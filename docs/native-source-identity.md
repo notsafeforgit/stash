@@ -481,6 +481,24 @@ Pinned and disabled selections remain protected. A gallery created from such a
 selection retains the original capture as its metadata provenance. Original
 selection-history scopes and exact review receipts remain unchanged.
 
+Schema 90 permits an explicit consolidated post-media choice to supersede the
+current choices of every original member. Each cross-owner replacement records
+the consolidation that established their shared identity. The database checks
+that original owner ancestry existed at that event, rather than comparing
+unrelated posts' revision counters. A deferred foreign key prevents committing
+replacement proof without the replacement itself. Original decisions and
+capture ownership remain immutable, and exact media-decision retries survive
+later merges and restart. Existing associations to deleted media can be carried
+forward without restoring library records or making them eligible for imports.
+
+The internal gallery choice operation requires the complete reviewed set of
+current associations, retires those associations and records one new choice.
+It retains both selected and unselected galleries and all original decisions.
+Later source synchronization recognizes automatic members contributed by earlier
+post identities while preserving manual additions, exclusions, covers and edited
+metadata. Gallery claims outside the consolidated group still block adoption;
+a caught late failure cannot commit partially retired associations.
+
 The identity writer is internal and has no application mutation route. It does
 not settle conflicting source-list, gallery or media choices. Original capture
 and ingestion lookup methods deliberately retain their original UUID scopes so

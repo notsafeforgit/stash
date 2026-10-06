@@ -197,8 +197,22 @@ func (s *SourcePostMediaStore) Decide(ctx context.Context, input models.SourcePo
 }
 
 func (s *SourcePostMediaStore) decide(ctx context.Context, input models.SourcePostMediaInput, synchronize bool) (*models.SourcePostMediaDecision, error) {
+	return s.decideWithConsolidation(ctx, input, synchronize, "")
+}
+
+func (s *SourcePostMediaStore) decideWithConsolidation(ctx context.Context, input models.SourcePostMediaInput, synchronize bool, consolidation string) (*models.SourcePostMediaDecision, error) {
 	if _, err := getTx(ctx); err != nil {
 		return nil, err
+	}
+	maximum := 1024
+	if consolidation != "" {
+		if !validSourceRunUUID(consolidation) {
+			return nil, models.ErrSourcePostMediaInvalid
+		}
+		if err := managedArchiveJobWrite(ctx); err != nil {
+			return nil, err
+		}
+		maximum = maxPostComparisonChoices
 	}
 	if sourceFileIDs(&input.UUID, &input.PostUUID, &input.MediaUUID) != nil || input.ExpectedPostRevision < 1 || input.ExpectedMediaRevision < 1 ||
 		(input.Origin != "review" && input.Origin != "migration") || !validAccountText(input.Reason, 4096, true) ||
@@ -206,7 +220,7 @@ func (s *SourcePostMediaStore) decide(ctx context.Context, input models.SourcePo
 		return nil, models.ErrSourcePostMediaInvalid
 	}
 	input.ExpectedDecisions = append([]string{}, input.ExpectedDecisions...)
-	if len(input.ExpectedDecisions) > 1024 {
+	if len(input.ExpectedDecisions) > maximum {
 		return nil, models.ErrSourcePostMediaInvalid
 	}
 	for i := range input.ExpectedDecisions {
@@ -219,6 +233,9 @@ func (s *SourcePostMediaStore) decide(ctx context.Context, input models.SourcePo
 		return nil, models.ErrSourcePostMediaInvalid
 	}
 	digest, err := sourceSignature("stash-post-media-decision-v1", input)
+	if consolidation != "" {
+		digest, err = sourceSignature("stash-post-consolidated-media-decision-v1", []any{input, consolidation})
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -240,17 +257,31 @@ func (s *SourcePostMediaStore) decide(ctx context.Context, input models.SourcePo
 	if err != nil {
 		return nil, err
 	}
-	if post == nil || post.State != "active" || post.Revision != input.ExpectedPostRevision || !archiveMedia(media) ||
-		media.State != models.ArchiveEntityActive || media.Revision != input.ExpectedMediaRevision {
+	validMedia := archiveMedia(media) && (media.State == models.ArchiveEntityActive ||
+		(consolidation != "" && media.State == models.ArchiveEntityDeleted))
+	if post == nil || post.State != "active" || post.Revision != input.ExpectedPostRevision || !validMedia || media.Revision != input.ExpectedMediaRevision {
 		return nil, models.ErrSourcePostMediaConflict
+	}
+	if consolidation != "" {
+		if err := validatePostMediaConsolidationScope(ctx, post.UUID, consolidation); err != nil {
+			return nil, err
+		}
 	}
 	ids, err := sourceMediaAliases(ctx, media.UUID)
 	if err != nil {
 		return nil, err
 	}
-	current, err := sourcePostMediaRows(ctx, post.UUID, ids)
+	var current []sourcePostMediaRow
+	if consolidation != "" {
+		current, err = consolidatedPostMediaRows(ctx, post.UUID, ids)
+	} else {
+		current, err = sourcePostMediaRows(ctx, post.UUID, ids)
+	}
 	if err != nil {
 		return nil, err
+	}
+	if media.State == models.ArchiveEntityDeleted && len(current) == 0 {
+		return nil, models.ErrSourcePostMediaConflict
 	}
 	currentIDs := make([]string, 0, len(current))
 	for _, d := range current {
@@ -259,6 +290,10 @@ func (s *SourcePostMediaStore) decide(ctx context.Context, input models.SourcePo
 	sort.Strings(currentIDs)
 	if !slices.Equal(currentIDs, input.ExpectedDecisions) {
 		return nil, models.ErrSourcePostMediaConflict
+	}
+	finish := func() {}
+	if consolidation != "" {
+		finish = postConsolidationCommitGuard(ctx, models.ErrSourcePostMediaConflict)
 	}
 	result, err := dbWrapper.Exec(ctx, "UPDATE source_posts SET revision=revision+1 WHERE uuid=? AND revision=?", post.UUID, post.Revision)
 	if err := checkArchiveIdentityUpdate(result, err); err != nil {
@@ -271,16 +306,23 @@ VALUES(?,?,?,?,?,?,?,?,?)`, input.UUID, post.UUID, media.UUID, post.Revision+1, 
 	// A fresh review resolves every current choice brought together by a merge.
 	// Original choices remain immutable history under their original identity.
 	for _, decision := range current {
+		if decision.PostUUID != post.UUID {
+			if _, err := dbWrapper.Exec(ctx, "INSERT INTO post_media_consolidation_edges(previous_uuid,decision_uuid,consolidation_uuid) VALUES(?,?,?)", decision.UUID, input.UUID, consolidation); err != nil {
+				return nil, err
+			}
+		}
 		if _, err := dbWrapper.Exec(ctx, "INSERT INTO post_media_supersessions(previous_uuid,decision_uuid) VALUES(?,?)", decision.UUID, input.UUID); err != nil {
 			return nil, err
 		}
 	}
-	args := []interface{}{post.UUID}
-	for _, id := range ids {
-		args = append(args, id)
-	}
-	if _, err := dbWrapper.Exec(ctx, "DELETE FROM post_media_links WHERE post_uuid=? AND media_uuid IN "+getInBinding(len(ids)), args...); err != nil {
-		return nil, err
+	if len(currentIDs) > 0 {
+		args := make([]interface{}, 0, len(currentIDs))
+		for _, id := range currentIDs {
+			args = append(args, id)
+		}
+		if _, err := dbWrapper.Exec(ctx, "DELETE FROM post_media_links WHERE decision_uuid IN "+getInBinding(len(args)), args...); err != nil {
+			return nil, err
+		}
 	}
 	if _, err := dbWrapper.Exec(ctx, "INSERT INTO post_media_links(post_uuid,media_uuid,decision_uuid) VALUES(?,?,?)", post.UUID, media.UUID, input.UUID); err != nil {
 		return nil, err
@@ -290,7 +332,11 @@ VALUES(?,?,?,?,?,?,?,?,?)`, input.UUID, post.UUID, media.UUID, post.Revision+1, 
 			return nil, err
 		}
 	}
-	return s.Decision(ctx, input.UUID)
+	ret, err := s.Decision(ctx, input.UUID)
+	if err == nil {
+		finish()
+	}
+	return ret, err
 }
 
 func (s *SourcePostMediaStore) syncGallery(ctx context.Context, post string) error {
@@ -324,10 +370,17 @@ func (s *SourcePostMediaStore) ValidateCapture(ctx context.Context, decisionID, 
 	if err != nil {
 		return err
 	}
-	if d == nil || c == nil || d.PostUUID != c.PostUUID || d.State != "linked" {
+	if d == nil || c == nil || d.State != "linked" {
 		return models.ErrSourcePostMediaConflict
 	}
-	post, err := (&SourceEvidenceStore{}).FindPost(ctx, c.PostUUID)
+	inScope, err := samePostIdentity(ctx, d.PostUUID, c.PostUUID)
+	if err != nil {
+		return err
+	}
+	if !inScope {
+		return models.ErrSourcePostMediaConflict
+	}
+	post, err := (&SourceEvidenceStore{}).FindPost(ctx, d.PostUUID)
 	if err != nil {
 		return err
 	}

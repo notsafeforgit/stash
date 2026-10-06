@@ -355,12 +355,16 @@ JOIN post_media_decisions d ON d.uuid=l.decision_uuid WHERE l.post_uuid=? ORDER 
 		}
 		ret.Entries = append(ret.Entries, item)
 	}
+	owners, err := postGallerySourceOwners(ctx, post.UUID)
+	if err != nil {
+		return nil, err
+	}
 	for _, member := range members {
 		policy := policies[member.UUID]
 		if desired[member.UUID] || member.Cover || policy.library != nil || policy.source == nil {
 			continue
 		}
-		if policy.source.State == "included" && policy.source.PostUUID.Valid && policy.source.PostUUID.String == post.UUID {
+		if policy.source.State == "included" && policy.source.PostUUID.Valid && owners[policy.source.PostUUID.String] {
 			ret.Remove = append(ret.Remove, *member.resolve())
 		}
 	}

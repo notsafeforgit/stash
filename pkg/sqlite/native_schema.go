@@ -686,7 +686,7 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+81 {
-			if err := validatePostMediaDecisionSchema(conn); err != nil {
+			if err := validatePostMediaDecisionSchema(conn, version >= NativeSchemaBaseline+90); err != nil {
 				return err
 			}
 		}

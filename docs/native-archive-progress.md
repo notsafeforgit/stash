@@ -59,6 +59,15 @@ pass. The verified rehearsal is at schema 89. No application post-merge mutation
 is exposed; canonical media/gallery resolution and the complete merge workflow
 remain unfinished.
 
+Schema 90 now adds internal media/gallery choice consolidation. Original media
+decisions retain their owners and explicit replacement proof; deleted media is
+not recreated. Gallery adoption retains existing galleries, manual members,
+covers and edited metadata. Focused history/retry, SQL guard, rollback, migration,
+startup, gallery regression and portable export/relocated-restore checks pass.
+The complete release gate and populated schema-90 migration remain pending.
+Equivalent attachment choices, canonical current readers and the complete
+reviewed merge API/UI still require integration before application use.
+
 Application local-file preview/admission now reuses native file verification and
 durable effects without creating a producer or source record. Focused real MP4/
 image, policy, restart, HTTP and portable-restore checks pass. Its integrated
@@ -10561,3 +10570,47 @@ current verified rehearsal and small evidence receipts are retained. Canonical c
 media/gallery resolution, equivalent-attachment decisions, pending-publication
 guards and the final post-merge API/UI remain unfinished. Production, live
 workers and backup policies are unchanged.
+
+## Media and gallery choices across post consolidation — 2026-10-06
+
+Schema 90 retains the existing post-media decision, head and supersession layouts
+and adds explicit proof for replacements across original post owners. Proof names
+the identity-consolidation event and must establish the old owner's ancestry at
+that event. Revision counters from different original posts are not compared.
+The deferred foreign key rejects orphan proof at commit; startup validates stored
+history, and anonymisation removes the new proof rows in dependency order.
+
+The internal writer checks the complete bounded set of current choices across
+the canonical group and merged media identities, then records one new decision.
+Original capture ownership and metadata provenance remain unchanged. Exact
+request replay works across later post merges, deleted media and restart. An
+existing association to deleted media can be carried without recreating a scene
+or permitting source metadata imports into it. Ordinary media edits still require
+an active library record.
+
+The internal gallery operation retires the reviewed original associations and
+records one linked or disabled choice. Original decisions, both existing galleries
+and their contents remain intact until the encompassing operation synchronizes
+the final choices. Source synchronization recognizes earlier member posts while
+preserving manual additions, exclusions, cover protection and edited metadata.
+Outside-group claims and stale input fail atomically, including when the caller
+catches an error after original heads have been removed.
+
+Focused tests cover chained histories, exact recovery, deleted media, unrelated
+captures, current lookup indexes, original-row migration preservation, schema
+collision rollback, readonly startup rejection, anonymisation and gallery
+protections. SQL tests reject missing/unrelated consolidation proof and roll back
+an orphan proof at transaction commit. Portable export and relocated restore
+preserve nonempty media replacement proof, transferred gallery ownership, original
+captures and metadata links, then reopen through the real native validator and
+recover the original request results. Existing gallery/album and selection
+provenance regressions pass. Receipts and source hashes are under
+`.local/native-post-media-consolidation-20261006/` and the corresponding
+`native_post_media_consolidation_`/`native_post_gallery_consolidation_` checks.
+
+These are internal building blocks, without an application merge mutation route.
+Equivalent attachment choices, canonical current readers, the encompassing saved
+review/result, pending-publication guards and API/UI integration remain unfinished.
+The schema-90 full gate and populated migration/reconciliation remain pending;
+the authoritative populated rehearsal is still schema 89. Production, live workers
+and backup policies are unchanged.

@@ -14,6 +14,7 @@ import (
 
 func removePostSelectionProvenanceSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removePostMediaConsolidationSchema(t, raw)
 	var exists bool
 	require.NoError(t, raw.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='post_attachment_decision_capture_scope')").Scan(&exists))
 	if !exists {

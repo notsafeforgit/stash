@@ -33,9 +33,11 @@ LEFT JOIN source_post_identities ri ON ri.post_uuid=r.uuid
 LEFT JOIN source_post_consolidations c ON c.source_uuid=p.uuid
 LEFT JOIN source_posts d ON d.uuid=c.destination_uuid
 LEFT JOIN source_post_identities di ON di.post_uuid=d.uuid
+LEFT JOIN source_post_consolidations next ON next.source_uuid=c.destination_uuid
 WHERE i.post_uuid IS NULL OR r.uuid IS NULL OR ri.canonical_uuid!=r.uuid OR r.state!=p.state
 OR (i.canonical_uuid=p.uuid AND c.source_uuid IS NOT NULL)
 OR (i.canonical_uuid!=p.uuid AND (c.source_uuid IS NULL OR di.canonical_uuid!=i.canonical_uuid))
+OR (next.source_uuid IS NOT NULL AND next.sequence<=c.sequence)
 OR (c.source_uuid IS NOT NULL AND (p.revision<=c.source_revision OR d.revision<=c.destination_revision)))`); err != nil {
 		return err
 	}

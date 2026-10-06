@@ -89,8 +89,7 @@ func (w *FileWorker) ProcessNext(ctx context.Context) (bool, error) {
 
 func (w *FileWorker) process(ctx context.Context, claimed *models.ArchiveJob) error {
 	var work FileWork
-	if err := StrictJSON(claimed.Arguments, 262144, &work); err != nil || work.Version != 1 || !ValidUUID(work.ProducerUUID) || !ValidUUID(work.EventUUID) ||
-		!archive.ValidSHA256(work.SHA256) || work.Size <= 0 {
+	if err := StrictJSON(claimed.Arguments, 262144, &work); err != nil || !validFileWork(work) {
 		return w.fail(ctx, claimed, ErrInvalid)
 	}
 	var progress fileProgress
@@ -100,6 +99,13 @@ func (w *FileWorker) process(ctx context.Context, claimed *models.ArchiveJob) er
 	root, err := w.authorize(ctx, claimed, work)
 	if err != nil {
 		return w.fail(ctx, claimed, err)
+	}
+	if work.Manual != nil && progress.Publication == nil {
+		if err := w.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
+			return w.Service.validateManualFilePublication(ctx, work)
+		}); err != nil {
+			return w.fail(ctx, claimed, err)
+		}
 	}
 	workCtx, cancelWork := context.WithCancelCause(ctx)
 	defer cancelWork(nil)
@@ -132,10 +138,21 @@ func (w *FileWorker) process(ctx context.Context, claimed *models.ArchiveJob) er
 		return w.fail(ctx, claimed, err)
 	}
 	defer prepared.Close()
+	if work.Manual != nil && !work.Manual.Inspection.Matches(prepared.Snapshot(), prepared.SHA256()) {
+		return w.fail(ctx, claimed, archive.ErrMediaFileChanged)
+	}
 	if progress.Publication == nil {
 		_, err := w.Durable.Checkpoint(workCtx, claimed.Lease(), func(ctx context.Context, _ *models.ArchiveJob) (json.RawMessage, error) {
 			if _, err := w.authorizeInTxn(ctx, claimed, work); err != nil {
 				return nil, err
+			}
+			if err := w.Service.validateManualFilePublication(ctx, work); err != nil {
+				return nil, err
+			}
+			if work.Manual != nil {
+				txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
+					return w.Service.validateManualFilePublication(ctx, work)
+				})
 			}
 			published, err := prepared.PublishIntake(ctx, w.Service.Repo, work.Publication)
 			if err != nil {
@@ -208,25 +225,16 @@ func (w *FileWorker) authorize(ctx context.Context, claimed *models.ArchiveJob, 
 
 func (w *FileWorker) authorizeInTxn(ctx context.Context, claimed *models.ArchiveJob, work FileWork) (*models.MediaRoot, error) {
 	repo := w.Service.Repo
-	receipt, err := repo.Ingest.FindReceipt(ctx, work.ProducerUUID, work.EventUUID)
-	if err != nil {
-		return nil, err
-	}
-	if receipt == nil || receipt.JobUUID != claimed.UUID || receipt.Kind != "file.completed" || receipt.CollectionUUID != work.Publication.CollectionUUID ||
-		receipt.CollectionRevision != work.Publication.CollectionRevision || receipt.RootUUID == nil || *receipt.RootUUID != work.Publication.Target.RootUUID {
-		return nil, ErrForbidden
-	}
-	if (work.Publication.Source == nil && receipt.CaptureUUID != "") || (work.Publication.Source != nil && work.Publication.Source.CaptureUUID != receipt.CaptureUUID) {
-		return nil, ErrForbidden
-	}
-	if receipt.PostUUID != "" {
-		post, err := repo.SourceEvidence.FindPost(ctx, receipt.PostUUID)
+	if work.Manual != nil {
+		accepted, err := repo.ArchiveJob.FindSubmission(ctx, work.Manual.Request.RequestUUID)
 		if err != nil {
 			return nil, err
 		}
-		if post == nil || post.State == "forgotten" {
-			return nil, models.ErrSourcePostForgotten
+		if accepted == nil || accepted.UUID != claimed.UUID {
+			return nil, ErrForbidden
 		}
+	} else if err := w.authorizeProducerFile(ctx, claimed, work); err != nil {
+		return nil, err
 	}
 	if err := validatePublicationCollection(ctx, repo, work.Publication); err != nil {
 		return nil, err
@@ -239,6 +247,31 @@ func (w *FileWorker) authorizeInTxn(ctx context.Context, claimed *models.Archive
 		return nil, ErrDefinition
 	}
 	return root, nil
+}
+
+func (w *FileWorker) authorizeProducerFile(ctx context.Context, claimed *models.ArchiveJob, work FileWork) error {
+	repo := w.Service.Repo
+	receipt, err := repo.Ingest.FindReceipt(ctx, work.ProducerUUID, work.EventUUID)
+	if err != nil {
+		return err
+	}
+	if receipt == nil || receipt.JobUUID != claimed.UUID || receipt.Kind != "file.completed" || receipt.CollectionUUID != work.Publication.CollectionUUID ||
+		receipt.CollectionRevision != work.Publication.CollectionRevision || receipt.RootUUID == nil || *receipt.RootUUID != work.Publication.Target.RootUUID {
+		return ErrForbidden
+	}
+	if (work.Publication.Source == nil && receipt.CaptureUUID != "") || (work.Publication.Source != nil && work.Publication.Source.CaptureUUID != receipt.CaptureUUID) {
+		return ErrForbidden
+	}
+	if receipt.PostUUID != "" {
+		post, err := repo.SourceEvidence.FindPost(ctx, receipt.PostUUID)
+		if err != nil {
+			return err
+		}
+		if post == nil || post.State == "forgotten" {
+			return models.ErrSourcePostForgotten
+		}
+	}
+	return nil
 }
 
 func (w *FileWorker) validatePublished(ctx context.Context, claimed *models.ArchiveJob, work FileWork, prepared *PreparedMedia, published IntakePublicationResult) error {
@@ -275,7 +308,7 @@ func (w *FileWorker) validatePublishedInTxn(ctx context.Context, claimed *models
 		return err
 	}
 	snapshot := prepared.Snapshot()
-	if proof == nil || proof.RootUUID != root.UUID || proof.Generation != published.Generation || proof.Content.UUID != published.ContentUUID || proof.Content.SHA256 != work.SHA256 ||
+	if proof == nil || proof.RootUUID != root.UUID || proof.Generation != published.Generation || proof.Content.UUID != published.ContentUUID || proof.Content.SHA256 != prepared.SHA256() ||
 		proof.Content.Size != work.Size || proof.Snapshot.Identity != snapshot.Identity || proof.Snapshot.ChangeToken != snapshot.ChangeToken || !proof.Snapshot.ModifiedAt.Equal(snapshot.ModifiedAt) {
 		return models.ErrFileGenerationConflict
 	}
@@ -320,7 +353,7 @@ func fileFailure(err error) (string, bool) {
 	switch {
 	case errors.Is(err, ErrInvalid), errors.Is(err, ErrUnsupported), errors.Is(err, video.ErrNoVideoStream):
 		return "invalid_file_work", true
-	case errors.Is(err, ErrForbidden), errors.Is(err, ErrDefinition):
+	case errors.Is(err, ErrForbidden), errors.Is(err, ErrDefinition), errors.Is(err, ErrManualFileChanged):
 		return "file_scope_changed", true
 	case errors.Is(err, archive.ErrMediaFileDigest):
 		return "file_digest_mismatch", true

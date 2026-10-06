@@ -47,6 +47,7 @@ type FileWork struct {
 	Size         int64             `json:"size"`
 	SHA256       string            `json:"sha256"`
 	Publication  IntakePublication `json:"publication"`
+	Manual       *ManualFileWork   `json:"manual,omitempty"`
 }
 
 func validateFileEvent(event FileEvent) error {

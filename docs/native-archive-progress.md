@@ -34,6 +34,12 @@ desktop/mobile navigation and direct scene/image links are now implemented,
 with 32 Chromium/WebKit browser checks and the integrated full fork gate passed.
 Broader archive management and direct-file intake remain unfinished.
 
+Application local-file preview/admission now reuses native file verification and
+durable effects without creating a producer or source record. Focused real MP4/
+image, policy, restart, HTTP and portable-restore checks pass. Its integrated
+full fork gate also passed. The file-picker, batch workflow and explicit retry
+controls remain unfinished.
+
 Performer pages now include linked source accounts and independently expanded
 identity history. Focused merge/ownership API and SQLite checks, read-only
 populated queries and desktop/mobile browser checks pass. The integrated full
@@ -10314,3 +10320,35 @@ Evidence is under `.local/native-download-status-20261006/` and uses
 `native_download_status_` validation receipts. Native worker activation, manual
 intake/post consolidation, remaining caller and compatibility work, complete
 production backup/restore and cutover remain open. Production is unchanged.
+
+## Application local-file admission — 2026-10-06
+
+Purchased videos and images now have application-authenticated preview, guarded
+admission, saved-request recovery and revision-checked cancellation. A bound
+folder/manual-batch collection supplies native performer and filename rules.
+The operation creates no producer, source account, post or capture. It uses the
+existing immutable archive-job submission and `media.verify` worker, so no schema
+change or new populated database copy is needed.
+
+Preview binds the confined filesystem identity, path generation, root,
+collection and policy revisions. Admission repeats those checks through commit.
+The worker verifies actual bytes and probes media before committing registration,
+then resumes generated previews and durable notifications separately. Stale
+manual reviews fail before registration; an interrupted notification retry does
+not reapply metadata. Cancellation retains any already committed registration.
+An unavailable worker refuses new work but still recovers prior admissions.
+
+Focused tests passed for real MP4 and image imports with a purchased-only
+performer, filename inheritance, explicit title clears, idempotent rescans,
+replaced files and restored modification times, changed policies/roots, admission
+rollback, scoped HTTP access, interrupted effects and cancellation. Portable
+export/relocated restore passed independent row comparisons and fresh Go request
+recovery for completed and pending work, with zero producer or source records.
+The integrated full fork gate passed in 1,491.8 seconds: generation and embedded
+UI, all 723 UI tests, producer/library/archive/backup suites, clean Go lint and
+complete Go integration tests.
+
+Evidence is retained under `.local/native-manual-intake-20261006/` and the
+`native_manual_intake_` check receipts. The native file picker, batch workflow,
+explicit retry controls and remaining transition gates are still required.
+Production and live workers are unchanged.

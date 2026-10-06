@@ -173,6 +173,12 @@ registering the verified media. The result reports `metadata_state`, applied
 
 ### Durable archive work
 
+Application-authenticated [local-file intake](native-manual-intake.md) uses the
+same worker for purchased or other unsourced media, without a producer identity.
+Its preview pins file identity and current folder/policy revisions. Unlike an
+external producer completion, a stale manual review prevents first registration;
+committed registration remains recoverable if later notifications need retry.
+
 Native schema 1000019 provides `archive_jobs`, immutable submission acknowledgements,
 and attempt history. `job.Durable` supplies submission, claim/renew, progress,
 cancellation, bounded recovery, and atomic publication. Supported kinds are

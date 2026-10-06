@@ -22,6 +22,7 @@ provides the frozen fallback for users who do not migrate.
 | [Native schema promotion](native-schema.md) | Implemented lineage, one-time historical imports, promoted tables, and remaining model conversions |
 | [Native source identity](native-source-identity.md) | Captured account claims, service namespaces, and reviewed performer/account registry import |
 | [Native source collections](native-source-collections.md) | Collections, media-root bindings, metadata rules, draft previews and durable browser saves |
+| [Native local-file intake](native-manual-intake.md) | Reviewed purchased-media admission, durable file verification, recovery and cancellation |
 | [Metadata policy migration](native-metadata-policy-migration.md) | Retained plugin/folder settings, explicit conversions and resumable native policy imports |
 | [Native source albums](native-source-albums.md) | Ordered post attachments, partial downloads, gallery membership, and source-evidence requirements |
 | [Native ingestion](native-ingestion.md) | Scoped ingestion, receipts, verified files, source-run coordination, native metadata policies, and preview/apply contracts |

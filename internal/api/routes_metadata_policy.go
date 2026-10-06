@@ -21,6 +21,7 @@ type nativeArchiveRoutes struct {
 	notifyMetadata func(context.Context, metadata.Input, []string) error
 	albums         *gallery.AlbumBackfill
 	translations   *translation.Service
+	fileIngestion  bool
 }
 
 // This router is mounted behind application authentication. Producer bearer
@@ -28,6 +29,11 @@ type nativeArchiveRoutes struct {
 func (rs *nativeArchiveRoutes) router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(nativeAdminOrigin)
+	r.Get("/manual-intake/capabilities", rs.manualIntakeCapabilities)
+	r.Post("/manual-intake/preview", rs.previewManualIntake)
+	r.Post("/manual-intake/apply", rs.applyManualIntake)
+	r.Get("/manual-intake/requests/{request}", rs.manualIntakeRequest)
+	r.Post("/manual-intake/requests/{request}/cancel", rs.cancelManualIntake)
 	r.Get("/entities/{entity}/source-accounts", rs.performerSourceAccounts)
 	r.Get("/entities/{entity}/performer-identities", rs.performerSourceIdentities)
 	r.Get("/source-accounts", rs.reviewAccounts)

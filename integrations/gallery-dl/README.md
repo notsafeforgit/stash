@@ -1521,6 +1521,55 @@ allow long URLs and escaped JSON without loading the entire library into memory.
 It uses `STASH_API_KEY` or `--api-key-env` and requires application authorization.
 See [activation API contracts](../../docs/native-schema.md#reviewed-enrichment-activation).
 
+### Reviewing pending work after editing a collection
+
+Pending metadata lookups retain the collection revision under which they were
+created. If that definition changes before work starts, use
+`stash-review-enrichment-collections` to review transfer to its current revision.
+The original target, URL, priority, retry deadline and all history are preserved.
+Targets with any previous worker attempt need checkpoint/recovery review instead.
+
+```sh
+stash-review-enrichment-collections candidates --endpoint STASH_ORIGIN \
+  --collection COLLECTION_UUID --revision CURRENT_REVISION --limit 100
+
+stash-review-enrichment-collections prepare --endpoint STASH_ORIGIN \
+  --input /migration/collection-selection.json --output /migration/collection-review.json
+
+stash-review-enrichment-collections show \
+  --plan /migration/collection-review.json --expected-sha256 PLAN_SHA256
+
+stash-review-enrichment-collections apply --endpoint STASH_ORIGIN \
+  --plan /migration/collection-review.json --expected-sha256 PLAN_SHA256
+
+stash-review-enrichment-collections status --endpoint STASH_ORIGIN \
+  --plan /migration/collection-review.json --expected-sha256 PLAN_SHA256
+```
+
+The selection JSON contains `collection_uuid`, `collection_revision`, `reason`
+and `targets`, an array of 1–100 `{target_uuid, revision}` objects from eligible
+candidates. An optional `uuid` fixes the review identity; preparation otherwise
+creates one and retains it in the private plan. Each plan handles one explicit
+batch. For another candidate page, pass both `--after-collection-revision` and
+`--after-target` from the returned `next_cursor`. Keep every prepared plan and
+its digest when processing several batches. Preparation and Show are read-only.
+
+Review the collection definition, original source URLs and schedules in the
+saved plan. Apply atomically excludes the old pending target and creates its
+replacement at the reviewed revision. It starts no collector and does not change
+profiles, policies or media metadata. Existing replacements and changed source,
+schedule or collection revisions require a fresh review. Prior worker attempts
+are never discarded or cancelled by this operation.
+
+Plans are never overwritten and their hashes are checked again before use.
+Apply reads the original receipt before submitting; after an interrupted response,
+reuse the same plan and digest. `rebound` confirms this transfer only;
+`execution_status: not_checked` does not claim the lookup ran. Exit codes are 0
+for preparation/show/candidates or a committed transfer, 1 for invalid input or
+transport failure, 2 for a conflict, and 3 for a saved transfer awaiting Apply.
+Authentication uses `STASH_API_KEY` or `--api-key-env`, never a key inside the plan.
+See [collection review API contracts](../../docs/native-schema.md#reviewing-unstarted-enrichment-after-a-collection-change).
+
 ## Historical post-to-media links
 
 `stash-backfill-post-media` connects retained post/file appearances to existing

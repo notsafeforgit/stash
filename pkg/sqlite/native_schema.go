@@ -665,6 +665,11 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return err
 			}
 		}
+		if version >= NativeSchemaBaseline+83 {
+			if err := validateEnrichmentRebindSchema(conn); err != nil {
+				return fmt.Errorf("invalid enrichment collection rebindings: %w", err)
+			}
+		}
 		if version >= NativeSchemaBaseline+78 {
 			if err := validateMetadataPolicyImportSchema(conn); err != nil {
 				return err

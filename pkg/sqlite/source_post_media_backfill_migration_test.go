@@ -12,6 +12,7 @@ import (
 
 func removePostMediaBackfillSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeEnrichmentRebindSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE post_media_decision_evidence; DROP TABLE post_media_backfill_decisions; DROP TABLE post_media_backfills;
 DELETE FROM native_migration_history WHERE version=1000082;`)
 	require.NoError(t, err)

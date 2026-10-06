@@ -97,4 +97,8 @@ type EnrichmentWorkReaderWriter interface {
 	PreviewActivation(context.Context, EnrichmentActivationInput) (*EnrichmentActivationPlan, error)
 	Activate(context.Context, EnrichmentActivationInput, string, time.Time) (*EnrichmentActivation, error)
 	Activation(context.Context, string) (*EnrichmentActivation, error)
+	RebindCandidates(context.Context, string, int, *EnrichmentRebindCursor, int) ([]EnrichmentRebindCandidate, error)
+	PreviewRebind(context.Context, EnrichmentRebindInput) (*EnrichmentRebindPlan, error)
+	Rebind(context.Context, EnrichmentRebindInput, string, time.Time) (*EnrichmentRebinding, error)
+	Rebinding(context.Context, string) (*EnrichmentRebinding, error)
 }

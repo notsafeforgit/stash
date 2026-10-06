@@ -6,7 +6,7 @@ that plan's scope or replace its completion criteria. Development remains on
 `v3-rewrite`; merge into `develop` requires verification and the owner's success
 review. Production has not been migrated.
 
-## Current release position — 2026-10-05
+## Current release position — 2026-10-06
 
 Implementation spans phases 1–6. The native schema, archive services and
 producer transport are substantial, and all 1,697 frozen catalog bodies have
@@ -23,6 +23,10 @@ previews passed for 188 retained sources and seven unsourced folder cases, with
 17 disabled-collection cases correctly gated. Bound-root HTTP previews,
 operational reconciliation, review resolution and complete cutover verification
 are still required.
+
+Reviewed transfer of unstarted pending enrichment after collection edits now has
+an atomic API, saved-plan client and a passing full fork gate. Its populated
+schema-83 rehearsal is in progress; the verified library copy remains schema 82.
 
 Durable enrichment execution, queued-job dispatch, stale-job maintenance and
 shared download/enrichment service reservations are implemented, including linked
@@ -9466,3 +9470,50 @@ collections and have no current job binding, but fetching requires reviewed
 handoff to the new collection revision. Of the eight discovery definitions, two
 are already superseded historical listings and six remain eligible for scope
 review; their saved cursors and recovery relationships must remain intact.
+
+## Reviewed transfer of unstarted enrichment — 2026-10-06
+
+Schema 1000083 adds a bounded review operation for pending enrichment whose
+collection definition changed before any worker attempt. It records the original
+pending revision, an intermediate review hold, the existing activation receipt
+and the replacement pending target in one transaction. Original source scope,
+priority and retry deadline remain intact. Any previous worker binding excludes
+the target from this path, including an old attempt whose current target revision
+is unbound; saved checkpoints stay on their existing recovery path.
+
+The application API discovers candidates through a collection/revision index,
+previews up to 100 explicitly selected targets, applies an exact plan digest and
+recovers immutable receipts before reconsidering current eligibility. The
+`stash-review-enrichment-collections` command saves private immutable batch plans,
+checks the reviewed digest again before use and recovers a committed operation
+after a response is lost. It does not start jobs, enable policies or change media
+metadata. Source, schedule, collection and destination conflicts require review.
+
+Focused native/archive/API tests passed in 30.39 seconds, including existing
+activation and enrichment contracts. Tests cover pagination, stale choices,
+duplicate destinations, schedules and history, previous worker/checkpoint
+preservation, atomic rollback after activation, restart and backup recovery,
+anonymisation, migration collisions, and startup refusal before writes when
+receipt history or the historical collection definition is corrupt. The actual
+Python client reviewed 105 targets in two batches against native HTTP, recovered
+a deliberately lost committed response and replayed both batches without another
+Apply. Invalid and stale requests return their documented 400/409 responses.
+
+A further read-only audit of the verified schema-82 library found that all
+227,443 pending targets in older scopes across 815 active collections have no
+worker history at any revision. This supports preparing this review path; it does
+not replace a saved-plan comparison or authorize a source job. Independent scope
+preparation recorded 2,768 batches with 227,443 unique, unoccupied destinations.
+All 815 collection changes add only the logical root and relative directory;
+their source definitions otherwise agree with the retained versions. That root
+remains disabled and unbound.
+
+The full fork gate passed in 1,866 seconds against the frozen implementation:
+624 UI tests, 540 producer tests, eight library tests, 108 archive tests, 262
+backup tests, zero lint issues and all tagged Go packages. API and SQLite tests
+took 1,302 and 1,415 seconds with the documented 30-minute timeout override.
+Fresh producer/backup installations were checked as part of this run. A
+consistent schema-82 candidate copy completed in 215 seconds; its migration,
+populated application and independent reconciliation are still in progress.
+The canonical rehearsal remains schema 1000082. Translation provenance and
+discovery scope reviews are separate and have not been rewritten.

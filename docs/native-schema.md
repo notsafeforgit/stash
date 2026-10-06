@@ -2086,6 +2086,49 @@ receipts and anonymisation removes them with source evidence. The bulk applicati
 client is `stash-activate-automation-enrichment`; source fetches remain separate
 metadata-only worker operations.
 
+### Reviewing unstarted enrichment after a collection change
+
+Schema 1000083 adds immutable `enrichment_rebindings` and
+`enrichment_rebinding_targets`. These review already-pending, unstarted work when
+its collection now has a newer definition. They preserve the existing held-work
+activation contract and its receipts.
+
+`GET /api/v3/archive/collections/{collection}/enrichment-rebind-candidates`
+requires the current `collection_revision` and accepts `limit` (1–100). The
+optional cursor is the paired `after_collection_revision` and `after_target`.
+An indexed lookup pages pending targets from older definitions of only this
+collection. Candidates include current post/collection state, the destination
+target UUID and `eligible`, `worker_history`, `replacement_exists`,
+`collection_disabled` or `post_forgotten` dispositions. Targets at the revision
+limit also remain in review. Any previous worker binding requires the existing
+checkpoint/recovery review, including a previous attempt whose current target
+revision has no job binding.
+
+`POST /api/v3/archive/enrichment-rebindings/preview` accepts an operation `uuid`,
+`collection_uuid`, current `collection_revision`, a reason of at most 4,096 UTF-8
+bytes, and 1–100 `{target_uuid, revision}` selections. It returns the exact current
+collection definition and a nested activation plan with source/post revision,
+URL, priority, retry deadline and destination UUID. Preview makes no writes.
+
+`POST /api/v3/archive/enrichment-rebindings` accepts
+`{input, expected_plan_sha256}`. Apply rechecks all selected work and records
+pending → held (`collection_rebind`) → excluded (`activation_rebound`) history
+for each old target, plus its new pending target, activation and review receipts
+in one transaction. Priority and retry deadline stay unchanged. Duplicate
+destinations, existing replacements, any worker history and stale source/target/
+collection revisions conflict without committing a partial hold. These operations
+do not admit jobs, enable profiles or policies, change selected metadata, or
+rewrite original provenance. Requests are bounded to 64 KiB and plans to 8 MiB.
+
+`GET /api/v3/archive/enrichment-rebindings/{uuid}` recovers the immutable receipt.
+Apply checks that receipt before current eligibility, so a lost response can be
+recovered after later holds, collection edits or source forgetting. A reused UUID
+with different input/digest conflicts. Startup validates the full original and
+intermediate target histories, nested activation, historical destination
+definition and absence of earlier worker bindings before writing. Backup/export
+includes both new tables; anonymisation removes them before activation history.
+The application client is `stash-review-enrichment-collections`.
+
 ### Imported enrichment staging
 
 Schema 1000060 converts saved `enrichment_jobs.staged_json` into native migration

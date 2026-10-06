@@ -1099,6 +1099,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"enrichment_job_seed_services", "enrichment_job_retained_records", "enrichment_handoff_jobs",
 			"checkpoint_handoffs", "checkpoint_evidence_captures", "checkpoint_evidence_acceptances",
 			"automation_checkpoint_records", "automation_checkpoint_imports", "automation_checkpoint_bodies",
+			"enrichment_rebinding_targets", "enrichment_rebindings",
 			"enrichment_activation_targets", "enrichment_activations",
 			"automation_discovery_records", "automation_discovery_imports",
 			"automation_enrichment_records", "automation_enrichment_imports",

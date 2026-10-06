@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { useIntl } from "react-intl";
 import { useForm } from "@tanstack/react-form";
+import { Link } from "@tanstack/react-router";
 import { z } from "zod";
 import { ChevronDown } from "lucide-react";
 import { useMsg } from "@/hooks/message";
@@ -12,7 +13,7 @@ import {
   type SourceReviewAPI,
 } from "@/core/native-archive/source-review-api";
 import { AccountService } from "@/components/archive/accounts/shared";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -364,7 +365,14 @@ export function SourcePostCard({
           </CollapsibleContent>
         </Collapsible>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex-col items-stretch gap-3">
+        <Link
+          className={buttonVariants({ variant: "outline" })}
+          to="/source-posts"
+          search={{ post: a.post_uuid }}
+        >
+          {msg("source_posts.open", "Open post")}
+        </Link>
         <Collapsible
           className="w-full"
           open={reviewOpen}

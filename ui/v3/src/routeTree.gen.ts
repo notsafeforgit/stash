@@ -16,6 +16,7 @@ import { Route as ImageDuplicateCheckerRouteImport } from './routes/image-duplic
 import { Route as MediaRootsRouteImport } from './routes/media-roots'
 import { Route as SceneDuplicateCheckerRouteImport } from './routes/scene-duplicate-checker'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SourcePostsRouteImport } from './routes/source-posts'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as TestRouteImport } from './routes/test'
 import { Route as TvRouteImport } from './routes/tv'
@@ -85,6 +86,11 @@ const SceneDuplicateCheckerRoute = SceneDuplicateCheckerRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SourcePostsRoute = SourcePostsRouteImport.update({
+  id: '/source-posts',
+  path: '/source-posts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StatsRoute = StatsRouteImport.update({
@@ -272,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/media-roots': typeof MediaRootsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/source-posts': typeof SourcePostsRoute
   '/stats': typeof StatsRoute
   '/test': typeof TestRoute
   '/tv': typeof TvRoute
@@ -315,6 +322,7 @@ export interface FileRoutesByTo {
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/media-roots': typeof MediaRootsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
+  '/source-posts': typeof SourcePostsRoute
   '/stats': typeof StatsRoute
   '/test': typeof TestRoute
   '/tv': typeof TvRoute
@@ -360,6 +368,7 @@ export interface FileRoutesById {
   '/media-roots': typeof MediaRootsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/source-posts': typeof SourcePostsRoute
   '/stats': typeof StatsRoute
   '/test': typeof TestRoute
   '/tv': typeof TvRoute
@@ -406,6 +415,7 @@ export interface FileRouteTypes {
     | '/media-roots'
     | '/scene-duplicate-checker'
     | '/settings'
+    | '/source-posts'
     | '/stats'
     | '/test'
     | '/tv'
@@ -449,6 +459,7 @@ export interface FileRouteTypes {
     | '/image-duplicate-checker'
     | '/media-roots'
     | '/scene-duplicate-checker'
+    | '/source-posts'
     | '/stats'
     | '/test'
     | '/tv'
@@ -493,6 +504,7 @@ export interface FileRouteTypes {
     | '/media-roots'
     | '/scene-duplicate-checker'
     | '/settings'
+    | '/source-posts'
     | '/stats'
     | '/test'
     | '/tv'
@@ -538,6 +550,7 @@ export interface RootRouteChildren {
   MediaRootsRoute: typeof MediaRootsRoute
   SceneDuplicateCheckerRoute: typeof SceneDuplicateCheckerRoute
   SettingsRoute: typeof SettingsRouteWithChildren
+  SourcePostsRoute: typeof SourcePostsRoute
   StatsRoute: typeof StatsRoute
   TestRoute: typeof TestRoute
   TvRoute: typeof TvRoute
@@ -609,6 +622,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/source-posts': {
+      id: '/source-posts'
+      path: '/source-posts'
+      fullPath: '/source-posts'
+      preLoaderRoute: typeof SourcePostsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/stats': {
@@ -907,6 +927,7 @@ const rootRouteChildren: RootRouteChildren = {
   MediaRootsRoute: MediaRootsRoute,
   SceneDuplicateCheckerRoute: SceneDuplicateCheckerRoute,
   SettingsRoute: SettingsRouteWithChildren,
+  SourcePostsRoute: SourcePostsRoute,
   StatsRoute: StatsRoute,
   TestRoute: TestRoute,
   TvRoute: TvRoute,

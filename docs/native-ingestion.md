@@ -1611,8 +1611,11 @@ separately, rather than repeated in each media row. Inspection does not select
 sources, create galleries, change membership or assign performers.
 The selected post is bounded to 8,192 retained media identities before redirect
 resolution; larger sets return `422 source_review_limit` rather than silently
-truncating evidence. These APIs provide the standalone browser foundation;
-its application page and navigation are separate implementation work.
+truncating evidence. The Source posts page exposes these reads through the desktop
+utility menu, mobile drawer and scene/image source cards. Opening a selected post
+does not fetch the browse queue. Shared captures, publishers, media and album
+details load only when their sections are expanded; account/media actions link
+to the existing review pages.
 
 Application-authenticated routes under `/api/v3/archive` expose direct links:
 

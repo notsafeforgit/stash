@@ -1,3 +1,5 @@
+import { SourcePostsFixture } from "./source-posts";
+import { postSearchSchema } from "@/core/native-archive/source-post-api";
 import { MetadataReviewFixture } from "./metadata-review";
 import { SourceReviewFixture } from "./source-review";
 import { AccountReviewFixture } from "./account-review";
@@ -405,6 +407,12 @@ const router = createRouter({
       path: "/media-roots",
       validateSearch: mediaRootSearchSchema,
       component: MediaRootsFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/source-posts",
+      validateSearch: postSearchSchema,
+      component: SourcePostsFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

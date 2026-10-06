@@ -5,6 +5,7 @@ import {
   sourcePost,
   sourceReceipt,
 } from "../fixtures/source-review";
+import { postSummary } from "../fixtures/source-posts";
 import type {
   SourceDecision,
   SourceLinkInput,
@@ -80,6 +81,11 @@ async function archive(
       };
     else if (path.endsWith("/source-posts"))
       result = options.empty ? [] : [post];
+    else if (path.endsWith(`/posts/${sourceIds.post}`))
+      result = {
+        ...postSummary(),
+        revision: post.association.post_revision,
+      };
     else if (path.endsWith("/review")) result = post;
     else if (path.includes("/post-media-decisions/")) {
       await route.fulfill({
@@ -235,6 +241,23 @@ for (const image of [false, true]) {
           ),
         )
         .toBe(true);
+      const openPost = page.getByRole("link", {
+        name: "Open post",
+        exact: true,
+      });
+      await expect(openPost).toHaveAttribute(
+        "href",
+        `/source-posts?post=${sourceIds.post}`,
+      );
+      await openPost.click();
+      await expect(
+        page.getByRole("heading", { name: "Source posts", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByText("Shared album caption", { exact: true }),
+      ).toBeVisible();
+      expect(remote.paths.some((path) => path.endsWith("/posts"))).toBe(false);
+      expect(remote.bodies).toHaveLength(1);
     });
   }
 }

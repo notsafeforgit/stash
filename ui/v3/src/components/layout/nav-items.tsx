@@ -15,6 +15,7 @@ import {
   Link2,
   FolderOpen,
   HardDrive,
+  FileText,
 } from "lucide-react";
 import { getRegisteredNavItems, type NavPlacement } from "@/plugins";
 
@@ -114,6 +115,14 @@ export function useNavItems(opts?: {
 
   const archiveItems: NavItem[] = placements.includes("utility")
     ? [
+        {
+          label: intl.formatMessage({
+            id: "source_posts.title",
+            defaultMessage: "Source posts",
+          }),
+          icon: <FileText className="size-4" />,
+          to: "/source-posts",
+        },
         {
           label: intl.formatMessage({
             id: "collections.title",

@@ -184,6 +184,14 @@ retains the loaded queue, updates only the affected card and uses the shared
 history load independently on expansion. Account ownership and depicted media
 performers are separate relationships.
 
+The Source posts route provides bounded browsing and exact URL, qualified source
+ID or archive UUID lookup. It is available in the desktop utility menu, mobile
+drawer and scene/image source cards. Deep links load only the selected post.
+Captures, publishers, media associations, album choices and identifiers expand
+independently. Shared post text is grouped by revision; rejected links and
+deleted library identities remain inspectable. This page makes no mutations;
+account/media links lead to their existing review workflows.
+
 The selected account also offers explicit consolidation of duplicate records on
 one service. `account-consolidation-api.ts` validates the reviewed components,
 resulting owner, stable-ID conflicts and exact event receipt. The picker scopes

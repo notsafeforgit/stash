@@ -278,7 +278,9 @@ func (s *ArchiveJobStore) ResourceHistory(ctx context.Context, kind, resource st
 	return ret, nil
 }
 
-const archiveJobWorkHistoryQuery = "SELECT * FROM archive_jobs WHERE kind=? AND work_key=?"
+// New global history indexes must not make a selected work lookup traverse
+// unrelated jobs to satisfy its cursor and limit.
+const archiveJobWorkHistoryQuery = "SELECT * FROM archive_jobs INDEXED BY archive_jobs_work_history WHERE kind=? AND work_key=?"
 
 func (s *ArchiveJobStore) WorkHistory(ctx context.Context, kind, work string, before int64, limit int) ([]models.ArchiveJob, error) {
 	if !validJobKind(kind) || !archive.ValidSHA256(work) || before < 0 || limit < 1 || limit > 100 {

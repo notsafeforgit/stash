@@ -1,6 +1,8 @@
 import { SourceAlbumsFixture } from "./source-albums";
 import { PerformerSourcesFixture } from "./performer-sources";
 import { SourcePostsFixture } from "./source-posts";
+import { ArchiveActivityFixture } from "./archive-activity";
+import { activitySearchSchema } from "@/core/native-archive/activity-schema";
 import { postSearchSchema } from "@/core/native-archive/source-post-api";
 import { MetadataReviewFixture } from "./metadata-review";
 import { SourceReviewFixture } from "./source-review";
@@ -425,6 +427,12 @@ const router = createRouter({
       path: "/source-posts",
       validateSearch: postSearchSchema,
       component: SourcePostsFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/archive-activity",
+      validateSearch: activitySearchSchema,
+      component: ArchiveActivityFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

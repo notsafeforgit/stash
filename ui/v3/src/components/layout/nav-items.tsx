@@ -16,6 +16,7 @@ import {
   FolderOpen,
   HardDrive,
   FileText,
+  History,
 } from "lucide-react";
 import { getRegisteredNavItems, type NavPlacement } from "@/plugins";
 
@@ -115,6 +116,14 @@ export function useNavItems(opts?: {
 
   const archiveItems: NavItem[] = placements.includes("utility")
     ? [
+        {
+          label: intl.formatMessage({
+            id: "archive_activity.title",
+            defaultMessage: "Archive activity",
+          }),
+          icon: <History className="size-4" />,
+          to: "/archive-activity",
+        },
         {
           label: intl.formatMessage({
             id: "source_posts.title",

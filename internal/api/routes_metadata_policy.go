@@ -29,6 +29,12 @@ type nativeArchiveRoutes struct {
 func (rs *nativeArchiveRoutes) router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(nativeAdminOrigin)
+	r.Get("/activity/jobs", rs.activityJobs)
+	r.Get("/activity/jobs/{job}", rs.activityJob)
+	r.Get("/activity/jobs/{job}/attempts", rs.activityJobAttempts)
+	r.Get("/activity/runs", rs.activityRuns)
+	r.Get("/activity/runs/{run}", rs.activityRun)
+	r.Get("/activity/runs/{run}/attempts", rs.activityRunAttempts)
 	r.Get("/manual-intake/capabilities", rs.manualIntakeCapabilities)
 	r.Get("/collections/{collection}/intake-files", rs.manualDirectory)
 	r.Post("/manual-intake/preview", rs.previewManualIntake)

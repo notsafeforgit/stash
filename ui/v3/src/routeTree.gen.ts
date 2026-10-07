@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountReviewRouteImport } from './routes/account-review'
+import { Route as ArchiveActivityRouteImport } from './routes/archive-activity'
 import { Route as CollectionsRouteImport } from './routes/collections'
 import { Route as ImageDuplicateCheckerRouteImport } from './routes/image-duplicate-checker'
 import { Route as MediaRootsRouteImport } from './routes/media-roots'
@@ -61,6 +62,11 @@ const IndexRoute = IndexRouteImport.update({
 const AccountReviewRoute = AccountReviewRouteImport.update({
   id: '/account-review',
   path: '/account-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArchiveActivityRoute = ArchiveActivityRouteImport.update({
+  id: '/archive-activity',
+  path: '/archive-activity',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CollectionsRoute = CollectionsRouteImport.update({
@@ -273,6 +279,7 @@ const TagsTagIdRoute = TagsTagIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account-review': typeof AccountReviewRoute
+  '/archive-activity': typeof ArchiveActivityRoute
   '/collections': typeof CollectionsRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/media-roots': typeof MediaRootsRoute
@@ -318,6 +325,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account-review': typeof AccountReviewRoute
+  '/archive-activity': typeof ArchiveActivityRoute
   '/collections': typeof CollectionsRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/media-roots': typeof MediaRootsRoute
@@ -363,6 +371,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account-review': typeof AccountReviewRoute
+  '/archive-activity': typeof ArchiveActivityRoute
   '/collections': typeof CollectionsRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/media-roots': typeof MediaRootsRoute
@@ -410,6 +419,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/account-review'
+    | '/archive-activity'
     | '/collections'
     | '/image-duplicate-checker'
     | '/media-roots'
@@ -455,6 +465,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/account-review'
+    | '/archive-activity'
     | '/collections'
     | '/image-duplicate-checker'
     | '/media-roots'
@@ -499,6 +510,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/account-review'
+    | '/archive-activity'
     | '/collections'
     | '/image-duplicate-checker'
     | '/media-roots'
@@ -545,6 +557,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountReviewRoute: typeof AccountReviewRoute
+  ArchiveActivityRoute: typeof ArchiveActivityRoute
   CollectionsRoute: typeof CollectionsRoute
   ImageDuplicateCheckerRoute: typeof ImageDuplicateCheckerRoute
   MediaRootsRoute: typeof MediaRootsRoute
@@ -587,6 +600,13 @@ declare module '@tanstack/react-router' {
       path: '/account-review'
       fullPath: '/account-review'
       preLoaderRoute: typeof AccountReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/archive-activity': {
+      id: '/archive-activity'
+      path: '/archive-activity'
+      fullPath: '/archive-activity'
+      preLoaderRoute: typeof ArchiveActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/collections': {
@@ -922,6 +942,7 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountReviewRoute: AccountReviewRoute,
+  ArchiveActivityRoute: ArchiveActivityRoute,
   CollectionsRoute: CollectionsRoute,
   ImageDuplicateCheckerRoute: ImageDuplicateCheckerRoute,
   MediaRootsRoute: MediaRootsRoute,

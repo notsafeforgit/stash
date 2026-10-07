@@ -2679,3 +2679,39 @@ not repeat identity, association or gallery writes. Job responses expose state,
 revision, parent retry identity, bounded error code and timestamps; internal job
 arguments and work keys are omitted. History pages default to 25 rows, with a
 1–100 limit; a missing notification `before` cursor selects the newest jobs.
+
+
+## Archive activity
+
+`/archive-activity` in the desktop utility menu and mobile drawer shows native
+background jobs and scrape runs. These application-session GET routes under
+`/api/v3/archive` inspect existing work without claiming, recovering or retrying it:
+
+| Route | Result |
+| --- | --- |
+| `/activity/jobs` | Compact jobs; optional `kind` and `state` filters |
+| `/activity/jobs/{job}` | Summary, original collection revision, resolved post/media subjects and relative file path when available |
+| `/activity/jobs/{job}/attempts` | Compact attempt outcomes and timestamps |
+| `/activity/runs` | Compact runs; optional `collection` UUID and `state` filters |
+| `/activity/runs/{run}` | Summary, pending/completed/current windows, progress and original destination |
+| `/activity/runs/{run}/attempts` | Compact attempt outcomes and timestamps |
+
+Lists and attempt histories are newest first. `before=0` starts the first page;
+subsequent `before` values are the last row's `sequence`, or `number` for attempts.
+`limit` defaults to 50 and is bounded to 1–100; the UI uses 25. Each page reads
+current state, so separate pages are not a frozen snapshot. Indexes avoid sorting
+or decoding every job's worker payload.
+
+Job detail is an explicit projection, without raw arguments/results, worker
+credentials, lease owners or plugin settings. Collection labels refer to the
+revision used at admission, even after renaming or disabling the collection.
+Post/media links follow current redirects while retaining the original reference.
+Missing or unsupported job context does not hide its status and attempt history.
+Opening manual-file history does not inspect the filesystem or require a current
+mount. Existing domain review screens remain responsible for guarded changes.
+
+A successful scrape attempt can leave other windows pending; its run remains
+queued until its complete window set has finished. Source-run completion is
+separate from verified library media intake. Only the selected queued/running
+item polls; attempts load on expansion. Failed refreshes retain the last
+successful view with an error and Retry, while changed filters discard old data.

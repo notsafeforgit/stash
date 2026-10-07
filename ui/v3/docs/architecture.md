@@ -184,6 +184,14 @@ retains the loaded queue, updates only the affected card and uses the shared
 history load independently on expansion. Account ownership and depicted media
 performers are separate relationships.
 
+The Archive activity route shares desktop/mobile navigation and reads bounded
+job/run summaries through `activity-api.ts`. Detail reads resolve safe domain
+subjects and original collection revisions; histories load only on expansion.
+Only the selected active item polls. Failed refreshes retain the last successful
+same-scope result with a visible retry action; filter or item changes cannot
+inherit stale data or errors. Successful attempts and completed source runs are
+distinct. Existing domain review screens own mutation and recovery controls.
+
 The Source posts route provides bounded browsing and exact URL, qualified source
 ID or archive UUID lookup. It is available in the desktop utility menu, mobile
 drawer and scene/image source cards. Deep links load only the selected post.

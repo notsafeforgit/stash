@@ -8,226 +8,67 @@ review. Production has not been migrated.
 
 ## Current release position — 2026-10-06
 
-Implementation spans phases 1–6. The native schema, archive services and
-producer transport are substantial, and all 1,697 frozen catalog bodies have
-been imported and reconciled on isolated copies. This does not close catalog
-migration. All 1,697 source collections now have imported, disabled metadata
-policies, verified through API replay, restart and independent whole-row
-comparison. Reviewed post-to-media associations now support source selection for
-captures without attachment manifests. Historical file-proof matching has now
-applied 411,690 associations on the isolated copy and recovered all 254,453 saved
-requests after restart. Independent receipt/proof comparison and all original-row
-reconciliation passed. Native scene/image source review and its
-desktop/mobile browser checks are implemented. Read-only populated policy
-previews passed for 188 retained sources and seven unsourced folder cases, with
-17 disabled-collection cases correctly gated. All 212 cases have now also passed
-through the real HTTP file/source pickers and preview routes with a read-only
-media binding. The production preview component also passed 32 populated
-GraphQL/native-API browser cases in Chromium and WebKit at 390 and 1280 pixels.
-Operational reconciliation, review resolution and complete cutover verification
-are still required.
+Implementation spans phases 1–6. Production has not been migrated. The final
+compatible release is frozen and pinned; native development stays on
+`v3-rewrite` until verification and the owner's success review. Historical
+entries below record the evidence available at their dates, including work that
+was incomplete then but has since finished. They are not the current task list.
 
-Standalone source-post browse/detail APIs now expose compact identity lookups,
-selected publishers, canonical media associations and current album choices.
-Focused SQLite/query-plan and real HTTP checks pass. The application page,
-desktop/mobile navigation and direct scene/image links are now implemented,
-with 32 Chromium/WebKit browser checks and the integrated full fork gate passed.
-Broader archive management and cross-device import history remain unfinished.
+The last published, fully verified checkpoint is schema 1000092 and atomic
+post-merge review.
+Its complete fork gate, populated migration, fresh reopen and independent
+comparison passed. The schema-92 rehearsal preserves all 40,512,441 original
+rows across 300 original tables with clean integrity and no foreign-key
+violations. `.local/native-rehearsal-current.json` identifies the retained
+verified database and its reconciliation receipts.
 
-Read-only post comparison now reports identity, source-order, gallery and media
-choice conflicts without treating shared URLs as identity proof. Repository,
-query-plan and HTTP checks pass, along with 69 pairs inspected through the real
-repository on the read-only rehearsal. The comparison API is implemented;
-reviewed consolidation and its UI remain unfinished.
+Verified development work includes:
 
-Canonical post-identity storage preserves original capture and receipt
-owners, chained redirect history and exact retry. Focused migration, rollback,
-query-plan, restart and portable-restore tests pass. The populated schema-88
-migration, fresh reopen and independent whole-row reconciliation also pass,
-along with the complete integrated validation gate. This internal storage writer
-has no application mutation route; album/media choice resolution and the complete
-reviewed consolidation workflow remain unfinished.
+- Native identity, source/post/profile/capture storage, metadata choices,
+  performer/account ownership, merge redirects, file evidence, durable jobs,
+  ordered source albums and manual gallery choices.
+- Import of all 1,697 frozen catalog bodies and their disabled metadata policies,
+  with independent reconciliation and original evidence/receipts preserved.
+  Historical file matching applied 411,690 associations and recovered all
+  254,453 saved requests after restart. Retained operational work and policies
+  have native import, preview and guarded activation paths; rehearsal does not
+  authorize live execution.
+- Desktop/mobile account review and consolidation, source-post browsing and
+  merging, source appearances, album choices/playback/download reporting,
+  collection/root management, metadata policies and previews, and purchased-file
+  intake with folder performer defaults and durable retry/cancellation.
+- Native producer transport, offline outboxes, capture/file publication,
+  coordinated source windows, enrichment/translation/discovery work and scoped
+  dispatch. Host and n8n launch/config conversion is staged for the inventoried
+  services; installed launchers and schedules have not switched.
+- Portable archive and host backup implementations covering retained snapshots,
+  producer boundaries, immutable media references, bounded retention and request
+  reuse. Their regression suites pass; complete production capture, relocated
+  restore, measured daily costs and reviewed cloud-policy activation remain open.
 
-All-member consolidation choice review now retains conflicts on earlier aliases
-and guards selected library revisions. Schema 89 permits source-list selections
-to use original captures/manifests across a consolidated post identity, with
-indexed scope checks and deterministic attachment representatives. Focused
-storage, migration, startup and portable-restore checks pass, as do the related
-HTTP checks and lint. The populated schema-89 migration, fresh reopen,
-independent whole-row reconciliation and complete integrated release gate now
-pass. No application post-merge mutation
-is exposed; canonical media/gallery resolution and the complete merge workflow
-remain unfinished.
+The next activity increment adds shared read-only job/run history and safe
+subject links. Its focused backend, type/lint/client and 14 Chromium/WebKit
+checks pass. Schema-93 migration, fresh reopen and independent comparison passed,
+preserving all 40,512,442 original rows across 300 tables. The first combined
+gate exposed an older-fixture cleanup omission and a selected-work query-plan
+regression; both are fixed and the affected migration/history checks pass. The
+combined release gate is running again. The source is retained in an incremental
+local commit pending that gate and publication; it is not deployed.
 
-Schema 90 now adds internal media/gallery choice consolidation. Original media
-decisions retain their owners and explicit replacement proof; deleted media is
-not recreated. Gallery adoption retains existing galleries, manual members,
-covers and edited metadata. Focused history/retry, SQL guard, rollback, migration,
-startup, gallery regression and portable export/relocated-restore checks pass.
-The complete release gate, populated schema-90 migration, fresh reopen and
-independent whole-row reconciliation now pass. The superseded schema-89
-database was retired after checking open
-handles, recovering 21.90 GB and retaining the original compatible snapshot.
-Shared attachment choices, current post-media readers and metadata source
-selection, source-list consolidation, canonical album reads/edits and current
-post browsing now pass the complete integrated fork gate: generation, real UI
-assets, 739 UI tests, Python suites, Go lint and full Go integration. Focused
-Chromium/WebKit checks cover original saved-request recovery after a merge;
-repository and portable-restore fixtures cover original evidence, explicit
-choices, chained merges and metadata URL mapping. Read-only comparisons on the
-populated rehearsal agree for 250 current-reader queries; that copy has no post
-consolidations, so merged cases are covered separately by real SQLite fixtures.
-The encompassing merge transaction, pending-work publication and complete merge
-API/UI still require integration before application use.
+Remaining release work:
 
-Schema 91 extends historical post/media and album matching across current post
-identities while retaining original file proofs, requests and publications.
-Focused migration, restart, worker, HTTP and portable-restore checks pass, along
-with 38 UI tests, 46 Chromium/WebKit browser cases and 30 producer/backfill tests.
-New CLI plans resolve explicit historical UUIDs; existing plans remain unchanged.
-The full-copy migration, fresh reopen and independent comparison of all
-40,512,440 original rows across 300 tables pass, with clean integrity and foreign
-keys. The complete release gate passes generation, real UI assets, 740 UI tests,
-554 producer tests, eight library tests, 113 archive tests, 262 backup tests,
-Go lint and full Go integration. The verified rehearsal is now schema 91.
+| Work | Required outcome |
+| --- | --- |
+| Shared import review | Current unresolved account/media/metadata choices are discoverable and actionable; immutable historical import warnings cannot masquerade as current conflicts. Complete the shared history/recovery integration. |
+| Callers and compatibility | Finish the actual host/n8n/config/service inventory and native conversion, test retained external contracts, then remove residual legacy adapters and dependencies. |
+| Backup and restore | Prove a complete common capture boundary, actual upload/request/storage costs, bounded retention/reclamation, and an isolated empty/relocated restore with pending producer and filesystem state. |
+| Production cutover | Pin artifacts, quiesce writers, take final coordinated snapshots, migrate/reconcile, switch native launchers and resume work gradually through verified launch paths. |
+| Observation and retirement | Verify scheduled scraping/recovery/backup cycles, preserve the rollback/export boundary, and retire obsolete catalog writers, mounts, services and packages. |
+| Acceptance | Publish the final evidence and limitations for owner review; merge into `develop` only after success is accepted. |
 
-Application local-file preview/admission now reuses native file verification and
-durable effects without creating a producer or source record. Focused real MP4/
-image, policy, restart, HTTP and portable-restore checks pass. Its integrated
-full fork gate also passed. The collection file-picker, saved batch workflow,
-explicit retry and cancellation controls now pass focused backend and UI checks
-and their combined integrated full fork gate, including 731 UI tests and the
-complete Go integration suite.
-
-Performer pages now include linked source accounts and independently expanded
-identity history. Focused merge/ownership API and SQLite checks, read-only
-populated queries and desktop/mobile browser checks pass. The integrated full
-fork gate also passed, including 644 UI tests and the complete Go integration
-suite. No schema or production state changed.
-
-Ordered source album inspection is now integrated on post and gallery pages,
-including mixed media, repeated positions and compact gaps. Focused and browser
-checks passed, along with read-only repository checks for 95 populated posts and
-50 galleries. The full fork gate passed, including 650 UI tests and the complete
-Go integration suite. Historical album preview/apply controls are now integrated,
-including saved-request recovery, guarded retry/cancel, targeted job history and
-separate publication/notification status. Focused client checks and desktop/mobile
-browser flows pass. The complete fork gate passed, including generation, embedded
-assets, 669 UI tests, the Python suites, Go lint and the full Go integration suite.
-The source-list editor below passed the complete fork gate. Explicit gallery/attachment association editing has now passed its full gate.
-Grouped download-state inspection has passed its integrated full fork gate.
-
-Source-list review APIs now provide unique-list discovery, read-only comparison,
-guarded selection, immutable history and exact request recovery. Focused SQLite,
-migration, restart, anonymisation, HTTP and indexed-query checks pass. Schema 85
-and the review API passed the full fork gate, full-copy migration, fresh reopen,
-whole-row comparison and portable export/relocated restore checks. The isolated
-schema-85 copy preserves all original source evidence and choices. The source-list
-editor passed staged browser checks and the integrated full fork gate.
-Gallery/attachment association review APIs now pass focused repository, migration,
-HTTP, restart, anonymisation and portable restore checks. Their integrated full
-gate, populated migration/reopen and independent whole-row comparison also pass.
-The association editor passed staged client and browser checks and the integrated
-full fork gate, including 707 UI tests and the complete Go integration suite.
-Source-order mixed-media playback passed staged unit and browser checks and the
-integrated full fork gate, including 715 UI tests and complete Go integration.
-Per-attachment download reporting now has a validated backend and reconciled
-schema-87 rehearsal. Producer lifecycle delivery and backup receipt checks pass
-the full producer, archive, host backup and API integration suites, remaining
-Go/Python caller checks and clean lint. Grouped read APIs and the album status/history
-UI now pass focused repository, HTTP and desktop/mobile browser checks and the
-integrated full fork gate, including 723 UI tests and complete Go integration.
-
-Reviewed transfer of unstarted pending enrichment after collection edits now has
-an atomic API, saved-plan client and a passing full fork gate. Its populated
-schema-83 migration and independent saved-plan comparison passed, and all
-227,443 pending targets have transferred on the isolated copy. Fresh-process
-receipt recovery and final whole-library comparison passed. Reviewed collection
-bindings for six unstarted discovery searches have also passed the complete fork
-gate, populated migration, independent saved-plan comparison, lost-response
-recovery and final whole-row comparison. That schema-84 rehearsal
-preserved six current searches with 569 targets; two superseded originals retain
-another 188 targets and their historical cursors. No source job was started.
-
-Durable enrichment execution, queued-job dispatch, stale-job maintenance and
-shared download/enrichment service reservations are implemented, including linked
-download services, typed service failure reporting and bounded download preference
-across collections. Dispatch across multiple profiles and automatic discovery of
-permitted metadata collections are implemented. Legacy enrichment preparation
-validates queue/progress semantics against the frozen inputs, and historical
-catalog receipts now have native import and inspection. Legacy enrichment queue,
-cooldown and progress mapping, reviewed activation and collection-revision
-handoffs are implemented. Retained legacy collector staging now has native
-conversion, inspection and reviewed acceptance into shared native captures.
-Native captures distinguish a missing historical observation time from the time
-the archive received retained evidence; acceptance retains the review hold.
-Exact handoff review, seed inspection and reviewed worker execution are now
-implemented, including child retry, publication and recovery without assigning
-new observation times to retained evidence. File edits, state changes and
-deduplication assertions now have native history, bounded import and inspection,
-while preserving current Stash selections. Historical metadata alternatives now
-have typed preview/application APIs, guarded relationship resolution and durable
-retry receipts. Scene/image review controls now expose those choices on desktop
-and mobile with saved-request recovery. Account ownership review now provides
-bounded discovery, explicit performer choices, selected-account updates and
-interrupted-request recovery through desktop and mobile navigation. Explicit
-account consolidation review now exposes same-service selection, conflicting-ID
-acknowledgement, ownership resolution and exact request recovery. Frozen discovery
-continuations, candidate associations and maintenance history now have bounded
-native mapping and inspection. Verified direct lookups can now attach an
-unclaimed native post ID to an existing legacy post atomically with publication;
-unverified or conflicting identities retain their checkpoints for review.
-Account listing definitions, owned one-page jobs, atomic cursor progress, shared
-scheduling, scoped worker HTTP and durable producer delivery/dispatch are
-implemented. Native candidates now share original page references, group repeated
-post IDs across pages and resume comparison automatically. Reviewed activation
-and current coverage inspection are implemented and rehearsed. Publication now
-commits complete, unique strong matches through shared native capture services,
-with automatic server dispatch. Two reviewed fresh searches now
-provide recovery bindings for 188 targets while preserving their original
-cursors and earlier evidence. Candidate detail comparison, native capture
-preparation and read-only application previews are implemented. Schema 76 adds
-candidate-bound detail jobs, producer-authenticated checkpoints, retained original-
-evidence comparisons and scoped worker HTTP, and has passed full-copy
-reconciliation, restart inspection and the full fork gate. The isolated rehearsal
-admits no source jobs. Python detail delivery and collection/profile dispatch
-are implemented. Schema 77 connects authenticated detail results to guarded native
-publication while preserving coverage, competing candidates and later native
-edits. The schema-77 full-copy migration, independent comparison, fresh reopen
-and full fork gate have now passed. The schema-78 policy-import and schema-79 relationship-name rehearsals below
-have also passed, preserving that discovery state. The superseded schema-76
-database was removed after
-verification, recovering 20.27 GB while preserving the original compatible
-snapshot and saved activation plans. Automatic candidate-detail admission is now
-implemented using selected worker profiles, bounded inspection and transactional
-review checks. Producer schema 15 preserves the inspection cursor across restart.
-Focused native/producer and real HTTP recovery tests passed. Populated-archive
-inspection visited the six retained collections in 41 bounded requests totaling
-116 milliseconds; subsequent full fork gates have passed. Actual source coverage and
-staging release remain open.
-Native collection management and metadata-policy editing now provide bounded
-lookups, immutable history, durable saves, fixed performer rules for folder scans
-and read-only scene/image draft previews through desktop/mobile workflows. Media
-root management now provides checked directory bindings, immutable history and
-durable save recovery; its full fork gate has passed. Historical policy migration
-and broader import review resolution still require work.
-Instagram download ingestion and a staged host launcher now preserve carousel
-membership, individual story identity and source-date windows. The actual host
-profile/list and timer replacement have been inspected without activation; the
-native dispatcher, durable outbox and final API registration remain cutover work.
-Coomer/Kemono user/post/listing ingestion now preserves original attachment
-membership, enforces original downloads and retains excluded nonvisual evidence.
-Host profiles and URL/list launchers are staged and tested; special mirror
-containers and actual caller activation remain open.
-Bluesky/TikTok post media ingestion and staged launchers now retain source
-membership, missing slots and source-time windows. Profile/shortlink dispatch,
-shared post-body storage and explicit TikTok failure handling are tested. Actual
-host profiles are staged, including reviewed media-only TikTok choices; native
-registration and live caller conversion remain open.
-Broader archive management UI, live host/n8n conversion, remaining compatibility removal, coordinated
-backup/export/restore, production cutover and retirement remain major release
-gates. The phase table below records that distinction; commit count is not a
-completion percentage.
+The full [transition plan](native-archive-transition-plan.md) remains the
+completion contract. A passing development gate or catalog receipt is not proof
+of production cutover, complete source coverage or a complete backup.
 
 ## Local rehearsal storage budget
 
@@ -324,20 +165,15 @@ it does not remove source files or recovery inputs.
 
 | Phase | Status |
 | --- | --- |
-| 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
-| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. The gallery-dl SDK now queues source evidence before download, verifies root/prefix and lease ownership, holds shared destination locks, and queues flushed final files before archive acknowledgement. Reddit single-media evidence and original Twitter attachment membership are covered. The producer now coalesces offline source requests, freezes submissions for replay, retains caller tickets and validates native admission receipts. Claimed Reddit/Twitter windows use precise source timestamps and parent context, with directory checks before postprocessor callbacks. Reviewed portable profiles now fingerprint settings/assets and execute one claimed attempt with concurrent outbox delivery and lost-finish recovery. A local converter now stages ordered, source-scoped profiles from the host and n8n JSON layers without copying website credentials. Scoped dispatch discovers eligible runs with durable pagination/backoff, and a separate n8n image packages the pinned worker runtime. A local profile list now rotates download and metadata work, automatically discovers permitted metadata collections, and recovers saved metadata delivery before loading website profiles. Staged host Twitter/Reddit launchers preserve saved lists, modes, date filters and full-history profiles through durable caller snapshots. Staged n8n backfill calls now check permanent history before source admission, preserve original completion proof, and expose pending results to converted workflow waits. Live image/profile activation, operational-history and policy migration, general durable edit notifications, additional source adapters and recovery caller conversion remain. |
-| 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. All 1,697 frozen catalog bodies have bounded snapshot receipt and native mappings for posts/profiles/captures, account/post relationships, captured publishers, attachment lists, assets/files/appearances, collection memberships, retained documents and translation results. Historical album backfill is resumable and rehearsed. Original evidence, replay receipts and unresolved conflicts are retained. Shared native translation request/cache/target storage, bounded execution, provider workers and application inspection/control are implemented. Automation snapshot preparation preserves all ten operational families and has passed full-source reconciliation. Resumable native receipt, translation request/cache/target mapping and reviewed activation are implemented. The saved-plan bulk client has activated 324,169 imported holds in a full-copy rehearsal with lost-response recovery and independent reconciliation. Automatic capture scheduling now records revisioned collection-policy decisions with its requests and targets in the capture transaction. Native enrichment targets preserve revisioned scheduling choices and exact capture-completion evidence, with application inspection/control. Internal execution binds jobs to exact source/target revisions, authenticates each attempt producer and retains compact checkpoints with original observation provenance. Verified publication now uses native capture, publisher, album and translation services and commits record associations with target/job completion. Completed staging is verified and released atomically, retaining native captures, acknowledgement/provenance rows and unresolved references. Scoped enrichment routes and the Python transport/lease client now expose those services, with controlled failure replay, bounded checkpoint transfer and exact source-number preservation. Selected-job execution now journals stable claims, returned checkpoints and pending delivery intents in producer outbox schema 8; reviewed metadata-only profiles and delivery-only recovery are implemented. Collection-scoped dispatch now discovers admitted retries before new targets, with durable producer cursors/backoff and pagination past incompatible URLs. Native server maintenance recovers expired attempts and cancels stale work without discarding checkpoints. Native shared service reservations and cooldowns now coordinate downloads with enrichment, including fenced reservations before contacting newly discovered child services. Download-side linked-service reservations, typed failures, bounded download preference and cooperative source turns are implemented. Persistent worker/profile rotation and automatic collection discovery are also implemented. Historical catalog enrichment receipts now have resumable native import and application inspection, preserving the old assertion without creating native attempts. Frozen legacy enrichment jobs, cooldowns and seed/source progress now have bounded native mapping with held work, scoped historical completion, explicit review and retained exclusions. Reviewed legacy enrichment activation is implemented, including explicit collection-revision handoffs. Retained staged results now have conversion, evidence acceptance and exact handoff review; scoped native admission, worker resume, child service scheduling, publication and released proofs preserve original observations separately from fresh child captures. Frozen discovery listings, pending targets, candidate associations and maintenance history now have bounded native mapping and inspection, with original cursors and retry delays retained. Immutable account listings and producer-owned page jobs have scoped worker HTTP support and shared pacing. Reviewed discovery activation, durable producer delivery/dispatch, native candidate comparison and current coverage inspection are implemented and rehearsed. Complete, unique strong matches now have atomic native publication, verified on the populated archive, and bounded automatic server dispatch. Reviewed recovery of missing-history listings is implemented and rehearsed on the populated archive, preserving earlier cursors, bindings and evidence. Original-evidence detail comparison, native capture preparation, read-only application previews, candidate-bound detail jobs, authenticated checkpoint/result retention and scoped worker HTTP are implemented. Python detail delivery/dispatch and scoped collection discovery are implemented. Authenticated detail results now publish through shared native services, with full-copy reconciliation, restart inspection and the full validation gate passed. Automatic candidate-detail admission now uses selected worker profiles and bounded indexed inspection, with durable producer cursors and transactional review guards. Actual discovery source coverage, verified staging release, explicit post consolidation, additional download adapters, existing policy migration, remaining historical/operational conversion, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
-| 4 Native UI and client conversion | In progress: scene/image metadata review is available through desktop tabs and mobile sections, with explicit relationship choices and browser request recovery. Source review now adds targeted post cards, grouped capture history, guarded link choices and exact request recovery in both layouts. Standalone post browsing adds exact identity/URL search, independently expanded publishers/media/albums and direct scene/image navigation. Account ownership review has native controls, desktop/mobile navigation, bounded discovery, explicit performer choice, selected-account refresh and saved-request recovery. Account consolidation review supports same-service selection, ownership conflict resolution, stable-ID acknowledgement, retained history and exact recovery. Collection definition management and metadata policy editing now include schema-constrained mappings, fixed performer selection for folder scans, read-only scene/image draft previews, bounded history and durable saves. Media-root management now has checked directory registration, binding history and durable saves, with the full fork gate passed. Performer detail now exposes current linked source accounts and independently expanded identity history on desktop/mobile, with merge/adoption-aware reads and the full fork gate passed. Ordered album inspection on post and gallery pages now retains mixed media, repeated positions, compact gaps and manual membership choices, with focused/populated/browser checks and the full fork gate passed. Historical album preview/apply, saved request recovery and guarded job retry/cancel controls are integrated; focused client and browser checks pass. The complete fork gate passed, including 669 UI tests, Python suites, Go lint and full Go integration. Source-list editing passed the complete fork gate, including 688 UI tests and Go integration. Explicit gallery/attachment association editing now also passes the full fork gate. Direct-file preview/admission, collection file picking, saved batches and explicit retry/cancel now pass the integrated full fork gate, including 731 UI tests and complete Go integration. Broader post/account management, cross-device import history and actual caller conversion remain unfinished. |
-| 5 Compatibility removal and packaging | Preview packaging is isolated. V3 is the sole embedded UI; native plugin manifests, playback, bulk edits and entity queries have replaced their former runtime contracts. Group aliases are removed in the current increment. Remaining API, configuration and export/import bridges still require conversion/removal. |
-| 6 Backup and cutover rehearsal | In progress: full-library portable export/restore and reconciliation passed; native/producer/filesystem checkpoints, host publication, interrupted-run recovery and scoped cleanup are implemented. Standard and cold publication now reuse checksum receipts with paginated inventories; larger database chunks reduce upload requests. Immutable cold objects have separate restore paths and shared-reference cleanup. Declared worker dependencies are resolved and bound to captured files. Successful publications now have durable history; configurable snapshot retention and pins protect historical cold media. Real 64 MiB database encoding and controlled edit costs are measured. Large manifests have shared reader/writer limits and streamed artifact/object downloads, verified against the actual 272,373-video inventory shape. Standard object retirement, safe reuse, bounded local run metadata and removal of duplicate ledger uploads are implemented and tested; activation requires reviewed lifecycle/versioning configuration. Final deployment/environment inventory, legacy ledger retirement review, real daily churn and full capture pause/WAL measurements, plus relocated restore/cutover review remain. |
-| 7 Production cutover | Not started; compatible production continues |
-| 8 Retirement and acceptance | Not started |
-
-No live catalog data or Stash schema has been changed. Do not retire existing
-writers, mounts, plugin data, or backups until rehearsal and cutover requirements
-have passed. Original catalogs and operating state are migration inputs, including
-performer merges, UUIDs, explicit unlink decisions, and pending producer work.
+| 0 Baseline and contract | Compatible source/images are frozen and production is pinned. Final coordinated backup boundary, deployment inventory and measured release budgets remain. |
+| 1 Native schema and services | Implemented and repeatedly rehearsed through schema 92, including canonical identities, promoted sidecars, source evidence, field choices, file recovery, jobs and post/performer merges. Final dependency and invariant audit remains. |
+| 2 Ingestion and producer adapter | Native transport, offline delivery, service pacing, source windows and the inventoried service adapters are implemented and tested. Actual host/n8n worker/profile installation and activation remain. |
+| 3 Catalog importer | Frozen catalogs, policies and operational families are imported and reconciled on copies. Final live snapshots, current review outcomes and cutover reconciliation remain. |
+| 4 Native UI and client conversion | Core account/source/collection/metadata/album/manual-intake workflows are implemented. Shared activity is under final validation; shared import review and actual caller conversion remain. |
+| 5 Compatibility removal and packaging | V3 is the sole embedded UI and v3 plugin contract. Remaining runtime/client compatibility removal and final pinned deployment artifacts require the dependency audit. |
+| 6 Backup and cutover rehearsal | Native snapshot/export, host publisher/retention and restore tools are implemented and tested. Complete production capture inventory, cost measurements and full relocated restore/cutover drill remain. |
+| 7 Production cutover | Not started. |
+| 8 Retirement | Not started; depends on successful cutover, observed scheduled cycles and owner acceptance. |
 
 ## First native schema rehearsal
 
@@ -10886,3 +10722,36 @@ Production, installed producers, active scheduling and S3 policies remain
 unchanged. Shared import/job history, remaining caller/compatibility conversion,
 full production backup/restore and request-cost evidence, cutover observation,
 retirement and owner acceptance remain required.
+
+
+## Shared archive activity — 2026-10-06
+
+Schema 1000093 adds four history indexes for bounded native job and source-run
+pages. The application API exposes summaries, original collection revisions,
+current post/media identities, safe relative file paths and lazy attempt history.
+The readers neither execute work nor disclose worker arguments or settings.
+Source-run completion and individual attempt outcomes remain separate.
+
+The Archive activity route uses existing Base UI controls, localized filters,
+shared desktop/mobile navigation, collection lookup and links to native review
+screens. It preserves successful results during failed refreshes and discards
+stale responses when scope changes. The selected active item polls; other rows
+and collapsed histories do not. This is activity inspection, not the remaining
+shared import-review queue or a new generic mutation API.
+
+Focused repository/API/migration/context tests passed, including absent media,
+renamed collections, original target bindings, shared translation work, published
+galleries and merged post redirects. All 14 Chromium/WebKit cases pass across
+mobile and desktop, including lazy paging, invalid detail responses and recovery.
+TypeScript, component lint, localization and six typed-client tests passed;
+pinned Go lint reported zero issues. The populated migration and fresh reopen
+passed. Independent comparison preserved all 40,512,442 original rows across 300
+tables, with four new indexes, one migration-history row, clean integrity and no
+foreign-key violations. Existing jobs and source evidence were unchanged.
+
+The first combined gate found that older migration fixtures retained the new
+source-run indexes, and SQLite selected an unbounded primary-key walk for one
+existing work-history cursor. The fixture removal chain now removes schema 93
+first, and selected-work history explicitly uses its dedicated work index.
+The affected migration/history checks pass (202.4 seconds); the combined release
+gate is running again. Production has not changed.

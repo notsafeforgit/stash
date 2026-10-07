@@ -16,6 +16,7 @@ import { Route as CollectionsRouteImport } from './routes/collections'
 import { Route as ImageDuplicateCheckerRouteImport } from './routes/image-duplicate-checker'
 import { Route as ImportHistoryRouteImport } from './routes/import-history'
 import { Route as MediaRootsRouteImport } from './routes/media-roots'
+import { Route as SavedActionsRouteImport } from './routes/saved-actions'
 import { Route as SceneDuplicateCheckerRouteImport } from './routes/scene-duplicate-checker'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SourcePostsRouteImport } from './routes/source-posts'
@@ -88,6 +89,11 @@ const ImportHistoryRoute = ImportHistoryRouteImport.update({
 const MediaRootsRoute = MediaRootsRouteImport.update({
   id: '/media-roots',
   path: '/media-roots',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SavedActionsRoute = SavedActionsRouteImport.update({
+  id: '/saved-actions',
+  path: '/saved-actions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SceneDuplicateCheckerRoute = SceneDuplicateCheckerRouteImport.update({
@@ -290,6 +296,7 @@ export interface FileRoutesByFullPath {
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/import-history': typeof ImportHistoryRoute
   '/media-roots': typeof MediaRootsRoute
+  '/saved-actions': typeof SavedActionsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
   '/source-posts': typeof SourcePostsRoute
@@ -337,6 +344,7 @@ export interface FileRoutesByTo {
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/import-history': typeof ImportHistoryRoute
   '/media-roots': typeof MediaRootsRoute
+  '/saved-actions': typeof SavedActionsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/source-posts': typeof SourcePostsRoute
   '/stats': typeof StatsRoute
@@ -384,6 +392,7 @@ export interface FileRoutesById {
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/import-history': typeof ImportHistoryRoute
   '/media-roots': typeof MediaRootsRoute
+  '/saved-actions': typeof SavedActionsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
   '/source-posts': typeof SourcePostsRoute
@@ -433,6 +442,7 @@ export interface FileRouteTypes {
     | '/image-duplicate-checker'
     | '/import-history'
     | '/media-roots'
+    | '/saved-actions'
     | '/scene-duplicate-checker'
     | '/settings'
     | '/source-posts'
@@ -480,6 +490,7 @@ export interface FileRouteTypes {
     | '/image-duplicate-checker'
     | '/import-history'
     | '/media-roots'
+    | '/saved-actions'
     | '/scene-duplicate-checker'
     | '/source-posts'
     | '/stats'
@@ -526,6 +537,7 @@ export interface FileRouteTypes {
     | '/image-duplicate-checker'
     | '/import-history'
     | '/media-roots'
+    | '/saved-actions'
     | '/scene-duplicate-checker'
     | '/settings'
     | '/source-posts'
@@ -574,6 +586,7 @@ export interface RootRouteChildren {
   ImageDuplicateCheckerRoute: typeof ImageDuplicateCheckerRoute
   ImportHistoryRoute: typeof ImportHistoryRoute
   MediaRootsRoute: typeof MediaRootsRoute
+  SavedActionsRoute: typeof SavedActionsRoute
   SceneDuplicateCheckerRoute: typeof SceneDuplicateCheckerRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SourcePostsRoute: typeof SourcePostsRoute
@@ -648,6 +661,13 @@ declare module '@tanstack/react-router' {
       path: '/media-roots'
       fullPath: '/media-roots'
       preLoaderRoute: typeof MediaRootsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/saved-actions': {
+      id: '/saved-actions'
+      path: '/saved-actions'
+      fullPath: '/saved-actions'
+      preLoaderRoute: typeof SavedActionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/scene-duplicate-checker': {
@@ -967,6 +987,7 @@ const rootRouteChildren: RootRouteChildren = {
   ImageDuplicateCheckerRoute: ImageDuplicateCheckerRoute,
   ImportHistoryRoute: ImportHistoryRoute,
   MediaRootsRoute: MediaRootsRoute,
+  SavedActionsRoute: SavedActionsRoute,
   SceneDuplicateCheckerRoute: SceneDuplicateCheckerRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SourcePostsRoute: SourcePostsRoute,

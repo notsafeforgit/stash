@@ -1,3 +1,5 @@
+import { SavedActionsFixture } from "./saved-actions";
+import { savedActionSearchSchema } from "@/core/native-archive/saved-actions";
 import { SourceAlbumsFixture } from "./source-albums";
 import { PerformerSourcesFixture } from "./performer-sources";
 import { SourcePostsFixture } from "./source-posts";
@@ -435,6 +437,12 @@ const router = createRouter({
       path: "/archive-activity",
       validateSearch: activitySearchSchema,
       component: ArchiveActivityFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/saved-actions",
+      validateSearch: savedActionSearchSchema,
+      component: SavedActionsFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

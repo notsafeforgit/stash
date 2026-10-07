@@ -55,8 +55,9 @@ Import history passes focused checks and its complete release gate. The CI
 backend and image workflows now explicitly install FFmpeg/ffprobe, after the
 published activity revision exposed that missing runner dependency. Verification
 of the next published artifact remains required.
-The shared queue of current unresolved choices and saved-action recovery remain
-unfinished; historical import warnings are not current conflict counts.
+Saved-action recovery is integrated and passes focused checks; its complete
+release gate remains pending. The shared queue of current unresolved choices
+is unfinished; historical import warnings are not current conflict counts.
 
 Remaining release work:
 
@@ -10822,3 +10823,30 @@ verify both `ffmpeg` and `ffprobe` before running the existing tests. No test is
 skipped or weakened. Cached actionlint 1.7.12 validation passes for both changed
 workflows. The next revision's CI and native image publication must still pass
 before its artifact can be selected for deployment.
+
+## Shared saved-action recovery — 2026-10-07
+
+The Saved actions route discovers browser requests across fourteen existing
+native review/intake protocols, using the current public endpoint as its scope.
+Bounded key cursors avoid loading every request body. Each owning protocol
+validates its selected records before compact summaries are shown. Opening the
+list sends no HTTP request. Existing requests are retained during a failed read,
+and invalid records remain visible without exposing their bodies or erasing them.
+
+Explicit Resume uses each original receipt/recovery flow. Lost replies, rejected
+choices, admitted work and retained file batches stay distinct. Rejected choices
+open their original review, including pending collection/root creation forms;
+media links use their original scene/image scope. Attachment and notification
+destinations resolve through checked read-only context/receipt lookups when
+opened. Job progress remains on the server and does not imply that all browser
+actions or all archive conflicts have been resolved.
+
+All fifteen paging/discovery/destination tests pass, along with the existing
+outbox regression suites. TypeScript, browser fixture types, component lint and
+localization checks pass. All fourteen Chromium/WebKit cases pass for desktop
+and mobile navigation, lazy technical references, lost replies across reload,
+rejection, storage failure, paging and damaged records. The mobile layout was
+inspected at 390 pixels without horizontal overflow. Main route generation and
+the complete release gate passed in 1,953.8 seconds, including all UI, producer,
+library, archive and backup checks, zero Go lint issues, and full Go integration.
+No database migration or production configuration change is introduced.

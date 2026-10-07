@@ -2749,3 +2749,34 @@ unchanged. The UI expands import steps and technical identifiers on demand,
 keeps successful same-scope results after a failed refresh and preserves list
 position when returning from a selected snapshot. Current associations are
 reviewed through their domain screens rather than by editing historical receipts.
+
+## Saved application actions
+
+`/saved-actions` in the desktop utility menu and mobile drawer discovers actions
+retained by the current browser for the current public Stash endpoint. It covers
+account ownership and merges, metadata and source edits, album and attachment
+choices, post merges and notification retries, collection/root/policy changes,
+and local-file batches. This browser journal is separate from server job progress
+and the current unresolved association queue.
+
+Opening the list makes no HTTP requests. Each page reads at most 25 keys from
+one protocol's IndexedDB store and validates records with that protocol's existing
+reader. Summaries omit request bodies and settings. Collection/root labels and
+the first filename of a batch come from the saved request. Technical target
+references expand on demand. Keys are paged in their stored order; this is not
+a chronological history. A failed refresh preserves the last successful page.
+
+Resume is explicit. It delegates to the owning outbox's receipt/recovery flow,
+retaining the original bytes and request identity. A lost reply can therefore
+be recognized without applying the action twice. Definitively rejected requests
+remain visible and open their original review rather than being resent. A damaged
+record remains stored and is reported without erasing it or hiding other valid
+records. Storage failures fail the read rather than being called damaged input.
+
+Work admission and completion remain distinct. A retained album job or manual
+batch may still have work running after its request was acknowledged. Server
+progress is available in Archive activity. Opening an attachment's original
+review reads its current post context; opening a merge notification reads its
+original merge receipt. Neither lookup changes the archive. Other review links
+use the original account, collection, root, post or local media scope, including
+the creation form for an uncommitted collection/root request.

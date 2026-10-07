@@ -202,6 +202,18 @@ activity reader's cancellation and failed-refresh behavior and the existing
 list scroll restoration; switching import kind clears the previous scope.
 Desktop and mobile navigation use the same route registry.
 
+The Saved actions route uses `saved-actions.ts` to enumerate the current
+installation's browser outboxes. `reviewKeys` uses bounded IndexedDB key cursors;
+the owning protocol validates each selected record before a compact summary is
+shown. Listing never sends a request or retries an action. Explicit Resume uses
+the existing receipt/recovery method with its original bytes and identity.
+Rejected and unreadable records stay distinct from uncertain submissions,
+admitted jobs and retained file batches. Original-review links preserve creation
+and media scopes; attachment and notification targets resolve through checked
+read-only APIs on navigation. The route shares native controls, localization,
+mobile/desktop navigation and same-scope failed-refresh behavior. These local
+requests are not a cross-device unresolved-conflict queue.
+
 The Source posts route provides bounded browsing and exact URL, qualified source
 ID or archive UUID lookup. It is available in the desktop utility menu, mobile
 drawer and scene/image source cards. Deep links load only the selected post.

@@ -134,6 +134,14 @@ export function useNavItems(opts?: {
         },
         {
           label: intl.formatMessage({
+            id: "saved_actions.title",
+            defaultMessage: "Saved actions",
+          }),
+          icon: <History className="size-4" />,
+          to: "/saved-actions",
+        },
+        {
+          label: intl.formatMessage({
             id: "source_posts.title",
             defaultMessage: "Source posts",
           }),

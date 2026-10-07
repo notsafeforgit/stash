@@ -19,15 +19,8 @@ export function requestUUID(): string {
   ].join("-");
 }
 
-/** Serialize competing tabs and wait for durable completion before sending.
- * Each review protocol validates its saved record and controls recovery. */
-export async function withReviewRecord<T>(
-  databaseName: string,
-  key: string,
-  mode: IDBTransactionMode,
-  action: (value: unknown, store: IDBObjectStore) => T,
-): Promise<T> {
-  const database = await new Promise<IDBDatabase>((resolve, reject) => {
+function openReviewDatabase(databaseName: string): Promise<IDBDatabase> {
+  return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(databaseName, 1);
     let blocked = false;
     request.onupgradeneeded = () =>
@@ -42,6 +35,17 @@ export async function withReviewRecord<T>(
       else resolve(request.result);
     };
   });
+}
+
+/** Serialize competing tabs and wait for durable completion before sending.
+ * Each review protocol validates its saved record and controls recovery. */
+export async function withReviewRecord<T>(
+  databaseName: string,
+  key: string,
+  mode: IDBTransactionMode,
+  action: (value: unknown, store: IDBObjectStore) => T,
+): Promise<T> {
+  const database = await openReviewDatabase(databaseName);
   try {
     return await new Promise<T>((resolve, reject) => {
       const tx = database.transaction("requests", mode, {
@@ -60,6 +64,58 @@ export async function withReviewRecord<T>(
         }
       };
       tx.oncomplete = () => resolve(result);
+      tx.onabort = () =>
+        reject(
+          failure ?? tx.error ?? new NativeArchiveError(0, "storage_aborted"),
+        );
+      tx.onerror = () => reject(tx.error);
+    });
+  } finally {
+    database.close();
+  }
+}
+
+export interface ReviewKeyPage {
+  keys: string[];
+  next: string | null;
+}
+
+/** Discover saved actions in one deployment/protocol without reading payloads.
+ * A key may describe a pending or rejected action. Its protocol must validate
+ * the record and inspect its receipt before offering or performing recovery. */
+export async function reviewKeys(
+  databaseName: string,
+  after = "",
+  limit = 25,
+): Promise<ReviewKeyPage> {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+    throw new NativeArchiveError(0, "invalid_review_page");
+  const database = await openReviewDatabase(databaseName);
+  try {
+    return await new Promise<ReviewKeyPage>((resolve, reject) => {
+      const tx = database.transaction("requests", "readonly");
+      const keys: string[] = [];
+      let next: string | null = null;
+      let failure: unknown;
+      const request = tx
+        .objectStore("requests")
+        .openKeyCursor(after ? IDBKeyRange.lowerBound(after, true) : null);
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        if (typeof cursor.key !== "string" || cursor.key.length === 0) {
+          failure = new NativeArchiveError(0, "invalid_saved_request_key");
+          tx.abort();
+          return;
+        }
+        if (keys.length === limit) {
+          next = keys.at(-1) ?? null;
+          return;
+        }
+        keys.push(cursor.key);
+        cursor.continue();
+      };
+      tx.oncomplete = () => resolve({ keys, next });
       tx.onabort = () =>
         reject(
           failure ?? tx.error ?? new NativeArchiveError(0, "storage_aborted"),

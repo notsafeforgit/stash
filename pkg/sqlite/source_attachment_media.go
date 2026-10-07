@@ -425,7 +425,9 @@ func (s *SourceAttachmentStore) prepareMediaChoiceWithDeleted(ctx context.Contex
 		if err != nil {
 			return nil, nil, err
 		}
-		if !archiveMedia(media) || (media.State != models.ArchiveEntityActive && !(allowDeleted && media.State == models.ArchiveEntityDeleted)) || media.Revision != input.ExpectedMediaRevision {
+		validMedia := archiveMedia(media) && (media.State == models.ArchiveEntityActive ||
+			(allowDeleted && media.State == models.ArchiveEntityDeleted))
+		if !validMedia || media.Revision != input.ExpectedMediaRevision {
 			return nil, nil, models.ErrSourceAttachmentConflict
 		}
 		association, err := (&SourcePostMediaStore{}).Association(ctx, attachment.PostUUID, media.UUID)

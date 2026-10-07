@@ -55,15 +55,17 @@ in 2,001.7 seconds, including 789 UI tests, 571 producer tests, all library,
 archive and backup suites, zero Go lint issues and full Go integration.
 Its installed package and the three scraper children plus heartbeat were checked
 in an isolated image built from the current n8n base. No scraper commands ran.
-The two parent and three source-removal workflows still need full conversion,
-including metadata defaults for newly registered sources. Worker service/timer
-templates are packaged and validated; live launchers and workflows have not switched.
+The two parent and three source-removal conversions now have a staged native
+helper and private graphs, including metadata defaults for newly registered
+sources. Their focused API and current-n8n runtime checks pass; the combined gate
+and deployment handoff remain pending. Worker service/timer templates are
+packaged and validated; live launchers and workflows have not switched.
 
 Remaining release work:
 
 | Work | Required outcome |
 | --- | --- |
-| Callers and compatibility | Finish the actual parent/source-removal workflows and host/profile/service handoff, including new-source metadata defaults, verify installed runtimes and retained external contracts, then remove residual legacy adapters and dependencies. |
+| Callers and compatibility | Finish the combined workflow gate and host/profile/service handoff, capture new source-operation state in backups, verify installed runtimes and retained external contracts, then remove residual legacy adapters and dependencies. |
 | Backup and restore | Prove a complete common capture boundary, actual upload/request/storage costs, bounded retention/reclamation, and an isolated empty/relocated restore with pending producer and filesystem state. |
 | Production cutover | Pin artifacts, quiesce writers, take final coordinated snapshots, migrate/reconcile, switch native launchers and resume work gradually through verified launch paths. |
 | Observation and retirement | Verify scheduled scraping/recovery/backup cycles, preserve the rollback/export boundary, and retire obsolete catalog writers, mounts, services and packages. |
@@ -10973,3 +10975,62 @@ parent/removal conversion, source policy and performer review integration, full
 coordinated backup/restore, measured publication costs and production cutover
 remain required. Registration alone does not create a metadata policy; new-source
 automation must install its reviewed defaults before dispatching media intake.
+
+## Native parent and source-removal workflows — 2026-10-07
+
+The native n8n source helper saves registration/removal plans, metadata defaults
+and exact before/after list bytes before mutating the server. It initializes
+metadata policies only for new collections, preserves existing owner policies,
+and returns the original receipt after later edits. Incomplete retries decline
+changed sources, policies, account links or lists. A stable execution/node/item
+identity cannot be reused with a different requested action or account.
+
+Performer removal follows current native account links and canonical account
+identifiers, with pagination and ambiguity checks. It never selects a performer
+by name or alias. The converted parents use native intake and metadata policies
+in place of their former scan/autotag/implicit performer-creation steps. They
+retain their inputs, child workflow IDs, waiting and error branches. Source
+registration does not certify scrape completion; the children still check their
+original durable backfill requests. List tracking begins after registration, so
+scheduled runs and the initial backfill share native source-window coordination.
+
+Fourteen focused producer tests pass, including lost policy replies, interrupted
+list/receipt publication, changed inputs, later owner edits, ambiguity and exact
+list preservation. The real Go/SQLite HTTP check passed in 3.4 seconds: six
+collections and policies were created, a lost first-policy reply recovered with
+only the five remaining saves, and linked-account removal disabled exactly those
+six sources. A different performer's matching display name did not affect the
+selection. Nine account identifiers exercised full identifier pagination.
+
+All nine active workflow conversions are staged privately. In an isolated image
+built from the current n8n base, the five new parent/removal graphs passed 37
+expression evaluations, four per-item normalization checks, nine result checks
+and three executions of the actual command node using help/error fixtures.
+The three scraper children in the composed set passed 62 expression evaluations
+and three real Wait checkpoints. The first new command-node harness lacked the
+installed runtime's cancellation signal; adding that required fixture method
+resolved it without changing product code. No source mutation or scrape command
+ran in these container checks.
+
+The combined release gate passed in 1,933.9 seconds: generation, embedded UI,
+789 UI tests, 585 producer tests, 8 library tests, 113 archive tests, 262 backup
+tests, zero Go lint issues and full Go integration. All eleven gated source files
+matched their recorded hashes before this result was added.
+
+The deployment handoff now has thirteen download profiles and seventeen metadata
+profiles verified against the installed host and isolated n8n runtimes. They
+share the same adapter digest and use the canonical imported library root,
+replacing the older staged prototype-root profiles. Coomer and Kemono still
+request originals. The download-profile dependency inspection resolves thirteen
+profiles, fifteen download archives and their required configuration files; it
+uses an explicit fixture outbox and is not a coordinated capture.
+
+Runtime defaults, subscription lists, source-operation state, credential references
+and the complete worker inventory still require coordinated backup coverage and
+actual deployment. Original executions must drain or be frozen before old graph/
+helper retirement. No live workflow, worker or production database has switched.
+
+The superseded schema-93 rehearsal and its exact auxiliary files were removed
+after no-open-handle checks and verification of the selected schema-94 copy.
+The original compatible snapshot and schema-94 rehearsal remain. This reclaimed
+20.4 GiB; large subsequent restores use the separate owned tank scratch directory.

@@ -1975,6 +1975,67 @@ performers or install metadata policies. Those choices use the native account
 review and policy APIs. The actual parent/add/remove n8n graphs still require
 that integration and runtime verification before deployment.
 
+### Native n8n source subscriptions
+
+`stash-n8n-sources` connects the reviewed parent/removal workflows to native
+source definitions, metadata policies and the lists used by scheduled host
+launchers. Set `STASH_SOURCE_MANAGEMENT_CONFIG` to a private JSON runtime file
+with these fields:
+
+- `version`: `1`.
+- `root_uuid`: the native media root covered by the producer's complete root grant.
+- `locks`: the existing shared native worker lock directory.
+- `state`: an existing private directory for durable source-operation plans and receipts.
+- `lists`: separate canonical absolute filenames keyed by `reddit` and `twitter`.
+- `new_source_policy`: a complete reviewed native metadata policy definition,
+  with `enabled: true`, `apply_to_scans: false` and explicit scene/image rules.
+  Source mappings, completeness requirements and filename fallback use the same
+  schema as the collection policy editor. Policies are captured in each request;
+  changing this runtime default does not reinterpret an interrupted operation.
+
+The command also uses `STASH_INGEST_ENDPOINT`, `STASH_INGEST_PRODUCER`,
+`STASH_INGEST_TOKEN` and the separate application `STASH_API_KEY`. Credentials
+are environment references; workflow command arguments contain no keys.
+
+```sh
+stash-n8n-sources --action add --platform reddit --identity Example \
+  --workflow WORKFLOW_ID --execution 123 --node NODE_UUID --item 0
+stash-n8n-sources --action remove --platform twitter --identity 123456789 \
+  --workflow WORKFLOW_ID --execution 124 --node NODE_UUID --item 0
+stash-n8n-sources --action remove-performer --platform reddit --identity 42 \
+  --workflow WORKFLOW_ID --execution 125 --node NODE_UUID --item 0
+```
+
+The stable workflow/execution/node/item tuple identifies one operation. Changed
+arguments conflict with its saved request. Registration initializes metadata
+policies only on newly created sources; existing policies and collection scopes
+stay selected. Missing or disabled policies on an existing source require review.
+An ambiguous account identifier also requires review before any mutation.
+Performer removal resolves current native account ownership, follows canonical
+identities and pages all identifiers. Names and aliases cannot authorize removal.
+Sources, media, accounts and metadata history are retained when tracking stops.
+
+The operation saves complete source/policy plans and before/after list bytes
+before changing the server. Retries recover original revisions and never rewrite
+a later list or policy edit. Completed receipts return the original result after
+later changes. List comments, unrelated accounts, communities and line endings
+are retained. Exit 0 means this source operation completed; exit 2 requires
+review, and exit 1 reports unavailable/invalid input. It does not certify a
+scrape: the parent must still await its native backfill children and their durable
+completion checks. Tracking starts once registration completes, allowing scheduled
+runs and the initial backfill to share native source-window coordination.
+
+The converted parents use native ingestion and metadata policies in place of
+their old scan/autotag/name-based performer creation sequence. Adding a source
+does not assert that its publisher is depicted in every file. Account ownership
+and depicted-performer defaults remain explicit native choices.
+
+Capture the runtime file, both lists and the entire operation-state directory
+under the same shared publication barrier as producer outboxes. These are
+required backup components before activation. Freeze/drain old n8n executions
+before replacing their graphs or retiring legacy helper paths. Staging workflow
+exports or testing this command does not install a live runtime or activate jobs.
+
 ## Backfill journal import
 
 `stash-import-backfills` migrates permanent account completion/skip decisions

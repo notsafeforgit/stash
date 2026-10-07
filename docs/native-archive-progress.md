@@ -69,26 +69,16 @@ independent whole-row reconciliation now pass. The verified rehearsal is at
 schema 90; the superseded schema-89 database was retired after checking open
 handles, recovering 21.90 GB and retaining the original compatible snapshot.
 Shared attachment choices, current post-media readers and metadata source
-selection now have focused integration checks, with the attachment editor's
-original-request recovery verified in Chromium and WebKit. Their integrated
-full fork gate found one original-owner test that still attempted an ordinary
-edit through a consolidated alias; the fixture now uses the reviewed consolidation
-operation and its focused regression passes. Internal source-list consolidation
-also passes combined-list, explicit-choice, rollback, original-receipt and restart
-checks. Canonical source-list/gallery reads, ordered album inspection and edits
-now pass focused SQLite/HTTP checks, 65 client tests and 124 Chromium/WebKit
-browser cases, including original saved-request recovery after a merge. Read-only
-comparisons on the populated rehearsal agree for 69 indexed queries; that copy
-has no post consolidations, so merged cases are covered separately by fixtures.
-That integrated gate passed generation, UI, Python, lint and all Go packages
-except two gallery fixtures still assuming original-owner current reads and
-ordinary writes before merge choices settled. Their canonical integration
-checks now pass, including portable restore; the next combined full gate remains
-required. Canonical post browsing,
-evidence expansion and source review now have focused repository/client/browser
-coverage, including metadata URL mapping across merged originals. The encompassing
-merge transaction and complete merge API/UI still require integration before
-application use.
+selection, source-list consolidation, canonical album reads/edits and current
+post browsing now pass the complete integrated fork gate: generation, real UI
+assets, 739 UI tests, Python suites, Go lint and full Go integration. Focused
+Chromium/WebKit checks cover original saved-request recovery after a merge;
+repository and portable-restore fixtures cover original evidence, explicit
+choices, chained merges and metadata URL mapping. Read-only comparisons on the
+populated rehearsal agree for 250 current-reader queries; that copy has no post
+consolidations, so merged cases are covered separately by real SQLite fixtures.
+The encompassing merge transaction, pending-work publication and complete merge
+API/UI still require integration before application use.
 
 Application local-file preview/admission now reuses native file verification and
 durable effects without creating a producer or source record. Focused real MP4/
@@ -10787,6 +10777,8 @@ fixture. Source hashes and receipts are under
 
 Gallery regression and portable-restore checks now pass, including original-head
 retirement, canonical reads, retained manual members, cover protection and metadata.
-No schema or production state changes. The combined full fork gate remains
-pending before push. The complete reviewed merge/API/UI,
+No schema or production state changes. The combined full fork gate now passes:
+generation, real embedded UI, 739 UI tests, 551 producer tests, eight library
+tests, 113 archive tests, 262 backup tests, Go lint and full Go integration.
+The complete reviewed merge/API/UI,
 pending-publication integration and broader transition/cutover work remain open.

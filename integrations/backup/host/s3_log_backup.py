@@ -2724,7 +2724,7 @@ def upload_new_videos_if_any(has_new_videos, dry_run):
                     # bytes instead stops for review, never triggers reupload.
                     if known is None and listed is not None and listed.get("Size") != content.size and candidate != target:
                         continue
-                    record = MEDIA_INDEX.get(candidate, local=content)
+                    record = MEDIA_INDEX.get(candidate, local=content, allow_legacy_etag=True)
                     if record is not None and media_objects.matches_local(record, content):
                         key, matched = candidate, record
                         break

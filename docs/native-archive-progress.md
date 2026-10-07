@@ -55,17 +55,28 @@ in 2,001.7 seconds, including 789 UI tests, 571 producer tests, all library,
 archive and backup suites, zero Go lint issues and full Go integration.
 Its installed package and the three scraper children plus heartbeat were checked
 in an isolated image built from the current n8n base. No scraper commands ran.
-The two parent and three source-removal conversions now have a staged native
-helper and private graphs, including metadata defaults for newly registered
-sources. Their focused API and current-n8n runtime checks pass; the combined gate
-and deployment handoff remain pending. Worker service/timer templates are
-packaged and validated; live launchers and workflows have not switched.
+The two parent and three source-removal conversions have staged native helpers
+and private graphs, including metadata defaults for newly registered sources.
+Their combined release gate passed, as did the subsequent source-operation
+backup gate. The staged dependency inventory covers all thirty profiles,
+download archives, source-operation state and n8n database/configuration/payloads.
+The separate host runtimes are installed and verified but inactive. Worker
+service/timer templates are packaged and validated; live launchers and workflows
+have not switched.
+
+The real host S3 publication, fresh download/restore and producer replay passed
+using a small native library and the actual frozen backup ledgers. The full
+populated coordinated rehearsal has sealed its checkpoint, verified all 769,643
+indexed media paths and is still packaging/restoring. Historical cold-video
+adoption passes 288 backup tests and three real checksum samples; complete
+media adoption, native daily-change measurement and metadata retention setup
+remain open.
 
 Remaining release work:
 
 | Work | Required outcome |
 | --- | --- |
-| Callers and compatibility | Finish the combined workflow gate and host/profile/service handoff, capture new source-operation state in backups, verify installed runtimes and retained external contracts, then remove residual legacy adapters and dependencies. |
+| Callers and compatibility | Finish real producer provisioning and host/profile/service handoff; verify live launch paths and retained external contracts, then remove residual legacy adapters and dependencies. |
 | Backup and restore | Prove a complete common capture boundary, actual upload/request/storage costs, bounded retention/reclamation, and an isolated empty/relocated restore with pending producer and filesystem state. |
 | Production cutover | Pin artifacts, quiesce writers, take final coordinated snapshots, migrate/reconcile, switch native launchers and resume work gradually through verified launch paths. |
 | Observation and retirement | Verify scheduled scraping/recovery/backup cycles, preserve the rollback/export boundary, and retire obsolete catalog writers, mounts, services and packages. |
@@ -11252,3 +11263,40 @@ The daily role cannot read bucket versioning, and the separate administrative
 AWS login requires refresh. Exact metadata lifecycle and narrowly scoped daily
 permissions are prepared but not installed. Standard cleanup, actual native
 daily churn, final production cutover and observed operating cycles remain open.
+
+## Verified adoption of historical cold videos — 2026-10-07
+
+The host publisher can now retain existing filename-based video objects that
+predate S3's additional checksum headers. It compares the complete local file
+with the remote plaintext/SSE-S3 single-part MD5 or historical multipart ETag,
+trying the observed 5 MiB and 16 MiB part layouts. Each adopted descriptor also
+requires independently calculated local SHA-256. Parts, count and metadata
+alone cannot authorize adoption; unsupported encryption or contradictory
+checksums fail without uploading a replacement.
+
+The fallback is explicit in the historical video path. New content keys,
+uploads and archive publication still require full-object S3 checksums, including
+recovery of an interrupted upload. The existing durable media ledger retains
+adopted evidence, so an unchanged subsequent inventory can reuse it without
+per-object requests. Offline reconstruction and streamed downloads validate
+both the saved historical checksum and local SHA-256. Changed source bytes use
+a new immutable key after the original object's identity has been established.
+
+All 288 backup tests passed in 63.6 seconds. New coverage exercises complete
+publisher runs for all three historical layouts, restart/request reuse, local
+edits, response corruption, SHA-256 mismatches, contradictory headers,
+encryption restrictions and strict new-object verification. No test uses real
+AWS or rclone. A separate read-only check used the actual implementation with
+three existing cloud videos, including both multipart sizes. All matched their
+complete local bytes using six HEAD requests and no upload, download, thaw or
+production-ledger change. An initial private sample selection mistakenly chose
+a modern object for the 5 MiB case and stopped at its header assertion; filtering
+the saved inventory correctly resolved that driver error.
+
+The [operational evidence](native-backup-operational-rehearsal.json) retains
+these measurements. Hashing a 1 GiB in-memory sample took 3.63 seconds with the
+additional historical digests versus 0.85 seconds previously; this measures CPU
+overhead, not disk throughput or the duration of a whole-library migration.
+Initial adoption still requires reading the relevant local media. The complete
+library pass, populated coordinated restore, actual daily-change/request costs,
+cloud retention setup and production cutover remain open.

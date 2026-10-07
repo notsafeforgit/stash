@@ -123,11 +123,82 @@
         "objects": 9016,
         "bytes": 624466698240
       }
+    },
+    "verified_legacy_samples": {
+      "api_invocations": {
+        "HeadObject": 6
+      },
+      "cloud_mutations": 0,
+      "cold_downloads": 0,
+      "digest_benchmark": {
+        "previous": {
+          "bytes": 1073741824,
+          "cpu_seconds": 0.841031565,
+          "seconds": 0.846482858993113,
+          "sha256": "2c06ade942ee3f17a048dd1064b2fab046a4bb95386d8bb41b68dc6711ac2af3"
+        },
+        "with_legacy_etags": {
+          "bytes": 1073741824,
+          "cpu_seconds": 3.6061172139999997,
+          "seconds": 3.6251756690326147,
+          "sha256": "2c06ade942ee3f17a048dd1064b2fab046a4bb95386d8bb41b68dc6711ac2af3"
+        }
+      },
+      "http_attempts": {
+        "HeadObject": 6
+      },
+      "production_ledger_changes": 0,
+      "samples": [
+        {
+          "algorithm": "s3-etag-md5",
+          "bytes": 23933,
+          "hash_seconds": 0.00022470898693427444,
+          "kind": "simple_etag",
+          "local_sha256": "2f316a0795796e70843dd4a3750b153e22aa7cbe6ced0e154438f56a420e75a6",
+          "part_size": null,
+          "status": "matched"
+        },
+        {
+          "algorithm": "s3-etag-multipart-md5",
+          "bytes": 209830864,
+          "hash_seconds": 0.7292795499670319,
+          "kind": "multipart_etag",
+          "local_sha256": "7e48c243070c90d859d84bd49d1d9e2032a3096987fb8d51c9ab66da0f83b20d",
+          "part_size": 16777216,
+          "status": "matched"
+        },
+        {
+          "algorithm": "s3-etag-multipart-md5",
+          "bytes": 273241600,
+          "hash_seconds": 2.2639021999784745,
+          "kind": "multipart_5_mib",
+          "local_sha256": "60657818b7797d2dbace6a9cd10e63d01322b202df3a17faf362907e4f3e08ad",
+          "part_size": 5242880,
+          "status": "matched"
+        }
+      ],
+      "scope": "Three sampled old videos only; whole-library adoption and production cutover remain pending.",
+      "seconds": 7.801344071980566,
+      "source_sha256": {
+        "media_index.py": "da6177207127aa0cc79399d074ccf056a9efada681ba7937c0d2019c5f27bc56",
+        "media_objects.py": "56fee13ac48535dc1ec0633180695fde3728ff9d52761e37dff137e29c5e0939",
+        "s3_log_backup.py": "eb2155ab159170e53a40303db09efee1f5ccade22fa5d000250e529299beb72a"
+      },
+      "started_at": "2026-10-07T17:10:10.260732+00:00",
+      "status": "passed",
+      "thaws": 0
+    },
+    "verification": {
+      "backup_tests": 288,
+      "exit_code": 0,
+      "seconds": 63.63901659601834,
+      "new_upload_checksum_policy": "FULL_OBJECT S3 checksums remain required for new uploads, new content keys and archives.",
+      "probe_correction": "First sample selection included a modern FULL_OBJECT object when selecting the old 5 MiB case; its assertion stopped after metadata-only requests. Filtering the saved inventory for absent additional checksums selected the correct legacy sample. No cloud writes occurred in either attempt."
     }
   },
   "remaining": [
     "Populated coordinated restore still running; isolated cloud drill uses a small native library and one existing cold-media reference.",
-    "Legacy video objects without additional S3 checksums need supported verified adoption; no automatic reupload or thaw was performed.",
+    "Historical ETag adoption is implemented and verified with three real videos; whole-library adoption remains required. No automatic reupload or thaw was performed.",
     "Daily backup principal lacks GetBucketVersioning; existing administrative login requires refresh. Native Standard retention is not activated.",
     "Final production migration, complete media adoption, real native daily change measurements, observed cycles, retirement and owner acceptance remain."
   ]

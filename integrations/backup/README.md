@@ -290,7 +290,8 @@ used 315 LIST requests, projecting about $0.05 per thirty daily inventories at
 the observed Oregon price. This excludes other operations and storage, and is
 not a measurement of native daily churn. Full populated restore and production
 activation remain pending. The inventory also found 57,725 required older videos
-without additional S3 checksums; their verified adoption remains a release gate.
+without additional S3 checksums. Their adoption now passes regression tests and
+three real read-only samples; whole-library reconciliation remains a release gate.
 
 ## Immutable media publication and restore
 
@@ -301,12 +302,26 @@ v3 native attempt must finish with its original writer before this writer is use
 A version 4 manifest separates each video's relative restore `path` from its
 S3 `key`. Several paths can reference one object; planning, status, thaw and
 download operate once per distinct key. Each required video/base/delta key has
-exactly one descriptor in `objects`: size, cold storage class, full-object S3
-checksum algorithm/value, and an optional independently checked local SHA-256.
+exactly one descriptor in `objects`: size, cold storage class, verified checksum
+algorithm/value, and an optional independently checked local SHA-256.
 Video descriptors require that local SHA-256. New content keys use
-`media/sha256/<sha256>`; historical keys remain valid when their full checksum
-can be checked against local bytes. Unsupported/composite-only evidence is an
-error for review, never authorization to upload existing media again.
+`media/sha256/<sha256>` and require full-object S3 checksums. Historical filename
+keys remain valid when their checksums can be checked against complete local
+bytes. Unsupported evidence is an error for review, never authorization to
+upload existing media again.
+
+For old videos with no additional checksum headers, the video adoption path can
+use a matching single-part MD5 ETag or a multipart MD5 ETag with verified 5 MiB
+or 16 MiB part boundaries. It also records the independently computed local
+SHA-256, which all subsequent byte verification requires. These descriptors use
+`s3-etag-md5` or `s3-etag-multipart-md5`; the latter includes its `part_size` in
+bytes. Shape, size, part count and uploader-supplied metadata cannot establish
+the match. Only plaintext/SSE-S3 objects qualify; SSE-KMS and SSE-C are rejected.
+See the [S3 ETag contract](https://docs.aws.amazon.com/AmazonS3/latest/API/API_Object.html)
+and [multipart calculation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/checking-object-integrity-upload.html).
+Malformed, unsupported or composite additional checksums do not fall back to
+ETags. New uploads, new content-key adoption and archive publication retain
+the full-object S3 checksum requirement, including interrupted-upload recovery.
 
 The existing `TAR_DELTA_DB` ledger now contains the cold-store binding, verified
 object receipts, current video path bindings and pending path associations.
@@ -514,7 +529,7 @@ metadata and all object SHA-256 headers. It never requests Glacier restores.
 without the extra flag, native coverage is reported as a manifest reference only.
 For v4 media, `stash-s3-audit --remote` uses the bound store's paginated inventory
 and checks restore paths separately from object keys. Add `--media-checksums`
-only for an explicit full-checksum HEAD audit of the selected cold objects;
+only for an explicit checksum HEAD audit of the selected cold objects;
 this adds one request per distinct object. It never reads cold payloads or
 requests a thaw. Historical media manifests lack those checksum descriptors
 and cannot use that option. Neither checksum audit runs as part of the normal

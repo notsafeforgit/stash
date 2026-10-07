@@ -2,7 +2,8 @@
 
 The existing backup ledger owns this index and its source-path associations.
 LIST identity can reuse previous checksum evidence, but cannot establish it.
-New/changed objects require a full-checksum HEAD. Nothing here uploads or thaws.
+New/changed objects require checksum evidence. Historical ETags additionally
+require a complete local byte comparison before adoption. Nothing uploads or thaws.
 """
 
 from contextlib import contextmanager
@@ -85,7 +86,7 @@ class MediaIndex:
             # A verified new upload is part of this run's inventory as well.
             self.listed[key] = dict(head, Size=head['ContentLength'], Key=self.store['prefix'] + key)
 
-    def get(self, key, *, local=None):
+    def get(self, key, *, local=None, allow_legacy_etag=False):
         media.relative_path(key)
         previous, receipt = self.previous(key)
         with self.lock:
@@ -105,6 +106,8 @@ class MediaIndex:
             if previous is not None:
                 media.verify_head(previous, head)  # Never adopt overwritten known bytes.
                 record = previous
+            elif allow_legacy_etag and not key.startswith(media.PREFIX):
+                record = media.existing_object_from_head(head, local=local)
             else:
                 record = media.object_from_head(head)
         if local is not None and media.matches_local(record, local) and 'sha256' not in record:

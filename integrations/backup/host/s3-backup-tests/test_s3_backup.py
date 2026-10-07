@@ -1128,6 +1128,50 @@ class BackupTests(unittest.TestCase):
         self.assertFalse(self.operations)
         self.assertFalse((self.standard / 'current_manifest.json').exists())
 
+    def test_historical_etags_reuse_local_files_and_durable_receipts(self):
+        cases = [('sample/clip.mp4', b'old single-part video', None),
+                 ('sample/five.mp4', b'a' * ((5 << 20) + 17), 5 << 20),
+                 ('sample/sixteen.mp4', b'b' * ((16 << 20) + 33), 16 << 20)]
+        for key, body, part_size in cases:
+            self.write(key, body)
+            old = self.archive / key
+            old.parent.mkdir(parents=True, exist_ok=True)
+            old.write_bytes(body)
+            self.cold_s3.reconcile(key)
+            head = self.cold_s3.headers[key]
+            for field in list(head):
+                if field.startswith('Checksum'):
+                    del head[field]
+            value = hashlib.md5(body, usedforsecurity=False).hexdigest()
+            if part_size:
+                parts = [hashlib.md5(body[i:i + part_size], usedforsecurity=False).digest()
+                         for i in range(0, len(body), part_size)]
+                value = hashlib.md5(b''.join(parts), usedforsecurity=False).hexdigest() + '-' + str(len(parts))
+            head.update(ETag='"' + value + '"', ServerSideEncryption='AES256')
+        self.run_backup()
+        catalog = self.catalog()
+        for key, body, part_size in cases:
+            self.assertEqual(self.video_key(key), key)
+            record = catalog['objects'][key]
+            algorithm = media_objects.ETAG_MULTIPART if part_size else media_objects.ETAG_MD5
+            self.assertEqual(record['checksum']['algorithm'], algorithm)
+            self.assertEqual(record['sha256'], hashlib.sha256(body).hexdigest())
+            self.assertFalse(any(op[:2] == ('rclone', 'copyto') and op[2] == str(self.source / key)
+                                 for op in self.operations))
+        self.assert_round_trip()
+        self.operations.clear()
+        self.cold_s3.operations.clear()
+        self.run_backup()
+        self.assertFalse(any(op[0] in ('head', 'get') for op in self.cold_s3.operations))
+        self.assertFalse(any(op[:2] == ('rclone', 'copyto') and op[3].startswith(self.m.REMOTE_PATH)
+                             for op in self.operations))
+        # A later local edit gets a new immutable object; the old backup survives.
+        self.write('sample/clip.mp4', b'x' * len(cases[0][1]))
+        self.run_backup()
+        self.assertTrue(self.video_key().startswith(media_objects.PREFIX))
+        self.assertEqual((self.archive / 'sample/clip.mp4').read_bytes(), cases[0][1])
+        self.assert_round_trip()
+
     def test_overwritten_known_cold_object_is_not_adopted_or_reuploaded(self):
         self.run_backup()
         previous = (self.standard / 'current_manifest.json').read_bytes()

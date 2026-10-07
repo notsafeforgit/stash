@@ -125,7 +125,7 @@ is bound into the server's filesystem receipt and checked again while packing.
 Publication-aware component release validates the complete archived inventory,
 supports interrupted cleanup and keeps permanent identity/receipt files.
 The tracked host tools in `integrations/backup` now publish v4 native/media
-manifests through host-owned S3 clients, require exact full-object checksums,
+manifests through host-owned S3 clients, require verified object checksums,
 and support native download/audit plus historical media restore inputs. Their
 isolated runtime (`make pre-backup`) and regression gate (`make validate-backup`)
 are separate from the server. Installed scripts and scheduling remain unchanged.
@@ -144,10 +144,18 @@ those identities into the portable archive. Deduplicate remote requests by
 object key; different source paths can share bytes. Offline restore verifies all
 selected bytes before extraction and rejects changed inputs and path collisions.
 Cold checksum audits are explicit (`--media-checksums`), never a routine daily
-HEAD sweep. The cold ledger now retains full-checksum receipts, path bindings
+HEAD sweep. The cold ledger now retains verified checksum receipts, path bindings
 and interrupted-upload associations. One complete inventory reuses unchanged
 proofs; matching renamed/duplicate videos share objects. Cleanup protects all
 current references and rechecks returning or changed live paths before tagging.
+Historical filename videos without additional S3 checksums may use matching
+plaintext/SSE-S3 single-part MD5 or 5/16 MiB multipart ETags plus independently
+computed local SHA-256. Verify complete local bytes before adoption; shape,
+part count and uploader metadata cannot prove integrity. Reject KMS/SSE-C and
+unusable modern checksums. New uploads, content keys and archive publication
+still require full-object S3 checksums. Durable receipts avoid repeated hashing
+or per-object HEAD requests for unchanged media. Whole-library adoption remains
+a deployment check; passing sampled matches does not complete it.
 Retained selections verify every selected object without rescanning. Historical
 v3 in-flight native attempts require their original writer. Production inventory,
 Standard reclamation, full cost measurements and cutover review remain open.

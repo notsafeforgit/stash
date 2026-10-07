@@ -194,12 +194,64 @@
       "seconds": 63.63901659601834,
       "new_upload_checksum_policy": "FULL_OBJECT S3 checksums remain required for new uploads, new content keys and archives.",
       "probe_correction": "First sample selection included a modern FULL_OBJECT object when selecting the old 5 MiB case; its assertion stopped after metadata-only requests. Filtering the saved inventory for absent additional checksums selected the correct legacy sample. No cloud writes occurred in either attempt."
+    },
+    "whole_selection_preflight": {
+      "snapshot_guid": "604611236369898354",
+      "required_videos": 273096,
+      "total_video_bytes": 10481030221828,
+      "missing_local_paths": 0,
+      "nonregular_local_paths": 0,
+      "local_size_mismatches": 0,
+      "scope": "Every video in the frozen compatible master compared with the separately held read-only media snapshot; not a checksum comparison or a common production boundary."
+    },
+    "reconciliation_pilot": {
+      "started_at": "2026-10-07T18:33:33.944803+00:00",
+      "status": "bounded_sample_passed",
+      "whole_selection_verified": false,
+      "required_objects": 282112,
+      "required_videos": 273096,
+      "total_video_bytes": 10481030221828,
+      "durable_verified_videos": 500,
+      "durable_issues": 0,
+      "counts": {
+        "algorithm:crc32": 55,
+        "algorithm:crc64nvme": 445,
+        "archives_verified": 9016,
+        "hash_worker_seconds": 125.17784666735679,
+        "hashed_bytes": 6604813720,
+        "hashed_videos": 500,
+        "videos_verified": 500
+      },
+      "api_invocations": {
+        "HeadObject": 9516,
+        "ListObjectsV2": 300
+      },
+      "http_attempts": {
+        "HeadObject": 9516,
+        "ListObjectsV2": 300
+      },
+      "seconds": 226.40810375800356,
+      "cloud_mutations": 0,
+      "cold_downloads": 0,
+      "thaws": 0,
+      "production_changed": false,
+      "scope": "Frozen historical selection; not a coordinated production backup or a fresh current-library census.",
+      "implementation_revision": "f60f8c2555e0d828e1ba4b615f2504e2eacb6bca",
+      "archive_scope": "9,016 full-object S3 checksum descriptors retained without reading archived payloads. This does not verify original image bytes or perform a media restore."
+    },
+    "resume_evidence": {
+      "archives_reused": 9016,
+      "video_receipts_reused": 500,
+      "prior_object_head_requests": 0,
+      "inventory_list_requests": 300,
+      "scope": "Observed start of the ongoing whole-selection run; original verified files were not rehashed. No completed whole-selection result yet."
     }
   },
   "remaining": [
     "Populated coordinated restore still running; isolated cloud drill uses a small native library and one existing cold-media reference.",
-    "Historical ETag adoption is implemented and verified with three real videos; whole-library adoption remains required. No automatic reupload or thaw was performed.",
+    "The resumable full-media check is running. All 273,096 source video paths and sizes match the saved manifest; 9,016 archive checksum headers and the first 500 complete video contents passed. The remaining video content is still being verified.",
     "Daily backup principal lacks GetBucketVersioning; existing administrative login requires refresh. Native Standard retention is not activated.",
-    "Final production migration, complete media adoption, real native daily change measurements, observed cycles, retirement and owner acceptance remain."
+    "Final production migration, complete media adoption, real native daily change measurements, observed cycles, retirement and owner acceptance remain.",
+    "The current host dedupe launcher still writes old catalogs; native plan/apply and remaining scan/manual-helper handoff must be completed before retiring those dependencies."
   ]
 }

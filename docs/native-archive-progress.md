@@ -76,7 +76,7 @@ Remaining release work:
 
 | Work | Required outcome |
 | --- | --- |
-| Callers and compatibility | Finish real producer provisioning and host/profile/service handoff; verify live launch paths and retained external contracts, then remove residual legacy adapters and dependencies. |
+| Callers and compatibility | Replace the catalog-backed dedupe launcher with native plan/apply, finish direct-scan/manual-helper handoff and real producer provisioning, verify live launch paths and retained external contracts, then remove residual legacy adapters and dependencies. |
 | Backup and restore | Prove a complete common capture boundary, actual upload/request/storage costs, bounded retention/reclamation, and an isolated empty/relocated restore with pending producer and filesystem state. |
 | Production cutover | Pin artifacts, quiesce writers, take final coordinated snapshots, migrate/reconcile, switch native launchers and resume work gradually through verified launch paths. |
 | Observation and retirement | Verify scheduled scraping/recovery/backup cycles, preserve the rollback/export boundary, and retire obsolete catalog writers, mounts, services and packages. |
@@ -11300,3 +11300,37 @@ overhead, not disk throughput or the duration of a whole-library migration.
 Initial adoption still requires reading the relevant local media. The complete
 library pass, populated coordinated restore, actual daily-change/request costs,
 cloud retention setup and production cutover remain open.
+
+## Resumable whole-media verification and live caller audit — 2026-10-07
+
+Every video in the frozen compatible backup master exists in the separately held
+read-only media snapshot: 273,096 paths and 10,481,030,221,828 bytes, with no
+missing, nonregular or size-mismatched paths. This is a path/size preflight, not
+a checksum comparison or a common production capture boundary.
+
+A bounded operational run then verified all 9,016 required image-archive S3
+checksum headers and read the complete local contents of 500 videos totalling
+6,604,813,720 bytes. All 500 matched their cloud checksums. The run took 226.4
+seconds, with 300 LIST and 9,516 HEAD requests and no retries. Its isolated ledger
+retains per-file signatures and verified object identities. It did not upload,
+download, thaw, tag or delete any cloud object, or alter the production ledger.
+Header verification does not claim to have restored the archived image bytes.
+
+The full selection is now being checked with four low-priority readers. On
+resume, one fresh inventory reused all 9,016 archive records and 500 video
+records without additional HEAD requests or repeated local hashing. Missing or
+changed evidence records an unresolved issue; only complete successful coverage
+can produce the final media manifest. The portable restore rehearsal continues
+independently with its original binary, checkpoint and runtime. Neither long
+check has a final passing result yet.
+
+Read-only service inspection confirmed the compatible Stash and n8n are running
+and the existing scrape/backup timers are enabled. Inspected stopped services
+reported success; some translation and scan work was still active.
+No schedules changed. The caller audit also confirmed an outstanding conversion:
+`dedupe-scraped-content` still uses `scrape_catalog` to prepare/reconcile deletion
+and preserve orphan NFO metadata. Both its scheduled unit and pre-backup wrapper
+must use native plan/apply before those catalogs can be retired. The post-dedupe
+recent-directory scan/autotag flow and staged manual library helpers also need
+their final native handoff. Existing live launchers cannot simply be retained
+unchanged at cutover.

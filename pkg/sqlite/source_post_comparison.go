@@ -81,11 +81,11 @@ func (s *SourceEvidenceStore) postComparisonState(ctx context.Context, id string
 	if err != nil {
 		return nil, nil, err
 	}
-	ret.Album, err = (&SourceGalleryStore{}).AssociationView(ctx, id)
+	ret.Album, err = (&SourceGalleryStore{}).associationViewForOriginal(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}
-	selection, err := (&SourceAttachmentStore{}).Selection(ctx, id)
+	selection, err := (&SourceAttachmentStore{}).selectionForOriginal(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}

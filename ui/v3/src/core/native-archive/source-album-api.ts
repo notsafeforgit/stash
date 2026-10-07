@@ -85,6 +85,7 @@ export const albumSlotSchema = z
   });
 export const albumPageSchema = z
   .object({
+    requested_uuid: uuid,
     post_uuid: uuid,
     post_revision: integer,
     post_state: z.enum(["active", "forgotten"]),
@@ -163,7 +164,7 @@ export function createSourceAlbumAPI(
         undefined,
         signal,
       );
-      if (page.post_uuid !== post)
+      if (page.requested_uuid !== post)
         throw new NativeArchiveError(0, "invalid_response");
       let previous = after ?? -1;
       for (const slot of page.slots) {

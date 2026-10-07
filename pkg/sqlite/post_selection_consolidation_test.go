@@ -40,6 +40,18 @@ func consolidationSelectionRequest(t *testing.T, repo models.Repository, post, c
 	return input, expected, slices.Compact(manifests)
 }
 
+func applyConsolidationSelection(t *testing.T, repo models.Repository, post, capture, mode, consolidation string) *models.AttachmentSelection {
+	t.Helper()
+	input, expected, manifests := consolidationSelectionRequest(t, repo, post, capture, mode)
+	var selected *models.AttachmentSelection
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		selected, err = publishConsolidatedPostSelection(ctx, input, consolidation, expected, manifests)
+		return err
+	}))
+	return selected
+}
+
 func TestPostSelectionConsolidationCombinesListsPreservingOriginalReceiptAndHistory(t *testing.T) {
 	db, repo := postIdentityFixture(t)
 	postSelectionConsolidationQueryPlan(t, repo)
@@ -181,6 +193,10 @@ func TestPostSelectionConsolidationRequiresCompleteReviewAndScopedLists(t *testi
 			require.Equal(t, before, identityRows(t, repo, "source_posts", "post_attachment_decisions", "post_attachment_decision_manifests", "post_attachment_selections"))
 		})
 	}
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, err := publishConsolidatedPostSelection(ctx, input, merge.UUID, expected, manifests)
+		return err
+	}))
 	conflicting := first
 	conflicting.UUID, conflicting.PostUUID = uuid.NewString(), b
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {

@@ -75,7 +75,12 @@ full fork gate found one original-owner test that still attempted an ordinary
 edit through a consolidated alias; the fixture now uses the reviewed consolidation
 operation and its focused regression passes. Internal source-list consolidation
 also passes combined-list, explicit-choice, rollback, original-receipt and restart
-checks. The next integrated full gate remains pending. Canonical source-list/gallery and post browsing,
+checks. Canonical source-list/gallery reads, ordered album inspection and edits
+now pass focused SQLite/HTTP checks, 65 client tests and 124 Chromium/WebKit
+browser cases, including original saved-request recovery after a merge. Read-only
+comparisons on the populated rehearsal agree for 69 indexed queries; that copy
+has no post consolidations, so merged cases are covered separately by fixtures.
+The next integrated full gate remains pending. General canonical post browsing,
 the encompassing merge transaction and the complete merge API/UI still require
 integration before application use.
 
@@ -10692,3 +10697,42 @@ its corrected reviewed-consolidation path passes. Evidence is under
 `.local/native-post-selection-consolidation-20261006/`. No schema migration is
 added. Canonical readers/editors and the encompassing merge API/UI remain separate
 integration work; the next full gate is still required before pushing.
+
+## Canonical source albums and saved edits — 2026-10-06
+
+Source-list selections, gallery associations and ordered album pages now follow
+the canonical post identity. Ordinary new edits require its current UUID and
+revision; retained choices on earlier aliases cause an explicit conflict until
+the encompassing merge resolves them. Gallery-to-post lists deduplicate merged
+post aliases. Manifest discovery pages the indexed source lists of each original
+member before sorting a bounded union, retaining original capture witnesses
+without loading their payloads.
+
+The application identity context returns requested and canonical records.
+Album responses similarly distinguish the requested UUID from the current post.
+Source-list and gallery editors recover saved original requests before pending
+canonical requests and use the current identity for new edits. Original history,
+complete merge comparison and immutable receipts retain their original scopes.
+Ingestion selects through the current post while preserving capture provenance.
+
+Focused SQLite checks cover canonical selections/albums, merged manifest pages,
+gallery deduplication, rejection of ordinary alias writes, original receipts and
+portable restore. Real HTTP and capture-intake/recovery checks also pass. Client
+validation includes app/browser TypeScript, Biome, ESLint and 65 tests. All 124
+Chromium/WebKit browser cases pass across source-list/association editing, source
+albums, post browsing and album review. An earlier browser run had one WebKit
+context closure; the final expanded run passes that case without a workaround.
+
+On the read-only schema-90 rehearsal, 69 selected-post and manifest-pagination
+queries return the same results as the prior readers; the slowest new query took
+8.3 ms. That populated copy has no post consolidations, so this comparison proves
+unchanged-data behavior rather than full-library merged-post performance. Merged
+groups are covered by the repository and browser fixtures. Source hashes,
+query results and check receipts are retained under
+`.local/native-canonical-post-albums-20261006/` and
+`.local/native-discovery-client-20261004/`.
+
+No schema migration or production change is added. The integrated full gate is
+pending before push. General canonical post browsing, the encompassing merge
+transaction/API/UI, pending-work publication and all broader transition gates
+remain required.

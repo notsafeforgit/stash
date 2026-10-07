@@ -83,6 +83,24 @@ export const postSearchSchema = postFilterSchema.safeExtend({
 });
 export type PostFilter = z.infer<typeof postFilterSchema>;
 export type PostIdentifier = z.infer<typeof identifier>;
+const postIdentitySchema = z.object({
+  uuid,
+  canonical_uuid: uuid,
+  redirect_to: uuid.nullable(),
+  state: z.enum(["active", "forgotten"]),
+  revision,
+  created_at: z.string().datetime({ offset: true }),
+});
+export const postIdentityContextSchema = z
+  .object({ requested: postIdentitySchema, canonical: postIdentitySchema })
+  .refine(
+    ({ requested, canonical }) =>
+      requested.canonical_uuid === canonical.uuid &&
+      canonical.uuid === canonical.canonical_uuid &&
+      canonical.redirect_to === null &&
+      (requested.uuid === canonical.uuid) === (requested.redirect_to === null),
+  );
+export type PostIdentity = z.infer<typeof postIdentitySchema>;
 export const postSummarySchema = z
   .object({
     uuid,
@@ -183,6 +201,16 @@ export function createSourcePostAPI(
     endpoint,
     pageLimit,
     review: createSourceReviewAPI(endpoint, transport),
+    async identity(id: string, signal?: AbortSignal) {
+      const value = await request(
+        `${path(id)}/identity`,
+        postIdentityContextSchema,
+        undefined,
+        signal,
+      );
+      if (value.requested.uuid !== id) invalidResponse();
+      return value;
+    },
     async posts(filter: PostFilter, after?: string, signal?: AbortSignal) {
       const valid = postFilterSchema.parse(filter);
       const query = page(after);
@@ -262,14 +290,14 @@ export function createSourcePostAPI(
       return ordered(rows, (row) => row.media.uuid, after);
     },
     async album(post: string, signal?: AbortSignal) {
-      const album = await request(
+      const value = await request(
         `${path(post)}/album`,
-        postAlbumSchema.nullable(),
+        z.object({ requested_uuid: uuid, album: postAlbumSchema.nullable() }),
         undefined,
         signal,
       );
-      if (album && album.post_uuid !== post) invalidResponse();
-      return album;
+      if (value.requested_uuid !== post) invalidResponse();
+      return value.album;
     },
   };
 }

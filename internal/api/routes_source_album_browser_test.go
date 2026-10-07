@@ -3,6 +3,9 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -11,6 +14,19 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSourceAlbumReadChoiceConflictsReturn409(t *testing.T) {
+	for _, err := range []error{models.ErrAttachmentSelectionConflict, models.ErrSourceGalleryConflict, models.ErrSourceAttachmentConflict} {
+		t.Run(err.Error(), func(t *testing.T) {
+			w := httptest.NewRecorder()
+			nativeArchiveError(w, fmt.Errorf("read album: %w", err))
+			require.Equal(t, http.StatusConflict, w.Code)
+			var body map[string]string
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+			require.Equal(t, "preview_changed", body["error"], "unsettled choices require review, not an outage retry")
+		})
+	}
+}
 
 func TestSourceAlbumBrowserHTTPOrderPaginationAndDisabledAssociation(t *testing.T) {
 	_, repo, get := sourcePostBrowserHTTPFixture(t)
@@ -66,6 +82,8 @@ func TestSourceAlbumBrowserHTTPOrderPaginationAndDisabledAssociation(t *testing.
 	path := "/posts/" + post.UUID + "/album-media"
 	var first, second models.SourceAlbumPage
 	require.NoError(t, json.Unmarshal(get(path+"?limit=2", 200).Body.Bytes(), &first))
+	require.Equal(t, post.UUID, first.RequestedUUID)
+	require.Equal(t, post.UUID, first.PostUUID)
 	require.Len(t, first.Slots, 2)
 	require.Equal(t, 0, first.Slots[0].Position)
 	require.Nil(t, first.Slots[1].Attachment)

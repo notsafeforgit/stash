@@ -67,6 +67,7 @@ export function albumPage(): AlbumPage {
     registered_files: 0,
   };
   return {
+    requested_uuid: postIds.post,
     post_uuid: postIds.post,
     post_revision: 10,
     post_state: "active",

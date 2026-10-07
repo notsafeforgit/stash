@@ -88,7 +88,7 @@ func TestPostAttachmentConsolidationRetainsOriginalEvidenceAndReviewReceiptAcros
 		_, err := publishConsolidatedAttachmentMedia(ctx, b, merge.UUID, snapshot.Signature, selectedInput)
 		return err
 	}))
-	postSelectionApply(t, repo, b, captures[a].UUID, "pinned", "review")
+	applyConsolidationSelection(t, repo, b, captures[a].UUID, "pinned", merge.UUID)
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		preview, err := repo.SourceGallery.Preview(ctx, b)
 		require.NoError(t, err)
@@ -118,7 +118,7 @@ func TestPostAttachmentConsolidationRetainsOriginalEvidenceAndReviewReceiptAcros
 		selected, err = publishConsolidatedAttachmentMedia(ctx, c, finalMerge.UUID, snapshot.Signature, finalInput)
 		return err
 	}))
-	postSelectionApply(t, repo, c, captures[a].UUID, "pinned", "review")
+	applyConsolidationSelection(t, repo, c, captures[a].UUID, "pinned", finalMerge.UUID)
 	require.Equal(t, evidence, identityRows(t, repo, "source_captures", "source_post_revisions", "source_attachment_manifests", "source_attachment_entries"))
 	require.NoError(t, db.Close())
 	require.NoError(t, db.Open(db.DatabasePath()))

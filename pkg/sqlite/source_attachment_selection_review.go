@@ -55,10 +55,19 @@ func attachmentSelectionReviewList(selected *models.AttachmentSelection) *models
 	return ret
 }
 
-const selectionReviewManifestsQuery = `SELECT m.*,
+// Take at most one page per original owner before sorting the small union.
+// A merged post can retain many captures, but listing its first page must not
+// sort or reconstruct every source list retained under those original posts.
+const selectionReviewManifestsQuery = `WITH candidates AS MATERIALIZED (
+ SELECT item.value AS uuid FROM source_post_identities i
+ CROSS JOIN json_each((SELECT json_group_array(uuid) FROM (
+  SELECT uuid FROM source_attachment_manifests WHERE post_uuid=i.post_uuid AND uuid>? ORDER BY uuid LIMIT ?
+ ))) item WHERE i.canonical_uuid=(SELECT canonical_uuid FROM source_post_identities WHERE post_uuid=?)
+), selected AS (SELECT uuid FROM candidates ORDER BY uuid LIMIT ?)
+SELECT m.*,
  (SELECT c.capture_uuid FROM source_capture_attachment_manifests c
   WHERE c.manifest_uuid=m.uuid ORDER BY c.capture_uuid LIMIT 1) AS capture_uuid
- FROM source_attachment_manifests m WHERE m.post_uuid=? AND m.uuid>? ORDER BY m.uuid LIMIT ?`
+ FROM selected JOIN source_attachment_manifests m ON m.uuid=selected.uuid ORDER BY m.uuid`
 
 func (s *SourceAttachmentStore) ReviewSelectionManifests(ctx context.Context, post, after string, limit int) ([]models.AttachmentSelectionReviewManifest, error) {
 	if id, err := archiveUUID(post); err != nil || id != post || limit < 1 || limit > 100 {
@@ -75,7 +84,7 @@ func (s *SourceAttachmentStore) ReviewSelectionManifests(ctx context.Context, po
 	}
 	// Both manifest pagination and the one witness lookup use their scoped
 	// indexes. Do not page through every capture or reconstruct source payloads.
-	if err := dbWrapper.Select(ctx, &rows, selectionReviewManifestsQuery, post, after, limit); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, selectionReviewManifestsQuery, after, limit, post, limit); err != nil {
 		return nil, err
 	}
 	ret := make([]models.AttachmentSelectionReviewManifest, 0, len(rows))

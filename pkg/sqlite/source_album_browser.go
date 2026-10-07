@@ -15,7 +15,19 @@ func (s *SourceGalleryStore) AssociationView(ctx context.Context, post string) (
 	if err != nil || association == nil {
 		return nil, err
 	}
-	ret := &models.SourcePostAlbum{PostUUID: post, DecisionUUID: association.UUID, Revision: association.Revision,
+	return sourceGalleryAssociationView(ctx, association)
+}
+
+func (s *SourceGalleryStore) associationViewForOriginal(ctx context.Context, post string) (*models.SourcePostAlbum, error) {
+	association, err := s.associationForOriginal(ctx, post)
+	if err != nil || association == nil {
+		return nil, err
+	}
+	return sourceGalleryAssociationView(ctx, association)
+}
+
+func sourceGalleryAssociationView(ctx context.Context, association *models.SourceGalleryDecision) (*models.SourcePostAlbum, error) {
+	ret := &models.SourcePostAlbum{PostUUID: association.PostUUID, DecisionUUID: association.UUID, Revision: association.Revision,
 		State: association.State, GalleryUUID: association.GalleryUUID, SelectionUUID: association.SelectionUUID,
 		Origin: association.Origin, Reason: association.Reason, CreatedAt: association.CreatedAt}
 	if association.GalleryUUID == nil {
@@ -156,11 +168,11 @@ func (s *SourceGalleryStore) ReadAlbum(ctx context.Context, id string, after, li
 	if !validSourceRunUUID(id) || after < -1 || after >= archive.MaxManifestPositions || limit < 1 || limit > 100 {
 		return nil, models.ErrSourcePostBrowseInvalid
 	}
-	post, err := (&SourceEvidenceStore{}).FindPost(ctx, id)
+	post, err := currentSourcePost(ctx, id)
 	if err != nil || post == nil {
 		return nil, err
 	}
-	ret := &models.SourceAlbumPage{PostUUID: post.UUID, PostRevision: post.Revision, PostState: post.State, Slots: []models.SourceAlbumSlot{}}
+	ret := &models.SourceAlbumPage{RequestedUUID: id, PostUUID: post.UUID, PostRevision: post.Revision, PostState: post.State, Slots: []models.SourceAlbumSlot{}}
 	ret.Album, err = s.AssociationView(ctx, id)
 	if err != nil {
 		return nil, err
@@ -241,8 +253,9 @@ func sourceAlbumGalleryPostsQuery(ids []string, after string, limit int) (string
 		args = append(args, id)
 	}
 	args = append(args, after, limit)
-	return `SELECT post_uuid FROM post_gallery_links INDEXED BY post_gallery_links_gallery
-WHERE gallery_uuid IN ` + getInBinding(len(ids)) + ` AND post_uuid>? ORDER BY post_uuid LIMIT ?`, args
+	return `SELECT DISTINCT i.canonical_uuid FROM post_gallery_links l INDEXED BY post_gallery_links_gallery
+JOIN source_post_identities i ON i.post_uuid=l.post_uuid
+WHERE l.gallery_uuid IN ` + getInBinding(len(ids)) + ` AND i.canonical_uuid>? ORDER BY i.canonical_uuid LIMIT ?`, args
 }
 
 func (s *SourceGalleryStore) PostsForGallery(ctx context.Context, id, after string, limit int) (*models.SourceGalleryPosts, error) {

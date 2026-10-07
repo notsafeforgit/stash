@@ -6,6 +6,7 @@ import {
   postMedia,
   postAlbum,
   postIds,
+  postAlbumContext,
 } from "../fixtures/source-posts";
 import { account } from "../fixtures/account-review";
 
@@ -91,15 +92,18 @@ async function archive(
       };
       result = [row, deleted];
     } else if (path.endsWith("/album")) {
-      result = options.disabledAlbum
-        ? {
-            ...postAlbum(),
-            state: "disabled",
-            gallery: null,
-            gallery_uuid: null,
-            reason: "Kept separate",
-          }
-        : postAlbum();
+      result = postAlbumContext(
+        options.disabledAlbum
+          ? {
+              ...postAlbum(),
+              state: "disabled",
+              gallery: null,
+              gallery_uuid: null,
+              reason: "Kept separate",
+            }
+          : postAlbum(),
+        path.split("/")[1],
+      );
     } else if (path.endsWith("/capture-summaries"))
       result = {
         revisions: [

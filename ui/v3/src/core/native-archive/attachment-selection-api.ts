@@ -3,7 +3,7 @@ import {
   accountUUIDSchema as uuid,
   ownershipReasonSchema as reason,
 } from "./account-review-api";
-import { postSummarySchema } from "./source-post-api";
+import { createSourcePostAPI } from "./source-post-api";
 import {
   createArchiveRequest,
   nativeArchiveEndpoint,
@@ -187,20 +187,13 @@ export function createAttachmentSelectionAPI(
   transport: typeof fetch = fetch,
 ) {
   const request = createArchiveRequest(endpoint, transport);
+  const posts = createSourcePostAPI(endpoint, transport);
   const pageLimit = 25;
   return {
     endpoint,
     pageLimit,
     async post(post: string, signal?: AbortSignal) {
-      const value = await request(
-        `posts/${uuid.parse(post)}`,
-        postSummarySchema,
-        undefined,
-        signal,
-      );
-      if (value.uuid !== post)
-        throw new NativeArchiveError(0, "invalid_response");
-      return value;
+      return (await posts.identity(post, signal)).canonical;
     },
     async manifests(post: string, after?: string, signal?: AbortSignal) {
       const query = new URLSearchParams({ limit: String(pageLimit) });

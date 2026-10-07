@@ -1,5 +1,10 @@
 import { expect, it, vi } from "vitest";
 import {
+  postIdentity,
+  postAlbum,
+  postAlbumContext,
+} from "../../../tests/fixtures/source-posts";
+import {
   createGalleryAssociationAPI,
   createAttachmentMediaAPI,
   attachmentMediaContextSchema,
@@ -13,6 +18,26 @@ import {
 } from "../../../tests/fixtures/source-association";
 
 const endpoint = "https://example.test/library/api/v3/archive/";
+
+it("loads a merged post's gallery context using its canonical identity", async () => {
+  const identity = postIdentity(ids.post, ids.otherPost, 7);
+  const album = { ...postAlbum(), post_uuid: ids.otherPost };
+  const transport = vi.fn<typeof fetch>(async (input) =>
+    Response.json(
+      String(input).endsWith("/identity")
+        ? identity
+        : postAlbumContext(album, ids.otherPost),
+    ),
+  );
+  const api = createGalleryAssociationAPI(endpoint, transport);
+  const context = await api.context(ids.post);
+  expect(context).toEqual({ post: identity.canonical, album });
+  expect(api.contextScope(context)).toBe(ids.otherPost);
+  expect(transport.mock.calls.map((call) => String(call[0]))).toEqual([
+    `${endpoint}posts/${ids.post}/identity`,
+    `${endpoint}posts/${ids.otherPost}/album`,
+  ]);
+});
 const galleryInput = () => ({
   ...galleryPreview().input,
   request_uuid: ids.request,

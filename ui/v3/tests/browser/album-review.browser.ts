@@ -7,7 +7,12 @@ import {
   albumReviewID,
 } from "../fixtures/album-review";
 import { albumPage, albumSlot } from "../fixtures/source-albums";
-import { postIds, postSummary, postAlbum } from "../fixtures/source-posts";
+import {
+  postIds,
+  postSummary,
+  postAlbum,
+  postAlbumContext,
+} from "../fixtures/source-posts";
 import {
   albumPolicySchema,
   type AlbumJob,
@@ -184,10 +189,12 @@ async function archive(page: Page, create = false) {
       };
     else if (path === `posts/${postIds.post}`) result = postSummary();
     else if (path.endsWith("/album"))
-      result =
+      result = postAlbumContext(
         create && ![...jobs.values()].some((j) => j.publication_committed)
           ? null
-          : postAlbum();
+          : postAlbum(),
+        path.split("/")[1],
+      );
     else if (path.endsWith("/album-media")) {
       const p = preview(),
         data = albumPage();

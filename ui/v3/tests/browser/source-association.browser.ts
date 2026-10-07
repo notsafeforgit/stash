@@ -2,7 +2,13 @@ import { emptyDownloadStatus } from "../fixtures/downloads";
 import type { Page, Route } from "@playwright/test";
 import { test, expect, chooseSection } from "./test";
 import { albumPage, albumUUID } from "../fixtures/source-albums";
-import { postIds, postSummary, postAlbum } from "../fixtures/source-posts";
+import {
+  postIds,
+  postSummary,
+  postAlbum,
+  postIdentity,
+  postAlbumContext,
+} from "../fixtures/source-posts";
 import {
   galleryPreview,
   mediaPreview,
@@ -51,6 +57,7 @@ async function archive(page: Page) {
   const galleryHistory: GalleryAssociationDecision[] = [],
     mediaHistory: AttachmentMediaDecision[] = [];
   let revision = 10,
+    canonicalPost = postIds.post,
     displayedAttachment = attachment,
     loseReply = false,
     wrongReceipt = false,
@@ -84,6 +91,11 @@ async function archive(page: Page) {
     const path = url.pathname.split("/archive/")[1]!;
     if (path === "gallery-association/preview") {
       const input = galleryAssociationInputSchema.parse(request.postDataJSON());
+      if (input.post_uuid !== canonicalPost || input.post_revision !== revision)
+        return route.fulfill({
+          status: 409,
+          json: { error: "preview_changed" },
+        });
       const proposed =
         input.state === "linked"
           ? input.gallery_uuid === galleryTarget.uuid
@@ -135,6 +147,7 @@ async function archive(page: Page) {
       if (
         conflict ||
         input.post_revision !== revision ||
+        (!("attachment_uuid" in input) && input.post_uuid !== canonicalPost) ||
         ("attachment_uuid" in input &&
           input.attachment_uuid !== media.attachment.uuid)
       )
@@ -164,7 +177,7 @@ async function archive(page: Page) {
       } else {
         receipt = galleryReceipt(input);
         gallery = {
-          post_uuid: postIds.post,
+          post_uuid: input.post_uuid,
           decision_uuid: receipt.decision_uuid,
           revision,
           state: input.state,
@@ -200,7 +213,11 @@ async function archive(page: Page) {
       });
     }
     let result: unknown;
-    if (path === `posts/${postIds.post}`) {
+    if (path.endsWith("/identity") && path.startsWith("posts/")) {
+      if (failRefresh && receipts.size)
+        return route.fulfill({ status: 503, json: { error: "unavailable" } });
+      result = postIdentity(path.split("/")[1], canonicalPost, revision);
+    } else if (path === `posts/${postIds.post}`) {
       if (failRefresh && receipts.size)
         return route.fulfill({ status: 503, json: { error: "unavailable" } });
       result = { ...postSummary(), revision };
@@ -217,6 +234,7 @@ async function archive(page: Page) {
       };
     } else if (path.endsWith("/gallery-association-history"))
       result = galleryHistory
+        .filter((item) => item.post_uuid === path.split("/")[1])
         .filter((item) => item.revision > Number(url.searchParams.get("after")))
         .slice(0, 25);
     else if (path.endsWith("/media-history"))
@@ -248,6 +266,8 @@ async function archive(page: Page) {
       };
     else if (path.endsWith("/album-media")) {
       const value = albumPage();
+      value.requested_uuid = path.split("/")[1]!;
+      value.post_uuid = canonicalPost;
       value.post_revision = revision;
       value.album = gallery;
       value.slots = value.slots.map((slot) =>
@@ -277,7 +297,8 @@ async function archive(page: Page) {
               },
         );
       result = value;
-    } else if (path.endsWith("/album")) result = gallery;
+    } else if (path.endsWith("/album"))
+      result = postAlbumContext(gallery, path.split("/")[1]);
     else throw new Error(`Unexpected association read ${path}`);
     return route.fulfill({ json: result });
   }
@@ -337,6 +358,11 @@ async function archive(page: Page) {
     searches,
     galleryHistory,
     mediaHistory,
+    mergePost: () => {
+      revision++;
+      canonicalPost = postIds.otherPost;
+      gallery = { ...gallery, post_uuid: canonicalPost, revision };
+    },
     mergeAttachment: () => {
       revision++;
       media.post_uuid = postIds.otherPost;
@@ -447,6 +473,25 @@ async function apply(page: Page, family: Family) {
 }
 
 for (const desktop of [false, true]) {
+  test(`gallery edits follow a merged post on ${desktop ? "desktop" : "phone"}`, async ({
+    page,
+  }) => {
+    const remote = await archive(page);
+    remote.mergePost();
+    await open(page, "gallery", desktop);
+    await apply(page, "gallery");
+    await expect(
+      page.getByText("Association choice saved", { exact: true }),
+    ).toBeVisible();
+    expect(remote.writes).toHaveLength(1);
+    expect(JSON.parse(remote.writes[0]!).post_uuid).toBe(postIds.otherPost);
+    expect(
+      remote.requests.some((url) =>
+        url.pathname.endsWith(`posts/${postIds.otherPost}/album`),
+      ),
+    ).toBe(true);
+  });
+
   test(`shared attachment saves to its owner on ${desktop ? "desktop" : "phone"}`, async ({
     page,
   }) => {
@@ -469,6 +514,30 @@ for (const desktop of [false, true]) {
     expect(remote.mediaHistory[0]?.attachment_uuid).toBe(ids.otherAttachment);
   });
 }
+
+test("an original gallery request recovers after a post merge without rewriting its body", async ({
+  page,
+}) => {
+  const remote = await archive(page);
+  await open(page, "gallery");
+  remote.loseReply();
+  await apply(page, "gallery");
+  await expect(
+    page.getByRole("button", { name: "Recover saved request", exact: true }),
+  ).toBeVisible();
+  const original = remote.writes[0]!;
+  remote.mergePost();
+  await open(page, "gallery", false, true);
+  expect(remote.writes).toEqual([original]);
+  await page
+    .getByRole("button", { name: "Recover saved request", exact: true })
+    .click();
+  await expect(
+    page.getByText("Association choice saved", { exact: true }),
+  ).toBeVisible();
+  expect(remote.writes).toEqual([original]);
+  expect(JSON.parse(original).post_uuid).toBe(postIds.post);
+});
 
 test("an original attachment request recovers after a merge even when context is unavailable", async ({
   page,

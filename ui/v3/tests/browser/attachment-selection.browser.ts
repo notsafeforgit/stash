@@ -1,7 +1,14 @@
 import type { Page, Route } from "@playwright/test";
+import { emptyDownloadStatus } from "../fixtures/downloads";
 import { test, expect, chooseSection } from "./test";
 import { albumPage, albumUUID } from "../fixtures/source-albums";
-import { postIds, postSummary, postAlbum } from "../fixtures/source-posts";
+import {
+  postIds,
+  postSummary,
+  postAlbum,
+  postIdentity,
+  postAlbumContext,
+} from "../fixtures/source-posts";
 import {
   preview as samplePreview,
   receipt as sampleReceipt,
@@ -42,6 +49,7 @@ async function archive(page: Page) {
     },
   ];
   let revision = 4,
+    canonicalPost = postIds.post,
     loseReply = false,
     wrongReceipt = false,
     conflict = "",
@@ -50,12 +58,25 @@ async function archive(page: Page) {
   let release: (() => void) | undefined;
   let held: Promise<void> | undefined;
   async function handler(route: Route) {
+    if (
+      new URL(route.request().url()).pathname.endsWith(
+        "/attachments/download-status",
+      )
+    )
+      return route.fulfill({
+        json: emptyDownloadStatus(route.request().postDataJSON().attachments),
+      });
     const request = route.request(),
       url = new URL(request.url());
     requests.push(url);
     const path = url.pathname.split("/archive/")[1]!;
     if (path === "attachment-selection/preview") {
       const input = selectionInputSchema.parse(request.postDataJSON());
+      if (input.post_uuid !== canonicalPost || input.post_revision !== revision)
+        return route.fulfill({
+          status: 409,
+          json: { error: "preview_changed" },
+        });
       const manifest = manifests.find(
         (item) => item.capture_uuid === input.capture_uuid,
       );
@@ -76,7 +97,11 @@ async function archive(page: Page) {
       const body = request.postData()!,
         input = selectionApplySchema.parse(request.postDataJSON());
       writes.push(body);
-      if (conflict || input.post_revision !== revision) {
+      if (
+        conflict ||
+        input.post_uuid !== canonicalPost ||
+        input.post_revision !== revision
+      ) {
         await route.fulfill({
           status: 409,
           json: { error: conflict || "preview_changed" },
@@ -93,7 +118,7 @@ async function archive(page: Page) {
       };
       history.push({
         uuid: receipt.decision_uuid,
-        post_uuid: postIds.post,
+        post_uuid: input.post_uuid,
         revision,
         mode: input.mode,
         origin: "review",
@@ -130,8 +155,13 @@ async function archive(page: Page) {
       result = manifests.filter((item) => item.uuid > after).slice(0, 25);
     } else if (path.endsWith("/attachment-selection-history")) {
       result = history
+        .filter((item) => item.post_uuid === path.split("/")[1])
         .filter((item) => item.revision > Number(url.searchParams.get("after")))
         .slice(0, 25);
+    } else if (path.endsWith("/identity") && path.startsWith("posts/")) {
+      if (failRefresh && receipts.size > 0)
+        return route.fulfill({ status: 503, json: { error: "unavailable" } });
+      result = postIdentity(path.split("/")[1], canonicalPost, revision);
     } else if (path === `posts/${postIds.post}`) {
       if (failRefresh && receipts.size > 0) {
         await route.fulfill({ status: 503, json: { error: "unavailable" } });
@@ -153,13 +183,17 @@ async function archive(page: Page) {
       };
     } else if (path.endsWith("/album-media")) {
       const album = albumPage();
+      album.requested_uuid = path.split("/")[1]!;
+      album.post_uuid = canonicalPost;
+      if (album.album) album.album.post_uuid = canonicalPost;
       album.post_revision = revision;
       if (current?.mode === "disabled") {
         album.selection = null;
         album.slots = [];
       }
       result = album;
-    } else if (path.endsWith("/album")) result = postAlbum();
+    } else if (path.endsWith("/album"))
+      result = postAlbumContext(postAlbum(), path.split("/")[1]);
     else throw new Error(`Unexpected selection read ${path}`);
     await route.fulfill({ json: result });
   }
@@ -182,6 +216,10 @@ async function archive(page: Page) {
     },
     failRefresh(value: boolean) {
       failRefresh = value;
+    },
+    mergePost() {
+      canonicalPost = postIds.otherPost;
+      revision++;
     },
     hold() {
       held = new Promise<void>((resolve) => {
@@ -252,6 +290,28 @@ async function apply(page: Page) {
 }
 
 for (const desktop of [false, true]) {
+  test(`new source-list edits follow a merged post on ${desktop ? "desktop" : "phone"}`, async ({
+    page,
+  }) => {
+    const remote = await archive(page);
+    remote.mergePost();
+    await open(page, desktop);
+    await apply(page);
+    await expect(
+      page.getByText("Source-list choice saved", { exact: true }),
+    ).toBeVisible();
+    expect(remote.writes).toHaveLength(1);
+    expect(JSON.parse(remote.writes[0]!).post_uuid).toBe(postIds.otherPost);
+    expect(remote.previews[0]!.input.post_uuid).toBe(postIds.otherPost);
+    expect(
+      remote.requests.some((url) =>
+        url.pathname.endsWith(
+          `posts/${postIds.otherPost}/attachment-manifests`,
+        ),
+      ),
+    ).toBe(true);
+  });
+
   test(`source-list preview preserves repeated positions without writes on ${desktop ? "desktop" : "phone"}`, async ({
     page,
   }) => {
@@ -324,6 +384,39 @@ for (const desktop of [false, true]) {
     );
   });
 }
+
+test("an original saved source-list request recovers after a merge before a new canonical edit", async ({
+  page,
+}) => {
+  const remote = await archive(page);
+  await open(page);
+  remote.loseReply();
+  await apply(page);
+  await expect(
+    page.getByText("A source-list change needs confirmation", { exact: true }),
+  ).toBeVisible();
+  const original = remote.writes[0]!;
+  remote.mergePost();
+  await open(page);
+  expect(remote.writes).toEqual([original]);
+  await page
+    .getByRole("button", { name: "Check and retry saved change", exact: true })
+    .click();
+  await expect(
+    page.getByText("Source-list choice saved", { exact: true }),
+  ).toBeVisible();
+  expect(remote.writes).toEqual([original]);
+  expect(JSON.parse(original).post_uuid).toBe(postIds.post);
+  await expect(
+    page.getByRole("button", { name: "Keep this order", exact: true }),
+  ).toBeEnabled();
+  await apply(page);
+  await expect(
+    page.getByText("Source-list choice saved", { exact: true }),
+  ).toBeVisible();
+  expect(remote.writes).toHaveLength(2);
+  expect(JSON.parse(remote.writes[1]!).post_uuid).toBe(postIds.otherPost);
+});
 
 test("a stale choice clears its preview; a request conflict remains pending", async ({
   page,

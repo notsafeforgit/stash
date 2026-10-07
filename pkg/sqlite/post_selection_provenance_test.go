@@ -61,8 +61,14 @@ func TestPostSelectionProvenanceCombinesOriginalListsAcrossChainedIdentities(t *
 	old := postSelectionApply(t, repo, a, first.UUID, "pinned", "review")
 	before := identityRows(t, repo, "source_captures", "source_post_revisions", "source_attachment_manifests", "source_attachment_entries")
 	publishPostIdentity(t, repo, identityRequest(t, repo, a, b))
-	publishPostIdentity(t, repo, identityRequest(t, repo, b, c))
-	selected := postSelectionApply(t, repo, c, first.UUID, "automatic", "ingest")
+	merge := publishPostIdentity(t, repo, identityRequest(t, repo, b, c))
+	input, expected, manifests := consolidationSelectionRequest(t, repo, c, first.UUID, "automatic")
+	var selected *models.AttachmentSelection
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		selected, err = publishConsolidatedPostSelection(ctx, input, merge.UUID, expected, manifests)
+		return err
+	}))
 	require.Len(t, selected.Entries, 2)
 	selected = postSelectionApply(t, repo, c, second.UUID, "automatic", "ingest")
 	require.Len(t, selected.Decision.ManifestUUIDs, 2)
@@ -91,6 +97,30 @@ func TestPostSelectionProvenanceCombinesOriginalListsAcrossChainedIdentities(t *
 		current, err := repo.SourceAttachment.Selection(ctx, c)
 		require.NoError(t, err)
 		require.Equal(t, selected, current)
+		for _, alias := range []string{a, b} {
+			current, err := repo.SourceAttachment.Selection(ctx, alias)
+			require.NoError(t, err)
+			require.Equal(t, selected, current)
+			preview, err := repo.SourceAttachment.PreviewSelection(ctx, alias, first.UUID)
+			require.NoError(t, err)
+			require.Equal(t, c, preview.PostUUID)
+			album, err := repo.SourceGallery.ReadAlbum(ctx, alias, -1, 25)
+			require.NoError(t, err)
+			require.Equal(t, alias, album.RequestedUUID)
+			require.Equal(t, c, album.PostUUID)
+			require.Equal(t, c, album.Album.PostUUID)
+			require.Len(t, album.Slots, 3)
+			_, err = repo.SourceAttachment.DecideSelection(ctx, models.AttachmentSelectionInput{PostUUID: alias,
+				ExpectedPostRevision: preview.PostRevision, CaptureUUID: first.UUID, Mode: "pinned", Origin: "review"})
+			require.ErrorIs(t, err, models.ErrAttachmentSelectionConflict)
+		}
+		posts, err := repo.SourceAttachment.SelectedPosts(ctx, "", 100)
+		require.NoError(t, err)
+		require.Len(t, posts, 1)
+		require.Equal(t, c, posts[0].PostUUID)
+		lists, err := repo.SourceAttachment.ReviewSelectionManifests(ctx, a, "", 100)
+		require.NoError(t, err)
+		require.Len(t, lists, 2)
 		history, err := repo.SourceAttachment.SelectionHistory(ctx, a, 0, 10)
 		require.NoError(t, err)
 		require.Equal(t, []models.AttachmentSelectionDecision{old.Decision}, history)

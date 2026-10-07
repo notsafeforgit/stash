@@ -1,4 +1,5 @@
 import { expect, it, vi } from "vitest";
+import { postIdentity } from "../../../tests/fixtures/source-posts";
 import {
   createAttachmentSelectionAPI,
   selectionListSchema,
@@ -10,6 +11,19 @@ import {
 } from "../../../tests/fixtures/attachment-selection";
 
 const endpoint = "https://example.test/library/api/v3/archive/";
+
+it("uses a verified canonical post revision for new source-list choices", async () => {
+  const value = postIdentity(ids.post, ids.otherPost, 7);
+  const transport = vi.fn<typeof fetch>(async () => Response.json(value));
+  const api = createAttachmentSelectionAPI(endpoint, transport);
+  expect(await api.post(ids.post)).toEqual(value.canonical);
+  expect(String(transport.mock.calls[0]?.[0])).toBe(
+    `${endpoint}posts/${ids.post}/identity`,
+  );
+  await expect(api.post(ids.otherPost)).rejects.toMatchObject({
+    code: "invalid_response",
+  });
+});
 function input() {
   return {
     ...preview().input,

@@ -40,19 +40,30 @@ func (s *SourceAttachmentStore) SelectedPosts(ctx context.Context, after string,
 		PostState     string `db:"post_state"`
 		SelectionUUID string `db:"selection_uuid"`
 		Mode          string `db:"mode"`
+		Unsettled     bool   `db:"unsettled"`
 	}
-	if err := dbWrapper.Select(ctx, &rows, `SELECT s.post_uuid,p.state AS post_state,s.decision_uuid AS selection_uuid,d.mode
-FROM post_attachment_selections s JOIN source_posts p ON p.uuid=s.post_uuid
-JOIN post_attachment_decisions d ON d.uuid=s.decision_uuid
-WHERE s.post_uuid>? ORDER BY s.post_uuid LIMIT ?`, after, limit); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, selectedCanonicalPostsQuery, after, limit); err != nil {
 		return nil, err
 	}
 	ret := make([]models.SelectedSourcePost, 0, len(rows))
 	for _, row := range rows {
+		if row.Unsettled {
+			return nil, models.ErrAttachmentSelectionConflict
+		}
 		ret = append(ret, models.SelectedSourcePost{PostUUID: row.PostUUID, PostState: row.PostState, SelectionUUID: row.SelectionUUID, Mode: row.Mode})
 	}
 	return ret, nil
 }
+
+const selectedCanonicalPostsQuery = `SELECT i.canonical_uuid AS post_uuid,p.state AS post_state,s.decision_uuid AS selection_uuid,d.mode,
+ (i.post_uuid<>i.canonical_uuid OR EXISTS(SELECT 1 FROM source_post_identities other
+  JOIN post_attachment_selections choice ON choice.post_uuid=other.post_uuid
+  WHERE other.canonical_uuid=i.canonical_uuid AND other.post_uuid<>i.post_uuid)) AS unsettled
+FROM source_post_identities i INDEXED BY source_post_identities_canonical
+JOIN post_attachment_selections s ON s.post_uuid=i.post_uuid
+JOIN source_posts p ON p.uuid=i.canonical_uuid
+JOIN post_attachment_decisions d ON d.uuid=s.decision_uuid
+WHERE i.canonical_uuid>? ORDER BY i.canonical_uuid LIMIT ?`
 
 func (r attachmentSelectionRow) resolve(ids []string) models.AttachmentSelectionDecision {
 	ret := models.AttachmentSelectionDecision{UUID: r.UUID, PostUUID: r.PostUUID, Revision: r.Revision, Mode: r.Mode,
@@ -223,7 +234,31 @@ func readSelection(row *attachmentSelectionRow, ids []string, sources map[string
 }
 
 func (s *SourceAttachmentStore) Selection(ctx context.Context, value string) (*models.AttachmentSelection, error) {
-	return s.selectionForOriginal(ctx, value)
+	post, err := currentSourcePost(ctx, value)
+	if err != nil || post == nil {
+		return nil, err
+	}
+	row, err := currentSelectionRow(ctx, post.UUID)
+	if err != nil {
+		return nil, err
+	}
+	return storedSelection(ctx, row)
+}
+
+// An identity-only merge has not yet resolved its source lists. Ordinary
+// readers and writers must not hide a retained choice on an earlier owner.
+func currentSelectionRow(ctx context.Context, post string) (*attachmentSelectionRow, error) {
+	var rows []attachmentSelectionRow
+	if err := dbWrapper.Select(ctx, &rows, consolidatedPostSelectionsQuery, post, 2); err != nil {
+		return nil, err
+	}
+	if len(rows) > 1 || (len(rows) == 1 && rows[0].PostUUID != post) {
+		return nil, models.ErrAttachmentSelectionConflict
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	return &rows[0], nil
 }
 
 // History and complete merge review inspect each original owner's current
@@ -234,14 +269,21 @@ func (s *SourceAttachmentStore) selectionForOriginal(ctx context.Context, value 
 		return nil, err
 	}
 	row, err := selectionRow(ctx, post)
-	if err != nil || row == nil {
+	if err != nil {
 		return nil, err
+	}
+	return storedSelection(ctx, row)
+}
+
+func storedSelection(ctx context.Context, row *attachmentSelectionRow) (*models.AttachmentSelection, error) {
+	if row == nil {
+		return nil, nil
 	}
 	ids, err := selectionManifestIDs(ctx, *row)
 	if err != nil {
 		return nil, err
 	}
-	sources, err := loadSelectionManifests(ctx, post, ids)
+	sources, err := loadSelectionManifests(ctx, row.PostUUID, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +306,7 @@ func selectionCapture(ctx context.Context, post, value string) (string, string, 
 }
 
 func (s *SourceAttachmentStore) PreviewSelection(ctx context.Context, postID, captureID string) (*models.AttachmentSelectionPreview, error) {
-	post, err := (&SourceEvidenceStore{}).FindPost(ctx, postID)
+	post, err := currentSourcePost(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +320,7 @@ func (s *SourceAttachmentStore) PreviewSelection(ctx context.Context, postID, ca
 	if err != nil {
 		return nil, err
 	}
-	row, err := selectionRow(ctx, post.UUID)
+	row, err := currentSelectionRow(ctx, post.UUID)
 	if err != nil {
 		return nil, err
 	}
@@ -331,15 +373,18 @@ func (s *SourceAttachmentStore) prepareSelectionChoice(ctx context.Context, inpu
 		(input.Origin == "ingest" && input.Mode != "automatic") {
 		return nil, nil, false, errors.New("invalid attachment selection choice")
 	}
-	post, err := (&SourceEvidenceStore{}).FindPost(ctx, input.PostUUID)
+	post, err := currentSourcePost(ctx, input.PostUUID)
 	if err != nil {
 		return nil, nil, false, err
 	}
-	if post == nil || post.Revision != input.ExpectedPostRevision {
+	if post == nil || post.UUID != input.PostUUID || post.Revision != input.ExpectedPostRevision {
 		return nil, nil, false, models.ErrAttachmentSelectionConflict
 	}
 	if post.State != "active" {
 		return nil, nil, false, models.ErrSourcePostForgotten
+	}
+	if _, err := currentSelectionRow(ctx, post.UUID); err != nil {
+		return nil, nil, false, err
 	}
 	var selected *models.AttachmentSelection
 	switch {

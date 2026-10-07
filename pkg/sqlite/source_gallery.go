@@ -44,6 +44,28 @@ func (r sourceGalleryDecisionRow) resolve() *models.SourceGalleryDecision {
 }
 
 func (s *SourceGalleryStore) Association(ctx context.Context, value string) (*models.SourceGalleryDecision, error) {
+	post, err := currentSourcePost(ctx, value)
+	if err != nil || post == nil {
+		return nil, err
+	}
+	if err := currentPostGalleryChoice(ctx, post.UUID); err != nil {
+		return nil, err
+	}
+	return s.associationForOriginal(ctx, post.UUID)
+}
+
+func currentPostGalleryChoice(ctx context.Context, post string) error {
+	var heads []postConsolidationGalleryHead
+	if err := dbWrapper.Select(ctx, &heads, consolidatedPostGalleriesQuery, post, 2); err != nil {
+		return err
+	}
+	if len(heads) > 1 || (len(heads) == 1 && heads[0].PostUUID != post) {
+		return models.ErrSourceGalleryConflict
+	}
+	return nil
+}
+
+func (s *SourceGalleryStore) associationForOriginal(ctx context.Context, value string) (*models.SourceGalleryDecision, error) {
 	id, err := archiveUUID(value)
 	if err != nil {
 		return nil, err
@@ -90,15 +112,18 @@ func (s *SourceGalleryStore) DecideAssociation(ctx context.Context, input models
 }
 
 func (s *SourceGalleryStore) prepareAssociationChoice(ctx context.Context, input models.SourceGalleryChoiceInput) (*models.SourcePost, *models.ArchiveEntity, error) {
-	post, err := (&SourceEvidenceStore{}).FindPost(ctx, input.PostUUID)
+	post, err := currentSourcePost(ctx, input.PostUUID)
 	if err != nil {
 		return nil, nil, err
 	}
-	if post == nil || post.Revision != input.ExpectedPostRevision {
+	if post == nil || post.UUID != input.PostUUID || post.Revision != input.ExpectedPostRevision {
 		return nil, nil, models.ErrSourceGalleryConflict
 	}
 	if post.State != "active" {
 		return nil, nil, models.ErrSourcePostForgotten
+	}
+	if err := currentPostGalleryChoice(ctx, post.UUID); err != nil {
+		return nil, nil, err
 	}
 	if !validAccountText(input.Reason, 4096, true) {
 		return nil, nil, errors.New("invalid source gallery decision reason")
@@ -168,7 +193,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, id, post.UUID, post.Revision+1, input.State, g
 ON CONFLICT(post_uuid) DO UPDATE SET decision_uuid = excluded.decision_uuid, gallery_uuid = excluded.gallery_uuid`, post.UUID, id, galleryUUID); err != nil {
 		return nil, err
 	}
-	return s.Association(ctx, post.UUID)
+	return s.associationForOriginal(ctx, post.UUID)
 }
 
 type galleryMembershipEventRow struct {

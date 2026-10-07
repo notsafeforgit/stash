@@ -234,11 +234,9 @@ export function createGalleryAssociationAPI(
     pageLimit: 25,
     contextScope: (value: { post: { uuid: string } }) => value.post.uuid,
     async context(post: string, signal?: AbortSignal) {
-      const [value, album] = await Promise.all([
-        posts.post(post, signal),
-        posts.album(post, signal),
-      ]);
-      return { post: value, album };
+      const value = await posts.identity(post, signal);
+      const album = await posts.album(value.canonical.uuid, signal);
+      return { post: value.canonical, album };
     },
     async history(post: string, after = 0, signal?: AbortSignal) {
       const values = await request(

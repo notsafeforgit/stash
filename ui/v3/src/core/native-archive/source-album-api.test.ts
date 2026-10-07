@@ -45,6 +45,7 @@ it("accepts positional continuation and rejects invalid bounds before HTTP", asy
 it("rejects wrong post scopes, unexplained position gaps and duplicate positions", async () => {
   const original = albumPage();
   for (const value of [
+    { ...original, requested_uuid: postIds.otherPost },
     { ...original, post_uuid: postIds.otherPost },
     { ...original, slots: [albumSlot(1)] },
     { ...original, slots: [albumSlot(0), albumSlot(0)] },
@@ -54,6 +55,21 @@ it("rejects wrong post scopes, unexplained position gaps and duplicate positions
     { ...original, album: { ...postAlbum(), post_uuid: postIds.otherPost } },
   ])
     await expect(client(value).api.album(postIds.post)).rejects.toThrow();
+});
+
+it("reads a merged album through its original post while checking the requested scope", async () => {
+  const original = albumPage();
+  const merged = {
+    ...original,
+    post_uuid: postIds.otherPost,
+    album: { ...postAlbum(), post_uuid: postIds.otherPost },
+  };
+  expect(await client(merged).api.album(postIds.post)).toEqual(merged);
+  await expect(
+    client(merged).api.album(postIds.otherPost),
+  ).rejects.toMatchObject({
+    code: "invalid_response",
+  });
 });
 
 it("does not turn rejected selections or deleted media into active file links", async () => {

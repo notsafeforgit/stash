@@ -50,6 +50,42 @@ func (rs *nativeArchiveRoutes) sourcePost(w http.ResponseWriter, r *http.Request
 	ingestJSON(w, http.StatusOK, result)
 }
 
+// Edits use the current canonical revision. Original capture/history endpoints
+// keep their existing scopes, and a saved request is never rewritten on redirect.
+func (rs *nativeArchiveRoutes) sourcePostIdentity(w http.ResponseWriter, r *http.Request) {
+	if !ingest.ValidUUID(chi.URLParam(r, "post")) {
+		ingestError(w, ingest.ErrInvalid)
+		return
+	}
+	var requested, canonical *models.SourcePostIdentity
+	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		requested, err = rs.repo.SourceEvidence.PostIdentity(ctx, chi.URLParam(r, "post"))
+		if err != nil {
+			return err
+		}
+		if requested == nil {
+			return ingest.ErrNotFound
+		}
+		canonical = requested
+		if requested.CanonicalUUID != requested.UUID {
+			canonical, err = rs.repo.SourceEvidence.PostIdentity(ctx, requested.CanonicalUUID)
+			if err != nil {
+				return err
+			}
+		}
+		if canonical == nil || canonical.UUID != canonical.CanonicalUUID || canonical.RedirectTo != nil {
+			return models.ErrSourcePayloadCorrupt
+		}
+		return nil
+	})
+	if err != nil {
+		nativeArchiveError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, map[string]any{"requested": requested, "canonical": canonical})
+}
+
 func (rs *nativeArchiveRoutes) sourcePostIdentifiers(w http.ResponseWriter, r *http.Request) {
 	post, query := chi.URLParam(r, "post"), r.URL.Query()
 	limit, err := documentLimit(r)
@@ -139,7 +175,7 @@ func (rs *nativeArchiveRoutes) sourcePostAlbum(w http.ResponseWriter, r *http.Re
 		nativeArchiveError(w, err)
 		return
 	}
-	ingestJSON(w, http.StatusOK, result)
+	ingestJSON(w, http.StatusOK, map[string]any{"requested_uuid": post, "album": result})
 }
 
 func (rs *nativeArchiveRoutes) sourcePostMedia(w http.ResponseWriter, r *http.Request) {

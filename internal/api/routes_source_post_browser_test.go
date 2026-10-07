@@ -66,6 +66,17 @@ func TestSourcePostBrowserHTTPExactLookupAndIdentifierPagination(t *testing.T) {
 	var summary models.SourcePostSummary
 	require.NoError(t, json.Unmarshal(get(base, 200).Body.Bytes(), &summary))
 	require.Equal(t, post.UUID, summary.UUID)
+	var identities struct {
+		Requested models.SourcePostIdentity `json:"requested"`
+		Canonical models.SourcePostIdentity `json:"canonical"`
+	}
+	require.NoError(t, json.Unmarshal(get(base+"/identity", 200).Body.Bytes(), &identities))
+	require.Equal(t, post.UUID, identities.Requested.UUID)
+	require.Equal(t, post.UUID, identities.Requested.CanonicalUUID)
+	require.Equal(t, identities.Requested, identities.Canonical)
+	require.Equal(t, summary.Revision, identities.Canonical.Revision)
+	get("/posts/invalid/identity", 400)
+	get("/posts/"+uuid.NewString()+"/identity", 404)
 	require.Len(t, summary.Identifiers, 3)
 	require.True(t, summary.MoreIdentifiers)
 	for _, query := range []string{"limit=1", "uuid=" + post.UUID, "namespace=native%3Atwitter&value=post-1", "url=" + url.QueryEscape(summary.URLs[0].URL)} {
@@ -211,7 +222,7 @@ func TestSourcePostBrowserHTTPAlbumAndMediaInspectionPreservesChoices(t *testing
 		return err
 	}))
 	base := "/posts/" + post.UUID
-	require.Equal(t, "null", strings.TrimSpace(get(base+"/album", 200).Body.String()), "inspection does not create an album")
+	require.JSONEq(t, `{"requested_uuid":"`+post.UUID+`","album":null}`, get(base+"/album", 200).Body.String(), "inspection does not create an album")
 	var items []models.SourcePostMediaItem
 	require.NoError(t, json.Unmarshal(get(base+"/media", 200).Body.Bytes(), &items))
 	require.Len(t, items, 1)
@@ -236,9 +247,13 @@ func TestSourcePostBrowserHTTPAlbumAndMediaInspectionPreservesChoices(t *testing
 		}))
 	}
 	readAlbum := func() models.SourcePostAlbum {
-		var album models.SourcePostAlbum
-		require.NoError(t, json.Unmarshal(get(base+"/album", 200).Body.Bytes(), &album))
-		return album
+		var value struct {
+			RequestedUUID string                 `json:"requested_uuid"`
+			Album         models.SourcePostAlbum `json:"album"`
+		}
+		require.NoError(t, json.Unmarshal(get(base+"/album", 200).Body.Bytes(), &value))
+		require.Equal(t, post.UUID, value.RequestedUUID)
+		return value.Album
 	}
 	choose("linked")
 	album := readAlbum()

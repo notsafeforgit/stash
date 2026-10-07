@@ -528,12 +528,25 @@ or a canonical post unlink. Attachment review contexts distinguish the requested
 UUID from the current choice owner, and the UI recovers saved original requests
 before following that owner for new choices.
 
+Current source-list and gallery reads resolve the canonical post, including
+ordered album pages and gallery-to-post links. They reject unsettled choices on
+earlier owners instead of silently selecting one. Source-list discovery pages
+the indexed manifests of all original members without reconstructing payloads.
+Ordinary new choices require the current canonical UUID and revision; ingestion
+uses that identity while retaining its original capture as provenance.
+
+The identity context returns both requested and canonical identities. Album
+responses likewise separate the requested UUID from the current post. Editors
+recover an original saved request before any pending canonical request, then use
+the canonical identity for new edits. Original history, full merge comparison,
+capture and ingestion lookup methods keep their original scopes so evidence and
+saved requests remain replayable.
+
 The identity writer is internal and has no application mutation route. It does
-not settle conflicting source-list, gallery or media choices. Original capture
-and ingestion lookup methods deliberately retain their original UUID scopes so
-saved requests remain replayable. Canonical source-list/gallery and post-browse
-integration, the encompassing reviewed transaction, pending-work publication and
-the complete post-merge UI must be connected before users can apply a post merge.
+not settle conflicting source-list, gallery or media choices on its own. General
+post-browse integration, the encompassing reviewed transaction, pending-work
+publication and the complete post-merge UI must be connected before users can
+apply a post merge.
 
 ## Mapping catalog relationships
 

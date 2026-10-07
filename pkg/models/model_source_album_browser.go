@@ -38,14 +38,15 @@ type SourceAlbumSlot struct {
 // Signature guards the source list and current association/membership state
 // across pages. Compact titles and file counts are live display projections.
 type SourceAlbumPage struct {
-	PostUUID     string                `json:"post_uuid"`
-	PostRevision int                   `json:"post_revision"`
-	PostState    string                `json:"post_state"`
-	Signature    string                `json:"signature"`
-	Selection    *SourceAlbumSelection `json:"selection"`
-	Album        *SourcePostAlbum      `json:"album"`
-	Slots        []SourceAlbumSlot     `json:"slots"`
-	NextAfter    *int                  `json:"next_after"`
+	RequestedUUID string                `json:"requested_uuid"`
+	PostUUID      string                `json:"post_uuid"`
+	PostRevision  int                   `json:"post_revision"`
+	PostState     string                `json:"post_state"`
+	Signature     string                `json:"signature"`
+	Selection     *SourceAlbumSelection `json:"selection"`
+	Album         *SourcePostAlbum      `json:"album"`
+	Slots         []SourceAlbumSlot     `json:"slots"`
+	NextAfter     *int                  `json:"next_after"`
 }
 
 // Each source post retains its own order after galleries are merged. A shared

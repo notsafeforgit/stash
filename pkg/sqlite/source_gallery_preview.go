@@ -181,7 +181,7 @@ func (s *SourceGalleryStore) Preview(ctx context.Context, value string) (*models
 // Proposed choices exist only in a read-only backfill preview. Normal sync
 // always reads the actual persisted decisions.
 func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value string, proposed map[string]sourceAlbumMediaChoice) (*models.SourceGalleryPreview, error) {
-	post, err := (&SourceEvidenceStore{}).FindPost(ctx, value)
+	post, err := currentSourcePost(ctx, value)
 	if err != nil {
 		return nil, err
 	}
@@ -305,8 +305,9 @@ func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value 
 		requested[head.MediaUUID] = true
 	}
 	var postChoices []sourcePostMediaRow
-	if err := dbWrapper.Select(ctx, &postChoices, `SELECT d.* FROM post_media_links l
-JOIN post_media_decisions d ON d.uuid=l.decision_uuid WHERE l.post_uuid=? ORDER BY l.media_uuid LIMIT ?`, post.UUID, maxSourceGalleryMembers+1); err != nil {
+	if err := dbWrapper.Select(ctx, &postChoices, `SELECT d.* FROM source_post_identities i
+JOIN post_media_links l ON l.post_uuid=i.post_uuid JOIN post_media_decisions d ON d.uuid=l.decision_uuid
+WHERE i.canonical_uuid=? ORDER BY l.media_uuid,l.post_uuid LIMIT ?`, post.UUID, maxSourceGalleryMembers+1); err != nil {
 		return nil, err
 	}
 	if len(postChoices) > maxSourceGalleryMembers {

@@ -29,7 +29,7 @@ func TestPostMediaConsolidationPortableRestorePreservesChoicesAndOriginalReceipt
 	merge := publishPostIdentity(t, repo, identityRequest(t, repo, a, b))
 	request := consolidationMediaRequest(t, repo, b, media.UUID, "linked", true)
 	selected := applyConsolidationMedia(t, repo, request, merge.UUID)
-	postSelectionApply(t, repo, b, capture.UUID, "pinned", "review")
+	applyConsolidationSelection(t, repo, b, capture.UUID, "pinned", merge.UUID)
 	galleryInput, expected := consolidationGalleryRequest(t, repo, b, *originalGallery.GalleryUUID)
 	var galleryChoice *models.SourceGalleryDecision
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {

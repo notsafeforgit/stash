@@ -1687,10 +1687,11 @@ The application can browse posts independently of scene/image selection:
 | `GET /posts?namespace=<namespace>&value=<source-id>` | Exact qualified source identity lookup |
 | `GET /posts?url=<encoded-url>` | Exact retained URL lookup; returns every matching post without treating a shared URL as proof of identity |
 | `GET /posts/<post>` | One compact summary, including active/forgotten state and current revision |
+| `GET /posts/<post>/identity` | Requested and current canonical post identities in one read transaction; new edits use the canonical UUID and revision |
 | `GET /posts/<post>/identifiers?limit=N` | Qualified identifiers; continue with both `after_namespace` and `after_value` |
 | `GET /posts/<post>/publishers?after=<account-uuid>&limit=N` | Canonical accounts selected by current capture-publisher decisions; retained claims alone do not select a publisher or depicted performer |
 | `GET /posts/<post>/media?after=<media-uuid>&limit=N` | Canonical scene/image identities with their explicit choices, retained-evidence flag and independent attachment-link count |
-| `GET /posts/<post>/album` | Current gallery choice, including disabled state and deleted/redirected gallery resolution; `null` when no choice exists |
+| `GET /posts/<post>/album` | `{requested_uuid, album}` with the canonical post's current gallery choice, including disabled state and deleted/redirected gallery resolution; `album` is `null` when no choice exists |
 
 These routes use the `/api/v3/archive` application-authenticated boundary.
 The three exact lookup selectors are mutually exclusive. Source IDs require
@@ -1789,6 +1790,15 @@ Repeated attachments retain every position while sharing their library identity.
 Unknown expected counts stay null. List completeness describes source evidence,
 not download completion.
 
+The required `requested_uuid` echoes the requested post, while `post_uuid` and
+`post_revision` describe its current canonical identity. Original post links
+therefore open the shared album after consolidation. Unsettled source-list or
+gallery choices return a conflict rather than hiding a choice on an earlier
+owner. Source-list and gallery editors recover saved original requests first;
+new edits use the canonical identity, while history remains under its original
+owner. Source-list discovery includes manifests from every original member,
+using bounded indexed pages without loading post/profile payloads.
+
 Each known slot separates the attachment choice, canonical scene/image,
 whole-post rejection/conflict and actual gallery membership. Manual exclusions
 remain explicit. `registered_files` counts library database associations without
@@ -1807,6 +1817,7 @@ retained gallery redirects and lists the posts currently associated with that
 identity group. The lookup uses the gallery association index and bounds the
 reverse identity group to 1,024; oversized groups return `422 source_review_limit`.
 Merged galleries retain each post's separate order instead of merging post identity.
+Already-consolidated post aliases appear once under their current canonical UUID.
 Manual, folder and ZIP galleries can have an empty source-post list.
 
 Post pages expose Source order on expansion. Gallery pages expose Source albums

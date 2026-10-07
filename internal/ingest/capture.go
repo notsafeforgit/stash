@@ -328,7 +328,7 @@ func (s *Service) captureAlbum(ctx context.Context, capture *models.SourceCaptur
 	default:
 		result.Album = "selected"
 		if preview.Changed {
-			_, err = s.Repo.SourceAttachment.DecideSelection(ctx, models.AttachmentSelectionInput{PostUUID: capture.PostUUID, ExpectedPostRevision: preview.PostRevision, CaptureUUID: capture.UUID, Mode: "automatic", Origin: "ingest"})
+			_, err = s.Repo.SourceAttachment.DecideSelection(ctx, models.AttachmentSelectionInput{PostUUID: preview.PostUUID, ExpectedPostRevision: preview.PostRevision, CaptureUUID: capture.UUID, Mode: "automatic", Origin: "ingest"})
 		}
 	}
 	return err

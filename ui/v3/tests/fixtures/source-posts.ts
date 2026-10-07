@@ -2,6 +2,7 @@ import type {
   PostSummary,
   PostMedia,
   PostAlbum,
+  PostIdentity,
 } from "../../src/core/native-archive/source-post-api";
 import { sourcePost, sourceIds } from "./source-review";
 
@@ -11,6 +12,28 @@ export const postIds = {
   gallery: "00000000-0000-4000-8000-000000000012",
   albumDecision: "00000000-0000-4000-8000-000000000013",
 };
+export function postIdentity(
+  requested: string = postIds.post,
+  canonical: string = requested,
+  revision = 4,
+) {
+  const current: PostIdentity = {
+    uuid: canonical,
+    canonical_uuid: canonical,
+    redirect_to: null,
+    state: "active",
+    revision,
+    created_at: "2026-09-29T00:00:00Z",
+  };
+  return {
+    requested: {
+      ...current,
+      uuid: requested,
+      redirect_to: requested === canonical ? null : canonical,
+    },
+    canonical: current,
+  };
+}
 export function postSummary(): PostSummary {
   const shared = sourcePost();
   return {
@@ -62,4 +85,11 @@ export function postAlbum(): PostAlbum {
       title_truncated: false,
     },
   };
+}
+
+export function postAlbumContext(
+  album: PostAlbum | null = postAlbum(),
+  requested: string = postIds.post,
+) {
+  return { requested_uuid: requested, album };
 }

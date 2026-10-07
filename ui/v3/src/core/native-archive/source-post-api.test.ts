@@ -5,6 +5,8 @@ import {
   postMedia,
   postAlbum,
   postIds,
+  postIdentity,
+  postAlbumContext,
 } from "../../../tests/fixtures/source-posts";
 import { account } from "../../../tests/fixtures/account-review";
 
@@ -14,6 +16,24 @@ function client(value: unknown) {
   const transport = vi.fn<typeof fetch>(async () => Response.json(value));
   return { api: createSourcePostAPI(endpoint, transport), transport };
 }
+
+it("checks both the requested post identity and the current canonical identity", async () => {
+  const value = postIdentity(postIds.post, postIds.otherPost, 7);
+  const { api, transport } = client(value);
+  expect(await api.identity(postIds.post)).toEqual(value);
+  expect(String(transport.mock.calls[0]?.[0])).toBe(
+    `${endpoint}posts/${postIds.post}/identity`,
+  );
+  await expect(api.identity(postIds.otherPost)).rejects.toMatchObject({
+    code: "invalid_response",
+  });
+  for (const invalid of [
+    { ...value, canonical: { ...value.canonical, uuid: postIds.post } },
+    { ...value, canonical: { ...value.canonical, redirect_to: postIds.post } },
+    { ...value, requested: { ...value.requested, redirect_to: null } },
+  ])
+    await expect(client(invalid).api.identity(postIds.post)).rejects.toThrow();
+});
 
 it("keeps deployment prefixes, exact URL query contents and session-only read requests", async () => {
   const { api, transport } = client([postSummary()]);
@@ -157,25 +177,43 @@ it("preserves suppressed media links and refuses cross-post or mismatched identi
 
 it("preserves disabled/deleted albums and resolves gallery aliases without inventing an active local ID", async () => {
   const album = postAlbum();
-  expect(await client(null).api.album(postIds.post)).toBeNull();
   expect(
-    await client({
-      ...album,
-      state: "disabled",
-      gallery: null,
-      gallery_uuid: null,
-    }).api.album(postIds.post),
+    await client(postAlbumContext(null)).api.album(postIds.post),
+  ).toBeNull();
+  expect(
+    await client(
+      postAlbumContext({
+        ...album,
+        state: "disabled",
+        gallery: null,
+        gallery_uuid: null,
+      }),
+    ).api.album(postIds.post),
   ).toMatchObject({ state: "disabled" });
   await expect(
-    client({ ...album, state: "disabled" }).api.album(postIds.post),
+    client(postAlbumContext({ ...album, state: "disabled" })).api.album(
+      postIds.post,
+    ),
   ).rejects.toThrow();
   album.gallery_uuid = postIds.otherPost;
-  expect(await client(album).api.album(postIds.post)).toEqual(album);
-  await expect(client(album).api.album(postIds.otherPost)).rejects.toThrow();
+  expect(await client(postAlbumContext(album)).api.album(postIds.post)).toEqual(
+    album,
+  );
+  await expect(
+    client(postAlbumContext(album)).api.album(postIds.otherPost),
+  ).rejects.toThrow();
   album.gallery!.state = "deleted";
   album.gallery!.local_id = null;
-  expect((await client(album).api.album(postIds.post))?.gallery?.state).toBe(
-    "deleted",
+  expect(
+    (await client(postAlbumContext(album)).api.album(postIds.post))?.gallery
+      ?.state,
+  ).toBe("deleted");
+});
+
+it("retains the requested scope while returning the merged post's gallery choice", async () => {
+  const album = { ...postAlbum(), post_uuid: postIds.otherPost };
+  expect(await client(postAlbumContext(album)).api.album(postIds.post)).toEqual(
+    album,
   );
 });
 

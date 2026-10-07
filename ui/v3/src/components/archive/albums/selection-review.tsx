@@ -9,7 +9,7 @@ import {
   createAttachmentSelectionOutbox,
   type SavedSelectionReview,
 } from "@/core/native-archive/attachment-selection-outbox";
-import type { PostSummary } from "@/core/native-archive/source-post-api";
+import type { PostIdentity } from "@/core/native-archive/source-post-api";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -30,7 +30,7 @@ export function SelectionReview({
   const msg = useMsg();
   const api = useMemo(() => createAttachmentSelectionAPI(endpoint), [endpoint]);
   const outbox = useMemo(() => createAttachmentSelectionOutbox(api), [api]);
-  const [current, setCurrent] = useState<PostSummary>();
+  const [current, setCurrent] = useState<PostIdentity>();
   const [postReady, setPostReady] = useState(false);
   const [saved, setSaved] = useState<SavedSelectionReview | null>(null);
   const [storageReady, setStorageReady] = useState(false);
@@ -60,6 +60,14 @@ export function SelectionReview({
         setSaved(pending);
         setStorageReady(true);
         const value = await api.post(post, controller.signal);
+        if (controller.signal.aborted) return;
+        if (!pending && value.uuid !== post) {
+          setStorageReady(false);
+          const sharedPending = await outbox.read(value.uuid);
+          if (controller.signal.aborted) return;
+          setSaved(sharedPending);
+          setStorageReady(true);
+        }
         if (!controller.signal.aborted) {
           setCurrent(value);
           setPostReady(true);
@@ -81,9 +89,11 @@ export function SelectionReview({
     setRefresh((value) => value + 1);
   }
   async function deliver(preview?: SelectionPreview) {
+    const storagePost = preview ? current?.uuid : saved?.post_uuid;
     if (
       busy ||
       operation.current ||
+      !storagePost ||
       !storageReady ||
       (preview && (!postReady || saved !== null))
     )
@@ -92,29 +102,26 @@ export function SelectionReview({
     setBusy(true);
     setError(undefined);
     setApplied(false);
+    let refreshContext = false;
     try {
       if (preview) {
-        const pending = await outbox.prepare(post, preview);
+        const pending = await outbox.prepare(storagePost, preview);
         if (mounted.current) setSaved(pending);
       }
       // Once saved, delivery may finish after this panel closes. Its immutable
       // receipt and browser journal remain authoritative on the next opening.
-      await outbox.deliver(post);
+      await outbox.deliver(storagePost);
       onChanged();
       if (!mounted.current) return;
       setApplied(true);
       setPostReady(false);
-      const value = await api.post(post);
-      if (mounted.current) {
-        setCurrent(value);
-        setPostReady(true);
-      }
+      refreshContext = true;
     } catch (error) {
       if (mounted.current) setError(error);
     } finally {
       if (mounted.current) {
         try {
-          const pending = await outbox.read(post);
+          const pending = await outbox.read(storagePost);
           if (mounted.current) {
             setSaved(pending);
             setStorageReady(true);
@@ -125,7 +132,10 @@ export function SelectionReview({
             setError(error);
           }
         }
-        if (mounted.current) setBusy(false);
+        if (mounted.current) {
+          if (refreshContext) setRefresh((value) => value + 1);
+          else setBusy(false);
+        }
       }
       operation.current = false;
     }
@@ -143,7 +153,7 @@ export function SelectionReview({
     setError(undefined);
     try {
       await outbox.forgetRejected(
-        post,
+        saved.post_uuid,
         selectionApplySchema.parse(JSON.parse(saved.body)).request_uuid,
       );
       if (mounted.current) {
@@ -259,7 +269,7 @@ export function SelectionReview({
           <SelectionForm
             key={`${current.uuid}:${current.revision}:${refresh}`}
             api={api}
-            post={post}
+            post={current.uuid}
             revision={current.revision}
             disabled={busy || !storageReady || !postReady || saved !== null}
             onApply={deliver}

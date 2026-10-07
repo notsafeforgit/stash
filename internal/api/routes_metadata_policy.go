@@ -54,6 +54,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/metadata-fields/{kind}", rs.fields)
 	r.Get("/posts", rs.browseSourcePosts)
 	r.Get("/posts/{post}", rs.sourcePost)
+	r.Get("/posts/{post}/identity", rs.sourcePostIdentity)
 	r.Get("/posts/{post}/comparison", rs.compareSourcePosts)
 	r.Get("/posts/{post}/identifiers", rs.sourcePostIdentifiers)
 	r.Get("/posts/{post}/publishers", rs.sourcePostPublishers)
@@ -342,8 +343,8 @@ func nativeArchiveError(w http.ResponseWriter, err error) {
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "request_conflict", "message": "This request UUID already names a different source-list choice."})
 		return
 	}
-	if errors.Is(err, models.ErrAttachmentSelectionConflict) || errors.Is(err, models.ErrSourcePostForgotten) {
-		ingestJSON(w, http.StatusConflict, map[string]string{"error": "preview_changed", "message": "The post or selected source list changed; load a fresh preview."})
+	if errors.Is(err, models.ErrAttachmentSelectionConflict) || errors.Is(err, models.ErrSourceGalleryConflict) || errors.Is(err, models.ErrSourceAttachmentConflict) || errors.Is(err, models.ErrSourcePostForgotten) {
+		ingestJSON(w, http.StatusConflict, map[string]string{"error": "preview_changed", "message": "The post, source list or media association changed; load a fresh preview."})
 		return
 	}
 	if errors.Is(err, models.ErrAccountReviewReplay) {

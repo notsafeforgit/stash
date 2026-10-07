@@ -345,7 +345,7 @@ class NativeBackupSession:
                 components.append({"role": "operating_state", "name": "worker-inventory.json", "path": report_path})
             self.stage = capture.prepare(component_cache, self.client, components, reserve=self.reserve)
             if inventory is not None:
-                worker_inventory.verify_stage(inventory, self.stage)
+                worker_inventory.verify_stage(inventory, self.stage, check_live=not self.resumed)
             self.stage.seal()
         self.view = self.media.open_bound(self.client.boundary_receipt).verify()
         self.media_path = self.view.resolve(relative)

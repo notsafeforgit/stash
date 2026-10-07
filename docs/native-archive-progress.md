@@ -11034,3 +11034,39 @@ The superseded schema-93 rehearsal and its exact auxiliary files were removed
 after no-open-handle checks and verification of the selected schema-94 copy.
 The original compatible snapshot and schema-94 rehearsal remain. This reclaimed
 20.4 GiB; large subsequent restores use the separate owned tank scratch directory.
+
+## Source-operation state in coordinated backups — 2026-10-07
+
+Worker inventory declarations can now include a source-management runtime.
+Its subscription lists, metadata defaults, lock root and complete operation-state
+tree enter the same component stage as the producer outboxes and download
+archives. This retains unfinished account/source requests as well as completed
+receipts. The runtime must identify the worker's media root; container path
+mappings apply to all of its dependencies. Directory membership, per-file hashes
+and bounded traversal reject incomplete or changed input before server capture.
+
+Version-2 retained inventories include these trees and still read version-1
+captures. Sealed retries verify the original staged bytes without consulting
+later live operations. Tests exercise actual SQLite component capture, changed
+and moved live operation state, container mappings, missing lists, extra files,
+symlinks, special files, size limits, barrier coverage and malformed retained
+inventories. All 270 backup tests passed against the isolated draft; all nineteen
+inventory tests pass after promotion and the aggregate traversal bound.
+
+The installed backup modules match source. Their dependency resolver inspected
+all thirty staged download/metadata profiles, fifteen archives and the explicit
+source-operation runtime. The existing fixture outbox and empty private state
+directory are inspection inputs, not live producer captures. The live Reddit
+subscription list changed between two inspections; its different hash was
+detected and retained in the handoff evidence. Final capture must fence the old
+writers, which do not participate in native publication locks.
+
+The combined release gate passed in 1,959.3 seconds: generation, embedded UI,
+789 UI tests, 585 producer tests, 8 library tests, 113 archive tests, 270 backup
+tests, zero Go lint issues and full Go integration. All seven source files
+matched their recorded gate hashes before this result was added. The initial
+attempt stopped because the workspace sandbox made the existing Go build cache
+read-only; the successful rerun used the same source with cache access restored.
+
+Real producer provisioning and the complete coordinated capture/restore remain
+pending. No backup schedule, cloud policy, workflow or production writer changed.

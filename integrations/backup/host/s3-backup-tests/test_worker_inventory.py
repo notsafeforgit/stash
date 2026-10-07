@@ -16,7 +16,7 @@ import uuid
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from fake_s3 import FakeS3
 from native_backup import CONFIG_FORMAT, NativeBackupSession
-from worker_inventory import FORMAT, collect, components_for_capture, verify_stage
+from worker_inventory import FORMAT, collect, components_for_capture, validate_report, verify_stage
 from stash_archive.host_boundary import HostFilesystemCapture
 from stash_archive.storage import InvalidArchive, json_bytes
 from stash_ingest.outbox import Outbox
@@ -69,6 +69,126 @@ class WorkerInventoryTests(unittest.TestCase):
     def save(self, workers=None):
         self.profile.write_bytes(json_bytes(self.document))
         self.inventory.write_bytes(json_bytes({'format': FORMAT, 'version': 1, 'workers': workers or [self.spec]}))
+
+    def source_runtime(self):
+        self.source_state = self.root / 'source-operations'
+        self.source_state.mkdir(mode=0o700)
+        operation = self.source_state / str(uuid.uuid4())
+        operation.mkdir(mode=0o700)
+        self.source_plan = operation / 'plan.json'
+        self.source_plan.write_bytes(json_bytes({'pending': self.secret, 'revision': 3}))
+        (operation / 'request.json').write_bytes(json_bytes({'request': str(uuid.uuid4())}))
+        (self.source_state / str(uuid.uuid4())).mkdir(mode=0o700)
+        self.source_lists = {}
+        for service in ('reddit', 'twitter'):
+            path = self.root / (service + '-list.conf')
+            path.write_text('# retained source list\n' + service + '-account\n')
+            self.source_lists[service] = str(path)
+        self.source_runtime_path = self.root / 'source-runtime.json'
+        self.source_runtime_value = {
+            'version': 1, 'root_uuid': self.document['root']['uuid'],
+            'locks': str(self.root / 'locks'), 'state': str(self.source_state),
+            'lists': self.source_lists,
+            'new_source_policy': {'enabled': True, 'apply_to_scans': False, 'rules': {'image': {
+                'on_create': True, 'on_existing': True, 'skip_organized_on_create': True,
+                'mark_organized': False, 'filename_title_fallback': True, 'mappings': {}}}},
+        }
+        self.source_runtime_path.write_bytes(json_bytes(self.source_runtime_value))
+        self.spec['source_management'] = str(self.source_runtime_path)
+        self.save()
+
+    def test_source_management_closure_retains_plans_lists_and_empty_directories(self):
+        self.source_runtime()
+        report = collect(str(self.inventory))
+        self.assertEqual(report['version'], 2)
+        paths = {c['path']: c['role'] for c in report['components']}
+        self.assertEqual(paths[str(self.source_runtime_path)], 'config')
+        for path in self.source_lists.values():
+            self.assertEqual(paths[path], 'config')
+            self.assertIn(path, report['read_checksums'])
+        self.assertEqual(paths[str(self.source_plan)], 'operating_state')
+        tree = report['state_trees'][str(self.source_state)]
+        self.assertEqual(len(tree['directories']), 3)
+        self.assertEqual(len(tree['files']), 2)
+        self.assertNotIn(self.secret, json.dumps(report))
+        self.assertEqual(validate_report(json.loads(json.dumps(report))), report)
+
+    def test_source_management_container_paths_resolve_before_capture(self):
+        self.source_runtime()
+        virtual = '/container/private'
+        document = json.loads(json.dumps(self.source_runtime_value).replace(str(self.root), virtual))
+        self.source_runtime_path.write_bytes(json_bytes(document))
+        self.spec['source_management'] = virtual + '/source-runtime.json'
+        self.spec['path_mappings'] = [{'from': virtual, 'to': str(self.root)}]
+        self.save()
+        report = collect(str(self.inventory))
+        self.assertIn(str(self.source_state), report['state_trees'])
+        self.assertNotIn(virtual, json.dumps(report))
+
+    def test_source_management_rejects_different_root_and_missing_lists(self):
+        self.source_runtime()
+        self.source_runtime_value['root_uuid'] = str(uuid.uuid4())
+        self.source_runtime_path.write_bytes(json_bytes(self.source_runtime_value))
+        with self.assertRaisesRegex(InvalidArchive, 'different worker root'):
+            collect(str(self.inventory))
+        self.source_runtime_value['root_uuid'] = self.document['root']['uuid']
+        self.source_runtime_path.write_bytes(json_bytes(self.source_runtime_value))
+        Path(self.source_lists['reddit']).unlink()
+        with self.assertRaises(FileNotFoundError):
+            collect(str(self.inventory))
+
+    def test_source_management_rejects_links_special_files_and_inventory_overflow(self):
+        self.source_runtime()
+        bad = self.source_plan.parent / 'unsafe'
+        for target in (self.private, self.root / 'archives'):
+            bad.symlink_to(target)
+            with self.assertRaisesRegex(InvalidArchive, 'links or special files'):
+                collect(str(self.inventory))
+            bad.unlink()
+        import os
+        os.mkfifo(bad)
+        with self.assertRaisesRegex(InvalidArchive, 'links or special files'):
+            collect(str(self.inventory))
+        bad.unlink()
+        with patch('source_state_inventory.MAX_ENTRIES', 3):
+            with self.assertRaisesRegex(InvalidArchive, 'inventory limit'):
+                collect(str(self.inventory))
+
+    def test_source_management_requires_its_own_publication_barrier(self):
+        self.source_runtime()
+        lock = self.root / 'source-locks'
+        lock.mkdir()
+        self.source_runtime_value['locks'] = str(lock)
+        self.source_runtime_path.write_bytes(json_bytes(self.source_runtime_value))
+        report = collect(str(self.inventory))
+        with self.assertRaisesRegex(InvalidArchive, 'publication barrier'):
+            components_for_capture(report, [], [self.root / 'locks'])
+        self.assertTrue(components_for_capture(report, [], [self.root / 'locks', lock]))
+
+    def test_source_state_is_hashed_without_the_config_parser_size_limit(self):
+        self.source_runtime()
+        self.source_plan.write_bytes(b' ' * (5 << 20))
+        report = collect(str(self.inventory))
+        self.assertEqual(report['read_checksums'][str(self.source_plan)],
+                         hashlib.sha256(self.source_plan.read_bytes()).hexdigest())
+        with patch('source_state_inventory.MAX_STATE_BYTES', 4 << 20):
+            with self.assertRaisesRegex(InvalidArchive, 'runtime size limit'):
+                collect(str(self.inventory))
+
+    def test_retained_source_tree_cannot_omit_component_or_escape_root(self):
+        self.source_runtime()
+        original = collect(str(self.inventory))
+        for change in ('checksum', 'path', 'identity'):
+            report = json.loads(json.dumps(original))
+            tree = report['state_trees'][str(self.source_state)]
+            if change == 'checksum':
+                del report['read_checksums'][str(self.source_plan)]
+            elif change == 'path':
+                tree['files'][str(self.private)] = tree['files'].pop(str(self.source_plan))
+            else:
+                tree['directories'][str(self.source_state)] = [False, 1, 2, 3]
+            with self.subTest(change=change), self.assertRaises(InvalidArchive):
+                validate_report(report)
 
     def test_closure_includes_private_path_targets_helpers_and_current_archives(self):
         report = collect(str(self.inventory))
@@ -189,6 +309,8 @@ class WorkerInventoryTests(unittest.TestCase):
         return path
 
     def test_host_captures_real_databases_and_retries_original_inventory(self):
+        self.source_runtime()
+        original_plan = self.source_plan.read_bytes()
         config = self.host_config()
         cloud = FakeS3(self.root / 'cloud')
         with patch('native_backup.ArtworkPins'), patch('native_backup.ZFSMedia'), \
@@ -198,6 +320,13 @@ class WorkerInventoryTests(unittest.TestCase):
         saved = json.loads((self.root / 'state/active.json').read_bytes())
         stage = self.root / 'state/components' / saved['checkpoint_uuid']
         record = json.loads((stage / 'manifest.json').read_bytes())
+        plan = next(c for c in record['components']
+                    if base64.b64decode(c['source_path']).decode() == str(self.source_plan))
+        self.assertEqual((stage / f"component-{plan['index']:05d}").read_bytes(), original_plan)
+        self.source_plan.write_bytes(json_bytes({'later_owner_change': True}))
+        (self.source_plan.parent / 'receipt.json').write_bytes(json_bytes({'later_receipt': True}))
+        # The retained stage must remain usable even if source operations move.
+        self.source_state.rename(self.root / 'moved-live-source-state')
         databases = [c for c in record['components'] if c['role'] in {'download_archive', 'producer_outbox'}]
         self.assertEqual(len(databases), 3)
         for component in databases:
@@ -215,6 +344,21 @@ class WorkerInventoryTests(unittest.TestCase):
                 NativeBackupSession(config, 'second', self.root / 'media', 'metadata', '', cloud)
         self.assertEqual(json.loads((stage / 'manifest.json').read_bytes()), record)
         self.assertEqual(cloud.operations, [])
+
+    def test_host_rejects_new_source_state_after_inventory_before_server_capture(self):
+        self.source_runtime()
+        config = self.host_config()
+        prepare = HostFilesystemCapture.prepare
+        def changed(host, *args, **kwargs):
+            stage = prepare(host, *args, **kwargs)
+            (self.source_plan.parent / 'receipt.json').write_bytes(json_bytes({'new': True}))
+            return stage
+        with patch('native_backup.ArtworkPins'), patch('native_backup.ZFSMedia'), \
+             patch.object(HostFilesystemCapture, 'prepare', changed), \
+             patch('stash_archive.server_checkpoint.ServerCheckpoint.seal') as seal:
+            with self.assertRaisesRegex(InvalidArchive, 'state changed between inspection and capture'):
+                NativeBackupSession(config, 'first', self.root / 'media', 'metadata', '', FakeS3(self.root / 'cloud'))
+        seal.assert_not_called()
 
     def test_host_detects_config_changed_during_copy_before_server_capture(self):
         config = self.host_config()

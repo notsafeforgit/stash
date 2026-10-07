@@ -16,6 +16,8 @@ import re
 import string
 import sys
 
+import source_state_inventory
+
 from stash_ingest.configuration import Configuration, _access_option, _pointer, merge_values
 from stash_archive.bundle import NAME
 from stash_archive.storage import InvalidArchive, decode_json, json_bytes, open_regular, publish_bytes, regular
@@ -37,6 +39,7 @@ def absolute(value):
 class Inventory:
     def __init__(self):
         self.files, self.checksums, self.locks, self.archives = {}, {}, set(), {}
+        self.state_trees = {}
 
     def add(self, path, role):
         path = absolute(str(path))
@@ -70,7 +73,7 @@ class Inventory:
 
     def worker(self, spec):
         required = {"name", "profile", "home", "working_directory", "outboxes"}
-        optional = {"path_mappings", "environment", "lock_roots"}
+        optional = {"path_mappings", "environment", "lock_roots", "source_management"}
         if (not isinstance(spec, dict) or not required <= spec.keys() or spec.keys() - required - optional
                 or not isinstance(spec["name"], str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", spec["name"])
                 or not isinstance(spec["outboxes"], list) or not spec["outboxes"]):
@@ -130,6 +133,11 @@ class Inventory:
             if not directory.is_dir() or directory.is_symlink():
                 raise InvalidArchive("Worker publication root is unavailable")
             self.locks.add(str(directory))
+
+        if "source_management" in spec:
+            if document["schema"] != "stash-gallery-worker-v1":
+                raise InvalidArchive("Declare source management with its download worker root")
+            source_state_inventory.collect(self, spec["source_management"], path, document["root"].get("uuid"))
 
         environment = spec.get("environment", {})
         if not isinstance(environment, dict):
@@ -249,10 +257,11 @@ class Inventory:
         visit(gallery)
 
     def report(self):
-        return {"format": FORMAT + ".resolved", "version": 1,
+        return {"format": FORMAT + ".resolved", "version": 2 if self.state_trees else 1,
                 "components": sorted(self.files.values(), key=lambda c: (c["role"], c["name"])),
                 "read_checksums": dict(sorted(self.checksums.items())),
-                "worker_lock_roots": sorted(self.locks), "archive_sets": dict(sorted(self.archives.items()))}
+                "worker_lock_roots": sorted(self.locks), "archive_sets": dict(sorted(self.archives.items())),
+                **({"state_trees": self.state_trees} if self.state_trees else {})}
 
 
 def collect(filename):
@@ -273,8 +282,10 @@ def collect(filename):
 
 def validate_report(report):
     fields = {"format", "version", "components", "read_checksums", "worker_lock_roots", "archive_sets"}
+    if isinstance(report, dict) and report.get("version") == 2:
+        fields.add("state_trees")
     if (not isinstance(report, dict) or set(report) != fields or report["format"] != FORMAT + ".resolved"
-            or type(report["version"]) is not int or report["version"] != 1
+            or type(report["version"]) is not int or report["version"] not in (1, 2)
             or not isinstance(report["components"], list) or not 1 <= len(report["components"]) <= MAX_FILES
             or not isinstance(report["read_checksums"], dict) or not isinstance(report["archive_sets"], dict)
             or not isinstance(report["worker_lock_roots"], list)):
@@ -292,7 +303,7 @@ def validate_report(report):
         paths[key] = component["role"]
         names.add((component["role"], component["name"]))
     for path, digest in report["read_checksums"].items():
-        if paths.get(path) not in {"config", "worker_profile"} or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        if paths.get(path) not in {"config", "worker_profile", "operating_state"} or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
             raise InvalidArchive("Invalid retained worker dependency digest")
     for root in report["worker_lock_roots"]:
         absolute(root)
@@ -300,6 +311,8 @@ def validate_report(report):
         absolute(template)
         if not isinstance(files, list) or any(paths.get(path) != "download_archive" for path in files):
             raise InvalidArchive("Invalid retained download archive inventory")
+    if report["version"] == 2:
+        source_state_inventory.validate(report["state_trees"], paths, report["read_checksums"])
     return report
 
 
@@ -319,7 +332,7 @@ def components_for_capture(report, existing, held_roots):
     return result
 
 
-def verify_stage(report, stage):
+def verify_stage(report, stage, *, check_live=False):
     validate_report(report)
     captured = {os.fsdecode(base64.b64decode(c["source_path"], validate=True)): c for c in stage.record["components"]}
     for component in report["components"]:
@@ -329,6 +342,8 @@ def verify_stage(report, stage):
     for path, expected in report["read_checksums"].items():
         if captured[path]["sha256"] != expected:
             raise InvalidArchive("Worker dependency changed between inspection and capture")
+    if check_live:
+        source_state_inventory.verify_current(report.get("state_trees", {}))
 
 
 def main():

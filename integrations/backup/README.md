@@ -426,6 +426,24 @@ to the explicit JSON `file`/`pointer` used to provision it. Capture dotenv files
 launcher units, source lists, reviewed n8n workflow exports and other operating
 inputs through the host's explicit `components` list.
 
+For a download worker that runs `stash-n8n-sources`, add
+`"source_management": "/private/source-management.json"` to its declaration.
+The inspector follows that runtime's current Reddit/Twitter subscription lists,
+metadata defaults, shared lock directory and complete operation-state tree,
+including unfinished requests, plans, receipts and empty directories. Container
+mount mappings apply to these paths as well. The runtime must identify the same
+media root as the download profile. Its publication barrier must be included in
+the host's `worker_lock_roots`, even when different from the download lock root.
+
+The retained version-2 inventory records tree membership and file checksums;
+version-1 inventories remain readable. New captures reject changed membership,
+content, symlinks, special files and missing dependencies before requesting the
+server snapshot. Sealed retries use the original staged state without consulting
+later live operations. Reports contain paths, identities and hashes, never plan
+contents or credentials. Explicitly restore the retained source-state files and
+recreate their private directories alongside the matching lists, producer
+outboxes and native checkpoint before restarting source-management commands.
+
 With `worker_inventory` configured, the host resolves this closure while holding
 worker publication barriers. It retains the report with the run and adds every
 dependency to the component stage. Parsed profile/private/helper hashes must match

@@ -60,7 +60,13 @@ func TestGenerateRenditions(t *testing.T) {
 			if transfer != "bt709" {
 				primaries, matrix = "bt2020", "bt2020nc"
 			}
-			out, err := exec.Command(ffmpegPath, "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=128x96:rate=2:duration=2",
+			// Compare colour rendition with a smooth full-range RGB signal.
+			// testsrc2's sharp saturated edges become only a few pixels wide in
+			// the 32x24 thumbnail, making independent JPEG/AVIF 4:2:0 chroma
+			// reconstruction dominate the colour error on older media tools.
+			const source = "nullsrc=size=128x96:rate=2:duration=2,format=gbrp16le," +
+				"geq=r='65535*X/W':g='65535*Y/H':b='65535*(1-X/W)*(1-Y/H)'"
+			out, err := exec.Command(ffmpegPath, "-v", "error", "-y", "-f", "lavfi", "-i", source,
 				"-vf", "format=yuv420p10le,setparams=color_primaries="+primaries+":color_trc="+transfer+":colorspace="+matrix, "-c:v", "ffv1", path).CombinedOutput()
 			if err != nil {
 				t.Fatalf("fixture: %v: %s", err, out)

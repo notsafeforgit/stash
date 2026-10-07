@@ -10861,3 +10861,20 @@ validation. This is the same Ubuntu package used by the CUDA runtime image.
 Actionlint passes. The complete local release gate also passed its image tests;
 the revised CI jobs and native image publication still require verification.
 No assertion or supported media path was removed to bypass the failure.
+
+## Cross-runtime thumbnail colour fixture — 2026-10-07
+
+With the media tools installed, Ubuntu CI reached a colour comparison failure
+for the 32×24 HLG thumbnail. The same failure reproduced in an isolated Ubuntu
+24.04 container: independent JPEG/AVIF chroma reconstruction at the saturated
+test pattern's sharp edges exceeded the mean-channel error limit. The 64×48
+rendition passed, and both AVIF encoders showed the thumbnail difference.
+
+The colour regression now uses a smooth full-range RGB fixture. It keeps the
+existing error limit, thumbnail dimensions, SDR/PQ/HLG cases, colour metadata,
+bit-depth checks and available gain-map paths. A deliberate test-only substitution
+of HDR bytes for the SDR fallback still fails all four PQ/HLG encoder cases,
+with mean errors of 44.94–62.19 against the unchanged limit of 12. Production
+rendering code is unchanged. The image package passes locally and in the isolated
+Ubuntu runtime with its required test fixtures; pinned Go lint reports zero
+issues. CI must rerun before selecting a native deployment artifact.

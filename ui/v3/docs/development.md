@@ -9,6 +9,7 @@ architecture, compatibility, feature guides, and operations.
 
 Run the commands below from the Git root. Use Go matching
 [go.mod](../../../go.mod), a C compiler for SQLite/CGO, Make, Git, FFmpeg/ffprobe,
+libavif's `avifenc`/`avifdec` tools (Ubuntu package `libavif-bin`),
 and Node.js 24.15 or newer in the 24 LTS line. v3 pins pnpm 12.4.2. Let pnpm select the version from its `packageManager` field. v3's build-script policy and
 scoped dependency overrides live in `pnpm-workspace.yaml`. `make lint` runs the
 CI-pinned Go linter through

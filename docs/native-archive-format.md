@@ -562,6 +562,10 @@ The tools reserve 50 GiB of free space by default, check additional space before
 snapshot/restore and recheck while writing. `--reserve-bytes` changes that reserve
 for another installation. A failed operation removes only its newly created
 output (server checkpoints retain their admission records as described above).
+SQLite verification uses a connection-local page cache bounded to 256 MiB to
+reduce repeated index reads on large disk-backed restores. It retains the full
+integrity, foreign-key and identity checks; the setting does not modify the
+database's contents or persistent configuration.
 A killed portable export/import process can leave an unsealed directory; an existing destination
 is always refused. Preserve that evidence or remove the abandoned directory
 before choosing a new destination.

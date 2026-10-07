@@ -30,6 +30,7 @@ MD5 = re.compile(r"[0-9a-f]{32}\Z")
 ROLES = {"config", "import_rules", "file_journal", "producer_outbox",
          "download_archive", "media_manifest", "worker_profile", "operating_state", "operating_database"}
 SQLITE_ROLES = {"library", "producer_outbox", "download_archive", "operating_database"}
+VERIFICATION_CACHE_KIB = 256 * 1024
 
 
 def connect_readonly(path):
@@ -40,6 +41,10 @@ def connect_readonly(path):
 
 
 def database_metadata(connection, role):
+    # Large foreign-key/index checks otherwise churn the default 2 MiB cache
+    # on disk-backed restores. This is a connection-local, bounded page cache;
+    # it changes neither the database nor the required verification checks.
+    connection.execute(f"PRAGMA cache_size=-{VERIFICATION_CACHE_KIB}")
     if connection.execute("PRAGMA integrity_check").fetchone() != ("ok",):
         raise InvalidArchive("SQLite integrity check failed")
     if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:

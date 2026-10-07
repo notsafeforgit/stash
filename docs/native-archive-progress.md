@@ -11130,3 +11130,29 @@ services. Preparation of the complete schema-94 database and original artwork
 is running separately. These are rehearsal inputs from distinct source views;
 the full coordinated capture, relocated restore, producer replay and production
 cutover gates remain open.
+
+## Populated restore preparation and verification cache — 2026-10-07
+
+The isolated schema-94 copy passed SQLite integrity, foreign-key and native
+identity checks. Its 21,901,381,632-byte database references exactly the same
+238,574 external artwork identities as the previously verified portable archive.
+Restoring those original files into the owned tank scratch is now running, with
+encoded/uncompressed hashes and original MD5 identities checked as files land.
+No production writer or original migration copy changed.
+
+The initial preparation used SQLite's 2,000 KiB default cache and took 3,455.3
+seconds through database copy, verification and artwork inventory comparison.
+A concurrent read-only check of the same unchanged copied database with a
+256 MiB page cache passed all integrity, foreign-key and native identity checks
+in 1,017.0 seconds, with 296,448 KiB peak process RSS. These observations shared
+disk I/O and are not an isolated comparative benchmark. The archive verifier now
+uses that bounded connection-local cache; it retains every verification check.
+The installed runtime passed all 117 archive and 274 host backup tests.
+
+The native host worker runtime is installed in its separate, inactive location.
+All 113 installed producer modules match source, and its pinned gallery-dl,
+yt-dlp and adapter identities match the prepared n8n image. All twenty host
+profiles and six referenced cookie files passed read-only readiness checks.
+No scrape/API command, credential provisioning, unit installation or schedule
+change occurred. Coordinated capture, complete relocated restore and production
+cutover are still pending.

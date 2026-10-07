@@ -113,6 +113,42 @@ class WorkerInventoryTests(unittest.TestCase):
         self.assertNotIn(self.secret, json.dumps(report))
         self.assertEqual(validate_report(json.loads(json.dumps(report))), report)
 
+    def test_declared_state_directory_resolves_container_payloads_and_retains_empty_directories(self):
+        payloads = self.root / 'binaryData'
+        payloads.mkdir(mode=0o700)
+        (payloads / 'empty').mkdir(mode=0o700)
+        payload = payloads / 'payload'
+        with payload.open('wb') as output:
+            output.write(self.secret.encode())
+            output.truncate(17 << 20)  # Binary payloads are not source-plan JSON.
+        virtual = '/container/private'
+        self.spec['path_mappings'] = [{'from': virtual, 'to': str(self.root)}]
+        self.spec['state_directories'] = [virtual + '/binaryData']
+        self.save()
+        report = collect(str(self.inventory))
+        self.assertEqual(report['version'], 2)
+        self.assertEqual(report['read_checksums'][str(payload)], hashlib.sha256(payload.read_bytes()).hexdigest())
+        self.assertIn(str(payloads / 'empty'), report['state_trees'][str(payloads)]['directories'])
+        self.assertNotIn(self.secret, json.dumps(report))
+        self.assertNotIn(virtual, json.dumps(report))
+        (payloads / 'later').write_bytes(b'new execution')
+        later = collect(str(self.inventory))
+        self.assertIn(str(payloads / 'later'), later['state_trees'][str(payloads)]['files'])
+
+    def test_declared_state_directory_rejects_unsafe_paths_and_non_files(self):
+        for value in ('not-a-list', [False], ['relative/path'], [str(self.root / '..' / 'escape')]):
+            self.spec['state_directories'] = value
+            self.save()
+            with self.assertRaises(InvalidArchive):
+                collect(str(self.inventory))
+        payloads = self.root / 'binaryData'
+        payloads.mkdir()
+        (payloads / 'escape').symlink_to(self.private)
+        self.spec['state_directories'] = [str(payloads)]
+        self.save()
+        with self.assertRaisesRegex(InvalidArchive, 'links or special files'):
+            collect(str(self.inventory))
+
     def test_source_management_container_paths_resolve_before_capture(self):
         self.source_runtime()
         virtual = '/container/private'
@@ -352,6 +388,66 @@ class WorkerInventoryTests(unittest.TestCase):
         def changed(host, *args, **kwargs):
             stage = prepare(host, *args, **kwargs)
             (self.source_plan.parent / 'receipt.json').write_bytes(json_bytes({'new': True}))
+            return stage
+        with patch('native_backup.ArtworkPins'), patch('native_backup.ZFSMedia'), \
+             patch.object(HostFilesystemCapture, 'prepare', changed), \
+             patch('stash_archive.server_checkpoint.ServerCheckpoint.seal') as seal:
+            with self.assertRaisesRegex(InvalidArchive, 'state changed between inspection and capture'):
+                NativeBackupSession(config, 'first', self.root / 'media', 'metadata', '', FakeS3(self.root / 'cloud'))
+        seal.assert_not_called()
+
+    def test_declared_payloads_and_workflow_database_retry_the_same_snapshot(self):
+        payloads = self.root / 'binaryData'
+        payloads.mkdir()
+        payload = payloads / 'pending-execution'
+        payload.write_bytes(b'original execution data')
+        self.spec['state_directories'] = [str(payloads)]
+        self.save()
+        database = self.root / 'workflow.sqlite'
+        with closing(sqlite3.connect(database)) as live:
+            live.executescript("PRAGMA journal_mode=WAL; CREATE TABLE executions(id INTEGER PRIMARY KEY, path TEXT); "
+                               "INSERT INTO executions VALUES(123,'pending-execution');")
+            config = self.host_config()
+            settings = json.loads(config.read_bytes())
+            settings['components'].append({'role': 'operating_database', 'name': 'workflow.sqlite', 'path': str(database)})
+            config.write_bytes(json_bytes(settings))
+            with patch('native_backup.ArtworkPins'), patch('native_backup.ZFSMedia'), \
+                 patch('stash_archive.server_checkpoint.ServerCheckpoint.seal', side_effect=OSError('lost reply')):
+                with self.assertRaisesRegex(OSError, 'lost reply'):
+                    NativeBackupSession(config, 'first', self.root / 'media', 'metadata', '', FakeS3(self.root / 'cloud'))
+            saved = json.loads((self.root / 'state/active.json').read_bytes())
+            stage = self.root / 'state/components' / saved['checkpoint_uuid']
+            record = json.loads((stage / 'manifest.json').read_bytes())
+            entries = {base64.b64decode(c['source_path']).decode(): c for c in record['components']}
+            captured = lambda path: stage / f"component-{entries[str(path)]['index']:05d}"
+            self.assertEqual(captured(payload).read_bytes(), b'original execution data')
+            with closing(sqlite3.connect(captured(database))) as db:
+                self.assertEqual(db.execute('SELECT * FROM executions').fetchall(), [(123, 'pending-execution')])
+            live.execute("UPDATE executions SET path='later'")
+            live.commit()
+        payload.write_bytes(b'new execution state')
+        payloads.rename(self.root / 'moved-payloads')
+        database.unlink()
+        with patch('native_backup.ArtworkPins'), patch('native_backup.ZFSMedia'), \
+             patch('native_backup.checkpoint_status', return_value={'state': 'sealed'}), \
+             patch('worker_inventory.collect', side_effect=AssertionError('must not inspect later state')), \
+             patch('stash_archive.server_checkpoint.ServerCheckpoint.seal', side_effect=OSError('same sealed reply')):
+            with self.assertRaisesRegex(OSError, 'same sealed reply'):
+                NativeBackupSession(config, 'second', self.root / 'media', 'metadata', '', FakeS3(self.root / 'cloud'))
+        self.assertEqual(json.loads((stage / 'manifest.json').read_bytes()), record)
+
+    def test_host_rejects_payload_change_before_native_capture(self):
+        payloads = self.root / 'binaryData'
+        payloads.mkdir()
+        payload = payloads / 'execution'
+        payload.write_bytes(b'original')
+        self.spec['state_directories'] = [str(payloads)]
+        self.save()
+        config = self.host_config()
+        prepare = HostFilesystemCapture.prepare
+        def changed(host, *args, **kwargs):
+            stage = prepare(host, *args, **kwargs)
+            payload.write_bytes(b'modified')
             return stage
         with patch('native_backup.ArtworkPins'), patch('native_backup.ZFSMedia'), \
              patch.object(HostFilesystemCapture, 'prepare', changed), \

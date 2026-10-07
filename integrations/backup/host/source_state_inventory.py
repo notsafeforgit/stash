@@ -1,4 +1,4 @@
-"""Capture source-management plans and subscriptions under worker barriers."""
+"""Capture declared state trees and source-management inputs under worker barriers."""
 
 import hashlib
 import os
@@ -64,13 +64,15 @@ def fingerprint(inventory, path, role, limit):
     inventory.add(path, role)
     with open_regular(path) as source:
         before = os.fstat(source.fileno())
-        if before.st_size > limit:
+        if limit is not None and before.st_size > limit:
             raise InvalidArchive("Source-management dependency exceeds its runtime size limit")
         digest = hashlib.sha256()
         size = 0
         while body := source.read(1 << 20):
             size += len(body)
-            if size > limit:
+            if size > before.st_size:
+                raise InvalidArchive("Source-management dependency changed during inventory")
+            if limit is not None and size > limit:
                 raise InvalidArchive("Source-management dependency exceeds its runtime size limit")
             digest.update(body)
         digest = digest.hexdigest()
@@ -80,6 +82,23 @@ def fingerprint(inventory, path, role, limit):
     previous = inventory.checksums.setdefault(str(path), digest)
     if previous != digest:
         raise InvalidArchive("Source-management dependency changed during inventory")
+
+
+def collect_tree(inventory, state, *, limit=None):
+    """Stream explicit non-database trees; source plans also have runtime limits."""
+    state = canonical(str(state))
+    record = snapshot(state)
+    count = sum(len(tree["directories"]) + len(tree["files"])
+                for name, tree in inventory.state_trees.items() if name != str(state))
+    if count + len(record["directories"]) + len(record["files"]) > MAX_ENTRIES:
+        raise InvalidArchive("Source-management state exceeds its inventory limit")
+    for filename in record["files"]:
+        fingerprint(inventory, Path(filename), "operating_state", limit)
+    if snapshot(state) != record:
+        raise InvalidArchive("Source-management state changed during inventory")
+    previous = inventory.state_trees.setdefault(str(state), record)
+    if previous != record:
+        raise InvalidArchive("Source-management state changed during inventory")
 
 
 def collect(inventory, filename, resolve, expected_root):
@@ -106,18 +125,7 @@ def collect(inventory, filename, resolve, expected_root):
         raise InvalidArchive("Source services require different subscription lists")
     for filename in lists:
         fingerprint(inventory, filename, "config", MAX_LIST_BYTES)
-    record = snapshot(state)
-    count = sum(len(tree["directories"]) + len(tree["files"])
-                for name, tree in inventory.state_trees.items() if name != str(state))
-    if count + len(record["directories"]) + len(record["files"]) > MAX_ENTRIES:
-        raise InvalidArchive("Source-management state exceeds its inventory limit")
-    for filename in record["files"]:
-        fingerprint(inventory, Path(filename), "operating_state", MAX_STATE_BYTES)
-    if snapshot(state) != record:
-        raise InvalidArchive("Source-management state changed during inventory")
-    previous = inventory.state_trees.setdefault(str(state), record)
-    if previous != record:
-        raise InvalidArchive("Source-management state changed during inventory")
+    collect_tree(inventory, state, limit=MAX_STATE_BYTES)
 
 
 def validate(trees, roles, checksums):

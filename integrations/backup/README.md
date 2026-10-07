@@ -437,6 +437,24 @@ to the explicit JSON `file`/`pointer` used to provision it. Capture dotenv files
 launcher units, source lists, reviewed n8n workflow exports and other operating
 inputs through the host's explicit `components` list.
 
+For changing directories of external state, add `state_directories` to one
+worker declaration, for example
+`"state_directories": ["/home/node/.n8n/binaryData"]`. The inspector applies that
+worker's container mappings, includes every regular file as `operating_state`,
+and retains empty directories, membership, identities and streamed checksums.
+The combined state-tree inventory is bounded to 16,384 files/directories;
+binary payloads do not inherit the source-plan JSON size limit. New backups
+enumerate newly created files. A sealed retry uses the original enumeration and
+captured bytes even after live files move or disappear. Changed files or tree
+membership before the native checkpoint stop the capture.
+
+Declare only the needed state directories, such as n8n's `binaryData`, rather
+than the whole application directory containing caches and logs. Live SQLite
+databases and their WAL/SHM files must stay outside these opaque trees; declare
+the database separately as `operating_database`. Writer coordination and
+validation that every database-referenced payload exists remain the enclosing
+deployment's responsibility.
+
 For a download worker that runs `stash-n8n-sources`, add
 `"source_management": "/private/source-management.json"` to its declaration.
 The inspector follows that runtime's current Reddit/Twitter subscription lists,

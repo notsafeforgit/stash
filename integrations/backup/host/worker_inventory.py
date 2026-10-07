@@ -73,7 +73,7 @@ class Inventory:
 
     def worker(self, spec):
         required = {"name", "profile", "home", "working_directory", "outboxes"}
-        optional = {"path_mappings", "environment", "lock_roots", "source_management"}
+        optional = {"path_mappings", "environment", "lock_roots", "source_management", "state_directories"}
         if (not isinstance(spec, dict) or not required <= spec.keys() or spec.keys() - required - optional
                 or not isinstance(spec["name"], str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", spec["name"])
                 or not isinstance(spec["outboxes"], list) or not spec["outboxes"]):
@@ -138,6 +138,13 @@ class Inventory:
             if document["schema"] != "stash-gallery-worker-v1":
                 raise InvalidArchive("Declare source management with its download worker root")
             source_state_inventory.collect(self, spec["source_management"], path, document["root"].get("uuid"))
+
+        state_directories = spec.get("state_directories", [])
+        if not isinstance(state_directories, list) or len(state_directories) > 128:
+            raise InvalidArchive("Invalid worker state directory declaration")
+        for value in state_directories:
+            source_state_inventory.canonical(value)
+            source_state_inventory.collect_tree(self, path(value))
 
         environment = spec.get("environment", {})
         if not isinstance(environment, dict):

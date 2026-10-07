@@ -11095,3 +11095,38 @@ Its retained execution counter was 1,819,469. Capture and verification took
 This checks the database capture path; it is not a coordinated production backup.
 Matching encryption/configuration files, external execution payloads, writer
 coordination and the populated full restore drill remain required.
+
+## External workflow payload inventory — 2026-10-07
+
+Worker declarations now accept `state_directories` for changing external payload
+trees such as n8n's `binaryData`. Container mappings apply before traversal.
+Each new backup enumerates regular files and empty directories, streams file
+checksums, and rejects membership or identity changes before the native
+checkpoint. The existing retained inventory preserves the original tree and
+bytes on sealed retry. Binary payloads have bounded traversal without inheriting
+the source-operation JSON size limit; source plans retain their runtime limits.
+
+All 274 host backup tests passed after installing the changed runtime. New
+checks cover container paths, payloads larger than source-plan limits, newly
+created files, unsafe paths, changed payloads before sealing, and the combined
+WAL database/payload retry after live state changes or disappears. The installed
+inventory modules match the reviewed source hashes.
+
+The real thirty-profile inspection now resolves 101 components, including 42
+n8n payload/metadata files. Its outbox is still an explicit inspection fixture,
+not a production producer capture. The first inspection rejected the new
+container directory until its explicit host mount mapping was added.
+
+Frozen rehearsal inputs preserve the previously captured n8n database, its
+configuration, hook, original/replacement workflow exports, and binary payloads.
+All nineteen database-referenced payloads have matching metadata and sizes. An
+offline container using the prepared n8n runtime decrypted all nine saved
+credentials with the retained configuration; no plaintext values were emitted
+and no workflow engine started.
+
+The owned tank scratch now also has a held media snapshot and an isolated ZFS
+clone. It shares the existing media data and does not modify live files or
+services. Preparation of the complete schema-94 database and original artwork
+is running separately. These are rehearsal inputs from distinct source views;
+the full coordinated capture, relocated restore, producer replay and production
+cutover gates remain open.

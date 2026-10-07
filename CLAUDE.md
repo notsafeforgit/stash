@@ -94,6 +94,10 @@ Capture committed WAL contents with SQLite backup, retain its original staged
 bytes on retry and verify database metadata again on restore. Include matching
 encryption/configuration files and external execution payloads separately;
 worker publication locks alone do not stop unrelated n8n writers or pruning.
+Worker inventories can declare `state_directories` for changing external payload
+trees, including n8n `binaryData`. Enumerate and hash their regular files with
+bounded traversal, retain empty directories, and reject changes before sealing.
+Keep live SQLite databases outside opaque trees and declare them explicitly.
 The optional external-boundary handshake keeps the native writer guard until a
 bounded host confirmation and seals that evidence with the checkpoint. Establish
 producer barriers before requesting that guard; the server never executes

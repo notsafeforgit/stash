@@ -1904,6 +1904,77 @@ not overwrite later workflow edits. Old result-file tokens are a separate input
 format, not native outbox tokens. The installed workflows remain on the old
 runner until that conversion and deployment boundary is complete.
 
+The converter also recognizes the reviewed parent-execution heartbeat command
+and relocates it to `stash-n8n-parent-alive` in the isolated worker environment.
+Its existing Redis coordination, connections and input expressions are preserved.
+The helper opens the local n8n SQLite database read-only; `new`, `running` and
+`waiting` executions remain alive until stopped. An unavailable database fails
+the command instead of claiming the parent finished. `N8N_DATABASE_PATH` or
+`--database` supplies a relocated database. This helper neither reads a creator
+catalog nor establishes scrape completion.
+
+## Registering and disabling native sources
+
+`stash-manage-sources` prepares and resumes bounded source-definition changes
+through the existing native API. It requires the application's `STASH_API_KEY`
+for administration and the producer's `STASH_INGEST_TOKEN` with a grant for the
+whole selected logical root. A collection-limited token cannot prove a URL is
+absent outside its own grants. Website login credentials are not involved.
+
+An input contains `operation` (`ensure` or `disable`), `root_uuid`, `reason` and
+one to fifty complete `targets` definitions. For example:
+
+```json
+{
+  "operation": "ensure",
+  "root_uuid": "00000000-0000-4000-8000-000000000001",
+  "reason": "Add the requested scrape source",
+  "targets": [{
+    "label": "Example Reddit source",
+    "kind": "account",
+    "namespace": "native:reddit",
+    "state": "active",
+    "target_url": "https://www.reddit.com/user/example/submitted/?sort=new",
+    "root_uuid": "00000000-0000-4000-8000-000000000001",
+    "account_uuid": null,
+    "path_prefix": "."
+  }]
+}
+```
+
+Use the real root UUID and exact URLs expanded by the launcher, including each
+Reddit traversal. Preparation uses indexed current-target lookups and records
+existing identities or new UUIDs in a private immutable plan. It performs no
+server mutation. Existing collections keep their labels, accounts and path
+scopes. Missing sources can be registered; ambiguous, disabled or retired
+sources require review before `ensure` can proceed. `disable` changes only the
+state of matched active collections, preserves their metadata and evidence, and
+does not create missing collections or delete media.
+
+```sh
+stash-manage-sources prepare --input sources.json --plan source-plan.json --locks /shared/native-locks
+stash-manage-sources apply --plan source-plan.json --expected-sha256 PLAN_DIGEST --locks /shared/native-locks
+stash-manage-sources status --plan source-plan.json --expected-sha256 PLAN_DIGEST
+```
+
+Configure `STASH_INGEST_ENDPOINT` and `STASH_INGEST_PRODUCER`, or pass the
+corresponding `--endpoint` and `--producer` arguments. Save the digest returned
+by preparation; retries reuse that plan rather than preparing new identities.
+Commands return 2 for changed targets needing review, 3 for unapplied work and
+1 for invalid input or unavailable service/storage. A successful apply confirms
+source definitions, not a completed scrape or media intake. A lost response is
+recovered from the original definition revision; later owner edits are retained
+and prevent the old plan from becoming ready again.
+
+Apply preflights all selected targets. Concurrent changes can still leave a
+partial batch, which the retained plan resumes safely. The shared producer lock
+directory coordinates host/container mutations and backup capture. Include the
+input/plan directory in the worker's backup inventory before activation.
+Registration does not infer account ownership, create performers, set depicted
+performers or install metadata policies. Those choices use the native account
+review and policy APIs. The actual parent/add/remove n8n graphs still require
+that integration and runtime verification before deployment.
+
 ## Backfill journal import
 
 `stash-import-backfills` migrates permanent account completion/skip decisions

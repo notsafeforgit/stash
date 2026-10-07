@@ -6,7 +6,7 @@ that plan's scope or replace its completion criteria. Development remains on
 `v3-rewrite`; merge into `develop` requires verification and the owner's success
 review. Production has not been migrated.
 
-## Current release position — 2026-10-06
+## Current release position — 2026-10-07
 
 Implementation spans phases 1–6. Production has not been migrated. The final
 compatible release is frozen and pinned; native development stays on
@@ -14,10 +14,10 @@ compatible release is frozen and pinned; native development stays on
 entries below record the evidence available at their dates, including work that
 was incomplete then but has since finished. They are not the current task list.
 
-The fully verified checkpoint is schema 1000093, with atomic post-merge review
-and shared archive activity.
+The fully verified checkpoint is schema 1000094, with the shared review queue,
+Keep current value receipts, atomic post-merge review and shared archive activity.
 Its complete fork gate, populated migration, fresh reopen and independent
-comparison passed. The schema-93 rehearsal preserves all 40,512,442 original
+comparison passed. The schema-94 rehearsal preserves all 40,512,443 original
 rows across 300 original tables with clean integrity and no foreign-key
 violations. `.local/native-rehearsal-current.json` identifies the retained
 verified database and its reconciliation receipts.
@@ -46,25 +46,24 @@ Verified development work includes:
   reuse. Their regression suites pass; complete production capture, relocated
   restore, measured daily costs and reviewed cloud-policy activation remain open.
 
-Shared read-only job/run history and safe subject links pass focused backend,
-type/lint/client and 14 Chromium/WebKit checks. The combined release gate passed
-in 1,931.8 seconds, including 758 UI tests, all producer/archive/backup suites,
-zero Go lint issues and full Go integration. Worker service/timer templates are
-packaged and pass parser validation; they are not installed or activated.
-Import history passes focused checks and its complete release gate. The CI
-backend and image workflows now explicitly install FFmpeg/ffprobe, after the
-published activity revision exposed that missing runner dependency. Verification
-of the next published artifact remains required.
-Saved-action recovery is integrated and passes focused checks; its complete
-release gate remains pending. The shared queue of current unresolved choices
-is unfinished; historical import warnings are not current conflict counts.
+Shared activity, import history, saved-action recovery and the current review
+queue pass their complete release gates. All four CI workflows passed at
+`333e5a5e0`; read-only registry inspection verified its source image digest and
+full revision label. The review queue also passed 36 Chromium/WebKit cases.
+The subsequent source-management/heartbeat increment passed its combined gate
+in 2,001.7 seconds, including 789 UI tests, 571 producer tests, all library,
+archive and backup suites, zero Go lint issues and full Go integration.
+Its installed package and the three scraper children plus heartbeat were checked
+in an isolated image built from the current n8n base. No scraper commands ran.
+The two parent and three source-removal workflows still need full conversion,
+including metadata defaults for newly registered sources. Worker service/timer
+templates are packaged and validated; live launchers and workflows have not switched.
 
 Remaining release work:
 
 | Work | Required outcome |
 | --- | --- |
-| Shared import review | Current unresolved account/media/metadata choices are discoverable and actionable; immutable historical import warnings cannot masquerade as current conflicts. Complete the shared history/recovery integration. |
-| Callers and compatibility | Finish the actual host/n8n/config/service inventory and native conversion, test retained external contracts, then remove residual legacy adapters and dependencies. |
+| Callers and compatibility | Finish the actual parent/source-removal workflows and host/profile/service handoff, including new-source metadata defaults, verify installed runtimes and retained external contracts, then remove residual legacy adapters and dependencies. |
 | Backup and restore | Prove a complete common capture boundary, actual upload/request/storage costs, bounded retention/reclamation, and an isolated empty/relocated restore with pending producer and filesystem state. |
 | Production cutover | Pin artifacts, quiesce writers, take final coordinated snapshots, migrate/reconcile, switch native launchers and resume work gradually through verified launch paths. |
 | Observation and retirement | Verify scheduled scraping/recovery/backup cycles, preserve the rollback/export boundary, and retire obsolete catalog writers, mounts, services and packages. |
@@ -170,10 +169,10 @@ it does not remove source files or recovery inputs.
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | Compatible source/images are frozen and production is pinned. Final coordinated backup boundary, deployment inventory and measured release budgets remain. |
-| 1 Native schema and services | Implemented and repeatedly rehearsed through schema 92, including canonical identities, promoted sidecars, source evidence, field choices, file recovery, jobs and post/performer merges. Final dependency and invariant audit remains. |
+| 1 Native schema and services | Implemented and repeatedly rehearsed through schema 94, including canonical identities, promoted sidecars, source evidence, field choices, file recovery, jobs, review receipts and post/performer merges. Final dependency and invariant audit remains. |
 | 2 Ingestion and producer adapter | Native transport, offline delivery, service pacing, source windows and the inventoried service adapters are implemented and tested. Actual host/n8n worker/profile installation and activation remain. |
 | 3 Catalog importer | Frozen catalogs, policies and operational families are imported and reconciled on copies. Final live snapshots, current review outcomes and cutover reconciliation remain. |
-| 4 Native UI and client conversion | Core account/source/collection/metadata/album/manual-intake workflows are implemented. Shared activity is under final validation; shared import review and actual caller conversion remain. |
+| 4 Native UI and client conversion | Core account/source/collection/metadata/album/manual-intake workflows, shared activity, import history, saved-action recovery and the current review queue are implemented and verified. Actual host/n8n caller conversion remains. |
 | 5 Compatibility removal and packaging | V3 is the sole embedded UI and v3 plugin contract. Remaining runtime/client compatibility removal and final pinned deployment artifacts require the dependency audit. |
 | 6 Backup and cutover rehearsal | Native snapshot/export, host publisher/retention and restore tools are implemented and tested. Complete production capture inventory, cost measurements and full relocated restore/cutover drill remain. |
 | 7 Production cutover | Not started. |
@@ -10940,3 +10939,37 @@ mismatch; all fourteen remaining GraphQL operations validate against the native
 schema. This is static contract evidence only. Native source registration,
 association-safe add/remove actions, heartbeat conversion and actual n8n runtime
 verification remain prerequisites to publishing the complete workflow changes.
+
+## Native source management for automation — 2026-10-07
+
+The producer package adds a source-management command that uses the existing
+application definition API and scoped current-target lookup. It saves complete
+plans before mutations, recovers original revisions after lost responses,
+preserves later owner edits and existing account/path choices, and declines
+ambiguous or inactive registrations. Disabling a source retains its evidence
+and media. A root grant is required to establish complete target lookup; the
+application API key remains necessary for mutations. Shared worker locks cover
+host/container coordination and common-boundary backup capture.
+
+Thirteen focused producer tests pass. A real Go/SQLite HTTP test passed across
+separate Python processes: one creation response was deliberately lost, replay
+created no duplicate, two sources were disabled, and a subsequent owner edit
+survived old-plan replay without another write. No schema migration is needed.
+The n8n parent-execution heartbeat is also packaged as a read-only helper; its
+staged converter preserves the existing graph and coordination semantics.
+
+The combined gate passed in 2,001.7 seconds: generation, embedded UI, 789 UI
+tests, 571 producer tests, 8 library tests, 113 archive tests, 262 backup tests,
+zero Go lint issues and full Go integration. The isolated installed package
+matches source and includes both commands. An isolated image built from the
+current n8n base passed 62 expression evaluations and three real Wait checkpoints
+for the scraper children, plus seven heartbeat expressions. Workflow/credential
+identities remain intact; no scraper commands executed. The read-only heartbeat
+also matched 25 actual execution rows at inspection time; this does not establish
+scraper health or completion.
+
+These commands are not installed in live workers or activated in n8n. Actual
+parent/removal conversion, source policy and performer review integration, full
+coordinated backup/restore, measured publication costs and production cutover
+remain required. Registration alone does not create a metadata policy; new-source
+automation must install its reviewed defaults before dispatching media intake.

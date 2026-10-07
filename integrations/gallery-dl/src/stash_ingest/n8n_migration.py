@@ -14,6 +14,9 @@ from .encoding import InvalidData, decode, digest, identifier
 
 OLD_RUNNER = "=python3 /home/andrew/src/private/scrape-catalog/n8n_runner.py"
 RUNNER = "=/opt/stash-ingest/bin/stash-ingest-n8n"
+OLD_PARENT_CHECK = "=python3 /home/andrew/src/private/scrape-catalog/n8n_parent_alive.py"
+PARENT_CHECK = "=/opt/stash-ingest/bin/stash-n8n-parent-alive"
+PARENT_ARGUMENT = " --execution '{{ /^[0-9]+:/.test(String($json.lock_token || \"\")) ? String($json.lock_token).split(\":\")[0] : \"INVALID\" }}'"
 
 
 def identity_expression(mode):
@@ -48,6 +51,15 @@ def convert(workflow):
     by_name = {node["name"]: node for node in nodes}
     if len(by_name) != len(nodes) or len({node["id"] for node in nodes}) != len(nodes):
         raise InvalidData("Workflow node names and IDs must be unique")
+    parent_checks = [node for node in nodes if node.get("type") == "n8n-nodes-base.executeCommand"
+                     and OLD_PARENT_CHECK in node.get("parameters", {}).get("command", "")]
+    if parent_checks:
+        if len(parent_checks) != 1 or parent_checks[0]["parameters"]["command"] != OLD_PARENT_CHECK + PARENT_ARGUMENT:
+            raise InvalidData("Workflow differs from the reviewed parent-execution check")
+        if any(OLD_RUNNER in node.get("parameters", {}).get("command", "") for node in nodes):
+            raise InvalidData("A parent heartbeat cannot also be a scraper workflow")
+        parent_checks[0]["parameters"]["command"] = PARENT_CHECK + PARENT_ARGUMENT
+        return value
     commands = [node for node in nodes if node.get("type") == "n8n-nodes-base.executeCommand"
                 and OLD_RUNNER in node.get("parameters", {}).get("command", "")]
     run = [(node, mode) for node in commands for mode in MODES

@@ -1,0 +1,12 @@
+[Unit]
+Description=Continue Stash native archive work (%i)
+
+[Timer]
+OnStartupSec=1min
+OnUnitInactiveSec=30s
+AccuracySec=5s
+RandomizedDelaySec=5s
+Unit=stash-ingest-worker@%i.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,18 @@
+[Unit]
+Description=Stash native archive worker (%i)
+Documentation=man:systemd.service(5)
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/stash-ingest/%i.env
+ExecStart=/usr/bin/env -- ${STASH_INGEST_EXECUTABLE} --outbox ${STASH_INGEST_OUTBOX} --endpoint ${STASH_INGEST_ENDPOINT} --producer ${STASH_INGEST_PRODUCER} dispatch-all --profiles ${STASH_INGEST_PROFILES}
+# Exit 2 means this bounded cycle left pending/review work; inspect its JSON.
+SuccessExitStatus=2
+# A single source attempt can be much longer than the usual service timeout.
+TimeoutStartSec=infinity
+TimeoutStopSec=90s
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+Nice=10
+SyslogIdentifier=stash-ingest-%i

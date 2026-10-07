@@ -337,10 +337,67 @@ unsuccessful attempt; exit 0 only describes this cycle. Neither certifies the
 whole source queue or media intake. Preserve the result's native run identity
 and inspect its state and file receipts when a workflow needs completion.
 
-A host timer can invoke this as one oneshot service per reviewed profile, with
-exit 2 accepted as pending work; an already-active service must not be launched
-again by its timer. Host/n8n wrapper activation and migration of old operational
-receipts remain required. This command does not update installed launchers.
+The [host worker units](#host-worker-service-and-timer) run `dispatch-all` across
+the reviewed local profiles. Host/n8n wrapper activation and migration of old
+operational receipts remain required. These commands do not update installed
+launchers.
+
+### Host worker service and timer
+
+The templates in [`systemd/`](systemd/) provide one user service instance per
+producer runtime. The `host` instance reads
+`~/.config/stash-ingest/host.env`; its profile list uses the
+[`stash-gallery-dispatch-v1` format](#dispatch-across-local-profiles). Configure
+the installed executable, durable outbox, Stash origin, registered producer
+UUID, reviewed profiles and scoped ingestion token with absolute paths. The
+example contains placeholders. Keep the completed environment file private
+(mode `0600`) and include it, the profile dependency closure and the outbox in
+the deployment's backup inventory.
+
+At the reviewed native cutover, after registering the producer and validating
+the installed runtime and its profile policies, install and start the units:
+
+```sh
+install -d -m 0700 ~/.config/stash-ingest
+install -d -m 0755 ~/.config/systemd/user
+install -m 0644 integrations/gallery-dl/systemd/stash-ingest-worker@.service \
+  integrations/gallery-dl/systemd/stash-ingest-worker@.timer \
+  ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now stash-ingest-worker@host.timer
+```
+
+Provision the completed `host.env` before starting the timer; copying the
+placeholder file is not configuration. These are user units, so unattended
+operation requires the user's service manager to remain running after logout.
+Use a separate producer identity, outbox and profile list for each runtime.
+An n8n container needs its worker in the container's reviewed runtime with its
+own path mappings; a host unit cannot substitute for that worker just by
+pointing at container paths.
+
+The timer starts its first cycle one minute after the user manager starts
+(immediately if enabled later) and schedules subsequent cycles 30 seconds after
+the service becomes inactive. Timer coalescing and random delay are configured
+at five seconds each; system load can postpone execution further. A cycle can
+contain a long source attempt. The
+service has no start timeout, and an already-running instance is not launched
+again by either its timer or another `systemctl start` for that same instance.
+This prevents timer overlap for that instance; native source leases still
+coordinate other producers and manual/n8n requests.
+
+Exit `2` is accepted because a cycle may leave pending, deferred or review work;
+exit `0` also describes only that cycle. Inspect its JSON outcome and native
+run/file receipts for completion. Configuration and execution failures remain
+visible in the journal, and the timer can retry on its next cycle. The service
+stops its whole process group; unfinished durable work resumes through outbox
+delivery and fenced lease recovery.
+
+```sh
+systemctl --user status stash-ingest-worker@host.timer stash-ingest-worker@host.service
+journalctl --user -u stash-ingest-worker@host.service -n 50
+# Stop the timer and any active cycle before replacing its runtime/configuration.
+systemctl --user stop stash-ingest-worker@host.timer stash-ingest-worker@host.service
+```
 
 ## n8n worker image
 

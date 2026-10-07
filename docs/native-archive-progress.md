@@ -10755,3 +10755,17 @@ existing work-history cursor. The fixture removal chain now removes schema 93
 first, and selected-work history explicitly uses its dedicated work index.
 The affected migration/history checks pass (202.4 seconds); the combined release
 gate is running again. Production has not changed.
+
+## Host worker service packaging — 2026-10-06
+
+The native producer now includes systemd user service/timer templates and a
+placeholder environment file. One service instance runs the reviewed profile
+list through `dispatch-all`; its timer schedules the next cycle after the
+previous service invocation becomes inactive. Existing native leases coordinate
+other producers and callers. Exit 2 remains a pending/review cycle result, not
+proof of scrape or media completion.
+
+The unit parser accepts both templates without warnings. The README documents
+the scoped Stash token, per-runtime outbox/profile configuration, backup inventory,
+and the separate n8n container runtime requirement. These files are packaged
+only; no live units, launchers, producer identities or outboxes were activated.

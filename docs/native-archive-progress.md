@@ -11156,3 +11156,42 @@ profiles and six referenced cookie files passed read-only readiness checks.
 No scrape/API command, credential provisioning, unit installation or schedule
 change occurred. Coordinated capture, complete relocated restore and production
 cutover are still pending.
+
+## Populated artwork capture and restore preflight — 2026-10-07
+
+The isolated input preparation finished: schema 1000094, a 21,901,381,632-byte
+library and all 238,574 original artwork files (36,496,053,336 bytes). Encoded and
+decoded hashes and original artwork identities passed. Total preparation time
+was 6,362.7 seconds, including the earlier database verification. The inputs
+remain separate source views; this is not a coordinated production snapshot.
+
+A real timing probe exposed a release blocker in artwork capture. The existing
+provider exceeded its 120-second checkpoint deadline after making 2,295 of 2,400
+sample links. Flushing every new hard link separately was too slow on the owned
+ZFS rehearsal storage. Linux 5.8+ now uses a checked filesystem-wide `syncfs`
+after retaining the links and before publishing the pin manifest; other
+platforms retain per-file `fsync`. Filesystem writeback errors and deadline
+expiry still prevent sealing. The exact same sample completed in 0.59 seconds;
+the complete 238,574-file capture then passed in about eleven seconds. These
+are observed runs on the rehearsal filesystem, not a production latency promise.
+
+All 121 portable archive tests and 274 host backup tests pass. New cases verify
+the flush occurs before publication, failure and deadline handling preserve an
+unsealed attempt, descriptor cleanup, and per-file fallback on kernels without
+filesystem writeback error reporting. The installed modules match the tested
+source. Documentation also corrects the earlier description of failed captures:
+partial pins are retained for fenced abandonment, not immediately discarded.
+
+The isolated HTTP preflight passed with a fresh native database, two scoped
+producers, real held ZFS media capture and portable restore. Each producer had
+an acknowledged event, an accepted event with a lost acknowledgement, and an
+undelivered event. Restored delivery completed both outstanding events without
+duplicates. A staged filesystem operation also recovered from the portable
+journal into a new directory. This small preflight validates the rehearsal
+driver; the populated capture/restore is the next gate.
+
+The published Stash image for `9739f848a` is verified by its full revision and
+digest. Its wrapper build is running with that explicit source digest. The
+configured origin and live deployment confirmed the publication destination
+after an initial automatic approval rejection; the evidence-backed retry was
+approved. No production service or cloud backup policy changed.

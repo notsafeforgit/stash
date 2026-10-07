@@ -1,15 +1,19 @@
 from datetime import datetime, timedelta, timezone
 import copy
+import errno
 import hashlib
 import os
 from pathlib import Path
 import shutil
 import tempfile
+import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 import uuid
 
 from stash_archive.artwork_pins import ArtworkPins
+from stash_archive.durability import syncfs_function
 from stash_archive.bundle import export_archive
 from stash_archive.storage import InvalidArchive, require_space, store_file
 
@@ -36,6 +40,74 @@ class ArtworkPinTests(unittest.TestCase):
     def capture(self):
         record = self.pins.capture(self.ready)
         return {**{k: self.ready[k] for k in ("uuid", "token", "request_sha256")}, "details": {"artwork": record}}
+
+    def test_filesystem_flush_precedes_manifest_without_per_inode_flushes(self):
+        inodes = {path.stat().st_ino for path, _ in self.originals.values()}
+        fsync, flushed_inodes, boundaries = os.fsync, [], []
+        target = self.pins.path(self.ready["uuid"], self.ready["token"])
+
+        def checked_fsync(fd):
+            if os.fstat(fd).st_ino in inodes:
+                flushed_inodes.append(os.fstat(fd).st_ino)
+            fsync(fd)
+
+        def boundary(fd):
+            self.assertEqual(os.fstat(fd).st_dev, self.cache.stat().st_dev)
+            self.assertFalse((target / "manifest.json").exists())
+            self.assertTrue((target / "0/inventory.jsonl").is_file())
+            for checksum, (source, data) in self.originals.items():
+                retained = target / "0" / checksum
+                self.assertEqual(retained.stat().st_ino, source.stat().st_ino)
+                self.assertEqual(retained.read_bytes(), data)
+            boundaries.append(fd)
+
+        with patch("stash_archive.durability.syncfs_function", return_value=boundary), patch("os.fsync", side_effect=checked_fsync):
+            view = self.pins.open_bound(self.capture()).verify()
+        self.assertEqual(flushed_inodes, [])
+        self.assertEqual(len(boundaries), 1)
+        self.assertTrue((view.path / "manifest.json").is_file())
+        with self.assertRaises(OSError): os.fstat(boundaries[0])
+
+    def test_unavailable_filesystem_flush_keeps_per_file_durability(self):
+        inodes = {path.stat().st_ino for path, _ in self.originals.values()}
+        fsync, flushed = os.fsync, []
+
+        def checked(fd):
+            inode = os.fstat(fd).st_ino
+            if inode in inodes:
+                flushed.append(inode)
+            fsync(fd)
+
+        with patch("stash_archive.durability.syncfs_function", return_value=None), patch("os.fsync", side_effect=checked):
+            self.pins.open_bound(self.capture()).verify()
+        self.assertCountEqual(flushed, inodes)
+
+    def test_kernel_without_writeback_error_reporting_uses_file_flushes(self):
+        for release in ("4.19.0", "5.7.99", "unknown"):
+            with self.subTest(release=release), patch("stash_archive.durability.sys.platform", "linux"), \
+                 patch("stash_archive.durability.os.uname", return_value=SimpleNamespace(release=release)), \
+                 patch("stash_archive.durability.ctypes.CDLL") as library:
+                self.assertIsNone(syncfs_function())
+                library.assert_not_called()
+
+    def test_filesystem_writeback_failure_or_expired_flush_never_seals(self):
+        for mode in ("writeback", "timeout"):
+            with self.subTest(mode=mode):
+                self.ready["token"] = str(uuid.uuid4())
+                now = [time.monotonic()]
+
+                def flush(fd):
+                    if mode == "writeback":
+                        raise OSError(errno.EIO, "injected filesystem writeback failure")
+                    now[0] += 60
+
+                with patch("stash_archive.durability.syncfs_function", return_value=flush), \
+                     patch("stash_archive.artwork_pins.time.monotonic", side_effect=lambda: now[0]):
+                    with self.assertRaises((OSError, InvalidArchive)):
+                        self.capture()
+                target = self.pins.path(self.ready["uuid"], self.ready["token"])
+                self.assertTrue((target / "intent.json").is_file())
+                self.assertFalse((target / "manifest.json").exists())
 
     def test_retained_inodes_survive_atomic_replacement_and_source_removal(self):
         boundary = self.capture()

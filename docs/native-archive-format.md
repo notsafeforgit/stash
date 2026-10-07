@@ -203,9 +203,14 @@ has disappeared; it cannot silently fall back to later live artwork.
 
 Pins use flat private directories, retaining the original inodes without another
 copy of all artwork bytes or all hash-prefix directories. Flushed inventories
-record their identities, lengths and modification times. The provider bounds
-capture by the server challenge's deadline and the normal disk reserve; a failed
-capture removes only its own attempt. It requires the native atomic artwork
+record their identities, lengths and modification times. On Linux 5.8 or newer,
+the provider uses one checked [`syncfs`](https://man7.org/linux/man-pages/man2/sync.2.html)
+on the retained filesystem before publishing its manifest. This waits for file
+data and link metadata, while avoiding a separate synchronous write for every
+new hard link. Other platforms keep per-file `fsync`. A writeback error or expired
+deadline prevents acknowledgement. The provider bounds capture by the server
+challenge's deadline and the normal disk reserve; a failed capture retains its
+attempt and partial pins for fenced abandonment. It requires the native atomic artwork
 writer and journaled cleanup. Other tools must not modify original artwork in
 place. Capture duration still needs measurement against the full live inventory.
 

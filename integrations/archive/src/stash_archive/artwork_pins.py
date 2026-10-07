@@ -15,6 +15,7 @@ import stat
 import time
 
 from .filesystem_boundary import canonical_uuid, timestamp
+from .durability import FilesystemFlush
 from .storage import (HEX, InvalidArchive, decode_json, json_bytes, open_regular,
                       publish_bytes, require_space, sync_directory)
 
@@ -88,6 +89,10 @@ class ArtworkPins:
 
     def capture(self, ready):
         """Call only from the authenticated boundary callback, before its ACK."""
+        with FilesystemFlush(self.cache, self.cache_identity) as flush:
+            return self._capture(ready, flush)
+
+    def _capture(self, ready, flush):
         target = self.path(ready["uuid"], ready["token"])
         request_hash = ready["request_sha256"]
         if not isinstance(request_hash, str) or not HEX.fullmatch(request_hash):
@@ -135,7 +140,7 @@ class ArtworkPins:
                         with open_regular(tree / checksum) as retained:
                             if identity(os.fstat(retained.fileno())) != identity(linked):
                                 raise InvalidArchive("Artwork pin changed before flushing")
-                            os.fsync(retained.fileno())
+                            flush.file(retained.fileno())
                         body = json_bytes({"checksum": checksum, **identity(linked)})
                         inventory.write(body)
                         digest.update(body)
@@ -149,6 +154,11 @@ class ArtworkPins:
                               "count": count, "bytes": total, "inventory_sha256": digest.hexdigest()})
                 if directory(source) != expected:
                     raise InvalidArchive("Artwork source root changed during capture")
+            # All retained file data and new link metadata must be durable
+            # before the manifest can authorize the server's boundary ACK.
+            check()
+            flush.finish()
+            check()
             record = {"format": FORMAT, "version": 1, "uuid": ready["uuid"], "token": ready["token"],
                       "request_sha256": request_hash, "roots": roots}
             body = json_bytes(record)

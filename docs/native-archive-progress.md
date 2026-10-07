@@ -14,10 +14,10 @@ compatible release is frozen and pinned; native development stays on
 entries below record the evidence available at their dates, including work that
 was incomplete then but has since finished. They are not the current task list.
 
-The last published, fully verified checkpoint is schema 1000092 and atomic
-post-merge review.
+The fully verified checkpoint is schema 1000093, with atomic post-merge review
+and shared archive activity.
 Its complete fork gate, populated migration, fresh reopen and independent
-comparison passed. The schema-92 rehearsal preserves all 40,512,441 original
+comparison passed. The schema-93 rehearsal preserves all 40,512,442 original
 rows across 300 original tables with clean integrity and no foreign-key
 violations. `.local/native-rehearsal-current.json` identifies the retained
 verified database and its reconciliation receipts.
@@ -46,14 +46,14 @@ Verified development work includes:
   reuse. Their regression suites pass; complete production capture, relocated
   restore, measured daily costs and reviewed cloud-policy activation remain open.
 
-The next activity increment adds shared read-only job/run history and safe
-subject links. Its focused backend, type/lint/client and 14 Chromium/WebKit
-checks pass. Schema-93 migration, fresh reopen and independent comparison passed,
-preserving all 40,512,442 original rows across 300 tables. The first combined
-gate exposed an older-fixture cleanup omission and a selected-work query-plan
-regression; both are fixed and the affected migration/history checks pass. The
-combined release gate is running again. The source is retained in an incremental
-local commit pending that gate and publication; it is not deployed.
+Shared read-only job/run history and safe subject links pass focused backend,
+type/lint/client and 14 Chromium/WebKit checks. The combined release gate passed
+in 1,931.8 seconds, including 758 UI tests, all producer/archive/backup suites,
+zero Go lint issues and full Go integration. Worker service/timer templates are
+packaged and pass parser validation; they are not installed or activated.
+The next import-history increment has passed focused checks in private staging.
+The shared queue of current unresolved choices and saved-action recovery remain
+unfinished; historical import warnings are not current conflict counts.
 
 Remaining release work:
 
@@ -10753,8 +10753,11 @@ The first combined gate found that older migration fixtures retained the new
 source-run indexes, and SQLite selected an unbounded primary-key walk for one
 existing work-history cursor. The fixture removal chain now removes schema 93
 first, and selected-work history explicitly uses its dedicated work index.
-The affected migration/history checks pass (202.4 seconds); the combined release
-gate is running again. Production has not changed.
+The affected migration/history checks pass (202.4 seconds). The corrected
+combined release gate passed in 1,931.8 seconds: generation, real embedded UI,
+758 UI tests, 554 producer tests, eight library tests, 113 archive tests,
+262 backup tests, zero Go lint issues and full Go integration. Production has
+not changed.
 
 ## Host worker service packaging — 2026-10-06
 

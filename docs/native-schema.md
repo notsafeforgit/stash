@@ -1987,6 +1987,18 @@ snapshots include the records with the other archive data. See
 [historical matching](native-ingestion.md#historical-post-to-media-matching) for
 the application API and saved-plan client.
 
+Schema 1000091 updates only the file-proof scope trigger. A new post/media
+matching decision can use an original member's evidence when both posts resolve
+to the same current post identity. The evidence, appearance and file match must
+still form their original chain. Startup validates that distinction, including
+after another merge or portable restore. Historical schema versions retain
+their original same-post validation before migration.
+
+No tables, columns or existing rows change. Original requests, decisions and
+proof references keep their owners and remain exactly replayable. The migration
+does not merge posts, select media or start jobs; new requests separately require
+the current post UUID and a revalidated preview.
+
 ## Historical metadata cleanup
 
 Schema 1000080 adds `source_cleanup_intents`, `catalog_cleanup_imports` and

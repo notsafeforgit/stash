@@ -185,7 +185,7 @@ func (w *AlbumWorker) fail(ctx context.Context, claimed *models.ArchiveJob, caus
 	}
 	code, permanent := "album_processing_unavailable", false
 	switch {
-	case errors.Is(cause, models.ErrSourceGalleryConflict), errors.Is(cause, models.ErrSourceAttachmentConflict):
+	case errors.Is(cause, models.ErrSourceGalleryConflict), errors.Is(cause, models.ErrSourceAttachmentConflict), errors.Is(cause, models.ErrAttachmentSelectionConflict):
 		code, permanent = "album_preview_changed", true
 	case errors.Is(cause, models.ErrSourcePostForgotten):
 		code, permanent = "album_post_forgotten", true

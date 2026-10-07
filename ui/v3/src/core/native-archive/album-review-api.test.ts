@@ -1,4 +1,5 @@
 import { expect, it, vi } from "vitest";
+import { postIdentity, postIds } from "../../../tests/fixtures/source-posts";
 import {
   albumJobSchema,
   albumPreviewSchema,
@@ -13,6 +14,18 @@ import {
 } from "../../../tests/fixtures/album-review";
 
 const endpoint = "https://example.test/library/api/v3/archive/";
+it("resolves the current post for new work without rewriting an original job", async () => {
+  const identity = postIdentity(postIds.post, postIds.otherPost);
+  const transport = vi.fn<typeof fetch>(async () => Response.json(identity));
+  const api = createAlbumReviewAPI(endpoint, transport);
+  expect(await api.post(postIds.post)).toEqual(identity.canonical);
+  expect(String(transport.mock.calls[0]?.[0])).toBe(
+    `${endpoint}posts/${postIds.post}/identity`,
+  );
+  await expect(api.post(postIds.otherPost)).rejects.toMatchObject({
+    code: "invalid_response",
+  });
+});
 it("previews one post with an explicit policy through the public session endpoint", async () => {
   const fetcher = vi.fn<typeof fetch>(async () =>
     Response.json(albumPreview()),

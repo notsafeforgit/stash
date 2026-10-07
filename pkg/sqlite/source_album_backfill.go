@@ -15,36 +15,50 @@ import (
 	"github.com/stashapp/stash/pkg/txn"
 )
 
-// Only this post's indexed evidence is inspected. A bounded but incomplete
+// Only this identity group's indexed evidence is inspected. A bounded but incomplete
 // candidate set must never appear unique, so exceeding the limit is an error.
 type sourceAlbumEvidence struct {
-	UUID            string         `db:"uuid"`
-	AttachmentUUID  sql.NullString `db:"attachment_uuid"`
-	MediaUUID       string         `db:"media_uuid"`
-	FileUUID        sql.NullString `db:"file_uuid"`
-	Basis           string         `db:"basis"`
-	PostFileUUID    sql.NullString `db:"post_file_uuid"`
-	MatchUUID       sql.NullString `db:"match_uuid"`
-	RelativePath    sql.NullString `db:"relative_path"`
-	SourceMediaID   sql.NullString `db:"source_media_id"`
-	SourceMediaType sql.NullString `db:"source_media_type"`
+	UUID                string         `db:"uuid"`
+	AttachmentUUID      sql.NullString `db:"attachment_uuid"`
+	AttachmentNamespace sql.NullString `db:"attachment_namespace"`
+	AttachmentValue     sql.NullString `db:"attachment_value"`
+	MediaUUID           string         `db:"media_uuid"`
+	FileUUID            sql.NullString `db:"file_uuid"`
+	Basis               string         `db:"basis"`
+	PostFileUUID        sql.NullString `db:"post_file_uuid"`
+	MatchUUID           sql.NullString `db:"match_uuid"`
+	RelativePath        sql.NullString `db:"relative_path"`
+	SourceMediaID       sql.NullString `db:"source_media_id"`
+	SourceMediaType     sql.NullString `db:"source_media_type"`
 }
 
-func sourceAlbumEvidenceRows(ctx context.Context, post string) ([]sourceAlbumEvidence, error) {
-	var rows []sourceAlbumEvidence
-	err := dbWrapper.Select(ctx, &rows, `SELECT m.uuid,m.attachment_uuid,m.media_uuid,m.file_uuid,m.basis,
+// Bound each member's ordered range before sorting their union. An identity
+// group cannot turn a small preview into a full evidence-table sort.
+const sourceAlbumEvidenceQuery = `WITH candidates AS MATERIALIZED (
+ SELECT item.value AS uuid FROM source_post_identities i
+ CROSS JOIN json_each((SELECT json_group_array(uuid) FROM (
+  SELECT m.uuid FROM source_media_evidence m INDEXED BY source_media_evidence_post
+  WHERE m.post_uuid=i.post_uuid AND (m.attachment_uuid IS NULL OR NOT EXISTS
+   (SELECT 1 FROM attachment_media_links l WHERE l.attachment_uuid=m.attachment_uuid))
+  ORDER BY m.uuid LIMIT ?
+ ))) item WHERE i.canonical_uuid=?
+), selected AS (SELECT uuid FROM candidates ORDER BY uuid LIMIT ?)
+SELECT m.uuid,m.attachment_uuid,a.namespace AS attachment_namespace,a.value AS attachment_value,m.media_uuid,m.file_uuid,m.basis,
  p.uuid AS post_file_uuid,f.uuid AS match_uuid,o.relative_path,
  CASE WHEN json_type(p.details,'$.source_media_id')='text' THEN json_extract(p.details,'$.source_media_id') END AS source_media_id,
  json_type(p.details,'$.source_media_id') AS source_media_type
- FROM source_media_evidence m
+ FROM selected CROSS JOIN source_media_evidence m ON m.uuid=selected.uuid
+ LEFT JOIN source_attachments a ON a.uuid=m.attachment_uuid
  LEFT JOIN source_post_file_evidence p ON m.attachment_uuid IS NULL AND m.basis='legacy'
   AND p.uuid=json_extract(m.details,'$.source_post_file_evidence_uuid') AND p.post_uuid=m.post_uuid
   AND p.origin='migration' AND p.basis='catalog-appearance'
  LEFT JOIN source_file_observations o ON o.uuid=p.observation_uuid
  LEFT JOIN source_file_matches f ON f.uuid=json_extract(m.details,'$.source_file_match_uuid') AND f.observation_uuid=p.observation_uuid
- WHERE m.post_uuid=? AND (m.attachment_uuid IS NULL OR NOT EXISTS
-  (SELECT 1 FROM attachment_media_links l WHERE l.attachment_uuid=m.attachment_uuid))
- ORDER BY m.uuid LIMIT ?`, post, maxSourceGalleryMembers+1)
+ ORDER BY m.uuid`
+
+func sourceAlbumEvidenceRows(ctx context.Context, post string) ([]sourceAlbumEvidence, error) {
+	var rows []sourceAlbumEvidence
+	err := dbWrapper.Select(ctx, &rows, sourceAlbumEvidenceQuery, maxSourceGalleryMembers+1, post, maxSourceGalleryMembers+1)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +70,9 @@ func sourceAlbumEvidenceRows(ctx context.Context, post string) ([]sourceAlbumEvi
 
 func sourceAlbumPostIdentifiers(ctx context.Context, post string) ([]models.SourcePostIdentifier, error) {
 	var rows []models.SourcePostIdentifier
-	err := dbWrapper.Select(ctx, &rows, `SELECT namespace,value FROM source_post_identifiers WHERE post_uuid=? ORDER BY namespace,value LIMIT ?`, post, maxSourceGalleryMembers+1)
+	err := dbWrapper.Select(ctx, &rows, `SELECT p.namespace,p.value FROM source_post_identities i
+CROSS JOIN source_post_identifiers p ON p.post_uuid=i.post_uuid
+WHERE i.canonical_uuid=? ORDER BY p.namespace,p.value LIMIT ?`, post, maxSourceGalleryMembers+1)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +97,7 @@ func sourceAlbumASCIIID(value string, upper bool) bool {
 
 func sourceAlbumEvidenceBasis(row sourceAlbumEvidence, attachment models.SourceAttachment, posts []models.SourcePostIdentifier, policy string) string {
 	if row.AttachmentUUID.Valid {
-		if row.AttachmentUUID.String == attachment.UUID {
+		if row.AttachmentNamespace.String == attachment.Reference.Namespace && row.AttachmentValue.String == attachment.Reference.Value {
 			return "attachment-evidence"
 		}
 		return ""
@@ -327,7 +343,7 @@ func (s *SourceGalleryStore) Backfill(ctx context.Context, post, policy, signatu
 	if err != nil {
 		return nil, err
 	}
-	if signature == "" || signature != preview.Signature || preview.Gallery.Action == "review" {
+	if preview.PostUUID != post || signature == "" || signature != preview.Signature || preview.Gallery.Action == "review" {
 		return nil, models.ErrSourceGalleryConflict
 	}
 	complete := false
@@ -348,6 +364,13 @@ func (s *SourceGalleryStore) Backfill(ctx context.Context, post, policy, signatu
 			result.Review++
 		case "matched":
 			candidate := match.Candidates[0]
+			attachment, err := store.Find(ctx, match.AttachmentUUID)
+			if err != nil {
+				return nil, err
+			}
+			if attachment == nil || attachment.Revision != match.AttachmentRevision {
+				return nil, models.ErrSourceAttachmentConflict
+			}
 			for _, proof := range candidate.Proofs {
 				if proof.Status != "valid" {
 					continue
@@ -358,13 +381,13 @@ func (s *SourceGalleryStore) Backfill(ctx context.Context, post, policy, signatu
 					return nil, err
 				}
 				id := uuid.NewSHA1(uuid.MustParse(proof.EvidenceUUID), []byte("source-album-match\x00"+policy+"\x00"+match.AttachmentUUID)).String()
-				if _, err := store.RecordMediaEvidence(ctx, models.SourceMediaEvidence{UUID: id, PostUUID: preview.PostUUID, AttachmentUUID: match.AttachmentUUID,
+				if _, err := store.RecordMediaEvidence(ctx, models.SourceMediaEvidence{UUID: id, PostUUID: attachment.PostUUID, AttachmentUUID: match.AttachmentUUID,
 					MediaUUID: candidate.MediaUUID, FileUUID: &proof.FileUUID, Basis: "legacy", Details: details}); err != nil {
 					return nil, err
 				}
 				proofs[proof.MatchUUID] = candidate
 			}
-			attachment, err := store.Find(ctx, match.AttachmentUUID)
+			attachment, err = store.Find(ctx, match.AttachmentUUID)
 			if err != nil {
 				return nil, err
 			}

@@ -102,7 +102,7 @@ func (s *SourcePostMediaStore) Backfill(ctx context.Context, input models.Source
 	if err != nil {
 		return nil, err
 	}
-	if preview.Signature != input.Signature {
+	if preview.PostUUID != input.PostUUID || preview.Signature != input.Signature {
 		return nil, models.ErrSourcePostMediaConflict
 	}
 	counts := make(map[string]int)
@@ -170,11 +170,11 @@ VALUES(?,?,?,?)`, decision.UUID, proof.EvidenceUUID, proof.PostFileUUID, proof.M
 		mediaRevisions[media] = entity.Revision
 	}
 	txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
-		post, err := (&SourceEvidenceStore{}).FindPost(ctx, preview.PostUUID)
+		post, err := currentSourcePost(ctx, preview.PostUUID)
 		if err != nil {
 			return err
 		}
-		if post == nil || post.Revision != revision || post.State != preview.PostState {
+		if post == nil || post.UUID != preview.PostUUID || post.Revision != revision || post.State != preview.PostState {
 			return models.ErrSourcePostMediaConflict
 		}
 		for match, owner := range proofOwners {

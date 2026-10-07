@@ -24,6 +24,10 @@ def run(setup):
     if setup["phase"] == "lost-response":
         prepared = invoke(["prepare", *endpoint, "--output", str(plan)])
         assert prepared["posts"] == 1 and prepared["matches"] == {"matched": 1} and not prepared["submitted"], prepared
+        selected = directory / "posts.json"
+        selected.write_text(json.dumps([setup["post_uuid"]]))
+        explicit = invoke(["prepare", *endpoint, "--posts-file", str(selected), "--output", str(directory / "explicit")])
+        assert explicit["posts"] == 1 and explicit["matches"] == prepared["matches"] and not explicit["submitted"], explicit
         review = invoke(["show", "--plan", str(plan), "--expected-sha256", prepared["plan_sha256"], "--post", setup["post_uuid"]])
         assert review["preview"]["candidates"][0]["proofs"][0]["basis"] == "catalog-file"
         base = [*endpoint, "--plan", str(plan), "--expected-sha256", prepared["plan_sha256"]]

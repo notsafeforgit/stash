@@ -54,7 +54,7 @@ func albumError(w http.ResponseWriter, err error) {
 		ingestJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
 	case errors.Is(err, models.ErrSourceAlbumLimit):
 		ingestJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "album_review_limit"})
-	case errors.Is(err, models.ErrSourceGalleryConflict), errors.Is(err, models.ErrSourceAttachmentConflict), errors.Is(err, models.ErrSourcePostForgotten):
+	case errors.Is(err, models.ErrSourceGalleryConflict), errors.Is(err, models.ErrSourceAttachmentConflict), errors.Is(err, models.ErrAttachmentSelectionConflict), errors.Is(err, models.ErrSourcePostForgotten):
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "album_preview_changed"})
 	case errors.Is(err, models.ErrArchiveJobConflict), errors.Is(err, models.ErrArchiveJobLease):
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "album_job_changed"})

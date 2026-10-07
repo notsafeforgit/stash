@@ -554,6 +554,23 @@ the same deduplicated current URLs while retaining the selected original capture
 and post as provenance. Original-owner evidence getters remain available to
 history, import recovery and complete merge comparison.
 
+Historical media matching uses the indexed evidence of every original post in
+the current identity. Equivalent source attachments can use original evidence
+with the same qualified source-media ID. Filename matching checks the original
+file observation against the group's qualified post IDs. New derived evidence
+keeps the original attachment owner; post/media proof references keep their
+original appearance and file-match chain. Unrelated posts and unresolved choices
+remain excluded or in review.
+
+New backfill requests require the current post UUID and a current preview.
+An unpublished album job whose post was subsequently merged stops with
+`album_preview_changed`. A committed publication can still finish notification
+delivery under its original post and event, without rerunning gallery changes.
+The browser recovers saved original requests before inspecting any saved request
+for the current post. Viewing historical jobs leaves pending requests intact.
+Command-line preparation resolves and deduplicates explicitly supplied historical
+UUIDs; existing plans, receipts and job histories retain their original scopes.
+
 The identity writer is internal and has no application mutation route. It does
 not settle conflicting source-list, gallery or media choices on its own. The
 encompassing reviewed transaction, pending-work publication and the complete

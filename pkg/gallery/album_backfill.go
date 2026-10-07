@@ -205,7 +205,7 @@ func (s *AlbumBackfill) submit(ctx context.Context, request string, work albumWo
 		if err != nil {
 			return nil, err
 		}
-		if preview.Signature != work.Signature || preview.Gallery.Action == "review" {
+		if preview.PostUUID != work.PostUUID || preview.Signature != work.Signature || preview.Gallery.Action == "review" {
 			return nil, models.ErrSourceGalleryConflict
 		}
 	}

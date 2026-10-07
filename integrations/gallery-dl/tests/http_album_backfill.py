@@ -28,6 +28,9 @@ def run(setup):
                            "--output", str(original)], 0)
         assert prepared["posts"] == 1 and not prepared["submitted"], prepared
         assert prepared["matches"] == {"unavailable": 2}, prepared
+        explicit = invoke(["prepare", *endpoint, "--post", post, "--policy", "source-identifiers-v1",
+                           "--output", str(directory / "explicit")], 0)
+        assert explicit["posts"] == 1 and explicit["matches"] == prepared["matches"] and not explicit["submitted"], explicit
         base = [*endpoint, "--plan", str(original), "--expected-sha256", prepared["plan_sha256"]]
         show = invoke(["show", "--plan", str(original), "--expected-sha256", prepared["plan_sha256"], "--post", post], 0)
         assert show["preview"]["initial_metadata"]["title"] == "Album title"

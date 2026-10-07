@@ -12,6 +12,7 @@ from .backfill_import import ImportClient
 from .catalog_source import source_time
 from .client import Unavailable
 from .encoding import InvalidData, decode, encode, identifier
+from .post_identity import current_post
 
 POLICY = "catalog-files-v1"
 MAX_RESPONSE = 64 << 20
@@ -177,6 +178,14 @@ class PostMediaClient(ImportClient):
                 yield post
             if len(page) < 100:
                 return
+
+    def current_post(self, post):
+        identifier(post)
+        value = self.request("GET", f"/posts/{post}/identity", limit=16 << 10)
+        try:
+            return current_post(value, post)
+        except (InvalidData, KeyError, TypeError):
+            raise Unavailable("invalid_post_identity") from None
 
     def preview(self, post):
         identifier(post)

@@ -33,6 +33,8 @@ export function AlbumReview({
   const [saved, setSaved] = useState<SavedAlbumReview | null>(null);
   const [job, setJob] = useState<AlbumJob>();
   const [ready, setReady] = useState(false);
+  const [currentPost, setCurrentPost] = useState<string>();
+  const [contextReady, setContextReady] = useState(false);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<unknown>();
   const [refreshFailed, setRefreshFailed] = useState(false);
@@ -49,8 +51,8 @@ export function AlbumReview({
     };
   }, []);
   const acceptJob = useCallback(
-    async (result: AlbumJob) => {
-      if (result.post_uuid !== post)
+    async (result: AlbumJob, expectedPost: string) => {
+      if (result.post_uuid !== expectedPost)
         throw new NativeArchiveError(0, "invalid_response");
       if (!mounted.current) return;
       setJob(result);
@@ -66,29 +68,55 @@ export function AlbumReview({
         }
       }
     },
-    [post, onPublished],
+    [onPublished],
   );
   // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit refresh rereads storage and an admitted job, never delivers a pending request.
   useEffect(() => {
     const controller = new AbortController();
     setBusy(true);
     setReady(false);
+    setContextReady(false);
     setError(undefined);
     async function load() {
       try {
-        const record = await outbox.read(post);
+        let record = await outbox.read(post);
         if (controller.signal.aborted) return;
         setSaved(record);
         setJob(undefined);
+        setReady(true);
         if (record?.state === "admitted") {
           const current = await outbox.inspectAdmitted(
             record,
             controller.signal,
           );
           if (controller.signal.aborted) return;
-          await acceptJob(current);
+          await acceptJob(current, record.post_uuid);
         }
-        if (!controller.signal.aborted) setReady(true);
+        const current = await api.post(post, controller.signal);
+        if (controller.signal.aborted) return;
+        if ((!record || record.state === "admitted") && current.uuid !== post) {
+          setReady(false);
+          const shared = await outbox.read(current.uuid);
+          if (controller.signal.aborted) return;
+          if (shared) {
+            record = shared;
+            setSaved(record);
+            setJob(undefined);
+            if (record.state === "admitted") {
+              const job = await outbox.inspectAdmitted(
+                record,
+                controller.signal,
+              );
+              if (controller.signal.aborted) return;
+              await acceptJob(job, record.post_uuid);
+            }
+          }
+          setReady(true);
+        }
+        if (!controller.signal.aborted) {
+          setCurrentPost(current.uuid);
+          setContextReady(true);
+        }
       } catch (error) {
         if (!controller.signal.aborted) setError(error);
       } finally {
@@ -97,7 +125,7 @@ export function AlbumReview({
     }
     void load();
     return () => controller.abort();
-  }, [post, outbox, acceptJob, loadVersion]);
+  }, [post, api, outbox, acceptJob, loadVersion]);
 
   // Poll only the visible, admitted/inspected job. This performs no admission or
   // recovery POSTs; any error leaves an explicit refresh action.
@@ -113,6 +141,7 @@ export function AlbumReview({
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     const jobID = job.job_uuid;
+    const jobPost = job.post_uuid;
     async function poll() {
       if (document.hidden) {
         timer = setTimeout(() => void poll(), 5000);
@@ -120,7 +149,7 @@ export function AlbumReview({
       }
       try {
         const current = await api.job(jobID, controller.signal);
-        if (!controller.signal.aborted) await acceptJob(current);
+        if (!controller.signal.aborted) await acceptJob(current, jobPost);
       } catch (error) {
         if (!controller.signal.aborted) setError(error);
       }
@@ -132,52 +161,71 @@ export function AlbumReview({
     };
   }, [api, job, busy, ready, error, acceptJob]);
 
-  async function run(action: () => Promise<AlbumJob | undefined>) {
+  async function run(
+    storagePost: string,
+    action: () => Promise<AlbumJob | undefined>,
+    options: { reloadContext?: boolean; inspectOnly?: boolean } = {},
+  ) {
     if (locked.current) return;
     locked.current = true;
     setBusy(true);
     setError(undefined);
+    let refreshContext = false;
     try {
       const current = await action();
       if (mounted.current) {
-        if (current) await acceptJob(current);
-        setFormVersion((value) => value + 1);
-        setHistoryVersion((value) => value + 1);
+        if (current) await acceptJob(current, storagePost);
+        if (!options.inspectOnly) {
+          setFormVersion((value) => value + 1);
+          setHistoryVersion((value) => value + 1);
+        }
+        refreshContext = options.reloadContext === true;
       }
     } catch (error) {
       if (mounted.current) setError(error);
     } finally {
       try {
-        const record = await outbox.read(post);
-        if (mounted.current) {
-          setSaved(record);
-          setReady(true);
+        if (!options.inspectOnly) {
+          const record = await outbox.read(storagePost);
+          if (mounted.current) {
+            setSaved(record);
+            setReady(true);
+          }
         }
       } catch (error) {
+        refreshContext = false;
         if (mounted.current) {
           setReady(false);
           setError(error);
         }
       }
       locked.current = false;
-      if (mounted.current) setBusy(false);
+      if (mounted.current) {
+        setBusy(false);
+        if (refreshContext) setLoadVersion((value) => value + 1);
+      }
     }
   }
-  function apply(preview: AlbumPreview) {
-    return run(async () => {
+  async function apply(preview: AlbumPreview) {
+    if (!contextReady || preview.post_uuid !== currentPost) return;
+    return run(preview.post_uuid, async () => {
       const record = await outbox.prepare(preview);
       if (mounted.current) setSaved(record);
-      return outbox.deliver(post);
+      return outbox.deliver(preview.post_uuid);
     });
   }
   function changeJob(action: "retry" | "cancel", current: AlbumJob) {
-    return run(async () => {
-      const record = await (action === "retry"
-        ? outbox.prepareRetry(current)
-        : outbox.prepareCancel(current));
-      if (mounted.current) setSaved(record);
-      return outbox.deliver(post);
-    });
+    return run(
+      current.post_uuid,
+      async () => {
+        const record = await (action === "retry"
+          ? outbox.prepareRetry(current)
+          : outbox.prepareCancel(current));
+        if (mounted.current) setSaved(record);
+        return outbox.deliver(current.post_uuid);
+      },
+      { reloadContext: current.post_uuid !== currentPost },
+    );
   }
   function refresh() {
     setBusy(true);
@@ -245,13 +293,26 @@ export function AlbumReview({
               variant="outline"
               disabled={busy || !ready}
               onClick={() =>
-                void run(async () => {
-                  if (saved.state === "pending") return outbox.deliver(post);
-                  await outbox.forgetRejected(post, saved.request_uuid);
-                  return saved.previous
-                    ? api.job(saved.previous.job_uuid)
-                    : undefined;
-                })
+                void run(
+                  saved.post_uuid,
+                  async () => {
+                    if (saved.state === "pending")
+                      return outbox.deliver(saved.post_uuid);
+                    await outbox.forgetRejected(
+                      saved.post_uuid,
+                      saved.request_uuid,
+                    );
+                    return saved.previous
+                      ? api.job(saved.previous.job_uuid)
+                      : undefined;
+                  },
+                  {
+                    reloadContext:
+                      saved.state === "pending" ||
+                      saved.post_uuid !== currentPost ||
+                      !contextReady,
+                  },
+                )
               }
             >
               {saved.state === "pending"
@@ -266,25 +327,35 @@ export function AlbumReview({
           job={job}
           api={api}
           disabled={disabled}
-          onRefresh={() => void run(() => api.job(job.job_uuid))}
+          onRefresh={() =>
+            void run(job.post_uuid, () => api.job(job.job_uuid), {
+              inspectOnly: true,
+            })
+          }
           onCancel={() => void changeJob("cancel", job)}
           onRetry={() => void changeJob("retry", job)}
         />
       )}
-      <AlbumPreviewForm
-        key={formVersion}
-        api={api}
-        post={post}
-        disabled={disabled}
-        onApply={apply}
-      />
+      {currentPost && (
+        <AlbumPreviewForm
+          key={`${currentPost}:${formVersion}`}
+          api={api}
+          post={currentPost}
+          disabled={disabled || !contextReady}
+          onApply={apply}
+        />
+      )}
       <PostSection title={msg("album_review.history", "Album job history")}>
         <AlbumJobHistory
           key={historyVersion}
           api={api}
           post={post}
           disabled={busy || !ready}
-          onChoose={(selected) => void run(() => api.job(selected.job_uuid))}
+          onChoose={(selected) =>
+            void run(selected.post_uuid, () => api.job(selected.job_uuid), {
+              inspectOnly: true,
+            })
+          }
         />
       </PostSection>
     </div>

@@ -113,7 +113,12 @@ def prepare(client, output, policy, posts=None):
         checked = [identifier(post) for post in posts]
         if len(set(checked)) != len(checked):
             raise InvalidData("Duplicate post UUID")
-        rows = ({"post_uuid": post, "post_state": "active"} for post in checked)
+        # Resolve explicit historical aliases only when preparing a new plan.
+        # Recovery and retry retain their original post and request identities.
+        def current_rows():
+            for post in sorted({client.current_post(post) for post in checked}):
+                yield {"post_uuid": post, "post_state": "active"}
+        rows = current_rows()
     else:
         rows = client.selected_posts()
 

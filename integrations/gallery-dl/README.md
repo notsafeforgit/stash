@@ -1612,6 +1612,11 @@ limit remains an explicit item and does not hide other eligible posts. The plan
 is bound to its original endpoint and never contains `STASH_API_KEY` or the value
 of `--api-key-env`.
 
+Explicit post UUIDs resolve to their current identity during preparation. Several
+old IDs for one merged post produce one reviewed entry. An existing plan keeps
+its original post/request IDs; a later merge requires a new preview for work
+that has not committed, while completed receipts remain recoverable.
+
 Resume Apply with the same plan and digest after a network error or restart.
 The client reads durable receipts before submitting missing requests. A later
 unlink does not cause an earlier request to recreate the link. Stale previews
@@ -1661,6 +1666,11 @@ Stash. `apply` validates every saved record before making changes. The endpoint
 must match the saved origin; redirects and ambient proxies are not used. Existing
 plan directories are never overwritten. Instead of `--all-selected`, use repeated
 `--post POST_UUID` arguments or `--posts-file FILE` containing a JSON array.
+New preparation resolves those explicit UUIDs and includes each current post
+once, including when several supplied IDs have merged. Saved plans and retries
+keep their original post UUIDs. A merge before gallery publication requires
+fresh review; notification retries for published changes keep their original
+event and do not repeat the gallery changes.
 
 Discovery includes only posts with selected attachment lists, including disabled
 and forgotten posts. Forgotten entries remain in the report without a submission.

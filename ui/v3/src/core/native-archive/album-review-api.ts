@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { accountUUIDSchema as uuid } from "./account-review-api";
+import { createSourcePostAPI } from "./source-post-api";
 import {
   createArchiveRequest,
   nativeArchiveEndpoint,
@@ -287,6 +288,7 @@ export function createAlbumReviewAPI(
   transport: typeof fetch = fetch,
 ) {
   const request = createArchiveRequest(endpoint, transport);
+  const posts = createSourcePostAPI(endpoint, transport);
   const pageLimit = 25;
   const postPath = (post: string) => `posts/${uuid.parse(post)}`;
   const jobPath = (job: string) => `album-backfills/${uuid.parse(job)}`;
@@ -299,6 +301,9 @@ export function createAlbumReviewAPI(
   return {
     endpoint,
     pageLimit,
+    async post(post: string, signal?: AbortSignal) {
+      return (await posts.identity(post, signal)).canonical;
+    },
     async preview(post: string, policy: AlbumPolicy, signal?: AbortSignal) {
       const result = await request(
         `${postPath(post)}/album-backfill/preview`,

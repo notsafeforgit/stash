@@ -14,7 +14,7 @@ func (s *SourcePostMediaStore) PreviewBackfill(ctx context.Context, postID strin
 	if sourceFileIDs(&postID) != nil {
 		return nil, models.ErrSourcePostMediaInvalid
 	}
-	post, err := (&SourceEvidenceStore{}).FindPost(ctx, postID)
+	post, err := currentSourcePost(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
@@ -81,10 +81,11 @@ func (s *SourcePostMediaStore) PreviewBackfill(ctx context.Context, postID strin
 	// A rejected attachment may not carry a media UUID. Without proof that its
 	// scope excludes this candidate, a migration must not override that intent.
 	var attachmentReview bool
-	if err := dbWrapper.Get(ctx, &attachmentReview, `SELECT EXISTS(SELECT 1 FROM source_attachments a
+	if err := dbWrapper.Get(ctx, &attachmentReview, `SELECT EXISTS(SELECT 1 FROM source_post_identities i
+CROSS JOIN source_attachments a ON a.post_uuid=i.post_uuid
 JOIN attachment_media_links l ON l.attachment_uuid=a.uuid
 JOIN attachment_media_decisions d ON d.uuid=l.decision_uuid
-WHERE a.post_uuid=? AND d.state IN ('unlinked','undecided'))`, post.UUID); err != nil {
+WHERE i.canonical_uuid=? AND d.state IN ('unlinked','undecided'))`, post.UUID); err != nil {
 		return nil, err
 	}
 	for _, candidate := range candidates {
@@ -119,11 +120,14 @@ WHERE a.post_uuid=? AND d.state IN ('unlinked','undecided'))`, post.UUID); err !
 	return ret, err
 }
 
-// Keep discovery on its ordered post cursor. Imported statistics can make the
-// attachment equality index look selective even when nearly every retained
-// record has no attachment; that plan sorts the full evidence set per page.
-const sourcePostMediaBackfillPostsQuery = `SELECT DISTINCT post_uuid FROM source_media_evidence INDEXED BY source_media_evidence_post
-WHERE post_uuid>? AND attachment_uuid IS NULL ORDER BY post_uuid LIMIT ?`
+// Iterate canonical identities before applying the cursor. The existence check
+// uses each original member's evidence index and stops at its first match.
+const sourcePostMediaBackfillPostsQuery = `SELECT root.post_uuid FROM source_post_identities root INDEXED BY source_post_identities_canonical
+WHERE root.canonical_uuid>? AND root.post_uuid=root.canonical_uuid AND EXISTS(
+ SELECT 1 FROM source_post_identities member
+ CROSS JOIN source_media_evidence e INDEXED BY source_media_evidence_post ON e.post_uuid=member.post_uuid
+ WHERE member.canonical_uuid=root.post_uuid AND e.attachment_uuid IS NULL
+) ORDER BY root.canonical_uuid LIMIT ?`
 
 func (s *SourcePostMediaStore) BackfillPosts(ctx context.Context, after string, limit int) ([]string, error) {
 	after, limit, err := sourceDefinitionPage(after, limit)

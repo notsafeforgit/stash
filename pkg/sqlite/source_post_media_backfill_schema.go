@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validatePostMediaBackfillSchema(conn *sqlx.DB) error {
+func validatePostMediaBackfillSchema(conn *sqlx.DB, consolidated bool) error {
 	for _, name := range []string{"post_media_backfills", "post_media_backfills_post", "post_media_backfill_immutable", "post_media_backfill_scope",
 		"post_media_backfill_decisions", "post_media_backfill_decision_immutable", "post_media_backfill_decision_scope",
 		"post_media_decision_evidence", "post_media_decision_evidence_source", "post_media_decision_evidence_post_file", "post_media_decision_evidence_match",
@@ -27,6 +27,12 @@ func validatePostMediaBackfillSchema(conn *sqlx.DB) error {
 	if !typed {
 		return errors.New("native database schema is incomplete: invalid post media backfill timestamp")
 	}
+	postScope := `d.post_uuid!=e.post_uuid OR d.post_uuid!=p.post_uuid`
+	if consolidated {
+		postScope = `e.post_uuid!=p.post_uuid OR NOT EXISTS(SELECT 1 FROM source_post_identities chosen
+JOIN source_post_identities original ON original.canonical_uuid=chosen.canonical_uuid
+WHERE chosen.post_uuid=d.post_uuid AND original.post_uuid=e.post_uuid)`
+	}
 	var invalid bool
 	if err := conn.Get(&invalid, `SELECT
 EXISTS(SELECT 1 FROM post_media_backfills b LEFT JOIN source_posts p ON p.uuid=b.post_uuid
@@ -43,7 +49,7 @@ OR EXISTS(SELECT 1 FROM post_media_decision_evidence l
  LEFT JOIN source_post_file_evidence p ON p.uuid=l.post_file_uuid
  LEFT JOIN source_file_matches f ON f.uuid=l.match_uuid
  WHERE d.uuid IS NULL OR b.decision_uuid IS NULL OR e.uuid IS NULL OR p.uuid IS NULL OR f.uuid IS NULL
- OR d.post_uuid!=e.post_uuid OR d.post_uuid!=p.post_uuid OR d.origin!='migration' OR d.state!='linked'
+ OR (`+postScope+`) OR d.origin!='migration' OR d.state!='linked'
  OR e.attachment_uuid IS NOT NULL OR e.basis!='legacy' OR p.origin!='migration' OR p.basis!='catalog-appearance'
  OR p.uuid IS NOT json_extract(e.details,'$.source_post_file_evidence_uuid')
  OR f.uuid IS NOT json_extract(e.details,'$.source_file_match_uuid')

@@ -298,6 +298,14 @@ Unpublished retries must still match their original preview; changed evidence
 requires a fresh preview and request. Cancellation cannot undo committed changes
 or retract a notification already delivered.
 
+After post consolidation, prepare new work under the current UUID returned by
+`GET /posts/{post}/identity`. Matching includes original members' qualified
+attachment and file evidence without rewriting its owners. A new submission
+through an old UUID or an unpublished job with unsettled merged choices returns
+`album_preview_changed`; explicit review is required. Original admitted requests,
+job history and already-committed notification retries remain scoped to their
+original post and event. Receipt recovery precedes current-identity checks.
+
 HTTP responses use snake_case names. Initial title/details/date appear only for
 gallery creation, and dates retain their calendar precision. The API is available
 on the development branch. The supported
@@ -1976,6 +1984,13 @@ not create attachments or galleries, replace selected metadata, or enable rules.
 Request UUID reuse with different inputs conflicts. A committed request remains
 recoverable after restart or a later explicit unlink; replay does not relink it.
 
+Discovery now returns each current post identity once before applying the UUID
+cursor. Preview resolves original post UUIDs and includes the entire identity's
+retained file evidence. New Apply requests must name the returned current post;
+an old UUID or a subsequent merge makes the preview stale. Historical decisions
+and file-proof references retain their original owners. Previously committed
+request replay still returns its original result after further merges.
+
 The supported `stash-backfill-post-media` client first writes a private immutable
 plan. Bounded parts retain candidate/proof previews and request UUIDs without one
 filesystem object per post. It validates every part before any submission, checks
@@ -1983,6 +1998,9 @@ part hashes again before use, and binds the plan to its original endpoint. Prepa
 supports up to one million discovered posts or an explicit `--posts-file` JSON
 array. Oversized posts remain visible as review items while other posts proceed.
 Use a new plan for stale previews, keeping prior requests and receipts intact.
+Explicit UUID lists are resolved through the identity API and deduplicated while
+preparing a new plan. The client never retargets an existing plan during Apply,
+status inspection or lost-response recovery.
 
 ```sh
 stash-backfill-post-media prepare --endpoint STASH_ORIGIN --output /migration/post-media

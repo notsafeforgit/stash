@@ -12,6 +12,7 @@ import {
   postSummary,
   postAlbum,
   postAlbumContext,
+  postIdentity,
 } from "../fixtures/source-posts";
 import {
   albumPolicySchema,
@@ -34,6 +35,8 @@ async function archive(page: Page, create = false) {
   const writes: { path: string; body: string }[] = [];
   const requests: URL[] = [];
   const previews: string[] = [];
+  let canonicalPost = postIds.post,
+    identityUnavailable = false;
   let loseReply = false,
     corruptReceipt = false,
     conflict = "",
@@ -41,7 +44,7 @@ async function archive(page: Page, create = false) {
   let action: AlbumPreview["action"] = create ? "create" : "sync";
   let noop = false;
   function preview(): AlbumPreview {
-    const result = { ...albumPreview(), post_uuid: postIds.post, action };
+    const result = { ...albumPreview(), post_uuid: canonicalPost, action };
     if (action !== "create") delete result.initial_metadata;
     if (!create)
       result.gallery = {
@@ -114,12 +117,19 @@ async function archive(page: Page, create = false) {
           resume_from_job_uuid: prior.job_uuid,
         };
         receipts.set(input.request_uuid, result.job_uuid);
-      } else if (path === `posts/${postIds.post}/album-backfills`) {
+      } else if (/^posts\/[^/]+\/album-backfills$/.test(path)) {
+        if (path.split("/")[1] !== canonicalPost) {
+          await route.fulfill({
+            status: 409,
+            json: { error: "album_preview_changed" },
+          });
+          return;
+        }
         const prior = receipts.get(input.request_uuid);
         result = prior
           ? jobs.get(prior)!
           : albumJob({
-              post_uuid: postIds.post,
+              post_uuid: canonicalPost,
               job_uuid: albumReviewID(100 + ++sequence),
               sequence,
               signature: input.signature,
@@ -140,7 +150,13 @@ async function archive(page: Page, create = false) {
       return;
     }
     let result: unknown;
-    if (path.startsWith("album-backfill-requests/")) {
+    if (path.endsWith("/identity")) {
+      if (identityUnavailable) {
+        await route.abort("failed");
+        return;
+      }
+      result = postIdentity(path.split("/")[1], canonicalPost);
+    } else if (path.startsWith("album-backfill-requests/")) {
       const id = receipts.get(path.split("/")[1]!);
       const job = id ? jobs.get(id) : undefined;
       if (!job) {
@@ -171,6 +187,7 @@ async function archive(page: Page, create = false) {
       result = jobs.get(path.split("/")[1]!);
     else if (path.endsWith("/album-backfills"))
       result = [...jobs.values()]
+        .filter((job) => job.post_uuid === path.split("/")[1])
         .filter((job) => job.sequence > Number(url.searchParams.get("after")))
         .sort((a, b) => a.sequence - b.sequence)
         .slice(0, 25);
@@ -242,6 +259,12 @@ async function archive(page: Page, create = false) {
     writes,
     requests,
     previews,
+    mergePost() {
+      canonicalPost = postIds.otherPost;
+    },
+    failIdentity(value: boolean) {
+      identityUnavailable = value;
+    },
     attach: (other: Page) => other.route("**/api/v3/archive/**", handler),
     loseReply() {
       loseReply = true;
@@ -269,7 +292,7 @@ async function archive(page: Page, create = false) {
         revision: prior.revision + 1,
         publication_committed: true,
         publication: {
-          post_uuid: postIds.post,
+          post_uuid: prior.post_uuid,
           event_uuid: prior.job_uuid,
           gallery_uuid: postIds.gallery,
           action: create ? "create" : "sync",
@@ -292,6 +315,7 @@ async function open(
   desktop = false,
   source = false,
   navigate = true,
+  recovery = false,
 ) {
   if (desktop) await page.setViewportSize({ width: 1280, height: 1000 });
   if (navigate)
@@ -320,7 +344,12 @@ async function open(
     .getByRole("button", { name: "Match existing media", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Preview album changes", exact: true }),
+    page.getByRole("button", {
+      name: recovery
+        ? "Check and retry saved request"
+        : "Preview album changes",
+      exact: true,
+    }),
   ).toBeEnabled();
 }
 async function preview(page: Page) {
@@ -337,6 +366,22 @@ async function apply(page: Page) {
 }
 
 for (const desktop of [false, true]) {
+  test(`an original album link submits new work under its current post on ${desktop ? "desktop" : "mobile"}`, async ({
+    page,
+  }) => {
+    const remote = await archive(page);
+    remote.mergePost();
+    await open(page, desktop);
+    expect(remote.writes).toEqual([]);
+    await apply(page);
+    await expect(
+      page.locator("[data-album-job]").getByText("Queued", { exact: true }),
+    ).toBeVisible();
+    expect(remote.writes).toHaveLength(1);
+    expect(remote.writes[0]!.path).toBe(
+      `posts/${postIds.otherPost}/album-backfills`,
+    );
+  });
   test(`album preview on ${desktop ? "desktop" : "mobile"} is read-only with explicit file evidence`, async ({
     page,
   }) => {
@@ -435,6 +480,83 @@ for (const desktop of [false, true]) {
     expect(remote.writes.map((write) => write.body)).toEqual([original]);
   });
 }
+
+test("an original admitted album request recovers after consolidation without current context or another write", async ({
+  page,
+}) => {
+  const remote = await archive(page);
+  await open(page);
+  remote.loseReply();
+  await apply(page);
+  await expect(
+    page.getByText("An album request needs confirmation", { exact: true }),
+  ).toBeVisible();
+  await expect.poll(() => remote.writes.length).toBe(1);
+  const original = { ...remote.writes[0]! };
+  remote.mergePost();
+  remote.failIdentity(true);
+  await open(page, false, false, true, true);
+  expect(remote.writes).toEqual([original]);
+  await page
+    .getByRole("button", { name: "Check and retry saved request", exact: true })
+    .click();
+  await expect(
+    page.locator("[data-album-job]").getByText("Queued", { exact: true }),
+  ).toBeVisible();
+  expect(remote.writes).toEqual([original]);
+  remote.failIdentity(false);
+  await open(page);
+  await apply(page);
+  await expect.poll(() => remote.writes.length).toBe(2);
+  expect(remote.writes[1]!.path).toBe(
+    `posts/${postIds.otherPost}/album-backfills`,
+  );
+  expect(remote.writes[0]).toEqual(original);
+});
+
+test("inspecting original job history preserves a pending request at the current post", async ({
+  page,
+}) => {
+  const remote = await archive(page);
+  const prior = albumJob({
+    post_uuid: postIds.post,
+    job_uuid: albumReviewID(200),
+    state: "failed",
+    revision: 3,
+  });
+  remote.jobs.set(prior.job_uuid, prior);
+  remote.mergePost();
+  await open(page);
+  remote.loseReply();
+  await apply(page);
+  const pending = page.getByText("An album request needs confirmation", {
+    exact: true,
+  });
+  await expect(pending).toBeVisible();
+  expect(remote.writes).toHaveLength(1);
+  await page
+    .getByRole("button", { name: "Album job history", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Inspect job", exact: true }).click();
+  await expect(
+    page.locator("[data-album-job]").getByText("Failed", { exact: true }),
+  ).toBeVisible();
+  await expect(pending).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Preview album changes", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Check and retry saved request", exact: true })
+    .click();
+  await expect(pending).toHaveCount(0);
+  await expect(
+    page.locator("[data-album-job]").getByText("Queued", { exact: true }),
+  ).toBeVisible();
+  expect(remote.writes).toHaveLength(1);
+  expect(remote.writes[0]!.path).toBe(
+    `posts/${postIds.otherPost}/album-backfills`,
+  );
+});
 
 test("committed changes refresh the gallery once and survive cancellation and notification retry", async ({
   page,

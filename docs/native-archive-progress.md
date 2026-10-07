@@ -80,6 +80,13 @@ consolidations, so merged cases are covered separately by real SQLite fixtures.
 The encompassing merge transaction, pending-work publication and complete merge
 API/UI still require integration before application use.
 
+Schema 91 extends historical post/media and album matching across current post
+identities while retaining original file proofs, requests and publications.
+Focused migration, restart, worker, HTTP and portable-restore checks pass, along
+with 38 UI tests, 46 Chromium/WebKit browser cases and 30 producer/backfill tests.
+New CLI plans resolve explicit historical UUIDs; existing plans remain unchanged.
+The full-copy migration/reconciliation and integrated release gate remain pending.
+
 Application local-file preview/admission now reuses native file verification and
 durable effects without creating a producer or source record. Focused real MP4/
 image, policy, restart, HTTP and portable-restore checks pass. Its integrated
@@ -10782,3 +10789,45 @@ generation, real embedded UI, 739 UI tests, 551 producer tests, eight library
 tests, 113 archive tests, 262 backup tests, Go lint and full Go integration.
 The complete reviewed merge/API/UI,
 pending-publication integration and broader transition/cutover work remain open.
+
+## Historical matching across post identities — 2026-10-06
+
+Schema 1000091 changes the post/media file-proof scope guard to accept evidence
+from any original member of a consolidated post identity. It retains the original
+evidence/appearance/file-match chain and every existing row. Historical schemas
+still use their original validation during migration. New requests require the
+current post UUID; exact prior receipt recovery happens before current-state
+checks and remains available after another merge or restart.
+
+Both matching services use bounded indexed evidence from all original members.
+Equivalent attachments match by their qualified source-media reference, while
+filename matching checks original observations against the group's qualified
+post IDs. New derived evidence keeps the attachment's original owner. Unrelated
+evidence is excluded, explicit choices remain protected, and discovery applies
+its cursor after resolving current identities. Read-only checks on the populated
+schema-90 rehearsal agree for 168 queries across 50 posts; the slowest new query
+took 15.4 ms. That copy has no post merges; separate SQLite fixtures cover them.
+
+An unpublished album job stops with `album_preview_changed` if consolidation
+invalidates its plan or leaves source choices unsettled. An already-published
+job resumes only notification delivery with its original event/post/result.
+The UI resolves the current identity for new work, recovers original saved work
+before current saved work, and keeps pending requests intact while inspecting
+older jobs. Clearing a rejected cancellation retains the job for fresh review.
+Command-line preparation similarly resolves and deduplicates explicit old post
+IDs, without retargeting saved plans or consulting identity during recovery.
+
+Focused Go/HTTP, migration, chained-merge, notification recovery, corruption guard
+and portable restore checks pass. Restore testing exposed an optimizer join
+reordering after statistics were rebuilt; fixing the bounded candidate join
+keeps the evidence lookup indexed. UI type/lint checks and 38 client tests pass.
+All 46 album Chromium/WebKit cases pass, including stale cancellation and pending
+request recovery. All 30 producer/backfill tests pass, including identity scope,
+alias deduplication and immutable original-plan recovery.
+
+The populated schema-91 migration/reopen is running on a separate library copy;
+whole-row reconciliation and the integrated release gate remain pending. Source
+hashes, receipts and rehearsal scripts are retained under
+`.local/native-canonical-post-backfill-20261006/`. This increment does not expose
+the encompassing post-merge mutation or activate any production writer/worker.
+The complete reviewed merge API/UI and broader transition gates remain required.

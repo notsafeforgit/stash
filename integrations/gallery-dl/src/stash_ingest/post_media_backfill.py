@@ -38,6 +38,9 @@ def prepare(client, output, posts=None):
         posts = sorted(identifier(post) for post in posts)
         if len(set(posts)) != len(posts):
             raise InvalidData("Duplicate explicit post")
+        # A new plan uses each current identity once. Saved plans and original
+        # receipts are never retargeted after a later consolidation.
+        posts = sorted({client.current_post(post) for post in posts})
     parent = destination.parent.resolve(strict=True)
     stage = Path(tempfile.mkdtemp(prefix=".stash-post-media-plan-", dir=parent))
     manifest = {"format": FORMAT, "endpoint": client.endpoint, "policy": POLICY, "created_at": utc_now(),

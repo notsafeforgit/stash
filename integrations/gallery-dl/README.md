@@ -1694,7 +1694,7 @@ requests. `processed` concerns the saved matching pass; `needs_review` and the
 outcome counts retain unresolved candidates. Matching does not apply metadata
 policies or enable scrapers. See the [native contract](../../docs/native-ingestion.md#historical-post-to-media-matching).
 
-## Native physical deduplication
+## Fclones-backed file deduplication
 
 `stash-dedupe` uses bounded `fclones group` discovery and the native Stash
 preview/apply API. It preserves the oldest copy, saves requests before sending

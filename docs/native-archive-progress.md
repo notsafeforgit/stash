@@ -11605,3 +11605,38 @@ Deduplication remains fclones-backed: fclones discovers candidates, while Stash
 preserves associations and performs journaled removal. The original full restore
 and release gate continue; media reconciliation remains suspended until that
 restore completes. None of these preparations activates production writers.
+
+## Final release validation and restore verification progress — 2026-10-07
+
+The complete release gate for the final manual-intake scope correction passed:
+`make GO_TEST_TIMEOUT=40m generate ui validate-fork` completed in 2,065 seconds.
+All 17 frozen scope files still match the validated revision. The separately
+checked manual helpers also match their committed sources. Commits through
+`bbcd61496` are pushed; its Build, Lint, v3 browser and GHCR publication workflows
+have succeeded. Production remains on the frozen compatible image.
+
+A further read-only audit identified 516 disabled, local-only catalog collections
+whose old `legacy_catalog` kind would incorrectly exclude them from manual
+intake. The staged API plan changes their kind to `directory`, retains their
+disabled state and rebinds their existing disabled policies. Two existing explicit
+folder defaults can also be activated for local content. The audit excluded
+collections with remote definitions, nonlocal captures, source-post links,
+credentials or outstanding job references. The 1,036 proposed operations remain
+unapplied: they require an isolated API rehearsal and fresh evidence/revision
+checks at the final writer boundary. Historical rootless membership groups remain
+disabled. Evidence is under `.local/native-local-collection-audit-20261007`.
+
+Current backup and producer packages are installed in separate inactive release
+directories. Original verifier runtimes and live commands were not changed.
+The new producer fingerprint requires matching staged worker profiles and n8n
+packaging before activation; an installed package alone does not establish a
+complete handoff.
+
+The original populated restore has reached its final independent artwork hash
+check. That implementation visits an unordered set of paths and reports no
+progress for this phase. Future restores now visit sorted paths and report the
+number checked every 1,000 artifacts, while retaining every checksum and the
+last-written completion receipt. All 121 archive tests and 26 native backup-store
+tests pass with that change. The already-running restore continues with its
+original runtime. Its final receipt, populated schema-95 migration, media
+reconciliation, publication/cost proof and production cutover are still pending.

@@ -371,11 +371,18 @@ def import_archive(source, destination, *, reserve=RESERVE_BYTES, progress=None)
             required = set(_blob_rows(connection))
         if required != blobs:
             raise InvalidArchive("Original artwork inventory does not match the library snapshot")
-        for name in blobs:
+        if progress is not None:
+            progress({"stage": "verify_artwork", "artifacts": 0, "total": len(blobs)})
+        # Match the export/restore path order instead of seeking between random
+        # set entries. Every restored byte still receives its independent MD5
+        # check before the final restore receipt is written.
+        for index, name in enumerate(sorted(blobs), 1):
             path = destination / "blobs" / name[:2] / name[2:4] / name
             with open_regular(path) as incoming:
                 if hashlib.file_digest(incoming, lambda: hashlib.md5(usedforsecurity=False)).hexdigest() != name:
                     raise InvalidArchive("Restored original artwork checksum mismatch")
+            if progress is not None and (index % 1000 == 0 or index == len(blobs)):
+                progress({"stage": "verify_artwork", "artifacts": index, "total": len(blobs)})
         # This receipt is last: a partial directory cannot claim a verified
         # restore, including after a process interruption or disk write failure.
         receipt = {"format": FORMAT + ".restore", "version": VERSION,

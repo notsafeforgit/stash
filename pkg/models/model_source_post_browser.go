@@ -24,6 +24,7 @@ type SourcePostIdentifierSummary struct {
 // SourcePostSummary projects compact metadata without reconstructing payloads,
 // profile bodies, attachment lists or account ownership for every list item.
 type SourcePostSummary struct {
+	RequestedUUID   string                        `json:"requested_uuid"`
 	UUID            string                        `json:"uuid"`
 	State           string                        `json:"state"`
 	Revision        int                           `json:"revision"`
@@ -64,6 +65,7 @@ type SourcePostLibraryItem struct {
 // historical evidence. Attachment links alone do not override an explicit
 // unlinked/conflicting post association. Post metadata is fetched separately.
 type SourcePostMediaItem struct {
+	RequestedPostUUID   string                      `json:"requested_post_uuid"`
 	Media               *SourcePostLibraryItem      `json:"media"`
 	Association         *SourcePostMediaAssociation `json:"association"`
 	HasRetainedEvidence bool                        `json:"has_retained_evidence"`

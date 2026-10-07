@@ -40,9 +40,7 @@ export const sourceAssociationSchema = z
     decisions: z.array(sourceDecisionSchema).max(1024),
   })
   .refine(
-    (a) =>
-      new Set(a.decisions.map((d) => d.uuid)).size === a.decisions.length &&
-      a.decisions.every((d) => d.post_uuid === a.post_uuid),
+    (a) => new Set(a.decisions.map((d) => d.uuid)).size === a.decisions.length,
   );
 const clockSchema = z.object({
   captured_at: time.nullable(),
@@ -57,10 +55,12 @@ export const sourceURLSchema = z.object({
 });
 export const sourcePostSchema = z
   .object({
+    requested_post_uuid: uuid,
     association: sourceAssociationSchema,
     latest_capture: clockSchema
       .extend({
         uuid,
+        post_uuid: uuid,
         revision_uuid: uuid,
         origin: z.string(),
         platform: z.string(),
@@ -76,12 +76,14 @@ export const sourcePostSchema = z
     has_retained_evidence: z.boolean(),
     linked_attachments: z.number().int().nonnegative(),
   })
-  .refine((post) =>
-    post.urls.every((url) => url.post_uuid === post.association.post_uuid),
+  .refine(
+    (post) =>
+      new Set(post.urls.map((url) => url.url)).size === post.urls.length,
   );
 export const sourceCaptureSchema = clockSchema
   .extend({
     uuid,
+    post_uuid: uuid,
     revision_uuid: uuid,
     origin: z.string(),
     platform: z.string(),
@@ -100,6 +102,7 @@ export const sourceRevisionSchema = z.object({
 });
 const capturesSchema = z
   .object({
+    requested_uuid: uuid,
     captures: z.array(sourceCaptureSchema).max(100),
     revisions: z.array(sourceRevisionSchema).max(100),
   })
@@ -203,6 +206,7 @@ export function createSourceReviewAPI(
       for (const row of rows) {
         if (
           row.association.media_uuid !== media ||
+          row.requested_post_uuid !== row.association.post_uuid ||
           row.association.post_uuid <= previous
         )
           throw new NativeArchiveError(0, "invalid_response");
@@ -218,7 +222,7 @@ export function createSourceReviewAPI(
         signal,
       );
       if (
-        row.association.post_uuid !== post ||
+        row.requested_post_uuid !== post ||
         row.association.media_uuid !== media
       )
         throw new NativeArchiveError(0, "invalid_response");
@@ -227,21 +231,30 @@ export function createSourceReviewAPI(
     async urls(post: string, after?: string, signal?: AbortSignal) {
       const query = new URLSearchParams({ limit: String(pageLimit) });
       if (after) query.set("after", uuid.parse(after));
-      const rows = await request(
+      const page = await request(
         `posts/${uuid.parse(post)}/urls?${query}`,
-        z.array(sourceURLSchema).max(pageLimit),
+        z.object({
+          requested_uuid: uuid,
+          urls: z.array(sourceURLSchema).max(pageLimit),
+        }),
         undefined,
         signal,
       );
+      if (
+        page.requested_uuid !== post ||
+        new Set(page.urls.map((url) => url.url)).size !== page.urls.length
+      )
+        throw new NativeArchiveError(0, "invalid_response");
+      const rows = page.urls;
       let previous = after ?? "";
       for (const row of rows) {
-        if (row.post_uuid !== post || row.uuid <= previous)
+        if (row.uuid <= previous)
           throw new NativeArchiveError(0, "invalid_response");
         previous = row.uuid;
       }
       return rows;
     },
-    captures(post: string, after?: SourceCapture, signal?: AbortSignal) {
+    async captures(post: string, after?: SourceCapture, signal?: AbortSignal) {
       const query = new URLSearchParams({ limit: String(pageLimit) });
       if (after) {
         const cursor = sourceCaptureSchema.parse(after);
@@ -249,12 +262,15 @@ export function createSourceReviewAPI(
         query.set("after_time", cursor.captured_at ?? cursor.recorded_at ?? "");
         query.set("after_clock", cursor.captured_at ? "observed" : "recorded");
       }
-      return request(
+      const result = await request(
         `posts/${uuid.parse(post)}/capture-summaries?${query}`,
         capturesSchema,
         undefined,
         signal,
       );
+      if (result.requested_uuid !== post)
+        throw new NativeArchiveError(0, "invalid_response");
+      return result;
     },
     async history(
       post: string,

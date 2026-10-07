@@ -99,7 +99,7 @@ func TestSourcePostReviewHTTPSharedCapturesAndTargetedPagination(t *testing.T) {
 	require.NotNil(t, last.RecordedAt)
 	query := url.Values{"after_uuid": {last.UUID}, "after_clock": {"recorded"}, "after_time": {last.RecordedAt.Format(time.RFC3339Nano)}}
 	w = get(path+"?"+query.Encode(), 200)
-	require.JSONEq(t, `{"captures":[],"revisions":[]}`, w.Body.String())
+	require.JSONEq(t, `{"requested_uuid":"`+post.UUID+`","captures":[],"revisions":[]}`, w.Body.String())
 	query.Set("after_clock", "unverified")
 	get(path+"?"+query.Encode(), 400)
 	get(path+"?after_uuid="+last.UUID, 400)

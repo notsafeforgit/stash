@@ -132,9 +132,11 @@ type SourceEvidenceReaderWriter interface {
 	PostSummary(context.Context, string) (*SourcePostSummary, error)
 	AddPostIdentifier(context.Context, string, SourcePostIdentifier, int) error
 	PostIdentifiers(context.Context, string, *SourcePostIdentifier, int) ([]SourcePostIdentifier, error)
+	CurrentPostIdentifiers(context.Context, string, *SourcePostIdentifier, int) ([]SourcePostIdentifier, error)
 	RecordCapture(context.Context, SourceCaptureInput) (*SourceCapture, error)
 	CaptureContexts(context.Context, string) ([]SourceCaptureContext, error)
 	RetainProfile(context.Context, string, json.RawMessage) (*SourceProfileBody, error)
 	FindCapture(context.Context, string) (*SourceCapture, error)
 	Captures(context.Context, string, *SourceCaptureCursor, int) ([]*SourceCapture, error)
+	CurrentCaptures(context.Context, string, *SourceCaptureCursor, int) ([]*SourceCapture, error)
 }

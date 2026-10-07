@@ -100,7 +100,7 @@ func TestPostGalleryConsolidationPreservesHistoryManualMembersCoverAndMetadata(t
 	// This later source list no longer includes either automatic member.
 	// The chosen cover and manual extra must nevertheless stay in the gallery.
 	later := postSelectionCapture(t, repo, b, 2)
-	postSelectionApply(t, repo, b, later.UUID, "pinned", "review")
+	applyConsolidationSelection(t, repo, b, later.UUID, "pinned", merge.UUID)
 	input, expected := consolidationGalleryRequest(t, repo, b, *oldA.GalleryUUID)
 	require.ElementsMatch(t, []string{oldA.UUID, oldB.UUID}, expected)
 	var selected *models.SourceGalleryDecision
@@ -110,7 +110,7 @@ func TestPostGalleryConsolidationPreservesHistoryManualMembersCoverAndMetadata(t
 		return err
 	}))
 	require.Equal(t, before, identityRows(t, repo, unchangedTables...), "adoption changes associations, not gallery contents")
-	require.Nil(t, consolidationGalleryChoice(t, repo, a))
+	require.Equal(t, selected, consolidationGalleryChoice(t, repo, a), "current reads follow the merged identity")
 	require.Equal(t, selected, consolidationGalleryChoice(t, repo, b))
 	require.Equal(t, oldA.GalleryUUID, selected.GalleryUUID)
 	result := consolidationGallerySync(t, repo, b)
@@ -120,6 +120,9 @@ func TestPostGalleryConsolidationPreservesHistoryManualMembersCoverAndMetadata(t
 	require.NoError(t, db.Open(db.DatabasePath()))
 	repo = db.Repository()
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		original, err := (&SourceGalleryStore{}).associationForOriginal(ctx, a)
+		require.NoError(t, err)
+		require.Nil(t, original, "the original current pointer is retired, not its history")
 		images, err := repo.Gallery.GetImageIDs(ctx, galleryID)
 		require.NoError(t, err)
 		require.Equal(t, []int{41}, images)
@@ -181,7 +184,13 @@ func TestPostGalleryConsolidationRejectsStaleReviewAndOutsideGalleryClaimAtomica
 		return err
 	}))
 	require.Equal(t, galleries, identityRows(t, repo, "galleries"))
-	require.Nil(t, consolidationGalleryChoice(t, repo, a))
+	require.Equal(t, "disabled", consolidationGalleryChoice(t, repo, a).State)
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		original, err := (&SourceGalleryStore{}).associationForOriginal(ctx, a)
+		require.NoError(t, err)
+		require.Nil(t, original, "the alias resolves the current choice after its original pointer is retired")
+		return nil
+	}))
 	require.Equal(t, "disabled", consolidationGallerySync(t, repo, b).Action)
 }
 

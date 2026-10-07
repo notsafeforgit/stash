@@ -542,11 +542,22 @@ the canonical identity for new edits. Original history, full merge comparison,
 capture and ingestion lookup methods keep their original scopes so evidence and
 saved requests remain replayable.
 
+Current post browsing, media reviews, selected publishers and expanded evidence
+pages follow the canonical identity. Exact UUID/qualified-ID/URL lookups resolve
+the original owner before applying the canonical cursor. A shared URL alone does
+not combine unrelated posts. Responses distinguish the requested identity from
+the current one; capture and URL references retain their original owners.
+Current URL pages select one stable witness per exact URL before pagination.
+Capture summaries share revision metadata and page the indexed ranges of the
+original members without reconstructing their payloads. Metadata policies use
+the same deduplicated current URLs while retaining the selected original capture
+and post as provenance. Original-owner evidence getters remain available to
+history, import recovery and complete merge comparison.
+
 The identity writer is internal and has no application mutation route. It does
-not settle conflicting source-list, gallery or media choices on its own. General
-post-browse integration, the encompassing reviewed transaction, pending-work
-publication and the complete post-merge UI must be connected before users can
-apply a post merge.
+not settle conflicting source-list, gallery or media choices on its own. The
+encompassing reviewed transaction, pending-work publication and the complete
+post-merge UI must be connected before users can apply a post merge.
 
 ## Mapping catalog relationships
 

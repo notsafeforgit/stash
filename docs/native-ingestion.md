@@ -1498,11 +1498,14 @@ for each attachment. Pagination uses `after_capture` with either
 retain the selected direct association UUID alongside capture and policy
 provenance. A changed or rejected association invalidates its old choice.
 
-`source.urls` contains the selected post's distinct known URLs in lexical order.
+`source.urls` contains the selected post's distinct known URLs in lexical order,
+including the original members of its current canonical identity.
 They come from shared post evidence, which may include observations recorded
 after the selected capture; they need not appear in its original raw payload.
-Only that post is read, through indexed pages. Repeated observations of one URL
-do not repeat it here. A later URL change is rechecked when applying a preview.
+Only that identity group is read, through indexed pages. Repeated observations
+of one URL do not repeat it here. The selected capture and `source.post_uuid`
+retain their original provenance. A later URL change is rechecked when applying
+a preview.
 
 The set is limited to 4,096 URLs and 1 MiB of encoded text. `urls_complete` is
 true for a complete set, including an empty array. If either limit is exceeded,
@@ -1682,13 +1685,13 @@ The application can browse posts independently of scene/image selection:
 
 | Read-only route | Behavior |
 | --- | --- |
-| `GET /posts?after=<post-uuid>&limit=N` | Compact post summaries in UUID order; limit 1–100 |
+| `GET /posts?after=<post-uuid>&limit=N` | Compact canonical post summaries in UUID order; limit 1–100 |
 | `GET /posts?uuid=<post-uuid>` | Exact archive identity lookup |
 | `GET /posts?namespace=<namespace>&value=<source-id>` | Exact qualified source identity lookup |
 | `GET /posts?url=<encoded-url>` | Exact retained URL lookup; returns every matching post without treating a shared URL as proof of identity |
-| `GET /posts/<post>` | One compact summary, including active/forgotten state and current revision |
+| `GET /posts/<post>` | One compact summary with `requested_uuid`, current canonical `uuid`, active/forgotten state and current revision |
 | `GET /posts/<post>/identity` | Requested and current canonical post identities in one read transaction; new edits use the canonical UUID and revision |
-| `GET /posts/<post>/identifiers?limit=N` | Qualified identifiers; continue with both `after_namespace` and `after_value` |
+| `GET /posts/<post>/identifiers?limit=N` | Qualified identifiers across original members; continue with both `after_namespace` and `after_value` |
 | `GET /posts/<post>/publishers?after=<account-uuid>&limit=N` | Canonical accounts selected by current capture-publisher decisions; retained claims alone do not select a publisher or depicted performer |
 | `GET /posts/<post>/media?after=<media-uuid>&limit=N` | Canonical scene/image identities with their explicit choices, retained-evidence flag and independent attachment-link count |
 | `GET /posts/<post>/album` | `{requested_uuid, album}` with the canonical post's current gallery choice, including disabled state and deleted/redirected gallery resolution; `album` is `null` when no choice exists |
@@ -1697,13 +1700,17 @@ These routes use the `/api/v3/archive` application-authenticated boundary.
 The three exact lookup selectors are mutually exclusive. Source IDs require
 their namespace, and URL lookup does not normalize or guess alternate URLs.
 Summary pages include at most three identifiers and URLs with continuation flags,
-plus the latest stored capture excerpt; payloads and profile bodies are not loaded.
+plus the latest stored capture excerpt across original members; payloads and
+profile bodies are not loaded. UUID lookups echo the requested UUID separately
+from the canonical UUID. Other browse modes return canonical UUIDs for both.
+Post deduplication precedes cursor/limit handling, including exact URL matches.
 Use the existing URL and shared capture-summary routes below for expansion.
 
 Media pages resolve merged identities before applying the cursor, so repeated
-evidence and aliases produce one row. Explicit unlinks and conflicting merged
-choices remain visible and suppress attachment-based association; a positive
-attachment count does not override them. Deleted entities retain their UUID
+evidence and aliases produce one row. Each row echoes `requested_post_uuid`
+separately from the association's canonical `post_uuid`. Explicit unlinks and
+conflicting merged choices remain visible and suppress attachment-based
+association; a positive attachment count does not override them. Deleted entities retain their UUID
 and state with no current local ID. Post captions and captures are fetched
 separately, rather than repeated in each media row. Inspection does not select
 sources, create galleries, change membership or assign performers.
@@ -1725,8 +1732,14 @@ Application-authenticated routes under `/api/v3/archive` expose direct links:
 | `GET /post-media-decisions/<request-uuid>` | Original committed decision for response-loss recovery |
 | `GET /entities/<entity>/source-posts?after=<post-uuid>&limit=N` | Targeted, unique post summaries from retained evidence, explicit choices and current attachment links across merged media identities; limit 1–100 |
 | `GET /posts/<post>/media/<entity>/review` | Refresh one post card with current guards, latest capture excerpt and independent evidence/link status |
-| `GET /posts/<post>/urls?after=<url-uuid>&limit=N` | Shared source URLs in UUID order; limit 1–100 |
-| `GET /posts/<post>/capture-summaries?limit=N` | Capture references and shared revision metadata, without raw payloads or profiles; limit 1–100 |
+| `GET /posts/<post>/urls?after=<url-uuid>&limit=N` | `{requested_uuid, urls}` for the current identity group, with one original witness per exact URL in UUID order; limit 1–100 |
+| `GET /posts/<post>/capture-summaries?limit=N` | `{requested_uuid, captures, revisions}` for the current identity group, without raw payloads or profiles; limit 1–100 |
+
+Review responses echo `requested_post_uuid`; current association guards use the
+canonical `post_uuid`. URL witnesses and captures retain their original
+`post_uuid`, including the latest capture in compact summaries. Saved decisions
+and original-owner history keep their original scopes and immutable request
+bodies. New edits use the current association's canonical UUID and revision.
 
 PUT takes `uuid`, `post_uuid`, `media_uuid`, `expected_post_revision`,
 `expected_media_revision`, `expected_decisions` (all current decision UUIDs),

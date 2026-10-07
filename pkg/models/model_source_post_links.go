@@ -66,6 +66,7 @@ var (
 type SourcePostLinksReaderWriter interface {
 	ObserveURL(context.Context, SourcePostURLInput) (*SourcePostURLObservation, error)
 	URLs(context.Context, string, string, int) ([]SourcePostURL, error)
+	CurrentURLs(context.Context, string, string, int) ([]SourcePostURL, error)
 	URLEvidence(context.Context, string, string, int) ([]SourcePostURLObservation, error)
 	ObserveIdentifier(context.Context, SourcePostIdentifierInput) (*SourcePostIdentifierObservation, error)
 	IdentifierEvidence(context.Context, string, string, int) ([]SourcePostIdentifierObservation, error)

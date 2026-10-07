@@ -103,7 +103,7 @@ func (rs *nativeArchiveRoutes) sourcePostIdentifiers(w http.ResponseWriter, r *h
 	}
 	result := []models.SourcePostIdentifierSummary{}
 	err = rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
-		rows, err := rs.repo.SourceEvidence.PostIdentifiers(ctx, post, after, limit)
+		rows, err := rs.repo.SourceEvidence.CurrentPostIdentifiers(ctx, post, after, limit)
 		if err != nil {
 			return err
 		}

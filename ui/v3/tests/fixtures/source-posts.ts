@@ -37,6 +37,7 @@ export function postIdentity(
 export function postSummary(): PostSummary {
   const shared = sourcePost();
   return {
+    requested_uuid: postIds.post,
     uuid: postIds.post,
     state: "active",
     revision: 4,
@@ -50,6 +51,7 @@ export function postSummary(): PostSummary {
 }
 export function postMedia(): PostMedia {
   return {
+    requested_post_uuid: postIds.post,
     media: {
       uuid: postIds.media,
       kind: "scene",

@@ -27,6 +27,7 @@ async function archive(
     stale?: boolean;
     conflict?: boolean;
     empty?: boolean;
+    merged?: boolean;
   } = {},
 ) {
   let committed: SourceDecision | null = null;
@@ -71,6 +72,22 @@ async function archive(
         post_revision: committed.post_revision,
         decisions: [committed],
       };
+    if (options.merged) {
+      const canonical = "00000000-0000-4000-8000-000000000011";
+      post.requested_post_uuid = canonical;
+      post.association.post_uuid = canonical;
+      if (committed && committed.post_uuid !== canonical) {
+        post.association.post_revision += 5;
+        post.association.decisions = [
+          {
+            ...committed,
+            uuid: sourceIds.revision,
+            post_uuid: canonical,
+            post_revision: post.association.post_revision,
+          },
+        ];
+      }
+    }
     let result: unknown;
     if (path.includes("/entity-identities/"))
       result = {
@@ -81,12 +98,15 @@ async function archive(
       };
     else if (path.endsWith("/source-posts"))
       result = options.empty ? [] : [post];
-    else if (path.endsWith(`/posts/${sourceIds.post}`))
+    else if (/\/posts\/[^/]+$/.test(path))
       result = {
         ...postSummary(),
+        requested_uuid: path.split("/").at(-1),
+        uuid: post.association.post_uuid,
         revision: post.association.post_revision,
       };
-    else if (path.endsWith("/review")) result = post;
+    else if (path.endsWith("/review"))
+      result = { ...post, requested_post_uuid: path.split("/").at(-4) };
     else if (path.includes("/post-media-decisions/")) {
       await route.fulfill({
         status: committed ? 200 : 404,
@@ -112,6 +132,7 @@ async function archive(
       result = committed;
     } else if (path.endsWith("/capture-summaries"))
       result = {
+        requested_uuid: path.split("/").at(-2),
         revisions: [
           {
             uuid: sourceIds.revision,
@@ -125,6 +146,7 @@ async function archive(
         captures: [
           {
             uuid: sourceIds.capture,
+            post_uuid: sourceIds.post,
             revision_uuid: sourceIds.revision,
             origin: "gallery-dl",
             platform: "reddit",
@@ -134,6 +156,7 @@ async function archive(
           },
           {
             uuid: sourceIds.secondCapture,
+            post_uuid: sourceIds.post,
             revision_uuid: sourceIds.revision,
             origin: "legacy-nfo",
             platform: "reddit",
@@ -261,6 +284,69 @@ for (const image of [false, true]) {
     });
   }
 }
+for (const desktop of [false, true]) {
+  test(`new source links use the consolidated post on ${desktop ? "desktop" : "mobile"}`, async ({
+    page,
+  }) => {
+    const remote = await archive(page, { merged: true });
+    await openReview(page, desktop);
+    await page
+      .getByRole("button", { name: "Review source link", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Link", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Save source link", exact: true })
+      .click();
+    await expect(
+      page.getByText("Source link saved", { exact: true }),
+    ).toBeVisible();
+    expect(remote.bodies).toHaveLength(1);
+    expect(remote.bodies[0]?.post_uuid).toBe(
+      "00000000-0000-4000-8000-000000000011",
+    );
+  });
+}
+
+test("a saved original source decision recovers after its post is consolidated", async ({
+  page,
+}) => {
+  const options = { loseReply: true, merged: false };
+  const remote = await archive(page, options);
+  await openReview(page);
+  await page
+    .getByRole("button", { name: "Review source link", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Unlink", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Save source link", exact: true })
+    .click();
+  await expect(
+    page.getByText("Could not complete this step", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("A saved source link needs confirmation", { exact: true }),
+  ).toBeVisible();
+  expect(remote.bodies).toHaveLength(1);
+  const original = JSON.stringify(remote.bodies);
+  options.merged = true;
+  await page.reload();
+  await chooseSection(page, "Sources");
+  await page
+    .getByRole("button", { name: "Check and retry saved change", exact: true })
+    .click();
+  await expect(
+    page.getByText("Source link saved", { exact: true }),
+  ).toBeVisible();
+  expect(JSON.stringify(remote.bodies)).toBe(original);
+  expect(remote.bodies[0]?.post_uuid).toBe(sourceIds.post);
+  await expect(
+    page.getByRole("link", { name: "Open post", exact: true }),
+  ).toHaveAttribute(
+    "href",
+    "/source-posts?post=00000000-0000-4000-8000-000000000011",
+  );
+});
+
 test("a lost committed reply is recovered after reload without another write", async ({
   page,
 }) => {

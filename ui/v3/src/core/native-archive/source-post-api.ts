@@ -103,6 +103,7 @@ export const postIdentityContextSchema = z
 export type PostIdentity = z.infer<typeof postIdentitySchema>;
 export const postSummarySchema = z
   .object({
+    requested_uuid: uuid,
     uuid,
     state: z.enum(["active", "forgotten"]),
     revision,
@@ -113,7 +114,10 @@ export const postSummarySchema = z
     more_urls: z.boolean(),
     latest_capture: sourcePostSchema.shape.latest_capture,
   })
-  .refine((post) => post.urls.every((url) => url.post_uuid === post.uuid));
+  .refine(
+    (post) =>
+      new Set(post.urls.map((url) => url.url)).size === post.urls.length,
+  );
 export const postLibraryItemSchema = z
   .object({
     uuid,
@@ -127,6 +131,7 @@ export const postLibraryItemSchema = z
   .refine((item) => (item.state === "active") === (item.local_id !== null));
 export const postMediaSchema = z
   .object({
+    requested_post_uuid: uuid,
     media: postLibraryItemSchema,
     association: sourceAssociationSchema,
     has_retained_evidence: z.boolean(),
@@ -226,7 +231,13 @@ export function createSourcePostAPI(
         undefined,
         signal,
       );
-      if (valid.mode === "uuid" && rows.some((row) => row.uuid !== valid.value))
+      if (
+        rows.some(
+          (row) =>
+            row.requested_uuid !==
+            (valid.mode === "uuid" ? valid.value : row.uuid),
+        )
+      )
         invalidResponse();
       return ordered(rows, (row) => row.uuid, after);
     },
@@ -237,7 +248,7 @@ export function createSourcePostAPI(
         undefined,
         signal,
       );
-      if (result.uuid !== id) invalidResponse();
+      if (result.requested_uuid !== id) invalidResponse();
       return result;
     },
     async identifiers(
@@ -285,7 +296,10 @@ export function createSourcePostAPI(
         undefined,
         signal,
       );
-      if (rows.some((row) => row.association.post_uuid !== post))
+      if (
+        rows.some((row) => row.requested_post_uuid !== post) ||
+        new Set(rows.map((row) => row.association.post_uuid)).size > 1
+      )
         invalidResponse();
       return ordered(rows, (row) => row.media.uuid, after);
     },

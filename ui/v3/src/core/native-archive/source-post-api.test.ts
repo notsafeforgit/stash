@@ -87,6 +87,7 @@ it("preserves multiple posts sharing one source URL and rejects duplicate/revers
   const first = postSummary();
   const second = {
     ...first,
+    requested_uuid: postIds.otherPost,
     uuid: postIds.otherPost,
     urls: first.urls.map((u) => ({ ...u, post_uuid: postIds.otherPost })),
   };
@@ -109,16 +110,30 @@ it("preserves multiple posts sharing one source URL and rejects duplicate/revers
   ).rejects.toThrow();
 });
 
-it("requires the requested post and matching URL ownership in detail responses", async () => {
+it("requires the requested scope while retaining original URL and capture owners after consolidation", async () => {
   const row = postSummary();
   expect(await client(row).api.post(row.uuid)).toEqual(row);
   await expect(client(row).api.post(postIds.otherPost)).rejects.toThrow();
+  const merged = { ...row, uuid: postIds.otherPost };
+  expect(await client(merged).api.post(row.uuid)).toEqual(merged);
+  expect(
+    await client([merged]).api.posts({
+      ...browse,
+      mode: "uuid",
+      value: row.uuid,
+    }),
+  ).toEqual([merged]);
+  await expect(client([merged]).api.posts(browse)).rejects.toThrow();
   await expect(
-    client({
-      ...row,
-      urls: [{ ...row.urls[0], post_uuid: postIds.otherPost }],
-    }).api.post(row.uuid),
+    client({ ...row, urls: [row.urls[0], row.urls[0]] }).api.post(row.uuid),
   ).rejects.toThrow();
+});
+
+it("reads canonical media choices through an original post link and checks the requested scope", async () => {
+  const row = postMedia();
+  row.association.post_uuid = postIds.otherPost;
+  expect(await client([row]).api.media(postIds.post)).toEqual([row]);
+  await expect(client([row]).api.media(postIds.otherPost)).rejects.toThrow();
 });
 
 it("keeps unknown observation time separate from archive recording time", async () => {

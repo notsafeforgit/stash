@@ -15,6 +15,7 @@ export const sourceIds = {
 };
 export function sourcePost(): SourcePost {
   return {
+    requested_post_uuid: sourceIds.post,
     association: {
       post_uuid: sourceIds.post,
       post_revision: 4,
@@ -27,6 +28,7 @@ export function sourcePost(): SourcePost {
     },
     latest_capture: {
       uuid: sourceIds.capture,
+      post_uuid: sourceIds.post,
       revision_uuid: sourceIds.revision,
       origin: "gallery-dl",
       platform: "reddit",

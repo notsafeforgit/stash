@@ -80,9 +80,15 @@ now pass focused SQLite/HTTP checks, 65 client tests and 124 Chromium/WebKit
 browser cases, including original saved-request recovery after a merge. Read-only
 comparisons on the populated rehearsal agree for 69 indexed queries; that copy
 has no post consolidations, so merged cases are covered separately by fixtures.
-The next integrated full gate remains pending. General canonical post browsing,
-the encompassing merge transaction and the complete merge API/UI still require
-integration before application use.
+That integrated gate passed generation, UI, Python, lint and all Go packages
+except two gallery fixtures still assuming original-owner current reads and
+ordinary writes before merge choices settled. Their canonical integration
+checks now pass, including portable restore; the next combined full gate remains
+required. Canonical post browsing,
+evidence expansion and source review now have focused repository/client/browser
+coverage, including metadata URL mapping across merged originals. The encompassing
+merge transaction and complete merge API/UI still require integration before
+application use.
 
 Application local-file preview/admission now reuses native file verification and
 durable effects without creating a producer or source record. Focused real MP4/
@@ -10732,7 +10738,55 @@ query results and check receipts are retained under
 `.local/native-canonical-post-albums-20261006/` and
 `.local/native-discovery-client-20261004/`.
 
-No schema migration or production change is added. The integrated full gate is
-pending before push. General canonical post browsing, the encompassing merge
-transaction/API/UI, pending-work publication and all broader transition gates
-remain required.
+No schema migration or production change is added. The integrated full gate
+passed generation, embedded assets, 737 UI tests, Python suites and Go lint.
+All Go packages except SQLite passed; two gallery fixtures still used the prior
+original-owner current-read/write expectations. The following integration
+increment updates those fixtures and retains explicit checks of original-head
+retirement and preserved gallery history. The encompassing merge transaction/API/UI,
+pending-work publication and all broader transition gates remain required.
+
+## Canonical post browsing and shared current evidence — 2026-10-06
+
+Post browsing, exact identity/URL lookup, media review and selected publishers now
+follow consolidated identities. Canonical resolution and deduplication precede
+pagination, so early-sorting original aliases are not lost behind a canonical
+cursor. Sharing a URL does not combine unrelated posts. Responses distinguish
+the requested UUID from the current identity; original URL witnesses, captures,
+saved requests and decision histories retain their owners.
+
+Expanded URL pages select one stable witness per exact value before pagination.
+Capture and identifier pages read bounded indexed ranges from original members;
+capture metadata remains shared and payload bodies are not loaded. Metadata
+policies use the same complete, deduplicated URL set while retaining the original
+selected capture as field provenance. Unresolved media/attachment choices remain
+visible, and a whole-post rejection remains separate from an attachment link.
+
+A real chained-merge fixture covers canonical cursors, shared URL witnesses,
+capture observation/recording clocks, current publisher selection, conflicting
+choices, original receipt recovery after restart and unchanged original evidence.
+The metadata preview/apply test verifies deduplicated merged URLs, a read-only
+preview and original capture provenance on the resulting field decision.
+Focused query, repository, HTTP and metadata checks pass. Client validation
+includes 64 protocol/outbox tests, TypeScript, Biome and ESLint.
+
+The six-file browser run passed 145 cases, exposed one test that reloaded before
+its simulated request committed and one WebKit context closure, and stopped
+before five cases ran. The corrected recovery test waits for the simulated
+response failure. All 68 source-review/association cases then passed Chromium
+and WebKit, including both earlier failures and the previously unrun cases.
+The other 84 browser cases had passed in the initial run; no production UI
+workaround was added.
+
+Read-only comparisons on the populated schema-90 rehearsal agree for 250 queries
+across 25 sampled posts; the slowest new query took 4.4 ms. That copy has no post
+consolidations, so merged behavior is covered by the separate real repository
+fixture. Source hashes and receipts are under
+`.local/native-canonical-post-browser-20261006/` and the corresponding
+`native_canonical_post_browser_` checks.
+
+Gallery regression and portable-restore checks now pass, including original-head
+retirement, canonical reads, retained manual members, cover protection and metadata.
+No schema or production state changes. The combined full fork gate remains
+pending before push. The complete reviewed merge/API/UI,
+pending-publication integration and broader transition/cutover work remain open.

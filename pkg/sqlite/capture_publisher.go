@@ -96,11 +96,12 @@ func (s *CapturePublisherStore) PostAccounts(ctx context.Context, value, after s
 		return nil, err
 	}
 	var rows []sourceAccountRow
-	if err := dbWrapper.Select(ctx, &rows, `SELECT DISTINCT r.* FROM source_captures c INDEXED BY source_captures_scope
+	if err := dbWrapper.Select(ctx, &rows, `SELECT DISTINCT r.* FROM source_post_identities i
+CROSS JOIN source_captures c INDEXED BY source_captures_scope ON c.post_uuid=i.post_uuid
 CROSS JOIN capture_publisher_heads h ON h.capture_uuid=c.uuid
 CROSS JOIN capture_publisher_decisions d ON d.uuid=h.decision_uuid AND d.state='linked'
 CROSS JOIN source_accounts a ON a.uuid=d.account_uuid CROSS JOIN source_accounts r ON r.uuid=a.canonical_uuid
-WHERE c.post_uuid=? AND r.uuid>? ORDER BY r.uuid LIMIT ?`, id, after, limit); err != nil {
+WHERE i.canonical_uuid=(SELECT canonical_uuid FROM source_post_identities WHERE post_uuid=?) AND r.uuid>? ORDER BY r.uuid LIMIT ?`, id, after, limit); err != nil {
 		return nil, err
 	}
 	ret := make([]*models.SourceAccount, 0, len(rows))

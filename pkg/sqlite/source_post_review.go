@@ -22,16 +22,19 @@ func sourceMediaPostsQuery(ids []string, after string, limit int) (string, []int
 	}
 	args = append(args, limit)
 	return `SELECT post_uuid FROM (
-SELECT post_uuid FROM (SELECT DISTINCT post_uuid FROM source_media_evidence INDEXED BY source_media_evidence_media
- WHERE media_uuid IN ` + bindings + ` AND post_uuid>? ORDER BY post_uuid LIMIT ?)
+SELECT post_uuid FROM (SELECT DISTINCT i.canonical_uuid AS post_uuid FROM source_media_evidence e INDEXED BY source_media_evidence_media
+ CROSS JOIN source_post_identities i ON i.post_uuid=e.post_uuid
+ WHERE e.media_uuid IN ` + bindings + ` AND i.canonical_uuid>? ORDER BY i.canonical_uuid LIMIT ?)
 UNION
-SELECT post_uuid FROM (SELECT post_uuid FROM post_media_links INDEXED BY post_media_links_media
- WHERE media_uuid IN ` + bindings + ` AND post_uuid>? GROUP BY post_uuid ORDER BY post_uuid LIMIT ?)
+SELECT post_uuid FROM (SELECT DISTINCT i.canonical_uuid AS post_uuid FROM post_media_links l INDEXED BY post_media_links_media
+ CROSS JOIN source_post_identities i ON i.post_uuid=l.post_uuid
+ WHERE l.media_uuid IN ` + bindings + ` AND i.canonical_uuid>? ORDER BY i.canonical_uuid LIMIT ?)
 UNION
-SELECT post_uuid FROM (SELECT DISTINCT a.post_uuid FROM attachment_media_decisions d INDEXED BY attachment_media_decisions_media
+SELECT post_uuid FROM (SELECT DISTINCT i.canonical_uuid AS post_uuid FROM attachment_media_decisions d INDEXED BY attachment_media_decisions_media
  JOIN attachment_media_links l ON l.attachment_uuid=d.attachment_uuid AND l.decision_uuid=d.uuid
  JOIN source_attachments a ON a.uuid=d.attachment_uuid
- WHERE d.media_uuid IN ` + bindings + ` AND a.post_uuid>? ORDER BY a.post_uuid LIMIT ?)
+ JOIN source_post_identities i ON i.post_uuid=a.post_uuid
+ WHERE d.media_uuid IN ` + bindings + ` AND i.canonical_uuid>? ORDER BY i.canonical_uuid LIMIT ?)
 ) ORDER BY post_uuid LIMIT ?`, args
 }
 
@@ -85,7 +88,7 @@ func (s *SourcePostMediaStore) Review(ctx context.Context, postID, mediaID strin
 }
 
 func (s *SourcePostMediaStore) review(ctx context.Context, postID string, media *models.ArchiveEntity, ids []string) (*models.SourcePostMediaReview, error) {
-	post, err := (&SourceEvidenceStore{}).FindPost(ctx, postID)
+	post, err := currentSourcePost(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
@@ -96,11 +99,12 @@ func (s *SourcePostMediaStore) review(ctx context.Context, postID string, media 
 	if err != nil {
 		return nil, err
 	}
-	ret.LatestCapture, err = sourceReviewLatestCapture(ctx, postID)
+	ret.RequestedPostUUID = postID
+	ret.LatestCapture, err = sourceReviewCurrentLatestCapture(ctx, post.UUID)
 	if err != nil {
 		return nil, err
 	}
-	ret.URLs, err = (&SourcePostLinksStore{}).URLs(ctx, postID, "", 4)
+	ret.URLs, err = (&SourcePostLinksStore{}).CurrentURLs(ctx, post.UUID, "", 4)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +116,7 @@ func (s *SourcePostMediaStore) review(ctx context.Context, postID string, media 
 
 func sourcePostMediaReview(ctx context.Context, post *models.SourcePost, media *models.ArchiveEntity, ids []string) (*models.SourcePostMediaReview, error) {
 	postID := post.UUID
-	choices, err := sourcePostMediaRows(ctx, postID, ids)
+	choices, err := consolidatedPostMediaRows(ctx, postID, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -121,27 +125,61 @@ func sourcePostMediaReview(ctx context.Context, post *models.SourcePost, media *
 	for _, choice := range choices {
 		a.Decisions = append(a.Decisions, *choice.resolve())
 	}
-	ret := &models.SourcePostMediaReview{Association: a}
+	ret := &models.SourcePostMediaReview{RequestedPostUUID: postID, Association: a}
 	args := []interface{}{postID}
 	for _, id := range ids {
 		args = append(args, id)
 	}
-	if err := dbWrapper.Get(ctx, &ret.HasRetainedEvidence, `SELECT EXISTS(SELECT 1 FROM source_media_evidence INDEXED BY source_media_evidence_media
-WHERE post_uuid=? AND media_uuid IN `+getInBinding(len(ids))+`)`, args...); err != nil {
+	if err := dbWrapper.Get(ctx, &ret.HasRetainedEvidence, `SELECT EXISTS(SELECT 1 FROM source_post_identities i
+CROSS JOIN source_media_evidence e INDEXED BY source_media_evidence_post ON e.post_uuid=i.post_uuid
+WHERE i.canonical_uuid=? AND e.media_uuid IN `+getInBinding(len(ids))+`)`, args...); err != nil {
 		return nil, err
 	}
-	if err := dbWrapper.Get(ctx, &ret.LinkedAttachments, `SELECT count(*) FROM source_attachments a
+	if err := dbWrapper.Get(ctx, &ret.LinkedAttachments, `SELECT count(*) FROM (
+SELECT a.namespace,a.value FROM source_post_identities i
+CROSS JOIN source_attachments a ON a.post_uuid=i.post_uuid
 JOIN attachment_media_links l ON l.attachment_uuid=a.uuid
 JOIN attachment_media_decisions d ON d.uuid=l.decision_uuid AND d.attachment_uuid=a.uuid
-WHERE a.post_uuid=? AND d.state='linked' AND d.media_uuid IN `+getInBinding(len(ids)), args...); err != nil {
+WHERE i.canonical_uuid=? GROUP BY a.namespace,a.value
+HAVING count(*)=1 AND max(d.state)='linked' AND max(d.media_uuid) IN `+getInBinding(len(ids))+`)`, args...); err != nil {
 		return nil, err
 	}
 	return ret, nil
 }
 
+const sourceReviewCaptureProjection = `c.uuid,c.post_uuid,c.revision_uuid,c.origin,c.platform,c.captured_at,c.recorded_at,
+substr(json_extract(r.metadata,'$.title'),1,512) AS title,
+coalesce(length(json_extract(r.metadata,'$.title'))>512,0) AS title_truncated,
+json_extract(r.metadata,'$.published_at') AS published_at,json_extract(r.metadata,'$.date_basis') AS date_basis`
+
 func sourceReviewLatestCapture(ctx context.Context, post string) (*models.SourcePostReviewCapture, error) {
+	return readSourceReviewCapture(ctx, `SELECT `+sourceReviewCaptureProjection+`
+FROM source_captures c INDEXED BY source_captures_order
+JOIN source_post_revisions r ON r.post_uuid=c.post_uuid AND r.uuid=c.revision_uuid
+WHERE c.post_uuid=? ORDER BY coalesce(c.captured_at,c.recorded_at) DESC,c.uuid DESC LIMIT 1`, post)
+}
+
+const canonicalPostLatestCaptureQuery = `WITH candidates AS MATERIALIZED (
+ SELECT item.value AS uuid FROM source_post_identities i
+ CROSS JOIN json_each((SELECT json_group_array(uuid) FROM (
+  SELECT uuid FROM source_captures INDEXED BY source_captures_order WHERE post_uuid=i.post_uuid
+  ORDER BY coalesce(captured_at,recorded_at) DESC,uuid DESC LIMIT 1
+ ))) item WHERE i.canonical_uuid=(SELECT canonical_uuid FROM source_post_identities WHERE post_uuid=?)
+), selected AS (
+ SELECT c.* FROM candidates JOIN source_captures c ON c.uuid=candidates.uuid
+ ORDER BY coalesce(c.captured_at,c.recorded_at) DESC,c.uuid DESC LIMIT 1
+)
+SELECT ` + sourceReviewCaptureProjection + ` FROM selected c
+JOIN source_post_revisions r ON r.post_uuid=c.post_uuid AND r.uuid=c.revision_uuid`
+
+func sourceReviewCurrentLatestCapture(ctx context.Context, post string) (*models.SourcePostReviewCapture, error) {
+	return readSourceReviewCapture(ctx, canonicalPostLatestCaptureQuery, post)
+}
+
+func readSourceReviewCapture(ctx context.Context, query string, args ...interface{}) (*models.SourcePostReviewCapture, error) {
 	var row struct {
 		UUID           string         `db:"uuid"`
+		PostUUID       string         `db:"post_uuid"`
 		RevisionUUID   string         `db:"revision_uuid"`
 		Origin         string         `db:"origin"`
 		Platform       string         `db:"platform"`
@@ -154,14 +192,7 @@ func sourceReviewLatestCapture(ctx context.Context, post string) (*models.Source
 	}
 	// Project only compact metadata. This deliberately never joins source_payloads
 	// or profile bodies, and uses the same observation/recording clock as Captures.
-	err := dbWrapper.Get(ctx, &row, `SELECT c.uuid, c.revision_uuid, c.origin, c.platform,
-c.captured_at,c.recorded_at,
-substr(json_extract(r.metadata,'$.title'),1,512) AS title,
-coalesce(length(json_extract(r.metadata,'$.title'))>512,0) AS title_truncated,
-json_extract(r.metadata,'$.published_at') AS published_at,json_extract(r.metadata,'$.date_basis') AS date_basis
-FROM source_captures c INDEXED BY source_captures_order
-JOIN source_post_revisions r ON r.post_uuid=c.post_uuid AND r.uuid=c.revision_uuid
-WHERE c.post_uuid=? ORDER BY coalesce(c.captured_at,c.recorded_at) DESC,c.uuid DESC LIMIT 1`, post)
+	err := dbWrapper.Get(ctx, &row, query, args...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -174,7 +205,7 @@ WHERE c.post_uuid=? ORDER BY coalesce(c.captured_at,c.recorded_at) DESC,c.uuid D
 		}
 		return nil
 	}
-	return &models.SourcePostReviewCapture{UUID: row.UUID, RevisionUUID: row.RevisionUUID, Origin: row.Origin, Platform: row.Platform,
+	return &models.SourcePostReviewCapture{UUID: row.UUID, PostUUID: row.PostUUID, RevisionUUID: row.RevisionUUID, Origin: row.Origin, Platform: row.Platform,
 		CapturedAt: row.CapturedAt.TimePtr(), RecordedAt: row.RecordedAt.TimePtr(), Title: stringPtr(row.Title), TitleTruncated: row.TitleTruncated,
 		PublishedAt: stringPtr(row.PublishedAt), DateBasis: stringPtr(row.DateBasis)}, nil
 }

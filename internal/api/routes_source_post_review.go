@@ -53,18 +53,19 @@ func (rs *nativeArchiveRoutes) reviewPostURLs(w http.ResponseWriter, r *http.Req
 	var ret []models.SourcePostURL
 	err = rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
 		var err error
-		ret, err = rs.repo.SourcePostLinks.URLs(ctx, post, after, limit)
+		ret, err = rs.repo.SourcePostLinks.CurrentURLs(ctx, post, after, limit)
 		return err
 	})
 	if err != nil {
 		nativeArchiveError(w, err)
 		return
 	}
-	ingestJSON(w, http.StatusOK, ret)
+	ingestJSON(w, http.StatusOK, map[string]any{"requested_uuid": post, "urls": ret})
 }
 
 type sourceReviewCapture struct {
 	UUID             string     `json:"uuid"`
+	PostUUID         string     `json:"post_uuid"`
 	RevisionUUID     string     `json:"revision_uuid"`
 	Origin           string     `json:"origin"`
 	Platform         string     `json:"platform"`
@@ -102,11 +103,12 @@ func (rs *nativeArchiveRoutes) reviewPostCaptures(w http.ResponseWriter, r *http
 		}
 	}
 	ret := struct {
-		Captures  []sourceReviewCapture  `json:"captures"`
-		Revisions []sourceReviewRevision `json:"revisions"`
-	}{Captures: []sourceReviewCapture{}, Revisions: []sourceReviewRevision{}}
+		RequestedUUID string                 `json:"requested_uuid"`
+		Captures      []sourceReviewCapture  `json:"captures"`
+		Revisions     []sourceReviewRevision `json:"revisions"`
+	}{RequestedUUID: post, Captures: []sourceReviewCapture{}, Revisions: []sourceReviewRevision{}}
 	err = rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
-		captures, err := rs.repo.SourceEvidence.Captures(ctx, post, after, limit)
+		captures, err := rs.repo.SourceEvidence.CurrentCaptures(ctx, post, after, limit)
 		if err != nil {
 			return err
 		}
@@ -116,7 +118,7 @@ func (rs *nativeArchiveRoutes) reviewPostCaptures(w http.ResponseWriter, r *http
 			if !capture.CapturedAt.IsZero() {
 				observed = &capture.CapturedAt
 			}
-			ret.Captures = append(ret.Captures, sourceReviewCapture{UUID: capture.UUID, RevisionUUID: capture.RevisionUUID,
+			ret.Captures = append(ret.Captures, sourceReviewCapture{UUID: capture.UUID, PostUUID: capture.PostUUID, RevisionUUID: capture.RevisionUUID,
 				Origin: capture.Origin, Platform: capture.Platform, CapturedAt: observed, RecordedAt: capture.RecordedAt, ExtractorVersion: capture.ExtractorVersion})
 			if !seen[capture.RevisionUUID] {
 				seen[capture.RevisionUUID] = true

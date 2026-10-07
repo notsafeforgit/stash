@@ -62,6 +62,7 @@ async function archive(
                 const summary = postSummary();
                 return {
                   ...summary,
+                  requested_uuid: uuid,
                   uuid,
                   latest_capture: {
                     ...summary.latest_capture,

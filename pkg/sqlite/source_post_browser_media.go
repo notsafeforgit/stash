@@ -12,22 +12,25 @@ import (
 // candidates before applying a canonical UUID cursor; paging original UUIDs
 // first would lose aliases that sort on the other side of that cursor.
 const sourcePostBrowserMediaQuery = `SELECT media_uuid FROM (
-SELECT media_uuid FROM (SELECT DISTINCT media_uuid FROM source_media_evidence INDEXED BY source_media_evidence_post
- WHERE post_uuid=? LIMIT ?)
+SELECT media_uuid FROM (SELECT DISTINCT e.media_uuid FROM source_post_identities i
+ CROSS JOIN source_media_evidence e INDEXED BY source_media_evidence_post ON e.post_uuid=i.post_uuid
+ WHERE i.canonical_uuid=? LIMIT ?)
 UNION
-SELECT media_uuid FROM (SELECT media_uuid FROM post_media_links WHERE post_uuid=? LIMIT ?)
+SELECT media_uuid FROM (SELECT DISTINCT l.media_uuid FROM source_post_identities i
+ CROSS JOIN post_media_links l ON l.post_uuid=i.post_uuid WHERE i.canonical_uuid=? LIMIT ?)
 UNION
-SELECT media_uuid FROM (SELECT DISTINCT d.media_uuid FROM source_attachments a
+SELECT media_uuid FROM (SELECT DISTINCT d.media_uuid FROM source_post_identities i
+ CROSS JOIN source_attachments a ON a.post_uuid=i.post_uuid
  CROSS JOIN attachment_media_links l ON l.attachment_uuid=a.uuid
  CROSS JOIN attachment_media_decisions d ON d.uuid=l.decision_uuid AND d.attachment_uuid=a.uuid
- WHERE a.post_uuid=? AND d.media_uuid IS NOT NULL LIMIT ?)
+ WHERE i.canonical_uuid=? AND d.media_uuid IS NOT NULL LIMIT ?)
 ) LIMIT ?`
 
 func (s *SourcePostMediaStore) MediaForPost(ctx context.Context, postID, after string, limit int) ([]models.SourcePostMediaItem, error) {
 	if sourceFileIDs(&postID) != nil || (after != "" && sourceFileIDs(&after) != nil) || limit < 1 || limit > 100 {
 		return nil, models.ErrSourcePostMediaInvalid
 	}
-	post, err := (&SourceEvidenceStore{}).FindPost(ctx, postID)
+	post, err := currentSourcePost(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +39,7 @@ func (s *SourcePostMediaStore) MediaForPost(ctx context.Context, postID, after s
 	}
 	var candidates []string
 	bound := maxSourceGalleryMembers + 1
-	if err := dbWrapper.Select(ctx, &candidates, sourcePostBrowserMediaQuery, postID, bound, postID, bound, postID, bound, bound); err != nil {
+	if err := dbWrapper.Select(ctx, &candidates, sourcePostBrowserMediaQuery, post.UUID, bound, post.UUID, bound, post.UUID, bound, bound); err != nil {
 		return nil, err
 	}
 	if len(candidates) > maxSourceGalleryMembers {
@@ -81,7 +84,7 @@ func (s *SourcePostMediaStore) MediaForPost(ctx context.Context, postID, after s
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, models.SourcePostMediaItem{Media: media, Association: review.Association,
+		result = append(result, models.SourcePostMediaItem{RequestedPostUUID: postID, Media: media, Association: review.Association,
 			HasRetainedEvidence: review.HasRetainedEvidence, LinkedAttachments: review.LinkedAttachments})
 	}
 	return result, nil

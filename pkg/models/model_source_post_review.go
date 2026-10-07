@@ -7,6 +7,7 @@ import "time"
 // links are reported separately because an explicit post decision can suppress
 // them without destroying their evidence or previously selected metadata.
 type SourcePostMediaReview struct {
+	RequestedPostUUID   string                      `json:"requested_post_uuid"`
 	Association         *SourcePostMediaAssociation `json:"association"`
 	LatestCapture       *SourcePostReviewCapture    `json:"latest_capture"`
 	URLs                []SourcePostURL             `json:"urls"`
@@ -19,6 +20,7 @@ type SourcePostMediaReview struct {
 // demand. An unknown capture time remains null, distinct from import time.
 type SourcePostReviewCapture struct {
 	UUID           string     `json:"uuid"`
+	PostUUID       string     `json:"post_uuid"`
 	RevisionUUID   string     `json:"revision_uuid"`
 	Origin         string     `json:"origin"`
 	Platform       string     `json:"platform"`

@@ -17,7 +17,7 @@ type policyURLReader struct {
 	calls int
 }
 
-func (r *policyURLReader) URLs(_ context.Context, post, after string, limit int) ([]models.SourcePostURL, error) {
+func (r *policyURLReader) CurrentURLs(_ context.Context, post, after string, limit int) ([]models.SourcePostURL, error) {
 	require.Equal(r.t, "selected-post", post)
 	require.Equal(r.t, 100, limit)
 	start := r.calls * 100

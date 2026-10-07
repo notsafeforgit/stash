@@ -10,13 +10,14 @@ const maxPolicySourceURLs = 4096
 const maxPolicySourceURLBytes = 1 << 20
 
 // URLs are shared post evidence, not necessarily repeated in the capture's raw
-// payload. Read only the chosen post in bounded pages. An oversized set is null,
+// payload. Read the chosen post's current identity group in bounded pages, with
+// one value per exact URL. An oversized set is null,
 // never a partial replacement that could silently erase selected entity URLs.
 func (s Service) sourcePostURLs(ctx context.Context, post string) ([]string, bool, error) {
 	values := []string{}
 	after, size := "", 2
 	for {
-		rows, err := s.Repo.SourcePostLinks.URLs(ctx, post, after, 100)
+		rows, err := s.Repo.SourcePostLinks.CurrentURLs(ctx, post, after, 100)
 		if err != nil {
 			return nil, false, err
 		}

@@ -35,6 +35,7 @@ it("validates source pagination and refuses a response for another media item", 
 it("keeps unknown capture time distinct and validates shared revision references", async () => {
   const capture = {
     uuid: sourceIds.capture,
+    post_uuid: sourceIds.post,
     revision_uuid: sourceIds.revision,
     origin: "legacy-nfo",
     platform: "reddit",
@@ -43,6 +44,7 @@ it("keeps unknown capture time distinct and validates shared revision references
     extractor_version: null,
   };
   const page = {
+    requested_uuid: sourceIds.post,
     captures: [capture],
     revisions: [
       { uuid: sourceIds.revision, metadata: { title: "Shared title" } },
@@ -69,6 +71,28 @@ it("keeps unknown capture time distinct and validates shared revision references
   await expect(api.captures(sourceIds.post)).rejects.toMatchObject({
     code: "invalid_response",
   });
+});
+
+it("keeps original evidence owners while validating requested canonical review scopes", async () => {
+  const row = sourcePost();
+  row.association.post_uuid = sourceIds.secondCapture;
+  let response: unknown = row;
+  const transport = vi.fn<typeof fetch>(async () => Response.json(response));
+  const api = createSourceReviewAPI(endpoint, transport);
+  expect(await api.review(sourceIds.post, sourceIds.media)).toEqual(row);
+  await expect(
+    api.review(sourceIds.secondCapture, sourceIds.media),
+  ).rejects.toMatchObject({ code: "invalid_response" });
+  response = { requested_uuid: sourceIds.secondCapture, urls: row.urls };
+  expect(await api.urls(sourceIds.secondCapture)).toEqual(row.urls);
+  await expect(api.urls(sourceIds.post)).rejects.toMatchObject({
+    code: "invalid_response",
+  });
+  response = {
+    requested_uuid: sourceIds.secondCapture,
+    urls: [...row.urls, ...row.urls],
+  };
+  await expect(api.urls(sourceIds.secondCapture)).rejects.toThrow();
 });
 it("compares every receipt guard and never treats a malformed success as permission to send again", async () => {
   const input = sourceLinkInputSchema.parse({

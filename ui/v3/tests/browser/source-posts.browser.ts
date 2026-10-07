@@ -21,6 +21,7 @@ async function archive(
     failMedia?: boolean;
     disabledAlbum?: boolean;
     unsafeURL?: boolean;
+    merged?: boolean;
   } = {},
 ) {
   const requests: URL[] = [];
@@ -41,6 +42,11 @@ async function archive(
       writes.push(route.request().method());
     const path = url.pathname.replace(/^.*\/api\/v3\/archive\//, "");
     const post = postSummary();
+    if (options.merged) {
+      post.uuid = postIds.otherPost;
+      post.requested_uuid =
+        path === "posts" ? post.uuid : (path.split("/")[1] ?? postIds.post);
+    }
     if (options.unsafeURL)
       post.urls[0]!.url = "javascript:alert('retained text')";
     let result: unknown;
@@ -53,6 +59,7 @@ async function archive(
               const uuid = `20000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
               return {
                 ...post,
+                requested_uuid: uuid,
                 uuid,
                 urls: [],
                 latest_capture: {
@@ -72,6 +79,8 @@ async function archive(
         return;
       }
       const row = postMedia();
+      row.requested_post_uuid = post.requested_uuid;
+      row.association.post_uuid = post.uuid;
       row.association.state = "unlinked";
       row.linked_attachments = 2;
       const deleted = {
@@ -92,20 +101,23 @@ async function archive(
       };
       result = [row, deleted];
     } else if (path.endsWith("/album")) {
+      const album = postAlbum();
+      album.post_uuid = post.uuid;
       result = postAlbumContext(
         options.disabledAlbum
           ? {
-              ...postAlbum(),
+              ...album,
               state: "disabled",
               gallery: null,
               gallery_uuid: null,
               reason: "Kept separate",
             }
-          : postAlbum(),
+          : album,
         path.split("/")[1],
       );
     } else if (path.endsWith("/capture-summaries"))
       result = {
+        requested_uuid: path.split("/").at(-2),
         revisions: [
           {
             uuid: postIds.revision,
@@ -118,6 +130,7 @@ async function archive(
         captures: [
           {
             uuid: postIds.capture,
+            post_uuid: postIds.post,
             revision_uuid: postIds.revision,
             origin: "gallery-dl",
             platform: "reddit",
@@ -127,6 +140,7 @@ async function archive(
           },
           {
             uuid: postIds.secondCapture,
+            post_uuid: postIds.post,
             revision_uuid: postIds.revision,
             origin: "legacy-nfo",
             platform: "reddit",
@@ -136,8 +150,9 @@ async function archive(
           },
         ],
       };
-    else if (path.endsWith("/identifiers") || path.endsWith("/urls"))
-      result = [];
+    else if (path.endsWith("/identifiers")) result = [];
+    else if (path.endsWith("/urls"))
+      result = { requested_uuid: path.split("/")[1], urls: [] };
     else throw new Error(`Unexpected post browser request: ${path}`);
     await route.fulfill({ json: result });
   });
@@ -237,6 +252,43 @@ for (const desktop of [false, true]) {
     await expect(
       page.getByRole("button", { name: "Open post", exact: true }),
     ).toBeVisible();
+    expect(remote.writes).toEqual([]);
+  });
+}
+
+for (const desktop of [false, true]) {
+  test(`an original post link opens shared current metadata on ${desktop ? "desktop" : "mobile"}`, async ({
+    page,
+  }) => {
+    const remote = await archive(page, { merged: true });
+    await page.setViewportSize(
+      desktop ? { width: 1280, height: 900 } : { width: 390, height: 844 },
+    );
+    await page.goto(`/source-posts?post=${postIds.post}`);
+    await expect(
+      page.getByText("Shared album caption", { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Identifiers", exact: true })
+      .click();
+    await expect(
+      page.getByText(postIds.otherPost, { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Post text and captures", exact: true })
+      .click();
+    await expect(
+      page.getByText("Full retained caption", { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Media associations", exact: true })
+      .click();
+    await expect(
+      page.getByText("Associated library video", { exact: true }),
+    ).toBeVisible();
+    expect(
+      remote.requests.filter((request) => request.pathname.endsWith("/posts")),
+    ).toHaveLength(0);
     expect(remote.writes).toEqual([]);
   });
 }

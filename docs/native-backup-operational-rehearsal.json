@@ -1,0 +1,134 @@
+{
+  "measured_at": "2026-10-07T16:10:14.589692+00:00",
+  "source_revision": "5a98dda4d726d4cc8c3fcfdd43ba8158af36371d",
+  "region": "us-west-2",
+  "cloud_inventory": {
+    "metadata": {
+      "objects": 14964,
+      "bytes": 75730369700,
+      "pages": 15,
+      "storage_classes": {
+        "STANDARD": {
+          "bytes": 75730369700,
+          "objects": 14964
+        }
+      }
+    },
+    "bulk_media": {
+      "objects": 299270,
+      "bytes": 11912320117392,
+      "pages": 300,
+      "storage_classes": {
+        "DEEP_ARCHIVE": {
+          "bytes": 11912320117392,
+          "objects": 299270
+        }
+      }
+    },
+    "http_attempts": {
+      "GetBucketLifecycleConfiguration": 2,
+      "GetBucketLocation": 2,
+      "GetBucketVersioning": 2,
+      "ListObjectsV2": 315
+    },
+    "api_invocations": {
+      "GetBucketLifecycleConfiguration": 2,
+      "GetBucketLocation": 2,
+      "GetBucketVersioning": 2,
+      "ListObjectsV2": 315
+    },
+    "scope": "Complete paginated current-object observations, not an atomic bucket snapshot or an invoice."
+  },
+  "request_cost": {
+    "pricing_source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonS3/current/us-west-2/index.json",
+    "pricing_publication_date": "2026-09-28T23:04:16Z",
+    "pricing_sha256": "feb852a03e9680268ce372afba72caf319526330e3673e5e55ece7e67efda629",
+    "list_usd_per_request": "0.0000050000",
+    "list_requests_per_observed_inventory": 315,
+    "daily_inventory_30_day_projection_usd": "0.0472500000",
+    "scope": "Projection for repeating this observed inventory once daily. Excludes upload, verification, tag, storage, restore and transfer charges; does not measure future native daily churn."
+  },
+  "host_publication_restore": {
+    "status": "passed",
+    "encoded_objects": 23,
+    "encoded_bytes": 108306186,
+    "host_ledgers": 4,
+    "restored_ledger_counts": {
+      "delta_keys": 23827,
+      "file_index": 506986,
+      "gc_tags": 19358,
+      "pending_archives": 0,
+      "pending_gc": 0,
+      "unit_state": 1415,
+      "video_uploads": 273096
+    },
+    "production_pointer_unchanged": true,
+    "source_media_uploaded_or_thawed": false,
+    "standard_cleanup_enabled": false,
+    "initial_upload_request_counts": "Not retained by the first failed harness; these metrics cover recovery verification only.",
+    "scope": "Isolated host S3 publication with a small native database, actual frozen host ledgers and one existing cold-media object; no production activation",
+    "unchanged_republication_requests": {
+      "GetObjectTagging:metadata": 3,
+      "HeadObject:metadata": 9,
+      "ListObjectsV2:chunk": 1,
+      "http_attempts:GetObjectTagging": 3,
+      "http_attempts:HeadObject": 9,
+      "http_attempts:ListObjectsV2": 1
+    },
+    "harness_corrections": "First attempt rejected non-absolute sudo before capture. Second published, released and restored successfully, then expected 3 metadata HEADs instead of 9 HEADs plus 3 tag reads. Read-only recovery downloaded afresh and verified zero unchanged-chunk HEADs/tag reads with all cloud writes prohibited; restored queues then replayed successfully."
+  },
+  "restored_producer_replay": {
+    "producers": [
+      {
+        "duplicate_replay_added_events": 0,
+        "producer": "host",
+        "recovered_events": 2
+      },
+      {
+        "duplicate_replay_added_events": 0,
+        "producer": "n8n",
+        "recovered_events": 2
+      }
+    ],
+    "seconds": 0.3674564689863473,
+    "status": "passed"
+  },
+  "existing_media_adoption": {
+    "required_objects": 282112,
+    "present_objects": 282112,
+    "missing_objects": 0,
+    "checksum_coverage": {
+      "full_object": 224387,
+      "simple_etag": 52652,
+      "multipart_etag": 5073
+    },
+    "sample_sizes": {
+      "simple_etag": 23933,
+      "multipart_etag": 209830864
+    },
+    "required_object_families": {
+      "video:full_object": {
+        "objects": 215371,
+        "bytes": 4290148498547
+      },
+      "video:simple_etag": {
+        "objects": 52652,
+        "bytes": 1140733880110
+      },
+      "video:multipart_etag": {
+        "objects": 5073,
+        "bytes": 5050147843171
+      },
+      "archive:full_object": {
+        "objects": 9016,
+        "bytes": 624466698240
+      }
+    }
+  },
+  "remaining": [
+    "Populated coordinated restore still running; isolated cloud drill uses a small native library and one existing cold-media reference.",
+    "Legacy video objects without additional S3 checksums need supported verified adoption; no automatic reupload or thaw was performed.",
+    "Daily backup principal lacks GetBucketVersioning; existing administrative login requires refresh. Native Standard retention is not activated.",
+    "Final production migration, complete media adoption, real native daily change measurements, observed cycles, retirement and owner acceptance remain."
+  ]
+}

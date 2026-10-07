@@ -280,6 +280,18 @@ permissions was withdrawn. Cold publication now preserves replacement bytes unde
 separate keys and reuses verified existing uploads. Production inventory, retention,
 cost measurements and restore/cutover review still precede activation.
 
+The [2026-10-07 operational drill](../../docs/native-backup-operational-rehearsal.json)
+used the actual host session and S3 in an isolated prefix, then restored the
+native fixture database, producer queues and real host ledgers. After reopening
+the publisher, its 23 unchanged encoded objects needed one LIST and no individual
+checksum/tag reads or uploads. Three small per-run metadata files still needed
+nine HEADs and three tag reads. The separate complete production bucket inventory
+used 315 LIST requests, projecting about $0.05 per thirty daily inventories at
+the observed Oregon price. This excludes other operations and storage, and is
+not a measurement of native daily churn. Full populated restore and production
+activation remain pending. The inventory also found 57,725 required older videos
+without additional S3 checksums; their verified adoption remains a release gate.
+
 ## Immutable media publication and restore
 
 The staged publisher writes version 4 manifests. Readers also retain historical

@@ -11195,3 +11195,60 @@ digest. Its wrapper build is running with that explicit source digest. The
 configured origin and live deployment confirmed the publication destination
 after an initial automatic approval rejection; the evidence-backed retry was
 approved. No production service or cloud backup policy changed.
+
+## Host S3 publication and inventory proof — 2026-10-07
+
+The native wrapper finished publishing, with its explicit Stash source digest
+verified in all three variants. The separate host backup environment is now
+installed and verified against revision `5a98dda4d`: twenty archive modules,
+113 producer modules, sixteen host modules and seven command entry points.
+It remains inactive; no production command or schedule has switched.
+
+A complete read-only cloud inventory found 14,964 Standard metadata objects and
+299,270 Deep Archive media objects. Its 315 LIST calls produced exactly 315 HTTP
+attempts, with no retries. Repeating that inventory daily projects $0.04725 in
+LIST charges over thirty days at the observed Oregon price. This is inventory
+overhead, not a total backup bill or a measurement of native daily change volume.
+The [operational proof](native-backup-operational-rehearsal.json) records the
+current official pricing source and the measurement limits.
+
+The actual `NativeBackupSession` now passed publication and restore against an
+isolated prefix in the existing metadata bucket. It used a small native library,
+two real fixture outboxes, the frozen 335 MB host ledger, three accompanying
+ledger/manifest files and the existing compatible master. One already archived
+video was adopted through its full checksum and local bytes. The checkpoint,
+artwork provider and held ZFS view used their real implementations. Publication,
+history receipt, retention protection and resumed local release completed.
+The resulting 23 encoded objects totalled 108,306,186 bytes in Standard.
+The production current manifest, media objects and cloud policies were unchanged.
+
+Two private-driver mistakes were resolved without restarting the committed
+backup. An initial preflight supplied `sudo` without its required absolute path
+and stopped before capture or cloud writes. The later run published, released
+and restored correctly, but its assertion expected three small-metadata HEADs.
+Lifecycle reconciliation actually needs nine HEADs and three tag reads there.
+A separate read-only recovery downloaded the same published archive afresh,
+verified the native schema, producer receipts and all four host ledgers, and
+confirmed every unchanged encoded chunk required no HEAD, tag read or upload.
+Both restored outboxes delivered their lost-acknowledgement and pending events;
+exact replay added no duplicate events. Initial upload request counters were
+not retained by the failed driver; the saved counters describe the recovery.
+
+The full populated local run separately sealed its coordinated checkpoint and
+matched all 769,643 indexed physical files by path, size and mtime against its
+immutable media view. Packaging and restoration are still running. Neither the
+small cloud drill nor path comparison proves a full populated cloud restore.
+
+The inventory exposed a remaining migration issue: all 282,112 objects required
+by the current media master are present, but 57,725 older videos lack additional
+S3 checksum headers. All 9,016 selected image-archive objects have full-object
+checksums. Read-only local probes matched the observed SSE-S3 ETags for one
+single-part video and one thirteen-part video using the installed uploader's
+16 MiB part size. This is exploratory evidence, not implemented adoption or
+permission to reupload older media. Verified adoption must be implemented and
+reconciled before the native publisher handles the whole library.
+
+The daily role cannot read bucket versioning, and the separate administrative
+AWS login requires refresh. Exact metadata lifecycle and narrowly scoped daily
+permissions are prepared but not installed. Standard cleanup, actual native
+daily churn, final production cutover and observed operating cycles remain open.

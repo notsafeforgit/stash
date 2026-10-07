@@ -64,9 +64,11 @@ jobs:
     - name: Install media test runtime
       run: |
         sudo apt-get update
-        sudo apt-get install --no-install-recommends -y ffmpeg
+        sudo apt-get install --no-install-recommends -y ffmpeg libavif-bin
         ffmpeg -version
         ffprobe -version
+        avifenc --version
+        avifdec --version
 
     - name: Validate fork before publishing
       run: make pre-producer pre-backup validate-fork

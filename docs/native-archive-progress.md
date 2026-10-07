@@ -10850,3 +10850,14 @@ inspected at 390 pixels without horizontal overflow. Main route generation and
 the complete release gate passed in 1,953.8 seconds, including all UI, producer,
 library, archive and backup checks, zero Go lint issues, and full Go integration.
 No database migration or production configuration change is introduced.
+
+## AVIF test runtime in CI — 2026-10-07
+
+The next published revision passed lint and browser CI, and FFmpeg installation
+succeeded in both backend environments. The image-rendering regression then
+identified the missing `avifdec` executable. Both workflows now install
+`libavif-bin` alongside FFmpeg and verify the encoder and decoder versions before
+validation. This is the same Ubuntu package used by the CUDA runtime image.
+Actionlint passes. The complete local release gate also passed its image tests;
+the revised CI jobs and native image publication still require verification.
+No assertion or supported media path was removed to bypass the failure.

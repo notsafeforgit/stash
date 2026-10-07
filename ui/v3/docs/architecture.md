@@ -192,6 +192,16 @@ same-scope result with a visible retry action; filter or item changes cannot
 inherit stale data or errors. Successful attempts and completed source runs are
 distinct. Existing domain review screens own mutation and recovery controls.
 
+The Import history route uses `import-history-api.ts` to inspect catalog and
+automation snapshots with bounded UUID pages and explicit selected details.
+Snapshot receipt, per-step import progress and current association review are
+separate states. Historical warning counts remain historical after a later
+resolution; retained operations do not imply active jobs. Step counters and
+technical identifiers use native expandable sections. The page shares the
+activity reader's cancellation and failed-refresh behavior and the existing
+list scroll restoration; switching import kind clears the previous scope.
+Desktop and mobile navigation use the same route registry.
+
 The Source posts route provides bounded browsing and exact URL, qualified source
 ID or archive UUID lookup. It is available in the desktop utility menu, mobile
 drawer and scene/image source cards. Deep links load only the selected post.

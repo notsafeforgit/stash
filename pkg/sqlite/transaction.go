@@ -175,6 +175,7 @@ func (db *Database) Repository() models.Repository {
 		FilePath:                    &FilePathStore{},
 		ArchiveJob:                  &ArchiveJobStore{},
 		ArchiveActivity:             &ArchiveActivityStore{},
+		ArchiveImport:               &ArchiveImportStore{},
 		SourceRun:                   &SourceRunStore{},
 		SourceBackfill:              &SourceBackfillStore{},
 		ScanJournal:                 &ScanJournalStore{},

@@ -2715,3 +2715,37 @@ queued until its complete window set has finished. Source-run completion is
 separate from verified library media intake. Only the selected queued/running
 item polls; attempts load on expansion. Failed refreshes retain the last
 successful view with an error and Retry, while changed filters discard old data.
+
+## Import history
+
+`/import-history` in the desktop utility menu and mobile drawer inspects retained
+catalog and automation imports. Application-session GET routes under
+`/api/v3/archive` expose compact snapshot summaries and import-step progress:
+
+| Route | Result |
+| --- | --- |
+| `/import-history/{kind}` | Snapshots for `catalog` or `automation` |
+| `/import-history/{kind}/{snapshot}` | One snapshot and its import-step counters |
+
+Snapshot lists use ascending UUID keyset order, not capture-time order. Omit
+`after` for the first page; subsequent pages use the last snapshot UUID. `limit`
+defaults to 25 and is bounded to 1–100. Unknown filters, repeated or empty query
+values, invalid kinds and malformed UUIDs are rejected. The detail route accepts
+no query parameters. These readers do not upload input, run importers or activate
+retained jobs and policies.
+
+Received chunks, records and bytes describe snapshot transfer only. Each domain
+importer has separate progress; a missing row means it has not run, even when
+its input may be empty. Catalog imports have eleven steps and automation imports
+have four. Completed progress retains the outcome at import time. In particular,
+`historical_review_records` does not decrease when an account or media association
+is resolved later. It is not the number of current unresolved conflicts.
+Retained cleanup or operational records also do not imply active work.
+
+Summaries omit manifests, raw input, payloads and settings. Selected details use
+a fixed number of progress lookups. Catalog labels and collection links refer
+to the current collection revision; snapshot identity and capture time remain
+unchanged. The UI expands import steps and technical identifiers on demand,
+keeps successful same-scope results after a failed refresh and preserves list
+position when returning from a selected snapshot. Current associations are
+reviewed through their domain screens rather than by editing historical receipts.

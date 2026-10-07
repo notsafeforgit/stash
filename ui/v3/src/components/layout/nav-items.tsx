@@ -126,6 +126,14 @@ export function useNavItems(opts?: {
         },
         {
           label: intl.formatMessage({
+            id: "import_history.title",
+            defaultMessage: "Import history",
+          }),
+          icon: <History className="size-4" />,
+          to: "/import-history",
+        },
+        {
+          label: intl.formatMessage({
             id: "source_posts.title",
             defaultMessage: "Source posts",
           }),

@@ -14,6 +14,7 @@ import { Route as AccountReviewRouteImport } from './routes/account-review'
 import { Route as ArchiveActivityRouteImport } from './routes/archive-activity'
 import { Route as CollectionsRouteImport } from './routes/collections'
 import { Route as ImageDuplicateCheckerRouteImport } from './routes/image-duplicate-checker'
+import { Route as ImportHistoryRouteImport } from './routes/import-history'
 import { Route as MediaRootsRouteImport } from './routes/media-roots'
 import { Route as SceneDuplicateCheckerRouteImport } from './routes/scene-duplicate-checker'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -77,6 +78,11 @@ const CollectionsRoute = CollectionsRouteImport.update({
 const ImageDuplicateCheckerRoute = ImageDuplicateCheckerRouteImport.update({
   id: '/image-duplicate-checker',
   path: '/image-duplicate-checker',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportHistoryRoute = ImportHistoryRouteImport.update({
+  id: '/import-history',
+  path: '/import-history',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MediaRootsRoute = MediaRootsRouteImport.update({
@@ -282,6 +288,7 @@ export interface FileRoutesByFullPath {
   '/archive-activity': typeof ArchiveActivityRoute
   '/collections': typeof CollectionsRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
+  '/import-history': typeof ImportHistoryRoute
   '/media-roots': typeof MediaRootsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -328,6 +335,7 @@ export interface FileRoutesByTo {
   '/archive-activity': typeof ArchiveActivityRoute
   '/collections': typeof CollectionsRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
+  '/import-history': typeof ImportHistoryRoute
   '/media-roots': typeof MediaRootsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/source-posts': typeof SourcePostsRoute
@@ -374,6 +382,7 @@ export interface FileRoutesById {
   '/archive-activity': typeof ArchiveActivityRoute
   '/collections': typeof CollectionsRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
+  '/import-history': typeof ImportHistoryRoute
   '/media-roots': typeof MediaRootsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -422,6 +431,7 @@ export interface FileRouteTypes {
     | '/archive-activity'
     | '/collections'
     | '/image-duplicate-checker'
+    | '/import-history'
     | '/media-roots'
     | '/scene-duplicate-checker'
     | '/settings'
@@ -468,6 +478,7 @@ export interface FileRouteTypes {
     | '/archive-activity'
     | '/collections'
     | '/image-duplicate-checker'
+    | '/import-history'
     | '/media-roots'
     | '/scene-duplicate-checker'
     | '/source-posts'
@@ -513,6 +524,7 @@ export interface FileRouteTypes {
     | '/archive-activity'
     | '/collections'
     | '/image-duplicate-checker'
+    | '/import-history'
     | '/media-roots'
     | '/scene-duplicate-checker'
     | '/settings'
@@ -560,6 +572,7 @@ export interface RootRouteChildren {
   ArchiveActivityRoute: typeof ArchiveActivityRoute
   CollectionsRoute: typeof CollectionsRoute
   ImageDuplicateCheckerRoute: typeof ImageDuplicateCheckerRoute
+  ImportHistoryRoute: typeof ImportHistoryRoute
   MediaRootsRoute: typeof MediaRootsRoute
   SceneDuplicateCheckerRoute: typeof SceneDuplicateCheckerRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -621,6 +634,13 @@ declare module '@tanstack/react-router' {
       path: '/image-duplicate-checker'
       fullPath: '/image-duplicate-checker'
       preLoaderRoute: typeof ImageDuplicateCheckerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/import-history': {
+      id: '/import-history'
+      path: '/import-history'
+      fullPath: '/import-history'
+      preLoaderRoute: typeof ImportHistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/media-roots': {
@@ -945,6 +965,7 @@ const rootRouteChildren: RootRouteChildren = {
   ArchiveActivityRoute: ArchiveActivityRoute,
   CollectionsRoute: CollectionsRoute,
   ImageDuplicateCheckerRoute: ImageDuplicateCheckerRoute,
+  ImportHistoryRoute: ImportHistoryRoute,
   MediaRootsRoute: MediaRootsRoute,
   SceneDuplicateCheckerRoute: SceneDuplicateCheckerRoute,
   SettingsRoute: SettingsRouteWithChildren,

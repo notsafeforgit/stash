@@ -51,7 +51,8 @@ type/lint/client and 14 Chromium/WebKit checks. The combined release gate passed
 in 1,931.8 seconds, including 758 UI tests, all producer/archive/backup suites,
 zero Go lint issues and full Go integration. Worker service/timer templates are
 packaged and pass parser validation; they are not installed or activated.
-The next import-history increment has passed focused checks in private staging.
+The import-history increment is integrated and has passed focused checks; its
+combined release gate remains pending.
 The shared queue of current unresolved choices and saved-action recovery remain
 unfinished; historical import warnings are not current conflict counts.
 
@@ -10772,3 +10773,36 @@ The unit parser accepts both templates without warnings. The README documents
 the scoped Stash token, per-runtime outbox/profile configuration, backup inventory,
 and the separate n8n container runtime requirement. These files are packaged
 only; no live units, launchers, producer identities or outboxes were activated.
+
+## Native import history — 2026-10-06
+
+The application API and desktop/mobile Import history route now expose compact
+catalog and automation snapshot summaries. UUID keyset paging reads only the
+selected page; details use eleven catalog or four automation progress lookups.
+The current collection label can change without rewriting the retained snapshot.
+Manifests, original payloads and settings are excluded.
+
+Transfer receipt, per-step import progress and current associations are shown
+separately. A missing progress row means the step has not run. Historical warning
+counts remain historical after subsequent association changes. Retained cleanup
+and operational state is not displayed as active work. This reader does not
+upload input, run importers, change associations or activate policies/jobs.
+
+The typed client rejects mismatched snapshots, invalid counters, unexpected
+families and non-advancing pages. Native expandable sections load technical
+details and step counters on demand. Failed refreshes preserve successful
+same-scope results; switching import kind drops the old scope, and returning
+from details restores list position.
+
+Focused repository and HTTP tests, five client contracts and all eight
+Chromium/WebKit checks passed. UI types, component lint and localization passed;
+pinned Go lint reported zero issues. Read-only checks on the populated schema-93
+copy paged all 1,697 catalogs in 14.8 ms and read their fixed progress sets in
+56.3 ms. Query plans use primary-key searches without temporary sorts. These
+local measurements are not a deployed latency guarantee. No schema migration
+is added. The combined release gate is pending; production is unchanged.
+
+The schema-93 activity checkpoint was published and selected as the current
+verified rehearsal. After checking open handles, its superseded schema-92
+development database was retired, reclaiming 21.90 GB and leaving about 96.6 GiB
+free. The original compatible snapshot and verified schema-93 copy remain.

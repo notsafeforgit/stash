@@ -45,6 +45,7 @@ export const manualFilePreviewSchema = manualFileInputSchema
     size: count.positive(),
     modified_at: timestamp,
     existing_file_uuid: uuid.optional(),
+    file_signature: signature,
     signature,
   })
   .refine((p) => p.filename === p.relative_path.split("/").at(-1));

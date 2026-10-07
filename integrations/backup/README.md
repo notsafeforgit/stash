@@ -522,6 +522,13 @@ The journal must exist before the first native backup. Restore it with the
 matching library/media view before restarting dedupe. Version-1/2 inventories
 remain readable for earlier snapshots and declarations without maintenance.
 
+Scheduled [local-file intake](../../docs/native-manual-intake.md#scheduled-folder-discovery)
+uses another maintenance entry: `{"kind":"folder_intake","config":"/private/intake.json"}`.
+The resolver includes its private configuration/key and `intake.sqlite3` as an
+operating database, and verifies its shared library lock at capture. Pending
+admissions and directory cursors must be restored with the corresponding native
+checkpoint. No additional object is created for each request.
+
 This proves the dependencies of declared workers. It does not discover every
 running process, provision outboxes/tokens, validate installed runtime versions,
 or prove that the declaration covers all active launchers. Reconcile that scope

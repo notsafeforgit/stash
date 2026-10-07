@@ -2,12 +2,11 @@
 
 from http.client import HTTPException
 import math
-import os
-import stat
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
 from .album_client import integer, sha256
+from .application_key import application_key
 from .backfill_import import ImportClient
 from .catalog_source import source_time
 from .client import Unavailable
@@ -97,22 +96,7 @@ class DeduplicationClient(ImportClient):
         self.key_file = key_file
 
     def request(self, method, path, value=None):
-        key = os.environ.get(self.key_env, "")
-        if self.key_file is not None:
-            fd = os.open(self.key_file, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-            with os.fdopen(fd, "rb") as source:
-                info = os.fstat(source.fileno())
-                if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
-                    raise InvalidData("Application key file must be private and owned by this user")
-                body = source.read(8193)
-            if len(body) > 8192:
-                raise InvalidData("Application key exceeds its byte limit")
-            try:
-                key = body.decode("ascii").rstrip("\r\n")
-            except UnicodeError:
-                raise InvalidData("Invalid application key encoding") from None
-        if not key or any(ord(c) <= 32 or ord(c) >= 127 for c in key):
-            raise Unavailable("stash_application_key_missing")
+        key = application_key(self.key_env, self.key_file)
         request = Request(self.endpoint + "/api/v3/archive/file-deduplication" + path,
                           method=method, data=None if value is None else encode(value, LIMIT),
                           headers={"ApiKey": key, "Accept": "application/json", "Content-Type": "application/json"})

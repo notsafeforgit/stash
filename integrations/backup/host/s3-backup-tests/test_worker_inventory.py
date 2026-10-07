@@ -24,6 +24,8 @@ from stash_archive.storage import InvalidArchive, json_bytes
 from stash_ingest.outbox import Outbox
 from stash_ingest.dedupe import Journal, private_directory
 from stash_ingest.dedupe_host import FORMAT as DEDUPE_FORMAT
+from stash_ingest.intake_folder import FORMAT as INTAKE_FORMAT
+from stash_ingest.intake_journal import Journal as IntakeJournal
 
 
 class WorkerInventoryTests(unittest.TestCase):
@@ -99,6 +101,43 @@ class WorkerInventoryTests(unittest.TestCase):
         value['maintenance'] = [{'kind': 'file_deduplication', 'config': str(self.dedupe_config)}]
         self.inventory.write_bytes(json_bytes(value))
         return journal
+
+    def test_folder_intake_journal_and_private_configuration_join_the_backup_boundary(self):
+        from stash_archive.bundle import snapshot_database
+        state, _ = private_directory(self.root / 'intake-state')
+        key = self.root / 'intake-key'
+        key.write_text(self.secret)
+        key.chmod(0o600)
+        value = {'format': INTAKE_FORMAT, 'endpoint': 'https://stash.example',
+                 'root_uuid': self.document['root']['uuid'], 'collections': [{'uuid': str(uuid.uuid4()), 'path_prefix': '.'}],
+                 'exclude': ['scrapes'], 'state_dir': str(state), 'library_lock': str(self.root / 'backup.lock'),
+                 'api_key_file': str(key), 'max_pending': 25, 'entries_per_run': 1000,
+                 'settle_seconds': 60, 'scan_interval_seconds': 3600}
+        journal = IntakeJournal(state, value)
+        saved = journal.prepare({'collection_uuid': value['collections'][0]['uuid'], 'relative_path': 'purchased.mp4',
+                                 'media_kind': 'scene', 'signature': 'a' * 64, 'file_signature': 'b' * 64,
+                                 'root_uuid': value['root_uuid'], 'root_revision': 1, 'collection_revision': 1,
+                                 'policy_revision': 0, 'filename': 'purchased.mp4', 'size': 123,
+                                 'modified_at': '2026-10-07T00:00:00Z'})
+        config = self.root / 'intake.json'
+        config.write_bytes(json_bytes(value))
+        declaration = json.loads(self.inventory.read_bytes())
+        declaration['maintenance'] = [{'kind': 'folder_intake', 'config': str(config)}]
+        self.inventory.write_bytes(json_bytes(declaration))
+        report = collect(self.inventory)
+        paths = {entry['path']: entry['role'] for entry in report['components']}
+        self.assertEqual('operating_database', paths[str(state / 'intake.sqlite3')])
+        self.assertEqual('config', paths[str(config)])
+        self.assertEqual('config', paths[str(key)])
+        self.assertEqual([value['library_lock']], report['maintenance_locks'])
+        self.assertNotIn(self.secret, json.dumps(report))
+        restored, _ = private_directory(self.root / 'restored-intake')
+        snapshot_database(state / 'intake.sqlite3', restored / 'intake.sqlite3', 'operating_database', 0)
+        self.assertEqual([saved], IntakeJournal(restored, value).pending())
+        value['root_uuid'] = str(uuid.uuid4())
+        config.write_bytes(json_bytes(value))
+        with self.assertRaisesRegex(InvalidArchive, 'Intake root'):
+            collect(self.inventory)
 
     def test_dedupe_database_config_and_key_are_inventoried_without_receipt_file_fanout(self):
         journal = self.dedupe_runtime()

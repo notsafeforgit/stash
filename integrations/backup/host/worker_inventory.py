@@ -22,6 +22,8 @@ import source_state_inventory
 from stash_ingest.configuration import Configuration, _access_option, _pointer, merge_values
 from stash_ingest.dedupe import JOURNAL_NAME
 from stash_ingest.dedupe_host import configuration as dedupe_configuration
+from stash_ingest.intake_folder import configuration as intake_configuration
+from stash_ingest.intake_journal import JOURNAL_NAME as INTAKE_JOURNAL_NAME
 from stash_archive.bundle import NAME
 from stash_archive.storage import InvalidArchive, decode_json, json_bytes, open_regular, publish_bytes, regular
 
@@ -299,19 +301,27 @@ def collect(filename):
     seen = set()
     for item in maintenance:
         if (not isinstance(item, dict) or set(item) != {"kind", "config"}
-                or item["kind"] != "file_deduplication"):
+                or item["kind"] not in {"file_deduplication", "folder_intake"}):
             raise InvalidArchive("Unsupported maintenance inventory entry")
         config_path = absolute(item["config"])
         if str(config_path) in seen:
             raise InvalidArchive("Duplicate maintenance configuration")
         seen.add(str(config_path))
-        value = dedupe_configuration(inventory.document(config_path))
-        if (value["root_uuid"], value["root"]) not in inventory.media_roots:
-            raise InvalidArchive("Dedupe root does not match an inventoried worker root")
-        if set(value["lock_roots"]) != inventory.locks:
-            raise InvalidArchive("Dedupe does not declare the complete worker publication boundary")
+        document = inventory.document(config_path)
+        if item["kind"] == "file_deduplication":
+            value = dedupe_configuration(document)
+            if (value["root_uuid"], value["root"]) not in inventory.media_roots:
+                raise InvalidArchive("Dedupe root does not match an inventoried worker root")
+            if set(value["lock_roots"]) != inventory.locks:
+                raise InvalidArchive("Dedupe does not declare the complete worker publication boundary")
+            journal_name = JOURNAL_NAME
+        else:
+            value = intake_configuration(document)
+            if value["root_uuid"] not in {root for root, _ in inventory.media_roots}:
+                raise InvalidArchive("Intake root does not match an inventoried worker root")
+            journal_name = INTAKE_JOURNAL_NAME
         inventory.maintenance_locks.add(value["library_lock"])
-        inventory.add(absolute(value["state_dir"]) / JOURNAL_NAME, "operating_database")
+        inventory.add(absolute(value["state_dir"]) / journal_name, "operating_database")
         source_state_inventory.fingerprint(inventory, absolute(value["api_key_file"]), "config", 8192)
     return validate_report(inventory.report())
 

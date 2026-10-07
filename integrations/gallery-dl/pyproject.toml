@@ -63,6 +63,7 @@ stash-backfill-source-albums = "stash_ingest.album_backfill:main"
 stash-backfill-post-media = "stash_ingest.post_media_backfill:main"
 stash-dedupe = "stash_ingest.dedupe:main"
 stash-dedupe-host = "stash_ingest.dedupe_host:main"
+stash-intake-folders = "stash_ingest.intake_folder:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

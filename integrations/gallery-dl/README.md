@@ -26,6 +26,13 @@ lookup to the source tree.
 
 ## Authentication boundary
 
+The package also provides `stash-intake-folders` for
+[scheduled local-file discovery](../../docs/native-manual-intake.md#scheduled-folder-discovery).
+It uses application authentication and native collection policies, retains exact
+admissions and directory cursors in one SQLite journal, and caps pending work
+across invocations. Service/timer templates are packaged but inactive; production
+folder coverage, policy activation and legacy scan retirement remain cutover work.
+
 `STASH_INGEST_TOKEN` is a token for Stash's ingestion API. The queue binds to a
 Stash HTTP origin and stable producer UUID, independently of that token. Rotating
 the token preserves queued event identity and receipts. The client reads the

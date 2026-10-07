@@ -1,0 +1,13 @@
+[Unit]
+Description=Discover local media through native Stash intake
+After=network-online.target stash.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/stash-ingest/intake.env
+ExecStart=/usr/bin/env -- ${STASH_INTAKE_EXECUTABLE} --config ${STASH_INTAKE_CONFIG}
+TimeoutStartSec=15min
+UMask=0077
+Nice=10
+IOSchedulingClass=idle

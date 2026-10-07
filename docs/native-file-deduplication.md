@@ -1,6 +1,7 @@
-# Native physical file deduplication
+# Fclones-backed file deduplication
 
-The development backend implements a preview/apply service for redundant
+Fclones remains the duplicate discovery engine. The development backend implements
+a preview/apply service for redundant
 physical media files in schema 1000095. The `stash-dedupe` host client is available
 in the native producer package. The installed host launcher still uses catalogs;
 its deployment and associated scan/sidecar-cleanup handoff remain outstanding.

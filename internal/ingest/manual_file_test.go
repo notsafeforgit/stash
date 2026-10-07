@@ -106,6 +106,44 @@ func (f manualFileFixture) policy(t *testing.T, revision int, mappings map[strin
 	return policy
 }
 
+func TestManualFileDiscoveryVersionSurvivesRegistrationAndDetectsHiddenFileChanges(t *testing.T) {
+	f := newManualFileFixture(t, models.ArchiveImage)
+	before, err := f.service.PreviewManualFile(t.Context(), f.input)
+	require.NoError(t, err)
+	require.Regexp(t, "^[0-9a-f]{64}$", before.FileSignature)
+	request := ingest.ManualFileRequest{ManualFileInput: f.input, RequestUUID: uuid.NewString(), Signature: before.Signature}
+	_, err = f.service.SubmitManualFile(t.Context(), request)
+	require.NoError(t, err)
+	processed, err := f.worker(t, func(ctx context.Context, _ ingest.FileWork, _ ingest.IntakePublicationResult, guard ingest.FileEffectGuard) error {
+		return guard(ctx)
+	}).ProcessNext(t.Context())
+	require.NoError(t, err)
+	require.True(t, processed)
+	require.Equal(t, "succeeded", f.status(t, request.RequestUUID).State)
+	after, err := f.service.PreviewManualFile(t.Context(), f.input)
+	require.NoError(t, err)
+	require.NotEmpty(t, after.ExistingFileUUID)
+	require.NotEqual(t, before.Signature, after.Signature)
+	require.Equal(t, before.FileSignature, after.FileSignature, "registration alone must not trigger another scheduled import")
+	f.policy(t, 0, map[string]models.MetadataMapping{})
+	policy, err := f.service.PreviewManualFile(t.Context(), f.input)
+	require.NoError(t, err)
+	require.Equal(t, after.FileSignature, policy.FileSignature)
+	require.NotEqual(t, after.PolicyRevision, policy.PolicyRevision)
+	info, err := os.Stat(f.path)
+	require.NoError(t, err)
+	body, err := os.ReadFile(f.path)
+	require.NoError(t, err)
+	body[len(body)-1] ^= 1
+	require.NoError(t, os.WriteFile(f.path, body, 0600))
+	require.NoError(t, os.Chtimes(f.path, info.ModTime(), info.ModTime()))
+	changed, err := f.service.PreviewManualFile(t.Context(), f.input)
+	require.NoError(t, err)
+	require.Equal(t, after.Size, changed.Size)
+	require.Equal(t, after.ModifiedAt, changed.ModifiedAt)
+	require.NotEqual(t, after.FileSignature, changed.FileSignature)
+}
+
 func TestManualFileImportsVideoAndImageWithPerformerPolicyWithoutProducer(t *testing.T) {
 	for _, kind := range []models.ArchiveEntityKind{models.ArchiveScene, models.ArchiveImage} {
 		t.Run(string(kind), func(t *testing.T) {

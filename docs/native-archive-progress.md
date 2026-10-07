@@ -90,6 +90,15 @@ completion cooldown handling and coordinated backup of the compact SQLite
 journal. Live installation, scan/sidecar cleanup handoff, a populated schema-95
 migration check, image publication and activation remain outstanding.
 
+Scheduled local-file discovery now has a native API client with a compact SQLite
+journal, resumable directory pagination, bounded pending admissions and private
+key-file authentication. It uses the existing manual-intake worker and metadata
+policies. Its real HTTP restart test, 614 producer tests, 294 backup tests and
+789 UI tests pass; the combined build/release gate is still running its Go suite.
+Service/timer templates validate but remain inactive. Actual folder coverage and
+policy activation must be reconciled before retiring the compatible scan helper;
+historical directory-membership collections are not filesystem scan grants.
+
 Remaining release work:
 
 | Work | Required outcome |
@@ -11452,3 +11461,53 @@ to the relocated restore. Its original Python process was verified alive with
 archive/restore descriptors; the restored library file is 21,901,381,632 bytes.
 There is still no final passing restore/replay receipt. The compatible service
 remains active, and root free space remains above 79 GiB.
+
+## Resumable scheduled local-file discovery — 2026-10-07
+
+`stash-intake-folders` uses the existing application-authenticated manual-intake
+API, without source credentials or an in-memory scan queue. It recursively reads
+bounded directory pages, persists its position and exact admissions in one private
+SQLite journal, and recovers receipts before admitting additional files. The
+configured pending limit survives process and server restarts. Queued admission
+never becomes a completed import merely because an HTTP request succeeded.
+
+Explicit collections provide filename/performer defaults. Nested scopes use the
+most specific configured collection; declared source scopes are excluded. Files
+with old timestamps are still discovered in new/nested directories. Existing
+indexed files form an explicit initial baseline. Later filesystem or policy
+changes can trigger intake, while registration itself does not produce another
+request. The preview's additional opaque file signature includes confined file
+identity/change-time evidence without changing existing admission signatures.
+The native UI validates the additional response field.
+
+Changed directory pages restart from their beginning without repeating completed
+file versions. Uncertain replies retain the original request. Known stale-file
+rejections and failed/cancelled attempts remain recorded; unchanged terminal
+attempts do not loop automatically. The service holds the shared backup lock
+during admissions, and worker inventory includes its config, private key and
+`intake.sqlite3` as an operating database. A capture/reopen fixture preserved its
+original pending request. Packaged service/timer units run bounded invocations
+independently of dedupe and passed host systemd verification.
+
+The real Python/Go fixture drops an accepted response, restarts both client and
+database, disables the worker, and verifies recovery without another Apply. Once
+that request is explicitly cancelled, only the next file is admitted. A real
+image-worker test verifies that registration preserves the discovery version and
+that overwriting bytes while restoring size/mtime changes it. The initial version
+fixture omitted the worker's required effects callback; the corrected fixture
+passed. Full producer (614), backup (294), library (8), archive (121), UI (789),
+build/generation and lint checks passed. The combined full Go integration suite
+is still running; the aggregate gate has not yet passed.
+
+Read-only scope inspection found 915 disabled directory collections: seven
+explicit folder-policy scopes and 908 rootless historical membership groups.
+The latter deliberately retain directory membership evidence and must not be
+automatically activated as manual scan scopes. Deployment must prepare the actual
+manual-root/folder coverage and current source exclusions, preserve ZIP scanning,
+and finish sidecar cleanup before replacing the old recents helper. This increment
+does not install a live launcher, activate a policy or change production.
+
+Evidence is under `.local/native-folder-intake-20261007`; the full gate uses
+`.local/native-discovery-client-20261004/native_folder_intake_full_gate.log`.
+The original populated restore is still importing its sealed archive; its media
+verification companion remains intentionally suspended to preserve I/O bandwidth.

@@ -43,6 +43,7 @@ type ManualFilePreview struct {
 	Size               int64     `json:"size"`
 	ModifiedAt         time.Time `json:"modified_at"`
 	ExistingFileUUID   string    `json:"existing_file_uuid,omitempty"`
+	FileSignature      string    `json:"file_signature,omitempty"`
 	Signature          string    `json:"signature"`
 }
 
@@ -148,11 +149,28 @@ func (s *Service) manualFilePlan(ctx context.Context, input ManualFileInput) (*m
 		RootUUID: root.UUID, RootRevision: root.Revision, Filename: path.Base(input.RelativePath),
 		Size: inspection.Snapshot.Size, ModifiedAt: inspection.Snapshot.ModifiedAt, ExistingFileUUID: pinned.FileUUID,
 	}}
+	// Folder discovery needs a filesystem version that remains stable when
+	// registration creates or updates the database's file identity. Hash the
+	// confined inspection, including ctime/inode (or full digest fallback),
+	// without exposing those server-local details. Apply still requires the
+	// complete preview signature and all its database/policy guards.
+	fileVersion, err := json.Marshal(struct {
+		RootUUID     string
+		RootRevision int
+		Path         string
+		Inspection   archive.MediaFileInspection
+	}{root.UUID, root.Revision, input.RelativePath, *inspection})
+	if err != nil {
+		return nil, err
+	}
 	raw, err := json.Marshal(plan)
 	if err != nil {
 		return nil, err
 	}
 	plan.Preview.Signature = Digest(raw)
+	// This output-only hint must not change the original admission signature:
+	// already saved native requests still need to validate after an upgrade.
+	plan.Preview.FileSignature = Digest(fileVersion)
 	return plan, nil
 }
 

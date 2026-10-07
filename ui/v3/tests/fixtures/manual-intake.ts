@@ -20,6 +20,7 @@ export function manualPreview(name = "Movie.mp4"): ManualFilePreview {
     filename: name,
     size: 25600,
     modified_at: manualTime,
+    file_signature: "c".repeat(64),
     signature: "a".repeat(64),
   };
 }

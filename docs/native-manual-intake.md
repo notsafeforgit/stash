@@ -56,6 +56,14 @@ absolute mount path and filesystem identity tokens. An existing file UUID means
 that path is registered; its absence does not promise a new scene or image.
 Verified content matching runs later in the worker.
 
+The additional `file_signature` identifies the confined filesystem inspection
+and root binding. It stays stable when registration changes database identities,
+but includes inode/change-time evidence (or a full digest on platforms without
+that evidence). It detects an overwrite with restored mtime and unchanged size.
+It never authorizes an import: Apply still requires the complete preview
+`signature`. This discovery hint does not change the admission-signature format
+of already saved native requests.
+
 Apply accepts the original preview inputs plus `signature` and a new
 `request_uuid`. Persist that exact request before sending it. HTTP 202 means the
 request was accepted into the queue; it does not claim the file was verified or
@@ -105,3 +113,82 @@ Portable export stores these requests, attempts, collection memberships, policy
 decisions and media identities in the native database. They need no producer
 outbox. Bulk media still belongs to the media backup inventory. A relocated
 installation must review its root bindings before executing retained work.
+
+## Scheduled folder discovery
+
+`stash-intake-folders --config /private/intake.json` connects explicit reviewed
+directory/manual-batch collections to this same API. It is packaged in the
+native producer runtime; it does not launch gallery-dl. The host's compatible
+scan helper has not yet been replaced. Example configuration:
+
+```json
+{
+  "format": "stash-folder-intake-v1",
+  "endpoint": "http://localhost:8009",
+  "root_uuid": "REVIEWED_ROOT_UUID",
+  "collections": [
+    {"uuid": "REVIEWED_DIRECTORY_COLLECTION_UUID", "path_prefix": "."}
+  ],
+  "exclude": ["scrapes"],
+  "state_dir": "/private/native-intake",
+  "library_lock": "/tank/media/backup_ledgers/.backup_run.lock",
+  "api_key_file": "/private/stash-application-key",
+  "max_pending": 25,
+  "entries_per_run": 1000,
+  "settle_seconds": 60,
+  "scan_interval_seconds": 3600
+}
+```
+
+Collection UUIDs and prefixes must match the active server definitions. Add
+explicit child collections for their folder policies; the most specific
+configured prefix wins. Exclusions are root-relative directory prefixes.
+Deployment must cover all intended manual folders and exclude producer-owned
+scopes using the current source inventory. Adding sources or changing collection
+coverage requires updating that inventory. This client does not infer performers,
+create collections, enable migrated policies, or discover every source scope
+on its own. Finish that deployment coverage before retiring the old scan trigger.
+
+Each invocation recovers saved admissions before discovering more files. It
+retains at most `max_pending` uncertain/queued/running requests across invocations.
+Admission is not completion: only a validated `succeeded` receipt counts as an
+import. Failed/cancelled outcomes and rejected previews stay explicit; unchanged
+terminal attempts are not automatically resubmitted. Native workers retain their
+bounded transient retries, and the existing manual-intake retry API remains
+available for explicit recovery.
+
+Discovery walks bounded directory pages, including nested folders and files
+with old modification dates. A changed continuation restarts that directory;
+retained file versions prevent duplicate submissions. A complete traversal waits
+the configured interval before starting again; pending receipts are checked on
+every invocation. Files younger than `settle_seconds`, zero-byte files, audio,
+partials, symlinks and unsupported entries are not admitted. The API checks
+reviewed file identities again before publication. ZIP-member intake still uses
+the ordinary scanner; it is not supported by this manual-file API.
+
+The first encounter with an already indexed file records an `already_indexed`
+baseline, without claiming its previews or notifications completed. Subsequent
+file, collection or policy version changes can create new admissions. Completing
+registration alone does not change the discovery fingerprint. Existing field
+clears and curated relationships remain protected by the native policy service.
+
+One private `intake.sqlite3` stores directory cursors, observed versions and exact
+request bodies before transmission. A state lock prevents concurrent invocations;
+the shared backup lock excludes admissions during coordinated capture. Endpoint,
+root and library-lock changes are refused for an existing journal. Collection
+coverage/exclusion changes are allowed only after its pending requests resolve;
+completed receipts remain retained and discovery restarts. Do not delete a journal
+to bypass uncertain work.
+
+The packaged `stash-native-intake.timer` invokes the oneshot service two minutes
+after boot and two minutes after each completion. A busy lock skips that attempt;
+a failure retains pending state. Its fifteen-minute runtime limit is recoverable
+on the next invocation. It is independent of dedupe scheduling and performs no
+global `metadataClean` or wildcard autotag operation.
+
+Declare `{"kind":"folder_intake","config":"/private/intake.json"}` in the
+worker inventory's `maintenance` list. The root must be inventoried, and the
+configuration, private key and journal join the same verified backup boundary.
+Initialize the journal before enabling backup; capture uses SQLite backup, not
+raw database/WAL copies. Restore it with the corresponding native checkpoint
+before resuming admissions.

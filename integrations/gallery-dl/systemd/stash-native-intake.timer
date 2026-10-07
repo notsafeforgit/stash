@@ -1,0 +1,10 @@
+[Unit]
+Description=Resume bounded native local-file discovery
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+Unit=stash-native-intake.service
+
+[Install]
+WantedBy=timers.target

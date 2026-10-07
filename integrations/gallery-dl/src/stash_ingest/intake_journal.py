@@ -10,7 +10,7 @@ import uuid
 
 from .catalog_snapshot import sync_directory
 from .encoding import InvalidData, decode, encode
-from .intake_client import LIMIT, TERMINAL, fingerprint, includes, preview as validate_preview, saved_request, status
+from .intake_client import LIMIT, TERMINAL, file_input, fingerprint, includes, preview as validate_preview, saved_request, status
 
 JOURNAL_NAME = "intake.sqlite3"
 APPLICATION_ID = 0x5344494E
@@ -95,7 +95,7 @@ class Journal:
 
     def prepare(self, preview):
         self.validate_preview(preview, preview)
-        request = {key: preview[key] for key in ("collection_uuid", "relative_path", "media_kind", "signature")}
+        request = {**file_input(preview), "signature": preview["signature"]}
         request["request_uuid"] = str(uuid.uuid4())
         saved_request(request)
         with database(self.directory) as db:
@@ -106,7 +106,11 @@ class Journal:
 
     def validate_preview(self, preview, request):
         validate_preview(preview, request, self.config["root_uuid"])
-        collection = next((item for item in self.config["collections"] if item["uuid"] == request["collection_uuid"]), None)
+        # The configured base bounds discovery. A server-selected child policy
+        # is authorized by the saved scan context and checked again at admission
+        # and publication; it need not be copied into a host configuration.
+        base = request.get("scan_collection_uuid", request["collection_uuid"])
+        collection = next((item for item in self.config["collections"] if item["uuid"] == base), None)
         if (collection is None or not includes(collection["path_prefix"], request["relative_path"])
                 or any(includes(prefix, request["relative_path"]) for prefix in self.config["exclude"])
                 or preview["signature"] != request["signature"]):
@@ -132,8 +136,8 @@ class Journal:
 
     def seen(self, preview):
         with database(self.directory) as db:
-            active = db.execute("SELECT 1 FROM requests WHERE collection=? AND path=? AND terminal=0",
-                                (preview["collection_uuid"], preview["relative_path"])).fetchone()
+            active = db.execute("SELECT 1 FROM requests WHERE path=? AND terminal=0",
+                                (preview["relative_path"],)).fetchone()
             row = db.execute("SELECT version FROM observed WHERE collection=? AND path=?",
                              (preview["collection_uuid"], preview["relative_path"])).fetchone()
             if active is not None or (row is not None and bytes(row[0]) == fingerprint(preview)):
@@ -183,6 +187,10 @@ class Journal:
     def reset_directory(self, row):
         with database(self.directory) as db:
             db.execute("UPDATE directories SET page=NULL,position=0,after_key='',signature='' WHERE id=?", (row["id"],))
+
+    def skip_directory(self, row):
+        with database(self.directory) as db:
+            db.execute("UPDATE directories SET page=NULL,position=0,done=1 WHERE id=?", (row["id"],))
 
     def complete_cycle(self, now):
         with database(self.directory) as db:

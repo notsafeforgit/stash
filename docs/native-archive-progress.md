@@ -73,7 +73,7 @@ media adoption, native daily-change measurement and metadata retention setup
 remain open.
 
 The next development increment is schema 1000095, with the
-[native physical deduplication service](native-file-deduplication.md). It
+[fclones-backed deduplication service](native-file-deduplication.md). It
 previews exact file pairs, verifies complete bytes, preserves source matches and
 media metadata, and uses the existing deletion journal. Different media owners
 are left for review. Primary replacement, changed bytes/generations, lost
@@ -94,10 +94,19 @@ Scheduled local-file discovery now has a native API client with a compact SQLite
 journal, resumable directory pagination, bounded pending admissions and private
 key-file authentication. It uses the existing manual-intake worker and metadata
 policies. Its real HTTP restart test, 614 producer tests, 294 backup tests and
-789 UI tests pass; the combined build/release gate is still running its Go suite.
+789 UI tests pass. That combined gate exceeded the 20-minute aggregate timeout
+in API/SQLite packages while running short-lived migration fixtures; no assertion
+failure was reported, but the gate did not pass. A complete rerun remains required.
 Service/timer templates validate but remain inactive. Actual folder coverage and
 policy activation must be reconciled before retiring the compatible scan helper;
 historical directory-membership collections are not filesystem scan grants.
+Automatic scope selection now reads current native folder policies and source
+boundaries. It distinguishes whole-root access from observed source folders,
+protects producer-submitted paths, and rechecks those decisions before publishing
+manual imports. Focused SQLite/worker/HTTP and client/UI checks pass. A populated
+read-only audit covers 1,674 narrow source prefixes, 34 additional source-evidence
+folders, the root and an unassigned folder. Host configuration and base-scope API
+requests are staged; the complete release gate and activation remain outstanding.
 
 Remaining release work:
 
@@ -11497,7 +11506,10 @@ that overwriting bytes while restoring size/mtime changes it. The initial versio
 fixture omitted the worker's required effects callback; the corrected fixture
 passed. Full producer (614), backup (294), library (8), archive (121), UI (789),
 build/generation and lint checks passed. The combined full Go integration suite
-is still running; the aggregate gate has not yet passed.
+hit its 20-minute per-package limit in API/SQLite fixture tests; the aggregate
+gate did not pass. The ingest package completed in 1,014 seconds. All reported
+failures were aggregate timeouts, rather than assertion failures; a complete
+rerun with sufficient package time remains required before publication.
 
 Read-only scope inspection found 915 disabled directory collections: seven
 explicit folder-policy scopes and 908 rootless historical membership groups.
@@ -11511,3 +11523,51 @@ Evidence is under `.local/native-folder-intake-20261007`; the full gate uses
 `.local/native-discovery-client-20261004/native_folder_intake_full_gate.log`.
 The original populated restore is still importing its sealed archive; its media
 verification companion remains intentionally suspended to preserve I/O bandwidth.
+
+## Automatic manual-intake scope selection — 2026-10-07
+
+The scheduled client now configures base scopes once. The backend selects the
+most specific active folder policy that applies to scans, including policies
+created later through Stash. Equal-depth conflicts remain explicit and do not
+prevent discovery of a more specific child. Disabled policies can mask inherited
+values, and configured policies that opt out of scans are respected. Saved
+requests retain the automatic base UUID/revision as well as their selected policy
+collection. The backend rechecks source ownership, policy choice and revisions
+at admission and before the first file registration commits. The client also
+prevents policy changes from stacking a second active request for the same path.
+
+An initial populated audit caught a real distinction missed by the small fixtures:
+20 imported collections use whole-root access because their files span renamed
+account directories. Excluding that permission prefix would block all manual
+intake. Whole-root access now excludes only directories with direct native source
+file evidence; mixed parent folders remain traversable. Exact source observations
+and producer file-job history reserve individual destinations, including newly
+submitted files without folder history. A producer admission supersedes automatic
+manual work that has not registered its file yet. Explicit interactive imports
+remain available for review.
+
+The revised read-only audit passed 1,710 indexed lookups: 1,674 narrow source
+prefixes, 34 additional folders with source evidence, the root and a new manual
+folder. Those 34 folders contain 4,773 indexed files; being outside a catalog's
+single prefix did not mean they were manual purchases. No catalog/association
+rows were edited to obtain this result. The lookup uses the existing directory
+and file-observation indexes and does not scan capture bodies or the whole library.
+
+Focused tests cover root-wide access, renamed/Unicode folders, mixed subfolders,
+source registration after preview/admission, policy selection, database restart,
+real image publication and producer/manual races. The Python/Go HTTP fixture adds
+a new source and child policy after restarting, then verifies only the new manual
+file is admitted without changing host scope configuration. Fourteen Python
+scheduler tests and nine UI request/recovery tests pass. The first UI test used
+the wrong fixture method and was corrected to `submitSaved`. One complete gate
+stopped on formatting; a later run was deliberately stopped when the populated
+scope bug was found. Complete validation of the final correction remains required.
+
+Private staging under `.local/native-scan-scope-20261007/installation` includes
+the root-wide manual collection/policy API requests, service, timer, environment
+and configuration. The default policy supplies a filename title for new files
+without guessing performers or marking them organized. The existing seven
+disabled folder policies need their source/manual intent resolved separately;
+the 908 unbound membership groups are not activated. The selected canonical root
+remains disabled/unbound. Installation, final backup inventory and live intake
+verification are still cutover steps, and the compatible service is unchanged.

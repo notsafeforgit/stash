@@ -24,6 +24,7 @@ const relativePath = z
 const directory = z.union([z.literal("."), relativePath]);
 export const manualFileInputSchema = z
   .object({
+    scan_collection_uuid: uuid.optional(),
     collection_uuid: uuid,
     relative_path: relativePath.refine(
       (value) => !value.toLowerCase().endsWith(".part"),
@@ -37,6 +38,7 @@ export const manualFileRequestSchema = manualFileInputSchema.extend({
 });
 export const manualFilePreviewSchema = manualFileInputSchema
   .extend({
+    scan_collection_revision: revision.optional(),
     collection_revision: revision,
     policy_revision: count,
     root_uuid: uuid,
@@ -48,7 +50,12 @@ export const manualFilePreviewSchema = manualFileInputSchema
     file_signature: signature,
     signature,
   })
-  .refine((p) => p.filename === p.relative_path.split("/").at(-1));
+  .refine(
+    (p) =>
+      p.filename === p.relative_path.split("/").at(-1) &&
+      (p.scan_collection_uuid !== undefined) ===
+        (p.scan_collection_revision !== undefined),
+  );
 const publicationSchema = z.object({
   file_uuid: uuid,
   generation: revision,
@@ -143,6 +150,7 @@ function compareDirectoryKeys(a: string, b: string) {
 }
 export function sameManualFile(a: ManualFileInput, b: ManualFileInput) {
   return (
+    a.scan_collection_uuid === b.scan_collection_uuid &&
     a.collection_uuid === b.collection_uuid &&
     a.relative_path === b.relative_path &&
     a.media_kind === b.media_kind

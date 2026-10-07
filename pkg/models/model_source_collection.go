@@ -133,6 +133,10 @@ type SourceCollectionReaderWriter interface {
 	Search(context.Context, SourceDefinitionFilter) ([]*SourceCollection, error)
 	LookupTarget(context.Context, string, string, int) ([]*SourceCollection, error)
 	LookupCurrentTargets(context.Context, []string, []string, *string, bool) ([]*SourceCollection, error)
+	// DirectoryScopes returns current bound definitions at directory ancestors.
+	// Whole-root source access excludes only folders with direct file evidence;
+	// disabled/retired sources retain their configured folder boundaries.
+	DirectoryScopes(context.Context, string, string) ([]*SourceCollection, error)
 	History(context.Context, string, int, int) ([]SourceCollectionRevision, error)
 	RecordPostMembership(context.Context, CollectionPostMembership) (*CollectionPostMembership, error)
 	Memberships(context.Context, string, string, int) ([]CollectionPostMembership, error)

@@ -14,7 +14,7 @@ from .dedupe import exclusive_lock, private_directory
 from .dedupe_host import absolute
 from .encoding import InvalidData, decode, identifier
 from .endpoint import origin
-from .intake_client import IntakeClient, LIMIT, REJECTIONS, directory, includes, page
+from .intake_client import IntakeClient, LIMIT, REJECTIONS, directory, includes, page, scan_scope
 from .intake_journal import Journal
 
 FORMAT = "stash-folder-intake-v1"
@@ -94,11 +94,24 @@ def run(value, *, client=None, now=None):
             return {**journal.summary(), "visited": 0, "submitted": 0}
         collections = {item["uuid"]: item for item in value["collections"]}
         submitted, visited = 0, 0
+        scopes, exclusions = {}, {}
         while visited < value["entries_per_run"] and pending_count < value["max_pending"]:
             row = journal.next_directory()
             if row is None:
                 break
             collection = collections[row["collection"]]
+            scope_key = (collection["uuid"], row["path"])
+            if scope_key not in scopes:
+                scopes[scope_key] = scan_scope(client.scan_scope(collection, value["root_uuid"], row["path"]),
+                                              collection, value["root_uuid"], row["path"])
+                reason = scopes[scope_key].get("blocked_reason")
+                if reason:
+                    exclusions[reason] = exclusions.get(reason, 0) + 1
+            scope = scopes[scope_key]
+            if scope.get("blocked_reason") == "source_folder":
+                journal.skip_directory(row)
+                visited += 1
+                continue
             if row["page"] is None:
                 try:
                     listing = client.directory(collection, value["root_uuid"], row["path"], row["after_key"], row["signature"])
@@ -128,8 +141,9 @@ def run(value, *, client=None, now=None):
             if selected is not None and selected["uuid"] == collection["uuid"]:
                 if entry["kind"] == "directory":
                     child = entry["relative_path"]
-                elif entry["size"] and now - datetime.fromisoformat(entry["modified_at"]).astimezone(timezone.utc).timestamp() >= value["settle_seconds"]:
-                    input = {"collection_uuid": collection["uuid"], "relative_path": entry["relative_path"], "media_kind": entry["kind"]}
+                elif not scope.get("blocked_reason") and entry["size"] and now - datetime.fromisoformat(entry["modified_at"]).astimezone(timezone.utc).timestamp() >= value["settle_seconds"]:
+                    input = {"scan_collection_uuid": collection["uuid"], "collection_uuid": scope["collection_uuid"],
+                             "relative_path": entry["relative_path"], "media_kind": entry["kind"]}
                     try:
                         preview = client.preview(input, value["root_uuid"])
                     except Unavailable as error:
@@ -145,7 +159,7 @@ def run(value, *, client=None, now=None):
             journal.advance(row, listing, child)
             visited += 1
         journal.complete_cycle(now)
-        return {**journal.summary(), "visited": visited, "submitted": submitted}
+        return {**journal.summary(), "visited": visited, "submitted": submitted, "scope_exclusions": exclusions}
 
 
 def main(argv=None):

@@ -71,6 +71,7 @@ function decode(value: unknown, collection: string): SavedManualBatch | null {
       item.preview.collection_uuid !== collection ||
       input.relative_path !== item.preview.relative_path ||
       input.media_kind !== item.preview.media_kind ||
+      input.scan_collection_uuid !== item.preview.scan_collection_uuid ||
       input.signature !== item.preview.signature ||
       requests.has(input.request_uuid) ||
       (item.status && item.rejection)
@@ -204,6 +205,8 @@ export function createManualIntakeOutbox(api: ManualIntakeAPI) {
     if (
       rows.some(
         (p) =>
+          p.scan_collection_uuid !== first.scan_collection_uuid ||
+          p.scan_collection_revision !== first.scan_collection_revision ||
           p.collection_uuid !== first.collection_uuid ||
           p.collection_revision !== first.collection_revision ||
           p.root_uuid !== first.root_uuid ||
@@ -220,6 +223,7 @@ export function createManualIntakeOutbox(api: ManualIntakeAPI) {
         preview,
         body: JSON.stringify(
           manualFileRequestSchema.parse({
+            scan_collection_uuid: preview.scan_collection_uuid,
             collection_uuid: preview.collection_uuid,
             relative_path: preview.relative_path,
             media_kind: preview.media_kind,

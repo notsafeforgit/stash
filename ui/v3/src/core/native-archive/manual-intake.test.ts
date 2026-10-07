@@ -2,6 +2,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   createManualIntakeAPI,
+  manualFilePreviewSchema,
   type ManualFileStatus,
 } from "./manual-intake-api";
 import { createManualIntakeOutbox } from "./manual-intake-outbox";
@@ -18,6 +19,35 @@ beforeEach(() => vi.stubGlobal("indexedDB", new IDBFactory()));
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+it("preserves automatic scan context through saved requests and rejects a changed receipt", async () => {
+  const preview = {
+    ...manualPreview(),
+    scan_collection_uuid: manualID(80),
+    scan_collection_revision: 2,
+  };
+  expect(
+    manualFilePreviewSchema.safeParse({
+      ...preview,
+      scan_collection_revision: undefined,
+    }).success,
+  ).toBe(false);
+  const remote = server();
+  const outbox = createManualIntakeOutbox(remote.api);
+  const saved = await outbox.prepare([preview]);
+  const input = JSON.parse(saved.items[0]!.body);
+  expect(input.scan_collection_uuid).toBe(preview.scan_collection_uuid);
+  const status = await remote.api.submitSaved(saved.items[0]!.body);
+  expect(status.scan_collection_uuid).toBe(preview.scan_collection_uuid);
+  const mismatched = createManualIntakeAPI(endpoint, async () =>
+    Response.json({ ...status, scan_collection_uuid: manualID(81) }),
+  );
+  await expect(
+    mismatched.submitSaved(saved.items[0]!.body),
+  ).rejects.toMatchObject({
+    code: "mismatched_receipt",
+  });
 });
 function server() {
   const statuses = new Map<string, ManualFileStatus>(),

@@ -40,6 +40,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/activity/runs/{run}/attempts", rs.activityRunAttempts)
 	r.Get("/manual-intake/capabilities", rs.manualIntakeCapabilities)
 	r.Get("/collections/{collection}/intake-files", rs.manualDirectory)
+	r.Get("/collections/{collection}/scan-scope", rs.manualScanScope)
 	r.Post("/manual-intake/preview", rs.previewManualIntake)
 	r.Post("/manual-intake/apply", rs.applyManualIntake)
 	r.Get("/manual-intake/requests/{request}", rs.manualIntakeRequest)

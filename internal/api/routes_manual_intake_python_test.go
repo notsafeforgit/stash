@@ -87,9 +87,10 @@ func TestPythonFolderIntakeRecoversAdmissionWithoutStackingJobs(t *testing.T) {
 		_, _ = w.Write(recorder.Body.Bytes())
 	}))
 	defer server.Close()
+	var dynamicCollection string
 	run := func(phase string) {
 		setup, err := json.Marshal(map[string]string{"directory": directory, "endpoint": server.URL,
-			"root_uuid": root.UUID, "collection_uuid": collection.UUID, "phase": phase})
+			"root_uuid": root.UUID, "collection_uuid": collection.UUID, "phase": phase, "dynamic_collection_uuid": dynamicCollection})
 		require.NoError(t, err)
 		ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 		defer cancel()
@@ -116,4 +117,35 @@ func TestPythonFolderIntakeRecoversAdmissionWithoutStackingJobs(t *testing.T) {
 	handlerMu.Unlock()
 	run("next")
 	require.EqualValues(t, 2, applies.Load(), "only the second path may be admitted after cancellation")
+	secondJSON, err := os.ReadFile(filepath.Join(directory, "saved-next-intake.json"))
+	require.NoError(t, err)
+	var second ingest.ManualFileRequest
+	require.NoError(t, json.Unmarshal(secondJSON, &second))
+	service := ingest.New(repo)
+	secondStatus, err := service.ManualFileStatus(t.Context(), second.RequestUUID)
+	require.NoError(t, err)
+	_, err = service.CancelManualFile(t.Context(), second.RequestUUID, secondStatus.Revision)
+	require.NoError(t, err)
+	for _, folder := range []string{"purchases", "scrape"} {
+		require.NoError(t, os.Mkdir(filepath.Join(media, folder), 0700))
+		require.NoError(t, os.WriteFile(filepath.Join(media, folder, "file.jpg"), []byte("awaiting native verification"), 0600))
+	}
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		if _, err := repo.SourceCollection.Put(ctx, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
+			Label: "New scrape", Kind: "feed", State: "disabled", RootUUID: &root.UUID, PathPrefix: "scrape"}}); err != nil {
+			return err
+		}
+		child, err := repo.SourceCollection.Put(ctx, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
+			Label: "New manual policy", Kind: "directory", State: "active", RootUUID: &root.UUID, PathPrefix: "purchases"}})
+		if err != nil {
+			return err
+		}
+		dynamicCollection = child.UUID
+		_, err = repo.MetadataPolicy.Put(ctx, models.MetadataPolicyInput{CollectionUUID: child.UUID, ExpectedCollectionRevision: child.Revision, Origin: "review",
+			Definition: models.MetadataPolicyDefinition{Enabled: true, ApplyToScans: true, Rules: map[models.ArchiveEntityKind]models.MetadataPolicyRule{
+				models.ArchiveImage: {OnCreate: true, FilenameTitleFallback: true, Mappings: map[string]models.MetadataMapping{}}}}})
+		return err
+	}))
+	run("dynamic")
+	require.EqualValues(t, 3, applies.Load(), "only the manual file is admitted after adding a new source and folder policy")
 }

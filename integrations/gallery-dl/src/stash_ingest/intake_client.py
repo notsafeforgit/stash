@@ -34,12 +34,15 @@ def file_input(value):
     relative_path(value.get("relative_path"))
     if value.get("media_kind") not in {"scene", "image"} or value["relative_path"].lower().endswith(".part"):
         raise InvalidData("Invalid local-file kind")
-    return {key: value[key] for key in INPUT_KEYS}
+    result = {key: value[key] for key in INPUT_KEYS}
+    if "scan_collection_uuid" in value:
+        result["scan_collection_uuid"] = identifier(value["scan_collection_uuid"])
+    return result
 
 
 def saved_request(value):
-    file_input(value)
-    if set(value) != set(INPUT_KEYS) | {"request_uuid", "signature"}:
+    input = file_input(value)
+    if set(value) != set(input) | {"request_uuid", "signature"}:
         raise InvalidData("Invalid saved local-file request")
     identifier(value.get("request_uuid"))
     sha256(value.get("signature"))
@@ -54,6 +57,10 @@ def preview(value, expected, root):
     for key in ("collection_revision", "root_revision", "size"):
         integer(value.get(key), 1, (1 << 63) - 1)
     integer(value.get("policy_revision"), 0, (1 << 63) - 1)
+    if "scan_collection_uuid" in value:
+        integer(value.get("scan_collection_revision"), 1, (1 << 63) - 1)
+    elif "scan_collection_revision" in value:
+        raise InvalidData("Unscoped preview contains an automatic scan revision")
     source_time(value.get("modified_at"))
     if value.get("filename") != value["relative_path"].split("/")[-1]:
         raise InvalidData("Local-file preview filename differs")
@@ -63,7 +70,31 @@ def preview(value, expected, root):
 
 
 def fingerprint(value):
-    return encode([value["file_signature"], value["collection_revision"], value["policy_revision"]])
+    version = [value["file_signature"], value["collection_revision"], value["policy_revision"]]
+    if "scan_collection_uuid" in value:
+        version.extend([value["scan_collection_uuid"], value["scan_collection_revision"]])
+    return encode(version)
+
+
+def scan_scope(value, collection, root, folder):
+    if (not isinstance(value, dict) or value.get("scan_collection_uuid") != collection["uuid"]
+            or value.get("scan_path_prefix") != collection["path_prefix"] or value.get("root_uuid") != root
+            or value.get("directory") != folder or not includes(collection["path_prefix"], folder)):
+        raise InvalidData("Automatic intake scope differs from its configured directory")
+    for key in ("scan_collection_revision", "root_revision"):
+        integer(value.get(key), 1, (1 << 63) - 1)
+    integer(value.get("policy_revision"), 0, (1 << 63) - 1)
+    if value.get("blocked_reason"):
+        if (value["blocked_reason"] not in {"source_folder", "ambiguous_directory", "policy_changed", "policy_not_for_scans"}
+                or any(key in value for key in ("collection_uuid", "collection_revision", "path_prefix"))):
+            raise InvalidData("Invalid automatic intake exclusion")
+    else:
+        identifier(value.get("collection_uuid"))
+        integer(value.get("collection_revision"), 1, (1 << 63) - 1)
+        directory(value.get("path_prefix"))
+        if not includes(collection["path_prefix"], value["path_prefix"]) or not includes(value["path_prefix"], folder):
+            raise InvalidData("Automatic intake selection escapes its configured directory")
+    return value
 
 
 def status(value, request):
@@ -186,3 +217,7 @@ class IntakeClient(ImportClient):
             query.update(after=after, signature=signature)
         result = self.request("GET", "/collections/" + collection["uuid"] + "/intake-files?" + urlencode(query))
         return page(result, collection, root, folder, after, signature)
+
+    def scan_scope(self, collection, root, folder):
+        result = self.request("GET", "/collections/" + collection["uuid"] + "/scan-scope?" + urlencode({"directory": folder}))
+        return scan_scope(result, collection, root, folder)

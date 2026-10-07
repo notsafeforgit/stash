@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import sys
+import time
 
 from stash_ingest.client import Unavailable
 from stash_ingest.intake_folder import FORMAT, run
@@ -37,9 +38,19 @@ elif setup["phase"] == "recovered":
         assert result["pending"] == 1 and result["submitted"] == 0, result
         assert result["observed"] == {}, result
         assert Journal(value["state_dir"], value).pending() == [saved]
-else:
+elif setup["phase"] == "next":
     result = run(value)
     assert result["pending"] == 1 and result["submitted"] == 1, result
     assert result["observed"] == {"cancelled": 1}, result
     saved, = Journal(value["state_dir"], value).pending()
     assert saved["relative_path"] == "second.jpg"
+    (directory / "saved-next-intake.json").write_text(json.dumps(saved))
+else:
+    value["max_pending"] = 5
+    result = run(value, now=int(time.time()) + 4000)
+    assert result["pending"] == 1 and result["submitted"] == 1, result
+    assert result["scope_exclusions"] == {"source_folder": 1}, result
+    saved, = Journal(value["state_dir"], value).pending()
+    assert saved["relative_path"] == "purchases/file.jpg", saved
+    assert saved["collection_uuid"] == setup["dynamic_collection_uuid"], saved
+    assert saved["scan_collection_uuid"] == setup["collection_uuid"], saved

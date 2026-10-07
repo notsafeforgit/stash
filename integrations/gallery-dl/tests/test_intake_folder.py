@@ -1,5 +1,6 @@
 from copy import deepcopy
 import hashlib
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -8,7 +9,7 @@ import uuid
 from stash_ingest.client import Unavailable
 from stash_ingest.dedupe import exclusive_lock
 from stash_ingest.encoding import InvalidData, encode
-from stash_ingest.intake_client import includes, page, preview, status
+from stash_ingest.intake_client import includes, page, preview, scan_scope, status
 from stash_ingest.intake_folder import FORMAT, configuration, run
 from stash_ingest.intake_journal import Journal, database
 
@@ -35,6 +36,7 @@ class Server:
         self.applies, self.previews, self.pages = [], [], []
         self.lose_response = self.reject = self.malformed = self.immediate = False
         self.policy = 0
+        self.scopes = {}
 
     def add(self, path, version="original", existing=False):
         self.files[path] = version
@@ -49,10 +51,23 @@ class Server:
         result = {**input, "root_uuid": root, "root_revision": 1, "collection_revision": 1,
                   "policy_revision": self.policy, "filename": path.split("/")[-1], "size": 16,
                   "modified_at": "2020-01-01T00:00:00Z", "file_signature": digest([path, self.files[path]])}
+        if "scan_collection_uuid" in input:
+            result["scan_collection_revision"] = 1
         if path in self.registered:
             result["existing_file_uuid"] = self.registered[path]
         result["signature"] = digest(result)
         return preview(result, input, root)
+
+    def scan_scope(self, collection, root, folder):
+        value = {"scan_collection_uuid": collection["uuid"], "scan_collection_revision": 1,
+                 "scan_path_prefix": collection["path_prefix"], "root_uuid": root, "root_revision": 1,
+                 "directory": folder, "policy_revision": self.policy}
+        selection = self.scopes.get(folder, {"uuid": collection["uuid"], "path_prefix": collection["path_prefix"]})
+        if isinstance(selection, str):
+            value["blocked_reason"] = selection
+        else:
+            value.update(collection_uuid=selection["uuid"], collection_revision=1, path_prefix=selection["path_prefix"])
+        return scan_scope(value, collection, root, folder)
 
     def directory(self, collection, root, folder, after="", signature=""):
         self.pages.append((folder, after))
@@ -113,6 +128,70 @@ class Server:
 
 
 class FolderIntakeTests(unittest.TestCase):
+    def test_dynamic_policy_and_new_source_need_no_host_config_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = fixture(directory)
+            original = deepcopy(config)
+            server = Server(config)
+            server.immediate = True
+            run(config, client=server, now=2000000000)
+            child = {"uuid": uid(), "path_prefix": "purchases"}
+            server.scopes.update(purchases=child, scrape="source_folder")
+            server.add("purchases/a.mp4")
+            server.add("scrape/account/a.mp4")
+            result = run(config, client=server, now=2000004000)
+            self.assertEqual(1, result["submitted"])
+            self.assertEqual({"source_folder": 1}, result["scope_exclusions"])
+            self.assertEqual(child["uuid"], server.applies[0]["collection_uuid"])
+            self.assertEqual(config["collections"][0]["uuid"], server.applies[0]["scan_collection_uuid"])
+            self.assertFalse(any(folder.startswith("scrape") for folder, _ in server.pages))
+            self.assertEqual(original, config)
+            self.assertEqual(0, run(config, client=server, now=2000008000)["submitted"])
+
+    def test_ambiguous_parent_keeps_discovering_more_specific_children(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = fixture(directory)
+            server = Server(config)
+            server.scopes["."] = "ambiguous_directory"
+            server.scopes["child"] = {"uuid": uid(), "path_prefix": "child"}
+            server.add("ambiguous.mp4")
+            server.add("child/eligible.mp4")
+            result = run(config, client=server, now=2000000000)
+            self.assertEqual(1, result["submitted"])
+            self.assertEqual(["child/eligible.mp4"], [r["relative_path"] for r in server.applies])
+
+    def test_changed_dynamic_policy_does_not_stack_pending_work_for_same_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = fixture(directory)
+            server = Server(config)
+            server.add("file.mp4")
+            run(config, client=server, now=2000000000)
+            original = deepcopy(server.applies[0])
+            server.scopes["."] = {"uuid": uid(), "path_prefix": "."}
+            self.assertEqual(0, run(config, client=server, now=2000004000)["submitted"])
+            self.assertEqual([original], Journal(config["state_dir"], config).pending())
+            self.assertEqual([original], server.applies)
+
+    def test_dynamic_scope_cannot_escape_configured_base_and_saved_scope_cannot_change(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = fixture(directory)
+            config["collections"][0]["path_prefix"] = "purchases"
+            server = Server(config)
+            server.add("purchases/file.mp4")
+            server.scopes["purchases"] = {"uuid": uid(), "path_prefix": "."}
+            with self.assertRaises(InvalidData):
+                run(config, client=server, now=2000000000)
+            self.assertEqual([], server.applies)
+            server.scopes["purchases"] = {"uuid": uid(), "path_prefix": "purchases"}
+            run(config, client=server, now=2000000001)
+            with database(config["state_dir"]) as db:
+                row = db.execute("SELECT preview,body FROM requests").fetchone()
+                body, saved = json.loads(row["body"]), json.loads(row["preview"])
+                body["scan_collection_uuid"] = saved["scan_collection_uuid"] = uid()
+                db.execute("UPDATE requests SET body=?,preview=?", (encode(body), encode(saved)))
+            with self.assertRaises(InvalidData):
+                Journal(config["state_dir"], config).pending()
+
     def test_lost_acceptance_recovers_original_before_discovery_and_never_claims_queued_completion(self):
         with tempfile.TemporaryDirectory() as directory:
             config = fixture(directory)

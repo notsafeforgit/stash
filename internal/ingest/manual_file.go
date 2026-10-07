@@ -22,9 +22,10 @@ var ErrManualFileChanged = errors.New("local file import preview changed")
 // ManualFileInput refers to an existing bound collection, including a folder or
 // manual batch with a shared performer policy. It needs no producer or source.
 type ManualFileInput struct {
-	CollectionUUID string                   `json:"collection_uuid"`
-	RelativePath   string                   `json:"relative_path"`
-	MediaKind      models.ArchiveEntityKind `json:"media_kind"`
+	ScanCollectionUUID string                   `json:"scan_collection_uuid,omitempty"`
+	CollectionUUID     string                   `json:"collection_uuid"`
+	RelativePath       string                   `json:"relative_path"`
+	MediaKind          models.ArchiveEntityKind `json:"media_kind"`
 }
 
 type ManualFileRequest struct {
@@ -35,26 +36,28 @@ type ManualFileRequest struct {
 
 type ManualFilePreview struct {
 	ManualFileInput
-	CollectionRevision int       `json:"collection_revision"`
-	PolicyRevision     int       `json:"policy_revision"`
-	RootUUID           string    `json:"root_uuid"`
-	RootRevision       int       `json:"root_revision"`
-	Filename           string    `json:"filename"`
-	Size               int64     `json:"size"`
-	ModifiedAt         time.Time `json:"modified_at"`
-	ExistingFileUUID   string    `json:"existing_file_uuid,omitempty"`
-	FileSignature      string    `json:"file_signature,omitempty"`
-	Signature          string    `json:"signature"`
+	ScanCollectionRevision int       `json:"scan_collection_revision,omitempty"`
+	CollectionRevision     int       `json:"collection_revision"`
+	PolicyRevision         int       `json:"policy_revision"`
+	RootUUID               string    `json:"root_uuid"`
+	RootRevision           int       `json:"root_revision"`
+	Filename               string    `json:"filename"`
+	Size                   int64     `json:"size"`
+	ModifiedAt             time.Time `json:"modified_at"`
+	ExistingFileUUID       string    `json:"existing_file_uuid,omitempty"`
+	FileSignature          string    `json:"file_signature,omitempty"`
+	Signature              string    `json:"signature"`
 }
 
 // ManualFileWork is server-created admission evidence within the immutable job
 // arguments. The archive job submission is its durable application receipt.
 // Producer file events cannot supply this variant of work.
 type ManualFileWork struct {
-	Resume       *ManualFileResume           `json:"resume,omitempty"`
-	Request      ManualFileRequest           `json:"request"`
-	RootRevision int                         `json:"root_revision"`
-	Inspection   archive.MediaFileInspection `json:"inspection"`
+	ScanCollectionRevision int                         `json:"scan_collection_revision,omitempty"`
+	Resume                 *ManualFileResume           `json:"resume,omitempty"`
+	Request                ManualFileRequest           `json:"request"`
+	RootRevision           int                         `json:"root_revision"`
+	Inspection             archive.MediaFileInspection `json:"inspection"`
 }
 
 type ManualFileStatus struct {
@@ -84,13 +87,17 @@ type manualFilePlan struct {
 }
 
 func validManualFileInput(input ManualFileInput) bool {
-	return ValidUUID(input.CollectionUUID) && archive.ValidRootRelativePath(input.RelativePath, false) &&
+	return (input.ScanCollectionUUID == "" || ValidUUID(input.ScanCollectionUUID)) && ValidUUID(input.CollectionUUID) && archive.ValidRootRelativePath(input.RelativePath, false) &&
 		!strings.HasSuffix(strings.ToLower(input.RelativePath), ".part") && (input.MediaKind == models.ArchiveScene || input.MediaKind == models.ArchiveImage)
 }
 
 func (s *Service) manualFilePlan(ctx context.Context, input ManualFileInput) (*manualFilePlan, error) {
 	if !validManualFileInput(input) {
 		return nil, ErrInvalid
+	}
+	scanRevision, err := s.manualFileScanRevision(ctx, input)
+	if err != nil {
+		return nil, err
 	}
 	collection, err := s.Repo.SourceCollection.Find(ctx, input.CollectionUUID)
 	if err != nil {
@@ -133,6 +140,9 @@ func (s *Service) manualFilePlan(ctx context.Context, input ManualFileInput) (*m
 	if pinned.FileUUID == "" && pinned.PathFence.Revision != 0 {
 		return nil, models.ErrFilePathChanged
 	}
+	if err := s.checkAutomaticFileReservation(ctx, input, *pinned); err != nil {
+		return nil, err
+	}
 	policy, err := s.Repo.MetadataPolicy.Find(ctx, input.CollectionUUID)
 	if err != nil {
 		return nil, err
@@ -145,7 +155,8 @@ func (s *Service) manualFilePlan(ctx context.Context, input ManualFileInput) (*m
 		policyRevision = policy.Revision
 	}
 	plan := &manualFilePlan{Target: *pinned, Inspection: *inspection, Preview: ManualFilePreview{
-		ManualFileInput: input, CollectionRevision: collection.Revision, PolicyRevision: policyRevision,
+		ScanCollectionRevision: scanRevision,
+		ManualFileInput:        input, CollectionRevision: collection.Revision, PolicyRevision: policyRevision,
 		RootUUID: root.UUID, RootRevision: root.Revision, Filename: path.Base(input.RelativePath),
 		Size: inspection.Snapshot.Size, ModifiedAt: inspection.Snapshot.ModifiedAt, ExistingFileUUID: pinned.FileUUID,
 	}}
@@ -206,6 +217,9 @@ func validFileWork(work FileWork) bool {
 		return false
 	}
 	if !validManualFileResume(m.Resume) {
+		return false
+	}
+	if (m.Request.ScanCollectionUUID == "" && m.ScanCollectionRevision != 0) || (m.Request.ScanCollectionUUID != "" && m.ScanCollectionRevision < 1) {
 		return false
 	}
 	p := work.Publication
@@ -282,7 +296,7 @@ func (s *Service) SubmitManualFile(ctx context.Context, input ManualFileRequest)
 			return ErrManualFileChanged
 		}
 		work := FileWork{Version: 2, Size: plan.Inspection.Snapshot.Size, SHA256: plan.Inspection.SHA256,
-			Manual: &ManualFileWork{Request: input, RootRevision: plan.Preview.RootRevision, Inspection: plan.Inspection},
+			Manual: &ManualFileWork{Request: input, RootRevision: plan.Preview.RootRevision, Inspection: plan.Inspection, ScanCollectionRevision: plan.Preview.ScanCollectionRevision},
 			Publication: IntakePublication{UUID: manualIntakeUUID(input.RequestUUID), CollectionUUID: input.CollectionUUID,
 				CollectionRevision: plan.Preview.CollectionRevision, PolicyRevision: plan.Preview.PolicyRevision, Target: plan.Target, Kind: input.MediaKind}}
 		args, err := json.Marshal(work)
@@ -363,6 +377,16 @@ func (s *Service) CancelManualFile(ctx context.Context, request string, revision
 func (s *Service) validateManualFilePublication(ctx context.Context, work FileWork) error {
 	if work.Manual == nil {
 		return nil
+	}
+	scanRevision, err := s.manualFileScanRevision(ctx, work.Manual.Request.ManualFileInput)
+	if err != nil {
+		return err
+	}
+	if scanRevision != work.Manual.ScanCollectionRevision {
+		return ErrManualFileChanged
+	}
+	if err := s.checkAutomaticFileReservation(ctx, work.Manual.Request.ManualFileInput, work.Publication.Target); err != nil {
+		return err
 	}
 	collection, err := s.Repo.SourceCollection.Find(ctx, work.Publication.CollectionUUID)
 	if err != nil {

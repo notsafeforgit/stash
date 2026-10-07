@@ -141,13 +141,38 @@ scan helper has not yet been replaced. Example configuration:
 ```
 
 Collection UUIDs and prefixes must match the active server definitions. Add
-explicit child collections for their folder policies; the most specific
-configured prefix wins. Exclusions are root-relative directory prefixes.
-Deployment must cover all intended manual folders and exclude producer-owned
-scopes using the current source inventory. Adding sources or changing collection
-coverage requires updating that inventory. This client does not infer performers,
-create collections, enable migrated policies, or discover every source scope
-on its own. Finish that deployment coverage before retiring the old scan trigger.
+only the base scopes to the host configuration. Within each base, the server
+selects the most specific active folder policy with `apply_to_scans` enabled.
+A policy-free base provides fallback coverage. New folder defaults created in
+Stash take effect without editing the host JSON. Equally specific policies require
+review; their files are skipped while deeper folders remain discoverable. A
+disabled policy can mask inherited metadata. A configured base policy that opts
+out of scans does not import its direct files.
+
+The server automatically excludes folders bound to source collections, including
+new sources and disabled/retired scrapes. Pausing a scraper does not turn its
+files into manual purchases. Whole-root source access is a permission boundary,
+not ownership of every folder: sources spanning renamed account folders exclude
+the individual directories supported by direct native file observations. Parent
+folders containing separate manual/source subfolders remain traversable. Exact
+source observations and producer file-job receipts also reserve individual paths,
+including new destinations without historical folder evidence. Reservation is
+rechecked before automatic registration commits. Unbound historical membership
+groups are ignored. Explicit `exclude`
+prefixes add further exclusions. A root-wide manual scope can therefore discover
+new purchase folders while registered scrape folders remain with their producer.
+Deployment must still establish the intended root/base scope and activate reviewed
+folder policies before retiring the old scan trigger. The scheduler does not
+infer performers or activate imported policies.
+
+`GET /api/v3/archive/collections/{base}/scan-scope?directory=relative/path` uses
+indexed ancestor lookups and returns the selected collection or a bounded exclusion
+reason. Scheduled preview/apply bodies retain `scan_collection_uuid` alongside
+the selected `collection_uuid`. The preview also binds `scan_collection_revision`.
+Admission and first publication recheck the current source boundary and selected
+policy, so a folder newly claimed by a producer cannot use a stale manual preview.
+Already admitted requests remain recoverable after those definitions change.
+Interactive manual imports omit this scan context and retain their explicit scope.
 
 Each invocation recovers saved admissions before discovering more files. It
 retains at most `max_pending` uncertain/queued/running requests across invocations.
@@ -156,6 +181,9 @@ import. Failed/cancelled outcomes and rejected previews stay explicit; unchanged
 terminal attempts are not automatically resubmitted. Native workers retain their
 bounded transient retries, and the existing manual-intake retry API remains
 available for explicit recovery.
+An active path cannot acquire a second scheduled request merely because its
+selected child policy changes. Invocation summaries include `scope_exclusions`;
+source folders are pruned without recursively reading their media.
 
 Discovery walks bounded directory pages, including nested folders and files
 with old modification dates. A changed continuation restarts that directory;

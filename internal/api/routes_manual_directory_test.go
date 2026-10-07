@@ -66,6 +66,20 @@ func TestManualDirectoryHTTPScopesFoldersAndChecksContinuations(t *testing.T) {
 	w = get("?q=.jpg")
 	require.Equal(t, http.StatusOK, w.Code)
 	require.NotContains(t, w.Body.String(), "a.mp4")
+	for _, query := range []string{"?directory=purchases", "?directory=.", "?directory=purchases&directory=purchases", "?directory=purchases&unknown=true"} {
+		w = httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/collections/"+collection.UUID+"/scan-scope"+query, nil))
+		if query != "?directory=purchases" {
+			require.Equal(t, http.StatusBadRequest, w.Code)
+			continue
+		}
+		require.Equal(t, http.StatusOK, w.Code)
+		require.NotContains(t, w.Body.String(), dir)
+		var scope ingest.ManualScanScope
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &scope))
+		require.Equal(t, collection.UUID, scope.ScanCollectionUUID)
+		require.Equal(t, collection.UUID, scope.CollectionUUID)
+	}
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		definition := collection.SourceCollectionDefinition
 		definition.State = "disabled"

@@ -1696,7 +1696,10 @@ backup lock plus every inventoried native worker publication barrier. Stash
 verifies full bytes and preserves provenance; different media owners remain
 review cases. See the [client guide](../../docs/native-file-deduplication.md#native-host-client)
 for arguments, persistent state, exit codes and the outstanding deployment
-boundary. The installed legacy dedupe launcher has not switched.
+boundary. `stash-dedupe-host` supplies the scheduled/pre-backup configuration,
+completion cooldown and private key-file handling. Its compact SQLite journal
+is inventoried as an operating database for coordinated backup. The installed
+legacy dedupe launcher has not switched.
 
 ## Historical source albums
 

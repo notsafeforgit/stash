@@ -62,6 +62,7 @@ stash-import-catalog-documents = "stash_ingest.catalog_document_import:main"
 stash-backfill-source-albums = "stash_ingest.album_backfill:main"
 stash-backfill-post-media = "stash_ingest.post_media_backfill:main"
 stash-dedupe = "stash_ingest.dedupe:main"
+stash-dedupe-host = "stash_ingest.dedupe_host:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

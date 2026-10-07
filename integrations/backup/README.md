@@ -507,6 +507,21 @@ the actual staged bytes before requesting the native checkpoint. A retry uses
 the original report and staged files, even if live profiles or archive membership
 have changed. The report itself is included in the native archive.
 
+Native file dedupe is an additional declared maintenance caller. Add
+`"maintenance": [{"kind": "file_deduplication", "config": "/private/dedupe.json"}]`
+alongside `workers`. Its [host configuration](../../docs/native-file-deduplication.md#scheduled-and-pre-backup-launcher)
+must identify an inventoried media root and every worker publication lock.
+The resolver captures its configuration/key file and the single `dedupe.sqlite3`
+as an `operating_database`, preserving committed WAL state and pending requests.
+Do not enumerate its database/WAL files as an opaque state directory.
+
+Resolved version-3 reports also bind its library-lock path. Native capture
+verifies the inherited backup descriptor holds that exact exclusive flock;
+matching a filename or observing another process's lock is insufficient.
+The journal must exist before the first native backup. Restore it with the
+matching library/media view before restarting dedupe. Version-1/2 inventories
+remain readable for earlier snapshots and declarations without maintenance.
+
 This proves the dependencies of declared workers. It does not discover every
 running process, provision outboxes/tokens, validate installed runtime versions,
 or prove that the declaration covers all active launchers. Reconcile that scope

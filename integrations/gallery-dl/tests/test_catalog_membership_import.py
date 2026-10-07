@@ -1,3 +1,4 @@
+from contextlib import closing
 import copy
 import json
 import sqlite3
@@ -54,7 +55,7 @@ class CatalogMembershipTests(unittest.TestCase):
     def fixture(self, root):
         source = root / "catalog.sqlite"
         catalog_fixture(source)
-        with sqlite3.connect(source) as db:
+        with closing(sqlite3.connect(source)) as db, db:
             for i in range(2):
                 db.execute("INSERT INTO memberships VALUES('reddit:post:album',?,'collection',?)", (f"directory:Group {i}", f"Group {i}"))
         prepared = prepare(source, root / "snapshot", str(uuid.uuid4()), str(uuid.uuid4()), CAPTURED)

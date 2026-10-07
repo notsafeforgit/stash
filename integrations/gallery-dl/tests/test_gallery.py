@@ -148,7 +148,7 @@ class GalleryTests(unittest.TestCase):
         return events if kinds is None else [e for e in events if e["kind"] in kinds]
 
     def archive_count(self):
-        with sqlite3.connect(self.directory / "downloads.sqlite") as db:
+        with closing(sqlite3.connect(self.directory / "downloads.sqlite")) as db, db:
             return db.execute("SELECT count(*) FROM archive").fetchone()[0]
 
     def test_download_and_every_postprocessor_phase_hold_publication_lock(self):

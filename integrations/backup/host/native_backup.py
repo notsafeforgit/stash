@@ -341,6 +341,7 @@ class NativeBackupSession:
                 else:
                     inventory = worker_inventory.collect(config["worker_inventory"])
                     same_or_publish(report_path, json_bytes(inventory))
+                worker_inventory.verify_maintenance_locks(inventory, lock_fd)
                 components = worker_inventory.components_for_capture(inventory, components, config["worker_lock_roots"])
                 components.append({"role": "operating_state", "name": "worker-inventory.json", "path": report_path})
             self.stage = capture.prepare(component_cache, self.client, components, reserve=self.reserve)

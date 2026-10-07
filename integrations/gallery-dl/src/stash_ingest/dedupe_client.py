@@ -3,6 +3,7 @@
 from http.client import HTTPException
 import math
 import os
+import stat
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
@@ -88,14 +89,28 @@ def validate_receipt(value, request):
 
 
 class DeduplicationClient(ImportClient):
-    def __init__(self, endpoint, key_env="STASH_API_KEY", *, timeout=900):
+    def __init__(self, endpoint, key_env="STASH_API_KEY", *, timeout=900, key_file=None):
         super().__init__(endpoint, key_env)
         if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 1 <= timeout <= 3600:
             raise InvalidData("Deduplication request timeout must be 1–3600 seconds")
         self.timeout = timeout
+        self.key_file = key_file
 
     def request(self, method, path, value=None):
         key = os.environ.get(self.key_env, "")
+        if self.key_file is not None:
+            fd = os.open(self.key_file, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            with os.fdopen(fd, "rb") as source:
+                info = os.fstat(source.fileno())
+                if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+                    raise InvalidData("Application key file must be private and owned by this user")
+                body = source.read(8193)
+            if len(body) > 8192:
+                raise InvalidData("Application key exceeds its byte limit")
+            try:
+                key = body.decode("ascii").rstrip("\r\n")
+            except UnicodeError:
+                raise InvalidData("Invalid application key encoding") from None
         if not key or any(ord(c) <= 32 or ord(c) >= 127 for c in key):
             raise Unavailable("stash_application_key_missing")
         request = Request(self.endpoint + "/api/v3/archive/file-deduplication" + path,

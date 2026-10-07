@@ -1,5 +1,5 @@
 import copy
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import closing, redirect_stderr, redirect_stdout
 import fcntl
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import sqlite3
 import threading
 import sys
 import unittest
@@ -14,7 +15,7 @@ from unittest.mock import patch
 import uuid
 
 from stash_ingest.client import Unavailable
-from stash_ingest.dedupe import Journal, apply_saved, exclusive_lock, main, private_directory
+from stash_ingest.dedupe import Journal, apply_saved, exclusive_lock, main, private_directory, journal_database
 from stash_ingest.dedupe_candidates import directory_identity, discover, pairs_from_report
 from stash_ingest.dedupe_client import DeduplicationClient, validate_preview, validate_receipt
 from stash_ingest.encoding import InvalidData, decode, encode
@@ -121,9 +122,12 @@ class DedupeTests(unittest.TestCase):
             self.assertEqual(["0.mp4"], [p.name for p in client.root.iterdir()])
             self.assertEqual(2, sum(kind == "apply" for kind, _ in client.calls))
             self.assertEqual(2, sum(kind == "preview" for kind, _ in client.calls))
-            self.assertFalse((journal.directory / "active.json").exists())
-            self.assertEqual(report, json.loads((journal.path / "summary.json").read_text()))
-            self.assertTrue(all(p.stat().st_mode & 0o077 == 0 for p in journal.path.iterdir()))
+            self.assertFalse(Journal.has_active(journal.directory))
+            with journal_database(journal.directory) as db:
+                summary = db.execute("SELECT summary FROM runs WHERE uuid=?", (journal.run_uuid,)).fetchone()[0]
+            self.assertEqual(report, decode(summary))
+            self.assertEqual(0, journal.path.stat().st_mode & 0o077)
+            self.assertEqual(["dedupe.sqlite3"], [p.name for p in journal.directory.iterdir()])
 
     def test_lost_uncommitted_response_replays_original_request(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -159,7 +163,7 @@ class DedupeTests(unittest.TestCase):
                 client.reject = code
                 with self.assertRaises(Unavailable):
                     apply_saved(client, journal)
-                self.assertTrue((journal.directory / "active.json").exists())
+                self.assertTrue(Journal.has_active(journal.directory))
                 self.assertEqual(1, len(journal.intents))
                 self.assertFalse(journal.results)
                 with self.assertRaises(InvalidData):
@@ -178,35 +182,56 @@ class DedupeTests(unittest.TestCase):
             with self.assertRaises(InvalidData):
                 apply_saved(client, journal)
             self.assertFalse(journal.results)
-            path = journal.path / (key + ".request.json")
-            value = json.loads(path.read_text())
+            value = journal.load(key, "request")
             value["request"]["request_uuid"] = str(uuid.uuid4())
-            path.write_bytes(encode(value))
+            with journal_database(journal.directory) as db:
+                db.execute("UPDATE operations SET intent=? WHERE uuid=?", (encode(value), key))
             calls = len(client.calls)
             with self.assertRaises(InvalidData):
                 Journal(journal.directory, journal.config)
             self.assertEqual(calls, len(client.calls))
 
-    def test_crash_after_result_or_summary_does_not_repeat_apply(self):
-        for point in ("result", "summary"):
-            with self.subTest(point=point), tempfile.TemporaryDirectory() as directory:
-                client, journal, _ = self.fixture(directory, 2)
-                if point == "result":
-                    with patch.object(journal, "finish", side_effect=OSError("crash")), self.assertRaises(OSError):
-                        apply_saved(client, journal)
-                else:
-                    original = Path.unlink
+    def test_crash_before_atomic_finish_does_not_repeat_apply(self):
+        with tempfile.TemporaryDirectory() as directory:
+            client, journal, _ = self.fixture(directory, 2)
+            with patch.object(journal, "finish", side_effect=OSError("crash")), self.assertRaises(OSError):
+                apply_saved(client, journal)
+            client.journal = resumed = Journal(journal.directory, journal.config)
+            self.assertTrue(apply_saved(client, resumed)["all_removed"])
+            self.assertFalse(Journal.has_active(journal.directory))
+            self.assertEqual(1, sum(kind == "apply" for kind, _ in client.calls))
 
-                    def unlink(path, *args, **kwargs):
-                        if path.name == "active.json":
-                            raise OSError("crash")
-                        return original(path, *args, **kwargs)
-
-                    with patch.object(Path, "unlink", unlink), self.assertRaises(OSError):
-                        apply_saved(client, journal)
-                client.journal = resumed = Journal(journal.directory, journal.config)
-                self.assertTrue(apply_saved(client, resumed)["all_removed"])
-                self.assertEqual(1, sum(kind == "apply" for kind, _ in client.calls))
+    def test_database_refuses_foreign_files_and_reopens_pending_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state, _ = private_directory(Path(directory) / "state")
+            path = state / "dedupe.sqlite3"
+            with closing(sqlite3.connect(path)) as db:
+                db.execute("CREATE TABLE unrelated(secret)")
+            path.chmod(0o600)
+            with self.assertRaises(InvalidData):
+                Journal.has_active(state)
+            path.unlink()
+            with journal_database(state, create=True) as db:
+                self.assertEqual(0, db.execute("SELECT count(*) FROM runs").fetchone()[0])
+            original = state / "original.sqlite3"
+            path.rename(original)
+            path.symlink_to(original)
+            with self.assertRaises(InvalidData):
+                Journal.has_active(state)
+        with tempfile.TemporaryDirectory() as directory:
+            client, journal, _ = self.fixture(directory, 2)
+            client.lose_before = True
+            with self.assertRaises(Unavailable):
+                apply_saved(client, journal)
+            restored, _ = private_directory(Path(directory) / "restored")
+            with closing(sqlite3.connect(journal.path)) as source:
+                # The committed snapshot includes the manifest and intent.
+                with closing(sqlite3.connect(restored / "dedupe.sqlite3")) as destination:
+                    source.backup(destination)
+            (restored / "dedupe.sqlite3").chmod(0o600)
+            client.journal = recovered = Journal(restored, journal.config)
+            self.assertEqual(journal.intents, recovered.intents)
+            self.assertTrue(apply_saved(client, recovered)["all_removed"])
 
     def test_report_rejects_escape_symlinks_sidecars_repeats_and_changed_files(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -302,7 +327,7 @@ class DedupeTests(unittest.TestCase):
                 finally:
                     os.close(fd)
                 self.assertFalse(client.calls)
-                self.assertFalse((base / "state" / "active.json").exists())
+                self.assertFalse(Journal.has_active(base / "state"))
                 # Blocked candidates finish as review, not successful removal.
                 client.blocked = "different_media_owners"
                 with redirect_stdout(io.StringIO()) as output:
@@ -379,6 +404,17 @@ class HTTPTests(unittest.TestCase):
                 result = client.apply(request)
                 self.assertEqual(result, client.receipt(request))
                 self.assertTrue(all(call[2] == "fixture-key" for call in calls))
+                with tempfile.TemporaryDirectory() as directory:
+                    key = Path(directory) / "application-key"
+                    key.write_text("file-fixture-key\n")
+                    key.chmod(0o600)
+                    file_client = DeduplicationClient(client.endpoint, "DEDUPE_TEST_KEY", key_file=key)
+                    self.assertEqual(result, file_client.receipt(request))
+                    self.assertEqual("file-fixture-key", calls[-1][2])
+                    self.assertEqual("fixture-key", os.environ["DEDUPE_TEST_KEY"])
+                    key.chmod(0o644)
+                    with self.assertRaises(InvalidData):
+                        file_client.receipt(request)
                 for state in ({"status": 302}, {"status": 200, "content_type": "text/html"},
                               {"status": 200, "body": {"padding": "x" * 20000}},
                               {"status": 404, "body": {"error": "file_not_found"}},

@@ -1,4 +1,4 @@
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import closing, redirect_stderr, redirect_stdout
 from copy import deepcopy
 import io
 import json
@@ -16,7 +16,7 @@ class N8nParentTests(unittest.TestCase):
     def test_live_waiting_and_terminal_statuses_and_database_bytes_are_preserved(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "n8n.sqlite"
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute("CREATE TABLE execution_entity(id INTEGER PRIMARY KEY,status TEXT,stoppedAt TEXT)")
                 db.executemany("INSERT INTO execution_entity VALUES(?,?,?)", [
                     (1, "new", None), (2, "running", None), (3, "waiting", None), (4, "success", None),

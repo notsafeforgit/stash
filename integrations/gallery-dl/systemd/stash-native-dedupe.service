@@ -1,0 +1,14 @@
+[Unit]
+Description=Verified native Stash file deduplication
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/stash-ingest/dedupe.env
+ExecStart=/usr/bin/env -- ${STASH_DEDUPE_EXECUTABLE} --config ${STASH_DEDUPE_CONFIG}
+TimeoutStartSec=infinity
+TimeoutStopSec=90s
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+Nice=10
+SyslogIdentifier=stash-native-dedupe

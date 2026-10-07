@@ -13,12 +13,15 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import stat
 import string
 import sys
 
 import source_state_inventory
 
 from stash_ingest.configuration import Configuration, _access_option, _pointer, merge_values
+from stash_ingest.dedupe import JOURNAL_NAME
+from stash_ingest.dedupe_host import configuration as dedupe_configuration
 from stash_archive.bundle import NAME
 from stash_archive.storage import InvalidArchive, decode_json, json_bytes, open_regular, publish_bytes, regular
 
@@ -40,6 +43,8 @@ class Inventory:
     def __init__(self):
         self.files, self.checksums, self.locks, self.archives = {}, {}, set(), {}
         self.state_trees = {}
+        self.media_roots = set()
+        self.maintenance_locks = set()
 
     def add(self, path, role):
         path = absolute(str(path))
@@ -128,6 +133,8 @@ class Inventory:
                     raise InvalidArchive("Worker directory identity changed")
                 if name == "locks":
                     roots = [*roots, value["path"]]
+                else:
+                    self.media_roots.add((document["root"].get("uuid"), str(directory)))
         for root in roots:
             directory = path(root)
             if not directory.is_dir() or directory.is_symlink():
@@ -264,17 +271,19 @@ class Inventory:
         visit(gallery)
 
     def report(self):
-        return {"format": FORMAT + ".resolved", "version": 2 if self.state_trees else 1,
+        return {"format": FORMAT + ".resolved", "version": 3 if self.maintenance_locks else 2 if self.state_trees else 1,
                 "components": sorted(self.files.values(), key=lambda c: (c["role"], c["name"])),
                 "read_checksums": dict(sorted(self.checksums.items())),
                 "worker_lock_roots": sorted(self.locks), "archive_sets": dict(sorted(self.archives.items())),
-                **({"state_trees": self.state_trees} if self.state_trees else {})}
+                **({"state_trees": self.state_trees} if self.state_trees or self.maintenance_locks else {}),
+                **({"maintenance_locks": sorted(self.maintenance_locks)} if self.maintenance_locks else {})}
 
 
 def collect(filename):
     inventory = Inventory()
     document = inventory.document(absolute(str(filename)))
-    if (not isinstance(document, dict) or set(document) != {"format", "version", "workers"}
+    required = {"format", "version", "workers"}
+    if (not isinstance(document, dict) or not required <= document.keys() or document.keys() - required - {"maintenance"}
             or document["format"] != FORMAT or type(document["version"]) is not int or document["version"] != 1
             or not isinstance(document["workers"], list) or not 1 <= len(document["workers"]) <= 256):
         raise InvalidArchive("Invalid worker inventory file")
@@ -284,15 +293,37 @@ def collect(filename):
         if worker["name"] in names:
             raise InvalidArchive("Duplicate worker inventory name")
         names.add(worker["name"])
+    maintenance = document.get("maintenance", [])
+    if not isinstance(maintenance, list) or len(maintenance) > 64:
+        raise InvalidArchive("Invalid maintenance inventory")
+    seen = set()
+    for item in maintenance:
+        if (not isinstance(item, dict) or set(item) != {"kind", "config"}
+                or item["kind"] != "file_deduplication"):
+            raise InvalidArchive("Unsupported maintenance inventory entry")
+        config_path = absolute(item["config"])
+        if str(config_path) in seen:
+            raise InvalidArchive("Duplicate maintenance configuration")
+        seen.add(str(config_path))
+        value = dedupe_configuration(inventory.document(config_path))
+        if (value["root_uuid"], value["root"]) not in inventory.media_roots:
+            raise InvalidArchive("Dedupe root does not match an inventoried worker root")
+        if set(value["lock_roots"]) != inventory.locks:
+            raise InvalidArchive("Dedupe does not declare the complete worker publication boundary")
+        inventory.maintenance_locks.add(value["library_lock"])
+        inventory.add(absolute(value["state_dir"]) / JOURNAL_NAME, "operating_database")
+        source_state_inventory.fingerprint(inventory, absolute(value["api_key_file"]), "config", 8192)
     return validate_report(inventory.report())
 
 
 def validate_report(report):
     fields = {"format", "version", "components", "read_checksums", "worker_lock_roots", "archive_sets"}
-    if isinstance(report, dict) and report.get("version") == 2:
+    if isinstance(report, dict) and report.get("version") in (2, 3):
         fields.add("state_trees")
+    if isinstance(report, dict) and report.get("version") == 3:
+        fields.add("maintenance_locks")
     if (not isinstance(report, dict) or set(report) != fields or report["format"] != FORMAT + ".resolved"
-            or type(report["version"]) is not int or report["version"] not in (1, 2)
+            or type(report["version"]) is not int or report["version"] not in (1, 2, 3)
             or not isinstance(report["components"], list) or not 1 <= len(report["components"]) <= MAX_FILES
             or not isinstance(report["read_checksums"], dict) or not isinstance(report["archive_sets"], dict)
             or not isinstance(report["worker_lock_roots"], list)):
@@ -300,7 +331,7 @@ def validate_report(report):
     paths, names = {}, set()
     for component in report["components"]:
         if (not isinstance(component, dict) or set(component) != {"role", "name", "path"}
-                or component["role"] not in {"config", "worker_profile", "producer_outbox", "download_archive", "operating_state"}
+                or component["role"] not in {"config", "worker_profile", "producer_outbox", "download_archive", "operating_state", "operating_database"}
                 or not isinstance(component["name"], str) or not NAME.fullmatch(component["name"])
                 or (component["role"], component["name"]) in names):
             raise InvalidArchive("Invalid retained worker dependency")
@@ -318,9 +349,42 @@ def validate_report(report):
         absolute(template)
         if not isinstance(files, list) or any(paths.get(path) != "download_archive" for path in files):
             raise InvalidArchive("Invalid retained download archive inventory")
-    if report["version"] == 2:
+    if report["version"] == 2 or (report["version"] == 3 and report["state_trees"] != {}):
         source_state_inventory.validate(report["state_trees"], paths, report["read_checksums"])
+    if report["version"] == 3:
+        locks = report["maintenance_locks"]
+        if not isinstance(locks, list) or not 1 <= len(locks) <= 64 or len(set(locks)) != len(locks):
+            raise InvalidArchive("Invalid retained maintenance locks")
+        for path in locks:
+            absolute(path)
     return report
+
+
+def verify_maintenance_locks(report, lock_fd):
+    """The inherited backup descriptor must fence the dedupe journal too."""
+    validate_report(report)
+    if not report.get("maintenance_locks"):
+        return
+    if type(lock_fd) is not int or lock_fd < 0:
+        raise InvalidArchive("Dedupe state capture requires the shared backup lock")
+    opened = os.fstat(lock_fd)
+    if not stat.S_ISREG(opened.st_mode):
+        raise InvalidArchive("Maintenance exclusion must be a regular file")
+    # Linux fdinfo identifies locks belonging to this open file description,
+    # including inherited descriptors. A competing process's lock is not proof
+    # that this backup owns exclusion; do not acquire a new lock out of order.
+    held = Path(f"/proc/self/fdinfo/{lock_fd}").read_text()
+    if not any(line.startswith("lock:") and re.search(r"\bFLOCK\s+ADVISORY\s+WRITE\b", line)
+               for line in held.splitlines()):
+        raise InvalidArchive("Backup/dedupe exclusion is not held by this descriptor")
+    for path in report["maintenance_locks"]:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            current = os.fstat(fd)
+            if (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino):
+                raise InvalidArchive("Backup and dedupe use different exclusion files")
+        finally:
+            os.close(fd)
 
 
 def components_for_capture(report, existing, held_roots):

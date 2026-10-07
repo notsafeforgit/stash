@@ -3,7 +3,9 @@
 import base64
 from contextlib import closing
 import hashlib
+import fcntl
 import json
+import os
 from pathlib import Path
 import sqlite3
 import sys
@@ -16,10 +18,12 @@ import uuid
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from fake_s3 import FakeS3
 from native_backup import CONFIG_FORMAT, NativeBackupSession
-from worker_inventory import FORMAT, collect, components_for_capture, validate_report, verify_stage
+from worker_inventory import FORMAT, collect, components_for_capture, validate_report, verify_stage, verify_maintenance_locks
 from stash_archive.host_boundary import HostFilesystemCapture
 from stash_archive.storage import InvalidArchive, json_bytes
 from stash_ingest.outbox import Outbox
+from stash_ingest.dedupe import Journal, private_directory
+from stash_ingest.dedupe_host import FORMAT as DEDUPE_FORMAT
 
 
 class WorkerInventoryTests(unittest.TestCase):
@@ -69,6 +73,91 @@ class WorkerInventoryTests(unittest.TestCase):
     def save(self, workers=None):
         self.profile.write_bytes(json_bytes(self.document))
         self.inventory.write_bytes(json_bytes({'format': FORMAT, 'version': 1, 'workers': workers or [self.spec]}))
+
+    def dedupe_runtime(self, *, defer_intent=False):
+        state, _ = private_directory(self.root / 'dedupe-state')
+        journal = Journal.create(state, {'root_uuid': self.document['root']['uuid']},
+                                 [{'keep_path': 'old.mp4', 'remove_path': 'new.mp4'}])
+        key, pair = next(iter(journal.records.items()))
+        preview = {**pair, 'eligible': True, 'signature': 'a' * 64,
+            'root_revision': 1, 'media_uuid': str(uuid.uuid4()), 'kept_file_uuid': str(uuid.uuid4()),
+            'removed_file_uuid': str(uuid.uuid4()), 'bytes': 123, 'source_matches': 0, 'replace_primary': False}
+        self.dedupe_intent = key, preview
+        if not defer_intent:
+            journal.save_intent(key, preview)
+        self.key = self.root / 'application-key'
+        self.key.write_text(self.secret)
+        self.key.chmod(0o600)
+        self.dedupe_config = self.root / 'dedupe.json'
+        self.dedupe_value = {'format': DEDUPE_FORMAT, 'endpoint': 'https://stash.example',
+            'root_uuid': self.document['root']['uuid'], 'root': str(self.root / 'media'),
+            'state_dir': str(state), 'library_lock': str(self.root / 'backup.lock'),
+            'lock_roots': [str(self.root / 'locks')], 'api_key_file': str(self.key),
+            'fclones': '/usr/bin/fclones', 'stamp_file': str(self.root / 'stamp')}
+        self.dedupe_config.write_bytes(json_bytes(self.dedupe_value))
+        value = json.loads(self.inventory.read_text())
+        value['maintenance'] = [{'kind': 'file_deduplication', 'config': str(self.dedupe_config)}]
+        self.inventory.write_bytes(json_bytes(value))
+        return journal
+
+    def test_dedupe_database_config_and_key_are_inventoried_without_receipt_file_fanout(self):
+        journal = self.dedupe_runtime()
+        report = collect(str(self.inventory))
+        self.assertEqual(3, report['version'])
+        self.assertEqual([self.dedupe_value['library_lock']], report['maintenance_locks'])
+        paths = {item['path']: item['role'] for item in report['components']}
+        self.assertEqual('operating_database', paths[str(journal.path)])
+        self.assertEqual('config', paths[str(self.dedupe_config)])
+        self.assertEqual('config', paths[str(self.key)])
+        self.assertNotIn(self.secret, json.dumps(report))
+        self.assertNotIn(str(journal.path), report['read_checksums'], 'SQLite must use its committed snapshot, not raw WAL-file hashing')
+        self.dedupe_value['lock_roots'].append(str(self.root / 'other-locks'))
+        self.dedupe_config.write_bytes(json_bytes(self.dedupe_value))
+        with self.assertRaisesRegex(InvalidArchive, 'complete worker publication boundary'):
+            collect(str(self.inventory))
+
+    def test_dedupe_capture_requires_the_actual_held_backup_descriptor(self):
+        self.dedupe_runtime()
+        report = collect(str(self.inventory))
+        lock = os.open(self.dedupe_value['library_lock'], os.O_CREAT | os.O_RDWR, 0o600)
+        second = os.open(self.dedupe_value['library_lock'], os.O_RDWR)
+        wrong = os.open(self.root / 'wrong.lock', os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            with self.assertRaises(InvalidArchive):
+                verify_maintenance_locks(report, None)
+            with self.assertRaises(InvalidArchive):
+                verify_maintenance_locks(report, lock)
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            verify_maintenance_locks(report, lock)
+            with self.assertRaises(InvalidArchive):
+                verify_maintenance_locks(report, second)
+            fcntl.flock(wrong, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with self.assertRaisesRegex(InvalidArchive, 'different exclusion files'):
+                verify_maintenance_locks(report, wrong)
+        finally:
+            for fd in (wrong, second, lock):
+                os.close(fd)
+
+    def test_dedupe_state_snapshots_committed_wal_and_reopens_its_pending_run(self):
+        from stash_archive.bundle import snapshot_database
+        journal = self.dedupe_runtime(defer_intent=True)
+        report = collect(str(self.inventory))
+        component, = [item for item in report['components'] if item['role'] == 'operating_database']
+        restored, _ = private_directory(self.root / 'restored-dedupe')
+        target = restored / 'dedupe.sqlite3'
+        with closing(sqlite3.connect(journal.path)) as live:
+            live.execute('PRAGMA journal_mode=WAL').fetchone()
+            live.execute('PRAGMA wal_autocheckpoint=0')
+            live.execute('BEGIN')
+            live.execute('SELECT count(*) FROM operations').fetchone()
+            journal.save_intent(*self.dedupe_intent)
+            self.assertGreater(Path(str(journal.path) + '-wal').stat().st_size, 0)
+            metadata = snapshot_database(Path(component['path']), target, component['role'], 0)
+        self.assertEqual(1, metadata['user_version'])
+        recovered = Journal(restored, journal.config)
+        self.assertEqual(journal.run_uuid, recovered.run_uuid)
+        self.assertEqual(journal.records, recovered.records)
+        self.assertEqual(journal.intents, recovered.intents)
 
     def source_runtime(self):
         self.source_state = self.root / 'source-operations'

@@ -1,3 +1,4 @@
+from contextlib import closing
 import copy
 import json
 from pathlib import Path
@@ -63,7 +64,7 @@ class CatalogMediaTests(unittest.TestCase):
     def fixture(self, root):
         source = root / "catalog.sqlite"
         catalog_fixture(source)
-        with sqlite3.connect(source) as db:
+        with closing(sqlite3.connect(source)) as db, db:
             for i in range(2):
                 asset, path = f"path:{i}", f"file{i}.mp4"
                 db.execute("INSERT INTO assets(asset_id,created_at) VALUES(?,?)", (asset, CAPTURED))

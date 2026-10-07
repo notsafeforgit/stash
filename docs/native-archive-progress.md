@@ -85,14 +85,16 @@ checks, with zero lint issues. The populated checkpoint/active restore is still
 schema 1000094. The native `stash-dedupe` caller now saves immutable requests,
 recovers committed deletions, previews pairs sequentially and holds backup and
 worker publication locks. Its real HTTP test spans a lost response and a server
-and client restart. Installation, scan/sidecar cleanup handoff, a populated
-schema-95 migration check, image publication and activation remain outstanding.
+and client restart. Host service/pre-backup replacements are staged, including
+completion cooldown handling and coordinated backup of the compact SQLite
+journal. Live installation, scan/sidecar cleanup handoff, a populated schema-95
+migration check, image publication and activation remain outstanding.
 
 Remaining release work:
 
 | Work | Required outcome |
 | --- | --- |
-| Callers and compatibility | Install the tested native dedupe caller with service/pre-backup exit handling, timestamp and state-backup coverage; finish sidecar cleanup, direct-scan/manual-helper handoff and real producer provisioning, verify live launch paths and retained external contracts, then remove residual legacy adapters and dependencies. |
+| Callers and compatibility | Activate the staged dedupe service/pre-backup replacement and verified state inventory with native cutover; finish sidecar cleanup, direct-scan/manual-helper handoff and real producer provisioning, verify live launch paths and retained external contracts, then remove residual legacy adapters and dependencies. |
 | Backup and restore | Prove a complete common capture boundary, actual upload/request/storage costs, bounded retention/reclamation, and an isolated empty/relocated restore with pending producer and filesystem state. |
 | Production cutover | Pin artifacts, quiesce writers, take final coordinated snapshots, migrate/reconcile, switch native launchers and resume work gradually through verified launch paths. |
 | Observation and retirement | Verify scheduled scraping/recovery/backup cycles, preserve the rollback/export boundary, and retire obsolete catalog writers, mounts, services and packages. |
@@ -11404,3 +11406,49 @@ service exit/timestamp handling, and the separate orphan-sidecar/direct-scan
 handoff. Legacy catalogs cannot be retired on the strength of this client test.
 The full populated restore continues with its original schema-94 binary and
 checkpoint; whole-media reconciliation remains suspended until that run finishes.
+
+## Compact dedupe state, host scheduling and backup coverage — 2026-10-07
+
+The not-yet-installed native dedupe client now uses one private SQLite journal
+instead of a manifest/request/result file tree. It retains exact manifests,
+intents, results and run summaries, with atomic completion and one active run.
+This keeps a large candidate batch within the backup component limit and avoids
+generating thousands of tiny operating-state files. Foreign or earlier
+development-only journals are refused rather than silently replaced.
+
+`stash-dedupe-host` supplies explicit runtime configuration, private key-file
+authentication, the existing 24-hour cooldown and pre-backup bypass. Pending
+requests resume despite a recent completion stamp. Busy locks skip without a
+new stamp; uncertainty/failure preserves the prior timestamp. Completed review
+cases remain explicit while permitting the backup to continue. The key is read
+for API requests rather than copied into the candidate finder's environment.
+
+The version-3 worker inventory can declare this maintenance runtime. It requires
+an inventoried media root and the complete worker publication boundary, captures
+the configuration and key file, and snapshots `dedupe.sqlite3` as an
+`operating_database`. The inherited backup descriptor must itself own an
+exclusive flock on the configured library lock. A second descriptor observing
+another process's lock is rejected. Restore testing retained a pending request
+committed only in an open WAL, then reopened it with its original identity.
+
+All 604 producer tests and 293 backup tests passed. The actual Go/Python API
+restart test now uses the host launcher and private key file; it verifies the
+lost-response recovery and completion timestamp. Four older fixture connections
+were also closed explicitly while preserving their transaction commits: their
+deferred ResourceWarnings had been contaminating another CLI test's captured
+stderr. The warning was fixed at the allocation source rather than suppressed.
+
+The concrete host service, pre-backup and manual wrapper replacements are staged
+under `.local/native-host-maintenance-20261007/installation`. Shell parsing and
+host systemd verification passed. The staged dependency rehearsal resolved all
+30 worker profiles, 62 components, their shared publication directory and the
+existing backup lock. It used an empty isolated dedupe journal and a fixture key;
+no real dedupe request or production change occurred. The live journal/key,
+installed package refresh and final inventory are activation steps, and the
+direct-file scan handoff must precede removing the old post-dedupe trigger.
+
+The full populated rehearsal sealed its 238,693-artifact archive and progressed
+to the relocated restore. Its original Python process was verified alive with
+archive/restore descriptors; the restored library file is 21,901,381,632 bytes.
+There is still no final passing restore/replay receipt. The compatible service
+remains active, and root free space remains above 79 GiB.

@@ -2,11 +2,12 @@
 
 import argparse
 from collections import Counter
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 import fcntl
 import json
 import os
 from pathlib import Path
+import sqlite3
 import stat
 import sys
 import tempfile
@@ -22,23 +23,52 @@ from .encoding import InvalidData, decode, digest, encode, identifier, utc_now
 from .publication_lock import PublicationBarrier
 
 FORMAT = "stash-file-deduplication-v1"
+JOURNAL_NAME = "dedupe.sqlite3"
+APPLICATION_ID = 0x53444450
 
 
-def write_once(path, value, limit=2 * LIMIT):
-    """Publish complete private bytes without replacing an existing intent."""
-    body = encode(value, limit)
-    fd, temporary = tempfile.mkstemp(prefix=".pending-", dir=path.parent)
-    try:
-        with os.fdopen(fd, "wb") as output:
-            output.write(body)
-            output.flush()
-            os.fsync(output.fileno())
-        os.link(temporary, path)
-        sync_directory(path.parent)
-    finally:
-        os.unlink(temporary)
-    return digest(body)
-
+@contextmanager
+def journal_database(directory, *, create=False):
+    path = Path(directory) / JOURNAL_NAME
+    # No real client used the earlier development-only JSON format. Refuse it
+    # rather than silently abandoning an uncertain request from that version.
+    if (Path(directory) / "active.json").exists() or (Path(directory) / "active.json").is_symlink():
+        raise InvalidData("Recover the earlier development dedupe journal before using this client")
+    if not path.exists() and not path.is_symlink() and create:
+        fd, temporary = tempfile.mkstemp(prefix=".dedupe-create-", dir=directory)
+        os.close(fd)
+        try:
+            with closing(sqlite3.connect(temporary)) as db:
+                db.executescript(f"""
+                    PRAGMA synchronous=FULL;
+                    BEGIN IMMEDIATE;
+                    PRAGMA application_id={APPLICATION_ID};
+                    PRAGMA user_version=1;
+                    CREATE TABLE runs(uuid TEXT PRIMARY KEY, manifest BLOB NOT NULL,
+                        sha256 TEXT NOT NULL, summary BLOB);
+                    CREATE UNIQUE INDEX one_active_run ON runs((1)) WHERE summary IS NULL;
+                    CREATE TABLE operations(run_uuid TEXT NOT NULL REFERENCES runs(uuid),
+                        uuid TEXT NOT NULL, intent BLOB, result BLOB,
+                        PRIMARY KEY(run_uuid, uuid), CHECK(intent IS NOT NULL OR result IS NOT NULL));
+                    COMMIT;
+                """)
+            os.link(temporary, path)
+            sync_directory(Path(directory))
+        finally:
+            os.unlink(temporary)
+    info = path.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        raise InvalidData("Dedupe database must be a private, owned regular file")
+    with closing(sqlite3.connect(path.as_uri() + "?mode=rw", uri=True, timeout=5)) as db:
+        db.execute("PRAGMA trusted_schema=OFF")
+        db.execute("PRAGMA foreign_keys=ON")
+        db.execute("PRAGMA synchronous=FULL")
+        if (db.execute("PRAGMA application_id").fetchone()[0] != APPLICATION_ID
+                or db.execute("PRAGMA user_version").fetchone()[0] != 1):
+            raise InvalidData("Unsupported dedupe database")
+        with db:
+            db.execute("BEGIN IMMEDIATE")
+            yield db
 
 def private_directory(path):
     path = Path(path).absolute()
@@ -78,15 +108,22 @@ class Journal:
     def __init__(self, directory, config):
         self.directory = directory
         self.config = config
-        active = decode(read_regular(directory / "active.json", LIMIT), LIMIT)
-        if not isinstance(active, dict) or set(active) != {"run_uuid", "sha256"}:
-            raise InvalidData("Invalid active dedupe reference")
-        self.run_uuid = identifier(active["run_uuid"])
-        self.path = directory / self.run_uuid
-        if self.path.resolve(strict=True) != self.path:
-            raise InvalidData("Dedupe run cannot be a symlink")
-        body = read_regular(self.path / "manifest.json", MAX_REPORT_BYTES)
-        if digest(body) != active["sha256"]:
+        self.path = directory / JOURNAL_NAME
+        with journal_database(directory) as db:
+            active = db.execute("SELECT uuid,sha256,length(manifest) FROM runs WHERE summary IS NULL").fetchone()
+            if active is None:
+                raise InvalidData("No pending dedupe run")
+            self.run_uuid = identifier(active[0])
+            if active[2] > MAX_REPORT_BYTES:
+                raise InvalidData("Dedupe manifest exceeds its size limit")
+            body = db.execute("SELECT manifest FROM runs WHERE uuid=?", (self.run_uuid,)).fetchone()[0]
+            rows = db.execute("SELECT uuid,length(intent),length(result) FROM operations WHERE run_uuid=? LIMIT ?",
+                              (self.run_uuid, MAX_PAIRS + 1)).fetchall()
+            if len(rows) > MAX_PAIRS or any(any(n is not None and n > 2 * LIMIT for n in row[1:]) for row in rows):
+                raise InvalidData("Dedupe operations exceed their bounds")
+            saved = {row[0]: row[1:] for row in db.execute(
+                "SELECT uuid,intent,result FROM operations WHERE run_uuid=?", (self.run_uuid,))}
+        if digest(body) != active[1]:
             raise InvalidData("Dedupe manifest changed")
         manifest = decode(body, MAX_REPORT_BYTES)
         if (not isinstance(manifest, dict) or manifest.get("format") != FORMAT
@@ -111,7 +148,7 @@ class Journal:
             removed.add(pair["remove_path"])
             keepers.add(pair["keep_path"])
             self.records[key] = pair
-            intent = self.load(key, "request")
+            intent = decode(saved[key][0], 2 * LIMIT) if key in saved and saved[key][0] is not None else None
             if intent is not None:
                 if not isinstance(intent, dict) or set(intent) != {"preview", "request"}:
                     raise InvalidData("Invalid saved dedupe intent")
@@ -121,36 +158,51 @@ class Journal:
                         or request["request_uuid"] != key):
                     raise InvalidData("Saved dedupe intent changed its preview")
                 self.intents[key] = intent
-            result = self.load(key, "result")
+            result = decode(saved[key][1], 2 * LIMIT) if key in saved and saved[key][1] is not None else None
             if result is not None:
                 self.validate_result(key, result)
                 self.results[key] = result
+        if saved.keys() - self.records.keys():
+            raise InvalidData("Dedupe operation is absent from its manifest")
         if removed & keepers:
             raise InvalidData("Dedupe plan removes a selected survivor")
 
     @classmethod
+    def has_active(cls, directory):
+        try:
+            with journal_database(directory) as db:
+                return db.execute("SELECT 1 FROM runs WHERE summary IS NULL").fetchone() is not None
+        except FileNotFoundError:
+            return False
+
+    @classmethod
     def create(cls, directory, config, pairs):
-        if (directory / "active.json").exists() or (directory / "active.json").is_symlink():
-            raise InvalidData("An existing dedupe run must be recovered first")
         if len(pairs) > MAX_PAIRS:
             raise InvalidData("Dedupe pair limit exceeded")
         run = str(uuid.uuid4())
-        path = directory / run
-        path.mkdir(mode=0o700)
         manifest = {"format": FORMAT, "run_uuid": run, "config": config, "created_at": utc_now(),
                     "pairs": [{"uuid": str(uuid.uuid4()), "pair": validate_pair({"root_uuid": config["root_uuid"], **pair})}
                               for pair in pairs]}
-        checksum = write_once(path / "manifest.json", manifest, MAX_REPORT_BYTES)
-        sync_directory(directory)
-        write_once(directory / "active.json", {"run_uuid": run, "sha256": checksum})
+        body = encode(manifest, MAX_REPORT_BYTES)
+        with journal_database(directory, create=True) as db:
+            if db.execute("SELECT 1 FROM runs WHERE summary IS NULL").fetchone() is not None:
+                raise InvalidData("An existing dedupe run must be recovered first")
+            db.execute("INSERT INTO runs(uuid,manifest,sha256) VALUES(?,?,?)", (run, body, digest(body)))
         return cls(directory, config)
 
     def load(self, key, kind):
-        try:
-            body = read_regular(self.path / (key + "." + kind + ".json"), 2 * LIMIT)
-        except FileNotFoundError:
-            return None
-        return decode(body, 2 * LIMIT)
+        if kind not in ("request", "result"):
+            raise InvalidData("Invalid dedupe record kind")
+        column = "intent" if kind == "request" else "result"
+        with journal_database(self.directory) as db:
+            row = db.execute("SELECT " + column + " FROM operations WHERE run_uuid=? AND uuid=?",
+                             (self.run_uuid, key)).fetchone()
+        return decode(row[0], 2 * LIMIT) if row and row[0] is not None else None
+
+    def guard(self, db):
+        row = db.execute("SELECT summary FROM runs WHERE uuid=?", (self.run_uuid,)).fetchone()
+        if row is None or row[0] is not None:
+            raise InvalidData("Dedupe run is no longer active")
 
     def validate_result(self, key, result):
         if not isinstance(result, dict):
@@ -171,12 +223,23 @@ class Journal:
         if not preview["eligible"]:
             raise InvalidData("Cannot submit an ineligible dedupe preview")
         intent = {"preview": preview, "request": {**pair, "request_uuid": key, "signature": preview["signature"]}}
-        write_once(self.path / (key + ".request.json"), intent)
+        with journal_database(self.directory) as db:
+            self.guard(db)
+            if db.execute("SELECT 1 FROM operations WHERE run_uuid=? AND uuid=?", (self.run_uuid, key)).fetchone():
+                raise InvalidData("Dedupe intent already exists")
+            db.execute("INSERT INTO operations(run_uuid,uuid,intent) VALUES(?,?,?)",
+                       (self.run_uuid, key, encode(intent, 2 * LIMIT)))
         self.intents[key] = intent
 
     def save_result(self, key, result):
         self.validate_result(key, result)
-        write_once(self.path / (key + ".result.json"), result)
+        with journal_database(self.directory) as db:
+            self.guard(db)
+            cursor = db.execute("""INSERT INTO operations(run_uuid,uuid,result) VALUES(?,?,?)
+                ON CONFLICT(run_uuid,uuid) DO UPDATE SET result=excluded.result WHERE operations.result IS NULL""",
+                (self.run_uuid, key, encode(result, 2 * LIMIT)))
+            if cursor.rowcount != 1:
+                raise InvalidData("Dedupe result already exists")
         self.results[key] = result
 
     def report(self):
@@ -191,14 +254,13 @@ class Journal:
         report = self.report()
         if not report["finished"]:
             raise InvalidData("Cannot finish dedupe with unresolved requests")
-        summary = self.path / "summary.json"
-        if summary.exists():
-            if decode(read_regular(summary, LIMIT), LIMIT) != report:
-                raise InvalidData("Dedupe summary differs from its receipts")
-        else:
-            write_once(summary, report)
-        (self.directory / "active.json").unlink()
-        sync_directory(self.directory)
+        with journal_database(self.directory) as db:
+            self.guard(db)
+            count = db.execute("SELECT count(*) FROM operations WHERE run_uuid=? AND result IS NOT NULL",
+                               (self.run_uuid,)).fetchone()[0]
+            if count != len(self.records):
+                raise InvalidData("Dedupe result persistence is incomplete")
+            db.execute("UPDATE runs SET summary=? WHERE uuid=?", (encode(report, LIMIT), self.run_uuid))
         return report
 
 
@@ -246,7 +308,8 @@ def apply_saved(client, journal, check=lambda: None):
 
 
 def run(args):
-    client = DeduplicationClient(args.endpoint, args.key_env, timeout=args.request_timeout)
+    client = DeduplicationClient(args.endpoint, args.key_env, timeout=args.request_timeout,
+                                 key_file=getattr(args, "key_file", None))
     state, state_identity = private_directory(args.state_dir)
     root = directory_identity(args.root)
     roots = sorted({str(Path(p).absolute()) for p in args.lock_root})
@@ -266,7 +329,7 @@ def run(args):
                     barrier.check()
 
                 check()
-                if (state / "active.json").exists() or (state / "active.json").is_symlink():
+                if Journal.has_active(state):
                     journal = Journal(state, config)
                 else:
                     if args.report:
@@ -285,6 +348,7 @@ def main(argv=None):
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--lock-root", action="append", required=True, help="Every inventoried native worker lock root")
     parser.add_argument("--key-env", default="STASH_API_KEY")
+    parser.add_argument("--key-file", help="Private application key file; overrides the key environment variable")
     parser.add_argument("--fclones", default="/home/andrew/.cargo/bin/fclones")
     parser.add_argument("--report", help="Use a saved fclones JSON report instead of running discovery")
     parser.add_argument("--all-content", action="store_true")
@@ -301,8 +365,8 @@ def main(argv=None):
     except (InvalidData, Unavailable) as error:
         print(str(error), file=sys.stderr)
         return 1
-    except OSError:
-        print("Dedupe filesystem operation failed; saved requests retained for recovery", file=sys.stderr)
+    except (OSError, sqlite3.Error):
+        print("Dedupe state or filesystem operation failed; saved requests retained for recovery", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
         return 130

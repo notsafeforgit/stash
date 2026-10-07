@@ -121,7 +121,10 @@ through receipt recovery and removal, rechecking directory/mount and lock-file
 identities before operations. These cooperative barriers do not stop legacy
 downloaders; activate this caller with the native worker handoff.
 
-Each run retains a private manifest and immutable per-pair intents/results.
+The private `dedupe.sqlite3` journal retains each run's manifest and immutable
+per-pair intents/results without creating a file for every request or receipt.
+SQLite transactions persist requests before submission and atomically record
+completion; a partial journal write cannot publish a new active run.
 The manifest fixes the endpoint, root identity, scope and lock roots. Every
 request is durably saved before Apply. On restart, the same invocation resumes
 the saved run before starting any new discovery, including when a successful
@@ -133,7 +136,7 @@ Pairs are previewed sequentially: a preceding primary-file change can advance
 the media owner's revision. Known stale/unequal-byte rejections and ineligible
 owners become retained review outcomes; they are not counted as removals.
 An active run is retired only after every pair has either a validated committed
-receipt or a known review outcome. The saved run directory remains available
+receipt or a known review outcome. Completed runs remain in the same journal
 for inspection and backup; do not discard pending state or change its configured
 endpoint/root to bypass a failed recovery. A later completed invocation can
 discover and review current candidates again.
@@ -144,12 +147,68 @@ processing with review cases, 2 for a busy state/library lock, and 1 for failure
 or uncertainty. `--request-timeout` defaults to 900 seconds; a timeout retains
 the original intent. `--report` accepts a bounded saved fclones JSON report for
 fixture/reviewed operation, with the same path checks and server byte proof.
+`--key-file` can supply a private application key file instead of `STASH_API_KEY`.
+The file must be owned by the invoking user with no group/other access; the key
+is read directly for requests and is not exported into fclones' environment.
+
+## Scheduled and pre-backup launcher
+
+`stash-dedupe-host --config /private/dedupe.json` uses this explicit configuration:
+
+```json
+{
+  "format": "stash-host-dedupe-v1",
+  "endpoint": "http://localhost:8009",
+  "root_uuid": "REVIEWED_ROOT_UUID",
+  "root": "/tank/media/porn",
+  "state_dir": "/private/native-dedupe",
+  "library_lock": "/tank/media/backup_ledgers/.backup_run.lock",
+  "lock_roots": ["/inventoried/worker-locks"],
+  "api_key_file": "/private/stash-application-key",
+  "fclones": "/home/andrew/.cargo/bin/fclones",
+  "stamp_file": "/run/user/1000/dedupe-last-run"
+}
+```
+
+The scheduled launcher applies the existing 24-hour completion cooldown. A
+pending run always resumes despite a recent timestamp. `--before-backup` skips
+the cooldown to discover files added since the preceding maintenance pass.
+Both modes retain state/library/publication exclusion; busy state or library
+locks skip without updating the timestamp. Completed review cases remain
+explicit in JSON and permit the backup to continue. Failed/uncertain work exits
+1 and does not advance the timestamp. This host wrapper returns 0 for a
+completed maintenance pass or a documented skip; the underlying diagnostic CLI
+retains its separate review/busy exit codes.
+
+The packaged `systemd/stash-native-dedupe.service` and `dedupe.env.example` use
+the installed producer runtime. The staged host replacement keeps the existing
+half-hour timer and daily cooldown, and the pre-backup wrapper invokes
+`stash-dedupe-host --before-backup` before backup takes the shared library lock.
+It has no catalog writer or global cleanup operation. Complete direct-file
+scan scheduling before dropping the old post-dedupe scan trigger.
+
+Declare this runtime under the worker inventory's top-level `maintenance` list:
+
+```json
+{"kind": "file_deduplication", "config": "/private/dedupe.json"}
+```
+
+The resolver requires the same root as an inventoried download worker and the
+complete set of worker publication locks. It includes the runtime configuration
+and private application-key file, and captures `dedupe.sqlite3` as an
+`operating_database` through SQLite backup, including committed WAL state.
+Initialize the private journal before enabling the first native backup. The
+resolved version-3 inventory records the library lock; capture verifies the
+inherited descriptor owns that exact exclusive flock. A different descriptor
+or a lock held by another process cannot establish the backup boundary.
+Restore this journal alongside the matching native database/media snapshot
+before restarting maintenance; do not copy a live database without its WAL.
 
 The client does not perform the old orphan-NFO/text cleanup. Retained sidecars
 need their verified native import and cleanup boundary, and direct/manual scan
-intake must remain available. Installation must also inventory this client state
-for coordinated backup, update the pre-backup launcher/service exit handling and
-rate-limit timestamp, and finish the post-dedupe scan handoff.
+intake must remain available. Installed production launchers have not switched;
+the final cutover must install the staged service/wrappers and maintenance
+inventory together with the native server and workers.
 
 Tests cover scenes and images, primary replacement, unchanged selected values,
 retained original/derived source matches, restart replay, changed bytes with

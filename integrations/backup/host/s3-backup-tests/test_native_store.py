@@ -3,7 +3,7 @@
 from contextlib import closing
 import base64
 import copy
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 import fcntl
 import hashlib
 import io
@@ -25,6 +25,7 @@ from fake_s3 import FakeS3, S3Error
 from native_backup import CONFIG_FORMAT, NativeBackupSession, NativeRunJournal, OwnedWorkspace, copy_ledger
 from native_store import MEDIA_FORMAT, NativeStore, PREFIX, selection_digest, media_selection
 from native_history import record_publication, publication_key
+from stash_archive.artwork_pins import ArtworkPins
 from stash_archive.bundle import FORMAT, export_archive, import_archive, iter_artifacts
 from stash_archive.checkpoint_abandon import FORMAT as ABANDON_FORMAT
 from stash_archive.filesystem_boundary import FORMAT as BOUNDARY_FORMAT
@@ -370,6 +371,64 @@ class NativeStoreTests(unittest.TestCase):
         with self.assertRaises(InvalidArchive):
             session.publish(changed, [])
         self.assertEqual(len(self.s3.operations), count)
+
+    def test_separate_artwork_filesystem_retains_inodes_while_bulk_state_uses_another_disk(self):
+        other_disk = Path('/dev/shm')
+        if not other_disk.is_dir() or other_disk.stat().st_dev == self.root.stat().st_dev:
+            self.skipTest('requires a second writable filesystem')
+        bulk = tempfile.TemporaryDirectory(dir=other_disk)
+        self.addCleanup(bulk.cleanup)
+        live, originals = self.root / 'live', self.root / 'originals'
+        live.mkdir()
+        original_body = b'original photo retained across replacement'
+        checksum = hashlib.md5(original_body, usedforsecurity=False).hexdigest()
+        original = originals / checksum[:2] / checksum[2:4] / checksum
+        original.parent.mkdir(parents=True)
+        original.write_bytes(original_body)
+        original_inode = original.stat().st_ino
+        key = self.root / 'key'
+        key.write_text('fixture-key\n')
+        config = {'format': CONFIG_FORMAT, 'version': 1, 'server': 'https://stash.example',
+                  'api_key_file': str(key), 'state_directory': str(Path(bulk.name) / 'state'),
+                  'artwork_pin_directory': str(self.root / 'pins'),
+                  'artwork_sources': [str(originals)], 'components': [], 'worker_lock_roots': [],
+                  'media': {'dataset': 'pool/library', 'guid': '123', 'mountpoint': str(self.root), 'relative_path': 'live'},
+                  'producer_origin': 'https://stash.example', 'native_validator': sys.executable,
+                  'recovery_roots': [], 'reserve_bytes': 0}
+        path = self.root / 'host.json'
+        path.write_bytes(json_bytes(config))
+        view = Mock()
+        view.root = live
+        view.resolve.return_value = live
+        view.verify.return_value = view
+        host = Mock()
+        host.__enter__ = Mock(return_value=host)
+        host.__exit__ = Mock(return_value=False)
+        host.client.return_value.boundary_receipt = self.boundary
+        with patch('native_backup.ZFSMedia') as media, patch('native_backup.HostFilesystemCapture', return_value=host):
+            media.return_value.open_bound.return_value = view
+            session = NativeBackupSession(path, 'fixture', live, 'metadata', '', self.s3)
+        self.assertNotEqual(session.root.stat().st_dev, session.pins.cache.stat().st_dev)
+        self.assertEqual(session.pins.cache.stat().st_dev, original.stat().st_dev)
+        self.assertFalse((Path(config['state_directory']) / 'artwork').exists())
+        ready = {'uuid': session.journal.record['checkpoint_uuid'], 'token': str(uuid.uuid4()),
+                 'request_sha256': 'f' * 64, 'expires_at': (datetime.now(timezone.utc) + timedelta(minutes=1)).isoformat()}
+        retained = session.pins.capture(ready)
+        boundary = {**ready, 'details': {'artwork': retained}}
+        original.unlink()
+        original.write_bytes(b'new photo')
+        reopened = ArtworkPins(config['artwork_pin_directory'], config['artwork_sources'], reserve=0)
+        pinned = reopened.open_bound(boundary).verify().resolve(checksum)
+        self.assertEqual(pinned.stat().st_ino, original_inode)
+        self.assertEqual(pinned.read_bytes(), original_body)
+        self.assertEqual(original.read_bytes(), b'new photo')
+        self.assertEqual(self.s3.operations, [])
+        # An unfinished run cannot switch pin roots and lose its sealed inodes.
+        path.write_bytes(json_bytes(dict(config, artwork_pin_directory=str(self.root / 'different-pins'))))
+        with self.assertRaises(InvalidArchive):
+            NativeBackupSession(path, 'later', live, 'metadata', '', self.s3)
+        self.assertEqual(pinned.read_bytes(), original_body)
+        self.assertFalse((self.root / 'different-pins').exists())
 
     def test_release_reclaims_only_run_objects_after_verified_master(self):
         reference = self.publish()

@@ -11640,3 +11640,29 @@ last-written completion receipt. All 121 archive tests and 26 native backup-stor
 tests pass with that change. The already-running restore continues with its
 original runtime. Its final receipt, populated schema-95 migration, media
 reconciliation, publication/cost proof and production cutover are still pending.
+
+## Separate artwork pins from bulk backup staging — 2026-10-07
+
+The production mount audit found original artwork on the system filesystem while
+the larger backup work can use `/tank`. The host backup configuration now accepts
+`artwork_pin_directory` independently of `state_directory`. The former retains
+hard links on the original artwork filesystem; database/component snapshots,
+packed archives and restore scratch remain in the latter. Both retain the
+configured free-space reserve. The complete configuration still binds every
+unfinished run, so moving its pins cannot silently detach existing recovery state.
+
+All 295 host backup tests pass. A real two-filesystem test keeps bulk state on a
+different device, replaces an original artwork path, reopens its retained pin and
+verifies the original inode/bytes. It also rejects changing the pin location on
+retry. Deployment must place native server checkpoints on the spacious staging
+filesystem as well; this setting does not move the server's own backup directory.
+No live storage paths or backup schedules were changed.
+
+The original populated rehearsal reached its enclosing eight-hour Go test
+deadline while independently hashing restored artwork. The original Python child
+remains alive and continues from the same sealed checkpoint. The export/import
+has not been restarted. A separately compiled continuation uses frozen schema-94
+code and refuses to run before that child succeeds and both original processes
+are gone; it covers the remaining deletion-journal recovery and producer replay.
+The timeout is retained as a failed harness result. Full restore success remains
+unproven until the original child's receipt and those remaining checks pass.

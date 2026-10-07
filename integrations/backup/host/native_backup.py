@@ -248,10 +248,14 @@ class NativeBackupSession:
         config = decode_json(body)
         required = {"format", "version", "server", "api_key_file", "state_directory", "artwork_sources", "media",
                     "worker_lock_roots", "components", "recovery_roots", "producer_origin", "native_validator"}
-        optional = {"reserve_bytes", "boundary_timeout", "validator_timeout", "zfs_command", "worker_inventory", "retention", "standard_cleanup"}
+        optional = {"reserve_bytes", "boundary_timeout", "validator_timeout", "zfs_command", "worker_inventory", "retention", "standard_cleanup", "artwork_pin_directory"}
         if (not isinstance(config, dict) or not required <= config.keys() or config.keys() - required - optional
                 or config["format"] != CONFIG_FORMAT or type(config["version"]) is not int or config["version"] != 1):
             raise InvalidArchive("Invalid native host backup configuration")
+        pins_path = config.get("artwork_pin_directory")
+        if "artwork_pin_directory" in config and (not isinstance(pins_path, str)
+                or not Path(pins_path).is_absolute() or ".." in Path(pins_path).parts):
+            raise InvalidArchive("Artwork pin directory must be an explicit absolute path")
         media = config["media"]
         if not isinstance(media, dict) or set(media) != {"dataset", "guid", "mountpoint", "relative_path"}:
             raise InvalidArchive("Native backup requires an explicit media dataset binding")
@@ -296,7 +300,8 @@ class NativeBackupSession:
             self.generated = self.read_generated()
             if (self.root / "released.json").exists():
                 return
-        pins_cache, media_cache, component_cache = [private_directory(state / name) for name in ("artwork", "media", "components")]
+        pins_cache = private_directory(pins_path if pins_path is not None else state / "artwork")
+        media_cache, component_cache = [private_directory(state / name) for name in ("media", "components")]
         self.pins = ArtworkPins(pins_cache, config["artwork_sources"], reserve=self.reserve)
         self.media = ZFSMedia(media_cache, media["dataset"], media["guid"], media["mountpoint"],
                              command=config.get("zfs_command", ["/usr/sbin/zfs"]), reserve=self.reserve, lock_fd=lock_fd)

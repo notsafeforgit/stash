@@ -386,7 +386,8 @@ Non-dry publication requires `--native-config /private/host-backup.json` or
 | --- | --- |
 | `format`, `version` | `org.notsafeforgit.stash.host-backup`, `1` |
 | `server`, `api_key_file` | Native endpoint and private application key file |
-| `state_directory` | Private persistent staging directory outside disposable `run_*` workspaces; artwork pins must share the original artwork filesystem |
+| `state_directory` | Private persistent staging directory outside disposable `run_*` workspaces, with space for database/component snapshots, packed archives and restore checks |
+| `artwork_pin_directory` | Optional private absolute directory on the original artwork filesystem; defaults to `state_directory/artwork` |
 | `artwork_sources` | Complete list of original Stash blob directories |
 | `media` | Explicit `dataset`, `guid`, `mountpoint`, and media `relative_path` within that dataset |
 | `worker_lock_roots` | Every native worker publication-lock root |
@@ -406,6 +407,14 @@ some files does not prove completeness. Reconcile production components,
 including layered profile references and environment assets, against every active
 worker before installation. The daily 03:00 America/Los_Angeles schedule remains
 host-owned and unchanged.
+
+Use `artwork_pin_directory` when original artwork and bulk backup staging live on
+different filesystems. Pins retain the original inodes through hard links; they
+do not copy every photo or cover onto the staging disk. Large packs and restore
+work stay under `state_directory`, while both locations enforce the configured
+free-space reserve. Retain the pin directory until the matching checkpoint is
+released. Changing either path during an unfinished run is rejected by its
+configuration binding; resume that run with its original configuration first.
 
 Declare an external SQLite database such as n8n's `database.sqlite` with
 `{"role":"operating_database","name":"n8n.sqlite","path":"/private/n8n/database.sqlite"}`.

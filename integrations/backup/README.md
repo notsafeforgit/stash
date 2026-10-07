@@ -380,6 +380,17 @@ including layered profile references and environment assets, against every activ
 worker before installation. The daily 03:00 America/Los_Angeles schedule remains
 host-owned and unchanged.
 
+Declare an external SQLite database such as n8n's `database.sqlite` with
+`{"role":"operating_database","name":"n8n.sqlite","path":"/private/n8n/database.sqlite"}`.
+The component stage takes a WAL-aware SQLite snapshot under the worker barriers,
+retains its integrity/foreign-key checks and reuses its original bytes on retry.
+Do not copy the live database as `operating_state` or include its WAL/SHM files.
+Include n8n's encryption/configuration files and any external execution payloads
+separately. These inputs must match the restored workflow database and producer
+state before workflows resume. The native worker barriers do not stop unrelated
+n8n nodes, pruning or configuration edits; coordinate those writers for a full
+recovery boundary. An archive export never activates or resumes n8n.
+
 ### Worker dependencies
 
 `stash-s3-inventory --inventory /private/workers.json --output /private/inspection.json`

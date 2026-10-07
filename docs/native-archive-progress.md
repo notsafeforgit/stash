@@ -11070,3 +11070,28 @@ read-only; the successful rerun used the same source with cache access restored.
 
 Real producer provisioning and the complete coordinated capture/restore remain
 pending. No backup schedule, cloud policy, workflow or production writer changed.
+
+## SQLite workflow state in coordinated backups — 2026-10-07
+
+The portable archive accepts an `operating_database` component for external
+SQLite state such as n8n's execution database. It uses the existing SQLite
+snapshot and integrity checks, captures committed WAL contents after producer
+outboxes, and retains database metadata for verification during restore.
+Component-stage retries reuse the original snapshot, including after a lost
+server reply and removal of the live database. Execution-ID sequences survive
+pruning and restore, so new executions do not reuse retained caller identities.
+
+All 117 archive tests and 270 host backup tests passed after installing the
+updated isolated runtime. New cases cover WAL-backed pending executions and
+their payloads, execution-ID sequences, lost replies, changed/missing live state,
+invalid SQLite and foreign-key data, and missing or altered database metadata.
+The first focused run found an incorrect expected error message in a new test;
+the implementation correctly rejected the mismatched metadata.
+
+A read-only snapshot of the actual n8n database passed integrity and foreign-key
+checks: 1,773,125,632 bytes, 148 tables, 43 workflows and 107 retained executions.
+Its retained execution counter was 1,819,469. Capture and verification took
+9.0 seconds in the owned tank rehearsal directory. No workflow was activated.
+This checks the database capture path; it is not a coordinated production backup.
+Matching encryption/configuration files, external execution payloads, writer
+coordination and the populated full restore drill remain required.

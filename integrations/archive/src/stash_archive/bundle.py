@@ -28,8 +28,8 @@ VERSION = 1
 NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 MD5 = re.compile(r"[0-9a-f]{32}\Z")
 ROLES = {"config", "import_rules", "file_journal", "producer_outbox",
-         "download_archive", "media_manifest", "worker_profile", "operating_state"}
-SQLITE_ROLES = {"library", "producer_outbox", "download_archive"}
+         "download_archive", "media_manifest", "worker_profile", "operating_state", "operating_database"}
+SQLITE_ROLES = {"library", "producer_outbox", "download_archive", "operating_database"}
 
 
 def connect_readonly(path):
@@ -181,7 +181,7 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
         with os.fdopen(inventory_fd, "wb") as inventory, tempfile.TemporaryDirectory(prefix=".snapshot-", dir=destination) as temp:
             snapshots = {}
             retained = component_stage.databases() if component_stage is not None else {}
-            for role in ("download_archive", "producer_outbox"):
+            for role in ("download_archive", "producer_outbox", "operating_database"):
                 for index, component in enumerate(components):
                     if component["role"] == role:
                         if (role, component["name"]) in retained:

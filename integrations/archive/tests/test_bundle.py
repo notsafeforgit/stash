@@ -120,6 +120,49 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(len(a["chunks"]), 1)
         self.assertLess(summary(self.output)["compressed_bytes"], summary(self.output)["uncompressed_bytes"])
 
+    def test_operating_database_restores_wal_rows_and_execution_sequence(self):
+        source = self.root / "workflow.sqlite"
+        with contextlib.closing(sqlite3.connect(source)) as live:
+            live.executescript("""
+                PRAGMA journal_mode=WAL;
+                PRAGMA wal_autocheckpoint=0;
+                CREATE TABLE executions(id INTEGER PRIMARY KEY AUTOINCREMENT, state TEXT);
+                CREATE TABLE execution_data(id INTEGER PRIMARY KEY REFERENCES executions(id), body BLOB);
+                INSERT INTO executions VALUES(41, 'waiting');
+                INSERT INTO execution_data VALUES(41, X'00FF01');
+                INSERT INTO executions VALUES(99, 'pruned');
+                DELETE FROM executions WHERE id=99;
+            """)
+            self.assertGreater(Path(str(source) + "-wal").stat().st_size, 0)
+            manifest = export_archive(self.database, self.output, blob_paths=[self.blobs], reserve=0,
+                                      components=[{"role": "operating_database", "name": "workflow.sqlite", "path": source}])
+            live.execute("UPDATE executions SET state='completed'")
+            live.commit()
+            restored = self.root / "restored"
+            import_archive(self.output, restored, reserve=0)
+        with contextlib.closing(sqlite3.connect(restored / "components/operating_database/workflow.sqlite")) as db:
+            self.assertEqual(db.execute("SELECT * FROM executions").fetchall(), [(41, 'waiting')])
+            self.assertEqual(db.execute("SELECT * FROM execution_data").fetchall(), [(41, b'\x00\xff\x01')])
+            self.assertEqual(db.execute("INSERT INTO executions(state) VALUES('new')").lastrowid, 100)
+        entry = next(e for e in iter_artifacts(self.output, manifest) if e["role"] == "operating_database")
+        self.assertEqual(entry["sqlite"], {"application_id": 0, "user_version": 0})
+
+    def test_operating_database_requires_sqlite_metadata_and_revalidates_it_on_restore(self):
+        manifest = export_archive(self.database, self.output, blob_paths=[self.blobs], reserve=0,
+                                  components=[{"role": "operating_database", "name": "workflow.sqlite", "path": self.outbox}])
+        entries = list(iter_artifacts(self.output, manifest))
+        database = next(e for e in entries if e["role"] == "operating_database")
+        metadata = database.pop("sqlite")
+        changed = self.rewrite_inventory(manifest, entries)
+        with self.assertRaisesRegex(InvalidArchive, "SQLite component metadata"):
+            import_archive(self.output, self.root / "missing-metadata", reserve=0)
+        self.assertFalse((self.root / "missing-metadata").exists())
+        database["sqlite"] = dict(metadata, user_version=metadata["user_version"] + 1)
+        self.rewrite_inventory(changed, entries)
+        with self.assertRaisesRegex(InvalidArchive, "database identity"):
+            import_archive(self.output, self.root / "wrong-metadata", reserve=0)
+        self.assertFalse((self.root / "wrong-metadata").exists())
+
     def test_legacy_small_chunk_archives_still_restore_and_enforce_their_limit(self):
         manifest = self.export(legacy=True)
         self.assertEqual(manifest['chunk_size'], LEGACY_CHUNK_SIZE)

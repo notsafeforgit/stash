@@ -2,6 +2,7 @@ from contextlib import closing
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+from pathlib import Path
 import sqlite3
 from unittest.mock import Mock, patch
 import uuid
@@ -133,6 +134,74 @@ class ComponentStageTests(ReceiptFixture):
         with self.host() as host:
             stage = host.prepare(self.cache, self.client(host), self.components, reserve=0)
             with self.assertRaisesRegex(InvalidArchive, "HTTP 404"): stage.seal()
+        self.assertEqual(self.creates, 0)
+
+    def test_workflow_database_lost_reply_restores_original_wal_state_without_recapture(self):
+        source = self.root / "workflow.sqlite"
+        components = [*self.components, {"role": "operating_database", "name": "n8n.sqlite", "path": source}]
+        order = []
+        def snapshot(source, target, role, reserve):
+            order.append(role)
+            return snapshot_database(source, target, role, reserve)
+        with closing(sqlite3.connect(source)) as live:
+            live.executescript("""
+                PRAGMA journal_mode=WAL;
+                PRAGMA wal_autocheckpoint=0;
+                CREATE TABLE executions(id INTEGER PRIMARY KEY AUTOINCREMENT, state TEXT);
+                INSERT INTO executions VALUES(100, 'waiting');
+                INSERT INTO executions VALUES(200, 'pruned');
+                DELETE FROM executions WHERE id=200;
+            """)
+            self.assertGreater(Path(str(source) + "-wal").stat().st_size, 0)
+            with self.host() as host:
+                client = self.client(host)
+                with patch("stash_archive.component_stage.snapshot_database", side_effect=snapshot):
+                    stage = host.prepare(self.cache, client, components, reserve=0)
+                actual = client.seal
+                def lost(*, reserve):
+                    actual(reserve=reserve)
+                    raise OSError("lost workflow capture reply")
+                client.seal = lost
+                with self.assertRaisesRegex(OSError, "lost workflow capture reply"):
+                    stage.seal()
+            live.execute("UPDATE executions SET state='completed'")
+            live.execute("INSERT INTO executions(state) VALUES('later')")
+            live.commit()
+        self.assertEqual(order, ["download_archive", "producer_outbox", "operating_database"])
+        source.unlink()
+        with self.host() as host:
+            client = self.client(host)
+            with patch("stash_archive.component_stage.snapshot_database", side_effect=AssertionError("must not recapture")):
+                stage = host.prepare(self.cache, client, components, reserve=0)
+            stage.seal()
+            with patch("stash_archive.bundle.snapshot_database", side_effect=AssertionError("must pack retained snapshots")):
+                export_archive(None, self.root / "bundle", reserve=0, server_checkpoint=client,
+                               producer_origin=ORIGIN, component_stage=stage)
+        import_archive(self.root / "bundle", self.root / "restored", reserve=0)
+        with closing(sqlite3.connect(self.root / "restored/components/operating_database/n8n.sqlite")) as db:
+            self.assertEqual(db.execute("SELECT * FROM executions").fetchall(), [(100, 'waiting')])
+            self.assertEqual(db.execute("INSERT INTO executions(state) VALUES('new')").lastrowid, 201)
+        self.assertEqual(self.creates, 1)
+
+    def test_invalid_operating_database_stops_before_server_capture(self):
+        source = self.root / "invalid.sqlite"
+        components = [*self.components, {"role": "operating_database", "name": "n8n.sqlite", "path": source}]
+        source.write_bytes(b"not a database")
+        with self.host() as host:
+            with self.assertRaises(sqlite3.DatabaseError):
+                host.prepare(self.cache, self.client(host), components, reserve=0)
+        self.assertEqual(self.creates, 0)
+        source.unlink()
+        with closing(sqlite3.connect(source)) as live:
+            live.executescript("""
+                CREATE TABLE executions(id INTEGER PRIMARY KEY);
+                CREATE TABLE execution_data(id INTEGER REFERENCES executions(id));
+                INSERT INTO execution_data VALUES(1);
+            """)
+        self.request_id = str(uuid.uuid4())
+        with self.host() as host:
+            with self.assertRaisesRegex(InvalidArchive, "foreign key"):
+                host.prepare(self.cache, self.client(host), components, reserve=0)
         self.assertEqual(self.creates, 0)
 
     def test_lost_sealed_response_reuses_original_without_new_capture(self):

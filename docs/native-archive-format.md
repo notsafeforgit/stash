@@ -574,17 +574,36 @@ before choosing a new destination.
 [
   {"role":"config","name":"config.yml","path":"/snapshots/config.yml"},
   {"role":"producer_outbox","name":"worker.sqlite","path":"/snapshots/outbox.sqlite"},
-  {"role":"download_archive","name":"downloads.sqlite","path":"/snapshots/downloads.sqlite"}
+  {"role":"download_archive","name":"downloads.sqlite","path":"/snapshots/downloads.sqlite"},
+  {"role":"operating_database","name":"n8n.sqlite","path":"/private/n8n/database.sqlite"}
 ]
 ```
 
 Supported additional roles are `config`, `import_rules`, `file_journal`,
-`producer_outbox`, `download_archive`, `media_manifest`, `worker_profile` and
-`operating_state`. Producer outboxes and download archives use SQLite snapshots.
+`producer_outbox`, `download_archive`, `media_manifest`, `worker_profile`,
+`operating_state` and `operating_database`. Producer outboxes, download archives
+and operating databases use SQLite snapshots, including committed WAL contents.
 Producer application IDs, bindings and schema versions are retained and checked.
-Other roles preserve exact file bytes. Components restore beneath
+`operating_database` covers external SQLite state such as n8n's executions,
+workflow definitions, encrypted credentials and execution-ID sequence. It checks
+SQLite integrity and foreign keys without requiring the Stash or producer schema.
+Declare each database file once; do not add its live WAL/SHM files or declare a
+live database as opaque `operating_state`. Other roles preserve exact file bytes.
+Components restore beneath
 `components/<role>/<name>`; they do not overwrite a running service's files.
 The input paths are omitted from the portable inventory.
+
+Operating databases are captured after download archives and producer outboxes,
+before the native library. A host component stage binds their snapshots to the
+same checkpoint and reuses those exact bytes on a sealed retry, even if the live
+database has changed or disappeared. The enclosing deployment must coordinate
+all writers and include associated encryption/configuration files and external
+execution payloads. Declaring a database alone does not establish that boundary
+or complete workflow recovery. Restoring does not activate workflows.
+
+This is an additional role in transport version 1; readers without
+`operating_database` support reject the unknown role. Use the matching archive
+runtime when restoring these captures. Older archives remain readable.
 
 ## Representation and integrity
 

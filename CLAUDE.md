@@ -89,6 +89,11 @@ temporary components after durable publication; retained checkpoint/release
 records prevent the same UUID from capturing newer state. Complete external-file/
 media inventory, publisher/abandoned-stage retention integration and S3/restore activation remain required;
 declared component coverage does not establish a complete production backup.
+External SQLite state such as n8n executions uses the `operating_database` role.
+Capture committed WAL contents with SQLite backup, retain its original staged
+bytes on retry and verify database metadata again on restore. Include matching
+encryption/configuration files and external execution payloads separately;
+worker publication locks alone do not stop unrelated n8n writers or pruning.
 The optional external-boundary handshake keeps the native writer guard until a
 bounded host confirmation and seals that evidence with the checkpoint. Establish
 producer barriers before requesting that guard; the server never executes

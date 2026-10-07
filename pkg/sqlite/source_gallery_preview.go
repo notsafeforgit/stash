@@ -100,17 +100,22 @@ func sourceAlbumChoices(ctx context.Context, selection *models.AttachmentSelecti
 	if len(ids) == 0 {
 		return ret, nil
 	}
-	args := make([]interface{}, 0, len(ids))
+	args := make([]interface{}, 0, len(ids)+1)
 	for id := range ids {
 		args = append(args, id)
 	}
+	args = append(args, len(ids)+1)
 	var rows []sourceAlbumMediaChoice
-	if err := dbWrapper.Select(ctx, &rows, `SELECT d.attachment_uuid, d.uuid AS decision_uuid, d.state, d.media_uuid FROM attachment_media_links l
-JOIN attachment_media_decisions d ON d.attachment_uuid = l.attachment_uuid AND d.uuid = l.decision_uuid
-WHERE l.attachment_uuid IN `+getInBinding(len(args)), args...); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, currentAlbumAttachmentChoicesQuery+getInBinding(len(ids))+" LIMIT ?", args...); err != nil {
 		return nil, err
 	}
+	if len(rows) > len(ids) {
+		return nil, models.ErrAmbiguousSourceMedia
+	}
 	for _, row := range rows {
+		if _, exists := ret[row.AttachmentUUID]; exists {
+			return nil, models.ErrAmbiguousSourceMedia
+		}
 		ret[row.AttachmentUUID] = row
 	}
 	return ret, nil

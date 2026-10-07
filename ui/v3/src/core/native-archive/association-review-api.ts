@@ -115,6 +115,7 @@ const mediaItem = postLibraryItemSchema.refine(
 );
 export const attachmentMediaContextSchema = z
   .object({
+    requested_attachment_uuid: uuid,
     post_uuid: uuid,
     post_revision: revision,
     post_state: z.enum(["active", "forgotten"]),
@@ -165,6 +166,7 @@ export const attachmentMediaPreviewSchema = z
       current.post_uuid === input.post_uuid &&
       current.post_revision === input.post_revision &&
       current.post_state === "active" &&
+      current.requested_attachment_uuid === input.attachment_uuid &&
       current.attachment.uuid === input.attachment_uuid &&
       current.attachment.revision === input.attachment_revision &&
       (input.state === "linked"
@@ -230,6 +232,7 @@ export function createGalleryAssociationAPI(
       (input) => input.post_uuid,
     ),
     pageLimit: 25,
+    contextScope: (value: { post: { uuid: string } }) => value.post.uuid,
     async context(post: string, signal?: AbortSignal) {
       const [value, album] = await Promise.all([
         posts.post(post, signal),
@@ -273,6 +276,7 @@ export function createAttachmentMediaAPI(
       (input) => input.attachment_uuid,
     ),
     pageLimit: 25,
+    contextScope: (value: AttachmentMediaContext) => value.attachment.uuid,
     async context(attachment: string, signal?: AbortSignal) {
       const value = await request(
         `attachments/${uuid.parse(attachment)}/review`,
@@ -280,7 +284,7 @@ export function createAttachmentMediaAPI(
         undefined,
         signal,
       );
-      if (value.attachment.uuid !== attachment)
+      if (value.requested_attachment_uuid !== attachment)
         throw new NativeArchiveError(0, "invalid_response");
       return value;
     },

@@ -90,6 +90,26 @@ it("allows a retained choice older than new attachment evidence", () => {
   ).toThrow();
 });
 
+it("binds alias context to its requested attachment and follows the current owner", async () => {
+  const context = {
+    ...mediaPreview().current,
+    requested_attachment_uuid: ids.otherAttachment,
+  };
+  const api = createAttachmentMediaAPI(endpoint, async () =>
+    Response.json(context),
+  );
+  const value = await api.context(ids.otherAttachment);
+  expect(api.contextScope(value)).toBe(ids.attachment);
+  await expect(api.context(ids.attachment)).rejects.toMatchObject({
+    code: "invalid_response",
+  });
+  await expect(
+    createAttachmentMediaAPI(endpoint, async () =>
+      Response.json({ ...mediaPreview(), current: context }),
+    ).preview(mediaPreview().input),
+  ).rejects.toThrow();
+});
+
 it("does not treat omitted-target choices as arbitrary field edits", async () => {
   const transport = vi.fn<typeof fetch>();
   await expect(

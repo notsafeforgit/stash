@@ -499,12 +499,32 @@ post identities while preserving manual additions, exclusions, covers and edited
 metadata. Gallery claims outside the consolidated group still block adoption;
 a caught late failure cannot commit partially retired associations.
 
+Equivalent attachments share a current media choice by canonical post identity
+and exact attachment namespace/value. The original attachments, manifests and
+immutable decisions keep their UUIDs; no separate attachment-identity table or
+copied decisions are needed. The internal consolidation operation reviews every
+original head, publishes one choice and retires the others atomically. Multiple
+unresolved heads fail explicitly. Later ingestion honors a shared unlink and
+can fill an undecided choice only with unique file evidence across the group.
+Album inspection resolves shared choices in a bounded batch while retaining the
+original attachment on every source slot.
+
+Current post-media association reads resolve the canonical post and include all
+its original heads. New ordinary decisions require the canonical UUID and cannot
+retire another owner's head without consolidation proof; committed request retry
+still returns the original result before inspecting current state. Metadata source
+pickers follow shared attachment and whole-post choices across original captures.
+They retain original capture/attachment provenance and suppress competing heads
+or a canonical post unlink. Attachment review contexts distinguish the requested
+UUID from the current choice owner, and the UI recovers saved original requests
+before following that owner for new choices.
+
 The identity writer is internal and has no application mutation route. It does
 not settle conflicting source-list, gallery or media choices. Original capture
 and ingestion lookup methods deliberately retain their original UUID scopes so
-saved requests remain replayable. Consolidated album/media readers, guarded
-choice resolution, pending-work publication and the complete review UI must be
-connected before users can apply a post merge.
+saved requests remain replayable. Canonical source-list/gallery and post-browse
+integration, the encompassing reviewed transaction, pending-work publication and
+the complete post-merge UI must be connected before users can apply a post merge.
 
 ## Mapping catalog relationships
 

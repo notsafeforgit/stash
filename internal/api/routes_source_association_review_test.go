@@ -148,6 +148,8 @@ func TestSourceAssociationReviewHTTPPreviewRecoveryHistoryAndRestore(t *testing.
 	w := get(contextURL, 200)
 	require.NotContains(t, w.Body.String(), `"Namespace"`)
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &current))
+	require.Equal(t, attachment.UUID, current.RequestedAttachmentUUID)
+	require.Equal(t, attachment.UUID, current.Attachment.UUID)
 	require.Equal(t, post.Revision+1, current.PostRevision)
 	require.Equal(t, []string{"image"}, current.SourceMediaKinds)
 	require.Nil(t, current.Current)

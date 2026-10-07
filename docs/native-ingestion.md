@@ -1882,6 +1882,14 @@ link state and media-kind hints from the currently selected source list. It
 does not load post/profile payloads. Hints describe source evidence: an original
 image may legitimately link to a scene after animation conversion.
 
+`requested_attachment_uuid` binds that context to the requested source slot.
+After post consolidation, `attachment.uuid` can identify another original
+attachment that owns their shared current choice. New previews use the returned
+owner and revisions. The editor first recovers any request saved under the
+requested UUID, then any request saved under the current owner; it never rewrites
+an old request body to follow a merge. Loading a panel never sends either request.
+History remains scoped to its original attachment and revision cursor.
+
 `POST /attachment-media/preview` accepts `post_uuid`, `post_revision`,
 `attachment_uuid`, `attachment_revision`, `state` and an optional `reason`.
 State `linked` requires an active scene/image `media_uuid` and `media_revision`.
@@ -1911,8 +1919,8 @@ checks. Producers cannot approve review decisions.
 
 Saving these associations leaves gallery members, manual exclusions, metadata
 and files intact. Use the separate Match existing media preview/application to
-review synchronization effects. The association editor UI remains transition
-work; these APIs do not perform downloads or prove file availability.
+review synchronization effects. The association editor supports these operations
+on desktop and mobile; they do not perform downloads or prove file availability.
 
 ### Historical post-to-media matching
 

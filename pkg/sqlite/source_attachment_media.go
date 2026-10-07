@@ -297,6 +297,24 @@ func (s *SourceAttachmentStore) MediaDecision(ctx context.Context, value string)
 	if err != nil {
 		return nil, err
 	}
+	var rows []attachmentMediaDecisionRow
+	if err := dbWrapper.Select(ctx, &rows, currentAttachmentChoicesQuery, id); err != nil {
+		return nil, err
+	}
+	if len(rows) > 1 {
+		return nil, models.ErrAmbiguousSourceMedia
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	return rows[0].resolve(), nil
+}
+
+func (s *SourceAttachmentStore) mediaDecisionForOriginal(ctx context.Context, value string) (*models.AttachmentMediaDecision, error) {
+	id, err := archiveUUID(value)
+	if err != nil {
+		return nil, err
+	}
 	var row attachmentMediaDecisionRow
 	if err := dbWrapper.Get(ctx, &row, `SELECT d.* FROM attachment_media_links l
 JOIN attachment_media_decisions d ON d.attachment_uuid = l.attachment_uuid AND d.uuid = l.decision_uuid WHERE l.attachment_uuid = ?`, id); err != nil {
@@ -339,7 +357,12 @@ func uniqueIngestMediaCandidate(ctx context.Context, attachment, target string) 
 	}
 	// Bound work even for a heavily observed attachment. Beyond this threshold
 	// require explicit review; no full-library or unbounded history scan.
-	if err := dbWrapper.Select(ctx, &rows, "SELECT media_uuid, file_uuid, basis FROM source_media_evidence WHERE attachment_uuid = ? ORDER BY uuid LIMIT 1001", attachment); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, `SELECT e.media_uuid,e.file_uuid,e.basis FROM source_attachments requested
+JOIN source_post_identities root ON root.post_uuid=requested.post_uuid
+CROSS JOIN source_post_identities member ON member.canonical_uuid=root.canonical_uuid
+JOIN source_attachments a ON a.post_uuid=member.post_uuid AND a.namespace=requested.namespace AND a.value=requested.value
+JOIN source_media_evidence e ON e.attachment_uuid=a.uuid
+WHERE requested.uuid=? LIMIT 1001`, attachment); err != nil {
 		return err
 	}
 	if len(rows) == 0 || len(rows) > 1000 {
@@ -374,6 +397,14 @@ func uniqueIngestMediaCandidate(ctx context.Context, attachment, target string) 
 }
 
 func (s *SourceAttachmentStore) prepareMediaChoice(ctx context.Context, input models.AttachmentMediaDecisionInput) (*models.SourceAttachment, *models.ArchiveEntity, error) {
+	normalized, err := s.normalizeMediaChoice(ctx, input)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s.prepareMediaChoiceWithDeleted(ctx, normalized, false)
+}
+
+func (s *SourceAttachmentStore) prepareMediaChoiceWithDeleted(ctx context.Context, input models.AttachmentMediaDecisionInput, allowDeleted bool) (*models.SourceAttachment, *models.ArchiveEntity, error) {
 	attachment, err := s.Find(ctx, input.AttachmentUUID)
 	if err != nil {
 		return nil, nil, err
@@ -394,7 +425,7 @@ func (s *SourceAttachmentStore) prepareMediaChoice(ctx context.Context, input mo
 		if err != nil {
 			return nil, nil, err
 		}
-		if !archiveMedia(media) || media.State != models.ArchiveEntityActive || media.Revision != input.ExpectedMediaRevision {
+		if !archiveMedia(media) || (media.State != models.ArchiveEntityActive && !(allowDeleted && media.State == models.ArchiveEntityDeleted)) || media.Revision != input.ExpectedMediaRevision {
 			return nil, nil, models.ErrSourceAttachmentConflict
 		}
 		association, err := (&SourcePostMediaStore{}).Association(ctx, attachment.PostUUID, media.UUID)
@@ -427,7 +458,15 @@ func (s *SourceAttachmentStore) prepareMediaChoice(ctx context.Context, input mo
 }
 
 func (s *SourceAttachmentStore) DecideMedia(ctx context.Context, input models.AttachmentMediaDecisionInput) (*models.AttachmentMediaDecision, error) {
-	attachment, media, err := s.prepareMediaChoice(ctx, input)
+	normalized, err := s.normalizeMediaChoice(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	return s.decideMedia(ctx, normalized, false)
+}
+
+func (s *SourceAttachmentStore) decideMedia(ctx context.Context, input models.AttachmentMediaDecisionInput, allowDeleted bool) (*models.AttachmentMediaDecision, error) {
+	attachment, media, err := s.prepareMediaChoiceWithDeleted(ctx, input, allowDeleted)
 	if err != nil {
 		return nil, err
 	}
@@ -447,7 +486,8 @@ func (s *SourceAttachmentStore) DecideMedia(ctx context.Context, input models.At
 	if count != 1 {
 		return nil, models.ErrSourceAttachmentConflict
 	}
-	if _, err := dbWrapper.Exec(ctx, "UPDATE source_posts SET revision = revision + 1 WHERE uuid = ?", attachment.PostUUID); err != nil {
+	if _, err := dbWrapper.Exec(ctx, `UPDATE source_posts SET revision=revision+1 WHERE uuid=?
+OR uuid=(SELECT canonical_uuid FROM source_post_identities WHERE post_uuid=?)`, attachment.PostUUID, attachment.PostUUID); err != nil {
 		return nil, err
 	}
 	id := uuid.NewString()
@@ -459,5 +499,5 @@ VALUES (?, ?, ?, ?, ?, ?, ?)`, id, attachment.UUID, attachment.Revision+1, input
 ON CONFLICT(attachment_uuid) DO UPDATE SET decision_uuid = excluded.decision_uuid`, attachment.UUID, id); err != nil {
 		return nil, err
 	}
-	return s.MediaDecision(ctx, attachment.UUID)
+	return s.mediaDecisionForOriginal(ctx, attachment.UUID)
 }

@@ -86,8 +86,10 @@ func resolvedPostMediaStates(rows []sourcePostMediaRow, resolved map[string]*mod
 // separate redirect/history lookup for every attachment candidate.
 func sourcePostMediaStates(ctx context.Context, post string) (map[string]string, error) {
 	var rows []sourcePostMediaRow
-	if err := dbWrapper.Select(ctx, &rows, `SELECT d.* FROM post_media_links l
-JOIN post_media_decisions d ON d.uuid=l.decision_uuid WHERE l.post_uuid=? ORDER BY l.media_uuid LIMIT ?`, post, maxSourceGalleryMembers+1); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, `SELECT d.* FROM source_post_identities requested
+CROSS JOIN source_post_identities member ON member.canonical_uuid=requested.canonical_uuid
+JOIN post_media_links l ON l.post_uuid=member.post_uuid
+JOIN post_media_decisions d ON d.uuid=l.decision_uuid WHERE requested.post_uuid=? ORDER BY l.media_uuid LIMIT ?`, post, maxSourceGalleryMembers+1); err != nil {
 		return nil, err
 	}
 	if len(rows) > maxSourceGalleryMembers {
@@ -108,7 +110,7 @@ func (s *SourcePostMediaStore) Association(ctx context.Context, postID, mediaID 
 	if sourceFileIDs(&postID, &mediaID) != nil {
 		return nil, models.ErrSourcePostMediaInvalid
 	}
-	post, err := (&SourceEvidenceStore{}).FindPost(ctx, postID)
+	post, err := currentSourcePost(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +125,7 @@ func (s *SourcePostMediaStore) Association(ctx context.Context, postID, mediaID 
 	if err != nil {
 		return nil, err
 	}
-	rows, err := sourcePostMediaRows(ctx, post.UUID, ids)
+	rows, err := consolidatedPostMediaRows(ctx, post.UUID, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +251,7 @@ func (s *SourcePostMediaStore) decideWithConsolidation(ctx context.Context, inpu
 		}
 		return existing.resolve(), nil
 	}
-	post, err := (&SourceEvidenceStore{}).FindPost(ctx, input.PostUUID)
+	post, err := currentSourcePost(ctx, input.PostUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +261,7 @@ func (s *SourcePostMediaStore) decideWithConsolidation(ctx context.Context, inpu
 	}
 	validMedia := archiveMedia(media) && (media.State == models.ArchiveEntityActive ||
 		(consolidation != "" && media.State == models.ArchiveEntityDeleted))
-	if post == nil || post.State != "active" || post.Revision != input.ExpectedPostRevision || !validMedia || media.Revision != input.ExpectedMediaRevision {
+	if post == nil || post.UUID != input.PostUUID || post.State != "active" || post.Revision != input.ExpectedPostRevision || !validMedia || media.Revision != input.ExpectedMediaRevision {
 		return nil, models.ErrSourcePostMediaConflict
 	}
 	if consolidation != "" {
@@ -271,12 +273,7 @@ func (s *SourcePostMediaStore) decideWithConsolidation(ctx context.Context, inpu
 	if err != nil {
 		return nil, err
 	}
-	var current []sourcePostMediaRow
-	if consolidation != "" {
-		current, err = consolidatedPostMediaRows(ctx, post.UUID, ids)
-	} else {
-		current, err = sourcePostMediaRows(ctx, post.UUID, ids)
-	}
+	current, err := consolidatedPostMediaRows(ctx, post.UUID, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -285,6 +282,11 @@ func (s *SourcePostMediaStore) decideWithConsolidation(ctx context.Context, inpu
 	}
 	currentIDs := make([]string, 0, len(current))
 	for _, d := range current {
+		// Retiring another original owner's current choice requires the full
+		// reviewed merge, including its cross-owner replacement proof.
+		if consolidation == "" && d.PostUUID != post.UUID {
+			return nil, models.ErrSourcePostMediaConflict
+		}
 		currentIDs = append(currentIDs, d.UUID)
 	}
 	sort.Strings(currentIDs)
@@ -395,7 +397,7 @@ func (s *SourcePostMediaStore) ValidateCapture(ctx context.Context, decisionID, 
 	if err != nil {
 		return err
 	}
-	if a.State == "linked" {
+	if a.PostState == "active" && a.State == "linked" {
 		for _, current := range a.Decisions {
 			if current.UUID == d.UUID {
 				return nil

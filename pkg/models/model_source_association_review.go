@@ -60,14 +60,17 @@ type AttachmentMediaReviewDecision struct {
 }
 
 type AttachmentMediaReviewContext struct {
-	PostUUID         string                         `json:"post_uuid"`
-	PostRevision     int                            `json:"post_revision"`
-	PostState        string                         `json:"post_state"`
-	Attachment       SourceAlbumAttachment          `json:"attachment"`
-	Current          *AttachmentMediaReviewDecision `json:"current"`
-	Media            *SourcePostLibraryItem         `json:"media"`
-	PostLinkState    string                         `json:"post_link_state"`
-	SourceMediaKinds []string                       `json:"source_media_kinds"`
+	// RequestedAttachmentUUID binds this response to the inspected source slot.
+	// Attachment is the current choice owner, which can differ after a post merge.
+	RequestedAttachmentUUID string                         `json:"requested_attachment_uuid"`
+	PostUUID                string                         `json:"post_uuid"`
+	PostRevision            int                            `json:"post_revision"`
+	PostState               string                         `json:"post_state"`
+	Attachment              SourceAlbumAttachment          `json:"attachment"`
+	Current                 *AttachmentMediaReviewDecision `json:"current"`
+	Media                   *SourcePostLibraryItem         `json:"media"`
+	PostLinkState           string                         `json:"post_link_state"`
+	SourceMediaKinds        []string                       `json:"source_media_kinds"`
 }
 
 type AttachmentMediaReviewPreview struct {

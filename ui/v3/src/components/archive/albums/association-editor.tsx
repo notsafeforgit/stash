@@ -47,6 +47,7 @@ export function AssociationEditor<
 }: {
   api: AssociationProtocol<Input, Apply, Preview, Receipt> & {
     context: (scope: string, signal?: AbortSignal) => Promise<Context>;
+    contextScope: (value: Context) => string;
   };
   scope: string;
   onChanged: () => void | Promise<void>;
@@ -96,6 +97,17 @@ export function AssociationEditor<
         setSaved(pending);
         setStorageReady(true);
         const value = await api.context(scope, controller.signal);
+        if (controller.signal.aborted) return;
+        // Finish the original saved request before following a merged choice.
+        // An alias can also expose a request saved while editing its owner.
+        const owner = api.contextScope(value);
+        if (!pending && owner !== scope) {
+          setStorageReady(false);
+          const sharedPending = await outbox.read(owner);
+          if (controller.signal.aborted) return;
+          setSaved(sharedPending);
+          setStorageReady(true);
+        }
         if (!controller.signal.aborted) {
           setCurrent(value);
           setReady(true);
@@ -117,9 +129,14 @@ export function AssociationEditor<
     setRefresh((value) => value + 1);
   }
   async function deliver(preview?: Preview) {
+    const storageScope =
+      preview && current !== undefined
+        ? api.contextScope(current)
+        : saved?.scope_uuid;
     if (
       busy ||
       operation.current ||
+      !storageScope ||
       !storageReady ||
       (preview && (!ready || saved !== null))
     )
@@ -128,33 +145,28 @@ export function AssociationEditor<
     setBusy(true);
     setError(undefined);
     setApplied(false);
+    let refreshContext = false;
     try {
       if (preview) {
-        const pending = await outbox.prepare(scope, preview);
+        const pending = await outbox.prepare(storageScope, preview);
         if (mounted.current) setSaved(pending);
       }
       // A saved operation can finish after closing. Recover through the same
       // receipt next time, and refresh the owning card even after unmount.
-      await outbox.deliver(scope);
+      await outbox.deliver(storageScope);
       if (mounted.current) {
         setApplied(true);
         setReady(false);
         setHistoryRevision((value) => value + 1);
       }
       await onChanged();
-      if (!mounted.current) return;
-      const value = await api.context(scope);
-      if (mounted.current) {
-        setCurrent(value);
-        setReady(true);
-        setFormGeneration((value) => value + 1);
-      }
+      refreshContext = true;
     } catch (error) {
       if (mounted.current) setError(error);
     } finally {
       if (mounted.current) {
         try {
-          const pending = await outbox.read(scope);
+          const pending = await outbox.read(storageScope);
           if (mounted.current) {
             setSaved(pending);
             setStorageReady(true);
@@ -165,7 +177,10 @@ export function AssociationEditor<
             setError(error);
           }
         }
-        if (mounted.current) setBusy(false);
+        if (mounted.current) {
+          if (refreshContext) setRefresh((value) => value + 1);
+          else setBusy(false);
+        }
       }
       operation.current = false;
     }
@@ -183,7 +198,7 @@ export function AssociationEditor<
     setError(undefined);
     try {
       await outbox.forgetRejected(
-        scope,
+        saved.scope_uuid,
         api.parseApply(JSON.parse(saved.body)).request_uuid,
       );
       if (mounted.current) {

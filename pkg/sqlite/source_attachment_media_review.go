@@ -29,6 +29,16 @@ func (s *SourceAttachmentStore) MediaReviewHistory(ctx context.Context, id strin
 	return ret, nil
 }
 
+const currentAttachmentMediaKindsQuery = `SELECT DISTINCT e.media_kind FROM source_attachments requested
+ JOIN source_post_identities root ON root.post_uuid=requested.post_uuid
+ JOIN post_attachment_selections h ON h.post_uuid=root.canonical_uuid
+ JOIN post_attachment_decisions d ON d.uuid=h.decision_uuid AND d.mode!='disabled'
+ JOIN post_attachment_decision_manifests m ON m.decision_uuid=d.uuid
+ JOIN source_attachment_entries e ON e.manifest_uuid=m.manifest_uuid
+ JOIN source_attachments a ON a.uuid=e.attachment_uuid
+ WHERE requested.uuid=? AND a.namespace=requested.namespace AND a.value=requested.value
+ AND e.media_kind!='unknown' ORDER BY e.media_kind LIMIT 2`
+
 func (s *SourceAttachmentStore) MediaReviewContext(ctx context.Context, id string) (*models.AttachmentMediaReviewContext, error) {
 	if !validAssociationReviewUUID(id) {
 		return nil, models.ErrSourceAssociationReviewInvalid
@@ -37,6 +47,19 @@ func (s *SourceAttachmentStore) MediaReviewContext(ctx context.Context, id strin
 	if err != nil || attachment == nil {
 		return nil, err
 	}
+	decision, err := s.MediaDecision(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if decision != nil && decision.AttachmentUUID != attachment.UUID {
+		attachment, err = s.Find(ctx, decision.AttachmentUUID)
+		if err != nil {
+			return nil, err
+		}
+		if attachment == nil {
+			return nil, models.ErrSourcePayloadCorrupt
+		}
+	}
 	post, err := (&SourceEvidenceStore{}).FindPost(ctx, attachment.PostUUID)
 	if err != nil {
 		return nil, err
@@ -44,20 +67,12 @@ func (s *SourceAttachmentStore) MediaReviewContext(ctx context.Context, id strin
 	if post == nil {
 		return nil, models.ErrSourcePayloadCorrupt
 	}
-	decision, err := s.MediaDecision(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	ret := &models.AttachmentMediaReviewContext{PostUUID: post.UUID, PostRevision: post.Revision, PostState: post.State,
+	ret := &models.AttachmentMediaReviewContext{RequestedAttachmentUUID: id, PostUUID: post.UUID, PostRevision: post.Revision, PostState: post.State,
 		Attachment: models.SourceAlbumAttachment{UUID: attachment.UUID, Revision: attachment.Revision, Reference: models.SourcePostIdentifierSummary{
 			Namespace: attachment.Reference.Namespace, Value: attachment.Reference.Value}}, Current: attachmentMediaDecisionView(decision), SourceMediaKinds: []string{}}
 	// These are hints from the currently selected source order, not restrictions
 	// on the chosen library type: postprocessing can convert an image to video.
-	if err := dbWrapper.Select(ctx, &ret.SourceMediaKinds, `SELECT DISTINCT e.media_kind FROM post_attachment_selections h
- JOIN post_attachment_decisions d ON d.uuid=h.decision_uuid AND d.mode!='disabled'
- JOIN post_attachment_decision_manifests m ON m.decision_uuid=d.uuid
- JOIN source_attachment_entries e ON e.manifest_uuid=m.manifest_uuid
- WHERE h.post_uuid=? AND e.attachment_uuid=? AND e.media_kind!='unknown' ORDER BY e.media_kind LIMIT 2`, post.UUID, id); err != nil {
+	if err := dbWrapper.Select(ctx, &ret.SourceMediaKinds, currentAttachmentMediaKindsQuery, id); err != nil {
 		return nil, err
 	}
 	if decision != nil && decision.MediaUUID != nil {
@@ -121,7 +136,7 @@ func (s *SourceAttachmentStore) PreviewMediaReview(ctx context.Context, input mo
 	if err != nil {
 		return nil, err
 	}
-	if current == nil || current.PostUUID != input.PostUUID || current.PostRevision != input.PostRevision || current.Attachment.Revision != input.AttachmentRevision {
+	if current == nil || current.Attachment.UUID != input.AttachmentUUID || current.PostUUID != input.PostUUID || current.PostRevision != input.PostRevision || current.Attachment.Revision != input.AttachmentRevision {
 		return nil, models.ErrSourceAssociationReviewConflict
 	}
 	_, target, err := s.prepareMediaChoice(ctx, attachmentMediaReviewChoice(input))

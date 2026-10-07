@@ -60,6 +60,17 @@ func (s *SourceEvidenceStore) PostIdentity(ctx context.Context, id string) (*mod
 	return &ret, nil
 }
 
+// Current choices follow the canonical post. Original evidence, history and
+// saved receipt readers continue using FindPost and their original UUIDs.
+func currentSourcePost(ctx context.Context, id string) (*models.SourcePost, error) {
+	store := &SourceEvidenceStore{}
+	identity, err := store.PostIdentity(ctx, id)
+	if err != nil || identity == nil {
+		return nil, err
+	}
+	return store.FindPost(ctx, identity.CanonicalUUID)
+}
+
 func postIdentityMembers(ctx context.Context, root, after string, limit int) ([]models.SourcePostIdentity, error) {
 	var rows []sourcePostIdentityRow
 	if err := dbWrapper.Select(ctx, &rows, postIdentityMembersQuery, root, after, limit); err != nil {

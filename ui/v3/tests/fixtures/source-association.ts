@@ -13,6 +13,7 @@ export const ids = {
   gallery: "22222222-2222-4222-8222-222222222222",
   media: "33333333-3333-4333-8333-333333333333",
   attachment: "44444444-4444-4444-8444-444444444444",
+  otherAttachment: "44444444-4444-4444-8444-444444444445",
   request: "55555555-5555-4555-8555-555555555555",
   decision: "66666666-6666-4666-8666-666666666666",
 };
@@ -51,6 +52,7 @@ export function mediaPreview(): AttachmentMediaPreview {
       media_revision: 4,
     },
     current: {
+      requested_attachment_uuid: ids.attachment,
       post_uuid: ids.post,
       post_revision: 3,
       post_state: "active",

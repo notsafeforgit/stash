@@ -68,8 +68,12 @@ The complete release gate, populated schema-90 migration, fresh reopen and
 independent whole-row reconciliation now pass. The verified rehearsal is at
 schema 90; the superseded schema-89 database was retired after checking open
 handles, recovering 21.90 GB and retaining the original compatible snapshot.
-Equivalent attachment choices, canonical current readers and the complete
-reviewed merge API/UI still require integration before application use.
+Shared attachment choices, current post-media readers and metadata source
+selection now have focused integration checks, with the attachment editor's
+original-request recovery verified in Chromium and WebKit. Their integrated
+full fork gate remains pending. Canonical source-list/gallery and post browsing,
+the encompassing merge transaction and the complete merge API/UI still require
+integration before application use.
 
 Application local-file preview/admission now reuses native file verification and
 durable effects without creating a producer or source record. Focused real MP4/
@@ -10629,3 +10633,41 @@ held the superseded schema-89 files, those files were removed, recovering
 21.90 GB. The original compatible snapshot, current verified copy, comparison
 reports and source hashes remain. Production, live workers and backup policies
 are unchanged.
+
+## Shared attachment choices and canonical media reads — 2026-10-06
+
+Attachment choices now resolve through canonical post identity plus the exact
+qualified attachment reference. One current decision can serve original source
+slots from several consolidated posts; original attachments, captures, manifests
+and decision history remain unchanged. Internal consolidation checks all original
+heads and selected media revisions, then publishes one choice and retires the
+other heads in a managed transaction. Caught late failures roll back the whole
+operation. Existing deleted-media choices can be retained without resurrection.
+
+Current attachment reads, batched album choices and source-kind hints follow the
+shared owner. Ingest honors shared rejections and checks candidates across all
+equivalent original attachments. Current post-media reads follow the canonical
+post and retain unresolved conflicts; new ordinary writes cannot bypass another
+original owner's decision. Exact original requests and history remain recoverable.
+Metadata source sampling exposes original captures through the shared choices,
+preserves original provenance/cursors and suppresses competing attachment heads
+or a canonical post unlink.
+
+The attachment context explicitly returns its requested UUID separately from the
+current owner. The editor uses the current owner for new requests while recovering
+saved original requests first, followed by any pending request at that owner.
+It preserves exact saved bodies, separate history cursors and explicit retry after
+definitive rejection. Read-only panel opening never sends pending operations.
+
+Focused repository, query-plan, receipt/restart, portable-restore and real HTTP
+checks pass. Client lint/type checks and 20 protocol/outbox tests pass. All 38
+Chromium/WebKit association browser cases pass, including desktop/mobile alias
+edits, lost-response recovery after a merge with unavailable context, stale
+original requests and pending requests under both identities. Source hashes and
+receipts are under `.local/native-attachment-choice-consolidation-20261006/`.
+The integrated full fork gate remains pending. No schema migration is added.
+
+Canonical source-list/gallery and post-browse integration, final selection-head
+retirement, pending-publication guards and the encompassing post-merge API/UI
+remain required. These changes do not expose the internal merge primitive or
+change production, worker activation or backup policies.

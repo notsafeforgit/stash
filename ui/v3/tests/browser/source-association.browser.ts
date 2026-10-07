@@ -51,6 +51,7 @@ async function archive(page: Page) {
   const galleryHistory: GalleryAssociationDecision[] = [],
     mediaHistory: AttachmentMediaDecision[] = [];
   let revision = 10,
+    displayedAttachment = attachment,
     loseReply = false,
     wrongReceipt = false,
     conflict = "",
@@ -58,6 +59,7 @@ async function archive(page: Page) {
   let gallery: PostAlbum = postAlbum();
   const media: AttachmentMediaContext = {
     ...mediaPreview().current,
+    requested_attachment_uuid: attachment,
     post_uuid: postIds.post,
     post_revision: revision,
     attachment: {
@@ -106,7 +108,11 @@ async function archive(page: Page) {
       const proposed = input.state === "linked" ? mediaTarget : null;
       const result = {
         input,
-        current: { ...media, post_revision: revision },
+        current: {
+          ...media,
+          requested_attachment_uuid: input.attachment_uuid,
+          post_revision: revision,
+        },
         proposed,
         changed:
           media.current?.state !== input.state ||
@@ -126,7 +132,12 @@ async function archive(page: Page) {
       const input = path.startsWith("gallery")
         ? galleryAssociationApplySchema.parse(request.postDataJSON())
         : attachmentMediaApplySchema.parse(request.postDataJSON());
-      if (conflict || input.post_revision !== revision)
+      if (
+        conflict ||
+        input.post_revision !== revision ||
+        ("attachment_uuid" in input &&
+          input.attachment_uuid !== media.attachment.uuid)
+      )
         return route.fulfill({
           status: 409,
           json: { error: conflict || "preview_changed" },
@@ -139,7 +150,7 @@ async function archive(page: Page) {
         media.post_revision = revision;
         media.current = {
           uuid: receipt.decision_uuid,
-          attachment_uuid: attachment,
+          attachment_uuid: input.attachment_uuid,
           revision: media.attachment.revision,
           state: input.state,
           media_uuid: input.media_uuid ?? null,
@@ -193,16 +204,24 @@ async function archive(page: Page) {
       if (failRefresh && receipts.size)
         return route.fulfill({ status: 503, json: { error: "unavailable" } });
       result = { ...postSummary(), revision };
-    } else if (path === `attachments/${attachment}/review`) {
+    } else if (
+      path === `attachments/${attachment}/review` ||
+      path === `attachments/${ids.otherAttachment}/review`
+    ) {
       if (failRefresh && receipts.size)
         return route.fulfill({ status: 503, json: { error: "unavailable" } });
-      result = { ...media, post_revision: revision };
+      result = {
+        ...media,
+        requested_attachment_uuid: path.split("/")[1],
+        post_revision: revision,
+      };
     } else if (path.endsWith("/gallery-association-history"))
       result = galleryHistory
         .filter((item) => item.revision > Number(url.searchParams.get("after")))
         .slice(0, 25);
     else if (path.endsWith("/media-history"))
       result = mediaHistory
+        .filter((item) => item.attachment_uuid === path.split("/")[1])
         .filter((item) => item.revision > Number(url.searchParams.get("after")))
         .slice(0, 25);
     else if (path === "entity-identities/gallery/12")
@@ -231,9 +250,17 @@ async function archive(page: Page) {
       const value = albumPage();
       value.post_revision = revision;
       value.album = gallery;
+      value.slots = value.slots.map((slot) =>
+        slot.attachment?.uuid === attachment
+          ? {
+              ...slot,
+              attachment: { ...slot.attachment, uuid: displayedAttachment },
+            }
+          : slot,
+      );
       if (media.current)
         value.slots = value.slots.map((slot) =>
-          slot.attachment?.uuid !== attachment
+          slot.attachment?.uuid !== displayedAttachment
             ? slot
             : {
                 ...slot,
@@ -310,6 +337,20 @@ async function archive(page: Page) {
     searches,
     galleryHistory,
     mediaHistory,
+    mergeAttachment: () => {
+      revision++;
+      media.post_uuid = postIds.otherPost;
+      media.post_revision = revision;
+      media.attachment = { ...media.attachment, uuid: ids.otherAttachment };
+      if (media.current)
+        media.current = {
+          ...media.current,
+          attachment_uuid: ids.otherAttachment,
+        };
+    },
+    viewOwner: (owner: boolean) => {
+      displayedAttachment = owner ? ids.otherAttachment : attachment;
+    },
     attach: async (other: Page) => {
       await other.route("**/api/v3/archive/**", handler);
       await other.route("**/graphql", graphql);
@@ -404,6 +445,138 @@ async function apply(page: Page, family: Family) {
     .getByRole("button", { name: "Save association choice", exact: true })
     .click();
 }
+
+for (const desktop of [false, true]) {
+  test(`shared attachment saves to its owner on ${desktop ? "desktop" : "phone"}`, async ({
+    page,
+  }) => {
+    const remote = await archive(page);
+    remote.mergeAttachment();
+    await open(page, "attachment", desktop);
+    expect(remote.writes).toHaveLength(0);
+    await apply(page, "attachment");
+    await expect(
+      page.getByText("Association choice saved", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("group", { name: "Association behavior", exact: true }),
+    ).toBeVisible();
+    expect(remote.writes).toHaveLength(1);
+    expect(JSON.parse(remote.writes[0]!)).toMatchObject({
+      attachment_uuid: ids.otherAttachment,
+      post_uuid: postIds.otherPost,
+    });
+    expect(remote.mediaHistory[0]?.attachment_uuid).toBe(ids.otherAttachment);
+  });
+}
+
+test("an original attachment request recovers after a merge even when context is unavailable", async ({
+  page,
+}) => {
+  const remote = await archive(page);
+  remote.loseReply();
+  await open(page, "attachment");
+  await apply(page, "attachment");
+  await expect(
+    page.getByRole("button", { name: "Recover saved request", exact: true }),
+  ).toBeVisible();
+  const original = remote.writes[0]!;
+  remote.mergeAttachment();
+  remote.failRefresh(true);
+  await open(page, "attachment", false, true);
+  await page
+    .getByRole("button", { name: "Recover saved request", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "The choice is saved, but this view could not be refreshed",
+      {
+        exact: true,
+      },
+    ),
+  ).toBeVisible();
+  expect(remote.writes).toEqual([original]);
+  remote.failRefresh(false);
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
+  await page.getByRole("button", { name: "Reject", exact: true }).click();
+  await preview(page);
+  expect(remote.previews.at(-1)).toMatchObject({
+    input: {
+      attachment_uuid: ids.otherAttachment,
+      post_uuid: postIds.otherPost,
+    },
+  });
+});
+
+test("a rejected original request can be reviewed against the merged owner", async ({
+  page,
+}) => {
+  const remote = await archive(page);
+  remote.conflict("preview_changed");
+  await open(page, "attachment");
+  await apply(page, "attachment");
+  const again = page.getByRole("button", { name: "Review again", exact: true });
+  await expect(again).toBeVisible();
+  const original = remote.writes[0]!;
+  remote.mergeAttachment();
+  remote.conflict("");
+  await again.click();
+  await apply(page, "attachment");
+  await expect(
+    page.getByText("Association choice saved", { exact: true }),
+  ).toBeVisible();
+  expect(remote.writes).toHaveLength(2);
+  expect(remote.writes[0]).toBe(original);
+  expect(JSON.parse(original).attachment_uuid).toBe(attachment);
+  expect(JSON.parse(remote.writes[1]!).attachment_uuid).toBe(
+    ids.otherAttachment,
+  );
+  expect(JSON.parse(remote.writes[1]!).request_uuid).not.toBe(
+    JSON.parse(original).request_uuid,
+  );
+});
+
+test("opening an alias recovers its original request before the owner's saved request", async ({
+  page,
+}) => {
+  const remote = await archive(page);
+  remote.loseReply();
+  await open(page, "attachment");
+  await apply(page, "attachment");
+  const recover = page.getByRole("button", {
+    name: "Recover saved request",
+    exact: true,
+  });
+  await expect(recover).toBeVisible();
+  const original = remote.writes[0]!;
+  remote.mergeAttachment();
+  remote.viewOwner(true);
+  await open(page, "attachment");
+  await page
+    .getByLabel("Reason (optional)", { exact: true })
+    .fill("Shared choice");
+  remote.loseReply();
+  await apply(page, "attachment");
+  await expect(recover).toBeVisible();
+  const shared = remote.writes[1]!;
+  remote.viewOwner(false);
+  await open(page, "attachment", false, true);
+  const receiptRequests = () =>
+    remote.requests.filter((url) => url.pathname.includes("/requests/"));
+  await recover.click();
+  await expect
+    .poll(() => receiptRequests().at(-1)?.pathname)
+    .toContain(JSON.parse(original).request_uuid);
+  await expect(recover).toBeVisible();
+  await recover.click();
+  await expect(
+    page.getByRole("group", { name: "Association behavior", exact: true }),
+  ).toBeVisible();
+  expect(receiptRequests().at(-1)?.pathname).toContain(
+    JSON.parse(shared).request_uuid,
+  );
+  expect(remote.writes).toEqual([original, shared]);
+});
 
 for (const family of ["gallery", "attachment"] as const) {
   for (const desktop of [false, true]) {

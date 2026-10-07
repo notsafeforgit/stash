@@ -134,27 +134,38 @@ func (s *MetadataPolicyStore) SampleSources(ctx context.Context, scope models.Me
 	err = dbWrapper.Select(ctx, &rows, `WITH identities AS (
 SELECT uuid FROM archive_entities WHERE uuid IN `+getInBinding(len(identities))+`
 ), choices AS (
-SELECT d.* FROM post_media_links l JOIN post_media_decisions d ON d.uuid=l.decision_uuid
+SELECT d.*,i.canonical_uuid FROM post_media_links l JOIN post_media_decisions d ON d.uuid=l.decision_uuid
+JOIN source_post_identities i ON i.post_uuid=l.post_uuid
 WHERE l.media_uuid IN (SELECT uuid FROM identities)
 ), links AS (
-SELECT m.capture_uuid,d.attachment_uuid,'' AS post_media_decision_uuid
+SELECT m.capture_uuid,a.uuid AS attachment_uuid,'' AS post_media_decision_uuid
 FROM attachment_media_decisions d
 JOIN attachment_media_links l ON l.attachment_uuid=d.attachment_uuid AND l.decision_uuid=d.uuid
-JOIN source_attachments a ON a.uuid=d.attachment_uuid
-JOIN source_attachment_entries e ON e.attachment_uuid=d.attachment_uuid
+JOIN source_attachments owner ON owner.uuid=d.attachment_uuid
+JOIN source_post_identities root ON root.post_uuid=owner.post_uuid
+CROSS JOIN source_post_identities member ON member.canonical_uuid=root.canonical_uuid
+JOIN source_attachments a ON a.post_uuid=member.post_uuid AND a.namespace=owner.namespace AND a.value=owner.value
+JOIN source_attachment_entries e ON e.attachment_uuid=a.uuid
 JOIN source_capture_attachment_manifests m ON m.manifest_uuid=e.manifest_uuid
 WHERE d.media_uuid IN (SELECT uuid FROM identities) AND d.state='linked'
-AND NOT EXISTS(SELECT 1 FROM choices WHERE post_uuid=a.post_uuid AND state!='undecided')
+AND NOT EXISTS(SELECT 1 FROM choices WHERE canonical_uuid=root.canonical_uuid AND state!='undecided')
+AND NOT EXISTS(SELECT 1 FROM source_post_identities peer
+ JOIN source_attachments other ON other.post_uuid=peer.post_uuid AND other.namespace=owner.namespace AND other.value=owner.value
+ JOIN attachment_media_links competing ON competing.attachment_uuid=other.uuid
+ WHERE peer.canonical_uuid=root.canonical_uuid AND competing.decision_uuid!=d.uuid)
 UNION ALL
 SELECT c.uuid,'',p.decision_uuid FROM (
-SELECT post_uuid,min(uuid) AS decision_uuid FROM choices GROUP BY post_uuid HAVING min(state)='linked' AND max(state)='linked'
-) p JOIN source_captures c ON c.post_uuid=p.post_uuid
+SELECT canonical_uuid,min(uuid) AS decision_uuid FROM choices GROUP BY canonical_uuid HAVING min(state)='linked' AND max(state)='linked'
+) p JOIN source_post_identities i ON i.canonical_uuid=p.canonical_uuid
+JOIN source_captures c ON c.post_uuid=i.post_uuid
 )
 SELECT DISTINCT c.uuid AS capture_uuid,l.attachment_uuid,l.post_media_decision_uuid,c.post_uuid,
 COALESCE(json_extract(r.metadata,'$.title'),'') AS title,c.platform,c.origin,c.captured_at
 FROM links l JOIN source_captures c ON c.uuid=l.capture_uuid
 JOIN source_post_revisions r ON r.uuid=c.revision_uuid
 JOIN source_posts p ON p.uuid=c.post_uuid AND p.state='active'
+JOIN source_post_identities identity ON identity.post_uuid=p.uuid
+JOIN source_posts canonical ON canonical.uuid=identity.canonical_uuid AND canonical.state='active'
 JOIN source_collection_captures cc ON cc.capture_uuid=c.uuid
 WHERE cc.collection_uuid=? AND cc.collection_revision<=?
 AND (c.uuid,CASE WHEN l.attachment_uuid='' THEN l.post_media_decision_uuid ELSE l.attachment_uuid END)>(?,?)

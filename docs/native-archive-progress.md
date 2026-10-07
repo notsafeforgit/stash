@@ -82,14 +82,17 @@ before/after commit have regression coverage. The initial increment passed the
 full SQLite/filesystem suite (1,127 seconds); subsequent receipt validation and
 collision-preflight changes passed focused SQLite, HTTP, archive and filesystem
 checks, with zero lint issues. The populated checkpoint/active restore is still
-schema 1000094. Host caller conversion, a populated schema-95 migration check,
-image publication and activation remain outstanding.
+schema 1000094. The native `stash-dedupe` caller now saves immutable requests,
+recovers committed deletions, previews pairs sequentially and holds backup and
+worker publication locks. Its real HTTP test spans a lost response and a server
+and client restart. Installation, scan/sidecar cleanup handoff, a populated
+schema-95 migration check, image publication and activation remain outstanding.
 
 Remaining release work:
 
 | Work | Required outcome |
 | --- | --- |
-| Callers and compatibility | Wire the catalog-backed dedupe launcher to the implemented native plan/apply API with saved requests and backup/download exclusion; finish direct-scan/manual-helper handoff and real producer provisioning, verify live launch paths and retained external contracts, then remove residual legacy adapters and dependencies. |
+| Callers and compatibility | Install the tested native dedupe caller with service/pre-backup exit handling, timestamp and state-backup coverage; finish sidecar cleanup, direct-scan/manual-helper handoff and real producer provisioning, verify live launch paths and retained external contracts, then remove residual legacy adapters and dependencies. |
 | Backup and restore | Prove a complete common capture boundary, actual upload/request/storage costs, bounded retention/reclamation, and an isolated empty/relocated restore with pending producer and filesystem state. |
 | Production cutover | Pin artifacts, quiesce writers, take final coordinated snapshots, migrate/reconcile, switch native launchers and resume work gradually through verified launch paths. |
 | Observation and retirement | Verify scheduled scraping/recovery/backup cycles, preserve the rollback/export boundary, and retire obsolete catalog writers, mounts, services and packages. |
@@ -11366,3 +11369,38 @@ after the original populated restore finishes; do not start a replacement merely
 because it is stopped. Packaging returned to about 49 seconds per thousand files
 in the first post-suspension observation. The overall migration goal remains
 active, and the dedupe/caller conversion work can proceed independently.
+
+## Native dedupe host client and restart proof — 2026-10-07
+
+The producer package now includes `stash-dedupe`. It uses bounded fclones group
+reports, retains the oldest physical copy, and delegates every removal to the
+schema-95 native service. It saves the fixed scope, private manifest and each
+exact request before submission. After interruption it reads the committed
+receipt before replaying; an uncertain result or reused-request conflict cannot
+silently acquire a new UUID. Pairs receive fresh previews sequentially so a
+previous primary-file update cannot invalidate every later saved request.
+
+The caller holds its state lock, the existing backup/dedupe lock, and all declared
+native-worker publication barriers through discovery and application. It checks
+root/mount/lock identities before subsequent operations and rejects out-of-root,
+symlink, repeated, unsupported or size-changed candidates. Fclones never receives
+a removal command. Ineligible owners and known stale/unequal-byte rejections
+remain review outcomes, separate from committed removal counts. Pending intents
+retain the active run; completed runs retain inspectable manifests and receipts.
+
+All 597 producer tests passed in 51.1 seconds. The subsequent process-output/
+deadline regression and final client checks passed all thirteen focused tests.
+The actual Go/Python HTTP test dropped the first committed deletion response,
+closed/reopened the native database and restarted Python. It recovered the
+original receipt without a second Apply, then previewed and removed the next
+duplicate against the changed primary/owner state. The existing selected title
+and surviving primary remained correct. The HTTP checks passed in 14.8 seconds;
+the final pinned Go lint reported zero issues.
+
+Only isolated fixture files were removed. The installed host launcher, pre-backup
+wrapper, service/timers and production database remain unchanged. Installation
+still needs reviewed worker-lock inventory, client-state backup coverage,
+service exit/timestamp handling, and the separate orphan-sidecar/direct-scan
+handoff. Legacy catalogs cannot be retired on the strength of this client test.
+The full populated restore continues with its original schema-94 binary and
+checkpoint; whole-media reconciliation remains suspended until that run finishes.

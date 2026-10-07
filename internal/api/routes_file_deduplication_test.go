@@ -21,7 +21,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFileDeduplicationHTTPPreviewApplyReplayAndScope(t *testing.T) {
+func fileDeduplicationHTTPFixture(t *testing.T, names []string) (*sqlite.Database, models.Repository, *models.MediaRoot, string) {
+	t.Helper()
 	config.InitializeEmpty()
 	db := sqlite.NewDatabase()
 	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "dedupe-http.sqlite")))
@@ -45,9 +46,13 @@ func TestFileDeduplicationHTTPPreviewApplyReplayAndScope(t *testing.T) {
 		if err := repo.Scene.Create(ctx, &scene, nil); err != nil {
 			return err
 		}
-		for _, name := range []string{"keep.mp4", "duplicate.mp4"} {
+		for index, name := range names {
 			path := filepath.Join(dir, name)
 			if err := os.WriteFile(path, []byte("same complete bytes"), 0600); err != nil {
+				return err
+			}
+			modified := time.Now().Add(time.Duration(index-10) * time.Hour)
+			if err := os.Chtimes(path, modified, modified); err != nil {
 				return err
 			}
 			info, err := os.Stat(path)
@@ -71,6 +76,11 @@ func TestFileDeduplicationHTTPPreviewApplyReplayAndScope(t *testing.T) {
 		}
 		return nil
 	}))
+	return db, repo, root, dir
+}
+
+func TestFileDeduplicationHTTPPreviewApplyReplayAndScope(t *testing.T) {
+	_, repo, root, dir := fileDeduplicationHTTPFixture(t, []string{"keep.mp4", "duplicate.mp4"})
 	handler := (&nativeArchiveRoutes{repo: repo}).router()
 	request := func(method, path string, body any, origin string) *httptest.ResponseRecorder {
 		encoded, err := json.Marshal(body)

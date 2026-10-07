@@ -1687,6 +1687,17 @@ requests. `processed` concerns the saved matching pass; `needs_review` and the
 outcome counts retain unresolved candidates. Matching does not apply metadata
 policies or enable scrapers. See the [native contract](../../docs/native-ingestion.md#historical-post-to-media-matching).
 
+## Native physical deduplication
+
+`stash-dedupe` uses bounded `fclones group` discovery and the native Stash
+preview/apply API. It preserves the oldest copy, saves requests before sending
+them, recovers committed receipts after interruption, and holds the existing
+backup lock plus every inventoried native worker publication barrier. Stash
+verifies full bytes and preserves provenance; different media owners remain
+review cases. See the [client guide](../../docs/native-file-deduplication.md#native-host-client)
+for arguments, persistent state, exit codes and the outstanding deployment
+boundary. The installed legacy dedupe launcher has not switched.
+
 ## Historical source albums
 
 `stash-backfill-source-albums` uses the native application API to match imported

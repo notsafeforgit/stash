@@ -146,5 +146,12 @@ class PublicationBarrier:
         while self.handles:
             os.close(self.handles.pop())
 
+    def check(self):
+        """Recheck the held boundary before a later filesystem/API operation."""
+        if not self.acquired or len(self.handles) != len(self.roots) * 2:
+            raise InvalidData("Publication barrier is not held")
+        for index, (identity, path) in enumerate(self.roots):
+            _verify(path, identity, self.handles[2 * index], self.handles[2 * index + 1])
+
     def __exit__(self, *_):
         self.release()

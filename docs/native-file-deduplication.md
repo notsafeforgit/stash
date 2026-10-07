@@ -1,9 +1,10 @@
 # Native physical file deduplication
 
 The development backend implements a preview/apply service for redundant
-physical media files in schema 1000095. The installed host dedupe launcher still
-uses catalogs; its native caller conversion and production activation are
-outstanding. This service is not a scene/image merge operation.
+physical media files in schema 1000095. The `stash-dedupe` host client is available
+in the native producer package. The installed host launcher still uses catalogs;
+its deployment and associated scan/sidecar-cleanup handoff remain outstanding.
+This service is not a scene/image merge operation.
 
 An automatic candidate must contain two distinct, indexed, nonempty regular
 video or image locations under one active, reviewed media root. Both must belong
@@ -89,19 +90,73 @@ The database snapshot includes deduplication receipts and provenance. Startup
 validates their signatures and retained verified-content references.
 Anonymisation removes the private receipts before source/content evidence.
 
-## Host conversion boundary
+## Native host client
 
-The native host caller must retain the existing backup/dedupe lock and acquire
-the inventoried native-worker publication barriers before application writes.
-Fclones may discover candidates and choose which path to keep, but must not run
-its own removal command. Apply pairs sequentially with saved request identities
-and report review cases. Do not perform the old orphan-NFO/text cleanup through
-an unconverted catalog writer; retained sidecars need their own verified import
-and cleanup boundary. Direct/manual file intake must remain available.
+`stash-dedupe` discovers candidates with `fclones group`. It retains the oldest
+file by mtime, with the relative path breaking ties. It never invokes fclones
+removal. The default scraped-folder scope matches the existing host launcher;
+`--all-content` includes other supported media under the reviewed root. Empty
+files, sidecars and partial downloads are not removal candidates. Symlinks,
+escaped paths, different filesystems, changed sizes and repeated report entries
+are rejected before submission. The report is bounded to 64 MiB and 100,000
+pairs; discovery has a two-hour deadline.
+
+Example after the native cutover, using an application API key supplied through
+`STASH_API_KEY`:
+
+```sh
+stash-dedupe --endpoint http://localhost:8009 \
+  --root /tank/media/porn --root-uuid REVIEWED_ROOT_UUID \
+  --state-dir /private/native-dedupe \
+  --library-lock /tank/media/backup_ledgers/.backup_run.lock \
+  --lock-root /inventoried/host-worker-locks \
+  --lock-root /inventoried/n8n-worker-locks \
+  --fclones /home/andrew/.cargo/bin/fclones
+```
+
+Supply **every** worker lock root from the deployment inventory. The client
+acquires its state lock, the existing backup/dedupe lock, and all native-worker
+publication barriers before discovery or API calls. It retains those locks
+through receipt recovery and removal, rechecking directory/mount and lock-file
+identities before operations. These cooperative barriers do not stop legacy
+downloaders; activate this caller with the native worker handoff.
+
+Each run retains a private manifest and immutable per-pair intents/results.
+The manifest fixes the endpoint, root identity, scope and lock roots. Every
+request is durably saved before Apply. On restart, the same invocation resumes
+the saved run before starting any new discovery, including when a successful
+removal's response was lost. It checks the original receipt before replaying an
+unchanged request. An invalid response or request-UUID conflict keeps that intent
+pending. It never replaces an uncertain request with a new UUID.
+
+Pairs are previewed sequentially: a preceding primary-file change can advance
+the media owner's revision. Known stale/unequal-byte rejections and ineligible
+owners become retained review outcomes; they are not counted as removals.
+An active run is retired only after every pair has either a validated committed
+receipt or a known review outcome. The saved run directory remains available
+for inspection and backup; do not discard pending state or change its configured
+endpoint/root to bypass a failed recovery. A later completed invocation can
+discover and review current candidates again.
+
+The JSON summary distinguishes `committed`, `review`, `pending`, `finished` and
+`all_removed`. Exit codes are 0 for a run without review cases, 3 for completed
+processing with review cases, 2 for a busy state/library lock, and 1 for failure
+or uncertainty. `--request-timeout` defaults to 900 seconds; a timeout retains
+the original intent. `--report` accepts a bounded saved fclones JSON report for
+fixture/reviewed operation, with the same path checks and server byte proof.
+
+The client does not perform the old orphan-NFO/text cleanup. Retained sidecars
+need their verified native import and cleanup boundary, and direct/manual scan
+intake must remain available. Installation must also inventory this client state
+for coordinated backup, update the pre-backup launcher/service exit handling and
+rate-limit timestamp, and finish the post-dedupe scan handoff.
 
 Tests cover scenes and images, primary replacement, unchanged selected values,
 retained original/derived source matches, restart replay, changed bytes with
 restored mtime, stale ownership/root/metadata/evidence, refusal of ambiguous
 owners and captions, transaction rollback, and real child-process death before
-and after commit. Host activation and the populated schema-95 rehearsal remain
-release work.
+and after commit. Python tests cover candidate bounds, locks, private saved
+intents, changed responses, known rejections and uncertain replay. A real
+Go/Python HTTP test drops a committed deletion response, reopens the database,
+restarts the client and verifies recovery plus the next pair's new preview.
+Host activation and the populated schema-95 rehearsal remain release work.

@@ -10837,7 +10837,11 @@ migration-history row change. No post merge or worker is activated on that copy.
 The complete release gate passes in 1,936.7 seconds: generation, real embedded
 UI, 740 UI tests, 554 producer tests, eight library tests, 113 archive tests,
 262 backup tests, Go lint and full Go integration, including API and SQLite.
-Source hashes, receipts and rehearsal scripts are retained under
+The current rehearsal pointer now selects schema 91 and retains all prior
+catalog, policy and queued-work verification references. The superseded schema-90
+copy was retired after checking open handles, recovering 21.90 GB while keeping
+the original compatible snapshot. Source hashes, receipts and rehearsal scripts
+are retained under
 `.local/native-canonical-post-backfill-20261006/`. This increment does not expose
 the encompassing post-merge mutation or activate any production writer/worker.
 The complete reviewed merge API/UI and broader transition gates remain required.

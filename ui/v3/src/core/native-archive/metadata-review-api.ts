@@ -39,15 +39,25 @@ export const editInputSchema = z
   })
   .strict();
 export const editApplySchema = editInputSchema
-  .extend({ request_uuid: uuid, digest })
+  .extend({ request_uuid: uuid, digest, keep_current: z.boolean().optional() })
   .strict();
-export const editReceiptSchema = z.object({
-  request_uuid: uuid,
-  decision_uuid: uuid,
-  field: z.string().min(1),
-  request: editApplySchema,
-  created_at: z.string(),
-});
+export const editReceiptSchema = z
+  .object({
+    request_uuid: uuid,
+    decision_uuid: uuid.optional(),
+    kept_current: z.literal(true).optional(),
+    field: z.string(),
+    request: editApplySchema,
+    created_at: z.string(),
+  })
+  .strict()
+  .refine((value) =>
+    value.request.keep_current === true
+      ? value.kept_current === true && value.decision_uuid === undefined
+      : value.kept_current === undefined &&
+        value.decision_uuid !== undefined &&
+        value.field.length > 0,
+  );
 const nameCandidateSchema = z.object({
   uuid,
   local_id: revision,
@@ -181,8 +191,11 @@ export function normalizeEditInput(input: EditInput): EditInput {
  * never reserialized into an Apply body. */
 export function editRequestKey(input: EditApply): string {
   const valid = editApplySchema.parse(input);
-  const { request_uuid, digest, ...choice } = valid;
-  return JSON.stringify([editInputKey(choice), request_uuid, digest]);
+  const { request_uuid, digest, keep_current, ...choice } = valid;
+  const key = [editInputKey(choice), request_uuid, digest];
+  // Preserve the key for already saved Apply requests. Keep is a separate
+  // outcome even when the reviewed field and preview digest are identical.
+  return JSON.stringify(keep_current ? [...key, true] : key);
 }
 
 function editInputKey(input: EditInput): string {

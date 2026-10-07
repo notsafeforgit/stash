@@ -232,7 +232,7 @@ func (rs *nativeArchiveRoutes) applyFileEdit(w http.ResponseWriter, r *http.Requ
 	err := rs.repo.WithTxn(r.Context(), func(ctx context.Context) error {
 		var err error
 		result.Review, result.Replayed, err = rs.repo.MetadataField.ApplyFileEdit(ctx, input)
-		if err == nil && !result.Replayed && rs.notifyMetadata != nil {
+		if err == nil && !result.Replayed && !result.Review.KeptCurrent && rs.notifyMetadata != nil {
 			err = rs.notifyMetadata(ctx, metadata.Input{EntityUUID: input.EntityUUID}, []string{result.Review.Field})
 		}
 		return err

@@ -1,0 +1,79 @@
+{
+  "accounts": {
+    "kind": "accounts",
+    "items": [
+      {
+        "uuid": "b9b47a0d-2589-4347-8eab-6466eae77248",
+        "reasons": ["account_owner_undecided"],
+        "account": {
+          "uuid": "b9b47a0d-2589-4347-8eab-6466eae77248",
+          "namespace": "native:reddit",
+          "label": "Review account",
+          "revision": 1,
+          "canonical_uuid": "b9b47a0d-2589-4347-8eab-6466eae77248",
+          "identifiers": [],
+          "more_identifiers": false
+        }
+      }
+    ],
+    "checked": 1
+  },
+  "media": {
+    "kind": "media",
+    "items": [
+      {
+        "uuid": "50765ed7-5081-433e-8f66-e07ba1d49a47",
+        "reasons": ["media_unselected"],
+        "post": {
+          "requested_uuid": "50765ed7-5081-433e-8f66-e07ba1d49a47",
+          "uuid": "50765ed7-5081-433e-8f66-e07ba1d49a47",
+          "state": "active",
+          "revision": 3,
+          "created_at": "2026-10-07T08:58:47Z",
+          "identifiers": [
+            {
+              "namespace": "native:reddit",
+              "value": "review-queue"
+            }
+          ],
+          "more_identifiers": false,
+          "urls": [],
+          "more_urls": false,
+          "latest_capture": {
+            "uuid": "71cf926b-0015-4c6c-8e78-5064910db56f",
+            "post_uuid": "50765ed7-5081-433e-8f66-e07ba1d49a47",
+            "revision_uuid": "6fdd1d6a-a9a6-4313-9f27-fb1c3283cd24",
+            "origin": "gallery-dl",
+            "platform": "reddit",
+            "captured_at": "2026-10-07T08:58:47.143373036Z",
+            "recorded_at": null,
+            "title": "Retained post",
+            "title_truncated": false,
+            "published_at": null,
+            "date_basis": null
+          }
+        }
+      }
+    ],
+    "checked": 1
+  },
+  "metadata": {
+    "kind": "metadata",
+    "items": [
+      {
+        "uuid": "50086c5a-47e9-430f-bbfb-6b08ec63f039",
+        "reasons": ["retained_metadata"],
+        "media": {
+          "uuid": "50086c5a-47e9-430f-bbfb-6b08ec63f039",
+          "kind": "scene",
+          "state": "active",
+          "revision": 1,
+          "local_id": 1,
+          "title": "Curated",
+          "title_truncated": false
+        }
+      }
+    ],
+    "checked": 1
+  }
+}

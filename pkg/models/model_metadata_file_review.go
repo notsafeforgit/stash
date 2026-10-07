@@ -25,6 +25,7 @@ type MetadataFileEditApplyInput struct {
 	MetadataFileEditInput
 	RequestUUID string `json:"request_uuid"`
 	Digest      string `json:"digest"`
+	KeepCurrent bool   `json:"keep_current,omitempty"`
 }
 
 type MetadataNameCandidate struct {
@@ -67,7 +68,8 @@ type MetadataFileEditPreview struct {
 // request returns the original decision even after later library edits.
 type MetadataFileEditReview struct {
 	RequestUUID  string                     `json:"request_uuid"`
-	DecisionUUID string                     `json:"decision_uuid"`
+	DecisionUUID string                     `json:"decision_uuid,omitempty"`
+	KeptCurrent  bool                       `json:"kept_current,omitempty"`
 	Field        string                     `json:"field"`
 	Request      MetadataFileEditApplyInput `json:"request"`
 	CreatedAt    time.Time                  `json:"created_at"`

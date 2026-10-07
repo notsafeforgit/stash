@@ -118,6 +118,14 @@ export function useNavItems(opts?: {
     ? [
         {
           label: intl.formatMessage({
+            id: "review_queue.title",
+            defaultMessage: "Review queue",
+          }),
+          icon: <History className="size-4" />,
+          to: "/review-queue",
+        },
+        {
+          label: intl.formatMessage({
             id: "archive_activity.title",
             defaultMessage: "Archive activity",
           }),

@@ -214,6 +214,23 @@ read-only APIs on navigation. The route shares native controls, localization,
 mobile/desktop navigation and same-scope failed-refresh behavior. These local
 requests are not a cross-device unresolved-conflict queue.
 
+The Review queue route uses `review-queue-api.ts` for current account ownership,
+post/media association and retained metadata decisions. UUID pages carry a
+checked count and may have an empty items array with a continuation cursor.
+The UI preserves that distinction, links to existing targeted review screens
+and retains its filter/cursor in the URL. It uses the shared activity reader,
+scroll restoration, desktop/mobile navigation and expandable technical details.
+Refresh recomputes current decisions; historical import warnings remain in
+Import history and local pending requests remain in Saved actions.
+
+Historical metadata review offers Apply and Keep current value. Both save an
+exact request before transport and recover its original receipt after a lost
+reply. Keep accepts unresolved names and unsupported historical fields without
+choosing a replacement. Its receipt refreshes review state without refetching
+unchanged library metadata, and its success message remains distinct from Apply.
+The request key includes the Keep outcome while existing Apply keys and bodies
+stay unchanged. A pending choice cannot be silently replaced by the other action.
+
 The Source posts route provides bounded browsing and exact URL, qualified source
 ID or archive UUID lookup. It is available in the desktop utility menu, mobile
 drawer and scene/image source cards. Deep links load only the selected post.

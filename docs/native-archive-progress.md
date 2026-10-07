@@ -10878,3 +10878,65 @@ with mean errors of 44.94–62.19 against the unchanged limit of 12. Production
 rendering code is unchanged. The image package passes locally and in the isolated
 Ubuntu runtime with its required test fixtures; pinned Go lint reports zero
 issues. CI must rerun before selecting a native deployment artifact.
+
+The published revision `21a615ddd88f6dcc0bb78792525578eeacf33fab` subsequently
+passed Build, Go lint, browser tests and GHCR publication. Read-only registry
+inspection confirms its full revision label and source image digest
+`sha256:bbd6250fafbef07436f3c439b7a9589446f808957c9c21efef70757dd0d139a4`.
+This verifies the source image; no production wrapper or deployment was changed.
+
+## Shared review queue and Keep current value — 2026-10-07
+
+The implementation adds a current review queue for account ownership,
+post/media associations and retained catalog fields. Bounded UUID pages link to
+existing targeted review screens through shared desktop/mobile navigation.
+An empty inspected batch with a continuation cursor offers Continue checking;
+it does not claim that review is complete. Explicit unlinks, current merge
+conflicts and field-specific review outcomes retain their existing semantics.
+
+Schema 1000094 records Keep current value receipts without changing selected
+metadata, protection, provenance or entity revisions. Unsupported fields and
+unresolved names can be declined without a replacement. Keep and Apply have
+distinct durable request identities and success messages. Original receipts
+survive later edits, identity adoption, merges, deletion and portable restore.
+Keep emits no metadata-update notification. Historical source edits remain
+available after their review outcome is recorded.
+
+Focused backend, HTTP, restart, staleness, anonymisation and portable restore
+checks pass. The typed client accepts populated responses captured from the
+real Go route. UI types, formatting, localization and 33 client/recovery tests
+pass; Go lint reports zero issues. All 36 Chromium/WebKit cases pass, including
+mobile navigation, empty continuation pages, lost Keep replies and stale
+responses. The initial browser failures were fixture errors: assertions did
+not open the collapsed current-field section, and a synthetic second page
+reused its continuation UUID. Both were corrected without changing the product
+or relaxing response validation. Mobile and desktop layouts were inspected.
+
+A consistent 21.90 GB schema-93 database copy migrated to schema 94 and reopened
+successfully in 586.4 seconds. Independent reconciliation preserved every typed
+cell in 40,512,443 original rows across 300 tables, with clean integrity and zero
+foreign-key violations. Only the empty Keep receipt table, its indexes/triggers
+and one migration-history row were added. Existing jobs and source evidence are
+unchanged. These local measurements are not a production downtime estimate.
+Read-only candidate queries on the populated copy completed in 1.81 seconds for
+media, 0.27 ms for retained metadata and 0.05 ms for an account page; these probes
+do not measure the full HTTP route or establish deployed latency.
+
+The combined release gate passed in 2,090.7 seconds, including generation,
+embedded assets, 789 UI tests, 554 producer tests, 8 library tests, 113 archive
+tests, 262 backup tests, zero Go lint issues and full Go integration. It has not
+been deployed. Live host/n8n conversion, complete backup/restore and request-cost
+proof, cutover observation, retirement and owner acceptance remain required.
+A fresh read-only handoff audit confirms the 49 inventoried host files
+and all 14 inventoried n8n workflow versions/statuses are unchanged; all nine
+active workflows have matching published versions. The three staged conversion
+input graphs still match live. This verifies definitions, not worker health or
+scrape completion.
+
+Inspection of the active workflow graphs also identified retired performer
+filters, an invalid performer-URL selection and two automatic database-migration
+nodes. A private draft corrects the three query shapes and stops on schema
+mismatch; all fourteen remaining GraphQL operations validate against the native
+schema. This is static contract evidence only. Native source registration,
+association-safe add/remove actions, heartbeat conversion and actual n8n runtime
+verification remain prerequisites to publishing the complete workflow changes.

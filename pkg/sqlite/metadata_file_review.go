@@ -342,8 +342,11 @@ func (s *MetadataFieldStore) ApplyFileEdit(ctx context.Context, input models.Met
 	if err != nil {
 		return nil, false, err
 	}
-	if preview.Digest != input.Digest || preview.Status != "ready" {
+	if preview.Digest != input.Digest || (!input.KeepCurrent && preview.Status != "ready") {
 		return nil, false, models.ErrMetadataFieldConflict
+	}
+	if input.KeepCurrent {
+		return s.keepFileEdit(ctx, input, encoded, preview)
 	}
 	complete := false
 	txn.AddPreCommitHook(ctx, func(context.Context) error {
@@ -379,7 +382,19 @@ func (s *MetadataFieldStore) FileEditReview(ctx context.Context, id string) (*mo
 	if _, err := archiveUUID(id); err != nil {
 		return nil, models.ErrMetadataFileReviewInvalid
 	}
-	return readMetadataFileReview(func(dest any, query string, args ...any) error { return dbWrapper.Get(ctx, dest, query, args...) }, id)
+	get := func(dest any, query string, args ...any) error { return dbWrapper.Get(ctx, dest, query, args...) }
+	var count int
+	if err := get(&count, `SELECT (SELECT count(*) FROM metadata_file_edit_reviews WHERE request_uuid=?)+(SELECT count(*) FROM metadata_file_edit_keeps WHERE request_uuid=?)`, id, id); err != nil {
+		return nil, err
+	}
+	if count > 1 {
+		return nil, models.ErrSourcePayloadCorrupt
+	}
+	ret, err := readMetadataFileReview(get, id)
+	if err != nil || ret != nil {
+		return ret, err
+	}
+	return readMetadataFileKeep(get, id)
 }
 
 type metadataFileReviewRow struct {
@@ -406,7 +421,7 @@ func readMetadataFileReview(get enrichmentGet, id string) (*models.MetadataFileE
 	}
 	encoded, _, err := metadataFileReviewRequest(input)
 	signature, signatureErr := metadataFileReviewSignature(input, row.DecisionUUID)
-	if err != nil || signatureErr != nil || string(encoded) != row.RequestJSON || signature != row.Signature || input.RequestUUID != row.RequestUUID ||
+	if input.KeepCurrent || err != nil || signatureErr != nil || string(encoded) != row.RequestJSON || signature != row.Signature || input.RequestUUID != row.RequestUUID ||
 		input.HistoryUUID != row.HistoryUUID || input.SourceField != row.SourceField || input.MatchUUID != row.MatchUUID {
 		return nil, models.ErrSourcePayloadCorrupt
 	}

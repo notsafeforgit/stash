@@ -48,7 +48,7 @@ export function NativeMetadataReview({
   const [saved, setSaved] = useState<SavedReview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
-  const [applied, setApplied] = useState(false);
+  const [outcome, setOutcome] = useState<"applied" | "kept">();
   const [refreshFailed, setRefreshFailed] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const target = { kind, localId: entity.id };
@@ -96,15 +96,17 @@ export function NativeMetadataReview({
     }
     setRefresh((value) => value + 1);
   }
-  async function deliver(preview?: EditPreview) {
+  async function deliver(preview?: EditPreview, keepCurrent = false) {
     setBusy(true);
     setError(undefined);
-    setApplied(false);
+    setOutcome(undefined);
+    setRefreshFailed(false);
     try {
-      if (preview) setSaved(await outbox.prepare(target, preview));
-      await outbox.deliver(target);
-      setApplied(true);
-      await reconcile();
+      if (preview) setSaved(await outbox.prepare(target, preview, keepCurrent));
+      const receipt = await outbox.deliver(target);
+      setOutcome(receipt.kept_current ? "kept" : "applied");
+      if (receipt.kept_current) setRefresh((value) => value + 1);
+      else await reconcile();
     } finally {
       try {
         setSaved(await outbox.read(target));
@@ -156,10 +158,12 @@ export function NativeMetadataReview({
           retry={() => setRefresh((value) => value + 1)}
         />
       )}
-      {applied && (
+      {outcome && (
         <Alert>
           <AlertTitle>
-            {msg("archive_review.applied", "Choice applied")}
+            {outcome === "kept"
+              ? msg("archive_review.kept", "Current value kept")
+              : msg("archive_review.applied", "Choice applied")}
           </AlertTitle>
           <AlertDescription>
             {msg(

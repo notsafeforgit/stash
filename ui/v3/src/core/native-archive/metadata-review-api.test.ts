@@ -3,8 +3,9 @@ import {
   createMetadataReviewAPI,
   editRequestKey,
   metadataReviewEndpoint,
+  validateEditReceipt,
 } from "./metadata-review-api";
-import { ids, preview } from "../../../tests/fixtures/metadata-review";
+import { ids, preview, receipt } from "../../../tests/fixtures/metadata-review";
 
 it("uses the application mount with same-origin session requests and passes cancellation", async () => {
   const endpoint = metadataReviewEndpoint(
@@ -96,4 +97,44 @@ it("bounds pages, sends both keyset parts and does not send internal settings or
     ),
   ).rejects.toThrow();
   expect(transport).toHaveBeenCalledTimes(1);
+});
+
+it("distinguishes keeping from applying and rejects receipts for a different outcome", () => {
+  const apply = {
+    ...preview().input,
+    request_uuid: ids.entity,
+    digest: preview().digest,
+  };
+  const keep = { ...apply, keep_current: true };
+  expect(editRequestKey(keep)).not.toBe(editRequestKey(apply));
+  expect(editRequestKey({ ...apply, keep_current: false })).toBe(
+    editRequestKey(apply),
+  );
+  expect(validateEditReceipt(receipt(keep), keep).kept_current).toBe(true);
+  expect(validateEditReceipt(receipt(apply), apply).decision_uuid).toBe(
+    ids.decision,
+  );
+  expect(() => validateEditReceipt(receipt(apply), keep)).toThrow();
+  expect(() => validateEditReceipt(receipt(keep), apply)).toThrow();
+  expect(() =>
+    validateEditReceipt(
+      { ...receipt(keep), decision_uuid: ids.decision },
+      keep,
+    ),
+  ).toThrow();
+  expect(() =>
+    validateEditReceipt({ ...receipt(apply), kept_current: true }, apply),
+  ).toThrow();
+  expect(() =>
+    validateEditReceipt({ ...receipt(apply), decision_uuid: undefined }, apply),
+  ).toThrow();
+  expect(() =>
+    validateEditReceipt({ ...receipt(keep), kept_current: undefined }, keep),
+  ).toThrow();
+  expect(validateEditReceipt({ ...receipt(keep), field: "" }, keep).field).toBe(
+    "",
+  );
+  expect(() =>
+    validateEditReceipt({ ...receipt(apply), field: "" }, apply),
+  ).toThrow();
 });

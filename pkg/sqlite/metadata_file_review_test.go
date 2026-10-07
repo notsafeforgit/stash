@@ -319,6 +319,10 @@ func TestMetadataFileReviewImageArchiveGenerationAndUnsupportedSceneField(t *tes
 		ArchiveFileUUID: &container.UUID, ArchiveGeneration: &generation, LibraryRootPath: "/identity-fixture", Basis: "exact-path", Origin: "migration"})
 	input := models.MetadataFileEditInput{EntityUUID: entity.UUID, HistoryUUID: history.UUID, MatchUUID: match.UUID, SourceField: "director"}
 	require.Equal(t, "unsupported", previewFileEdit(t, f.repo, input).Status)
+	kept, replay, err := applyFileEdit(f.repo, keepFileEditRequest(t, f.repo, input))
+	require.NoError(t, err)
+	require.False(t, replay)
+	require.True(t, kept.KeptCurrent, "an unsupported image field can be declined without importing it")
 	input.SourceField = "title"
 	preview := previewFileEdit(t, f.repo, input)
 	require.Equal(t, "ready", preview.Status)
@@ -329,6 +333,8 @@ func TestMetadataFileReviewImageArchiveGenerationAndUnsupportedSceneField(t *tes
 	_, _, err = applyFileEdit(f.repo, models.MetadataFileEditApplyInput{MetadataFileEditInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest})
 	require.ErrorIs(t, err, models.ErrFileGenerationConflict)
 	require.ErrorIs(t, err, models.ErrMetadataFieldConflict)
+	_, _, err = applyFileEdit(f.repo, models.MetadataFileEditApplyInput{MetadataFileEditInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest, KeepCurrent: true})
+	require.ErrorIs(t, err, models.ErrMetadataFieldConflict, "Keep must also revalidate the containing ZIP")
 }
 
 func TestMetadataFileReviewCandidateOverflowCannotLookUnique(t *testing.T) {

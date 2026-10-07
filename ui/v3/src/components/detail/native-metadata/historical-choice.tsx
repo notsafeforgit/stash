@@ -56,7 +56,7 @@ function PreviewChoice({
   fields: MetadataFields;
   entity: EntityNames;
   blocked: boolean;
-  onApply: (preview: EditPreview) => Promise<void>;
+  onApply: (preview: EditPreview, keepCurrent: boolean) => Promise<void>;
 }) {
   const msg = useMsg();
   const intl = useIntl();
@@ -108,6 +108,19 @@ function PreviewChoice({
       setBusy(false);
     }
   }
+  async function decide(keepCurrent: boolean) {
+    if (!preview) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      await onApply(preview, keepCurrent);
+    } catch (error) {
+      setError(error);
+    } finally {
+      setPreview(undefined);
+      setBusy(false);
+    }
+  }
   return (
     <Card size="sm">
       <CardHeader>
@@ -121,7 +134,7 @@ function PreviewChoice({
         <CardDescription>
           {msg(
             "archive_review.preview_help",
-            "Compare this retained choice with your current metadata before applying it.",
+            "Compare this retained choice with your current metadata, then apply it or keep the current value.",
           )}
         </CardDescription>
       </CardHeader>
@@ -277,6 +290,14 @@ function PreviewChoice({
               </FieldGroup>
             </>
           ))}
+        {preview && (
+          <p className="text-sm text-muted-foreground">
+            {msg(
+              "archive_review.keep_help",
+              "Keeping the current value marks this retained field reviewed without changing your metadata or its protection from automatic updates. The original edit stays available.",
+            )}
+          </p>
+        )}
       </CardContent>
       <CardFooter className="flex flex-wrap gap-2">
         <Button
@@ -288,23 +309,17 @@ function PreviewChoice({
           {msg("archive_review.preview", "Preview choice")}
         </Button>
         {preview?.status === "ready" && (
-          <Button
-            disabled={busy || blocked}
-            onClick={async () => {
-              setBusy(true);
-              setError(undefined);
-              try {
-                await onApply(preview);
-                setPreview(undefined);
-              } catch (error) {
-                setError(error);
-                setPreview(undefined);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
+          <Button disabled={busy || blocked} onClick={() => void decide(false)}>
             {msg("archive_review.apply", "Apply this choice")}
+          </Button>
+        )}
+        {preview && (
+          <Button
+            variant="outline"
+            disabled={busy || blocked}
+            onClick={() => void decide(true)}
+          >
+            {msg("archive_review.keep", "Keep current value")}
           </Button>
         )}
       </CardFooter>
@@ -325,7 +340,7 @@ export function HistoricalChoice({
   fields: MetadataFields;
   entity: EntityNames;
   blocked: boolean;
-  onApply: (preview: EditPreview) => Promise<void>;
+  onApply: (preview: EditPreview, keepCurrent: boolean) => Promise<void>;
 }) {
   const msg = useMsg();
   const [history, setHistory] =

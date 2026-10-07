@@ -50,7 +50,10 @@ async function archive(
         fields: [
           {
             definition: { name: "title", type: "string", clear_value: "" },
-            value: committed ? "Retained title" : "Library title",
+            value:
+              committed && !committed.kept_current
+                ? "Retained title"
+                : "Library title",
             mode: "set",
             origin: "library",
             protected: true,
@@ -288,9 +291,93 @@ test("ambiguous canonical/alias candidates must be resolved before Apply appears
   });
 });
 
+for (const image of [false, true]) {
+  test(`keeps the current ${image ? "image" : "scene"} value without replacing metadata`, async ({
+    page,
+  }) => {
+    const bodies = await archive(page, { image });
+    await openReview(page, false, image);
+    const panel = page.getByRole("region", { name: "Metadata review" });
+    expect(bodies).toHaveLength(0);
+    await panel
+      .getByRole("button", { name: "Keep current value", exact: true })
+      .click();
+    await expect(
+      panel.getByText("Current value kept", { exact: true }),
+    ).toBeVisible();
+    await panel
+      .getByRole("button", { name: "Current field choices", exact: true })
+      .click();
+    await expect(
+      panel.getByText("Library title", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      panel.getByText("Choice applied", { exact: true }),
+    ).toHaveCount(0);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]?.keep_current).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  });
+}
+
+test("can decline an ambiguous retained performer name without selecting a candidate", async ({
+  page,
+}) => {
+  const bodies = await archive(page, { names: true });
+  await openReview(page);
+  await expect(
+    page.getByRole("button", { name: "Apply this choice" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Keep current value", exact: true })
+    .click();
+  await expect(
+    page.getByText("Current value kept", { exact: true }),
+  ).toBeVisible();
+  expect(bodies).toHaveLength(1);
+  expect(bodies[0]?.keep_current).toBe(true);
+  expect(bodies[0]?.selections).toBeUndefined();
+});
+
 test.describe("response recovery", () => {
   test.use({
     expectedConsoleErrors: ["Failed to load resource", "Load failed"],
+  });
+  test("recovers a lost Keep reply after reload without treating it as Apply", async ({
+    page,
+  }) => {
+    const bodies = await archive(page, { loseResponse: true });
+    await openReview(page);
+    await page
+      .getByRole("button", { name: "Keep current value", exact: true })
+      .click();
+    await expect(
+      page.getByText("Could not complete this step", { exact: true }),
+    ).toBeVisible();
+    expect(bodies).toHaveLength(1);
+    await page.reload();
+    await chooseSection(page, "Metadata review");
+    await page
+      .getByRole("button", { name: "Check and retry saved change" })
+      .click();
+    await expect(
+      page.getByText("Current value kept", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("Choice applied", { exact: true })).toHaveCount(
+      0,
+    );
+    await page
+      .getByRole("button", { name: "Current field choices", exact: true })
+      .click();
+    await expect(
+      page.getByText("Library title", { exact: true }),
+    ).toBeVisible();
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]?.keep_current).toBe(true);
   });
   test("a reload recovers the committed receipt without applying twice", async ({
     page,

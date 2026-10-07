@@ -1,4 +1,6 @@
 import { SavedActionsFixture } from "./saved-actions";
+import { ReviewQueueFixture } from "./review-queue";
+import { reviewQueueSearchSchema } from "@/core/native-archive/review-queue-api";
 import { savedActionSearchSchema } from "@/core/native-archive/saved-actions";
 import { SourceAlbumsFixture } from "./source-albums";
 import { PerformerSourcesFixture } from "./performer-sources";
@@ -443,6 +445,12 @@ const router = createRouter({
       path: "/saved-actions",
       validateSearch: savedActionSearchSchema,
       component: SavedActionsFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/review-queue",
+      validateSearch: reviewQueueSearchSchema,
+      component: ReviewQueueFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

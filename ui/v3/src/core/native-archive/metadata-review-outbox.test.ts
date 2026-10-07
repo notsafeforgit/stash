@@ -89,6 +89,45 @@ it("saves before send and recovers a lost committed response through a new clien
   expect(await first.read(target)).toBeNull();
 });
 
+it.each(["ready", "unresolved_names", "unsupported"] as const)(
+  "recovers an explicit keep choice for a %s field without applying it or repeating the POST",
+  async (status) => {
+    const remote = server();
+    remote.setLoseResponse();
+    const box = createMetadataReviewOutbox(remote.api);
+    const reviewed = { ...preview(), status };
+    const saved = await box.prepare(target, reviewed, true);
+    expect(JSON.parse(saved.body).keep_current).toBe(true);
+    expect(remote.requests).toHaveLength(0);
+    if (status === "ready")
+      await expect(box.prepare(target, reviewed)).rejects.toMatchObject({
+        code: "pending_review",
+      });
+    await expect(box.deliver(target)).rejects.toThrow("Response lost");
+    const reopened = createMetadataReviewOutbox(remote.api);
+    expect(await reopened.read(target)).toEqual(saved);
+    const recovered = await reopened.deliver(target);
+    expect(recovered.kept_current).toBe(true);
+    expect(recovered.decision_uuid).toBeUndefined();
+    expect(remote.bodies).toEqual([saved.body]);
+    expect(await reopened.read(target)).toBeNull();
+  },
+);
+
+it("does not replace a saved Apply request with a Keep choice", async () => {
+  const remote = server();
+  const box = createMetadataReviewOutbox(remote.api);
+  const saved = await box.prepare(target, preview());
+  expect(JSON.parse(saved.body)).not.toHaveProperty("keep_current");
+  await expect(box.prepare(target, preview(), true)).rejects.toMatchObject({
+    code: "pending_review",
+  });
+  expect(await createMetadataReviewOutbox(remote.api).read(target)).toEqual(
+    saved,
+  );
+  expect(remote.requests).toHaveLength(0);
+});
+
 it("retries the byte-identical saved body when the first request never committed", async () => {
   const remote = server();
   remote.setLoseBeforeCommit();

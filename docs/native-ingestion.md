@@ -2032,7 +2032,7 @@ review** section, available through desktop tabs and the mobile section menu.
 | `GET /entities/<uuid>/metadata-fields/<field>/history?after=<sequence>&limit=N` | Immutable decisions in ascending sequence order |
 | `GET /entities/<uuid>/file-edits?after_history=<uuid>&after_match=<uuid>&limit=N` | Historical alternatives linked to that scene/image's files; both cursor parts are required together |
 | `POST /metadata-file-edits/preview` | Current and proposed values, name candidates, file generations, status and digest; no writes |
-| `POST /metadata-file-edits/apply` | Revision-checked application and durable receipt |
+| `POST /metadata-file-edits/apply` | Revision-checked Apply or Keep outcome and durable receipt |
 | `GET /metadata-file-edits/requests/<request-uuid>` | The original committed receipt, or 404 |
 
 List limits are 1–100, default 50. Existing integer library IDs remain valid
@@ -2074,21 +2074,32 @@ retry returns `replayed:true` without editing again. A changed preview or reused
 request UUID with different contents returns 409. Requests are limited to
 256 KiB and cannot specify arbitrary target columns or source payload changes.
 
+To decline a retained field, save the preview request, digest and new request
+UUID with `keep_current:true` and send it to the same endpoint. Keep accepts
+`ready`, `unresolved_names` and `unsupported` previews, but still rechecks their
+digest, current entity revision, field state, file generations and ownership.
+It records review without changing the library value, protection or provenance.
+No replacement performer selection is required and no metadata-update hook is
+sent. A Keep receipt has `kept_current:true` and no `decision_uuid`; an Apply
+receipt has its original decision identity. The exact saved body, including the
+outcome, is part of request identity. Old Apply bodies remain unchanged.
+
 Legacy null removes field protection while keeping the displayed value until a
 permitted native policy updates it. The mode change is explicit in preview.
 Historical edits remain separate choices regardless of timestamps, duplicate
 content claims or file survivors. File/ZIP generations, ownership, selected
 entity revision and relationship candidates are checked again before commit.
 
-The browser journals each Apply body in IndexedDB before transmission. One
+The browser journals each Apply or Keep body in IndexedDB before transmission. One
 pending choice per scene/image is shared across tabs, and separate public
 deployment prefixes have separate journals. Reopening the panel only reads
 state. **Check and retry saved change** inspects the original receipt before
 retrying the identical body. Uncertain responses and storage errors preserve the
 pending choice; a definitive stale-preview refusal permits **Review again**.
-Successful receipts remove the pending browser entry and refresh active library
-queries. A subsequent display-refresh failure does not turn a saved change into
-a failed Apply. Browser storage is temporary request recovery; committed choices
+Successful receipts remove the pending browser entry and refresh review state;
+Apply also refreshes active library queries. A subsequent display-refresh
+failure does not turn a saved outcome into a failed action. Browser storage is
+temporary request recovery; committed choices
 and their provenance live in the native database and its backups.
 
 Application requests use same-origin session authentication and the public
@@ -2780,3 +2791,40 @@ review reads its current post context; opening a merge notification reads its
 original merge receipt. Neither lookup changes the archive. Other review links
 use the original account, collection, root, post or local media scope, including
 the creation form for an uncommitted collection/root request.
+
+## Shared review queue
+
+`GET /api/v3/archive/review-queue/<kind>?after=<uuid>&limit=N` uses application
+session authentication. Supported kinds are `accounts`, `media` and `metadata`;
+limits are 1–50, default 25. It returns `{kind, items, checked, next?}`. Each item
+has its canonical UUID, typed reasons and exactly one compact account, source
+post or scene/image summary. Payload documents, plugin settings and saved
+request bodies are excluded. Opening the queue changes no data.
+
+- Accounts lists canonical accounts with undecided ownership. Explicit links
+  and unlinks are settled; leaving an aggregator without a performer is valid.
+- Media lists active canonical posts with unselected evidence, undecided
+  attachment links or conflicting associations after post/media history has
+  been consolidated. Explicit post choices take precedence over unambiguous
+  attachment defaults. Oversized association sets remain visible for review.
+- Metadata lists current scenes/images with retained source fields that have no
+  Apply or Keep outcome for that media or its merged identities. It starts at
+  indexed source edits and file matches, without scanning every library item.
+
+Paging is by UUID rather than time. Media inspects at most 100 candidate posts
+per request and returns at most the requested number of unresolved items.
+`checked` is the number inspected, not a total backlog count. `next` can follow
+an empty `items` array because settled posts consumed the inspection budget.
+Continue with that cursor; an empty page alone does not establish completion.
+Each candidate is rechecked against its current canonical associations. These
+pages are current views, so refreshing from the first page discovers newly
+unresolved items that sort before an earlier cursor.
+
+The desktop utility menu and mobile drawer expose `/review-queue`. Its three
+filters link to the selected account, post or scene/image's existing review
+controls. The URL retains the kind and cursor, and returning restores list
+position. Failed refreshes keep successful same-scope results; a filter change
+cannot display a late response from the previous scope. An empty intermediate
+media page offers **Continue checking**. Explicit refresh removes items whose
+decisions have since been resolved. Import history retains historical warnings,
+and Saved actions retains uncertain browser submissions independently.

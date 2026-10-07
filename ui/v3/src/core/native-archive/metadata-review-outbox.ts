@@ -67,14 +67,16 @@ export function createMetadataReviewOutbox(api: MetadataReviewAPI) {
   async function prepare(
     target: ReviewTarget,
     preview: EditPreview,
+    keepCurrent = false,
   ): Promise<SavedReview> {
     const checked = editPreviewSchema.parse(preview);
-    if (checked.status !== "ready")
+    if (!keepCurrent && checked.status !== "ready")
       throw new NativeArchiveError(0, "preview_not_ready");
     const input = editApplySchema.parse({
       ...normalizeEditInput(checked.input),
       digest: checked.digest,
       request_uuid: requestUUID(),
+      ...(keepCurrent ? { keep_current: true } : {}),
     });
     const saved: SavedReview = {
       target,

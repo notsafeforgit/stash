@@ -16,6 +16,7 @@ import { Route as CollectionsRouteImport } from './routes/collections'
 import { Route as ImageDuplicateCheckerRouteImport } from './routes/image-duplicate-checker'
 import { Route as ImportHistoryRouteImport } from './routes/import-history'
 import { Route as MediaRootsRouteImport } from './routes/media-roots'
+import { Route as ReviewQueueRouteImport } from './routes/review-queue'
 import { Route as SavedActionsRouteImport } from './routes/saved-actions'
 import { Route as SceneDuplicateCheckerRouteImport } from './routes/scene-duplicate-checker'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -89,6 +90,11 @@ const ImportHistoryRoute = ImportHistoryRouteImport.update({
 const MediaRootsRoute = MediaRootsRouteImport.update({
   id: '/media-roots',
   path: '/media-roots',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewQueueRoute = ReviewQueueRouteImport.update({
+  id: '/review-queue',
+  path: '/review-queue',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SavedActionsRoute = SavedActionsRouteImport.update({
@@ -296,6 +302,7 @@ export interface FileRoutesByFullPath {
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/import-history': typeof ImportHistoryRoute
   '/media-roots': typeof MediaRootsRoute
+  '/review-queue': typeof ReviewQueueRoute
   '/saved-actions': typeof SavedActionsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -344,6 +351,7 @@ export interface FileRoutesByTo {
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/import-history': typeof ImportHistoryRoute
   '/media-roots': typeof MediaRootsRoute
+  '/review-queue': typeof ReviewQueueRoute
   '/saved-actions': typeof SavedActionsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/source-posts': typeof SourcePostsRoute
@@ -392,6 +400,7 @@ export interface FileRoutesById {
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/import-history': typeof ImportHistoryRoute
   '/media-roots': typeof MediaRootsRoute
+  '/review-queue': typeof ReviewQueueRoute
   '/saved-actions': typeof SavedActionsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -442,6 +451,7 @@ export interface FileRouteTypes {
     | '/image-duplicate-checker'
     | '/import-history'
     | '/media-roots'
+    | '/review-queue'
     | '/saved-actions'
     | '/scene-duplicate-checker'
     | '/settings'
@@ -490,6 +500,7 @@ export interface FileRouteTypes {
     | '/image-duplicate-checker'
     | '/import-history'
     | '/media-roots'
+    | '/review-queue'
     | '/saved-actions'
     | '/scene-duplicate-checker'
     | '/source-posts'
@@ -537,6 +548,7 @@ export interface FileRouteTypes {
     | '/image-duplicate-checker'
     | '/import-history'
     | '/media-roots'
+    | '/review-queue'
     | '/saved-actions'
     | '/scene-duplicate-checker'
     | '/settings'
@@ -586,6 +598,7 @@ export interface RootRouteChildren {
   ImageDuplicateCheckerRoute: typeof ImageDuplicateCheckerRoute
   ImportHistoryRoute: typeof ImportHistoryRoute
   MediaRootsRoute: typeof MediaRootsRoute
+  ReviewQueueRoute: typeof ReviewQueueRoute
   SavedActionsRoute: typeof SavedActionsRoute
   SceneDuplicateCheckerRoute: typeof SceneDuplicateCheckerRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -661,6 +674,13 @@ declare module '@tanstack/react-router' {
       path: '/media-roots'
       fullPath: '/media-roots'
       preLoaderRoute: typeof MediaRootsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/review-queue': {
+      id: '/review-queue'
+      path: '/review-queue'
+      fullPath: '/review-queue'
+      preLoaderRoute: typeof ReviewQueueRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/saved-actions': {
@@ -987,6 +1007,7 @@ const rootRouteChildren: RootRouteChildren = {
   ImageDuplicateCheckerRoute: ImageDuplicateCheckerRoute,
   ImportHistoryRoute: ImportHistoryRoute,
   MediaRootsRoute: MediaRootsRoute,
+  ReviewQueueRoute: ReviewQueueRoute,
   SavedActionsRoute: SavedActionsRoute,
   SceneDuplicateCheckerRoute: SceneDuplicateCheckerRoute,
   SettingsRoute: SettingsRouteWithChildren,

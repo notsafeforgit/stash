@@ -40,7 +40,9 @@ export function preview(): EditPreview {
 export function receipt(request: EditApply): EditReceipt {
   return {
     request_uuid: request.request_uuid,
-    decision_uuid: ids.decision,
+    ...(request.keep_current
+      ? { kept_current: true as const }
+      : { decision_uuid: ids.decision }),
     field:
       request.source_field === "actors" ? "performers" : request.source_field,
     request,

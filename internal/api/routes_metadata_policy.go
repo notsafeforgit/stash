@@ -183,6 +183,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/catalog-registry-imports", rs.applyCatalogRegistryImport)
 	r.Get("/catalog-registry-imports/{import}", rs.catalogRegistryImport)
 	r.Get("/catalog-registry-imports/{import}/records", rs.catalogRegistryImportRecords)
+	r.Get("/review-queue/{kind}", rs.archiveReviewQueue)
 	r.Get("/import-history/{kind}", rs.importSnapshots)
 	r.Get("/import-history/{kind}/{snapshot}", rs.importSnapshot)
 	r.Post("/catalog-snapshots", rs.beginCatalogSnapshot)

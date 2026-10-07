@@ -1141,8 +1141,29 @@ their private source history. Migration creates no reviews and changes no
 selected fields. The [application API](native-ingestion.md#historical-metadata-review-api)
 and scene/image review controls are implemented. The review controls use the
 shared mobile section menu and retain uncertain Apply requests across browser
-reloads. Broader account, source and migration review interfaces remain
-transition work.
+reloads.
+
+Schema 1000094 adds `metadata_file_edit_keeps` for an explicit **Keep current
+value** outcome. It retains the exact request, reviewed entity revision, current
+field-decision identity, source field and file match. It creates no field
+decision and changes neither the selected value nor its protection, provenance
+or entity revision. Unsupported fields and unresolved relationship names may be
+declined without choosing a replacement. Keeping a value emits no metadata
+update notification.
+
+Keep repeats the same preview digest, current ownership and file-generation
+checks before commit. Its signed receipt remains replayable after later edits,
+UUID adoption, merges and file deletion. Apply and Keep cannot share a request
+UUID; triggers enforce that distinction across both receipt tables. A late
+receipt failure prevents the surrounding transaction from committing. Startup
+validates scope, signatures, redirects and cross-table request uniqueness.
+Anonymisation removes Keep receipts before their private source history.
+
+The shared review queue considers each retained source field separately. An
+Apply or Keep receipt settles that field for the selected media and its retained
+merged identities, while other fields remain pending. Later library edits do
+not reopen a previously reviewed historical field. Historical evidence remains
+available, including for a later explicit Apply with a new request identity.
 
 ## Retained source documents
 

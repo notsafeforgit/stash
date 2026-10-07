@@ -21,7 +21,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNativeMetadataReviewHTTPSelectionRetryAndAfterCommit(t *testing.T) {
+func nativeMetadataReviewFixture(t *testing.T) (*sqlite.Database, models.Repository, models.MetadataFileEditInput) {
+	t.Helper()
 	config.InitializeEmpty()
 	db := sqlite.NewDatabase()
 	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "metadata-review.sqlite")))
@@ -76,6 +77,11 @@ func TestNativeMetadataReviewHTTPSelectionRetryAndAfterCommit(t *testing.T) {
 		input = models.MetadataFileEditInput{EntityUUID: entity.UUID, HistoryUUID: history.UUID, SourceField: "title", MatchUUID: match.UUID}
 		return nil
 	}))
+	return db, repo, input
+}
+
+func TestNativeMetadataReviewHTTPSelectionRetryAndAfterCommit(t *testing.T) {
+	_, repo, input := nativeMetadataReviewFixture(t)
 	notifications, failHook := 0, false
 	handler := (&nativeArchiveRoutes{repo: repo, notifyMetadata: func(ctx context.Context, in metadata.Input, fields []string) error {
 		require.Equal(t, input.EntityUUID, in.EntityUUID)

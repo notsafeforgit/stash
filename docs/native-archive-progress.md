@@ -71,7 +71,11 @@ handles, recovering 21.90 GB and retaining the original compatible snapshot.
 Shared attachment choices, current post-media readers and metadata source
 selection now have focused integration checks, with the attachment editor's
 original-request recovery verified in Chromium and WebKit. Their integrated
-full fork gate remains pending. Canonical source-list/gallery and post browsing,
+full fork gate found one original-owner test that still attempted an ordinary
+edit through a consolidated alias; the fixture now uses the reviewed consolidation
+operation and its focused regression passes. Internal source-list consolidation
+also passes combined-list, explicit-choice, rollback, original-receipt and restart
+checks. The next integrated full gate remains pending. Canonical source-list/gallery and post browsing,
 the encompassing merge transaction and the complete merge API/UI still require
 integration before application use.
 
@@ -10671,3 +10675,20 @@ Canonical source-list/gallery and post-browse integration, final selection-head
 retirement, pending-publication guards and the encompassing post-merge API/UI
 remain required. These changes do not expose the internal merge primitive or
 change production, worker activation or backup policies.
+
+## Source-list choice consolidation — 2026-10-06
+
+The internal merge can now combine compatible reviewed source lists, pin one
+original capture or explicitly disable selection. It requires the latest merge,
+current post revision and every existing choice. It rejects conflicting,
+duplicate, unrelated and unreviewed additional lists before retiring pointers.
+Original captures, manifests, decisions and review receipts remain unchanged;
+caught late failures roll back both the identity merge and its selections.
+
+Focused selection/review, chained-merge, restart, scoped-query and rollback tests
+pass, including recovery of an original saved review after later merges. The
+previous integrated gate found one test still writing through an old post UUID;
+its corrected reviewed-consolidation path passes. Evidence is under
+`.local/native-post-selection-consolidation-20261006/`. No schema migration is
+added. Canonical readers/editors and the encompassing merge API/UI remain separate
+integration work; the next full gate is still required before pushing.

@@ -223,6 +223,12 @@ func readSelection(row *attachmentSelectionRow, ids []string, sources map[string
 }
 
 func (s *SourceAttachmentStore) Selection(ctx context.Context, value string) (*models.AttachmentSelection, error) {
+	return s.selectionForOriginal(ctx, value)
+}
+
+// History and complete merge review inspect each original owner's current
+// choice even after its post identity has been consolidated.
+func (s *SourceAttachmentStore) selectionForOriginal(ctx context.Context, value string) (*models.AttachmentSelection, error) {
 	post, err := archiveUUID(value)
 	if err != nil {
 		return nil, err
@@ -385,6 +391,10 @@ func (s *SourceAttachmentStore) DecideSelection(ctx context.Context, input model
 	if err != nil || unchanged {
 		return selected, err
 	}
+	return s.publishSelection(ctx, post, input, selected)
+}
+
+func (s *SourceAttachmentStore) publishSelection(ctx context.Context, post *models.SourcePost, input models.AttachmentSelectionInput, selected *models.AttachmentSelection) (*models.AttachmentSelection, error) {
 	signature, err := selectedAttachmentSignature(selected)
 	if err != nil {
 		return nil, err
@@ -414,7 +424,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, post.UUID, post.Revision+1, input.Mode,
 ON CONFLICT(post_uuid) DO UPDATE SET decision_uuid = excluded.decision_uuid`, post.UUID, id); err != nil {
 		return nil, err
 	}
-	return s.Selection(ctx, post.UUID)
+	return s.selectionForOriginal(ctx, post.UUID)
 }
 
 func (s *SourceAttachmentStore) SelectionHistory(ctx context.Context, value string, after, limit int) ([]models.AttachmentSelectionDecision, error) {

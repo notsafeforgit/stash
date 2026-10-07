@@ -481,6 +481,15 @@ Pinned and disabled selections remain protected. A gallery created from such a
 selection retains the original capture as its metadata provenance. Original
 selection-history scopes and exact review receipts remain unchanged.
 
+The internal source-list consolidation operation validates the latest post merge
+and the complete reviewed set of current choices. It can combine compatible
+lists, pin one original capture or explicitly disable source selection. Additional
+lists must come from the reviewed current choices; unrelated, duplicate and
+unreviewed lists are rejected. It retires only current pointers, preserving all
+original captures, manifests, decisions and saved review receipts. Late failures
+roll back the transaction even if a caller catches the error. The encompassing
+merge still owns its final receipt and subsequent gallery synchronization.
+
 Schema 90 permits an explicit consolidated post-media choice to supersede the
 current choices of every original member. Each cross-owner replacement records
 the consolidation that established their shared identity. The database checks

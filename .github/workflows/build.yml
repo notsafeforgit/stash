@@ -117,6 +117,13 @@ jobs:
       with:
         name: generated
 
+    - name: Install media test runtime
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends -y ffmpeg
+        ffmpeg -version
+        ffprobe -version
+
     - name: Install native producer test runtime
       run: make pre-producer pre-backup
 

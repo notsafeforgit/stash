@@ -61,6 +61,13 @@ jobs:
     - name: Build UI
       run: make ui
 
+    - name: Install media test runtime
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends -y ffmpeg
+        ffmpeg -version
+        ffprobe -version
+
     - name: Validate fork before publishing
       run: make pre-producer pre-backup validate-fork
 

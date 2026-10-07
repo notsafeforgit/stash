@@ -51,8 +51,10 @@ type/lint/client and 14 Chromium/WebKit checks. The combined release gate passed
 in 1,931.8 seconds, including 758 UI tests, all producer/archive/backup suites,
 zero Go lint issues and full Go integration. Worker service/timer templates are
 packaged and pass parser validation; they are not installed or activated.
-The import-history increment is integrated and has passed focused checks; its
-combined release gate remains pending.
+Import history passes focused checks and its complete release gate. The CI
+backend and image workflows now explicitly install FFmpeg/ffprobe, after the
+published activity revision exposed that missing runner dependency. Verification
+of the next published artifact remains required.
 The shared queue of current unresolved choices and saved-action recovery remain
 unfinished; historical import warnings are not current conflict counts.
 
@@ -10800,9 +10802,23 @@ pinned Go lint reported zero issues. Read-only checks on the populated schema-93
 copy paged all 1,697 catalogs in 14.8 ms and read their fixed progress sets in
 56.3 ms. Query plans use primary-key searches without temporary sorts. These
 local measurements are not a deployed latency guarantee. No schema migration
-is added. The combined release gate is pending; production is unchanged.
+is added. The combined release gate passed in 2,111.7 seconds, including
+generation, real embedded assets, 763 UI tests, all producer/archive/backup
+suites, zero Go lint issues and full Go integration. Production is unchanged.
 
 The schema-93 activity checkpoint was published and selected as the current
 verified rehearsal. After checking open handles, its superseded schema-92
 development database was retired, reclaiming 21.90 GB and leaving about 96.6 GiB
 free. The original compatible snapshot and verified schema-93 copy remain.
+
+## Media test runtime in CI — 2026-10-07
+
+The published activity revision passed CI lint and browser checks. Its Linux
+binary build also passed, but both backend validation and image-publication
+validation failed because the runner lacked `ffmpeg`. The real-MP4 manual intake
+test correctly requires it; the failures were not a migration or import mismatch.
+Both Ubuntu test environments now explicitly install the FFmpeg package and
+verify both `ffmpeg` and `ffprobe` before running the existing tests. No test is
+skipped or weakened. Cached actionlint 1.7.12 validation passes for both changed
+workflows. The next revision's CI and native image publication must still pass
+before its artifact can be selected for deployment.

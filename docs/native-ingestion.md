@@ -2611,3 +2611,71 @@ container traversals pause before polling again.
 Authenticated results feed the guarded native publication service above.
 Verified staging release remains transition work. Production scrapers have not
 switched to these routes.
+
+## Reviewed post merges
+
+These authenticated application routes live under `/api/v3/archive`. They review
+records of the same source post; a shared creator, URL or matching media does not
+by itself establish post identity. Producer ingestion does not call these routes.
+
+| Route | Purpose |
+| --- | --- |
+| `POST /post-consolidation/preview` | Read-only comparison, explicit choices, proposed album effects and digest |
+| `POST /post-consolidation/apply` | Atomically apply the exact reviewed request; returns `{review, replayed}` |
+| `GET /post-consolidation/requests/<request>` | Retrieve the immutable original request and result |
+| `POST /post-consolidation/requests/<request>/check` | Read-only exact-request recovery; body is the complete original Apply request |
+| `GET /posts/<post>/consolidation-history?after=N&limit=N` | Indexed ascending event history involving this original record as source or destination |
+| `GET /post-consolidation/requests/<request>/notifications?before=N&limit=N` | Indexed notification jobs, newest first, including retries from other sessions |
+| `GET /post-merge-notifications/<job>` | Compact delivery state and revision |
+| `POST /post-merge-notifications/<job>/cancel` | Cancel remaining delivery using `expected_revision` |
+| `POST /post-merge-notifications/<job>/retry` | Retry delivery with a new `request_uuid` and terminal parent's `expected_revision` |
+| `GET /post-merge-notification-requests/<request>` | Recover a saved retry without another POST |
+
+Preview input contains current canonical `source_uuid` and `destination_uuid`,
+`media` and `attachments` arrays, an optional `reason`, and optional `selection`
+and `gallery` overrides. Omitted overrides preserve agreeing current choices.
+The UI sends empty arrays and an empty reason when there are no overrides.
+API callers may omit empty choice lists; their original receipts retain `null`
+for those lists. History accepts that representation without treating it as the
+browser's exact saved request.
+
+- `selection` accepts `mode: choose` plus an original `decision_uuid`,
+  `mode: combine` plus the primary original `decision_uuid`, or `mode: disabled`.
+  Combining fills compatible source positions and retains the primary capture;
+  contradictory positions need a selected list.
+- `gallery` accepts `state: linked` plus a gallery UUID already present in these
+  posts' choices, or `state: disabled`. Shared gallery validation checks current
+  availability, filesystem-backed galleries and other posts' claims.
+- Each `media` override contains a known canonical `media_uuid` and a state of
+  `linked`, `unlinked` or `undecided`.
+- Each `attachments` override contains the qualified `namespace` and `value`,
+  one of those states, and a `media_uuid` only when linked. A linked target must
+  already occur among that qualified attachment's choices. An explicit post
+  unlink and attachment link to the same media must be resolved together.
+
+The response includes all original members, resulting choices, source order,
+gallery additions/removals, structured blockers, `ready` and `digest`. No source
+payload or profile documents are duplicated into this review. The request body
+is limited to 4 MiB; at most 256 original posts and 8,192 choices are considered.
+Exceeding a complete-review bound returns `post_comparison_limit`, never a
+truncated permission to merge. Conflicting qualified upstream IDs return
+`post_identity_conflict`.
+
+Apply repeats the preview input with `request_uuid` and `digest`. It revalidates
+current heads and library revisions before publishing any effect. It returns
+`preview_changed` if the reviewed state changed. Exact committed retries recover
+the original receipt even after restart or a later merge. A UUID reused for a
+different request is rejected. HTTP 404 from the exact-request check means no
+matching receipt exists; transport errors and other refusals cannot establish
+that a previous write did not commit.
+
+Gallery changes admit durable `post.merge_notify` work in the same transaction.
+The server resumes delivery after restart using the original merge event UUID;
+a crash during hook delivery can redeliver that same event. Successful no-op
+or disabled gallery outcomes need no notification job. Delivery failure never
+undoes the committed merge. Cancellation stops pending work and cannot retract
+a hook already delivered. An explicit retry uses its own saved request and does
+not repeat identity, association or gallery writes. Job responses expose state,
+revision, parent retry identity, bounded error code and timestamps; internal job
+arguments and work keys are omitted. History pages default to 25 rows, with a
+1–100 limit; a missing notification `before` cursor selects the newest jobs.

@@ -15,6 +15,15 @@ func (s *Manager) NewAlbumBackfillWorker(service *gallery.AlbumBackfill) *galler
 	return gallery.NewAlbumWorker(service, s.finishAlbumBackfill)
 }
 
+func (s *Manager) NewPostMergeNotificationWorker(service *gallery.PostMergeNotifications) *gallery.PostMergeNotificationWorker {
+	return gallery.NewPostMergeNotificationWorker(service, func(ctx context.Context, review models.PostConsolidationReview, guard gallery.AlbumEffectGuard) error {
+		result := review.Result.Gallery
+		return s.finishAlbumBackfill(ctx, gallery.AlbumPublication{EventUUID: review.Request.RequestUUID,
+			PostUUID: review.Request.DestinationUUID, GalleryUUID: result.GalleryUUID, Action: result.Action,
+			Created: result.Created, Added: len(result.Added), Removed: len(result.Removed)}, guard)
+	})
+}
+
 func (s *Manager) finishAlbumBackfill(ctx context.Context, published gallery.AlbumPublication, guard gallery.AlbumEffectGuard) error {
 	if err := guard(ctx); err != nil {
 		return err

@@ -24,10 +24,11 @@ type postConsolidationChoiceConflict struct {
 // earlier alias. Original choices remain independent evidence until the apply
 // operation explicitly resolves them in the same transaction as consolidation.
 type postConsolidationChoiceSnapshot struct {
-	Identity  *postIdentitySnapshot
-	Posts     []models.SourcePostComparisonState
-	Conflicts []postConsolidationChoiceConflict
-	Signature string
+	Identity   *postIdentitySnapshot
+	Posts      []models.SourcePostComparisonState
+	Conflicts  []postConsolidationChoiceConflict
+	Signature  string
+	selections map[string]*models.AttachmentSelection
 }
 
 const postConsolidationManifestBudgetQuery = `SELECT m.entry_count FROM source_post_identities i
@@ -55,7 +56,7 @@ func inspectPostConsolidationChoices(ctx context.Context, source, destination st
 			return nil, models.ErrSourcePostIdentityLimit
 		}
 	}
-	ret := &postConsolidationChoiceSnapshot{Identity: identity, Posts: []models.SourcePostComparisonState{}, Conflicts: []postConsolidationChoiceConflict{}}
+	ret := &postConsolidationChoiceSnapshot{Identity: identity, Posts: []models.SourcePostComparisonState{}, Conflicts: []postConsolidationChoiceConflict{}, selections: map[string]*models.AttachmentSelection{}}
 	var references, attachments, mediaChoices, sourceEntries int
 	selections := make([]*models.AttachmentSelection, 0, len(identity.Members))
 	store := &SourceEvidenceStore{}
@@ -68,6 +69,7 @@ func inspectPostConsolidationChoices(ctx context.Context, source, destination st
 		attachments += len(post.Attachments)
 		mediaChoices += len(post.MediaChoices)
 		if selection != nil {
+			ret.selections[selection.Decision.UUID] = selection
 			sourceEntries += len(selection.Entries)
 			selections = append(selections, selection)
 		}

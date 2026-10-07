@@ -429,8 +429,9 @@ does not establish that two records represent the same post. An empty conflict
 list likewise does not establish identity. This endpoint performs no merge,
 returns no Apply authorization, and does not rewrite captures or job receipts.
 It inspects current choices; original history, evidence and pending work remain
-under their existing post scopes. Reviewed consolidation is a separate release
-requirement.
+under their existing post scopes. The separate
+[reviewed merge](native-ingestion.md#reviewed-post-merges) binds explicit choices
+and a fresh digest before applying them together.
 
 Each post is limited to 512 identifiers, 512 URLs, 8,192 retained attachment
 identities and 8,192 explicit media choices. Larger scopes return HTTP 422 with
@@ -571,10 +572,28 @@ for the current post. Viewing historical jobs leaves pending requests intact.
 Command-line preparation resolves and deduplicates explicitly supplied historical
 UUIDs; existing plans, receipts and job histories retain their original scopes.
 
-The identity writer is internal and has no application mutation route. It does
-not settle conflicting source-list, gallery or media choices on its own. The
-encompassing reviewed transaction, pending-work publication and the complete
-post-merge UI must be connected before users can apply a post merge.
+The identity writer remains internal. The application uses an encompassing
+reviewed transaction to resolve source-list, gallery, post-media and attachment
+choices before publishing the canonical identity. Its preview includes every
+original member and the resulting source order and gallery membership. Conflicts
+require explicit choices; distinct upstream post IDs from one namespace cannot
+be forced together. Current library metadata, manual membership and exclusions
+remain subject to the shared gallery services.
+
+Schema 1000092 retains the complete request and original result alongside the
+identity event. Canonical identity changes, copied decisions, gallery effects,
+notification admission and the immutable receipt commit in one managed
+transaction. A late failure invalidates that transaction even if a caller
+catches its error. Retries compare the saved request before consulting current
+identity, so later merges do not rewrite the original result. Captures and
+source revisions remain under their original owners.
+
+The Source posts detail page offers this review on desktop and mobile. It saves
+the exact application request in browser storage before sending, checks the
+original receipt after a lost response, and keeps unresolved requests attached
+to their original post UUID after redirection. A definitively stale preview
+requires a new review. Merge history and notification retries are available
+without depending on the browser that performed the merge.
 
 ## Mapping catalog relationships
 

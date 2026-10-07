@@ -1,4 +1,5 @@
 import { SourceAlbum } from "../albums/ordered";
+import { PostMerge } from "./merge";
 import { LibraryLink } from "./library-link";
 import { useCallback, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -446,6 +447,20 @@ export function PostDetail({
             <PostIdentifiers post={post} api={api} />
           </PostSection>
         </>
+      )}
+      {post && (
+        <PostSection title={msg("post_merge.title", "Merge source posts")}>
+          <PostMerge
+            key={`${api.endpoint}:${id}`}
+            api={api}
+            requested={id}
+            post={post}
+            onSaved={() => {
+              refreshAlbum();
+              result.retry();
+            }}
+          />
+        </PostSection>
       )}
     </div>
   );

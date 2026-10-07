@@ -9,7 +9,8 @@ export function LibraryLink({
   children,
   sources = false,
 }: {
-  item: PostLibraryItem;
+  item: Pick<PostLibraryItem, "kind" | "state" | "local_id"> &
+    Partial<PostLibraryItem>;
   children: ReactNode;
   sources?: boolean;
 }) {

@@ -16,6 +16,7 @@ const (
 	ArchiveJobEnrichPost      = "post.enrich"
 	ArchiveJobListAccount     = "account.list_page"
 	ArchiveJobVerifyCandidate = "post.verify_candidate"
+	ArchiveJobNotifyPostMerge = "post.merge_notify"
 )
 
 type ArchiveJob struct {
@@ -93,6 +94,8 @@ type ArchiveJobReaderWriter interface {
 	FindSubmission(context.Context, string) (*ArchiveJob, error)
 	List(context.Context, string, string, int64, int) ([]ArchiveJob, error)
 	ResourceHistory(context.Context, string, string, int64, int) ([]ArchiveJob, error)
+	// WorkHistory returns newest first; before=0 starts with the latest job.
+	WorkHistory(context.Context, string, string, int64, int) ([]ArchiveJob, error)
 	Attempts(context.Context, string, int64, int) ([]ArchiveJobAttempt, error)
 	Claim(context.Context, string, string, time.Time, time.Duration) (*ArchiveJob, error)
 	// ClaimByID claims only the selected revision. The caller must authorize

@@ -91,6 +91,7 @@ const postIdentitySchema = z.object({
   revision,
   created_at: z.string().datetime({ offset: true }),
 });
+export { identifier as postIdentifierSchema, postIdentitySchema };
 export const postIdentityContextSchema = z
   .object({ requested: postIdentitySchema, canonical: postIdentitySchema })
   .refine(

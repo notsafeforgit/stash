@@ -74,18 +74,33 @@ hooks:
 	require.Equal(t, float64(7), data["id"])
 	require.Equal(t, "Gallery.Create.Post", data["type"])
 	require.Empty(t, data["inputFields"])
+	mergeWorker := mgr.NewPostMergeNotificationWorker(gallery.NewPostMergeNotifications(repo))
+	merge := models.PostConsolidationReview{Request: models.PostConsolidationReviewApplyInput{RequestUUID: published.EventUUID},
+		Result: models.PostConsolidationReviewResult{Gallery: models.PostConsolidationGalleryResult{
+			GalleryUUID: entity.UUID, Created: true, Action: "create", Added: []string{uuid.NewString()},
+		}}}
+	require.EqualError(t, mergeWorker.Effects(t.Context(), merge, guard), first)
+	require.EqualError(t, mergeWorker.Effects(t.Context(), merge, guard), first, "merge retry retains the original hook event")
 	published.Created, published.Action = false, "sync"
 	updated := worker.Effects(t.Context(), published, guard)
 	require.ErrorContains(t, updated, `"inputFields":["image_ids","scene_ids"]`)
 	require.ErrorContains(t, updated, `"type":"Gallery.Update.Post"`)
 	require.NotContains(t, updated.Error(), data["eventId"])
+	merge.Result.Gallery.Created, merge.Result.Gallery.Action = false, "sync"
+	require.EqualError(t, mergeWorker.Effects(t.Context(), merge, guard), updated.Error())
 	published.Added = 0
 	require.NoError(t, worker.Effects(t.Context(), published, guard), "a no-op album does not notify plugins")
+	merge.Result.Gallery.Added = nil
+	require.NoError(t, mergeWorker.Effects(t.Context(), merge, guard), "a no-op merge does not notify plugins")
+	merge.Result.Gallery.Removed = []string{uuid.NewString()}
+	require.EqualError(t, mergeWorker.Effects(t.Context(), merge, guard), updated.Error())
 	published.Added = 1
 	require.ErrorIs(t, worker.Effects(t.Context(), published, func(context.Context) error { return models.ErrArchiveJobLease }), models.ErrArchiveJobLease)
+	require.ErrorIs(t, mergeWorker.Effects(t.Context(), merge, func(context.Context) error { return models.ErrArchiveJobLease }), models.ErrArchiveJobLease)
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		_, _, err := db.ExecSQL(ctx, "DELETE FROM galleries WHERE id=7; INSERT INTO galleries(id,title,created_at,updated_at) VALUES(7,'Replacement',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)", nil)
 		return err
 	}))
 	require.NoError(t, worker.Effects(t.Context(), published, guard), "a deleted UUID cannot send an old event to its replacement local ID")
+	require.NoError(t, mergeWorker.Effects(t.Context(), merge, guard), "a deleted UUID cannot send merge notifications to its replacement local ID")
 }

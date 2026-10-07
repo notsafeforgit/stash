@@ -1,0 +1,199 @@
+{
+  "input": {
+    "source_uuid": "dc68b6e1-a128-4766-87d4-919d91292fae",
+    "destination_uuid": "694c651a-9ef9-4090-9013-6ba793729cd8",
+    "media": [],
+    "attachments": [],
+    "reason": ""
+  },
+  "preview": {
+    "source": {
+      "uuid": "dc68b6e1-a128-4766-87d4-919d91292fae",
+      "canonical_uuid": "dc68b6e1-a128-4766-87d4-919d91292fae",
+      "redirect_to": null,
+      "state": "active",
+      "revision": 1,
+      "created_at": "2026-10-07T03:38:21Z"
+    },
+    "destination": {
+      "uuid": "694c651a-9ef9-4090-9013-6ba793729cd8",
+      "canonical_uuid": "694c651a-9ef9-4090-9013-6ba793729cd8",
+      "redirect_to": null,
+      "state": "active",
+      "revision": 4,
+      "created_at": "2026-10-07T03:38:21Z"
+    },
+    "posts": [
+      {
+        "uuid": "694c651a-9ef9-4090-9013-6ba793729cd8",
+        "state": "active",
+        "revision": 4,
+        "identifiers": [
+          {
+            "namespace": "native:reddit",
+            "value": "fixture"
+          }
+        ],
+        "urls": [],
+        "latest_capture": {
+          "uuid": "ae147028-9e8b-4273-bdc1-2d946556de8d",
+          "post_uuid": "694c651a-9ef9-4090-9013-6ba793729cd8",
+          "revision_uuid": "ec52c927-8a43-43d6-86c9-cead1f13e845",
+          "origin": "gallery-dl",
+          "platform": "reddit",
+          "captured_at": "2026-10-07T03:38:21.608912376Z",
+          "recorded_at": null,
+          "title": "Album title",
+          "title_truncated": false,
+          "published_at": "2026-09-28",
+          "date_basis": null
+        },
+        "selection": {
+          "decision_uuid": "c35a5773-a666-4c34-a526-2bed6d259092",
+          "mode": "pinned",
+          "origin": "review",
+          "capture_uuid": "ae147028-9e8b-4273-bdc1-2d946556de8d",
+          "complete": true,
+          "declared_album": true,
+          "expected_count": 2,
+          "entries": [
+            {
+              "position": 0,
+              "attachment_uuid": "19e09a2c-8467-4bfd-a3a7-5eacafc58690",
+              "media_kind": "image"
+            },
+            {
+              "position": 1,
+              "attachment_uuid": "ca7ee61f-204f-4f9b-be99-d54cf26c7d18",
+              "media_kind": "video"
+            }
+          ]
+        },
+        "album": null,
+        "attachments": [
+          {
+            "uuid": "19e09a2c-8467-4bfd-a3a7-5eacafc58690",
+            "namespace": "native:reddit",
+            "value": "first",
+            "revision": 1,
+            "choice": null,
+            "media": null
+          },
+          {
+            "uuid": "ca7ee61f-204f-4f9b-be99-d54cf26c7d18",
+            "namespace": "native:reddit",
+            "value": "second",
+            "revision": 1,
+            "choice": null,
+            "media": null
+          }
+        ],
+        "media_choices": []
+      },
+      {
+        "uuid": "dc68b6e1-a128-4766-87d4-919d91292fae",
+        "state": "active",
+        "revision": 1,
+        "identifiers": [
+          {
+            "namespace": "legacy:catalog:fixture",
+            "value": "old-post"
+          }
+        ],
+        "urls": [],
+        "latest_capture": null,
+        "selection": null,
+        "album": null,
+        "attachments": [],
+        "media_choices": []
+      }
+    ],
+    "selection": {
+      "mode": "pinned",
+      "capture_uuid": "ae147028-9e8b-4273-bdc1-2d946556de8d",
+      "manifest_uuids": ["1f3d1eba-01a1-4506-9607-6b657a969ece"],
+      "entry_count": 2,
+      "complete": true,
+      "declared_album": true,
+      "expected_count": 2
+    },
+    "gallery": null,
+    "album": {
+      "action": "create",
+      "title": "Album title",
+      "date": "2026-09-28",
+      "entries": [
+        {
+          "position": 0,
+          "namespace": "native:reddit",
+          "value": "first",
+          "status": "unselected"
+        },
+        {
+          "position": 1,
+          "namespace": "native:reddit",
+          "value": "second",
+          "status": "unselected"
+        }
+      ],
+      "add": [],
+      "remove": []
+    },
+    "media": [],
+    "attachments": [],
+    "blockers": [],
+    "ready": true,
+    "digest": "c2df44378fe90caea230b3da803910134369376a7cfee17de612494ca6f75038"
+  },
+  "receipt": {
+    "request": {
+      "source_uuid": "dc68b6e1-a128-4766-87d4-919d91292fae",
+      "destination_uuid": "694c651a-9ef9-4090-9013-6ba793729cd8",
+      "media": [],
+      "attachments": [],
+      "reason": "",
+      "request_uuid": "dfe4e299-86b8-4937-a99f-5a33565148fb",
+      "digest": "c2df44378fe90caea230b3da803910134369376a7cfee17de612494ca6f75038"
+    },
+    "result": {
+      "consolidation": {
+        "uuid": "dfe4e299-86b8-4937-a99f-5a33565148fb",
+        "sequence": 1,
+        "source_uuid": "dc68b6e1-a128-4766-87d4-919d91292fae",
+        "destination_uuid": "694c651a-9ef9-4090-9013-6ba793729cd8",
+        "source_revision": 1,
+        "destination_revision": 4,
+        "member_count": 2,
+        "identity_signature": "4f9dc89fc4e61c40bc009d0ca1776c7bf7a5eda43db2b5eabc201d5ff1f17be8",
+        "review_signature": "c2df44378fe90caea230b3da803910134369376a7cfee17de612494ca6f75038",
+        "origin": "review",
+        "reason": "",
+        "created_at": "2026-10-07T03:38:21Z"
+      },
+      "members": [
+        {
+          "post_uuid": "694c651a-9ef9-4090-9013-6ba793729cd8",
+          "previous_canonical_uuid": "694c651a-9ef9-4090-9013-6ba793729cd8",
+          "previous_revision": 4
+        },
+        {
+          "post_uuid": "dc68b6e1-a128-4766-87d4-919d91292fae",
+          "previous_canonical_uuid": "dc68b6e1-a128-4766-87d4-919d91292fae",
+          "previous_revision": 1
+        }
+      ],
+      "selection_uuid": "681c46e8-56cd-4019-97c2-110283707163",
+      "gallery_decision_uuid": "b800ddf3-d0bd-41be-ab25-adf70880d2d3",
+      "media_decision_uuids": [],
+      "attachment_decision_uuids": [],
+      "gallery": {
+        "gallery_uuid": "f4e7d646-543a-4255-aff2-c769eddc68dc",
+        "action": "create",
+        "created": true,
+        "added": [],
+        "removed": []
+      },
+      "notification_job_uuid": "9c92f77f-f6b3-479d-b262-66558b682033"
+    }
+  }
+}

@@ -65,7 +65,7 @@ func managedArchiveJobWrite(ctx context.Context) error {
 
 func validJobTime(value time.Time) bool { return value.UnixMilli() > 0 && value.UTC().Year() <= 9999 }
 func validJobKind(kind string) bool {
-	return kind == models.ArchiveJobVerifyMedia || kind == models.ArchiveJobBackfillAlbum || kind == models.ArchiveJobTranslateText || metadataJobKind(kind)
+	return kind == models.ArchiveJobVerifyMedia || kind == models.ArchiveJobBackfillAlbum || kind == models.ArchiveJobTranslateText || kind == models.ArchiveJobNotifyPostMerge || metadataJobKind(kind)
 }
 func metadataJobKind(kind string) bool {
 	return kind == models.ArchiveJobEnrichPost || kind == models.ArchiveJobListAccount || kind == models.ArchiveJobVerifyCandidate
@@ -154,6 +154,9 @@ func (s *ArchiveJobStore) Submit(ctx context.Context, input models.ArchiveJobSub
 	}
 	if input.Kind == models.ArchiveJobListAccount {
 		discoveryJobSubmissionGuard(ctx, input.RequestUUID)
+	}
+	if input.Kind == models.ArchiveJobNotifyPostMerge {
+		postMergeNotificationSubmissionGuard(ctx, input.RequestUUID)
 	}
 	var previous struct {
 		Digest string `db:"digest"`
@@ -266,6 +269,30 @@ func (s *ArchiveJobStore) ResourceHistory(ctx context.Context, kind, resource st
 	}
 	var rows []archiveJobRow
 	if err := dbWrapper.Select(ctx, &rows, "SELECT * FROM archive_jobs WHERE kind=? AND resource_key=? AND id>? ORDER BY id LIMIT ?", kind, resource, after, limit); err != nil {
+		return nil, err
+	}
+	ret := make([]models.ArchiveJob, 0, len(rows))
+	for _, row := range rows {
+		ret = append(ret, *row.resolve())
+	}
+	return ret, nil
+}
+
+const archiveJobWorkHistoryQuery = "SELECT * FROM archive_jobs WHERE kind=? AND work_key=?"
+
+func (s *ArchiveJobStore) WorkHistory(ctx context.Context, kind, work string, before int64, limit int) ([]models.ArchiveJob, error) {
+	if !validJobKind(kind) || !archive.ValidSHA256(work) || before < 0 || limit < 1 || limit > 100 {
+		return nil, models.ErrArchiveJobConflict
+	}
+	query, args := archiveJobWorkHistoryQuery, []any{kind, work}
+	if before != 0 {
+		query += " AND id<?"
+		args = append(args, before)
+	}
+	query += " ORDER BY id DESC LIMIT ?"
+	args = append(args, limit)
+	var rows []archiveJobRow
+	if err := dbWrapper.Select(ctx, &rows, query, args...); err != nil {
 		return nil, err
 	}
 	ret := make([]models.ArchiveJob, 0, len(rows))

@@ -208,7 +208,7 @@ func (db *Database) Repository() models.Repository {
 		SourceCollection:            &SourceCollectionStore{},
 		CapturePublisher:            &CapturePublisherStore{},
 		Ingest:                      &IngestStore{},
-		SourceEvidence:              &SourceEvidenceStore{},
+		SourceEvidence:              &SourceEvidenceStore{gallery: db.Gallery},
 		SourceDocument:              &SourceDocumentStore{},
 		SourceTranslation:           &SourceTranslationStore{},
 		TranslationWork:             &TranslationWorkStore{},

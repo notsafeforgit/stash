@@ -10845,3 +10845,44 @@ are retained under
 `.local/native-canonical-post-backfill-20261006/`. This increment does not expose
 the encompassing post-merge mutation or activate any production writer/worker.
 The complete reviewed merge API/UI and broader transition gates remain required.
+
+## Atomic post merge review and notification recovery — 2026-10-06
+
+The reviewed post merge now resolves source-list, gallery, post-media and
+attachment choices in one managed transaction. Its digest covers original
+identity members, current decisions and library state; stale reviews and caught
+late errors cannot leave a partial merge. Schema 1000092 stores immutable exact
+requests, original results and decision ownership. Retained captures and prior
+producer/backfill receipts are preserved across later merges and restart.
+Gallery changes admit durable notification work, with separate saved retry
+requests and indexed history so recovery works after reload or on another device.
+
+The native Source posts screen now exposes target lookup, original choices,
+explicit conflict resolution and a preview of source order and gallery changes.
+It writes a durable browser request before transport and recovers its original
+receipt before attempting delivery again. Original post redirects cannot hide a
+pending request. Notification retry/cancellation leaves the committed merge in
+place. Existing Base UI controls and expandable sections work on desktop/mobile;
+large choice lists render in bounded portions.
+
+Focused backend migration, atomicity, publication, HTTP, restart, integrity,
+portable restore and hook tests passed; the new notification-history checks
+passed in 56.0 seconds and pinned Go lint reported zero issues. The typed client
+accepts a synthetic response captured from the real Go routes; all 12 recovery
+and validation tests passed. All 36 Chromium/WebKit merge and existing post
+browser cases passed, including conflicting links, stale previews, lost replies,
+redirect recovery and a failed post refresh after a successful merge. UI types,
+component lint and localization checks passed. The full-copy schema-92 migration and fresh reopen passed in 461.2 seconds.
+Independent reconciliation checked 40,512,441 original rows across all 300
+original tables, preserving every typed cell value; integrity was clean with
+zero foreign-key violations. The four new receipt tables are empty and no job or
+policy was activated. These concurrent rehearsal measurements are not a
+production downtime estimate. The combined release gate passed in 1,928.3 seconds: generation,
+real embedded assets, 752 UI tests, 554 producer tests, eight library tests,
+113 archive tests, 262 backup tests, zero Go lint issues and full Go integration,
+including the API and SQLite suites.
+
+Production, installed producers, active scheduling and S3 policies remain
+unchanged. Shared import/job history, remaining caller/compatibility conversion,
+full production backup/restore and request-cost evidence, cutover observation,
+retirement and owner acceptance remain required.

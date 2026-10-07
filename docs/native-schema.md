@@ -1,5 +1,8 @@
 # Native schema promotion
 
+The current development schema is 1000092. Production promotion remains a
+separate reviewed cutover; development migrations are rehearsed on copies.
+
 The independent schema begins at primary migration 1000000 and identifies itself
 with `native_schema.lineage = org.notsafeforgit.stash.native-archive`. New
 databases use this lineage. Existing compatible databases require explicit
@@ -2878,3 +2881,32 @@ producer/owner/fence still holds a live server lease. Neither a completed downlo
 report nor an old successful verification establishes current file availability.
 The read does not mutate run state or synthesize missing producer reports.
 See [the wire contract](native-ingestion.md#attachment-download-reports).
+
+## Reviewed post merge receipts
+
+Migration 1000092 preserves the existing `archive_jobs` rows, constraints,
+indexes and transition guards while adding the `post.merge_notify` kind. The
+`archive_jobs_work_history` index supports bounded newest-first lookup by kind
+and immutable work key. Four authoritative tables retain each completed review:
+
+| Table | Preserved state |
+| --- | --- |
+| `post_consolidation_reviews` | Exact canonical request/result JSON, digest, selected source/gallery decisions and original notification job |
+| `post_consolidation_review_members` | Every original post's previous canonical UUID and revision |
+| `post_consolidation_review_media` | Ordered post-media decisions created by this review |
+| `post_consolidation_review_attachments` | Ordered attachment decisions created by this review |
+
+Foreign keys and immutable/scope triggers bind these records to the original
+identity event and reviewed decisions. Startup checks canonical request/result
+bytes, signatures, original members, decision ownership and original job scope;
+corrupt receipts or missing authoritative tables are rejected. Anonymization
+removes dependent receipt rows in dependency order. Portable exports and restored
+native databases carry all four tables and unfinished delivery work.
+
+The managed merge transaction publishes identity, source-list selection,
+gallery and media choices, actual album effects, receipt and notification job
+together. Required notification delivery begins after commit, retains the
+original event identity across explicit retries, and cannot substitute a newly
+created gallery that happens to reuse an old local integer ID. Historical
+captures, revisions and successful producer/backfill receipts keep their
+original ownership and recovery semantics.

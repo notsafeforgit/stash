@@ -57,15 +57,16 @@ type Server struct {
 	http.Server
 	displayAddress string
 
-	manager               *manager.Manager
-	shares                *sharing.Service
-	ingestWorker          *archiveWorkerRuntime
-	albumWorker           *archiveWorkerRuntime
-	translationWorker     *archiveWorkerRuntime
-	enrichmentMaintenance *archiveWorkerRuntime
-	discoveryMaintenance  *archiveWorkerRuntime
-	discoveryComparison   *archiveWorkerRuntime
-	discoveryPublication  *archiveWorkerRuntime
+	manager                *manager.Manager
+	shares                 *sharing.Service
+	ingestWorker           *archiveWorkerRuntime
+	albumWorker            *archiveWorkerRuntime
+	postMergeNotifications *archiveWorkerRuntime
+	translationWorker      *archiveWorkerRuntime
+	enrichmentMaintenance  *archiveWorkerRuntime
+	discoveryMaintenance   *archiveWorkerRuntime
+	discoveryComparison    *archiveWorkerRuntime
+	discoveryPublication   *archiveWorkerRuntime
 }
 
 // TODO - os.DirFS doesn't implement ReadDir, so re-implement it here
@@ -279,6 +280,7 @@ func Initialize() (*Server, error) {
 	}
 	albums := gallery.NewAlbumBackfill(repo)
 	server.albumWorker = &archiveWorkerRuntime{worker: mgr.NewAlbumBackfillWorker(albums)}
+	server.postMergeNotifications = &archiveWorkerRuntime{worker: mgr.NewPostMergeNotificationWorker(gallery.NewPostMergeNotifications(repo))}
 	translations := translation.New(repo)
 	server.translationWorker = newTranslationWorkerRuntime(config.GetInstance(), translations)
 	r.Mount("/api/v3/ingest-admin", (&ingestRoutes{service: ingestion}).adminRouter())
@@ -405,6 +407,7 @@ func handleFavicon(staticUI http.Handler) func(w http.ResponseWriter, r *http.Re
 func (s *Server) Start() error {
 	s.ingestWorker.start()
 	s.albumWorker.start()
+	s.postMergeNotifications.start()
 	s.translationWorker.start()
 	s.enrichmentMaintenance.start()
 	s.discoveryMaintenance.start()
@@ -412,6 +415,7 @@ func (s *Server) Start() error {
 	s.discoveryPublication.start()
 	defer s.ingestWorker.stop()
 	defer s.albumWorker.stop()
+	defer s.postMergeNotifications.stop()
 	defer s.translationWorker.stop()
 	defer s.enrichmentMaintenance.stop()
 	defer s.discoveryMaintenance.stop()
@@ -435,6 +439,7 @@ func (s *Server) Shutdown() {
 	}
 	s.ingestWorker.stop()
 	s.albumWorker.stop()
+	s.postMergeNotifications.stop()
 	s.translationWorker.stop()
 	s.enrichmentMaintenance.stop()
 	s.discoveryMaintenance.stop()

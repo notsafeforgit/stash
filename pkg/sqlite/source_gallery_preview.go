@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"slices"
 
@@ -196,34 +197,12 @@ func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value 
 	if err != nil {
 		return nil, err
 	}
-	if ret.Association != nil {
-		if ret.Association.State == "disabled" {
-			ret.Action = "disabled"
-			return finishSourceGalleryPreview(ret)
-		}
-		ret.Gallery, err = (&ArchiveEntityStore{}).Find(ctx, *ret.Association.GalleryUUID)
-		if err != nil {
-			return nil, err
-		}
-		if ret.Gallery == nil || ret.Gallery.Kind != models.ArchiveGallery {
-			return nil, models.ErrSourcePayloadCorrupt
-		}
-		if ret.Gallery.State == models.ArchiveEntityDeleted {
-			ret.Action = "disabled"
-			return finishSourceGalleryPreview(ret)
-		}
-		if ret.Gallery.State != models.ArchiveEntityActive {
-			ret.Action = "review"
-			return finishSourceGalleryPreview(ret)
-		}
-		pathless, err := sourceGalleryPathless(ctx, *ret.Gallery.LocalID)
-		if err != nil {
-			return nil, err
-		}
-		if !pathless {
-			ret.Action = "review"
-			return finishSourceGalleryPreview(ret)
-		}
+	ready, err := sourceGalleryPreviewReady(ctx, ret)
+	if err != nil {
+		return nil, err
+	}
+	if !ready {
+		return finishSourceGalleryPreview(ret)
 	}
 	selection, err := (&SourceAttachmentStore{}).Selection(ctx, post.UUID)
 	if err != nil {
@@ -232,46 +211,16 @@ func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value 
 	if selection == nil {
 		return finishSourceGalleryPreview(ret)
 	}
-	ret.SelectionUUID = selection.Decision.UUID
-	if selection.Decision.Mode == "disabled" {
-		ret.Action = "disabled"
-		return finishSourceGalleryPreview(ret)
+	owners, err := postGallerySourceOwners(ctx, post.UUID)
+	if err != nil {
+		return nil, err
 	}
-	if ret.Gallery == nil {
-		if !selection.IsAlbum() {
-			return finishSourceGalleryPreview(ret)
-		}
-		ret.Action, ret.Title = "create", "Source album"
-		if selection.Decision.CaptureUUID == nil {
-			return nil, models.ErrSourcePayloadCorrupt
-		}
-		capture, err := (&SourceEvidenceStore{}).FindCapture(ctx, *selection.Decision.CaptureUUID)
-		if err != nil {
-			return nil, err
-		}
-		if capture == nil {
-			return nil, models.ErrSourcePayloadCorrupt
-		}
-		inScope, err := samePostIdentity(ctx, capture.PostUUID, post.UUID)
-		if err != nil {
-			return nil, err
-		}
-		if !inScope {
-			return nil, models.ErrSourcePayloadCorrupt
-		}
-		if capture.Metadata.Title != nil && *capture.Metadata.Title != "" {
-			ret.Title = *capture.Metadata.Title
-		}
-		if capture.Metadata.OriginalText != nil {
-			ret.Details = *capture.Metadata.OriginalText
-		}
-		if capture.Metadata.PublishedAt != nil {
-			if date, err := models.ParseDate(*capture.Metadata.PublishedAt); err == nil {
-				ret.Date = &date
-			}
-		}
-	} else {
-		ret.Action = "sync"
+	ready, err = sourceGallerySelectPreview(ctx, ret, selection, owners)
+	if err != nil {
+		return nil, err
+	}
+	if !ready {
+		return finishSourceGalleryPreview(ret)
 	}
 	choices, err := sourceAlbumChoices(ctx, selection)
 	if err != nil {
@@ -283,6 +232,116 @@ func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value 
 		}
 		choices[id] = choice
 	}
+	var postChoices []sourcePostMediaRow
+	if err := dbWrapper.Select(ctx, &postChoices, `SELECT d.* FROM source_post_identities i
+JOIN post_media_links l ON l.post_uuid=i.post_uuid JOIN post_media_decisions d ON d.uuid=l.decision_uuid
+WHERE i.canonical_uuid=? ORDER BY l.media_uuid,l.post_uuid LIMIT ?`, post.UUID, maxSourceGalleryMembers+1); err != nil {
+		return nil, err
+	}
+	if len(postChoices) > maxSourceGalleryMembers {
+		return nil, errors.New("source post exceeds the media association preview limit")
+	}
+	return sourceGalleryMembershipPreview(ctx, ret, selection, choices, postChoices, owners)
+}
+
+func sourceGalleryPreviewReady(ctx context.Context, ret *models.SourceGalleryPreview) (bool, error) {
+	var err error
+	if ret.Association != nil {
+		if ret.Association.State == "disabled" {
+			ret.Action = "disabled"
+			return false, nil
+		}
+		ret.Gallery, err = (&ArchiveEntityStore{}).Find(ctx, *ret.Association.GalleryUUID)
+		if err != nil {
+			return false, err
+		}
+		if ret.Gallery == nil || ret.Gallery.Kind != models.ArchiveGallery {
+			return false, models.ErrSourcePayloadCorrupt
+		}
+		if ret.Gallery.State == models.ArchiveEntityDeleted {
+			ret.Action = "disabled"
+			return false, nil
+		}
+		if ret.Gallery.State != models.ArchiveEntityActive {
+			ret.Action = "review"
+			return false, nil
+		}
+		pathless, err := sourceGalleryPathless(ctx, *ret.Gallery.LocalID)
+		if err != nil {
+			return false, err
+		}
+		if !pathless {
+			ret.Action = "review"
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func sourceGallerySelectPreview(ctx context.Context, ret *models.SourceGalleryPreview, selection *models.AttachmentSelection, owners map[string]bool) (bool, error) {
+	ret.SelectionUUID = selection.Decision.UUID
+	if selection.Decision.Mode == "disabled" {
+		ret.Action = "disabled"
+		return false, nil
+	}
+	if ret.Gallery == nil {
+		if !selection.IsAlbum() {
+			return false, nil
+		}
+		ret.Action, ret.Title = "create", "Source album"
+		if selection.Decision.CaptureUUID == nil {
+			return false, models.ErrSourcePayloadCorrupt
+		}
+		owner, metadata, err := sourceGalleryCaptureMetadata(ctx, *selection.Decision.CaptureUUID)
+		if err != nil {
+			return false, err
+		}
+		if !owners[owner] {
+			return false, models.ErrSourcePayloadCorrupt
+		}
+		if metadata.Title != nil && *metadata.Title != "" {
+			ret.Title = *metadata.Title
+		}
+		if metadata.OriginalText != nil {
+			ret.Details = *metadata.OriginalText
+		}
+		if metadata.PublishedAt != nil {
+			if date, err := models.ParseDate(*metadata.PublishedAt); err == nil {
+				ret.Date = &date
+			}
+		}
+	} else {
+		ret.Action = "sync"
+	}
+	return true, nil
+}
+
+const sourceGalleryCaptureMetadataQuery = `SELECT c.post_uuid,r.metadata
+FROM source_captures c JOIN source_post_revisions r ON r.post_uuid=c.post_uuid AND r.uuid=c.revision_uuid
+WHERE c.uuid=?`
+
+// Album labels need only the retained metadata projection. Do not reconstruct
+// source bodies, per-media patches or embedded profiles for a gallery preview.
+func sourceGalleryCaptureMetadata(ctx context.Context, capture string) (string, models.SourcePostMetadata, error) {
+	var row struct {
+		PostUUID string `db:"post_uuid"`
+		Metadata string `db:"metadata"`
+	}
+	var metadata models.SourcePostMetadata
+	if err := dbWrapper.Get(ctx, &row, sourceGalleryCaptureMetadataQuery, capture); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", metadata, models.ErrSourcePayloadCorrupt
+		}
+		return "", metadata, err
+	}
+	if len(row.Metadata) > 262144 || json.Unmarshal([]byte(row.Metadata), &metadata) != nil {
+		return "", metadata, models.ErrSourcePayloadCorrupt
+	}
+	return row.PostUUID, metadata, nil
+}
+
+func sourceGalleryMembershipPreview(ctx context.Context, ret *models.SourceGalleryPreview, selection *models.AttachmentSelection, choices map[string]sourceAlbumMediaChoice, postChoices []sourcePostMediaRow, owners map[string]bool) (*models.SourceGalleryPreview, error) {
+	var err error
 	var members []sourceGalleryMember
 	var heads []galleryMembershipEventRow
 	if ret.Gallery != nil {
@@ -303,15 +362,6 @@ func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value 
 	}
 	for _, head := range heads {
 		requested[head.MediaUUID] = true
-	}
-	var postChoices []sourcePostMediaRow
-	if err := dbWrapper.Select(ctx, &postChoices, `SELECT d.* FROM source_post_identities i
-JOIN post_media_links l ON l.post_uuid=i.post_uuid JOIN post_media_decisions d ON d.uuid=l.decision_uuid
-WHERE i.canonical_uuid=? ORDER BY l.media_uuid,l.post_uuid LIMIT ?`, post.UUID, maxSourceGalleryMembers+1); err != nil {
-		return nil, err
-	}
-	if len(postChoices) > maxSourceGalleryMembers {
-		return nil, errors.New("source post exceeds the media association preview limit")
 	}
 	for _, choice := range postChoices {
 		requested[choice.MediaUUID] = true
@@ -360,10 +410,6 @@ WHERE i.canonical_uuid=? ORDER BY l.media_uuid,l.post_uuid LIMIT ?`, post.UUID, 
 			}
 		}
 		ret.Entries = append(ret.Entries, item)
-	}
-	owners, err := postGallerySourceOwners(ctx, post.UUID)
-	if err != nil {
-		return nil, err
 	}
 	for _, member := range members {
 		policy := policies[member.UUID]

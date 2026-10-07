@@ -20,7 +20,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-type SourceEvidenceStore struct{}
+type SourceEvidenceStore struct{ gallery *GalleryStore }
 
 const legacyRetentionPolicy = "legacy-retained-v1"
 

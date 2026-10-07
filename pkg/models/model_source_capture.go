@@ -119,6 +119,10 @@ var (
 )
 
 type SourceEvidenceReaderWriter interface {
+	PreviewConsolidationReview(context.Context, PostConsolidationReviewInput) (*PostConsolidationReviewPreview, error)
+	ApplyConsolidationReview(context.Context, PostConsolidationReviewApplyInput, time.Time) (*PostConsolidationReview, bool, error)
+	ConsolidationReview(context.Context, string) (*PostConsolidationReview, error)
+	CheckConsolidationReview(context.Context, PostConsolidationReviewApplyInput) (*PostConsolidationReview, error)
 	PostIdentity(context.Context, string) (*SourcePostIdentity, error)
 	PostIdentityMembers(context.Context, string, string, int) ([]SourcePostIdentity, error)
 	PostConsolidationHistory(context.Context, string, int, int) ([]SourcePostConsolidation, error)

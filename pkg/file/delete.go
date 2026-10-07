@@ -2,6 +2,7 @@ package file
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"os"
 
@@ -106,6 +107,25 @@ func (d *Deleter) RegisterHooks(ctx context.Context) {
 // Call Rollback if staging returns an error and hooks are not registered.
 func (d *Deleter) Files(paths []string) error {
 	return d.stagePaths(paths, false, false)
+}
+
+// FileWithValidation stages an existing path in a managed deletion journal and
+// validates the actual staged entry before allowing commit. Unlike Files, a
+// missing source is an error. A rejected entry remains available to rollback.
+func (d *Deleter) FileWithValidation(path string, validate func(staged string) error) error {
+	if !d.registered || d.journal == nil || validate == nil {
+		d.stagingErr = errors.New("validated deletion requires a managed journal and validator")
+		return d.stagingErr
+	}
+	if err := d.stage(path, false, false); err != nil {
+		d.stagingErr = err
+		return err
+	}
+	err := validate(d.pending[len(d.pending)-1].Staged)
+	if err != nil {
+		d.stagingErr = err
+	}
+	return err
 }
 
 // FilesWithoutTrash permanently deletes generated files after commit.

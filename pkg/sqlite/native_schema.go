@@ -624,6 +624,11 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return err
 			}
 		}
+		if version >= NativeSchemaBaseline+95 {
+			if err := validateFileDeduplicationSchema(conn); err != nil {
+				return err
+			}
+		}
 		if version >= NativeSchemaBaseline+93 {
 			if err := validateArchiveActivitySchema(conn); err != nil {
 				return err

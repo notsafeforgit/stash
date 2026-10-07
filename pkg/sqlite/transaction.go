@@ -172,6 +172,7 @@ func (db *Database) Repository() models.Repository {
 		Blob:                        db.Blobs,
 		File:                        db.File,
 		FileContent:                 &FileContentStore{},
+		FileDeduplication:           &FileDeduplicationStore{},
 		FilePath:                    &FilePathStore{},
 		ArchiveJob:                  &ArchiveJobStore{},
 		ArchiveActivity:             &ArchiveActivityStore{},

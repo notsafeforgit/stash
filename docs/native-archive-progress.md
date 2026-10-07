@@ -72,11 +72,24 @@ adoption passes 288 backup tests and three real checksum samples; complete
 media adoption, native daily-change measurement and metadata retention setup
 remain open.
 
+The next development increment is schema 1000095, with the
+[native physical deduplication service](native-file-deduplication.md). It
+previews exact file pairs, verifies complete bytes, preserves source matches and
+media metadata, and uses the existing deletion journal. Different media owners
+are left for review. Primary replacement, changed bytes/generations, lost
+responses, UUID adoption, later file deletion, anonymisation and process death
+before/after commit have regression coverage. The initial increment passed the
+full SQLite/filesystem suite (1,127 seconds); subsequent receipt validation and
+collision-preflight changes passed focused SQLite, HTTP, archive and filesystem
+checks, with zero lint issues. The populated checkpoint/active restore is still
+schema 1000094. Host caller conversion, a populated schema-95 migration check,
+image publication and activation remain outstanding.
+
 Remaining release work:
 
 | Work | Required outcome |
 | --- | --- |
-| Callers and compatibility | Replace the catalog-backed dedupe launcher with native plan/apply, finish direct-scan/manual-helper handoff and real producer provisioning, verify live launch paths and retained external contracts, then remove residual legacy adapters and dependencies. |
+| Callers and compatibility | Wire the catalog-backed dedupe launcher to the implemented native plan/apply API with saved requests and backup/download exclusion; finish direct-scan/manual-helper handoff and real producer provisioning, verify live launch paths and retained external contracts, then remove residual legacy adapters and dependencies. |
 | Backup and restore | Prove a complete common capture boundary, actual upload/request/storage costs, bounded retention/reclamation, and an isolated empty/relocated restore with pending producer and filesystem state. |
 | Production cutover | Pin artifacts, quiesce writers, take final coordinated snapshots, migrate/reconcile, switch native launchers and resume work gradually through verified launch paths. |
 | Observation and retirement | Verify scheduled scraping/recovery/backup cycles, preserve the rollback/export boundary, and retire obsolete catalog writers, mounts, services and packages. |

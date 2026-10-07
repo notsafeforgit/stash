@@ -29,6 +29,9 @@ type nativeArchiveRoutes struct {
 func (rs *nativeArchiveRoutes) router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(nativeAdminOrigin)
+	r.Post("/file-deduplication/preview", rs.previewFileDeduplication)
+	r.Post("/file-deduplication/apply", rs.applyFileDeduplication)
+	r.Get("/file-deduplication/requests/{request}", rs.fileDeduplicationRequest)
 	r.Get("/activity/jobs", rs.activityJobs)
 	r.Get("/activity/jobs/{job}", rs.activityJob)
 	r.Get("/activity/jobs/{job}/attempts", rs.activityJobAttempts)

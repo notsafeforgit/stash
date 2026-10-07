@@ -1,7 +1,14 @@
 # Native schema promotion
 
-The current development schema is 1000092. Production promotion remains a
+The current development schema is 1000095. Production promotion remains a
 separate reviewed cutover; development migrations are rehearsed on copies.
+
+Schema 1000095 adds signed `file_deduplications` receipts for verified redundant
+physical locations. It preserves original content/source proofs and logical
+media identities, with journaled filesystem recovery. See
+[native file deduplication](native-file-deduplication.md). The populated verified
+checkpoint and still-running coordinated restore remain at schema 1000094;
+the new increment requires its populated migration check before deployment.
 
 The independent schema begins at primary migration 1000000 and identifies itself
 with `native_schema.lineage = org.notsafeforgit.stash.native-archive`. New

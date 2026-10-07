@@ -17,6 +17,7 @@ type Repository struct {
 	Blob                        BlobReader
 	File                        FileReaderWriter
 	FileContent                 FileContentReaderWriter
+	FileDeduplication           FileDeduplicationReaderWriter
 	FilePath                    FilePathReader
 	Folder                      FolderReaderWriter
 	Gallery                     GalleryReaderWriter

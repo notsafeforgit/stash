@@ -1,5 +1,6 @@
 """Regression tests: every cloud boundary is mocked; never contact AWS/rclone."""
 import argparse
+from contextlib import closing
 import fcntl
 import importlib.util
 import io
@@ -1127,6 +1128,35 @@ class BackupTests(unittest.TestCase):
             self.run_backup()
         self.assertFalse(self.operations)
         self.assertFalse((self.standard / 'current_manifest.json').exists())
+
+    def test_unadopted_changed_video_preserves_old_bytes_and_uploads_new_content(self):
+        # Real migration cases have equal sizes but different remote CRC/MD5.
+        # A verified remote checksum proves the old object, not the new local bytes.
+        key = 'sample/clip.mp4'
+        original = b'previous archived content'
+        current = b'x' * len(original)
+        old = self.archive / key
+        old.parent.mkdir(parents=True)
+        old.write_bytes(original)
+        self.cold_s3.reconcile(key)
+        self.write(key, current)
+        self.run_backup()
+        target = media_objects.object_key(hashlib.sha256(current).hexdigest())
+        self.assertEqual(self.video_key(key), target)
+        self.assertEqual(old.read_bytes(), original)
+        self.assertEqual((self.archive / target).read_bytes(), current)
+        self.assertEqual(self.catalog()['objects'][target]['sha256'], hashlib.sha256(current).hexdigest())
+        with closing(sqlite3.connect(self.m.TAR_DELTA_DB)) as db:
+            self.assertEqual(db.execute('SELECT sha256 FROM media_objects WHERE key=?', (key,)).fetchone(), (None,))
+        uploads = [op for op in self.operations if op[:2] == ('rclone', 'copyto') and op[2] == str(self.source / key)]
+        self.assertEqual(len(uploads), 1)
+        self.assertEqual(uploads[0][3], self.m.REMOTE_PATH + target)
+        self.assert_round_trip()
+        self.operations.clear()
+        self.run_backup()
+        self.assertEqual(old.read_bytes(), original)
+        self.assertFalse(any(op[:2] == ('rclone', 'copyto') and op[3].startswith(self.m.REMOTE_PATH)
+                             for op in self.operations))
 
     def test_historical_etags_reuse_local_files_and_durable_receipts(self):
         cases = [('sample/clip.mp4', b'old single-part video', None),

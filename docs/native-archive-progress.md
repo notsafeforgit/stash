@@ -11334,3 +11334,22 @@ must use native plan/apply before those catalogs can be retired. The post-dedupe
 recent-directory scan/autotag flow and staged manual library helpers also need
 their final native handoff. Existing live launchers cannot simply be retained
 unchanged at cutover.
+
+The full media run subsequently retained 4,489 verified video receipts and
+found two same-size local/remote content differences, totalling 36,345,921 bytes.
+Independent full-object CRC and single-part MD5 checks both differ; each current
+local file matches its frozen copy. The remote objects were last changed on
+2026-03-16. Their original contents were not retrieved. These are unresolved
+backup differences, not successful adoptions. The native publisher can preserve
+the old objects while writing the current bytes to new immutable keys; an added
+host regression verifies that first-adoption path and subsequent unchanged reuse.
+Fifteen focused changed-media tests passed, and the final new regression passed
+in both fixture variants. No real media upload has been performed.
+
+Four concurrent media readers slowed artwork packaging from approximately 44
+to 110 seconds per thousand files. That one verification process was suspended
+with `SIGSTOP`, keeping its memory and durable receipts. Resume the same process
+after the original populated restore finishes; do not start a replacement merely
+because it is stopped. Packaging returned to about 49 seconds per thousand files
+in the first post-suspension observation. The overall migration goal remains
+active, and the dedupe/caller conversion work can proceed independently.

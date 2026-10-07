@@ -245,11 +245,26 @@
       "prior_object_head_requests": 0,
       "inventory_list_requests": 300,
       "scope": "Observed start of the ongoing whole-selection run; original verified files were not rehashed. No completed whole-selection result yet."
+    },
+    "whole_check_observation": {
+      "checked_at": "2026-10-07T18:50:26.084425+00:00",
+      "verified_video_receipts": 4489,
+      "unresolved_content_differences": 2,
+      "differing_video_bytes": 36345921,
+      "sse_s3_md5_and_full_object_crc_both_differ": true,
+      "live_local_files_match_frozen_snapshot": true,
+      "remote_objects_modified_at": "2026-03-16T03:02:42+00:00",
+      "diagnosis_http_attempts": {
+        "HeadObject": 2
+      },
+      "cloud_mutations": 0,
+      "status": "Temporarily suspended with SIGSTOP to restore throughput to the already running populated restore; resume the same process after that restore finishes.",
+      "resolution": "Keep the old remote objects; the native publisher must write changed local bytes to new content keys. No actual upload has been performed."
     }
   },
   "remaining": [
     "Populated coordinated restore still running; isolated cloud drill uses a small native library and one existing cold-media reference.",
-    "The resumable full-media check is running. All 273,096 source video paths and sizes match the saved manifest; 9,016 archive checksum headers and the first 500 complete video contents passed. The remaining video content is still being verified.",
+    "The resumable full-media check has 4,489 verified video receipts and two confirmed local/archived content differences. It is temporarily suspended to prioritize the existing full restore; resume the same process afterwards. Changed local contents require new native backup objects, preserving the older archived bytes.",
     "Daily backup principal lacks GetBucketVersioning; existing administrative login requires refresh. Native Standard retention is not activated.",
     "Final production migration, complete media adoption, real native daily change measurements, observed cycles, retirement and owner acceptance remain.",
     "The current host dedupe launcher still writes old catalogs; native plan/apply and remaining scan/manual-helper handoff must be completed before retiring those dependencies."

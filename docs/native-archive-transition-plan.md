@@ -679,7 +679,7 @@ or move a newer run back into an earlier state.
 | scrape-catalog-inventory | Native reconciliation with mount guards and explicit pending/missing states |
 | scrape-catalog-legacy-catchup | Import completion receipt; retire after proving no old handoff remains |
 | stash-recents-scan-autotag | Replace redundant work with targeted ingestion/scan jobs and native import policy; retain scanning for files added outside the adapter |
-| dedupe-scraped-content and pre-backup dedupe | Use native plan/apply and provenance preservation with existing backup/download locks |
+| dedupe-scraped-content and pre-backup dedupe | Keep `fclones group` for discovery; use native plan/apply to preserve associations and remove files under existing backup/download locks |
 | s3-backup and s3-backup-recovery | Snapshot native archive state and delivery/run state; publish matching media manifest |
 | rclone home-directory backup | Include new configuration and producer state; remove obsolete catalog exclusions only after inventory |
 | n8n workflows and container helpers | Submit/inspect native runs and distinguish queued work from successful completed backfills |

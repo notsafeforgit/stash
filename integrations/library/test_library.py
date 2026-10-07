@@ -4,7 +4,9 @@ from unittest.mock import Mock
 
 from stash_autotag_with_aliases import build_combined_path_regex, find_performers, matching_ids
 from stash_library import StashClient, StashError, completed_count, filter_ast
+from stash_scan_and_generate import run_scan
 from tag_stash_collections import auto_apply_modes, resolve_tag_id, selected_ids
+from update_image_titles_stash_performer import apply_titles, resolve_performer, title_changes
 
 
 class LibraryHelpersTests(unittest.TestCase):
@@ -82,6 +84,62 @@ class LibraryHelpersTests(unittest.TestCase):
         self.assertEqual(auto_apply_modes("gallery", "auto"), ["images"])
         with self.assertRaises(StashError):
             auto_apply_modes("group", "both")
+
+    def test_title_repair_does_not_guess_between_duplicate_names(self):
+        client = Mock()
+        client.find_all.return_value = [{"id": "7", "name": "Example"}, {"id": "8", "name": "Example"}]
+        with self.assertRaisesRegex(StashError, "use --performer-id"):
+            resolve_performer(client, "Example", None, 20)
+        client.call.assert_not_called()
+        client.call.return_value = {"findPerformer": {"id": "8", "name": "Example"}}
+        self.assertEqual(resolve_performer(client, None, "8", 20)["id"], "8")
+        client.call.return_value = {"findPerformer": None}
+        with self.assertRaises(StashError):
+            resolve_performer(client, None, "9", 20)
+
+    def test_title_repair_selection_primary_file_and_empty_only(self):
+        client = Mock()
+        client.find_all.return_value = [
+            {"id": "1", "title": "", "visual_files": [{"path": "/album.zip/primary.jpg"}, {"path": "/different.jpg"}]},
+            {"id": "2", "title": "keep", "visual_files": [{"path": "/replace.jpg"}]},
+            {"id": "3", "title": "same", "visual_files": [{"path": "/same.png"}]},
+            {"id": "4", "title": "", "visual_files": []},
+        ]
+        self.assertEqual(title_changes(client, "8", 20, True), [{"id": "1", "title": "primary"}])
+        self.assertEqual(title_changes(client, "8", 20), [{"id": "1", "title": "primary"}, {"id": "2", "title": "replace"}])
+        self.assertEqual(client.find_all.call_args.args[2], filter_ast(performers={"value": ["8"], "modifier": "INCLUDES"}))
+        changes = [{"id": "1", "title": "primary"}, {"id": "2", "title": "replace"}]
+        self.assertEqual(apply_titles(client, changes, True), 2)
+        client.call.assert_not_called()
+
+    def test_title_repair_requires_exact_success_before_later_edits(self):
+        changes = [{"id": "1", "title": "first"}, {"id": "2", "title": "second"}]
+        for bad in [None, {"id": "2", "title": "first"}, {"id": "1", "title": "old"}]:
+            with self.subTest(bad=bad):
+                client = Mock()
+                client.call.return_value = {"imageUpdate": bad}
+                with self.assertRaises(StashError):
+                    apply_titles(client, changes)
+                self.assertEqual(client.call.call_count, 1)
+        client = Mock()
+        client.call.side_effect = [{"imageUpdate": value} for value in changes]
+        self.assertEqual(apply_titles(client, changes), 2)
+
+    def test_scan_explicit_path_dry_run_and_admission(self):
+        client = Mock()
+        with self.assertRaises(StashError):
+            run_scan(client, " ")
+        self.assertIsNone(run_scan(client, "/media/album.zip", True))
+        client.call.assert_not_called()
+        client.call.return_value = {"metadataScan": "42"}
+        self.assertEqual(run_scan(client, "/media/album.zip"), "42")
+        self.assertEqual(client.call.call_args.args[1], {"input": {
+            "paths": ["/media/album.zip"], "scanGenerateCovers": True, "scanGeneratePhashes": True,
+        }})
+        for bad in [None, "", True, {"id": "42"}]:
+            client.call.return_value = {"metadataScan": bad}
+            with self.assertRaises(StashError):
+                run_scan(client, "/media/album.zip")
 
 
 if __name__ == "__main__":

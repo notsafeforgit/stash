@@ -11571,3 +11571,37 @@ disabled folder policies need their source/manual intent resolved separately;
 the 908 unbound membership groups are not activated. The selected canonical root
 remains disabled/unbound. Installation, final backup inventory and live intake
 verification are still cutover steps, and the compatible service is unchanged.
+
+## Manual helper handoff and sidecar retirement inventory — 2026-10-07
+
+The remaining host caller audit found the image-title helper still using retired
+filters and a scan helper invoked by Home Assistant. Native stdlib replacements
+now accompany the two converted tagging tools in `integrations/library`. Title
+repair uses canonical filters, bounded ID-sorted selection and primary visual
+files. Ambiguous performer names require an explicit ID; dry runs send no writes,
+and an unconfirmed title edit stops later edits. An optional empty-title filter
+preserves existing titles. The explicit scan helper retains cover/phash generation
+and ZIP support through the existing scanner, reporting admission separately from
+completion. It does not become the scheduled discovery worker.
+
+All twelve helper tests pass. Five actual generated query/variable sets validate
+against the native schema; the first check caught a missing inline fragment on
+the `VisualFile` union, which was corrected before staging. Private deployment
+preparation under `.local/native-library-handoff-20261007` contains nine exact
+files, private-key launchers and backup component declarations. It preserves the
+Home Assistant command prefix. Live commands, keys and application state were not
+changed; installed dry runs and a real ZIP scan remain cutover checks.
+
+A read-only sidecar inventory found zero NFO/text files and zero traversal errors
+in both the held media snapshot (781,527 files) and the live tree (781,910 files).
+The selected native copy already retains 272,556 source documents/content bodies.
+No files were removed. These observations allow the old orphan-sidecar cleanup
+step to retire without a replacement cleanup engine, provided the final quiesced
+inventory and imported document reconciliation also pass. The live observation is
+not a common backup boundary. Reports are under
+`.local/native-sidecar-audit-20261007`.
+
+Deduplication remains fclones-backed: fclones discovers candidates, while Stash
+preserves associations and performs journaled removal. The original full restore
+and release gate continue; media reconciliation remains suspended until that
+restore completes. None of these preparations activates production writers.

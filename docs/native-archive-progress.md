@@ -65,8 +65,8 @@ not recreated. Gallery adoption retains existing galleries, manual members,
 covers and edited metadata. Focused history/retry, SQL guard, rollback, migration,
 startup, gallery regression and portable export/relocated-restore checks pass.
 The complete release gate, populated schema-90 migration, fresh reopen and
-independent whole-row reconciliation now pass. The verified rehearsal is at
-schema 90; the superseded schema-89 database was retired after checking open
+independent whole-row reconciliation now pass. The superseded schema-89
+database was retired after checking open
 handles, recovering 21.90 GB and retaining the original compatible snapshot.
 Shared attachment choices, current post-media readers and metadata source
 selection, source-list consolidation, canonical album reads/edits and current
@@ -85,7 +85,11 @@ identities while retaining original file proofs, requests and publications.
 Focused migration, restart, worker, HTTP and portable-restore checks pass, along
 with 38 UI tests, 46 Chromium/WebKit browser cases and 30 producer/backfill tests.
 New CLI plans resolve explicit historical UUIDs; existing plans remain unchanged.
-The full-copy migration/reconciliation and integrated release gate remain pending.
+The full-copy migration, fresh reopen and independent comparison of all
+40,512,440 original rows across 300 tables pass, with clean integrity and foreign
+keys. The complete release gate passes generation, real UI assets, 740 UI tests,
+554 producer tests, eight library tests, 113 archive tests, 262 backup tests,
+Go lint and full Go integration. The verified rehearsal is now schema 91.
 
 Application local-file preview/admission now reuses native file verification and
 durable effects without creating a producer or source record. Focused real MP4/
@@ -10825,9 +10829,15 @@ All 46 album Chromium/WebKit cases pass, including stale cancellation and pendin
 request recovery. All 30 producer/backfill tests pass, including identity scope,
 alias deduplication and immutable original-plan recovery.
 
-The populated schema-91 migration/reopen is running on a separate library copy;
-whole-row reconciliation and the integrated release gate remain pending. Source
-hashes, receipts and rehearsal scripts are retained under
+The populated schema-91 migration and fresh reopen pass on a separate library
+copy in 449.7 seconds. Independent comparison preserves every original cell and
+type across 300 tables and 40,512,440 rows; integrity is clean and there are no
+foreign-key violations. Only the file-proof scope guard, schema version and one
+migration-history row change. No post merge or worker is activated on that copy.
+The complete release gate passes in 1,936.7 seconds: generation, real embedded
+UI, 740 UI tests, 554 producer tests, eight library tests, 113 archive tests,
+262 backup tests, Go lint and full Go integration, including API and SQLite.
+Source hashes, receipts and rehearsal scripts are retained under
 `.local/native-canonical-post-backfill-20261006/`. This increment does not expose
 the encompassing post-merge mutation or activate any production writer/worker.
 The complete reviewed merge API/UI and broader transition gates remain required.

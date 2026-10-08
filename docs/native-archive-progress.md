@@ -66,13 +66,16 @@ have not switched.
 
 The real host S3 publication, fresh download/restore and producer replay passed
 using a small native library and the actual frozen backup ledgers. The full
-populated coordinated rehearsal has sealed its checkpoint, verified all 769,643
-indexed media paths, restored the archive and completed the independent artwork
-checks. Its original child is now validating the restored native database;
-the complete restore/recovery/replay proof has not passed yet. The enclosing
-Go harness timed out after eight hours, and a guarded continuation preserves
-that failure while waiting for the original child. Complete cold-media adoption,
-native daily-change measurement and metadata retention setup remain open.
+populated local restore/recovery/replay has now passed: all 769,643 indexed media
+paths matched the retained filesystem view, all 238,693 artifacts were restored
+and verified, and the guarded continuation recovered interrupted deletion state
+and both pending producer outboxes. The enclosing Go harness's eight-hour timeout
+remains a failed result; the original child and subsequent continuation each
+have separate successful receipts. Complete cold-media adoption, populated S3
+publication, native daily-change measurement and metadata retention setup remain
+open. The schema-95 migration, typed reconciliation, populated policy handoff,
+wrapper startup and browsing-under-ingestion checks have one ordered supervisor
+chain; dependent stages cannot run before their prerequisites finish.
 
 The next development increment is schema 1000095, with the
 [fclones-backed deduplication service](native-file-deduplication.md). It
@@ -137,6 +140,7 @@ Remaining release work:
 
 | Work | Required outcome |
 | --- | --- |
+| Populated release checks | Finish the existing schema-95 migration/reconciliation, policy API, exact-wrapper startup and ingestion/browsing performance chain. Preserve every original row and meet the declared latency budgets. |
 | Callers and compatibility | Activate the staged dedupe service/pre-backup replacement and verified state inventory with native cutover; finish sidecar cleanup, direct-scan/manual-helper handoff and real producer provisioning, verify live launch paths and retained external contracts, then remove residual legacy adapters and dependencies. |
 | Backup and restore | Prove a complete common capture boundary, actual upload/request/storage costs, bounded retention/reclamation, and an isolated empty/relocated restore with pending producer and filesystem state. |
 | Production cutover | Pin artifacts, quiesce writers, take final coordinated snapshots, migrate/reconcile, switch native launchers and resume work gradually through verified launch paths. |
@@ -11823,3 +11827,46 @@ records remain, together with the replacement archive, restored database and
 selected migration baseline. The cleanup receipt is
 `.local/native-coordinated-restore-20261007/old-bundle-retirement.json`.
 Production writers, media and backup schedules were unchanged.
+
+## Stash-box protocol checks and lookup corrections — 2026-10-08
+
+New HTTP protocol fixtures found and reproduced two retained client defects:
+multi-performer lookup skipped nonempty names, and a shortened fingerprint
+response panicked while reconstructing the input order. Batch lookup now skips
+empty names and preserves the position of every supplied performer. Fingerprint
+lookup rejects missing/extra batch results and null scene entries as errors.
+It retains the 40-scene request limit, MD5/OSHASH/signed-pHash conversion and
+empty-input behavior.
+
+The passing fixtures also cover authentication, cancellation while rate-limited,
+remote performer deletion/merge flags, studio/tag metadata, endpoint-qualified
+fingerprint submission and multipart scene drafts with original image bytes.
+Submission tests use local HTTP servers only. Focused client/model tests and the
+repository-pinned linter pass. An initial draft fixture incorrectly supplied an
+unloaded file relationship; the corrected fixture supplies an explicitly loaded
+empty list. The original failing results remain available.
+
+A separate compiled-client probe made exactly twenty read-only requests across
+the four configured services: StashDB, ThePornDB, JavStash and FansDB. Each passed
+authentication and the generated performer, fingerprint, studio and tag lookup
+queries. Lookup inputs used synthetic IDs/fingerprints; no real metadata, user
+details or credentials were retained. No live drafts or fingerprints were
+submitted. The public aggregate is
+[native-stash-box-verification.json](native-stash-box-verification.json).
+These checks verify the client boundary, not installed native launchers or the
+remaining manager-level remote-merge handling. The selected `74d96dc3a` image
+predates the two client fixes; final image selection must include them without
+replacing the frozen binaries used by the ongoing populated verification.
+
+The compatible browsing baseline now records sixty actual HTTP requests across
+scene, image and performer pages. Warm p95 latency was 9–19 ms; the first image
+request took 1.38 seconds. Before measuring native performance, the release
+budgets were fixed at 100 ms idle p95, 250 ms ingestion p95, three seconds for
+the first request and five seconds for any individual request, with no read
+failures. A disposable harness passed 288 capture events, 24 completed file jobs
+(twelve images and twelve videos) and 180 concurrent browsing requests. The
+full-library run and complete original-row comparison remain queued after the
+populated startup check. An image's exposed port with no host binding initially
+failed an overly strict fixture guard; the corrected guard checks actual port
+bindings. Both original failures and corrected smoke evidence are retained.
+Browser rendering and thumbnail download latency are separate acceptance checks.

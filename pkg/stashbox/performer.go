@@ -63,7 +63,7 @@ func (c Client) queryPerformer(ctx context.Context, queryStr string) ([]*models.
 func (c Client) QueryPerformers(ctx context.Context, names []string) ([][]*models.ScrapedPerformer, error) {
 	ret := make([][]*models.ScrapedPerformer, len(names))
 	for i, name := range names {
-		if name != "" {
+		if name == "" {
 			continue
 		}
 

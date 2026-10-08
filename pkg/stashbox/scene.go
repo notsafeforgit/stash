@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -119,10 +120,16 @@ func (c Client) findScenesByFingerprints(ctx context.Context, scenes [][]*graphq
 		if err != nil {
 			return nil, err
 		}
+		if len(scenes.FindScenesBySceneFingerprints) != end-i {
+			return nil, fmt.Errorf("stash-box returned %d fingerprint results for %d scenes", len(scenes.FindScenesBySceneFingerprints), end-i)
+		}
 
 		for _, sceneFragments := range scenes.FindScenesBySceneFingerprints {
 			var sceneResults []*models.ScrapedScene
 			for _, scene := range sceneFragments {
+				if scene == nil {
+					return nil, errors.New("stash-box returned a null scene in fingerprint results")
+				}
 				ss, err := c.sceneFragmentToScrapedScene(ctx, scene)
 				if err != nil {
 					return nil, err

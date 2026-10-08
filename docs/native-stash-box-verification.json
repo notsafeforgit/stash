@@ -1,0 +1,150 @@
+{
+  "recorded_at": "2026-10-08T04:54:58.441677+00:00",
+  "status": "passed_for_stated_scope",
+  "parent_revision": "9bf8f5879b8593646f19a1635c838ff7ce0e39bf",
+  "tested_files_sha256": {
+    "pkg/stashbox/client.go": "1c969f7921d79aa065a9df322e994fe94e211d4b6498114141f937d662f433d6",
+    "pkg/stashbox/performer.go": "0050c12e95f23c243b9ebc7385007e3775fea0f8798f705f4ba64ec0873c2a7f",
+    "pkg/stashbox/scene.go": "aca8d99e8c7c9816f73ebd527c42c35c1c5e996ef202ddede5e71a386d780695",
+    "pkg/stashbox/studio.go": "18c45d1913c3d2113699d6788f9e4cce0e9f1d0e445447abbd56d9d794770512",
+    "pkg/stashbox/tag.go": "e1458be61d91d9624c69d58f0d537f7f9e892c5a6f12f10df17cf993c0e056bb",
+    "pkg/stashbox/draft.go": "0f3d765390d507432726968523c4e87f07cfa47a5758576bbf59ab852da0226b",
+    "pkg/stashbox/protocol_test.go": "ebcb1ba3ab3f7925ff6bfee181e8ca5699add76a75b88ac849d16a8a6691dcc8",
+    "pkg/stashbox/graphql/generated_client.go": "bd01e514e5cf189244e453276995682982ef39e85294dde065b9633a3e9ffd8c",
+    "graphql/stash-box/query.graphql": "33de27493b8942a7c5e2bb2bf853cf4996e099a95a16acdbde1b91406c0bb364"
+  },
+  "checks": [
+    {
+      "command": [
+        "go",
+        "test",
+        "./pkg/stashbox",
+        "./pkg/models",
+        "-run",
+        "TestProtocol|TestFingerprint",
+        "-count=1",
+        "-timeout=3m"
+      ],
+      "exit_code": 0,
+      "seconds": 1.0027127370121889
+    },
+    {
+      "command": [
+        "go",
+        "run",
+        "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2",
+        "run",
+        "./pkg/stashbox/..."
+      ],
+      "exit_code": 0,
+      "seconds": 2.0513269540388137
+    },
+    {
+      "command": [
+        "go",
+        "run",
+        ".local/native-stashbox-20261008/probe.go"
+      ],
+      "exit_code": 0,
+      "seconds": 9.783426804002374
+    }
+  ],
+  "local_http_fixtures": [
+    "Ordered nonempty performer batches",
+    "Remote performer merge/deletion fields and missing records",
+    "Forty-scene request batching, empty inputs and signed pHash encoding",
+    "Malformed fingerprint batches return errors",
+    "Endpoint-qualified fingerprint submissions",
+    "Rate-limit cancellation",
+    "Studio hierarchy and tag metadata",
+    "Endpoint-qualified multipart drafts and exact image bytes"
+  ],
+  "configured_endpoint_probe": {
+    "started_at": "2026-10-08T04:52:11.552697443Z",
+    "completed_at": "2026-10-08T04:52:20.352907767Z",
+    "requests": 20,
+    "endpoints": [
+      {
+        "host": "stashdb.org",
+        "checks": [
+          "authentication",
+          "performer_lookup",
+          "fingerprint_lookup",
+          "studio_lookup",
+          "tag_lookup"
+        ],
+        "read_only_requests": 5,
+        "http_statuses": [
+          200,
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      {
+        "host": "theporndb.net",
+        "checks": [
+          "authentication",
+          "performer_lookup",
+          "fingerprint_lookup",
+          "studio_lookup",
+          "tag_lookup"
+        ],
+        "read_only_requests": 5,
+        "http_statuses": [
+          200,
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      {
+        "host": "javstash.org",
+        "checks": [
+          "authentication",
+          "performer_lookup",
+          "fingerprint_lookup",
+          "studio_lookup",
+          "tag_lookup"
+        ],
+        "read_only_requests": 5,
+        "http_statuses": [
+          200,
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      {
+        "host": "fansdb.cc",
+        "checks": [
+          "authentication",
+          "performer_lookup",
+          "fingerprint_lookup",
+          "studio_lookup",
+          "tag_lookup"
+        ],
+        "read_only_requests": 5,
+        "http_statuses": [
+          200,
+          200,
+          200,
+          200,
+          200
+        ]
+      }
+    ]
+  },
+  "production_changed": false,
+  "remote_writes": 0,
+  "credentials_or_user_details_in_report": false,
+  "limitations": [
+    "Compiled host client tested; installed native application not yet activated.",
+    "Live reads use synthetic nonexistent identifiers; positive metadata conversion and submissions use local fixtures.",
+    "Manager-level remote merge/deletion handling and final deployed launch paths still require verification.",
+    "Selected74d96dc image predates these lookup corrections. Existing frozen populated migration/startup/performance checks must finish with their original artifacts."
+  ]
+}

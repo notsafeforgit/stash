@@ -1,0 +1,10 @@
+[Unit]
+Description=Resume an interrupted native archive backup
+After=network-online.target
+ConditionPathIsMountPoint=/tank/media
+ConditionPathExists=/tank/media/backup_ledgers/.backup-interrupted.json
+ConditionPathExists=%h/.config/stash-native-backup/host-backup.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl --user start --no-block s3-backup.service

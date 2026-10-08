@@ -62,6 +62,16 @@ invocation gets a new UUID. Both server and host keep permanent failure receipts
 Unknown/legacy files without ownership evidence require inspection, and identity
 records must never be removed as a shortcut to recovery.
 
+The [recovery service](systemd/s3-backup-recovery.service) checks that the media
+dataset is mounted and an interrupted-backup marker and native configuration
+exist, then asks systemd to start the regular `s3-backup.service`. An already
+running service is not started twice. The native publisher owns validation,
+locking and recovery of the retained checkpoint; the recovery service requires
+no catalog package or catalog directory. Its [timer](systemd/s3-backup-recovery.timer)
+preserves the five-minute boot delay and fifteen-minute retry cadence. Include
+both unit files in the host backup's configuration components. Keep them held
+during cutover until the native backup and isolated restore have passed.
+
 Interrupted packing and verification use private scratch directories with
 durable inode ownership records. A fully sealed bundle is promoted without
 re-export; incomplete copies can be rebuilt from the retained original view.

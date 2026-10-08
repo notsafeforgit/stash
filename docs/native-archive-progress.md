@@ -12395,3 +12395,40 @@ values and SQLite types. The comparison included committed WAL pages; the schema
 was unchanged and there were no foreign-key violations. Its disposable database copy was then
 reclaimed, leaving approximately 82 GiB free. The two migration baselines and
 all release/performance receipts remain available.
+
+## Production imports and native backup recovery — 2026-10-08
+
+All 1,711 production catalog snapshots completed their 20,532 import phases.
+Their immutable receipts retain 78 catalogs requiring relation review and 81
+requiring media review; these are preserved review outcomes, not guessed links.
+The 925,869-record automation snapshot has been uploaded, and its queues and
+checkpoints are being mapped. Independent reconciliation, post/media matching,
+source albums and policy handoff still gate public startup.
+
+The live backup ledger now includes the already-published cold-media receipts:
+274,466 video paths, 513,333 image-file entries and 283,634 media objects. The
+handoff held the backup lock, verified the original live files against the held
+snapshot, checked every prepared manifest object against its local receipt, and
+retained the previous ledger and footprints. Other ledgers were unchanged. It
+made no cloud requests or master-manifest publication. Its first preflight
+stopped before mutation on unused inspection sidecars; the corrected check
+requires no open handles and an empty WAL. A complete coordinated native backup
+and isolated restore are still required.
+
+The last backup recovery helper depended on `scrape_catalog.cli` to check the
+old catalog root. The tracked recovery unit now requeues the regular native
+backup service directly, guarded by the mounted media dataset, interrupted-run
+marker and native configuration. The existing boot/retry cadence is preserved.
+Both unit files are now included in backup coverage. Host systemd validation
+passes, and the inactive deployment verifies 80 files, 49 static backup
+components, 141 dynamic components and 32 worker profiles. Both recovery units
+remain held; no worker/application binary was rebuilt for this configuration
+change.
+
+The remote `v2.5-compatible-final` tag and all eight frozen image tags were
+reverified against their recorded commit/digests. No tag or image changed.
+Discovery recovery, final inventory, the closed SSD database move, public
+startup and actual n8n publication verification have prepared guarded drivers;
+none of those handoffs has run yet. The private native API remains active while
+public Stash and scraper schedules remain stopped. See the updated
+[production verification report](native-production-cutover-verification.json).

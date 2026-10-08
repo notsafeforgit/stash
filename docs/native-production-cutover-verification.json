@@ -844,11 +844,27 @@
   "catalog_bodies": {
     "input_preparation": "passed",
     "catalogs": 1711,
-    "native_import_status": "running",
-    "completed_catalogs_at_checkpoint": 1423,
-    "completed_passes_at_checkpoint": 17081,
+    "native_import_status": "passed",
+    "completed_catalogs_at_checkpoint": 1711,
+    "completed_passes_at_checkpoint": 20532,
     "total_passes": 20532,
-    "independent_reconciliation": "pending"
+    "independent_reconciliation": "pending",
+    "phase_outcomes": {
+      "upload:received": 1711,
+      "evidence:mapped": 1711,
+      "relations:mapped": 1633,
+      "publishers:mapped": 1711,
+      "attachments:mapped": 1711,
+      "media:mapped": 1630,
+      "file_history:mapped": 1711,
+      "memberships:mapped": 1711,
+      "documents:mapped": 1711,
+      "translations:mapped": 1711,
+      "enrichment:mapped": 1711,
+      "cleanup:retained": 1711,
+      "media:review": 81,
+      "relations:review": 78
+    }
   },
   "artwork_capture": {
     "status": "captured",
@@ -869,7 +885,7 @@
     "owner_acceptance"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-08T22:28:54.686733+00:00",
+  "checked_at": "2026-10-08T23:02:57.276044+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -1114,7 +1130,38 @@
       "activate-scan-recovery.py",
       "finish-private-handoff.py",
       "prepare-operational-activation.py"
-    ]
+    ],
+    "apply-operational-activation.py": {
+      "sha256": "eac7edea4a7bd647c4a22d68929fa064ef9ade5690f9817f556dee1ed085c91a",
+      "syntax_checked": true,
+      "executed": false
+    },
+    "recover-discovery.py": {
+      "sha256": "23c61ecf5fb0149a6777b885ecfa8571336b1b4ba3114c4da742f5ea84247580",
+      "syntax_checked": true,
+      "executed": false
+    },
+    "verify-final-worker-inventory.py": {
+      "sha256": "4f6753b70a54a164aa861d8d1a6093314e8995e7086ff21bb31808f693f129e5",
+      "syntax_checked": true,
+      "executed": false
+    },
+    "promote-native-database.py": {
+      "sha256": "6b21dbc5629e943baa97aba359310de9e6820f40e7d870e31cc976e6897a5e45",
+      "syntax_checked": true,
+      "executed": false,
+      "same_ssd_inode_move_required": true
+    },
+    "start-native-public.py": {
+      "sha256": "b4540427b169c7311eddc58ec0b470f936d70a1aeb3532d07a60321aa65bef77",
+      "syntax_checked": true,
+      "executed": false
+    },
+    "verify-live-n8n.py": {
+      "sha256": "cdf604e44e0cd203a93263c720241d8ae292b0da450e7e39e4ce98732b3c74a9",
+      "syntax_checked": true,
+      "executed": false
+    }
   },
   "retired_rehearsal_databases": {
     "status": "passed",
@@ -1132,5 +1179,124 @@
       1000094
     ],
     "running_container_and_open_descriptor_checks_passed": true
+  },
+  "automation_import": {
+    "status": "running",
+    "phase": "translations",
+    "snapshot_uuid": "e8800d56-376d-5f93-9eb1-37d9a7abf689",
+    "manifest_sha256": "d8778fad513c3ade9f1fd7dcc85eaff535cbee0a0f8804dda94b6f677bb9a07f",
+    "completed": [
+      {
+        "phase": "upload",
+        "state": "received",
+        "records": 925869,
+        "review_records": 0,
+        "receipt_sha256": "2f4796bf6761ab76ea96cc4e34a33ffecb6a6182f361612bb5415eb5a79ccdd8"
+      },
+      {
+        "phase": "enrichment",
+        "state": "review",
+        "records": 252066,
+        "review_records": 747,
+        "receipt_sha256": "89613120cf8f4355f8bf840fb3ac49a31441d6d17983a7fd33c769a7b5523f85"
+      },
+      {
+        "phase": "checkpoints",
+        "state": "mapped",
+        "records": 0,
+        "review_records": 0,
+        "receipt_sha256": "2d8c5c8f5298de4dccdc175dc6d360e27985b0fa317a1a662e447bfc34a269f9"
+      }
+    ],
+    "updated_at": "2026-10-08T23:01:53.248960+00:00",
+    "uploaded_records": 925869
+  },
+  "compatible_release_reverification": {
+    "status": "passed",
+    "checked_at": "2026-10-08T22:39:00.362223+00:00",
+    "source_commit": "0a603d07e9ec3dd9863a7340858a635525bb2c11",
+    "source_tag": "v2.5-compatible-final",
+    "remote_source_tag_matches": true,
+    "images": [
+      {
+        "image": "ghcr.io/notsafeforgit/stash:v2.5-compatible-final",
+        "digest": "sha256:0faad6d2cffb19dc97421b0879e638c83e4fe245eda871505c5d913d3fc44805",
+        "verified": true
+      },
+      {
+        "image": "ghcr.io/notsafeforgit/stash:v2.5-compatible-20260930",
+        "digest": "sha256:0faad6d2cffb19dc97421b0879e638c83e4fe245eda871505c5d913d3fc44805",
+        "verified": true
+      },
+      {
+        "image": "ghcr.io/notsafeforgit/stash-s6:hwaccel-v2.5-compatible-final",
+        "digest": "sha256:b9c30164d591cb9764f809505208fbf7d42d0bfdf209230b94f0dba69b46014b",
+        "verified": true
+      },
+      {
+        "image": "ghcr.io/notsafeforgit/stash-s6:hwaccel-v2.5-compatible-20260930",
+        "digest": "sha256:b9c30164d591cb9764f809505208fbf7d42d0bfdf209230b94f0dba69b46014b",
+        "verified": true
+      },
+      {
+        "image": "ghcr.io/notsafeforgit/stash-s6:alpine-v2.5-compatible-final",
+        "digest": "sha256:7f51d4a15f27d1439be8c84cd1046f1e5740bddc64535434b9dacc15b7afa880",
+        "verified": true
+      },
+      {
+        "image": "ghcr.io/notsafeforgit/stash-s6:alpine-v2.5-compatible-20260930",
+        "digest": "sha256:7f51d4a15f27d1439be8c84cd1046f1e5740bddc64535434b9dacc15b7afa880",
+        "verified": true
+      },
+      {
+        "image": "ghcr.io/notsafeforgit/stash-s6:hwaccel-alpine-v2.5-compatible-final",
+        "digest": "sha256:d62f457c496f6fdce6652984838c4741490653a567628747aca522cf0e83a2fc",
+        "verified": true
+      },
+      {
+        "image": "ghcr.io/notsafeforgit/stash-s6:hwaccel-alpine-v2.5-compatible-20260930",
+        "digest": "sha256:d62f457c496f6fdce6652984838c4741490653a567628747aca522cf0e83a2fc",
+        "verified": true
+      }
+    ],
+    "layers_downloaded": false,
+    "tags_changed": false
+  },
+  "backup_media_ledger_handoff": {
+    "status": "passed",
+    "boundary_uuid": "8c462d7a-ee41-4508-a4c8-b4ab55c7ca13",
+    "completed_at": "2026-10-08T22:55:43.819354+00:00",
+    "verified_counts": {
+      "media_objects": 283634,
+      "video_objects": 274466,
+      "video_uploads": 274466,
+      "media_paths": 274466,
+      "unit_state": 1428,
+      "file_index": 513333,
+      "delta_keys": 23741
+    },
+    "manifest_sha256": "c099b47a60b2defe56242341094b06fb6760294ab80573a7fd0e4493e0411fd7",
+    "cloud_requests": 0,
+    "master_manifest_published": false,
+    "coordinated_native_backup_still_required": true,
+    "untouched_other_ledgers": true,
+    "live_preimages_match_held_snapshot": true,
+    "previous_ledger_retained": true,
+    "first_preflight_stopped_before_mutation": "Unused zero-byte WAL and SHM from read-only inspection. The corrected guard verified no open handles and zero WAL bytes; the next invocation passed."
+  },
+  "backup_recovery_deployment": {
+    "status": "passed",
+    "checked_at": "2026-10-08T23:00:40.991942+00:00",
+    "deployment_files": 80,
+    "dynamic_components": 141,
+    "static_components": 49,
+    "profiles": 32,
+    "prior_dynamic_definitions_unchanged": true,
+    "credentials_still_pending": true,
+    "recovery_units_systemd_verified": true,
+    "public_services_started": false,
+    "legacy_catalog_dependency_removed": true,
+    "services_still_held": true,
+    "native_builds_unchanged": true
   }
 }

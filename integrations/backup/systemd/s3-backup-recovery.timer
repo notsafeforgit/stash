@@ -1,0 +1,10 @@
+[Unit]
+Description=Recover interrupted native archive backups after startup
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=15min
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

@@ -1217,9 +1217,14 @@ with the same producer and worker UUID returns its still-valid lease. A differen
 producer or worker cannot borrow it. Rotate the ingestion token while retaining
 the producer UUID when the same worker should keep ownership.
 
-The download executor requires `source_run_pacing_protocol: 1`. Before each root
-or linked extractor initializes, it reserves the contacted service through
-`/source`. The current attempt may reserve its root service, Redgifs or Imgur.
+The download executor requires `source_run_pacing_protocol: 1` and
+`source_run_origins_protocol: 1`. Before each root or linked extractor initializes,
+and before its explicit source HTTP requests, it reserves the requested service
+through `/source`. The current attempt can retain additional website or CDN
+dependencies using the canonical HTTP origin of the requested URL. Origin
+evidence excludes paths, query parameters, fragments and credentials; it cannot
+change the frozen `SourceScopeV1` equivalence rules or combine unknown sibling
+hosts. Historical root/Imgur/Redgifs bindings retain their previous meaning.
 Authority, definition and lease validity are checked through transaction commit.
 A busy service returns `ready: false` and remains a recorded dependency without
 holding it. Finish that attempt with `state: "retry"`, `error_code: "source_busy"`
@@ -1227,6 +1232,14 @@ and `error_scope` equal to the returned `source_scope`. Exact-window retries wai
 for recorded dependencies before repeating parent extraction; a widened traversal
 starts its own dependency set. Repeated reservations under the same fence do not
 extend ownership or rewrite service start times.
+
+Independent downloads retain the existing concurrency policy. Provider cooldowns
+apply across them, and download/enrichment priority and fairness still use the
+same service scopes. A collection with no namespace can explicitly collect
+posts from different services: each captured leaf must supply its own valid
+native identity. Such collections support download runs, not namespace-specific
+metadata enrichment. Collection/root revisions, grants and destination exclusion
+still apply.
 
 An unsuccessful `outcome` may include `error_scope` with a controlled source code:
 `source_busy`, `rate_limited`, `timeout`, `extraction_failed`, `authentication`,

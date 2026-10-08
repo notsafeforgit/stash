@@ -151,10 +151,13 @@ not pause legacy gallery-dl processes or unrelated filesystem tools. The existin
 backup/dedupe lock is still required, and the host snapshot orchestration remains
 to be integrated before production uses this barrier.
 
-The executor requires native `source_run_pacing_protocol: 1`. It reserves the root
+The executor requires native `source_run_pacing_protocol: 1` and
+`source_run_origins_protocol: 1`. It reserves the root
 service and each supported linked service before extractor initialization, which
-may log in. Currently the reviewed linked services are Redgifs and Imgur. A busy
-service stops the attempt with `source_busy`; native attempt dependencies make an
+may log in. Explicit source HTTP requests also reserve their requested service,
+including additional website and CDN hosts. The server retains a canonical HTTP
+origin without paths, signed queries or fragments. A busy service stops the
+attempt with `source_busy`; native attempt dependencies make an
 exact-window retry wait before repeating source work. Reservations are released
 by completion, cancellation or expiry, and expired retries retain dependencies.
 
@@ -262,8 +265,9 @@ An `upload_date` without a timestamp stays a day-only date; an undated video
 stays undated. Neither can prove a publication-time window. A profile with
 `source_mode: "traversal"` supports these downloads as configured scans instead;
 the default `published` mode still rejects missing precise timestamps. Supported
-cross-host source scopes, the direct manual command and final deployment profiles
-remain required before cutover.
+cross-host origins are retained separately from their shared provider cooldowns.
+The direct manual command and final deployment profiles remain required before
+cutover.
 
 ## Worker profiles and execution
 

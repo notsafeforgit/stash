@@ -29,23 +29,25 @@ SUPPORTED_VERSION = "1.32.15-dev"
 class SourceSession:
     """Check each source HTTP attempt, including gallery-dl's internal retries."""
 
-    def __init__(self, producer, session, scope):
-        self.producer, self.session, self.scope = producer, session, scope
+    def __init__(self, producer, session):
+        self.producer, self.session = producer, session
 
     def __getattr__(self, name):
         return getattr(self.session, name)
 
     def request(self, *args, **kwargs):
         self.producer.check()
+        url = args[1] if len(args) >= 2 else kwargs.get("url")
+        scope = self.producer.reserve_source(url)
         try:
             response = self.session.request(*args, **kwargs)
         except requests.exceptions.Timeout:
-            self.producer.fail_source("timeout", self.scope)
+            self.producer.fail_source("timeout", scope)
         except requests.exceptions.RequestException:
-            self.producer.fail_source("extraction_failed", self.scope)
+            self.producer.fail_source("extraction_failed", scope)
         if response.status_code == 429:
             response.close()
-            self.producer.fail_source("rate_limited", self.scope)
+            self.producer.fail_source("rate_limited", scope)
         return response
 
 
@@ -200,9 +202,9 @@ class NativeDownloadJob(job.DownloadJob):
             # session remains usable while its current file finishes.
             if len(args) >= 3:
                 args = list(args)
-                args[2] = SourceSession(self.producer, args[2] or extractor.session, self._native_scope)
+                args[2] = SourceSession(self.producer, args[2] or extractor.session)
             else:
-                kwargs["session"] = SourceSession(self.producer, kwargs.get("session") or extractor.session, self._native_scope)
+                kwargs["session"] = SourceSession(self.producer, kwargs.get("session") or extractor.session)
             return request(*args, **kwargs)
 
         extractor.request = guarded_request

@@ -522,6 +522,32 @@ class GalleryTests(unittest.TestCase):
                 if code == "rate_limited":
                     response.close.assert_called_once()
 
+    def test_source_http_dependency_reserves_and_attributes_actual_request_host(self):
+        for busy in (False, True):
+            with self.subTest(busy=busy):
+                self.producer.source_failure = None
+                reservations = []
+
+                def reserve(url):
+                    reservations.append(url)
+                    if url == self.lease.run['target_url']:
+                        return 'service:reddit'
+                    if busy:
+                        raise SourceFailure('source_busy', 'host:metadata.invalid')
+                    return 'host:metadata.invalid'
+
+                self.lease.reserve_source = reserve
+                task = self.task()
+                task._init()
+                response = Mock(status_code=429)
+                with patch.object(task.extractor.session, 'request', return_value=response) as request:
+                    with self.assertRaises(SourceFailure) as failure:
+                        task.extractor.request('https://metadata.invalid/probe?token=private', interval=False)
+                    self.assertEqual(failure.exception.scope, 'host:metadata.invalid')
+                    self.assertEqual(failure.exception.code, 'source_busy' if busy else 'rate_limited')
+                    self.assertEqual(request.call_count, 0 if busy else 1)
+                self.assertEqual(reservations, [self.lease.run['target_url'], 'https://metadata.invalid/probe?token=private'])
+
     def test_individual_media_failure_does_not_create_a_service_cooldown(self):
         task = self.task()
         task.download = Mock(side_effect=Timeout("missing media"))

@@ -1,7 +1,14 @@
 # Native schema promotion
 
-The current development schema is 1000098. Production promotion remains a
+The current development schema is 1000099. Production promotion remains a
 separate reviewed cutover; development migrations are rehearsed on copies.
+
+Schema 1000099 retains a canonical HTTP origin for newly observed download
+dependencies. The existing `source_run_attempt_pacing` rows gain a nullable
+`source_origin`; historical root/Imgur/Redgifs bindings remain unchanged with no
+invented origin. New dependencies must match their original `SourceScopeV1`
+scope. Triggers keep the origin immutable and carry it into exact-window retry
+attempts. Signed paths, query parameters and fragments are not retained there.
 
 Schema 1000098 distinguishes configured source scans from publication windows.
 The existing run/attempt window envelopes carry optional `basis: "traversal"`;
@@ -20,7 +27,7 @@ it cannot infer historical removals from missing links. Schema 1000096 added
 provider metadata import receipts, following schema 1000095's
 [file deduplication receipts](native-file-deduplication.md).
 The [populated verified release](native-profile-release-verification.json)
-remains at schema 1000097; schema 1000098 requires its populated migration and
+remains at schema 1000097; schemas 1000098–1000099 require populated migration and
 release checks before deployment.
 
 The independent schema begins at primary migration 1000000 and identifies itself

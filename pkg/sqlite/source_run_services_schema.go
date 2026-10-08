@@ -7,10 +7,14 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateSourceRunServicesSchema(conn *sqlx.DB) error {
-	for _, name := range []string{"source_run_attempt_pacing", "source_run_attempt_pacing_scope",
+func validateSourceRunServicesSchema(conn *sqlx.DB, origins bool) error {
+	names := []string{"source_run_attempt_pacing", "source_run_attempt_pacing_scope",
 		"source_run_attempt_pacing_bind", "source_run_attempt_pacing_current", "source_run_attempt_pacing_transition",
-		"source_run_attempt_failures", "source_run_attempt_failure_current", "source_run_attempt_failure_immutable"} {
+		"source_run_attempt_failures", "source_run_attempt_failure_current", "source_run_attempt_failure_immutable"}
+	if origins {
+		names = append(names, "source_run_attempt_pacing_origin", "source_run_attempt_pacing_origin_immutable")
+	}
+	for _, name := range names {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
 			return err
@@ -18,6 +22,11 @@ func validateSourceRunServicesSchema(conn *sqlx.DB) error {
 		if !found {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
+	}
+	dependency := "b.scope=p.scope OR p.scope IN ('service:redgifs','service:imgur')"
+	if origins {
+		dependency = "((p.source_origin IS NULL AND (" + dependency + ")) OR " +
+			"(typeof(p.source_origin)='text' AND p.source_origin=source_origin_v1(p.source_origin) AND source_scope_v1(p.source_origin)=p.scope))"
 	}
 	var invalid bool
 	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_run_attempts a
@@ -28,7 +37,7 @@ func validateSourceRunServicesSchema(conn *sqlx.DB) error {
  WHERE NOT EXISTS(SELECT 1 FROM source_run_attempts a WHERE a.run_uuid=p.run_uuid AND a.fence=p.fence)
  OR NOT EXISTS(SELECT 1 FROM source_pacing s WHERE s.scope=p.scope)
  OR NOT EXISTS(SELECT 1 FROM source_run_pacing b WHERE b.run_uuid=p.run_uuid
-  AND (b.scope=p.scope OR p.scope IN ('service:redgifs','service:imgur'))))
+  AND (`+dependency+`)))
  OR EXISTS(SELECT 1 FROM source_run_attempt_failures f
  WHERE NOT EXISTS(SELECT 1 FROM source_run_attempts a
  JOIN source_run_attempt_pacing p ON p.run_uuid=a.run_uuid AND p.fence=a.fence AND p.scope=f.scope

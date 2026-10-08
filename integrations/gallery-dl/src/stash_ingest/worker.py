@@ -76,6 +76,7 @@ def execute(box, client, configuration, run_uuid):
     if (capabilities.get("source_runs") is not True or capabilities.get("source_run_protocol") != 1
             or capabilities.get("source_run_recovery_protocol") != 1
             or capabilities.get("source_run_pacing_protocol") != 1
+            or capabilities.get("source_run_origins_protocol") != 1
             or capabilities.get("source_run_fairness_protocol") != 1
             or capabilities.get("attachment_download_protocol") != 1
             or capabilities.get("max_attachment_download_bytes", 0) < 16384

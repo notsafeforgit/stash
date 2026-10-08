@@ -33,6 +33,7 @@ class WorkerTests(unittest.TestCase):
         self.profile = Configuration(profile)
         self.client = Client("http://example.invalid", PRODUCER, timeout=1)
         self.client.capabilities = Mock(return_value={"source_runs": True, "source_run_protocol": 1, "source_run_recovery_protocol": 1, "source_run_pacing_protocol": 1, "source_run_fairness_protocol": 1, "file_ingestion": True,
+                                                     "source_run_origins_protocol": 1,
                                                      "attachment_download_protocol": 1, "max_attachment_download_bytes": 16384,
                                                      "kinds": ["source.capture", "file.completed", "attachment.download"]})
         self.lease = LeaseFixture()
@@ -104,7 +105,7 @@ class WorkerTests(unittest.TestCase):
             self.run_worker()
         self.claim.assert_not_called()
         self.client.capabilities.return_value["source_run_fairness_protocol"] = 1
-        for key, invalid in (("attachment_download_protocol", 0), ("max_attachment_download_bytes", 8192), ("kinds", ["source.capture", "file.completed"])):
+        for key, invalid in (("source_run_origins_protocol", 0), ("attachment_download_protocol", 0), ("max_attachment_download_bytes", 8192), ("kinds", ["source.capture", "file.completed"])):
             original = self.client.capabilities.return_value[key]
             self.client.capabilities.return_value[key] = invalid
             with self.subTest(capability=key), self.assertRaises(Unavailable):

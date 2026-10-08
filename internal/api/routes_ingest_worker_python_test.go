@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -62,6 +63,10 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 	case "ytdl", "ytdl-traversal":
 		target, namespace, attachmentKey = "https://fixture.invalid/video/one", "ytdl:nativevideofixture", "one"
 	}
+	collectionNamespace := namespace
+	if adapter == "ytdl-traversal" {
+		collectionNamespace = "" // A reviewed collection can resolve leaves from different sites.
+	}
 	require.NoError(t, service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		producer, err = service.Repo.Ingest.CreateProducer(ctx, "Python download fixture")
 		if err != nil {
@@ -74,7 +79,7 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 			return err
 		}
 		collection, err = service.Repo.SourceCollection.Put(ctx, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
-			Label: "Worker feed", Kind: "feed", Namespace: namespace, State: "active", TargetURL: target,
+			Label: "Worker feed", Kind: "feed", Namespace: collectionNamespace, State: "active", TargetURL: target,
 			RootUUID: &root.UUID, PathPrefix: "Account",
 		}})
 		return err
@@ -162,6 +167,14 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 		Downloaded string `json:"downloaded"`
 	}
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
+	if adapter == "ytdl-traversal" {
+		raw, err := sql.Open("sqlite3ex", db.DatabasePath())
+		require.NoError(t, err)
+		defer raw.Close()
+		var origin string
+		require.NoError(t, raw.QueryRow("SELECT source_origin FROM source_run_attempt_pacing WHERE run_uuid=? AND scope='host:metadata.cdn.invalid' AND reserved=1", result.RunUUID).Scan(&origin))
+		require.Equal(t, "https://metadata.cdn.invalid/", origin)
+	}
 	require.EqualValues(t, http.StatusOK, finishStatus.Load())
 	require.EqualValues(t, 1, finishes.Load())
 	if adapter == "n8n-backfill" {

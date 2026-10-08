@@ -46,6 +46,7 @@ func (d *CustomSQLiteDriver) Open(dsn string) (driver.Conn, error) {
 				"basename":          basenameFn,
 				"phash_distance":    phashDistanceFn,
 				"source_scope_v1":   scrape.SourceScopeV1,
+				"source_origin_v1":  scrape.SourceOriginV1,
 			}
 
 			for name, fn := range funcs {

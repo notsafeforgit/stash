@@ -116,6 +116,8 @@ def main():
             _VALID_URL = r'https://fixture\.invalid/video/(?P<id>one)'
 
             def _real_extract(self, url):
+                if traversal:
+                    assert self._downloader.urlopen('https://metadata.cdn.invalid/probe?signature=private').status == 200
                 return {'id': 'one', 'title': 'Resolved video', 'uploader_id': 'publisher',
                         **({} if traversal else {'timestamp': int((now - timedelta(days=1)).timestamp())}),
                         'ext': 'mp4', 'url': 'https://cdn.invalid/video.mp4'}
@@ -125,6 +127,7 @@ def main():
         def factory(*args, **kwargs):
             client = original_factory(*args, **kwargs)
             client.add_info_extractor(NativeVideoFixtureIE())
+            client.urlopen = lambda request: SimpleNamespace(status=200)
             return client
 
         def job(target, *, producer, lock_directory):

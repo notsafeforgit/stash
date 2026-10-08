@@ -286,6 +286,12 @@ func TestSourceFairnessMigrationPreservesExistingState(t *testing.T) {
 	require.NoError(t, f.db.RunAllMigrations())
 	require.NoError(t, f.db.ReInitialise())
 	for table, rows := range before {
+		if table == "source_run_attempt_pacing" {
+			// Schema 99 adds an origin without inventing evidence for old attempts.
+			for i := range rows {
+				rows[i] = append(rows[i], nil)
+			}
+		}
 		require.Equal(t, rows, albumJobRows(t, raw, table), table)
 	}
 	require.EqualValues(t, queryUint(t, raw, "SELECT count(*) FROM source_pacing"), queryUint(t, raw, "SELECT count(*) FROM source_service_turns"))

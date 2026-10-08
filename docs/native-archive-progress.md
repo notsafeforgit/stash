@@ -21,12 +21,14 @@ the entire database byte-identical before and after. Its profile URL import and
 after-commit plugin notifications are implemented and tested, but not deployed.
 The prior schema-96 checkpoint also passed browsing under concurrent ingestion.
 
-An audit of the actual manual command found a remaining implementation gap:
-`gallery-dl` still invokes legacy catalog hooks, and native download adapters do
-not yet cover ThisVid/yt-dlp and every generic extractor path required by the
-plan. The yt-dlp source-request guard and resolved-video identity adapters are
-implemented. Undated-source traversal and the remaining caller paths must be
-finished, then changed producer runtimes/profiles rebuilt before coherent cutover.
+The live manual `gallery-dl` command still invokes legacy catalog hooks.
+Native ThisVid/yt-dlp identities, undated configured scans and the inventoried
+Tumblr/Chevereto/LeakGallery adapters are implemented and verified. Schema 1000099
+adds captured origins for cross-host dependencies and permits explicit mixed
+download collections; its complete backend gate has passed. The manual caller and
+its deployment profiles are being verified separately before transfer into the
+main checkout. Final installed producer runtimes/profiles, the populated schema
+rehearsal and the coordinated writer handoff remain required.
 
 The earlier verified checkpoint is schema 1000094, with the shared review queue,
 Keep current value receipts, atomic post-merge review and shared archive activity.
@@ -12271,3 +12273,38 @@ Restart and acknowledged replay preserve those identities without duplication.
 Conflicting claims still require review. The final populated import must use a
 fresh common backup boundary; it cannot replace a completed catalog snapshot
 with a second snapshot UUID for the same catalog/source pair.
+
+
+## Observed source dependencies and mixed collections — 2026-10-08
+
+Schema 1000099 adds canonical HTTP origins to new download dependency
+reservations. Gallery-dl source requests and yt-dlp source probes use the actual
+requested host for reservation and failure attribution. URL paths, query values
+and fragments are excluded from the stored origin. The existing service-scope
+equivalence, independent-download policy, shared provider cooldowns, download
+priority, fairness and lease/definition checks remain in force. Unknown sibling
+hosts stay separate. Historical dependency rows retain their original values
+with no invented origin; exact-window retries retain newly captured origins.
+
+Explicit mixed-source collections may now admit downloads while each resolved
+post retains its own native namespace and identifier. Such collections cannot
+run namespace-specific metadata enrichment. The real HTTP worker test exercises
+a mixed yt-dlp collection with an additional metadata host, durable intake, lost
+response recovery and export/restore. Focused migration/restart/pacing checks and
+all 647 producer tests pass. Initial test setup mistakes were corrected: the run
+model stores collection identity instead of a namespace, a traversal has no
+lower publication bound, and existing independent downloads share cooldowns
+without exclusive ownership of an entire website.
+
+The preceding web-media increment is committed as
+`0c4c4c520574fafa4f965872b106b49b5c90743c`. The origins gate passed preparation,
+including 797 UI tests, 647 producer tests, the library/archive/backup suites and
+zero Go lint issues. Its Go run passed every package except one migration test
+whose old four-column expectation omitted the new nullable origin column. That
+assertion now verifies the preserved values and absent historical origin. Its
+focused check and the complete resumed lint/backend gate passed; the latter
+completed in 2,046.3 seconds with every Go package successful.
+Production remains compatible; the latest populated verified
+release is schema 1000097. The manual gallery-dl entry point, rebuilt application
+and host/n8n/backup runtimes, final migration rehearsal, coordinated backups and
+coherent cutover still remain.

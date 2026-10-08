@@ -15,6 +15,7 @@ import (
 
 func removeSourceTraversalSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSourceServiceOriginsSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER IF EXISTS source_run_basis_insert;
 DROP TRIGGER IF EXISTS source_run_basis_update;
 DROP TRIGGER IF EXISTS source_run_attempt_basis;

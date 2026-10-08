@@ -50,7 +50,7 @@ func TestSourceRunServicesReserveBeforeChildAndReleaseAfterFinish(t *testing.T) 
 	stale.Fence++
 	_, err = d.coordinator.ReserveSource(t.Context(), d.token, stale, child)
 	require.ErrorIs(t, err, models.ErrSourceRunLease)
-	_, err = d.coordinator.ReserveSource(t.Context(), d.token, r.Lease(), "https://unrelated.invalid/private")
+	_, err = d.coordinator.ReserveSource(t.Context(), d.token, r.Lease(), "https://user:password@unrelated.invalid/private")
 	require.ErrorIs(t, err, models.ErrSourceRunInvalid)
 	_, err = d.coordinator.Finish(t.Context(), d.token, r.Lease(), models.SourceRunOutcome{State: "succeeded"})
 	require.NoError(t, err)

@@ -213,7 +213,8 @@ func (s *SourceRunStore) enqueue(ctx context.Context, input models.SourceRunRequ
 	if err != nil {
 		return nil, false, err
 	}
-	if c == nil || c.Revision != input.CollectionRevision || c.State != "active" || c.TargetURL == "" || c.Namespace == "" ||
+	if c == nil || c.Revision != input.CollectionRevision || c.State != "active" || c.TargetURL == "" ||
+		(input.Operation == "enrich" && c.Namespace == "") ||
 		(input.Operation == "download" && c.RootUUID == nil) {
 		return nil, false, models.ErrSourceDefinitionConflict
 	}

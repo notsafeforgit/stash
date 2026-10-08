@@ -26,11 +26,8 @@ func (s *SourceRunStore) ReserveSource(ctx context.Context, lease models.SourceR
 	if err != nil {
 		return nil, models.ErrSourceRunInvalid
 	}
-	root, err := sourcePacingScope(ctx, r.UUID, false)
+	origin, err := scrape.SourceOriginV1(url)
 	if err != nil {
-		return nil, err
-	}
-	if scope != root && scope != "service:redgifs" && scope != "service:imgur" {
 		return nil, models.ErrSourceRunInvalid
 	}
 	result := &models.SourceRunServiceReservation{RunUUID: r.UUID, Fence: r.Fence, Scope: scope}
@@ -63,8 +60,8 @@ func (s *SourceRunStore) ReserveSource(ctx context.Context, lease models.SourceR
 	if _, err := dbWrapper.Exec(ctx, "INSERT OR IGNORE INTO source_pacing(scope) VALUES(?)", scope); err != nil {
 		return nil, err
 	}
-	if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_run_attempt_pacing(run_uuid,fence,scope,reserved) VALUES(?,?,?,0)
- ON CONFLICT(run_uuid,fence,scope) DO NOTHING`, r.UUID, r.Fence, scope); err != nil {
+	if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_run_attempt_pacing(run_uuid,fence,scope,reserved,source_origin) VALUES(?,?,?,0,?)
+ ON CONFLICT(run_uuid,fence,scope) DO NOTHING`, r.UUID, r.Fence, scope, origin); err != nil {
 		return nil, err
 	}
 	if ready {

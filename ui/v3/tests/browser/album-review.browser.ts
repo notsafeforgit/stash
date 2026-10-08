@@ -504,10 +504,21 @@ test("an original admitted album request recovers after consolidation without cu
     page.locator("[data-album-job]").getByText("Queued", { exact: true }),
   ).toBeVisible();
   expect(remote.writes).toEqual([original]);
+  // Recovery reloads the admitted job before retrying the unavailable context.
+  // Let that read finish before navigating away from this document.
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Could not complete this album step" })
+      .getByRole("button", { name: "Refresh album status", exact: true }),
+  ).toBeEnabled();
   remote.failIdentity(false);
   await open(page);
   await apply(page);
   await expect.poll(() => remote.writes.length).toBe(2);
+  await expect(page.locator("[data-album-job]")).toContainText(
+    `Album job ${remote.current().sequence}`,
+  );
   expect(remote.writes[1]!.path).toBe(
     `posts/${postIds.otherPost}/album-backfills`,
   );

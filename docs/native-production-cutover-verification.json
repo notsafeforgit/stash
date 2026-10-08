@@ -1,0 +1,852 @@
+{
+  "status": "cutover_in_progress",
+  "boundary_uuid": "8c462d7a-ee41-4508-a4c8-b4ab55c7ca13",
+  "native_schema": 1000099,
+  "public_native_activated": false,
+  "legacy_writers_paused": true,
+  "original_database_unchanged": true,
+  "source_revision": "0ea2c05fbc20356929c561f2173386a14870fdb7",
+  "producer_backup_revision": "d863a41af893bcdc341bc3021cca02eff8ebeebd",
+  "library_reconciliation": {
+    "status": "passed",
+    "source_schema": 86,
+    "schema": 1000099,
+    "boundary_uuid": "8c462d7a-ee41-4508-a4c8-b4ab55c7ca13",
+    "tables": {
+      "blobs": {
+        "native_table": "blobs",
+        "columns": [
+          "checksum",
+          "blob"
+        ],
+        "rows": 240872,
+        "sha256": "f82b723d6f8eb71627b880bef60937a6514715ce5f5746f89adb1e6ccc820394"
+      },
+      "files": {
+        "native_table": "files",
+        "columns": [
+          "id",
+          "basename",
+          "zip_file_id",
+          "parent_folder_id",
+          "size",
+          "mod_time",
+          "created_at",
+          "updated_at"
+        ],
+        "rows": 778224,
+        "sha256": "bf81b109092898ecbbcd103d8c6c1e838377bed721ee9db4de86591fdbf146e0"
+      },
+      "files_fingerprints": {
+        "native_table": "files_fingerprints",
+        "columns": [
+          "file_id",
+          "type",
+          "fingerprint"
+        ],
+        "rows": 1556120,
+        "sha256": "a35bdb65f4020fbfc26168317e8e39c025726cfa3d7cd7bf154a3fa43679f146"
+      },
+      "folders": {
+        "native_table": "folders",
+        "columns": [
+          "id",
+          "basename",
+          "path",
+          "parent_folder_id",
+          "zip_file_id",
+          "mod_time",
+          "created_at",
+          "updated_at"
+        ],
+        "rows": 3494,
+        "sha256": "cdedc85400fbb636f34d96b355bea95bcd899790771651cdd19a5297d25db141"
+      },
+      "fork_file_deletions": {
+        "native_table": "file_deletions",
+        "columns": [
+          "id"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "fork_image_file_metadata": {
+        "native_table": "image_file_metadata",
+        "columns": [
+          "file_id",
+          "source_size",
+          "source_mod_time",
+          "bit_depth",
+          "color_range",
+          "color_space",
+          "color_transfer",
+          "color_primaries"
+        ],
+        "rows": 504472,
+        "sha256": "416468d43fd79884adf8dc332dc8965834e518cfe00380998bdd979b4b794fb2"
+      },
+      "fork_scene_cover_sources": {
+        "native_table": "scene_cover_sources",
+        "columns": [
+          "scene_id",
+          "cover_checksum",
+          "source_file_id",
+          "at",
+          "source_fingerprint"
+        ],
+        "rows": 273507,
+        "sha256": "b949f024396121908461b14a0fd67e0cb642b6a52eb045d61b23f90f628769ce"
+      },
+      "fork_share_sessions": {
+        "native_table": "share_sessions",
+        "columns": [
+          "token_hash",
+          "share_id",
+          "version",
+          "expires_at",
+          "preview",
+          "exchange_only"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "fork_shares": {
+        "native_table": "shares",
+        "columns": [
+          "id",
+          "token_hash",
+          "label",
+          "created_by",
+          "created_at",
+          "expires_at",
+          "revoked_at",
+          "allow_download",
+          "show_metadata",
+          "version",
+          "access_count",
+          "last_accessed_at",
+          "snapshot"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "fork_video_file_metadata": {
+        "native_table": "video_file_metadata",
+        "columns": [
+          "file_id",
+          "source_size",
+          "source_mod_time",
+          "video_stream_duration",
+          "frame_count",
+          "duration_mismatch",
+          "bit_depth",
+          "color_range",
+          "color_space",
+          "color_transfer",
+          "color_primaries"
+        ],
+        "rows": 273752,
+        "sha256": "fb322f304e1e4d7d8669a52b255d2b109c695e63f81e14b706e2f90978f10dcf"
+      },
+      "galleries": {
+        "native_table": "galleries",
+        "columns": [
+          "id",
+          "folder_id",
+          "title",
+          "date",
+          "details",
+          "studio_id",
+          "rating",
+          "organized",
+          "created_at",
+          "updated_at",
+          "code",
+          "photographer",
+          "date_precision"
+        ],
+        "rows": 1340,
+        "sha256": "3305617638749ea394ca82019fa1bbb85762c7ace848d37dc85bc90952e7b3fa"
+      },
+      "galleries_chapters": {
+        "native_table": "galleries_chapters",
+        "columns": [
+          "id",
+          "title",
+          "image_index",
+          "gallery_id",
+          "created_at",
+          "updated_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "galleries_files": {
+        "native_table": "galleries_files",
+        "columns": [
+          "gallery_id",
+          "file_id",
+          "primary"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "galleries_images": {
+        "native_table": "galleries_images",
+        "columns": [
+          "gallery_id",
+          "image_id",
+          "cover"
+        ],
+        "rows": 505653,
+        "sha256": "a31a3f7f9d8f5335d9fe296e228afdaa012d91c976985c7a081e90cc9f2d8571"
+      },
+      "galleries_tags": {
+        "native_table": "galleries_tags",
+        "columns": [
+          "gallery_id",
+          "tag_id"
+        ],
+        "rows": 1127,
+        "sha256": "08568e8d7dfc1261bce56f54608d52cb38dde42b0e7d13584a6776b8796923fd"
+      },
+      "gallery_custom_fields": {
+        "native_table": "gallery_custom_fields",
+        "columns": [
+          "gallery_id",
+          "field",
+          "value"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "gallery_urls": {
+        "native_table": "gallery_urls",
+        "columns": [
+          "gallery_id",
+          "position",
+          "url"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "group_custom_fields": {
+        "native_table": "group_custom_fields",
+        "columns": [
+          "group_id",
+          "field",
+          "value"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "group_urls": {
+        "native_table": "group_urls",
+        "columns": [
+          "group_id",
+          "position",
+          "url"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "groups": {
+        "native_table": "groups",
+        "columns": [
+          "id",
+          "name",
+          "aliases",
+          "duration",
+          "date",
+          "rating",
+          "studio_id",
+          "director",
+          "description",
+          "created_at",
+          "updated_at",
+          "front_image_blob",
+          "back_image_blob",
+          "date_precision"
+        ],
+        "rows": 5,
+        "sha256": "9e5a9c50278c10fb082ff30805dffb221b2ed081128ddca3348010a83781e083"
+      },
+      "groups_relations": {
+        "native_table": "groups_relations",
+        "columns": [
+          "containing_id",
+          "sub_id",
+          "order_index",
+          "description"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "groups_scenes": {
+        "native_table": "groups_scenes",
+        "columns": [
+          "group_id",
+          "scene_id",
+          "scene_index"
+        ],
+        "rows": 11,
+        "sha256": "c2ac419a82483c905ffd7a20cfcf8cae35cb9621e6a8f02482f7d597e4c29c18"
+      },
+      "groups_tags": {
+        "native_table": "groups_tags",
+        "columns": [
+          "group_id",
+          "tag_id"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "image_custom_fields": {
+        "native_table": "image_custom_fields",
+        "columns": [
+          "image_id",
+          "field",
+          "value"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "image_files": {
+        "native_table": "image_files",
+        "columns": [
+          "file_id",
+          "format",
+          "width",
+          "height"
+        ],
+        "rows": 504472,
+        "sha256": "ddc464d6788ddb08524d2a928d8faf64ae923f5079b16864410290682941334a"
+      },
+      "image_urls": {
+        "native_table": "image_urls",
+        "columns": [
+          "image_id",
+          "position",
+          "url"
+        ],
+        "rows": 290664,
+        "sha256": "f4497cd0af114e76d04197f9e00a3653c88f2d061fabd8833959359a61e34c13"
+      },
+      "images": {
+        "native_table": "images",
+        "columns": [
+          "id",
+          "title",
+          "rating",
+          "studio_id",
+          "o_counter",
+          "organized",
+          "created_at",
+          "updated_at",
+          "date",
+          "code",
+          "photographer",
+          "details",
+          "date_precision"
+        ],
+        "rows": 503711,
+        "sha256": "3c101a6f32b05ff60a81f3e2a527374198d992cbe3ced212be61f1701e191189"
+      },
+      "images_files": {
+        "native_table": "images_files",
+        "columns": [
+          "image_id",
+          "file_id",
+          "primary"
+        ],
+        "rows": 504480,
+        "sha256": "874658ed436d454fe64e111cb81dacd4fe51084f54a51c3b20c755c23a38c6ae"
+      },
+      "images_tags": {
+        "native_table": "images_tags",
+        "columns": [
+          "image_id",
+          "tag_id"
+        ],
+        "rows": 399009,
+        "sha256": "47bfba60debcf61a208a1aefbe46b0efd662d56a8b216cdfa80fd7a9f27edf04"
+      },
+      "performer_custom_fields": {
+        "native_table": "performer_custom_fields",
+        "columns": [
+          "performer_id",
+          "field",
+          "value"
+        ],
+        "rows": 77,
+        "sha256": "7b4f8ec88ff3c5e7edd5515d22450acbb5987256a4b718490edc607f3cc6a619"
+      },
+      "performer_stash_ids": {
+        "native_table": "performer_stash_ids",
+        "columns": [
+          "performer_id",
+          "endpoint",
+          "stash_id",
+          "updated_at"
+        ],
+        "rows": 35,
+        "sha256": "baf716b4d0ed72c67101ec7a94dbaffc19d72994672967938438b6eaa4718418"
+      },
+      "performer_urls": {
+        "native_table": "performer_urls",
+        "columns": [
+          "performer_id",
+          "position",
+          "url"
+        ],
+        "rows": 1510,
+        "sha256": "47c7d29ed625fe3d75390e42de60b19568166123adeac389bf15c1f4b49aef85"
+      },
+      "performers": {
+        "native_table": "performers",
+        "columns": [
+          "id",
+          "disambiguation",
+          "gender",
+          "birthdate",
+          "birthdate_precision",
+          "ethnicity",
+          "country",
+          "eye_color",
+          "height",
+          "measurements",
+          "fake_tits",
+          "tattoos",
+          "piercings",
+          "favorite",
+          "created_at",
+          "updated_at",
+          "details",
+          "death_date",
+          "death_date_precision",
+          "hair_color",
+          "weight",
+          "rating",
+          "ignore_auto_tag",
+          "penis_length",
+          "circumcised",
+          "career_start",
+          "career_start_precision",
+          "career_end",
+          "career_end_precision",
+          "image_blob"
+        ],
+        "rows": 1440,
+        "sha256": "a425dfb54cae2677eb90cbb5900f94f33a84ef9dcb01aa3a59bf3d97ac0c57a7"
+      },
+      "performers_galleries": {
+        "native_table": "performers_galleries",
+        "columns": [
+          "performer_id",
+          "gallery_id"
+        ],
+        "rows": 1278,
+        "sha256": "116ea90d8811a44695b1ebf5e7443b3bcf22df9e12b422227f782a6553198357"
+      },
+      "performers_images": {
+        "native_table": "performers_images",
+        "columns": [
+          "performer_id",
+          "image_id"
+        ],
+        "rows": 465355,
+        "sha256": "ffc4ffe1224d5776fb727ac1bd9ea54bac8668f959d4f1bfdeccf959083f9fa9"
+      },
+      "performers_scenes": {
+        "native_table": "performers_scenes",
+        "columns": [
+          "performer_id",
+          "scene_id"
+        ],
+        "rows": 252378,
+        "sha256": "c90d18a5e4b11548756d9008286ea78be62959674dcbbcc8ca7576ebea24993b"
+      },
+      "performers_tags": {
+        "native_table": "performers_tags",
+        "columns": [
+          "performer_id",
+          "tag_id"
+        ],
+        "rows": 3567,
+        "sha256": "028ab99bf62b3086798e176ca1cd9df7bee49470109bb26d67bcd410051e3b78"
+      },
+      "saved_filters": {
+        "native_table": "saved_filters",
+        "columns": [
+          "id",
+          "name",
+          "mode",
+          "find_filter",
+          "ui_options"
+        ],
+        "rows": 83,
+        "sha256": "6539331937b95dfffa7bcc383571d314d98fa3eae6abdd4251d8d1907ce2d13d"
+      },
+      "scene_custom_fields": {
+        "native_table": "scene_custom_fields",
+        "columns": [
+          "scene_id",
+          "field",
+          "value"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "scene_markers": {
+        "native_table": "scene_markers",
+        "columns": [
+          "id",
+          "title",
+          "seconds",
+          "primary_tag_id",
+          "scene_id",
+          "created_at",
+          "updated_at",
+          "end_seconds"
+        ],
+        "rows": 1663,
+        "sha256": "68dabc069bf060000c9310afba77cfc7c7ea5a95fca498a6fcde2579e797baa0"
+      },
+      "scene_markers_tags": {
+        "native_table": "scene_markers_tags",
+        "columns": [
+          "scene_marker_id",
+          "tag_id"
+        ],
+        "rows": 2000,
+        "sha256": "c7882172125b68f75e371522feecdc463f73722ae413b9f4da05294b8a388047"
+      },
+      "scene_stash_ids": {
+        "native_table": "scene_stash_ids",
+        "columns": [
+          "scene_id",
+          "endpoint",
+          "stash_id",
+          "updated_at"
+        ],
+        "rows": 10,
+        "sha256": "50ea7aedcd2d703d9d38ad7ffc976b5f23c72e5df7e528eba2649319e85c26e7"
+      },
+      "scene_urls": {
+        "native_table": "scene_urls",
+        "columns": [
+          "scene_id",
+          "position",
+          "url"
+        ],
+        "rows": 112238,
+        "sha256": "5d4ea1659402293d263b423be87c6d5ea7031210f43d78f52ee72253d27da98c"
+      },
+      "scenes": {
+        "native_table": "scenes",
+        "columns": [
+          "id",
+          "title",
+          "details",
+          "date",
+          "rating",
+          "studio_id",
+          "organized",
+          "created_at",
+          "updated_at",
+          "code",
+          "director",
+          "resume_time",
+          "play_duration",
+          "cover_blob",
+          "date_precision",
+          "production_date",
+          "production_date_precision"
+        ],
+        "rows": 273546,
+        "sha256": "6fe0587fee619e171d0cc27151dec9bdb9e875f15bfe695066cb28cbdd0ae19e"
+      },
+      "scenes_files": {
+        "native_table": "scenes_files",
+        "columns": [
+          "scene_id",
+          "file_id",
+          "primary"
+        ],
+        "rows": 273744,
+        "sha256": "6ccb038d5337c0e67da45bfff4a32589c945397ebfb486432b661a7f493303d5"
+      },
+      "scenes_galleries": {
+        "native_table": "scenes_galleries",
+        "columns": [
+          "scene_id",
+          "gallery_id"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "scenes_o_dates": {
+        "native_table": "scenes_o_dates",
+        "columns": [
+          "scene_id",
+          "o_date"
+        ],
+        "rows": 3920,
+        "sha256": "35533adc1ff81b821ef0500367ff9e70eb6d535775bf3a3e30883298e0f2a52a"
+      },
+      "scenes_tags": {
+        "native_table": "scenes_tags",
+        "columns": [
+          "scene_id",
+          "tag_id"
+        ],
+        "rows": 278448,
+        "sha256": "5be521b001085a888bdbf14cc7d043155eaff2b2cb52ae18199281c1b8e49ab3"
+      },
+      "scenes_view_dates": {
+        "native_table": "scenes_view_dates",
+        "columns": [
+          "scene_id",
+          "view_date"
+        ],
+        "rows": 4442,
+        "sha256": "bfdfe084d223758956f1d65c5812ef7d61f74dd8c3f7bbee9bc6fa4378598395"
+      },
+      "studio_aliases": {
+        "native_table": "studio_aliases",
+        "columns": [
+          "studio_id",
+          "alias"
+        ],
+        "rows": 6,
+        "sha256": "cbf80bd412067494e7ed6043f86a125ec4a5c16305de3f30b2f9cee9fa83d598"
+      },
+      "studio_custom_fields": {
+        "native_table": "studio_custom_fields",
+        "columns": [
+          "studio_id",
+          "field",
+          "value"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "studio_stash_ids": {
+        "native_table": "studio_stash_ids",
+        "columns": [
+          "studio_id",
+          "endpoint",
+          "stash_id",
+          "updated_at"
+        ],
+        "rows": 3,
+        "sha256": "c1b32e5dceb5fc790478e313b9e3b09aff2c993092d146d94987488ac599ab75"
+      },
+      "studio_urls": {
+        "native_table": "studio_urls",
+        "columns": [
+          "studio_id",
+          "position",
+          "url"
+        ],
+        "rows": 91,
+        "sha256": "fb725b864f3f6a0d9ac661642d965b70709584fde775f9dab95bea60c53ea76a"
+      },
+      "studios": {
+        "native_table": "studios",
+        "columns": [
+          "id",
+          "name",
+          "parent_id",
+          "created_at",
+          "updated_at",
+          "details",
+          "rating",
+          "ignore_auto_tag",
+          "image_blob",
+          "favorite",
+          "organized"
+        ],
+        "rows": 124,
+        "sha256": "866b900feef67cb8cec406287c47b204143cd0c9e802e708d44d2e05a35765c2"
+      },
+      "studios_tags": {
+        "native_table": "studios_tags",
+        "columns": [
+          "studio_id",
+          "tag_id"
+        ],
+        "rows": 73,
+        "sha256": "69485218a7a46811f2d317544985ccfa43132604dc3eb24b57934803c01014b1"
+      },
+      "tag_aliases": {
+        "native_table": "tag_aliases",
+        "columns": [
+          "tag_id",
+          "alias"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tag_custom_fields": {
+        "native_table": "tag_custom_fields",
+        "columns": [
+          "tag_id",
+          "field",
+          "value"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tag_stash_ids": {
+        "native_table": "tag_stash_ids",
+        "columns": [
+          "tag_id",
+          "endpoint",
+          "stash_id",
+          "updated_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tags": {
+        "native_table": "tags",
+        "columns": [
+          "id",
+          "name",
+          "created_at",
+          "updated_at",
+          "ignore_auto_tag",
+          "description",
+          "image_blob",
+          "favorite",
+          "sort_name"
+        ],
+        "rows": 118,
+        "sha256": "3943a1185aaa0bdb6c0c1f962f999ca485665ffcdad158b27cc412f347886f01"
+      },
+      "tags_relations": {
+        "native_table": "tags_relations",
+        "columns": [
+          "parent_id",
+          "child_id"
+        ],
+        "rows": 19,
+        "sha256": "5d2a8c7fcfd5810434471b6d6969461d9a3b2c77c622a99644accab6dd088a90"
+      },
+      "video_captions": {
+        "native_table": "video_captions",
+        "columns": [
+          "file_id",
+          "language_code",
+          "filename",
+          "caption_type"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "video_files": {
+        "native_table": "video_files",
+        "columns": [
+          "file_id",
+          "duration",
+          "video_codec",
+          "format",
+          "audio_codec",
+          "width",
+          "height",
+          "frame_rate",
+          "bit_rate",
+          "interactive",
+          "interactive_speed"
+        ],
+        "rows": 273752,
+        "sha256": "638b58076848b6abf476ba1ead26d7e63a7288b395a848f4e86d6a349d951e9a"
+      }
+    },
+    "unchanged_typed_rows": 8290833,
+    "performer_names": 1941,
+    "selected_filters": 83,
+    "original_fork_history_rows": 5,
+    "unmatched_name_policies_retained": 0,
+    "integrity": "ok",
+    "foreign_key_violations": 0,
+    "old_data_unchanged": true,
+    "native_activated": false,
+    "seconds": 54.627112552989274,
+    "completed_at": "2026-10-08T18:21:25.917854+00:00"
+  },
+  "registry": {
+    "source_accounts": 1237,
+    "catalog_groupings": 1711,
+    "saved_identities_adopted": 9,
+    "resolved_saved_account_links": 9,
+    "unresolved_saved_account_links": 1
+  },
+  "journal_reconciliation": {
+    "status": "passed",
+    "boundary_uuid": "8c462d7a-ee41-4508-a4c8-b4ab55c7ca13",
+    "source_rows": 575,
+    "families": {
+      "backfill_policy_migrations": 1,
+      "backfill_scan_completion": 59,
+      "collection_backfill_completion": 4,
+      "extractor_jobs": 135,
+      "legacy_handoffs": 0,
+      "scan_deferrals": 169,
+      "scan_jobs": 207
+    },
+    "dispositions": {
+      "historical": 64,
+      "pending_binding": 504,
+      "review": 7
+    },
+    "backfill_decisions": 1350,
+    "all_original_evidence_equal": true,
+    "jobs_activated": 0,
+    "completed_at": "2026-10-08T18:38:49.944597+00:00"
+  },
+  "producer_queues": {
+    "identities": 2,
+    "credentials_issued": 0,
+    "workers_started": false,
+    "legacy_receipts": 34,
+    "legacy_receipt_outcomes": {
+      "failed": 7,
+      "review": 0,
+      "skipped": 0,
+      "succeeded": 27
+    },
+    "original_receipt_bytes_equal": true
+  },
+  "deployment": {
+    "files": 78,
+    "profiles": 32,
+    "workflow_replacements": 9,
+    "freshness_check": "passed",
+    "installed": false
+  },
+  "backup_queue": {
+    "redis_files": 4,
+    "redis_bytes": 28367431,
+    "redis_aof_check": "passed",
+    "containers": [
+      "n8n",
+      "redis-n8n"
+    ],
+    "installed": false
+  },
+  "catalog_bodies": "awaiting_complete_frozen_input_preparation",
+  "artwork_capture": "in_progress",
+  "remaining": [
+    "current_catalog_and_operational_imports",
+    "domain_and_policy_reconciliation",
+    "pending_work_handoff",
+    "scoped_credentials_and_installed_inventory",
+    "current_coordinated_backup_and_restore",
+    "controlled_native_activation",
+    "scheduled_cycles_and_legacy_retirement",
+    "owner_acceptance"
+  ],
+  "scope": "Current migration checkpoint; not a completed production cutover or full backup."
+}

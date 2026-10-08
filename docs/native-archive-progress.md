@@ -4,167 +4,69 @@ This is the implementation record for the
 [full transition plan](native-archive-transition-plan.md). It does not narrow
 that plan's scope or replace its completion criteria. Development remains on
 `v3-rewrite`; merge into `develop` requires verification and the owner's success
-review. Production has not been migrated.
+review. The production cutover is in progress; the native replacement is not yet public.
 
 ## Current release position — 2026-10-08 UTC
 
-Implementation spans phases 1–6. Production has not been migrated. The final
-compatible release is frozen and pinned; native development stays on
-`v3-rewrite` until verification and the owner's success review. Historical
-entries below record the evidence available at their dates, including work that
-was incomplete then but has since finished. They are not the current task list.
+The production maintenance boundary is active. Compatible Stash, n8n, Redis,
+scrapers and their related schedules are stopped behind reversible admission
+gates. The public native replacement has **not** been activated. The compatible
+release, original databases, workflow state and held media snapshot are retained.
+Development remains on `v3-rewrite`; merge into `develop` requires the owner's
+success review. Historical entries below record the evidence available at their
+dates and are not the current task list.
 
-The latest application checkpoint is schema **1000097** at `9c0edb356`.
-Its populated migration and independent comparison preserved all 40,513,487
-existing rows. The published wrapper passed populated startup and restart with
-the entire database byte-identical before and after. Its profile URL import and
-after-commit plugin notifications are implemented and tested, but not deployed.
-The prior schema-96 checkpoint also passed browsing under concurrent ingestion.
+The selected application is schema **1000099**, source `0ea2c05fb`; the producer
+and backup packages are `d863a41af`. The exact source and wrapper images are pinned
+in [release verification](native-schema99-release-verification.json). Complete
+source checks, populated migration/startup/restart, browsing during ingestion,
+original-row preservation, installed worker verification and the bounded real S3
+publication/restore passed. These checks do not replace the current-data cutover.
 
-The live manual `gallery-dl` command still invokes legacy catalog hooks.
-Native ThisVid/yt-dlp identities, undated configured scans and the inventoried
-Tumblr/Chevereto/LeakGallery adapters are implemented and verified. Schema 1000099
-adds captured origins for cross-host dependencies and permits explicit mixed
-download collections; its complete backend gate has passed. The manual caller is
-now integrated after passing the complete repository gate, real HTTP/restore
-checks and installed-package verification. The final host/n8n/backup packages,
-32 profiles and 77 deployment files are staged and verified. The populated
-schema-99 migration, image startup/restart and bounded real S3 restore passed.
-The final browsing/ingestion performance and full row comparison passed. Fresh production
-migration, a current full coordinated backup and the writer handoff remain.
+The fresh compatible production database has now migrated separately to schema
+1000099 in 108 seconds. Independent reconciliation verified **8,290,833 unchanged
+typed rows**, all **1,941 performer names/aliases**, **83 selected saved filters**
+and the original fork history, with clean integrity and no foreign-key violations.
+The original compatible database is unchanged. The exact native image is running
+on a private localhost endpoint against this candidate, with external workers off.
 
-The earlier verified checkpoint is schema 1000094, with the shared review queue,
-Keep current value receipts, atomic post-merge review and shared archive activity.
-Its complete fork gate, populated migration, fresh reopen and independent
-comparison passed. The schema-94 rehearsal preserves all 40,512,443 original
-rows across 300 original tables with clean integrity and no foreign-key
-violations. `.local/native-rehearsal-current.json` identifies the retained
-verified database and its reconciliation receipts.
+Current imports have preserved the saved performer UUIDs and merged identity,
+**1,237 source accounts** and **1,711 catalog groupings**. Nine resolved saved
+account links were restored; one nonstandard account label remains reviewable.
+All **575 scan-journal records** and **1,350 permanent backfill decisions** match
+the original evidence. No source jobs have been activated. Two inactive producer
+identities and their staged outboxes retain all **34 legacy n8n result receipts**
+byte-for-byte, without treating them as native ingestion-completion proof.
 
-Verified development work includes:
+All 1,711 catalog databases are copied from the held current snapshot. The
+240,872 original saved images are still being copied and checked; the catalog
+body importer waits for the complete frozen-input preparation. The snapshot has
+an explicit read-only mount after its automatic mount expired. This is the same
+held snapshot, not a new data boundary.
 
-- Native identity, source/post/profile/capture storage, metadata choices,
-  performer/account ownership, merge redirects, file evidence, durable jobs,
-  ordered source albums and manual gallery choices.
-- Import of all 1,697 frozen catalog bodies and their disabled metadata policies,
-  with independent reconciliation and original evidence/receipts preserved.
-  Historical file matching applied 411,690 associations and recovered all
-  254,453 saved requests after restart. Retained operational work and policies
-  have native import, preview and guarded activation paths; rehearsal does not
-  authorize live execution.
-- Desktop/mobile account review and consolidation, source-post browsing and
-  merging, source appearances, album choices/playback/download reporting,
-  collection/root management, metadata policies and previews, and purchased-file
-  intake with folder performer defaults and durable retry/cancellation.
-- Native producer transport, offline outboxes, capture/file publication,
-  coordinated source windows, enrichment/translation/discovery work and scoped
-  dispatch. Host and n8n launch/config conversion is staged for the inventoried
-  services; installed launchers and schedules have not switched.
-- Portable archive and host backup implementations covering retained snapshots,
-  producer boundaries, immutable media references, bounded retention and request
-  reuse. Their regression suites pass; complete production capture, relocated
-  restore, measured daily costs and reviewed cloud-policy activation remain open.
+The final inactive deployment now contains **78 files**, **32 worker profiles**
+and **nine workflow replacements**. Its preimages and current workflow versions
+were checked at the paused boundary. The backup configuration includes both n8n
+and Redis in its brief container pause and retains Redis's complete AOF directory;
+the captured queue passed the existing Redis runtime's AOF validation. No runtime
+code change or artifact rebuild was required. AWS access and metadata retention
+configuration are verified; bucket versioning remains unchanged.
 
-Shared activity, import history, saved-action recovery and the current review
-queue pass their complete release gates. All four CI workflows passed at
-`333e5a5e0`; read-only registry inspection verified its source image digest and
-full revision label. The review queue also passed 36 Chromium/WebKit cases.
-The subsequent source-management/heartbeat increment passed its combined gate
-in 2,001.7 seconds, including 789 UI tests, 571 producer tests, all library,
-archive and backup suites, zero Go lint issues and full Go integration.
-Its installed package and the three scraper children plus heartbeat were checked
-in an isolated image built from the current n8n base. No scraper commands ran.
-The two parent and three source-removal conversions have staged native helpers
-and private graphs, including metadata defaults for newly registered sources.
-Their combined release gate passed, as did the subsequent source-operation
-backup gate. The staged dependency inventory covers all thirty profiles,
-download archives, source-operation state and n8n database/configuration/payloads.
-The separate host runtimes are installed and verified but inactive. Worker
-service/timer templates are packaged and validated; live launchers and workflows
-have not switched.
-
-The real host S3 publication, fresh download/restore and producer replay passed
-using a small native library and the actual frozen backup ledgers. The full
-populated local restore/recovery/replay has now passed: all 769,643 indexed media
-paths matched the retained filesystem view, all 238,693 artifacts were restored
-and verified, and the guarded continuation recovered interrupted deletion state
-and both pending producer outboxes. The enclosing Go harness's eight-hour timeout
-remains a failed result; the original child and subsequent continuation each
-have separate successful receipts. Complete cold-media adoption, populated S3
-publication, native daily-change measurement and metadata retention setup remain
-open. The schema-95 migration, typed reconciliation, populated policy handoff,
-wrapper startup and browsing-under-ingestion checks have one ordered supervisor
-chain; dependent stages cannot run before their prerequisites finish.
-
-The next development increment is schema 1000095, with the
-[fclones-backed deduplication service](native-file-deduplication.md). It
-previews exact file pairs, verifies complete bytes, preserves source matches and
-media metadata, and uses the existing deletion journal. Different media owners
-are left for review. Primary replacement, changed bytes/generations, lost
-responses, UUID adoption, later file deletion, anonymisation and process death
-before/after commit have regression coverage. The initial increment passed the
-full SQLite/filesystem suite (1,127 seconds); subsequent receipt validation and
-collision-preflight changes passed focused SQLite, HTTP, archive and filesystem
-checks, with zero lint issues. The populated checkpoint/active restore is still
-schema 1000094. The native `stash-dedupe` caller now saves immutable requests,
-recovers committed deletions, previews pairs sequentially and holds backup and
-worker publication locks. Its real HTTP test spans a lost response and a server
-and client restart. Host service/pre-backup replacements are staged, including
-completion cooldown handling and coordinated backup of the compact SQLite
-journal. The source and wrapper images are published and pinned. Live
-installation, scan/sidecar cleanup handoff, a populated schema-95 migration check
-and activation remain outstanding.
-
-Scheduled local-file discovery now has a native API client with a compact SQLite
-journal, resumable directory pagination, bounded pending admissions and private
-key-file authentication. It uses the existing manual-intake worker and metadata
-policies. The final scope correction and manual helper handoff passed the full
-`make GO_TEST_TIMEOUT=40m generate ui validate-fork` gate in 2,065 seconds,
-including 790 UI and 618 producer tests, the archive/backup/library suites,
-Go lint and full Go integration. This supersedes the earlier aggregate timeout.
-Service/timer templates validate but remain inactive. Actual folder coverage and
-policy activation must be reconciled before retiring the compatible scan helper;
-historical directory-membership collections are not filesystem scan grants.
-Automatic scope selection now reads current native folder policies and source
-boundaries. It distinguishes whole-root access from observed source folders,
-protects producer-submitted paths, and rechecks those decisions before publishing
-manual imports. Focused SQLite/worker/HTTP and client/UI checks pass. A populated
-read-only audit covers 1,674 narrow source prefixes, 34 additional source-evidence
-folders, the root and an unassigned folder. Host configuration and base-scope API
-requests are staged; populated policy activation and live verification remain
-outstanding.
-
-Subsequent artwork and external-container capture changes pass 123 archive,
-304 backup and 27 focused session/store checks. Build, Lint and image-publication
-CI passed at `e047e57bc` and `74d96dc3a`. The latter corrects the container's
-update-check repository without changing Go, SQL or UI source. Its explicitly
-selected wrapper passed isolated fresh startup, restart, UI/native-route checks
-and native snapshot validation at schema 1000095. Prepared Stash and daily-backup
-units are validated but uninstalled. Production still uses the compatible
-deployment.
-
-The staged manual helpers pass real ZIP/MP4 scanning, repeated scans, alias
-attachment, scoped tagging, title repair and unchanged dry runs against the
-`bbcd61496` wrapper. Its startup log exposed an omitted container-build
-`UPDATE_REPO` setting. The corrected `74d96dc3a` image and wrapper are now pinned;
-their binaries match, and isolated runtime logs verify the fork's update URL.
-The refreshed uninstalled unit and backup declaration select those artifacts.
-The 518 local collection updates and one fixed-UUID creation now use
-UUID-qualified PUT routes; an actual API fixture verifies identity retention,
-stale-request rejection and manual-intake scope selection. Applying the complete
-1,038 collection/policy requests to the populated candidate still awaits the
-restore and schema-95 reconciliation gates.
+[Current production verification](native-production-cutover-verification.json)
+records this partial cutover checkpoint. Private input manifests, immutable
+receipts and continuation state remain outside source control. The original
+historical cold-media audit continues independently; it is not a current full
+coordinated backup. The system filesystem retains more than 50 GiB free.
 
 Remaining release work:
 
 | Work | Required outcome |
 | --- | --- |
-| Populated release checks | Schema-97 migration, reconciliation and exact-wrapper startup/restart passed; schema-96 ingestion/browsing budgets also passed. Carry these receipts into the final artifact selection and verify subsequent changes before deployment. |
-| Callers and compatibility | Finish direct `gallery-dl`, ThisVid/yt-dlp and the remaining actual generic extractor paths; rebuild affected producer runtimes and profiles. Activate staged dedupe/backup/manual helpers and provision producers at cutover, verify live launch paths, then retire residual legacy writers and dependencies. |
-| Backup and restore | Prove a complete common capture boundary, actual upload/request/storage costs, bounded retention/reclamation, and an isolated empty/relocated restore with pending producer and filesystem state. |
-| Production cutover | Pin artifacts, quiesce writers, take final coordinated snapshots, migrate/reconcile, switch native launchers and resume work gradually through verified launch paths. |
-| Observation and retirement | Verify scheduled scraping/recovery/backup cycles, preserve the rollback/export boundary, and retire obsolete catalog writers, mounts, services and packages. |
-| Acceptance | Publish the final evidence and limitations for owner review; merge into `develop` only after success is accepted. |
+| Current import | Finish the snapshot and all catalog record families; independently reconcile current domain references, operational work, policies and source scopes. |
+| Writer handoff | Provision scoped credentials and final paths, preserve pending work, replace obsolete workflow execution paths and switch the pinned application/host/manual/n8n runtimes together. |
+| Backup and restore | Complete historical media reconciliation, publish the current coordinated backup and verify isolated restoration with original images, queues and pending filesystem work. |
+| Observation and retirement | Verify actual scrape, enrichment, manual intake and scheduled recovery/backup cycles; then retire obsolete catalog writers, mounts, services and packages. |
+| Acceptance | Publish final evidence and limitations for desktop/mobile owner review; merge into `develop` only after success is accepted. |
 
 The full [transition plan](native-archive-transition-plan.md) remains the
 completion contract. A passing development gate or catalog receipt is not proof

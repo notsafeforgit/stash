@@ -1,6 +1,6 @@
 {
-  "recorded_at": "2026-10-08T17:22:32.233387+00:00",
-  "status": "final_artifacts_migration_startup_and_bounded_cloud_restore_verified",
+  "recorded_at": "2026-10-08T17:37:03.895577+00:00",
+  "status": "final_artifacts_populated_release_and_bounded_cloud_restore_verified",
   "source_revision": "0ea2c05fbc20356929c561f2173386a14870fdb7",
   "producer_revision": "d863a41af893bcdc341bc3021cca02eff8ebeebd",
   "schema": 1000099,
@@ -145,20 +145,92 @@
   "disk_reserve": {
     "minimum_free_GiB": 50,
     "obsolete_completed_load_copy_reclaimed_bytes": 22415201984,
-    "migration_baselines_and_proofs_preserved": true
+    "migration_baselines_and_proofs_preserved": true,
+    "completed_final_load_copy_reclaimed_bytes": 22408288456,
+    "free_GiB_after_completed_load_copies_reclaimed": 81.97
   },
   "final_populated_performance": {
-    "status": "running",
-    "budgets": "Unchanged from the compatible baseline; idle p95 <=100ms, ingestion p95 <=250ms, no request >5s.",
-    "original_row_comparison_required": true
+    "status": "passed",
+    "budgets_unchanged": true,
+    "measurements": {
+      "scenes": {
+        "first_request_ms": 193.096028000582,
+        "idle": {
+          "samples": 60,
+          "min_ms": 4.049057024531066,
+          "median_ms": 5.349953018594533,
+          "p95_ms": 12.267142010387033,
+          "max_ms": 13.465478958096355
+        },
+        "ingestion": {
+          "samples": 60,
+          "min_ms": 10.618217987939715,
+          "median_ms": 12.594116502441466,
+          "p95_ms": 19.4200900150463,
+          "max_ms": 20.494307042099535
+        }
+      },
+      "images": {
+        "first_request_ms": 1117.7907480159774,
+        "idle": {
+          "samples": 60,
+          "min_ms": 3.9510770002380013,
+          "median_ms": 4.975204967195168,
+          "p95_ms": 27.69181499024853,
+          "max_ms": 31.228744017425925
+        },
+        "ingestion": {
+          "samples": 60,
+          "min_ms": 26.716498017776757,
+          "median_ms": 32.255186000838876,
+          "p95_ms": 40.86097399704158,
+          "max_ms": 97.30116097489372
+        }
+      },
+      "performers": {
+        "first_request_ms": 12.709051021374762,
+        "idle": {
+          "samples": 60,
+          "min_ms": 7.397918030619621,
+          "median_ms": 11.42555449041538,
+          "p95_ms": 14.554595982190222,
+          "max_ms": 20.03510802751407
+        },
+        "ingestion": {
+          "samples": 60,
+          "min_ms": 9.34007199248299,
+          "median_ms": 11.860128986882046,
+          "p95_ms": 22.589719970710576,
+          "max_ms": 44.278343964833766
+        }
+      }
+    },
+    "source_captures": 344,
+    "completed_file_jobs": 24,
+    "concurrent_browse_requests": 180,
+    "idle_browse_requests": 180,
+    "original_rows_preserved": 40513490,
+    "original_tables": 309,
+    "native_schema_unchanged": true,
+    "foreign_key_violations": 0,
+    "original_wals_unchanged": true,
+    "source_unchanged": true,
+    "target_unchanged_during_comparison": true,
+    "comparison_seconds": 280.7563545029843,
+    "completed_disposable_database_reclaimed": true
   },
   "production_migrated": false,
   "develop_merged": false,
   "remaining": [
-    "Finish final populated browsing/ingestion measurement and complete typed-row preservation.",
     "Finish historical cold-media audit and current full coordinated backup/restore with measured metadata churn.",
     "Capture a fresh common compatible database/catalog/operating boundary and migrate/reconcile current data.",
     "Provision and coherently activate the native application, host/manual/n8n producers, backup tools and nine workflow graphs.",
     "Verify scheduled recovery/backup/scrape cycles, retire legacy writers, and obtain owner desktop/mobile acceptance before merging develop."
-  ]
+  ],
+  "deployment_freshness": {
+    "files_match_expected_live_state": 77,
+    "workflow_versions_and_graphs_match": 9,
+    "n8n_base_image_unchanged": true,
+    "repeat_at_final_writer_boundary": true
+  }
 }

@@ -30,7 +30,7 @@ now integrated after passing the complete repository gate, real HTTP/restore
 checks and installed-package verification. The final host/n8n/backup packages,
 32 profiles and 77 deployment files are staged and verified. The populated
 schema-99 migration, image startup/restart and bounded real S3 restore passed.
-The final browsing/ingestion performance check is running. Fresh production
+The final browsing/ingestion performance and full row comparison passed. Fresh production
 migration, a current full coordinated backup and the writer handoff remain.
 
 The earlier verified checkpoint is schema 1000094, with the shared review queue,
@@ -12389,3 +12389,12 @@ and preserve at least 50 GiB of free space. The historical media audit continues
 in its original runtime. Current full backup verification, a fresh common
 production boundary, coherent writer activation, scheduled-cycle verification
 and owner acceptance remain before merging `develop`.
+
+The final load check subsequently passed with 344 captures, 24 completed file
+jobs and 180 concurrent browsing requests. During ingestion, scene/image/performer
+p95 response times were 19.4/40.9/22.6 ms, below the unchanged 250 ms budget.
+Every one of the schema-99 baseline's 40,513,490 rows survived with identical
+values and SQLite types. The comparison included committed WAL pages; the schema
+was unchanged and there were no foreign-key violations. Its disposable database copy was then
+reclaimed, leaving approximately 82 GiB free. The two migration baselines and
+all release/performance receipts remain available.

@@ -76,6 +76,7 @@ jobs:
     - name: Compile linux amd64
       env:
         OFFICIAL_BUILD: 'false'
+        UPDATE_REPO: ${{ github.repository }}
       run: make build-cc-linux
 
     - name: Log in to the Container registry

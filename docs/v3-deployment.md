@@ -31,6 +31,8 @@ frontend dependencies, regenerates Go/v3 bindings, builds the app/share/offline
 entries and login locales, runs `make validate-fork`, and compiles Linux amd64.
 It publishes `ghcr.io/notsafeforgit/stash:native-preview` and the seven-character
 revision tag above. The moving tag alone is not a deployment identity.
+Both container and downloadable-binary builds set `UPDATE_REPO` to the current
+GitHub repository, so the application's release check targets this fork.
 
 Select the run with the exact `headSha`, wait for success, then resolve the
 revision tag:

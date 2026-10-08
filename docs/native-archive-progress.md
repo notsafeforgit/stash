@@ -120,6 +120,14 @@ restart, UI/native-route check and native snapshot validation at schema 1000095.
 Prepared Stash and daily-backup units are validated but uninstalled. Production
 still uses the compatible deployment.
 
+The staged manual helpers also pass real ZIP/MP4 scanning, repeated scans,
+alias attachment, scoped tagging, title repair and unchanged dry runs against
+that exact isolated wrapper. Its startup log exposed an omitted container-build
+`UPDATE_REPO` setting: the publication workflow now matches the regular binary
+build and targets this fork. Publishing, selecting and verifying that corrected
+artifact remains required before cutover; the schema and application source did
+not change.
+
 Remaining release work:
 
 | Work | Required outcome |
@@ -11734,3 +11742,25 @@ separate populated schema-95 copy/migration and full typed reconciliation. It
 resumes the same suspended cold-media auditor only after those checks pass.
 Each stage rechecks its frozen inputs. None of these checks changes production
 or replaces the pending full backup/cost and cutover evidence.
+
+## Manual helper runtime proof and release-check target — 2026-10-08
+
+The five staged manual-helper modules match their committed source hashes and
+passed a real runtime check against the pinned native wrapper in 35.9 seconds.
+The isolated library contained a fixture MP4, a two-image ZIP and one loose
+image. Both scanner jobs reached `FINISHED`; repeating the scan preserved IDs
+and metadata. Canonical/alias attachment covered the scene, three images and ZIP
+gallery with one-item pagination and batches. Gallery tagging selected only its
+two images. Filename repair retained an existing title, repaired empty titles
+and was idempotent; duplicate performer names required an explicit ID. Every
+dry run left the observed library unchanged. The container had no network,
+published ports or production mounts, and the live Stash identity was unchanged.
+Evidence is under `.local/native-library-handoff-20261008/fixture-v1`.
+
+This verifies the actual staged modules and application API. Installation of
+the host launchers, their private key path and the Home Assistant command path
+still requires the native cutover. The same probe showed that the GHCR compile
+step omitted `UPDATE_REPO`, despite the regular binary build already setting it.
+That step now passes the repository identity through the existing Makefile linker
+flag. Corrected image publication and wrapper verification remain pending; frozen
+compatible images and the running restore binaries are untouched.

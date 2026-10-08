@@ -11658,6 +11658,26 @@ retry. Deployment must place native server checkpoints on the spacious staging
 filesystem as well; this setting does not move the server's own backup directory.
 No live storage paths or backup schedules were changed.
 
+## Coordinate external workflow writers during capture — 2026-10-08
+
+Worker publication barriers do not stop n8n's execution database and payload
+pruning. The host backup now accepts explicit `quiesce_containers` and a bounded
+`quiesce_timeout`. It acquires worker barriers before pausing external containers,
+captures the declared database/payload components and retained filesystem views,
+then resumes them before the large native database copy and remote publication.
+Each pause is owned by a transient user systemd service with an exact container
+ID and an independent resume deadline. Already-paused containers are refused;
+originally stopped containers remain stopped. Replacements and expired guards
+cannot seal a new checkpoint. Sealed retries inspect only the original evidence.
+
+All 123 archive and 304 backup tests pass. An isolated Podman test using the
+staged n8n worker image verified matching SQLite/payload capture, normal resume,
+automatic resume after the publisher exits without cleanup, expiry refusal and
+sealed replay. It used fixture data with networking disabled and checked the
+live n8n container stayed unchanged. The proof is retained under
+`.local/native-container-boundary-20261008`; production configuration and daily
+backup activation remain pending the full migration/restore gates.
+
 The original populated rehearsal reached its enclosing eight-hour Go test
 deadline while independently hashing restored artwork. The original Python child
 remains alive and continues from the same sealed checkpoint. The export/import

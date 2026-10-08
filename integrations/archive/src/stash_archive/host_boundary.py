@@ -12,21 +12,28 @@ from .storage import InvalidArchive
 
 
 class HostFilesystemCapture:
-    def __init__(self, worker_lock_roots, artwork, media, *, timeout=300):
+    def __init__(self, worker_lock_roots, artwork, media, *, timeout=300, external=None):
         from stash_ingest.publication_lock import PublicationBarrier
         self.barrier = PublicationBarrier(worker_lock_roots, timeout=timeout)
         self.artwork, self.media = artwork, media
         self.components = None
+        self.external = external
 
     def __enter__(self):
         self.barrier.__enter__()
+        try:
+            if self.external is not None:
+                self.external.__enter__()
+        except BaseException:
+            self.release()
+            raise
         return self
 
     def client(self, server, api_key, request_id, roots=(), **options):
         if not self.barrier.acquired:
             raise InvalidArchive("Acquire producer barriers before requesting the native checkpoint")
         return ServerCheckpoint(server, api_key, request_id, roots, boundary=self,
-                                boundary_release=self.barrier.release, boundary_validate=self.validate, **options)
+                                boundary_release=self.release, boundary_validate=self.validate, **options)
 
     def worker_roots(self):
         return [{"path": base64.b64encode(os.fsencode(path)).decode("ascii"),
@@ -45,6 +52,8 @@ class HostFilesystemCapture:
             raise InvalidArchive("Worker barrier inventory differs from the sealed checkpoint")
         if self.components is not None:
             self.components.validate_boundary(boundary)
+        if self.external is not None:
+            self.external.validate_boundary(boundary)
         self.artwork.open_bound(boundary)
         self.media.open_bound(boundary).verify()
 
@@ -63,7 +72,16 @@ class HostFilesystemCapture:
         result = {"artwork": artwork, "media": media, "producer_barriers": self.worker_roots()}
         if self.components is not None:
             result["components"] = self.components.binding()
+        if self.external is not None:
+            result["external_containers"] = self.external.binding()
         return result
 
+    def release(self):
+        try:
+            if self.external is not None:
+                self.external.release()
+        finally:
+            self.barrier.release()
+
     def __exit__(self, *_):
-        self.barrier.release()
+        self.release()

@@ -19,4 +19,4 @@ stash-s3-inventory = "worker_inventory:main"
 
 [tool.setuptools]
 package-dir = {"" = "host"}
-py-modules = ["s3_log_backup", "s3_restore_performer", "s3_restore_native", "s3_backup_audit", "s3_test_restore", "native_backup", "native_store", "native_history", "native_cleanup", "native_tags", "manifest_limits", "object_receipts", "media_objects", "media_index", "worker_inventory", "source_state_inventory"]
+py-modules = ["s3_log_backup", "s3_restore_performer", "s3_restore_native", "s3_backup_audit", "s3_test_restore", "native_backup", "native_store", "native_history", "native_cleanup", "native_tags", "manifest_limits", "object_receipts", "media_objects", "media_index", "worker_inventory", "source_state_inventory", "container_boundary"]

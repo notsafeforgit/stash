@@ -393,6 +393,8 @@ Non-dry publication requires `--native-config /private/host-backup.json` or
 | `worker_lock_roots` | Every native worker publication-lock root |
 | `components` | Complete `{role, name, path}` inventory of outboxes, download archives, profiles and referenced private files |
 | `worker_inventory` | Optional path to the worker dependency declaration described below; resolved under publication barriers and retained for retries |
+| `quiesce_containers` | Optional list of rootless Podman container names whose external database/payload writers must pause during capture, for example `["n8n"]` |
+| `quiesce_timeout` | Maximum pause in seconds, default 300, range 1–900; expiry resumes the containers and prevents sealing an unfinished capture |
 | `retention` | Optional `{keep_last, pins}` policy; default seven successful snapshots with no extra pinned archive UUIDs |
 | `standard_cleanup` | Optional boolean, default false; enable after reviewing/installing the native lifecycle policy and granting configuration/tag reads and tag writes |
 | `recovery_roots` | Native deletion-recovery `{name, path}` bindings |
@@ -424,8 +426,22 @@ Do not copy the live database as `operating_state` or include its WAL/SHM files.
 Include n8n's encryption/configuration files and any external execution payloads
 separately. These inputs must match the restored workflow database and producer
 state before workflows resume. The native worker barriers do not stop unrelated
-n8n nodes, pruning or configuration edits; coordinate those writers for a full
-recovery boundary. An archive export never activates or resumes n8n.
+n8n nodes, pruning or configuration edits. Set `quiesce_containers: ["n8n"]`
+in the host configuration to coordinate those writers. The host first acquires
+every worker publication barrier, then pauses the selected running containers.
+It resumes them after retaining the component and filesystem views, before the
+large Stash database copy and remote publication. Originally stopped containers
+stay stopped; already-paused containers are refused without changing them.
+
+Each pause uses a separate transient user systemd service, addressed by a random
+unit name and the exact container ID. Its `ExecStopPost` resumes that ID and its
+bounded lifetime still applies if the backup process dies. A replaced container,
+expired pause or failed resume prevents publication. The capture receipt retains
+the container IDs and guard units. Sealed retries validate this original receipt
+without pausing or inspecting current containers. This host option requires
+rootless Podman and a user systemd manager; manually changing paused containers
+or their mounted operating files during capture is unsupported. Restoring an
+archive never starts or resumes n8n.
 
 ### Worker dependencies
 

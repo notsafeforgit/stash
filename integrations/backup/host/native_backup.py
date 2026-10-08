@@ -248,10 +248,13 @@ class NativeBackupSession:
         config = decode_json(body)
         required = {"format", "version", "server", "api_key_file", "state_directory", "artwork_sources", "media",
                     "worker_lock_roots", "components", "recovery_roots", "producer_origin", "native_validator"}
-        optional = {"reserve_bytes", "boundary_timeout", "validator_timeout", "zfs_command", "worker_inventory", "retention", "standard_cleanup", "artwork_pin_directory"}
+        optional = {"reserve_bytes", "boundary_timeout", "validator_timeout", "zfs_command", "worker_inventory", "retention", "standard_cleanup", "artwork_pin_directory", "quiesce_containers", "quiesce_timeout"}
         if (not isinstance(config, dict) or not required <= config.keys() or config.keys() - required - optional
                 or config["format"] != CONFIG_FORMAT or type(config["version"]) is not int or config["version"] != 1):
             raise InvalidArchive("Invalid native host backup configuration")
+        from container_boundary import ContainerBoundary, validate_options
+        containers, pause_timeout = config.get("quiesce_containers", []), config.get("quiesce_timeout", 300)
+        validate_options(containers, pause_timeout)
         pins_path = config.get("artwork_pin_directory")
         if "artwork_pin_directory" in config and (not isinstance(pins_path, str)
                 or not Path(pins_path).is_absolute() or ".." in Path(pins_path).parts):
@@ -318,7 +321,8 @@ class NativeBackupSession:
         components = list(config["components"]) + [
             {"role": "config", "name": "host-backup.json", "path": filename},
             {"role": "config", "name": "host-backup-api-key", "path": api_file}]
-        with HostFilesystemCapture(config["worker_lock_roots"], self.pins, self.media) as capture:
+        external = ContainerBoundary(containers, timeout=pause_timeout, existing_only=self.resumed) if containers else None
+        with HostFilesystemCapture(config["worker_lock_roots"], self.pins, self.media, external=external) as capture:
             self.client = capture.client(config["server"], key, saved["checkpoint_uuid"], config["recovery_roots"],
                                          boundary_timeout=config.get("boundary_timeout", 120))
             if self.resumed:

@@ -94,6 +94,11 @@ Capture committed WAL contents with SQLite backup, retain its original staged
 bytes on retry and verify database metadata again on restore. Include matching
 encryption/configuration files and external execution payloads separately;
 worker publication locks alone do not stop unrelated n8n writers or pruning.
+The host backup's optional `quiesce_containers` setting briefly pauses explicit
+rootless Podman containers after taking worker barriers. Separate bounded
+systemd guards resume their exact IDs even if the publisher dies; sealed retries
+validate the original evidence without pausing again. Enable this for n8n only
+at the coordinated native handoff, with its database and payloads inventoried.
 Worker inventories can declare `state_directories` for changing external payload
 trees, including n8n `binaryData`. Enumerate and hash their regular files with
 bounded traversal, retain empty directories, and reject changes before sealing.

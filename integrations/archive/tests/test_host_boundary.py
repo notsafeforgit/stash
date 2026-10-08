@@ -104,4 +104,30 @@ class HostBoundaryTests(unittest.TestCase):
                 with self.assertRaises(FileExistsError): client.capture(stage, reserve=0)
             self.assertFalse(self.locked())
             transport.assert_not_called()
-            self.assertEqual((stage / "existing").read_bytes(), b"keep")
+        self.assertEqual((stage / "existing").read_bytes(), b"keep")
+
+    def test_external_writers_pause_after_workers_and_resume_before_ack(self):
+        external = Mock()
+        external.__enter__ = Mock(side_effect=lambda: self.assertTrue(self.locked()))
+        external.release.side_effect = lambda: self.assertTrue(self.locked())
+        external.binding.return_value = {"fixture": "external-writer"}
+        with HostFilesystemCapture([self.root], self.artwork, self.media, external=external) as host:
+            boundary = {"details": host({})}
+            self.assertEqual(boundary["details"]["external_containers"], {"fixture": "external-writer"})
+            host.validate(boundary)
+            external.validate_boundary.assert_called_once_with(boundary)
+            host.release()
+            self.assertFalse(self.locked())
+            external.release.side_effect = None  # Subsequent context exit is idempotent.
+        external.__enter__.assert_called_once()
+
+    def test_external_start_or_capture_failure_releases_worker_locks(self):
+        for phase in ('start', 'binding'):
+            external = Mock()
+            external.__enter__ = Mock(side_effect=RuntimeError('pause failed') if phase == 'start' else None)
+            external.binding.side_effect = RuntimeError('pause failed')
+            with self.subTest(phase=phase), self.assertRaisesRegex(RuntimeError, 'pause failed'):
+                with HostFilesystemCapture([self.root], self.artwork, self.media, external=external) as host:
+                    host({})
+            self.assertFalse(self.locked())
+            external.release.assert_called()

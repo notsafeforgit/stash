@@ -321,6 +321,7 @@ class NativeStoreTests(unittest.TestCase):
         config = {'format': CONFIG_FORMAT, 'version': 1, 'server': 'https://stash.example',
                   'api_key_file': str(key), 'state_directory': str(self.root / 'state'),
                   'artwork_sources': [str(self.root / 'originals')], 'components': [], 'worker_lock_roots': [],
+                  'quiesce_containers': ['n8n'], 'quiesce_timeout': 300,
                   'media': {'dataset': 'pool/library', 'guid': '123', 'mountpoint': str(self.root), 'relative_path': 'live'},
                   'producer_origin': 'https://stash.example', 'native_validator': sys.executable,
                   'recovery_roots': [], 'reserve_bytes': 0}
@@ -337,13 +338,16 @@ class NativeStoreTests(unittest.TestCase):
         host.client.return_value.boundary_receipt = self.boundary
         host.prepare.return_value.seal.side_effect = lambda: order.append('sealed')
         with patch('native_backup.ArtworkPins') as pins, patch('native_backup.ZFSMedia') as media, \
-             patch('native_backup.HostFilesystemCapture', return_value=host):
+             patch('native_backup.HostFilesystemCapture', return_value=host) as boundary_factory:
             def opened(boundary):
                 self.assertEqual(order, ['sealed'])
                 return view
             media.return_value.open_bound.side_effect = opened
             session = NativeBackupSession(path, 'fixture', live, 'metadata', '', self.s3)
         self.assertEqual(session.media_path, live)
+        external = boundary_factory.call_args.kwargs['external']
+        self.assertEqual(external.names, ['n8n'])
+        self.assertFalse(external.existing_only)
         pins.assert_called_once()
         parts = host.prepare.call_args.args[2]
         self.assertEqual({part['name'] for part in parts}, {'host-backup.json', 'host-backup-api-key'})

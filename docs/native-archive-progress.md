@@ -12450,3 +12450,15 @@ Post/media previews cover a scope of 261,642 posts, with independent preview and
 receipt checks before source albums and the 1,718 disabled policy definitions
 are applied. Source registration and operational recovery remain gated on these
 steps; the public application and scraper schedules are still held.
+
+All 261,642 post previews then passed independent comparison: 423,849 media
+candidates are backed by 427,207 valid file proofs. Applying those associations
+is in progress. A coordinated native backup and isolated restore now explicitly
+precede the public switch. The queued backup controller waits for all domain and
+policy checks, captures the private API with producers still stopped, and uses
+the already-verified media ledger without cold-media compaction or cleanup.
+The installed production backup configuration is unchanged. A fresh isolated
+ZFS probe verified read-only capture, retained original bytes, replay and release;
+only its disposable dataset was removed. No live-root activation, credential
+provisioning, database promotion or public startup has occurred. A fresh backup
+after controlled ingestion still gates resuming scraper schedules.

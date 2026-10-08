@@ -886,7 +886,7 @@
     "owner_acceptance"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-08T23:35:52.780073+00:00",
+  "checked_at": "2026-10-08T23:54:48.442462+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -956,14 +956,36 @@
   "domain_services": {
     "post_media": {
       "status": "running",
-      "stage": "preview",
+      "stage": "apply",
       "started_at": "2026-10-08T23:25:56.423869+00:00",
       "preview_progress": {
-        "posts": 220000,
-        "batches": 220,
+        "posts": 261642,
+        "batches": 262,
         "review_limit_posts": 0,
         "statuses": {
-          "matched": 356518
+          "matched": 423849
+        }
+      },
+      "independent_preview_comparison": {
+        "status": "passed",
+        "posts": 261642,
+        "candidates": 423849,
+        "proofs": 427207,
+        "proof_statuses": {
+          "valid": 427207
+        }
+      },
+      "apply_progress": {
+        "posts": 79000,
+        "batches": 79,
+        "outcomes": {
+          "selected": 128903,
+          "preserved": 0,
+          "review": 0,
+          "unavailable": 0
+        },
+        "statuses": {
+          "committed": 79000
         }
       }
     },
@@ -1379,5 +1401,35 @@
     "failed_comparison_retained": true,
     "imports_replayed": false
   },
-  "root_free_GiB": 117.78
+  "root_free_GiB": 117.58,
+  "pre_public_coordinated_backup": {
+    "status": "running",
+    "stage": "waiting_for_verified_domain_migration",
+    "public_handoff_started": false,
+    "root_activated": false,
+    "credentials_issued": 0,
+    "source_runs_activated": 0,
+    "scraper_schedules_resumed": false,
+    "coordinated_backup_complete": false,
+    "isolated_restore_complete": false,
+    "configuration_changes": [
+      "Use existing private native API on loopback port 19499",
+      "Verify producer services are held, containers absent/stopped and database files closed before capturing them without container pause hooks"
+    ],
+    "installed_configuration_unchanged": true,
+    "native_backup_reserve_GiB": 50,
+    "media_compaction": false,
+    "media_cleanup_deferred": true,
+    "publication_scope": "Current reconciled candidate before live root binding and public startup; a fresh checkpoint after controlled ingestion remains required before schedules resume."
+  },
+  "fresh_backup_snapshot_probe": {
+    "status": "passed",
+    "capture_seconds": 0.7095598329906352,
+    "read_only": true,
+    "original_bytes_preserved_after_live_edit": true,
+    "replay_did_not_recapture": true,
+    "release_and_retry_passed": true,
+    "disposable_dataset_removed": true,
+    "production_media_unchanged": true
+  }
 }

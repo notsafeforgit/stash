@@ -71,6 +71,21 @@ class ConfigurationTests(unittest.TestCase):
             with self.subTest(mode=mode), self.assertRaises(InvalidData):
                 Configuration(self.path)
 
+    def test_explicit_source_adapter_is_validated_and_bound_to_policy(self):
+        original = Configuration(self.path)
+        self.assertEqual(original.source_adapter, 'gallery-dl')
+        self.value['source_adapter'] = 'gallery-dl'
+        self.write()
+        self.assertEqual(original.policy_sha256, Configuration(self.path).policy_sha256)
+        self.value['source_adapter'] = 'yt-dlp'
+        self.write()
+        self.assertNotEqual(original.policy_sha256, Configuration(self.path).policy_sha256)
+        for adapter in ('unknown', None, [], True):
+            self.value['source_adapter'] = adapter
+            self.write()
+            with self.subTest(adapter=adapter), self.assertRaises(InvalidData):
+                Configuration(self.path)
+
     def test_equivalent_host_container_paths_and_rotated_access_keep_one_policy(self):
         host = Configuration(self.path)
         container_path, _ = profile_fixture(self.directory / "container")

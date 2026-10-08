@@ -115,7 +115,11 @@ def execute(box, client, configuration, run_uuid):
 
             producer = Producer(box, lease, configuration.root, extractor_version=SUPPORTED_VERSION,
                                 configuration_check=check_configuration, source_category=configuration.source_category)
-            task = NativeDownloadJob(lease.run["target_url"], producer=producer, lock_directory=configuration.locks.path)
+            target = lease.run["target_url"]
+            if configuration.source_adapter == 'yt-dlp':
+                from gallery_dl.extractor.ytdl import YoutubeDLExtractor
+                target = YoutubeDLExtractor.from_url('ytdl:' + target)
+            task = NativeDownloadJob(target, producer=producer, lock_directory=configuration.locks.path)
             status = task.run()
             producer.check()
             if status == 0:

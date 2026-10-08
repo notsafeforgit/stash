@@ -163,7 +163,7 @@ class Configuration:
 
     def _initialize(self, value, base):
         required = {"schema", "root", "locks", "gallery", "bindings"}
-        if (not isinstance(value, dict) or not required <= set(value) or set(value) - required - {"source_category", "source_mode"}
+        if (not isinstance(value, dict) or not required <= set(value) or set(value) - required - {"source_category", "source_mode", "source_adapter"}
                 or value["schema"] != SCHEMA or not isinstance(value["gallery"], dict)
                 or not isinstance(value["bindings"], dict) or len(value["bindings"]) > 64):
             raise InvalidData("Invalid native gallery-dl worker configuration")
@@ -174,6 +174,9 @@ class Configuration:
         self.source_mode = value.get('source_mode', 'published')
         if self.source_mode not in ('published', 'traversal'):
             raise InvalidData('Invalid worker source mode')
+        self.source_adapter = value.get('source_adapter', 'gallery-dl')
+        if self.source_adapter not in ('gallery-dl', 'yt-dlp'):
+            raise InvalidData('Invalid worker source adapter')
         self.root_uuid, self.root = self._root(value["root"], base, media=True)
         _, self.locks = self._root(value["locks"], base, media=False)
         assets = self._bindings(value["bindings"], base, values={"media_root": str(self.root.path)}, kinds={"media_root": "path"})
@@ -182,6 +185,7 @@ class Configuration:
         self.policy_sha256 = digest(encode({"version": SCHEMA, "operation": "download",
                                            "source_category": self.source_category,
                                            "source_mode": self.source_mode,
+                                           "source_adapter": self.source_adapter,
                                            "runtime": runtime_identity(), "gallery_sha256": digest(profile_bytes(value["gallery"])),
                                            "assets": assets}, CONFIG_LIMIT))
 

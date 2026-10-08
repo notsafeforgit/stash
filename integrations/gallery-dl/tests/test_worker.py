@@ -117,6 +117,24 @@ class WorkerTests(unittest.TestCase):
         self.delivery.start.assert_not_called()
         self.assertEqual(self.downloaded, [])
 
+    def test_explicit_ytdlp_profile_selects_bridge_after_claim_without_changing_source_url(self):
+        from gallery_dl.extractor.ytdl import YoutubeDLExtractor
+        value = json.loads((self.directory / 'worker.json').read_text())
+        value['source_adapter'] = 'yt-dlp'
+        value['gallery']['extractor']['ytdl'] = {'module': 'yt_dlp'}
+        self.profile = Configuration.from_document(value, self.directory)
+        self.lease.run.update(policy_sha256=self.profile.policy_sha256)
+        self.client._request.return_value = self.lease.run
+
+        def task(target, *, producer, lock_directory):
+            self.lease.start.assert_called_once()
+            self.assertIsInstance(target, YoutubeDLExtractor)
+            self.assertEqual(target.ytdl_url, self.lease.run['target_url'])
+            self.assertEqual(target.url, 'ytdl:' + self.lease.run['target_url'])
+            return Mock(run=Mock(return_value=0))
+
+        self.assertEqual(self.run_worker(task)['state'], 'source_succeeded')
+
     def test_success_preserves_queued_files_without_claiming_intake_completion(self):
         result = self.run_worker()
         self.assertEqual(result["state"], "source_succeeded")

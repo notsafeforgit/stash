@@ -44,6 +44,7 @@ def main():
     if traversal:
         profile['source_mode'] = 'traversal'
     if native_ytdl:
+        profile['source_adapter'] = 'yt-dlp'
         profile['source_category'] = 'ytdl-generic'
         profile['gallery']['extractor']['filename'] = '{id}.{extension}'
         profile['gallery']['extractor']['ytdl'] = {'module': 'yt_dlp', 'logging': False,
@@ -134,8 +135,8 @@ def main():
             class CallerFixture(Fixture):
                 pattern = re.escape(setup["target"])
             if native_ytdl:
-                extractor = YoutubeDLExtractor.from_url('ytdl:' + target)
-                extractor.url = target
+                assert isinstance(target, YoutubeDLExtractor)
+                extractor = target
                 extractor.ytdl_ie_key = 'NativeVideoFixture'
             elif setup['adapter'] == 'tumblr':
                 extractor = TumblrFixture.from_url(target)

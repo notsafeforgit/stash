@@ -185,8 +185,8 @@ class YTDLSourceTests(unittest.TestCase):
         config.set(('extractor',), 'base-directory', str(self.producer.root.path))
         config.set(('extractor',), 'directory', ['Account'])
         config.set(('extractor',), 'filename', '{id}.{extension}')
+        config.set(('extractor', 'ytdl'), 'websites', ['other-site'])
         extractor = YoutubeDLExtractor.from_url('ytdl:' + target)
-        extractor.url = target
         task = NativeDownloadJob(extractor, producer=self.producer, lock_directory=self.locks)
 
         def download(url):
@@ -203,6 +203,8 @@ class YTDLSourceTests(unittest.TestCase):
         self.assertEqual([e['kind'] for e in events], ['source.capture', 'attachment.download', 'file.completed', 'attachment.download'])
         self.assertEqual(events[0]['post']['namespace'], 'ytdl:thisvid.com')
         self.assertEqual(events[0]['source']['uploader_id'], '150629')
+        self.assertEqual(events[0]['source']['source_extractor_url'], target)
+        self.assertEqual(extractor.url, 'ytdl:' + target)
         self.assertNotIn('published_at', events[0]['metadata'])
         self.assertNotIn('timestamp', events[0]['source'])
         self.assertEqual(events[2]['relative_path'], 'Account/3533241.mp4')
@@ -222,7 +224,6 @@ class YTDLSourceTests(unittest.TestCase):
         self.responses['https://fixture.invalid/account'] = HTTPError(
             Response(BytesIO(b''), 'https://fixture.invalid/account', {}, status=429))
         extractor = YoutubeDLExtractor.from_url('ytdl:https://fixture.invalid/account')
-        extractor.url = self.lease.run['target_url']
         extractor.ytdl_ie_key = 'NativeRootFixture'
         job = NativeDownloadJob(extractor, producer=self.producer, lock_directory=self.locks)
         with self.assertRaises(SourceFailure) as caught:

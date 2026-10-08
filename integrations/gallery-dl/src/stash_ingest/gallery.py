@@ -26,6 +26,14 @@ from .scan_resume import legacy_cursor
 SUPPORTED_VERSION = "1.32.15-dev"
 
 
+def source_url(extractor):
+    # The ytdl: prefix selects an adapter; it is not part of the source URL.
+    # Keep it on the extractor so gallery-dl preserves explicit-bridge options.
+    if extractor.category in ('ytdl', 'ytdl-generic'):
+        return extractor.ytdl_url
+    return extractor.url
+
+
 class SourceSession:
     """Check each source HTTP attempt, including gallery-dl's internal retries."""
 
@@ -183,7 +191,7 @@ class NativeDownloadJob(job.DownloadJob):
         extractor = self.extractor
         if parent is None and self.producer.source_category is not None and extractor.category != self.producer.source_category:
             raise InvalidData("Extractor does not match this worker profile's source category")
-        if parent is None and extractor.url != self.producer.lease.run["target_url"]:
+        if parent is None and source_url(extractor) != self.producer.lease.run["target_url"]:
             raise InvalidData("Extractor target differs from the claimed collection")
         if (parent is not None and self._native_source_date is None and not self.producer.window.traversal
                 and not (parent._native_collection_child and extractor.category == parent.extractor.category
@@ -224,7 +232,7 @@ class NativeDownloadJob(job.DownloadJob):
 
     def _init(self):
         self.producer.check()
-        self._native_scope = self.producer.reserve_source(self.extractor.url)
+        self._native_scope = self.producer.reserve_source(source_url(self.extractor))
         self._source_operation(super()._init)
         if self.extractor.category in web_media.CATEGORIES:
             web_media.install(self.extractor, self.producer, self._native_scope)
@@ -401,7 +409,7 @@ class NativeDownloadJob(job.DownloadJob):
         if self.extractor.category in ("kemono", "coomer", *web_media.CATEGORIES) and kwdict.get('extension', '').lower() not in mirror.VISUAL:
             # Keep non-playable source evidence, but do not download audio or
             # archives which cannot produce a supported native file receipt.
-            kept = dict(kwdict, _url=url, source_extractor_url=self.extractor.url,
+            kept = dict(kwdict, _url=url, source_extractor_url=source_url(self.extractor),
                         native_file_exclusion='unsupported_image_or_video_extension')
             prepared = self.producer.prepare(kept)
             self.producer.report_download(prepared, "excluded", reason_code="unsupported_media")
@@ -463,7 +471,7 @@ class NativeDownloadJob(job.DownloadJob):
         self._release()
         pathfmt.kwdict.pop("_meta_path", None)
         filename.install(self).begin(pathfmt.kwdict)
-        kept = dict(pathfmt.kwdict, _url=self._native_url, source_extractor_url=self.extractor.url)
+        kept = dict(pathfmt.kwdict, _url=self._native_url, source_extractor_url=source_url(self.extractor))
         self._native_prepared = self.producer.prepare(kept)
         old_cursor = legacy_cursor(self, pathfmt) if self.producer.legacy_resume else None
         self._native_cursor, self._native_replay = self.producer.cursor(self._native_prepared, legacy_cursor=old_cursor)

@@ -266,15 +266,19 @@ stays undated. Neither can prove a publication-time window. A profile with
 `source_mode: "traversal"` supports these downloads as configured scans instead;
 the default `published` mode still rejects missing precise timestamps. Supported
 cross-host origins are retained separately from their shared provider cooldowns.
-The direct manual command and final deployment profiles remain required before
-cutover.
+The manual command below selects traversal profiles; deployment profiles and
+the live command handoff still require the coordinated cutover.
 
 ## Worker profiles and execution
 
 A `stash-gallery-worker-v1` JSON profile separates portable gallery-dl settings
 from deployment paths and local website-access references. Its five required
 keys are `schema`, `root`, `locks`, `gallery` and `bindings`. Optional
-`source_category` restricts the root extractor; a mismatch stops before extraction:
+`source_category` restricts the root extractor; a mismatch stops before extraction.
+`source_adapter` selects `gallery-dl` (default) or the explicit `yt-dlp` bridge
+and participates in the policy digest. The latter preserves gallery-dl's
+`ytdl:` selection semantics while Stash stores and leases the actual HTTP URL.
+`stash-ingest-config --source-adapter yt-dlp` prepares that profile. For example:
 
 ```json
 {
@@ -627,6 +631,99 @@ pending portions stay unassigned. Both tickets and requests are read in bounded
 pages. A failed migration rolls back. Older producer code refuses the new schema when opening
 it; preserve the queue in backups rather than recreating it during rollback.
 This does not change the Stash database schema.
+
+## Manual downloads
+
+`stash-gallery-dl` accepts one to fifty HTTP URLs, including `ytdl:`-prefixed
+URLs, and `-i FILE` lists containing one full URL per line. Blank lines and
+whole-line comments are ignored; extra command flags or inline comments in a
+list are rejected. Downloader settings come from reviewed profiles. Unsupported
+gallery-dl command-line flags produce an error rather than being ignored.
+
+```sh
+stash-gallery-dl https://www.reddit.com/user/Example/submitted/
+stash-gallery-dl ytdl:https://thisvid.com/videos/example/
+stash-gallery-dl -i /persistent/targets.txt --queue-only
+stash-gallery-dl --call SAVED_INVOCATION_UUID
+```
+
+Set the usual `STASH_INGEST_OUTBOX`, `STASH_INGEST_ENDPOINT`,
+`STASH_INGEST_PRODUCER` and `STASH_INGEST_TOKEN` values, plus
+`STASH_INGEST_MANUAL_CONFIG` pointing to this runtime document:
+
+```json
+{
+  "schema": "stash-manual-gallery-v1",
+  "state": "/persistent/manual-requests",
+  "profiles": {
+    "gallery-dl": "/persistent/profiles/manual-gallery.json",
+    "yt-dlp": "/persistent/profiles/manual-ytdlp.json"
+  },
+  "new_source_policy": {
+    "enabled": true,
+    "apply_to_scans": false,
+    "rules": {
+      "scene": {
+        "on_create": true, "on_existing": false,
+        "skip_organized_on_create": true, "mark_organized": false,
+        "filename_title_fallback": true, "mappings": {}
+      },
+      "image": {
+        "on_create": true, "on_existing": false,
+        "skip_organized_on_create": true, "mark_organized": false,
+        "filename_title_fallback": true, "mappings": {}
+      }
+    }
+  }
+}
+```
+
+Create the canonical state directory first. Both profiles must use
+`source_mode: "traversal"`, omit `source_category`, select their respective
+`source_adapter`, and share the same verified media root and lock directory.
+Convert the existing complete gallery-dl configuration so its service-specific
+directories, filenames, download archives, filters and originals preference
+remain in effect. Configure `new_source_policy.rules` using the native metadata
+policy schema; this example only supplies filename titles on creation, with no
+source-field mappings. Source registration
+and policy initialization use `STASH_API_KEY`, or the environment variable named
+by `--api-key-env`. This is separate from the scoped ingestion token and local
+website-access references.
+
+Before queuing, the command saves its input snapshot and guarded registration
+plans. Existing unique active sources retain their labels, namespace, ownership,
+directory and metadata policy. Disabled, retired or ambiguous sources require
+review. A new source is a `manual_batch` collection without inferred account or
+performer ownership, with its configured media root and broad `.` path prefix.
+That prefix serializes overlapping root work until it is explicitly narrowed.
+Only newly created collections receive `new_source_policy`; each downloaded
+leaf establishes its own captured source identity, including links to other sites.
+
+Foreground execution runs only this invocation's admitted downloads and waits
+through pending source work. `--queue-only` reports `recorded`, leaving execution
+to the background dispatcher. Include both profiles in that dispatcher's reviewed
+profile list. `--max-wait SECONDS` stops waiting between worker steps; it does not
+cancel durable requests or interrupt a current download. `--dry-run` validates
+targets and local profiles without creating state or making API calls.
+
+Resume with the printed invocation UUID even if the original list has changed
+or disappeared. The original targets, request time and profile policies stay
+fixed; retain those profiles while work remains pending. Registration and
+completion recover their original receipts after lost responses. Exit 0 in
+foreground mode means the source traversal succeeded; native file intake and
+metadata jobs still have their own receipts. Review, cancellation or deferral
+exit 2; a wait limit or unavailable completion status exits 3. Ctrl-C exits 130
+and leaves saved work resumable.
+
+Back up the complete manual state directory as operating state under the same
+publication barrier as its producer outbox. It holds registration plans that
+may exist before any runnable source call. Retain the runtime, both profiles and
+their local bindings in the worker inventory. Installing the entry point alone
+does not replace the host's current `gallery-dl` executable. The staged
+`bin/gallery-dl` convenience launcher reads the owner's private
+`~/.config/stash-ingest/host.env` (or `STASH_INGEST_ENV_FILE`), uses the Python
+beside `STASH_INGEST_EXECUTABLE`, and selects `STASH_INGEST_API_KEY` for source
+management. It runs that installed runtime with Python import isolation.
 
 ## Durable caller lists
 

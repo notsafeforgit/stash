@@ -25,10 +25,11 @@ The live manual `gallery-dl` command still invokes legacy catalog hooks.
 Native ThisVid/yt-dlp identities, undated configured scans and the inventoried
 Tumblr/Chevereto/LeakGallery adapters are implemented and verified. Schema 1000099
 adds captured origins for cross-host dependencies and permits explicit mixed
-download collections; its complete backend gate has passed. The manual caller and
-its deployment profiles are being verified separately before transfer into the
-main checkout. Final installed producer runtimes/profiles, the populated schema
-rehearsal and the coordinated writer handoff remain required.
+download collections; its complete backend gate has passed. The manual caller is
+now integrated after passing the complete repository gate, real HTTP/restore
+checks and installed-package verification. Final
+installed producer runtimes/profiles, the populated schema rehearsal and the
+coordinated writer handoff remain required.
 
 The earlier verified checkpoint is schema 1000094, with the shared review queue,
 Keep current value receipts, atomic post-merge review and shared archive activity.
@@ -12308,3 +12309,36 @@ Production remains compatible; the latest populated verified
 release is schema 1000097. The manual gallery-dl entry point, rebuilt application
 and host/n8n/backup runtimes, final migration rehearsal, coordinated backups and
 coherent cutover still remain.
+
+## Durable manual gallery-dl requests — 2026-10-08
+
+`stash-gallery-dl` now accepts explicit URLs and input files, including `ytdl:`
+selection, through the native registration and download services. It retains
+the first invocation's inputs, profile policies and configured-scan time before
+mutations. Source and metadata-policy receipts recover lost responses before
+any runnable call is queued. Existing source definitions, policies and disabled
+state remain authoritative; new mixed collections do not infer account or
+performer ownership. Only newly registered sources receive metadata defaults.
+
+Foreground work uses admitted run IDs belonging to that invocation, normal
+leases, shared provider pacing and the durable file outbox. Queue-only, explicit
+resume, bounded waiting and local dry preview are supported. A completed source
+scan does not claim completed file intake. The two reviewed adapter profiles
+share one verified root and publication lock; `ytdl:` remains an extractor
+selector while native requests and retained source URLs use the actual HTTP URL.
+
+The complete integrated repository gate passes: 797 UI tests, 657 producer tests,
+12 library tests, 125 archive tests, 304 backup tests, all Go packages and zero
+Go lint issues. The real HTTP manual test recovers lost registration/policy/finish responses,
+preserves an existing owner's choices, delivers actual file receipts and restores
+all four saved registration files. A disposable installed wheel matches all
+125 current modules and produces identical profile hashes. The staged host
+launcher passes help/dry-preview and incomplete/private-configuration checks.
+Conversion of the actual global configuration preserves Coomer/Kemono originals;
+its backup inspection resolves 29 dependencies and the manual request state tree.
+
+The manual changes are integrated and verified. The existing live `gallery-dl`
+symlink and scraper configuration remain unchanged. Final installed runtimes,
+all host/n8n policy hashes, dispatcher
+selection, manual state provisioning and the combined backup/deployment manifest
+must be refreshed before the coordinated writer handoff.

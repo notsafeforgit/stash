@@ -845,8 +845,8 @@
     "input_preparation": "passed",
     "catalogs": 1711,
     "native_import_status": "running",
-    "completed_catalogs_at_checkpoint": 200,
-    "completed_passes_at_checkpoint": 2408,
+    "completed_catalogs_at_checkpoint": 284,
+    "completed_passes_at_checkpoint": 3416,
     "total_passes": 20532,
     "independent_reconciliation": "pending"
   },
@@ -869,14 +869,18 @@
     "owner_acceptance"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-08T20:32:30.779425+00:00",
+  "checked_at": "2026-10-08T20:53:16.650963+00:00",
   "n8n_staging": {
     "status": "passed_staged",
     "unchanged_tables": 142,
     "unchanged_rows": 18650,
     "unrelated_workflows_preserved": 34,
     "replaced_workflows": 9,
-    "actual_publication_pending": true
+    "actual_publication_pending": true,
+    "effective_execution_mode": "regular",
+    "running_executions_use_crash_recovery": true,
+    "queued_or_waiting_legacy_executions": 0,
+    "startup_recovery_still_requires_verification": true
   },
   "current_policy_assessment": {
     "status": "passed",
@@ -933,7 +937,8 @@
     "post_media": "waiting_for_import_reconciliation",
     "albums": "waiting_for_post_media_reconciliation",
     "policies": "waiting_for_complete_import_boundary",
-    "policy_import": "waiting_for_current_domain_migration"
+    "policy_import": "waiting_for_current_domain_migration",
+    "local_manual_handoff": "waiting_for_verified_disabled_policy_import_then_prepare_only"
   },
   "maintenance_journals": {
     "status": "passed",
@@ -943,10 +948,47 @@
     "final_credentials_and_environment_pending": true
   },
   "current_images": {
-    "status": "delta_plan_running",
-    "publication_pending": true,
-    "source_files": 513331,
-    "source_bytes": 514421575962,
-    "cloud_mutations": false
+    "plan_status": "prepared",
+    "counts": {
+      "units": 1342,
+      "unchanged_units": 1300,
+      "files": 513333,
+      "added_files": 2774,
+      "added_bytes": 1447650341,
+      "deleted_files": 0,
+      "delta_units": 40,
+      "base_units": 2
+    },
+    "publication_status": "passed",
+    "completed_units_at_checkpoint": 1342,
+    "total_units": 1342,
+    "extension_only_filenames_included": 2,
+    "source_media_unchanged": true,
+    "production_backup_ledger_unchanged": true,
+    "master_manifest_published": false,
+    "verification_requests_at_checkpoint": {
+      "ListObjectsV2": 301,
+      "HeadObject": 42
+    },
+    "verified_new_archives": 42,
+    "verified_new_archive_bytes": 1452933120,
+    "all_current_supported_image_bytes_backed_up": true,
+    "current_verified_videos": 274466,
+    "publication_completed_at": "2026-10-08T20:51:38.379645+00:00"
+  },
+  "outside_existing_media_extension_policy": {
+    "untracked_matroska_files": 1,
+    "matroska_bytes": 65391674,
+    "filename_correction_and_native_intake": "prepared_not_applied",
+    "svg_avatar_files": 1,
+    "svg_bytes": 715,
+    "deleted": false
+  },
+  "final_application_configuration": {
+    "status": "prepared_not_installed",
+    "source": "current_migrated_candidate",
+    "authentication_and_stashboxes_preserved": true,
+    "published_default_filter_checkpoint_preserved": true,
+    "translation_worker_enabled": false
   }
 }

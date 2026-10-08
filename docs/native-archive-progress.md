@@ -41,8 +41,7 @@ byte-for-byte, without treating them as native ingestion-completion proof.
 All 1,711 catalog databases and the automation database have completed frozen
 input preparation. The original copy is complete, including all **240,872 saved
 photos and covers**. Native imports are running through durable services.
-Completion requires agreement
-between the imported database slice and the full held boundary, followed by
+Completion requires agreement between the imported database slice and the full held boundary, followed by
 independent source-byte and domain reconciliation. The same snapshot remains
 held and mounted read-only; the original compatible database is unchanged.
 
@@ -62,7 +61,12 @@ their final paths, including the 34 original n8n receipts; producer credentials
 and final runtime environments remain pending. The **nine workflow replacements**
 are staged in the separate n8n candidate: 142 tables, 18,650 rows and all 34
 unrelated workflows remain unchanged. Actual publication pointers must be
-verified after controlled startup. The backup configuration includes both n8n
+verified after controlled startup. The pinned runtime uses regular execution
+mode; retained running executions follow crash recovery, with no queued/waiting
+legacy executions eligible for restart. A fresh final Stash configuration is
+prepared from the current candidate, preserving authentication, StashDB settings
+and its published default-filter migration checkpoint; installation is pending.
+The backup configuration includes both n8n
 and Redis in its brief container pause and retains Redis's complete AOF directory;
 the captured queue passed the existing Redis runtime's AOF validation. No runtime
 code change or artifact rebuild was required. AWS access and metadata retention
@@ -78,8 +82,16 @@ of those historical byte proofs. Hashing only the remaining 1,391 files required
 9,081 archive objects using one metadata GET, 300 LIST requests and 824 HEADs.
 The remaining 697 video paths contain 678 unique contents totaling 6.87 GB;
 their immutable Deep Archive uploads and checksums are verified. All **274,466
-current videos** now have byte-level backup evidence. Planning the current image
-deltas uses the captured ledger and held snapshot. The current coordinated
+videos in the backup inventory** now have byte-level backup evidence. The image
+plan covers **513,333 files**, including two extension-only `.jpg` filenames the
+temporary census initially missed. Only 2,774 files need uploading: 40 deltas and
+two new bases, totaling 1.45 GB before tar overhead. All **42 packs** are uploaded
+and checksum-verified in Deep Archive, using an isolated ledger. The current
+master manifest and production ledger remain unchanged until coordinated native
+publication succeeds. An untracked 65 MB extensionless Matroska
+file has a guarded filename/intake plan for the native handoff; a 715-byte SVG
+avatar remains outside supported media extensions. Both remain unchanged.
+The current coordinated
 metadata/image backup and isolated restore remain outstanding. The system
 filesystem retains more than 50 GiB free.
 

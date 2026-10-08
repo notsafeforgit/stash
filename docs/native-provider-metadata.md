@@ -41,6 +41,38 @@ GET /api/v3/archive/entities/{uuid}/provider-metadata-history?after=0&limit=50
 are ordered by sequence. The route is read-only and does not contact providers.
 Invalid identities/cursors are rejected; unknown identities return 404.
 
+## Interactive selection and history
+
+Scene and performer scrape review carries each accepted field's provider and
+remote ID into the edit form. Apply changes the pending form; Save records the
+edit and its import receipts together. Changing a field afterward removes its
+pending attribution, even if the user types the original value back. Discard
+and a successful save clear pending choices. A failed save retains them for
+retry. Explicit list merges can retain choices from multiple providers;
+replacing a scalar keeps the most recently selected provider.
+
+The existing create-related-item actions still create those items when Apply is
+pressed. New performers, studios and tags use their own remote IDs, never the
+parent scene's ID. A user-entered replacement name keeps the explicit remote
+association without attributing that name to the provider. Results missing a
+required remote ID cannot be imported as provider metadata.
+
+GraphQL scene, performer, studio and tag create/update inputs accept
+`provider_metadata: [{ endpoint, remote_id, fields }]`. These are explicit user
+choices, not trusted claims signed by a provider. Every selected field must be
+on that entity's metadata allowlist and included in the same mutation input.
+The server records the values actually saved, including normalization and merge
+results. Invalid fields, identities or receipts roll back the edit. Provider
+choices are excluded from entity-field hook lists and are rejected inside merge
+values; save such choices separately from merging entities.
+
+Provider import history is available in scene metadata review and the performer,
+studio and tag history tabs. It loads on expansion, with bounded pages and
+explicit refresh. A performer's Source accounts identity history also exposes
+receipts on retained identities from before a merge. Historical accepted values
+remain separate from current field decisions: matching a current value to an old
+receipt does not establish its current origin.
+
 ## Integration status
 
 Batch performer, studio and tag creation/refresh record accepted fields,
@@ -64,10 +96,11 @@ reject replacement of a different current link at the same provider. Ambiguous
 exact tag-name results require an explicit remote ID. Failed parent creation
 does not leave a stale local ID in the source result.
 
-The storage contract, API, batches and identification paths are implemented and
-covered by SQLite/HTTP tests. Interactive scrape selection and the history UI
-still need integration. Existing field
-decision views must distinguish historical imports from current field provenance.
-These remaining paths are part of the transition requirement; the initial
-automated import integration does not complete it. Production remains on the compatible
+The storage contract, API, batches, identification paths, interactive selection
+and history UI are implemented. SQLite/HTTP tests verify transactional receipts;
+form tests and Chromium/WebKit checks cover selection, manual edits, discard,
+related-item creation and history pagination. See
+[the interactive verification report](native-provider-review-verification.json).
+Populated schema-96 migration, final-image startup/performance and owner
+acceptance remain cutover requirements. Production remains on the compatible
 release until the full cutover gates pass.

@@ -1,4 +1,8 @@
-import { useEffect, useState } from "react";
+import {
+  ProviderMetadataDraft,
+  type ProviderPatch,
+} from "@/components/scrape/provider-metadata";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { useForm } from "@tanstack/react-form";
 import { useLazyQuery } from "@apollo/client/react";
@@ -459,6 +463,10 @@ function PerformerNamesField({
         <InputGroup>
           <InputGroupInput
             value={canonicalName}
+            aria-label={intl.formatMessage({
+              id: "canonical_name",
+              defaultMessage: "Canonical name",
+            })}
             disabled={disabled}
             onBlur={onCanonicalNameBlur}
             onChange={(e) => onCanonicalNameChange(e.target.value)}
@@ -609,30 +617,48 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
   }, [tagData]);
 
   // ── Form ──
+  const providerDraft = useRef(new ProviderMetadataDraft());
   const form = useForm({
     defaultValues: performer
       ? performerToFormValues(performer)
       : emptyPerformerFormValues(),
     onSubmit: async ({ value, formApi }) => {
+      const provider_metadata = providerDraft.current.selections(value);
       if (isCreate) {
         const result = await createPerformer({
-          variables: { input: formValuesToCreateInput(value) },
+          variables: {
+            input: { ...formValuesToCreateInput(value), provider_metadata },
+          },
           update(cache) {
             evictQueries(cache, [GQL.FindPerformersDocument]);
           },
         });
         const newId = result.data?.performerCreate?.id;
+        providerDraft.current.clear();
         formApi.reset();
         if (newId) props.onCreated?.(newId);
       } else {
         await updatePerformer({
-          variables: { input: formValuesToInput(props.performer.id, value) },
+          variables: {
+            input: {
+              ...formValuesToInput(props.performer.id, value),
+              provider_metadata,
+            },
+          },
         });
+        providerDraft.current.clear();
         formApi.reset(value);
         props.onSaved?.();
       }
     },
   });
+
+  useEffect(() => {
+    const subscription = form.store.subscribe(() => {
+      providerDraft.current.observe(form.state.values);
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   // ── Scrape ──
   const toast = useToast();
@@ -729,13 +755,18 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
     if (scrapeSearchSource) openMergeWith(scraped, scrapeSearchSource);
   }
 
-  function applyScrapePatch(patch: Partial<PerformerFormValues>) {
-    for (const [key, value] of Object.entries(patch)) {
-      form.setFieldValue(
-        key as keyof PerformerFormValues,
-        value as PerformerFormValues[keyof PerformerFormValues],
-      );
-    }
+  function applyScrapePatch(
+    patch: Partial<PerformerFormValues>,
+    selection?: ProviderPatch,
+  ) {
+    providerDraft.current.apply(patch, selection, () => {
+      for (const [key, value] of Object.entries(patch)) {
+        form.setFieldValue(
+          key as keyof PerformerFormValues,
+          value as PerformerFormValues[keyof PerformerFormValues],
+        );
+      }
+    });
   }
 
   const busy = saving || deleting || scraping;
@@ -1490,7 +1521,10 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
                 variant="outline"
                 size="sm"
                 disabled={busy || !isDirty}
-                onClick={() => form.reset()}
+                onClick={() => {
+                  providerDraft.current.clear();
+                  form.reset();
+                }}
               >
                 <RotateCcw />
                 {intl.formatMessage({

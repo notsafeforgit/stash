@@ -1,3 +1,4 @@
+import { ProviderMetadataHistory } from "@/components/detail/provider-metadata-history";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useState, useCallback } from "react";
 import { cn } from "src/lib/utils";
@@ -24,6 +25,7 @@ import {
   Droplets,
   User,
   Pencil,
+  History,
   Clapperboard,
   GalleryHorizontalEnd,
   Images,
@@ -278,6 +280,22 @@ function PerformerDetailPage() {
           }),
           content: (
             <NativePerformerSources key={performer.id} localId={performer.id} />
+          ),
+        },
+        {
+          id: "provider-imports",
+          icon: History,
+          label: intl.formatMessage({
+            id: "provider_metadata.history",
+            defaultMessage: "Provider import history",
+          }),
+          content: (
+            <div className="p-4">
+              <ProviderMetadataHistory
+                kind="performer"
+                localId={performer.id}
+              />
+            </div>
           ),
         },
       ]

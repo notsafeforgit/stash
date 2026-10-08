@@ -86,6 +86,7 @@ input SceneGroupInput {
 }
 
 input SceneCreateInput {
+  provider_metadata: [ProviderMetadataSelectionInput!]
   title: String
   code: String
   details: String
@@ -117,6 +118,7 @@ input SceneCreateInput {
 }
 
 input SceneUpdateInput {
+  provider_metadata: [ProviderMetadataSelectionInput!]
   clientMutationId: String
   id: ID!
   title: String

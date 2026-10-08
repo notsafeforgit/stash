@@ -27,6 +27,7 @@ type Tag {
 }
 
 input TagCreateInput {
+  provider_metadata: [ProviderMetadataSelectionInput!]
   name: String!
   "Value that does not appear in the UI but overrides name for sorting"
   sort_name: String
@@ -48,6 +49,7 @@ input TagCreateInput {
 }
 
 input TagUpdateInput {
+  provider_metadata: [ProviderMetadataSelectionInput!]
   id: ID!
   name: String
   "Value that does not appear in the UI but overrides name for sorting"

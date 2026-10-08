@@ -174,7 +174,7 @@ func (r *mutationResolver) PerformerCreate(ctx context.Context, input models.Per
 			}
 		}
 
-		return nil
+		return r.recordProviderSelections(ctx, models.ArchivePerformer, newPerformer.ID, input.ProviderMetadata, translator)
 	}); err != nil {
 		return nil, err
 	}
@@ -492,7 +492,7 @@ func (r *mutationResolver) PerformerUpdate(ctx context.Context, input models.Per
 			}
 		}
 
-		return nil
+		return r.recordProviderSelections(ctx, models.ArchivePerformer, performerID, input.ProviderMetadata, translator)
 	}); err != nil {
 		return nil, err
 	}
@@ -583,6 +583,9 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 	valuesTranslator := changesetTranslator{}
 
 	if input.Values != nil {
+		if len(input.Values.ProviderMetadata) != 0 {
+			return nil, fmt.Errorf("%w: provider selections must be saved separately from a merge", models.ErrProviderMetadataInvalid)
+		}
 		valuesTranslator = changesetTranslator{
 			inputMap: getNamedUpdateInputMap(ctx, "input.values"),
 		}

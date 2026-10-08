@@ -1,3 +1,4 @@
+import { ProviderMetadataHistory } from "./provider-metadata-history";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
@@ -226,6 +227,7 @@ function IdentityRow({ row }: { row: PerformerIdentity }) {
             )}
           </p>
         )}
+        <ProviderMetadataHistory kind="performer" entityUUID={row.uuid} />
       </CardContent>
     </Card>
   );

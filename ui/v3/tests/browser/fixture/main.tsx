@@ -1,3 +1,4 @@
+import { ProviderMetadataFixture } from "./provider-metadata";
 import { SavedActionsFixture } from "./saved-actions";
 import { ReviewQueueFixture } from "./review-queue";
 import { reviewQueueSearchSchema } from "@/core/native-archive/review-queue-api";
@@ -463,6 +464,11 @@ const router = createRouter({
       path: "/collections",
       validateSearch: collectionSearchSchema,
       component: CollectionsFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/provider-metadata",
+      component: ProviderMetadataFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

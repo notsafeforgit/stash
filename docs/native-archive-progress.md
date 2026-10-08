@@ -11973,3 +11973,43 @@ policies were activated. Its existing owner automatically advanced to full typed
 reconciliation, with that child process confirmed live. These long validation
 times do not establish acceptable application startup performance; the queued
 wrapper/performance gates and later schema-96 verification still apply.
+
+## Interactive provider choices and history — 2026-10-08
+
+Scene and performer scrape review now carries explicitly selected provider
+fields into Save. Later manual edits remove a field's pending attribution, even
+when typed back to its previous value; discard and successful save clear the
+pending choices. List merges can preserve multiple selected sources. Related
+performers, studios and tags use their own remote IDs, and a manually substituted
+name receives no provider attribution. The existing related-item create action
+still occurs during Apply, independently of saving the parent form.
+
+GraphQL create/update mutations validate that every selected field is allowed
+and included in the same edit. The final saved values and receipts commit
+together. Invalid receipts roll back the whole edit and emit no success hook.
+Merge values reject provider selections explicitly. The UI exposes lazy, paged
+history on scene metadata review and performer/studio/tag history tabs, with
+earlier performer identities available through Source accounts. Historical
+accepted values are clearly distinguished from current field origin.
+
+The complete API package passed in 915 seconds. All 796 UI tests, types, locale
+and native-contract checks passed, and real embedded assets built successfully.
+Eight provider browser checks passed across Chromium and WebKit, including
+mobile and desktop scene review; forty mobile-toolbar checks also passed. The
+pinned Go linter reports zero issues. Initial fixture/environment failures and
+the earlier eight-minute aggregate API timeout are retained alongside the
+corrected results in
+[native-provider-review-verification.json](native-provider-review-verification.json).
+Populated schema-96 migration, final-image startup/performance, owner acceptance
+and production cutover remain outstanding.
+
+Separately, schema-95 reconciliation passed at 06:38 UTC: all 40,512,444 original
+rows retained their typed values, integrity was good and there were no foreign
+key violations. The downstream policy rehearsal stopped before opening the
+candidate because its expected total incorrectly used schema 93's row count.
+Schema 94 had added exactly one migration-history row; per-table reconciliation
+accounts for the difference. The failed check and its stopped dependent
+supervisors remain intact. A separately compiled continuation uses the original
+schema-95 source and identical 1,038 policy requests with the corrected count.
+Its first supervisor stopped at an outdated result-path guard before invoking
+the test; the corrected supervisor is now running. Production is unchanged.

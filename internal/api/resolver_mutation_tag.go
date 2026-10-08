@@ -91,7 +91,7 @@ func (r *mutationResolver) TagCreate(ctx context.Context, input TagCreateInput) 
 			}
 		}
 
-		return nil
+		return r.recordProviderSelections(ctx, models.ArchiveTag, newTag.ID, input.ProviderMetadata, translator)
 	}); err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func (r *mutationResolver) TagUpdate(ctx context.Context, input TagUpdateInput) 
 			}
 		}
 
-		return nil
+		return r.recordProviderSelections(ctx, models.ArchiveTag, tagID, input.ProviderMetadata, translator)
 	}); err != nil {
 		return nil, err
 	}
@@ -279,6 +279,9 @@ func (r *mutationResolver) TagsMerge(ctx context.Context, input TagsMergeInput) 
 	var imageData []byte
 
 	if input.Values != nil {
+		if len(input.Values.ProviderMetadata) != 0 {
+			return nil, fmt.Errorf("%w: provider selections must be saved separately from a merge", models.ErrProviderMetadataInvalid)
+		}
 		translator := changesetTranslator{
 			inputMap: getNamedUpdateInputMap(ctx, "input.values"),
 		}

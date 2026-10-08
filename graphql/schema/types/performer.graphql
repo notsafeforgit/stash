@@ -66,6 +66,7 @@ type Performer {
 }
 
 input PerformerCreateInput {
+  provider_metadata: [ProviderMetadataSelectionInput!]
   name: String!
   disambiguation: String
   url: String @deprecated(reason: "Use urls")
@@ -110,6 +111,7 @@ input PerformerCreateInput {
 }
 
 input PerformerUpdateInput {
+  provider_metadata: [ProviderMetadataSelectionInput!]
   id: ID!
   name: String
   disambiguation: String

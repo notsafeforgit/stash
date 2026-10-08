@@ -37,6 +37,14 @@ type ProviderMetadataImportInput struct {
 	Fields []string
 }
 
+// ProviderMetadataSelectionInput accompanies an explicit interactive edit.
+// The API restricts Fields to metadata included in that same mutation.
+type ProviderMetadataSelectionInput struct {
+	Endpoint string   `json:"endpoint"`
+	RemoteID string   `json:"remote_id"`
+	Fields   []string `json:"fields"`
+}
+
 var ErrProviderMetadataInvalid = errors.New("invalid provider metadata import")
 
 type ProviderMetadataReaderWriter interface {

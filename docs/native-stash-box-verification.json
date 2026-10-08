@@ -213,5 +213,10 @@
     "report": "native-provider-import-paths-verification.json",
     "status": "automated_import_paths_verified_interactive_and_ui_pending",
     "native_schema": 1000096
+  },
+  "metadata_attribution_interactive": {
+    "report": "native-provider-review-verification.json",
+    "status": "interactive_selection_and_history_verified_final_deployment_pending",
+    "native_schema": 1000096
   }
 }

@@ -1,0 +1,159 @@
+{
+  "recorded_at": "2026-10-08T06:55:07.539693+00:00",
+  "status": "passed_for_stated_scope",
+  "parent_revision": "42c2c0124718705c546ac2e92c7b7c87a4be25b6",
+  "native_schema": 1000096,
+  "tested_files_sha256": {
+    "graphql/schema/types/performer.graphql": "2a11c948787c3cd4dadf66e85ae227d5d6432d07f44f71712b296020c6a0d196",
+    "graphql/schema/types/provider-metadata.graphql": "36ce8b39384274f2e9a713d42359d92817940daa42884f080b84cf1a1d2c341e",
+    "graphql/schema/types/scene.graphql": "e3ec155770f06f2ea6dc6aaaa65a6398f96809e43240c50dfc12a41f67b0f93a",
+    "graphql/schema/types/studio.graphql": "5f34b25234d0353542730b7a74ac3b951cea15ca4f7088975d3b0b9c23dc3bbb",
+    "graphql/schema/types/tag.graphql": "28713e25355d19882d5903d081e7612a36a8a36c34fc25f077d34de8b8a8bc38",
+    "internal/api/changeset_translator.go": "ef3171ad185d25d69bdf98e6b46cdbb48bbf60afcd1b31b09d36094e70521772",
+    "internal/api/provider_metadata.go": "d88c4e5c6a9a85554e3153b62c64438953c74e483d8d21ff6ded8f4e4e915531",
+    "internal/api/provider_metadata_test.go": "9de5658105063f7636fe8e1e124f59cb3f70433683480ceb9e1c1b698de3efc5",
+    "internal/api/resolver_mutation_performer.go": "0fb24330a24776671e87b4a8047b0f25357329b7ccedd23f71f236f8fc27834c",
+    "internal/api/resolver_mutation_scene.go": "108f39c2bdde7354a228261c9ec5822ea02b126348dc857e9da8be17e7a0e91b",
+    "internal/api/resolver_mutation_studio.go": "8e88d47503797e887f080ffa81143be0eb1789a299e3ecd739c72a7771e11b9d",
+    "internal/api/resolver_mutation_tag.go": "14123fd09c10ab9702bb0befc6d9fdf98df446e19108293bad271afda12091d0",
+    "pkg/models/model_provider_metadata.go": "97fda4bad82e613e97e27fd0e3143d252ddaa6fca2b025a4c27aa095ac8b3282",
+    "pkg/models/performer.go": "971cfd63fd7748f8a5f8101eb96d66366e53c65982c87bb0325aea9905a711c1",
+    "pkg/models/scene.go": "857ff0f988151aeb873596197f3115dcc134e6b77ef0de0eca4e1f812419a9e0",
+    "pkg/models/studio.go": "2e2b26c4b1cde8814fb47dc160c40befce37b6a38a78ca38d3ba98adea5c54d6",
+    "ui/v3/src/components/detail/native-metadata-review.tsx": "af753f03aeac1a6b29ad162f5a4558901e388babf9c1dbe531e8ee0374e9720e",
+    "ui/v3/src/components/detail/native-performer-sources.tsx": "ad77d8eb85b278cdb0b7c0672587720989bb574abbfd05cad2b4738d731d2ce7",
+    "ui/v3/src/components/detail/performer-edit-form.tsx": "972747c5417c0c49c77146ab1e5e8d9bc9f797fb1e139abec7b7523950341d4a",
+    "ui/v3/src/components/detail/provider-metadata-history.tsx": "40aad3907e906bf6e5b90dc9b07521ea738752eab49185bb6e5db34b594c1630",
+    "ui/v3/src/components/detail/scene-edit-form.tsx": "84039bc02714b30d328f3d40c9fd0eb7905d030997ad1ca744cc05472287ee04",
+    "ui/v3/src/components/scrape/performer-scrape-merge-dialog.tsx": "9d434303ae0ca8a474d4114922d6449fb802b0354af5567b3a7b81415e1ac605",
+    "ui/v3/src/components/scrape/provider-metadata.test.ts": "16f2ce4c590a29f754bf5edf66340f6eabf89a0f8cbbad4fe4fc11c82c1a6fd6",
+    "ui/v3/src/components/scrape/provider-metadata.ts": "c2e910d73dbedf3b565762cf8b2b40421832f2058c989518f8f9fa312aaa394a",
+    "ui/v3/src/components/scrape/scene-scrape-merge-dialog.tsx": "7e5fa1e4f63509a9ef2dc31dce315eacfbc39fb5591c030b79ceb1f17ef0d55c",
+    "ui/v3/src/core/native-archive/provider-metadata-api.test.ts": "4da90a5d8b5f99fd82264609de4eab80a03e344f0e1321585b5cb55940e9ebcd",
+    "ui/v3/src/core/native-archive/provider-metadata-api.ts": "9b9fadc9e07b7c0135489e8f1f17cd83677396b1ce239ae93252a8509d834332",
+    "ui/v3/src/locales/en-GB.json": "d7cfb1c9b4661f16ea2e60c8126b29faccf9ee530049329a1f83147dad81c527",
+    "ui/v3/src/routes/performers/$performerId.tsx": "9d560033961b37ba059fb2a21f388b11d7c8da28b178911ffd350705db5640ef",
+    "ui/v3/src/routes/studios/$studioId.tsx": "2e37a5a8df4587e1a84950ff1c5cbd9ba38b21506f803a0fb1fc3e5b91843f2c",
+    "ui/v3/src/routes/tags/$tagId.tsx": "98d8d4bcb302d7541352e690e2fa70417446169ec7cf57cca8d2f9e66eb3683d",
+    "ui/v3/tests/browser/fixture/main.tsx": "3d28251d4053d4350fb1dd3da8c46c174b5d42724444be7b5065f83ead3f28cd",
+    "ui/v3/tests/browser/fixture/merge-dialogs.tsx": "45b4f1e79e6c48de7b993ad0020d432b1285980011cfe291d48fa2fef78e0122",
+    "ui/v3/tests/browser/fixture/provider-metadata.tsx": "d490d08670762d36559ab0600ef98eed470b42c6f28d92e0fbbbb7bccff06ac3",
+    "ui/v3/tests/browser/provider-metadata.browser.ts": "d7ad77a934a05316b0bbb0e2b3b878be7525f5a698812a047c13f252b995889c"
+  },
+  "checks": [
+    {
+      "label": "native_provider_review_generate",
+      "command": [
+        "make",
+        "generate"
+      ],
+      "exit_code": 0,
+      "seconds": 16.45113590400433
+    },
+    {
+      "label": "native_provider_review_graphql_configured",
+      "command": [
+        "go",
+        "test",
+        "./internal/api",
+        "-run",
+        "TestProviderMetadata|TestNativeProviderMetadata",
+        "-count=1",
+        "-timeout=5m"
+      ],
+      "exit_code": 0,
+      "seconds": 19.95151966798585
+    },
+    {
+      "label": "native_provider_review_go_lint",
+      "command": [
+        "go",
+        "run",
+        "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2",
+        "run",
+        "./internal/api/...",
+        "./pkg/models/..."
+      ],
+      "exit_code": 0,
+      "seconds": 6.120036092004739
+    },
+    {
+      "label": "native_provider_review_ui_final",
+      "command": [
+        "make",
+        "validate-ui-v3"
+      ],
+      "exit_code": 0,
+      "seconds": 40.999105224967934
+    },
+    {
+      "label": "native_provider_review_assets",
+      "command": [
+        "make",
+        "ui"
+      ],
+      "exit_code": 0,
+      "seconds": 11.504852121986914
+    },
+    {
+      "label": "native_provider_review_browser_final",
+      "command": [
+        "python3",
+        ".local/native-provider-review-20261008/run-browser.py",
+        "corrected",
+        "tests/browser/provider-metadata.browser.ts"
+      ],
+      "exit_code": 0,
+      "seconds": 25.191974147979636
+    },
+    {
+      "label": "native_provider_review_api_complete",
+      "command": [
+        "go",
+        "test",
+        "./internal/api",
+        "-json",
+        "-count=1",
+        "-timeout=30m"
+      ],
+      "exit_code": 0,
+      "seconds": 915.0953378339764
+    }
+  ],
+  "api_tests_and_subtests_passed": 435,
+  "ui_test_files_passed": 124,
+  "ui_tests_passed": 796,
+  "provider_browser_tests_passed": 8,
+  "provider_browsers": [
+    "Chromium",
+    "WebKit"
+  ],
+  "toolbar_browser_tests_passed": 40,
+  "toolbar_evidence": "native_provider_review_browser_mounted; all toolbar checks passed, followed by corrected provider-only rerun",
+  "verified_scope": [
+    "GraphQL selected fields must be included in the same entity create/update; actual saved values are recorded transactionally",
+    "Scene, performer, studio and tag create/update normalization, repeated imports and rollback on invalid receipts",
+    "Merge-value provider inputs rejected and provider control fields omitted from entity-change hooks",
+    "Scene/performer Apply followed by Save, manual edit, edit-back and Discard",
+    "Multiple selected providers on explicit list merges; scalar replacement and ordinary scrape remove previous attribution",
+    "Related studio, performer and tag creation uses each item remote ID, with custom names unattributed",
+    "Lazy read-only import history with bounded pagination, exact identity validation, proxy/session transport and retained performer identities",
+    "History is distinguished from current field origin; no source is inferred from value equality"
+  ],
+  "remaining_scope": [
+    "Populated schema96 migration and original-data reconciliation",
+    "Final selected application image, populated startup and performance gates",
+    "Real desktop/mobile owner acceptance and coherent production cutover"
+  ],
+  "failed_attempts_retained": {
+    "native_provider_review_graphql": "Fixture assumed the retired performer name column and omitted required empty fields input.",
+    "native_provider_review_graphql_fixed": "Scene fixture lacked the configured plugin cache required after successful commits.",
+    "native_provider_review_api_suite": "Eight-minute aggregate package timeout; the complete suite subsequently passed with a thirty-minute test budget.",
+    "native_provider_review_browser_initial": "Host browser executables unavailable.",
+    "native_provider_review_browser_container": "Fixture dependency symlink was outside the Vite file allowlist.",
+    "native_provider_review_browser_mounted": "Performer assertion omitted the alias selected by canonical-name replacement; fixed and rerun in both browsers."
+  },
+  "production_changed": false,
+  "live_provider_requests": 0,
+  "frozen_schema95_rehearsal_changed": false
+}

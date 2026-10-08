@@ -1,3 +1,9 @@
+import {
+  providerPatch,
+  providerFromScrape,
+  providerCreationFields,
+  type ProviderPatch,
+} from "./provider-metadata";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
@@ -64,7 +70,7 @@ interface SceneScrapeMergeDialogProps {
   /** Source the scrape came from. When this is a stash-box and the scraped
    *  payload includes a remote_site_id, the dialog offers a stash-id row. */
   source?: ScrapeSource | null;
-  onApply: (patch: Partial<SceneFormValues>) => void;
+  onApply: (patch: Partial<SceneFormValues>, selection?: ProviderPatch) => void;
 }
 
 export function SceneScrapeMergeDialog({
@@ -353,7 +359,7 @@ export function SceneScrapeMergeDialog({
   >(
     items: T[],
     resMap: Record<number, ScrapedItemResolution>,
-    create: (name: string) => Promise<EntityOption | null>,
+    create: (name: string, item: T) => Promise<EntityOption | null>,
   ): Promise<Map<string, EntityOption> | null> {
     const additions = new Map<string, EntityOption>();
     const promises: Promise<void>[] = [];
@@ -366,7 +372,7 @@ export function SceneScrapeMergeDialog({
       }
       // create
       promises.push(
-        create(r.name).then((opt) => {
+        create(r.name, item).then((opt) => {
           if (opt) additions.set(opt.id, opt);
         }),
       );
@@ -382,6 +388,18 @@ export function SceneScrapeMergeDialog({
 
   async function handleApply() {
     if (!scraped) return;
+    try {
+      providerFromScrape(source, scraped.remote_site_id);
+    } catch {
+      toast.error(
+        intl.formatMessage({
+          id: "provider_metadata.missing_id",
+          defaultMessage:
+            "This provider result has no remote ID. Reload it before importing.",
+        }),
+      );
+      return;
+    }
     setApplying(true);
     try {
       const patch: Partial<SceneFormValues> = {};
@@ -397,7 +415,16 @@ export function SceneScrapeMergeDialog({
         } else if (studioRes.kind === "create") {
           try {
             const result = await createStudio({
-              variables: { input: { name: studioRes.name } },
+              variables: {
+                input: {
+                  name: studioRes.name,
+                  ...providerCreationFields(
+                    source,
+                    scraped.studio ?? {},
+                    studioRes.name,
+                  ),
+                },
+              },
             });
             const created = result.data?.studioCreate;
             if (created) {
@@ -417,9 +444,11 @@ export function SceneScrapeMergeDialog({
         const additions = await resolveList(
           scrapedPerformers,
           performerRes,
-          async (name) => {
+          async (name, item) => {
             const result = await createPerformer({
-              variables: { input: { name } },
+              variables: {
+                input: { name, ...providerCreationFields(source, item, name) },
+              },
             });
             const c = result.data?.performerCreate;
             return c ? { id: c.id, name: c.name } : null;
@@ -448,9 +477,11 @@ export function SceneScrapeMergeDialog({
         const additions = await resolveList(
           scrapedTags,
           tagRes,
-          async (name) => {
+          async (name, item) => {
             const result = await createTag({
-              variables: { input: { name } },
+              variables: {
+                input: { name, ...providerCreationFields(source, item, name) },
+              },
             });
             const c = result.data?.tagCreate;
             return c ? { id: c.id, name: c.name } : null;
@@ -512,8 +543,27 @@ export function SceneScrapeMergeDialog({
         }
       }
 
-      onApply(patch);
+      onApply(
+        patch,
+        providerPatch(
+          "scene",
+          source,
+          scraped.remote_site_id,
+          patch,
+          getMergeMode,
+        ),
+      );
       onOpenChange(false);
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message === "missing_provider_remote_id"
+          ? intl.formatMessage({
+              id: "provider_metadata.missing_id",
+              defaultMessage:
+                "This provider result has no remote ID. Reload it before importing.",
+            })
+          : error,
+      );
     } finally {
       setApplying(false);
     }

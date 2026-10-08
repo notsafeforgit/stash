@@ -93,6 +93,9 @@ func (t changesetTranslator) hasField(field string) bool {
 func (t changesetTranslator) getFields() []string {
 	var ret []string
 	for k := range t.inputMap {
+		if k == "provider_metadata" {
+			continue
+		}
 		ret = append(ret, k)
 	}
 

@@ -1,3 +1,4 @@
+import { ProviderMetadataHistory } from "@/components/detail/provider-metadata-history";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useState } from "react";
 import { cn } from "src/lib/utils";
@@ -22,6 +23,7 @@ import {
   Star,
   Heart,
   Pencil,
+  History,
   Clapperboard,
   GalleryHorizontalEnd,
   Images,
@@ -269,6 +271,19 @@ function StudioDetailPage() {
               },
             ]
           : []),
+        {
+          id: "provider-imports",
+          icon: History,
+          label: intl.formatMessage({
+            id: "provider_metadata.history",
+            defaultMessage: "Provider import history",
+          }),
+          content: (
+            <div className="p-4">
+              <ProviderMetadataHistory kind="studio" localId={studio.id} />
+            </div>
+          ),
+        },
       ]
     : [];
 

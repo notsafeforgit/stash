@@ -1,3 +1,9 @@
+import {
+  providerPatch,
+  providerFromScrape,
+  providerCreationFields,
+  type ProviderPatch,
+} from "./provider-metadata";
 import React, { useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { useMutation } from "@apollo/client/react";
@@ -95,7 +101,10 @@ interface PerformerScrapeMergeDialogProps {
    *  payload includes a remote_site_id, the dialog offers a stash-id row so
    *  the user can attach the matched id to the form. */
   source?: ScrapeSource | null;
-  onApply: (patch: Partial<PerformerFormValues>) => void;
+  onApply: (
+    patch: Partial<PerformerFormValues>,
+    selection?: ProviderPatch,
+  ) => void;
 }
 
 export function PerformerScrapeMergeDialog({
@@ -654,6 +663,18 @@ export function PerformerScrapeMergeDialog({
 
   async function handleApply() {
     if (!scraped) return;
+    try {
+      providerFromScrape(source, scraped.remote_site_id);
+    } catch {
+      toast.error(
+        intl.formatMessage({
+          id: "provider_metadata.missing_id",
+          defaultMessage:
+            "This provider result has no remote ID. Reload it before importing.",
+        }),
+      );
+      return;
+    }
     setApplying(true);
     try {
       const patch: Partial<PerformerFormValues> = {};
@@ -705,7 +726,16 @@ export function PerformerScrapeMergeDialog({
         if (res.kind === "create") {
           createPromises.push(
             createTag({
-              variables: { input: { name: res.name } },
+              variables: {
+                input: {
+                  name: res.name,
+                  ...providerCreationFields(
+                    source,
+                    scrapedTags[i] ?? {},
+                    res.name,
+                  ),
+                },
+              },
             }).then((result) => {
               const created = result.data?.tagCreate;
               if (created) {
@@ -736,8 +766,27 @@ export function PerformerScrapeMergeDialog({
         patch.tags = [...current.tags, ...additions.values()];
       }
 
-      onApply(patch);
+      onApply(
+        patch,
+        providerPatch(
+          "performer",
+          source,
+          scraped.remote_site_id,
+          patch,
+          getMergeMode,
+        ),
+      );
       onOpenChange(false);
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message === "missing_provider_remote_id"
+          ? intl.formatMessage({
+              id: "provider_metadata.missing_id",
+              defaultMessage:
+                "This provider result has no remote ID. Reload it before importing.",
+            })
+          : error,
+      );
     } finally {
       setApplying(false);
     }

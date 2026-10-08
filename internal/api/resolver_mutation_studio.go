@@ -158,7 +158,7 @@ func (r *mutationResolver) StudioCreate(ctx context.Context, input models.Studio
 			}
 		}
 
-		return nil
+		return r.recordProviderSelections(ctx, models.ArchiveStudio, newStudio.ID, input.ProviderMetadata, translator)
 	}); err != nil {
 		return nil, err
 	}
@@ -292,7 +292,7 @@ func (r *mutationResolver) StudioUpdate(ctx context.Context, input models.Studio
 			}
 		}
 
-		return nil
+		return r.recordProviderSelections(ctx, models.ArchiveStudio, studioID, input.ProviderMetadata, translator)
 	}); err != nil {
 		return nil, err
 	}

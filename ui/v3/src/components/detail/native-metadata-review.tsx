@@ -1,3 +1,4 @@
+import { ProviderMetadataHistory } from "./provider-metadata-history";
 import { useEffect, useState } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import { History } from "lucide-react";
@@ -141,6 +142,9 @@ export function NativeMetadataReview({
       aria-label={msg("archive_review.title", "Metadata review")}
       className="flex flex-col gap-4"
     >
+      {kind === "scene" && (
+        <ProviderMetadataHistory kind="scene" localId={entity.id} />
+      )}
       <p className="text-sm text-muted-foreground">
         {msg(
           "archive_review.intro",

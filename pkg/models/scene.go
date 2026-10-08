@@ -181,6 +181,8 @@ type SceneGroupInput struct {
 }
 
 type SceneCreateInput struct {
+	ProviderMetadata []*ProviderMetadataSelectionInput `json:"provider_metadata,omitempty"`
+
 	Title          *string           `json:"title"`
 	Code           *string           `json:"code"`
 	Details        *string           `json:"details"`
@@ -207,6 +209,8 @@ type SceneCreateInput struct {
 }
 
 type SceneUpdateInput struct {
+	ProviderMetadata []*ProviderMetadataSelectionInput `json:"provider_metadata,omitempty"`
+
 	ClientMutationID *string           `json:"clientMutationId"`
 	ID               string            `json:"id"`
 	Title            *string           `json:"title"`

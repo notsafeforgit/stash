@@ -32,6 +32,7 @@ type Studio {
 }
 
 input StudioCreateInput {
+  provider_metadata: [ProviderMetadataSelectionInput!]
   name: String!
   url: String @deprecated(reason: "Use urls")
   urls: [String!]
@@ -56,6 +57,7 @@ input StudioCreateInput {
 }
 
 input StudioUpdateInput {
+  provider_metadata: [ProviderMetadataSelectionInput!]
   id: ID!
   name: String
   url: String @deprecated(reason: "Use urls")

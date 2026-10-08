@@ -7,7 +7,7 @@ import {
 import * as GQL from "@/core/generated-graphql";
 
 const longValue = "LongUnbrokenName".repeat(8);
-const performers: GQL.PerformerDataFragment[] = ["1", "2", "3", "4"].map(
+export const performers: GQL.PerformerDataFragment[] = ["1", "2", "3", "4"].map(
   (id) => ({
     __typename: "Performer",
     id,

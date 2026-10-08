@@ -110,7 +110,10 @@ func (r *mutationResolver) SceneCreate(ctx context.Context, input models.SceneCr
 			CoverImage:   coverImageData,
 			CustomFields: customFields,
 		})
-		return err
+		if err != nil {
+			return err
+		}
+		return r.recordProviderSelections(ctx, models.ArchiveScene, ret.ID, input.ProviderMetadata, translator)
 	}); err != nil {
 		return nil, err
 	}
@@ -336,6 +339,10 @@ func (r *mutationResolver) sceneUpdate(ctx context.Context, input models.SceneUp
 		}
 	}
 
+	if err := r.recordProviderSelections(ctx, models.ArchiveScene, scene.ID, input.ProviderMetadata, translator); err != nil {
+		return nil, err
+	}
+
 	return scene, nil
 }
 
@@ -500,6 +507,9 @@ func (r *mutationResolver) SceneMerge(ctx context.Context, input SceneMergeInput
 	var customFields *models.CustomFieldsInput
 
 	if input.Values != nil {
+		if len(input.Values.ProviderMetadata) != 0 {
+			return nil, fmt.Errorf("%w: provider selections must be saved separately from a merge", models.ErrProviderMetadataInvalid)
+		}
 		translator := changesetTranslator{
 			inputMap: getNamedUpdateInputMap(ctx, "input.values"),
 		}

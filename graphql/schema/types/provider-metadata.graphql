@@ -1,0 +1,12 @@
+"""
+An explicit choice to apply fields from a stash-box result in this create/update.
+This records the saved values and their selected source, not a provider signature
+or an assertion that later edits still come from this source. Not accepted in
+merge values. Each field must also be present in the enclosing mutation input.
+"""
+input ProviderMetadataSelectionInput {
+  endpoint: String!
+  remote_id: String!
+  "Canonical metadata field names; validated for the target entity kind."
+  fields: [String!]!
+}

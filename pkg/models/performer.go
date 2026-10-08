@@ -226,6 +226,8 @@ type UpdatePerformerAliasesInput struct {
 }
 
 type PerformerCreateInput struct {
+	ProviderMetadata []*ProviderMetadataSelectionInput `json:"provider_metadata,omitempty"`
+
 	Name           string                 `json:"name"`
 	Disambiguation *string                `json:"disambiguation"`
 	URL            *string                `json:"url"` // deprecated
@@ -268,6 +270,8 @@ type PerformerCreateInput struct {
 }
 
 type PerformerUpdateInput struct {
+	ProviderMetadata []*ProviderMetadataSelectionInput `json:"provider_metadata,omitempty"`
+
 	ID             string                       `json:"id"`
 	Name           *string                      `json:"name"`
 	Disambiguation *string                      `json:"disambiguation"`

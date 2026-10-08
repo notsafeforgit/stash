@@ -1,4 +1,8 @@
-import { useEffect, useId, useState } from "react";
+import {
+  ProviderMetadataDraft,
+  type ProviderPatch,
+} from "@/components/scrape/provider-metadata";
+import { useEffect, useId, useRef, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useLazyQuery } from "@apollo/client/react";
 import { useIntl } from "react-intl";
@@ -311,17 +315,20 @@ export function SceneEditForm(props: SceneEditFormProps) {
   }, [studioData]);
 
   // ── Form ──
+  const providerDraft = useRef(new ProviderMetadataDraft());
   const form = useForm({
     defaultValues: scene
       ? sceneToFormValues(scene)
       : { ...emptySceneFormValues(), ...(isCreate ? props.initialValues : {}) },
     onSubmit: async ({ value, formApi }) => {
+      const provider_metadata = providerDraft.current.selections(value);
       if (isCreate) {
         const result = await createScene({
           variables: {
             input: {
-              ...formValuesToCreateInput(value),
               ...(props.createInputExtras ?? {}),
+              ...formValuesToCreateInput(value),
+              provider_metadata,
             },
           },
           update(cache) {
@@ -329,19 +336,33 @@ export function SceneEditForm(props: SceneEditFormProps) {
           },
         });
         const newId = result.data?.sceneCreate?.id;
+        providerDraft.current.clear();
         formApi.reset();
         if (newId) props.onCreated?.(newId);
       } else {
         await updateScene({
-          variables: { input: formValuesToInput(props.scene.id, value) },
+          variables: {
+            input: {
+              ...formValuesToInput(props.scene.id, value),
+              provider_metadata,
+            },
+          },
         });
         // Reset to the saved values so isDirty becomes false and defaultValues
         // reflect what's now on the server.
+        providerDraft.current.clear();
         formApi.reset(value);
         props.onSaved?.();
       }
     },
   });
+
+  useEffect(() => {
+    const subscription = form.store.subscribe(() => {
+      providerDraft.current.observe(form.state.values);
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   const busy = saving || scraping;
 
@@ -401,13 +422,18 @@ export function SceneEditForm(props: SceneEditFormProps) {
     if (scrapeSearchSource) openMergeWith(scrapedScene, scrapeSearchSource);
   }
 
-  function applyScrapePatch(patch: Partial<SceneFormValues>) {
-    for (const [key, value] of Object.entries(patch)) {
-      form.setFieldValue(
-        key as keyof SceneFormValues,
-        value as SceneFormValues[keyof SceneFormValues],
-      );
-    }
+  function applyScrapePatch(
+    patch: Partial<SceneFormValues>,
+    selection?: ProviderPatch,
+  ) {
+    providerDraft.current.apply(patch, selection, () => {
+      for (const [key, value] of Object.entries(patch)) {
+        form.setFieldValue(
+          key as keyof SceneFormValues,
+          value as SceneFormValues[keyof SceneFormValues],
+        );
+      }
+    });
   }
 
   // ── Render ──
@@ -831,7 +857,10 @@ export function SceneEditForm(props: SceneEditFormProps) {
                   variant="outline"
                   size="sm"
                   disabled={busy || !isDirty}
-                  onClick={() => form.reset()}
+                  onClick={() => {
+                    providerDraft.current.clear();
+                    form.reset();
+                  }}
                 >
                   <RotateCcw />
                   {intl.formatMessage({

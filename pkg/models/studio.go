@@ -62,6 +62,8 @@ type StudioFilterType struct {
 }
 
 type StudioCreateInput struct {
+	ProviderMetadata []*ProviderMetadataSelectionInput `json:"provider_metadata,omitempty"`
+
 	Name     string   `json:"name"`
 	URL      *string  `json:"url"` // deprecated
 	Urls     []string `json:"urls"`
@@ -83,6 +85,8 @@ type StudioCreateInput struct {
 }
 
 type StudioUpdateInput struct {
+	ProviderMetadata []*ProviderMetadataSelectionInput `json:"provider_metadata,omitempty"`
+
 	ID       string   `json:"id"`
 	Name     *string  `json:"name"`
 	URL      *string  `json:"url"` // deprecated

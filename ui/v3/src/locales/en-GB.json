@@ -3935,5 +3935,15 @@
     "first": "First page",
     "continue": "Continue checking",
     "next": "Next page"
-  }
+  },
+  "provider_metadata.missing_id": "This provider result has no remote ID. Reload it before importing.",
+  "provider_metadata.history": "Provider import history",
+  "provider_metadata.history_help": "These are the values saved when an import was accepted, including merged local values. Later edits may differ. This history does not identify the source of every current field.",
+  "provider_metadata.merged_help": "Imports recorded before a performer merge remain under the earlier identity. Open identity history in Source accounts to view them.",
+  "provider_metadata.loading": "Loading provider imports",
+  "provider_metadata.failed": "Could not load import history",
+  "provider_metadata.empty": "No recorded imports on this page",
+  "provider_metadata.entry": "{provider} · {date}",
+  "provider_metadata.remote_id": "Provider ID: {id}",
+  "provider_metadata.refresh": "Refresh imports"
 }

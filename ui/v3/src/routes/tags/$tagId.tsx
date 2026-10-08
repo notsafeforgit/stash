@@ -1,3 +1,4 @@
+import { ProviderMetadataHistory } from "@/components/detail/provider-metadata-history";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useState } from "react";
 import { cn } from "src/lib/utils";
@@ -21,6 +22,7 @@ import {
   Tag,
   Heart,
   Pencil,
+  History,
   Building2,
   Clapperboard,
   GalleryHorizontalEnd,
@@ -259,6 +261,19 @@ function TagDetailPage() {
               },
             ]
           : []),
+        {
+          id: "provider-imports",
+          icon: History,
+          label: intl.formatMessage({
+            id: "provider_metadata.history",
+            defaultMessage: "Provider import history",
+          }),
+          content: (
+            <div className="p-4">
+              <ProviderMetadataHistory kind="tag" localId={tag.id} />
+            </div>
+          ),
+        },
       ]
     : [];
 

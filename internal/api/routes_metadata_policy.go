@@ -116,6 +116,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/entity-identities/{kind}/{localID}", rs.metadataEntity)
 	r.Get("/entities/{entity}/metadata-fields", rs.entityMetadataFields)
 	r.Get("/entities/{entity}/metadata-fields/{field}/history", rs.entityMetadataHistory)
+	r.Get("/entities/{entity}/provider-metadata-history", rs.entityProviderMetadataHistory)
 	r.Get("/entities/{entity}/file-edits", rs.entityFileEdits)
 	r.Post("/metadata-file-edits/preview", rs.previewFileEdit)
 	r.Post("/metadata-file-edits/apply", rs.applyFileEdit)

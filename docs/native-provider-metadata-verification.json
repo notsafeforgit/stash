@@ -1,0 +1,83 @@
+{
+  "recorded_at": "2026-10-08T05:39:23.807947+00:00",
+  "status": "passed_for_stated_scope",
+  "parent_revision": "325548b94e4962f29a8ed922f1f82a6d9e6ff458",
+  "native_schema": 1000096,
+  "tested_files_sha256": {
+    "pkg/models/model_provider_metadata.go": "1c0e5d94b2fde66783fc646766800f32767e24fe910efca754e55f50daa1e8c2",
+    "pkg/models/repository.go": "fb934303a66f30b5ec09450264b51b3831332f39ee4e232ad43762abe5088ebb",
+    "pkg/sqlite/provider_metadata.go": "bb70dab97d292b55488bcccbafb031fb57cc82dd16bc510b7fc8bb89bfacd052",
+    "pkg/sqlite/provider_metadata_schema.go": "dc7687a17b27b268a1e748c228830c1dc3d27056dae5c0dad07bbc5fce39aa27",
+    "pkg/sqlite/provider_metadata_test.go": "e25267fb168617872da7b225d6995eb4d8a400ceaa8fa94ca0adbae551a2f4ba",
+    "pkg/sqlite/migrations/1000096_provider_metadata_imports.up.sql": "8627ecc2ecfb9c815fa368937f9202894e63396e53bac268c064f003f3d8fa89",
+    "pkg/sqlite/database.go": "172d12bcf4607587089346e9b25686123481b14bc12babc9dd5cda62867f9a32",
+    "pkg/sqlite/transaction.go": "8b0a54d5e545cc4052a4da0a97550c0e209fcaf9ca41b2dd584a9b69057dc499",
+    "pkg/sqlite/native_schema.go": "ff1158ebbdecccdf20eec61a7bfc5b1958e79290df8d0bf3bacba6ca2350ba0c",
+    "pkg/sqlite/anonymise.go": "c1fa802270831b94b3ce2d3f82030fcde83c285b2512cc47f206a237ce734cf1",
+    "pkg/sqlite/file_deduplication_test.go": "c0ae2702a16fd4598ed596fcc6c35a363405171f629f39365ba3d5188f02de10",
+    "pkg/stashbox/metadata.go": "4f74a386e269cf5e41531a69166d57a90818fd0546301a513ed84c7c3c0e6d8d",
+    "internal/manager/task_stash_box_tag.go": "005e8fb76beb79db691277fcfbc36fbbdde003eaec3924e6187cd3c459b454ff",
+    "internal/manager/task_stash_box_tag_test.go": "2c4b10df51258d2d8a2dcea813e8c15f63922499bba79d527f1b5a6b3de40d1f",
+    "internal/api/routes_provider_metadata.go": "bfe7f006843ec66c30e30322ab2a0dd4ee635aa6250fece32232fd92b7dd85aa",
+    "internal/api/routes_provider_metadata_test.go": "3ddd1177407a8407e4d2ec80a64e53abe5c92d42ad70f13c895f4133e8da081b",
+    "internal/api/routes_metadata_policy.go": "1c96fff164937c544ce1e9a3526e7cb45c95deb9ea08b161accd57fc20b80a72"
+  },
+  "checks": [
+    {
+      "command": [
+        "go",
+        "test",
+        "./pkg/sqlite",
+        "./internal/manager",
+        "./pkg/stashbox",
+        "./internal/api",
+        "-run",
+        "TestProviderMetadata|TestStashBox|TestNativeProviderMetadata|TestFileDeduplicationMigration|TestMetadataFieldChoicesClearInheritAndReplay|TestMetadataFileKeepsMigration|TestNewNativeDatabaseHasSingleMigrationLineage",
+        "-count=1",
+        "-timeout=5m"
+      ],
+      "exit_code": 0,
+      "seconds": 44.8389768669731
+    },
+    {
+      "command": [
+        "go",
+        "run",
+        "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2",
+        "run",
+        "./pkg/sqlite/...",
+        "./pkg/stashbox/...",
+        "./internal/manager/...",
+        "./internal/api/..."
+      ],
+      "exit_code": 0,
+      "seconds": 10.791506986017339
+    }
+  ],
+  "verified_scope": [
+    "Transactional provider receipt storage with actual accepted library values",
+    "Performer batch creation and refresh, including exclusions and final remote merge ID",
+    "Read-only paginated native history API",
+    "Scene, performer, studio and tag field snapshots; precise dates and artwork digests",
+    "UUID adoption, performer merge, deletion and restart",
+    "Rollback including intentionally ignored receipt failure",
+    "Schema-95 migration and foreign-table rejection",
+    "Receipt corruption rejection and anonymization",
+    "Existing schema-94/95 migration fixtures and metadata choices"
+  ],
+  "remaining_scope": [
+    "Studio and tag batch application paths",
+    "Scene identification and related entity creation",
+    "Interactive scrape selection and save paths",
+    "History UI and accurate current field attribution",
+    "Populated schema-96 migration and final image validation"
+  ],
+  "failed_attempts_retained": [
+    "native_provider_metadata_compile",
+    "native_provider_metadata_storage",
+    "native_provider_metadata_storage_corrected"
+  ],
+  "production_changed": false,
+  "live_provider_requests": 0,
+  "frozen_schema95_rehearsal_changed": false
+}

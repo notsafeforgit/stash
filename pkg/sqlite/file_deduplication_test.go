@@ -24,6 +24,7 @@ import (
 
 func removeFileDeduplicationsSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeProviderMetadataSchema(t, raw)
 	var exists bool
 	require.NoError(t, raw.QueryRow("SELECT EXISTS(SELECT 1 FROM native_migration_history WHERE version=1000095)").Scan(&exists))
 	if exists {

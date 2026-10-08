@@ -83,6 +83,7 @@ type Repository struct {
 	SourcePostMedia             SourcePostMediaReaderWriter
 	SourceGallery               SourceGalleryReaderWriter
 	MetadataField               MetadataFieldReaderWriter
+	ProviderMetadata            ProviderMetadataReaderWriter
 	MetadataPolicy              MetadataPolicyReaderWriter
 	MetadataPolicyImport        MetadataPolicyImportReaderWriter
 	Share                       ShareReaderWriter

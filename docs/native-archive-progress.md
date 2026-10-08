@@ -11893,3 +11893,40 @@ query documents are unchanged. The aggregate report retains both checkpoints.
 Final native image selection must include these changes. Attribution of
 Stash-box metadata choices still needs a separate audit against the transition
 plan; these results do not claim that wider requirement is complete.
+
+## Attributed provider import storage — 2026-10-08
+
+The attribution audit confirmed that retained stash-box IDs did not identify
+which field values were accepted from a provider. Native schema 1000096 now adds
+immutable provider-import receipts keyed to the native entity identity. Each
+receipt records endpoint, remote ID, application path, accepted values and time.
+Values are read from the library in the edit's write transaction, including
+merged relationships. A failed receipt prevents commit even if its error is
+accidentally swallowed. Later manual edits never rewrite the historical import.
+
+Batch performer creation and refresh now record selected fields and the final
+provider ID after a remote merge. Field exclusions remain effective. The native
+API exposes bounded, indexed import history for an identity. UUID adoption,
+performer merges and deletion preserve the original attribution; anonymization
+removes it. Relationship snapshots use native UUIDs, performer dates preserve
+precision, and artwork snapshots contain digests instead of duplicate image
+bytes. The table is part of normal database snapshots, without a new backup
+component. The contract and remaining integration work are documented in
+[native-provider-metadata.md](native-provider-metadata.md).
+
+The final SQLite, manager and HTTP checks passed in 44.8 seconds, covering all
+four supported entity field shapes, configured batch exclusions, rollback,
+adoption/merge/deletion/restart, malformed requests, schema-95 migration,
+foreign-table collision, corruption rejection and anonymization. Existing
+schema-94/95 migration fixtures and metadata choice tests also pass. The pinned
+linter reports zero issues. Early tests caught an uninitialized entity-store
+reader and an unconfigured artwork test fixture; their failing logs are retained.
+The checked scope is recorded in
+[native-provider-metadata-verification.json](native-provider-metadata-verification.json).
+
+Studio/tag batches, scene identification and related entity creation, interactive
+scrape selection, and history/current-field attribution views still need wiring.
+This checkpoint does not complete the plan's stash-box metadata requirement.
+The existing schema-95 populated rehearsal retains its frozen runtime and inputs;
+the later schema-96 application needs its own populated migration/image checks.
+Production, producer launchers and the compatible release tags remain unchanged.

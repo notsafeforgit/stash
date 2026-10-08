@@ -256,7 +256,7 @@ func (t *stashBoxBatchPerformerTagTask) processMatchedPerformer(ctx context.Cont
 				}
 			}
 
-			return nil
+			return stashbox.RecordMetadataImport(ctx, r, models.ArchivePerformer, t.performer.ID, t.box.Endpoint, p.RemoteSiteID, "batch", stashbox.PerformerImportFields(partial, len(image) > 0))
 		})
 		if err != nil {
 			logger.Errorf("Failed to update performer %s: %v", *p.Name, err)
@@ -299,7 +299,11 @@ func (t *stashBoxBatchPerformerTagTask) processMatchedPerformer(ctx context.Cont
 				}
 			}
 
-			return nil
+			selected := p.ToPartial(t.box.Endpoint, excluded, nil, nil)
+			// Creation always accepts the required name, even if name updates
+			// were excluded in the batch's refresh settings.
+			selected.Name = models.NewOptionalString(newPerformer.Name)
+			return stashbox.RecordMetadataImport(ctx, r, models.ArchivePerformer, newPerformer.ID, t.box.Endpoint, p.RemoteSiteID, "batch", stashbox.PerformerImportFields(selected, len(image) > 0))
 		})
 		if err != nil {
 			logger.Errorf("Failed to create performer %s: %v", *p.Name, err)

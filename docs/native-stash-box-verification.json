@@ -203,5 +203,10 @@
     ],
     "production_changed": false,
     "remote_writes": 0
+  },
+  "metadata_attribution_initial": {
+    "report": "native-provider-metadata-verification.json",
+    "status": "storage_api_and_performer_batch_passed_other_paths_pending",
+    "native_schema": 1000096
   }
 }

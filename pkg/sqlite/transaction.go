@@ -238,6 +238,7 @@ func (db *Database) Repository() models.Repository {
 		CatalogMembershipImport:     &CatalogMembershipImportStore{},
 		SourceGallery:               &SourceGalleryStore{gallery: db.Gallery},
 		MetadataField:               &MetadataFieldStore{},
+		ProviderMetadata:            &ProviderMetadataStore{db: db},
 		MetadataPolicy:              &MetadataPolicyStore{},
 		MetadataPolicyImport:        &MetadataPolicyImportStore{},
 		Share:                       &ShareStore{},

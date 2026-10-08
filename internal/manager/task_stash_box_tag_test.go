@@ -104,6 +104,40 @@ func TestStashBoxRemoteMergeRetainsSelectedLocalIdentity(t *testing.T) {
 		after, err := mgr.Repository.ArchiveEntity.FindByLocalID(ctx, models.ArchivePerformer, local.ID)
 		require.NoError(t, err)
 		assert.Equal(t, before.UUID, after.UUID)
+		imports, err := mgr.Repository.ProviderMetadata.History(ctx, after.UUID, 0, 100)
+		require.NoError(t, err)
+		require.Len(t, imports, 1)
+		assert.Equal(t, box.Endpoint, imports[0].Endpoint)
+		assert.Equal(t, "final", imports[0].RemoteID)
+		assert.Equal(t, "batch", imports[0].Operation)
+		var accepted map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(imports[0].Values, &accepted))
+		assert.JSONEq(t, `"New remote name"`, string(accepted["name"]))
+		return nil
+	}))
+}
+
+func TestStashBoxPerformerImportRecordsOnlyAcceptedFields(t *testing.T) {
+	mgr, box := stashBoxPerformerTestManager(t, nil)
+	remoteID, name, details, aliases := "source-performer", "Provider name", "Provider details", "Provider alias"
+	p := &models.ScrapedPerformer{RemoteSiteID: &remoteID, Name: &name, Details: &details, Aliases: &aliases}
+	task := &stashBoxBatchPerformerTagTask{box: box}
+	task.processMatchedPerformer(t.Context(), p, map[string]bool{"name": true, "details": true}, nil)
+	require.NoError(t, mgr.Repository.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		matches, err := mgr.Repository.Performer.FindByStashID(ctx, models.StashID{Endpoint: box.Endpoint, StashID: remoteID})
+		require.NoError(t, err)
+		require.Len(t, matches, 1)
+		entity, err := mgr.Repository.ArchiveEntity.FindByLocalID(ctx, models.ArchivePerformer, matches[0].ID)
+		require.NoError(t, err)
+		imports, err := mgr.Repository.ProviderMetadata.History(ctx, entity.UUID, 0, 100)
+		require.NoError(t, err)
+		require.Len(t, imports, 1)
+		var values map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(imports[0].Values, &values))
+		require.Contains(t, values, "name") // mandatory on creation
+		require.Contains(t, values, "aliases")
+		require.NotContains(t, values, "details")
+		require.NotContains(t, values, "stash_ids")
 		return nil
 	}))
 }

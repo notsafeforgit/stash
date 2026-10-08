@@ -38,15 +38,31 @@ the original evidence. No source jobs have been activated. Two inactive producer
 identities and their staged outboxes retain all **34 legacy n8n result receipts**
 byte-for-byte, without treating them as native ingestion-completion proof.
 
-All 1,711 catalog databases are copied from the held current snapshot. The
-240,872 original saved images are still being copied and checked; the catalog
-body importer waits for the complete frozen-input preparation. The snapshot has
-an explicit read-only mount after its automatic mount expired. This is the same
-held snapshot, not a new data boundary.
+All 1,711 catalog databases and the automation database have completed frozen
+input preparation. The original copy is complete, including all **240,872 saved
+photos and covers**. Native imports are running through durable services.
+Completion requires agreement
+between the imported database slice and the full held boundary, followed by
+independent source-byte and domain reconciliation. The same snapshot remains
+held and mounted read-only; the original compatible database is unchanged.
 
-The final inactive deployment now contains **78 files**, **32 worker profiles**
-and **nine workflow replacements**. Its preimages and current workflow versions
-were checked at the paused boundary. The backup configuration includes both n8n
+Current settings match the rehearsed conversion exactly: 38 retained layered
+values and 27 effective settings. All seven explicit folder defaults resolve
+against the current library. A fresh assessment qualifies 516 catalog groupings
+as local directories; 49 nonportable historical paths remain reviewable.
+Post/media matching, source albums and policy conversion have dependent services
+prepared to use current imported records. Their preparation does not constitute
+completed domain migration or policy activation. A dependent service will retain
+the converted policies through the API and independently compare their receipts,
+leaving them disabled for the final scope and worker handoff.
+
+The final inactive deployment's **78 files** and **32 worker profiles** are now
+installed with their original preimages retained. Both producer outboxes are at
+their final paths, including the 34 original n8n receipts; producer credentials
+and final runtime environments remain pending. The **nine workflow replacements**
+are staged in the separate n8n candidate: 142 tables, 18,650 rows and all 34
+unrelated workflows remain unchanged. Actual publication pointers must be
+verified after controlled startup. The backup configuration includes both n8n
 and Redis in its brief container pause and retains Redis's complete AOF directory;
 the captured queue passed the existing Redis runtime's AOF validation. No runtime
 code change or artifact rebuild was required. AWS access and metadata retention
@@ -54,17 +70,26 @@ configuration are verified; bucket versioning remains unchanged.
 
 [Current production verification](native-production-cutover-verification.json)
 records this partial cutover checkpoint. Private input manifests, immutable
-receipts and continuation state remain outside source control. The original
-historical cold-media audit continues independently; it is not a current full
-coordinated backup. The system filesystem retains more than 50 GiB free.
+receipts and continuation state remain outside source control. The historical
+cold-media audit has finished with 273,077 verified videos and 19 diagnosed
+exceptions. The fresh current census contains 274,466 videos and reuses 273,075
+of those historical byte proofs. Hashing only the remaining 1,391 files required
+10.4 GB of reads. A fresh cloud assessment verified 273,769 current videos and
+9,081 archive objects using one metadata GET, 300 LIST requests and 824 HEADs.
+The remaining 697 video paths contain 678 unique contents totaling 6.87 GB;
+their immutable Deep Archive uploads and checksums are verified. All **274,466
+current videos** now have byte-level backup evidence. Planning the current image
+deltas uses the captured ledger and held snapshot. The current coordinated
+metadata/image backup and isolated restore remain outstanding. The system
+filesystem retains more than 50 GiB free.
 
 Remaining release work:
 
 | Work | Required outcome |
 | --- | --- |
-| Current import | Finish the snapshot and all catalog record families; independently reconcile current domain references, operational work, policies and source scopes. |
+| Current import | Finish all catalog record families; independently reconcile current domain references, operational work, policies and source scopes. |
 | Writer handoff | Provision scoped credentials and final paths, preserve pending work, replace obsolete workflow execution paths and switch the pinned application/host/manual/n8n runtimes together. |
-| Backup and restore | Complete historical media reconciliation, publish the current coordinated backup and verify isolated restoration with original images, queues and pending filesystem work. |
+| Backup and restore | Publish current image deltas and the coordinated native backup and verify isolated restoration with original images, queues and pending filesystem work. |
 | Observation and retirement | Verify actual scrape, enrichment, manual intake and scheduled recovery/backup cycles; then retire obsolete catalog writers, mounts, services and packages. |
 | Acceptance | Publish final evidence and limitations for desktop/mobile owner review; merge into `develop` only after success is accepted. |
 

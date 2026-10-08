@@ -817,14 +817,19 @@
       "skipped": 0,
       "succeeded": 27
     },
-    "original_receipt_bytes_equal": true
+    "original_receipt_bytes_equal": true,
+    "installed_outboxes": 2
   },
   "deployment": {
     "files": 78,
     "profiles": 32,
     "workflow_replacements": 9,
     "freshness_check": "passed",
-    "installed": false
+    "installed": true,
+    "services_started": false,
+    "systemd_reloaded": false,
+    "all_installed_hashes_equal": true,
+    "native_database_promoted": false
   },
   "backup_queue": {
     "redis_files": 4,
@@ -834,10 +839,25 @@
       "n8n",
       "redis-n8n"
     ],
-    "installed": false
+    "installed": true
   },
-  "catalog_bodies": "awaiting_complete_frozen_input_preparation",
-  "artwork_capture": "in_progress",
+  "catalog_bodies": {
+    "input_preparation": "passed",
+    "catalogs": 1711,
+    "native_import_status": "running",
+    "completed_catalogs_at_checkpoint": 200,
+    "completed_passes_at_checkpoint": 2408,
+    "total_passes": 20532,
+    "independent_reconciliation": "pending"
+  },
+  "artwork_capture": {
+    "status": "captured",
+    "artwork": 240872,
+    "artwork_total": 240872,
+    "artwork_bytes": 36882763390,
+    "completed_at": "2026-10-08T20:21:57.803977+00:00",
+    "manifest_sha256": "091b55067fe1f2932450f2f8ac9274301242ffec1961c74850d9ca56dcf43c6c"
+  },
   "remaining": [
     "current_catalog_and_operational_imports",
     "domain_and_policy_reconciliation",
@@ -848,5 +868,85 @@
     "scheduled_cycles_and_legacy_retirement",
     "owner_acceptance"
   ],
-  "scope": "Current migration checkpoint; not a completed production cutover or full backup."
+  "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
+  "checked_at": "2026-10-08T20:32:30.779425+00:00",
+  "n8n_staging": {
+    "status": "passed_staged",
+    "unchanged_tables": 142,
+    "unchanged_rows": 18650,
+    "unrelated_workflows_preserved": 34,
+    "replaced_workflows": 9,
+    "actual_publication_pending": true
+  },
+  "current_policy_assessment": {
+    "status": "passed",
+    "catalogs": 1711,
+    "unique_document_interpretations": 272556,
+    "settings_layers": 38,
+    "effective_settings": 27,
+    "settings_match_rehearsal": true,
+    "explicit_folder_defaults": 7,
+    "qualified_local_directories": 516,
+    "nonportable_historical_paths": 49,
+    "native_definitions_applied": false
+  },
+  "historical_media_audit": {
+    "status": "finished_with_diagnosed_exceptions",
+    "verified_videos": 273077,
+    "required_videos": 273096,
+    "verified_archive_objects": 9016,
+    "known_byte_differences": 14,
+    "unverified_multipart_layouts": 5
+  },
+  "current_media_census": {
+    "status": "passed",
+    "counts": {
+      "image_or_document_files": 513331,
+      "image_or_document_bytes": 514421575962,
+      "video_files": 274466,
+      "video_bytes": 10488791210667,
+      "historical_video_proofs_reusable": 273075,
+      "videos_require_hashing": 1391,
+      "bytes_require_hashing": 10406922631,
+      "other_files": 4
+    },
+    "local_hashing_complete": true,
+    "cloud_verified_videos_before_gap_upload": 273769,
+    "verified_current_archive_objects": 9081,
+    "cloud_assessment_requests": {
+      "GetObject": 1,
+      "ListObjectsV2": 300,
+      "HeadObject": 824
+    },
+    "unique_contents_requiring_publication": 678,
+    "unique_bytes_requiring_publication": 6872161880,
+    "gap_publication_status": "passed",
+    "verified_gap_contents_at_checkpoint": 678,
+    "storage_class": "DEEP_ARCHIVE",
+    "old_objects_modified": false,
+    "master_published": false,
+    "verified_gap_bytes": 6872161880,
+    "current_verified_videos": 274466,
+    "all_current_video_bytes_verified": true
+  },
+  "domain_services": {
+    "post_media": "waiting_for_import_reconciliation",
+    "albums": "waiting_for_post_media_reconciliation",
+    "policies": "waiting_for_complete_import_boundary",
+    "policy_import": "waiting_for_current_domain_migration"
+  },
+  "maintenance_journals": {
+    "status": "passed",
+    "empty_journals_initialized": 2,
+    "verified_profiles": 32,
+    "backup_components": 141,
+    "final_credentials_and_environment_pending": true
+  },
+  "current_images": {
+    "status": "delta_plan_running",
+    "publication_pending": true,
+    "source_files": 513331,
+    "source_bytes": 514421575962,
+    "cloud_mutations": false
+  }
 }

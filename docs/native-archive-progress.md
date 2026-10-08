@@ -89,8 +89,11 @@ The final inactive deployment's **78 files** and **32 worker profiles** are now
 installed with their original preimages retained. Both producer outboxes are at
 their final paths, including the 34 original n8n receipts; producer credentials
 and final runtime environments remain pending. The **nine workflow replacements**
-are staged in the separate n8n candidate: 142 tables, 18,650 rows and all 34
-unrelated workflows remain unchanged. Actual publication pointers must be
+have been installed in n8n's production database while its runtime remains
+stopped. The original workflow conversion preserved 142 tables, 18,650 rows and
+all 34 unrelated workflows. Installation included committed WAL and independently
+matched all **148 tables and 19,737 rows** to the reviewed, paused candidate.
+The original production database and its sidecars are retained. Actual publication pointers must be
 verified after controlled startup. The pinned runtime uses regular execution
 mode; retained running executions follow crash recovery, with no queued/waiting
 legacy executions eligible for restart. A fresh final Stash configuration is
@@ -102,7 +105,7 @@ the captured queue passed the existing Redis runtime's AOF validation. No runtim
 code change or artifact rebuild was required. AWS access and metadata retention
 configuration are verified; bucket versioning remains unchanged.
 
-Two parent n8n queue-dispatch schedules are now paused in the staged database
+Two parent n8n queue-dispatch schedules are now paused in the installed database
 using the pinned offline CLI. Only their activation fields and update timestamps
 changed; all 41 other workflows and the values in 147 other tables remain
 unchanged. The nine converted workflow versions and their pending
@@ -112,6 +115,16 @@ inactive. The two dispatch schedules resume only after controlled runtime and
 backup/restore verification. Provisioning inputs for the two existing producer
 identities and three environment files are prepared; no credentials have been
 issued because root grants require an active live root.
+
+The remaining private handoff has prepared drivers for binding the actual live
+root, issuing the two scoped credentials, installing the three environment files,
+and applying the six qualified local/manual policy operations. Separate drivers
+retain and independently compare all 207 scan previews before activation, and
+prepare current enrichment/translation previews after qualified source scopes
+are activated. Their syntax and installed-runtime imports were checked; these
+operations have not run. The n8n database install initially stopped before any
+file changes because a zero transient-service timeout meant immediate expiry;
+the corrected launcher completed with the original failure evidence retained.
 
 [Current production verification](native-production-cutover-verification.json)
 records this partial cutover checkpoint. Private input manifests, immutable
@@ -134,7 +147,11 @@ file has a guarded filename/intake plan for the native handoff; a 715-byte SVG
 avatar remains outside supported media extensions. Both remain unchanged.
 The current coordinated
 metadata/image backup and isolated restore remain outstanding. The system
-filesystem retains more than 50 GiB free.
+filesystem now has approximately **125 GiB free** after retiring three unused
+schema 94/96/97 rehearsal database copies (61 GiB). Their completed verification
+reports and scripts remain; running-container and open-descriptor checks found
+no consumers. Production originals, the held snapshot and the active candidate
+were preserved. The minimum reserve remains 50 GiB.
 
 Remaining release work:
 

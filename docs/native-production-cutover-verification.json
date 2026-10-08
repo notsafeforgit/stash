@@ -845,8 +845,8 @@
     "input_preparation": "passed",
     "catalogs": 1711,
     "native_import_status": "running",
-    "completed_catalogs_at_checkpoint": 1095,
-    "completed_passes_at_checkpoint": 13148,
+    "completed_catalogs_at_checkpoint": 1423,
+    "completed_passes_at_checkpoint": 17081,
     "total_passes": 20532,
     "independent_reconciliation": "pending"
   },
@@ -869,9 +869,9 @@
     "owner_acceptance"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-08T21:59:53.423956+00:00",
+  "checked_at": "2026-10-08T22:28:54.686733+00:00",
   "n8n_staging": {
-    "status": "passed_staged",
+    "status": "passed_installed_paused",
     "unchanged_tables": 142,
     "unchanged_rows": 18650,
     "unrelated_workflows_preserved": 34,
@@ -1060,7 +1060,8 @@
     "paused_parent_dispatch_schedules": 2,
     "resume_after": "Coordinated native backup/restore and controlled runtime verification",
     "inactive_archived_legacy_direct_workflows": 5,
-    "active_scheduled_scrape_triggers": 0
+    "active_scheduled_scrape_triggers": 0,
+    "installed_with_database": true
   },
   "producer_provisioning_preparation": {
     "status": "prepared_not_applied",
@@ -1069,5 +1070,67 @@
     "required_live_root_revision": 2,
     "credentials_issued": 0,
     "existing_api_key_matches_final_configuration": true
+  },
+  "n8n_database_installation": {
+    "status": "passed_installed_paused",
+    "completed_at": "2026-10-08T22:21:45.829672+00:00",
+    "tables_verified": 148,
+    "rows_verified": 19737,
+    "original_rows_verified": 19773,
+    "staged_bytes": 1773125632,
+    "inventory_sha256": "8327aee49e5d99e2399e0bfa9f0bb26d5b538cecf69e71c7ba816402b75c38f8",
+    "dispatch_schedules_paused": 2,
+    "native_workflows_installed": 9,
+    "original_state_retained": true,
+    "committed_wal_included": true,
+    "encryption_and_execution_records_preserved": true,
+    "runtime_publication_verification_pending": true,
+    "workers_started": 0,
+    "free_GiB": 64.66,
+    "initial_launcher_recovery": "The first transient unit expired immediately at TimeoutStartUSec=0 before producing state or changing files. The corrected 24h launcher completed."
+  },
+  "prepared_recovery_drivers": {
+    "activate-scan-recovery.py": {
+      "sha256": "1c32957090d2dc8bafb20c7a26bccbfe774a07cc68419d1c75fa95ecb23b8e0e",
+      "status": "prepared_not_executed",
+      "syntax_valid": true
+    },
+    "finish-private-handoff.py": {
+      "sha256": "7f1b693fb9e8704aa22b3ac7b9676194b503a0f3e19cb0429a89f6c4d13ec449",
+      "status": "prepared_not_executed",
+      "syntax_valid": true
+    },
+    "activate-qualified-scopes.py": {
+      "sha256": "f148cc459fb418ad597185671d396ee3eb683e47add1e6ac078ab971a30736ce",
+      "status": "prepared_not_executed",
+      "syntax_valid": true
+    },
+    "prepare-operational-activation.py": {
+      "sha256": "be2920692a4e640f5209b58818072f56b7874789bb5d570337a709f9ea166928",
+      "status": "prepared_not_executed",
+      "syntax_valid": true
+    },
+    "installed_runtime_imports_checked": [
+      "activate-scan-recovery.py",
+      "finish-private-handoff.py",
+      "prepare-operational-activation.py"
+    ]
+  },
+  "retired_rehearsal_databases": {
+    "status": "passed",
+    "completed_at": "2026-10-08T22:27:56.396949+00:00",
+    "bytes_unlinked": 65758610792,
+    "allocated_bytes_unlinked": 65758920704,
+    "free_before_GiB": 63.94644546508789,
+    "free_after_GiB": 125.18920516967773,
+    "boundary_originals_retained": true,
+    "production_candidate_untouched": true,
+    "proofs_and_scripts_retained": true,
+    "schemas": [
+      1000096,
+      1000097,
+      1000094
+    ],
+    "running_container_and_open_descriptor_checks_passed": true
   }
 }

@@ -11791,3 +11791,35 @@ path changed in the pending backup configuration; original restore binaries and
 inactive Python runtimes remain intact. These are staged deployment checks.
 The populated restore, full schema-95 reconciliation, live handoff and backup
 activation gates remain required.
+
+## Complete populated local restore proof — 2026-10-08
+
+The original capture/restore child completed successfully in 38,821 seconds.
+It restored and verified 238,693 artifacts, including all 238,574 original
+artwork files and the populated schema-94 database. All 769,643 indexed media
+paths matched the held ZFS snapshot by path, size and modification time. The
+restored n8n state retained 43 workflows, nine credentials verified offline with
+the restored configuration, and all 19 referenced execution payloads. This is
+local restore evidence; it does not complete full cold-media checksum adoption
+or populated S3 publication.
+
+The original enclosing Go test's eight-hour timeout remains a failed result.
+The guarded continuation subsequently passed in 2,235 seconds using its frozen
+schema-94 runtime. It recovered the exact bytes from an interrupted, uncommitted
+file deletion and replayed both restored producer outboxes. Each producer
+recovered its two outstanding acknowledgements; replaying again added zero
+events. The complete receipt is
+`/tank/stash-native-rehearsal-20261007/coordinated-run/evidence/coordinated-result.json`.
+The existing release chain then copied the selected database into its separate
+schema-95 candidate and started migration. Full typed reconciliation, the
+populated policy/API and wrapper checks, and production cutover remain pending.
+
+The older schema-77 rehearsal's 238,574 artwork entries matched the verified
+replacement exactly. After the complete recovery/replay result and a fresh
+privileged read-only process-use check, only its obsolete compressed-object
+directory was removed. This reclaimed 39.1 GiB and left approximately 117 GiB
+free on the system filesystem. Original manifests, inventories and verification
+records remain, together with the replacement archive, restored database and
+selected migration baseline. The cleanup receipt is
+`.local/native-coordinated-restore-20261007/old-bundle-retirement.json`.
+Production writers, media and backup schedules were unchanged.

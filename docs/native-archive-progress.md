@@ -11870,3 +11870,26 @@ populated startup check. An image's exposed port with no host binding initially
 failed an overly strict fixture guard; the corrected guard checks actual port
 bindings. Both original failures and corrected smoke evidence are retained.
 Browser rendering and thumbnail download latency are separate acceptance checks.
+
+## Stash-box performer refresh and merge safety — 2026-10-08
+
+Remote performer refresh now resolves local ownership before following merge
+redirects. A bounded chain retains the selected local performer ID and native
+UUID. Deleted records, unavailable targets, cycles, excessive chains and links
+to a different or ambiguous local performer stop the refresh. The update
+transaction rechecks the selected endpoint's original link and the destination's
+current ownership. Other providers' IDs remain intact. Adding an already linked
+remote performer does not create another local performer, including when the
+link appears between lookup and the create transaction. Exact-name lookup also
+rejects multiple remote matches while interactive search retains all candidates.
+
+Real SQLite and local HTTP fixtures cover successful chained merges, native UUID
+preservation, deleted/missing/conflicting targets, changed links, concurrent link
+creation and duplicate-add prevention. The complete focused manager/client/model
+check passed in 31.0 seconds; the repository-pinned linter reports zero issues.
+No live performer edits or remote submissions were used for validation. The
+configured-endpoint reads remain the preceding twenty-request proof; generated
+query documents are unchanged. The aggregate report retains both checkpoints.
+Final native image selection must include these changes. Attribution of
+Stash-box metadata choices still needs a separate audit against the transition
+plan; these results do not claim that wider requirement is complete.

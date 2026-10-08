@@ -307,7 +307,7 @@ func (c Client) FindPerformerByID(ctx context.Context, id string) (*models.Scrap
 }
 
 // FindPerformerByName queries stash-box for a performer by name.
-// Unlike QueryPerformer, this function will only return a performer if the name matches exactly.
+// Unlike QueryPerformer, this function requires one exact name match.
 func (c Client) FindPerformerByName(ctx context.Context, name string) (*models.ScrapedPerformer, error) {
 	performers, err := c.client.SearchPerformer(ctx, name)
 	if err != nil {
@@ -317,6 +317,9 @@ func (c Client) FindPerformerByName(ctx context.Context, name string) (*models.S
 	var ret *models.ScrapedPerformer
 	for _, performer := range performers.SearchPerformer {
 		if strings.EqualFold(performer.Name, name) {
+			if ret != nil {
+				return nil, fmt.Errorf("multiple stash-box performers match %q; select a remote ID instead", name)
+			}
 			ret = performerFragmentToScrapedPerformer(*performer)
 		}
 	}

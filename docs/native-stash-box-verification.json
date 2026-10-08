@@ -144,7 +144,64 @@
   "limitations": [
     "Compiled host client tested; installed native application not yet activated.",
     "Live reads use synthetic nonexistent identifiers; positive metadata conversion and submissions use local fixtures.",
-    "Manager-level remote merge/deletion handling and final deployed launch paths still require verification.",
-    "Selected74d96dc image predates these lookup corrections. Existing frozen populated migration/startup/performance checks must finish with their original artifacts."
-  ]
+    "Selected74d96dc image predates these lookup corrections. Existing frozen populated migration/startup/performance checks must finish with their original artifacts.",
+    "Attribution of imported stash-box metadata choices still requires a separate implementation audit; protocol and identity checks alone do not prove it.",
+    "Configured-endpoint reads were performed at the initial client checkpoint. Subsequent changes affect exact-name ambiguity and local merge/update handling; the generated read-query documents are unchanged."
+  ],
+  "initial_client_checkpoint": "17703a145",
+  "manager_followup": {
+    "recorded_at": "2026-10-08T05:09:23.398531+00:00",
+    "parent_revision": "17703a145",
+    "status": "passed",
+    "checks": [
+      {
+        "command": [
+          "go",
+          "test",
+          "./internal/manager",
+          "./pkg/stashbox",
+          "./pkg/models",
+          "-run",
+          "TestStashBox|TestProtocol|TestFingerprint",
+          "-count=1",
+          "-timeout=5m"
+        ],
+        "exit_code": 0,
+        "seconds": 31.01115265698172
+      },
+      {
+        "command": [
+          "go",
+          "run",
+          "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2",
+          "run",
+          "./internal/manager/...",
+          "./pkg/stashbox/..."
+        ],
+        "exit_code": 0,
+        "seconds": 3.146302855981048
+      }
+    ],
+    "tested_files_sha256": {
+      "internal/manager/task_stash_box_tag.go": "cdec947abee6da85880c7bd570ae5081c6023582cf20c4d8809ba7fe748c9c3d",
+      "internal/manager/task_stash_box_tag_test.go": "c240f5c65e022bced8fdd9f499b45f1cd9a396a3f221042e4e3af8923d7f00ee",
+      "pkg/stashbox/performer.go": "abefdb80c6d254ba8dfb7da6bf8b0d23d96fbc45e317ef4ef01bef8efbd68f14",
+      "pkg/stashbox/protocol_test.go": "ce2de86c5d82ccfdd2496f69595dd32921401dcd9e897032818e2e87df4fa70a",
+      "pkg/stashbox/graphql/generated_client.go": "bd01e514e5cf189244e453276995682982ef39e85294dde065b9633a3e9ffd8c"
+    },
+    "cases": [
+      "Multi-hop remote merge retains selected local ID and native UUID",
+      "Other providers IDs preserved",
+      "Deleted or unavailable destination leaves metadata unchanged",
+      "Cycle and excessive chain rejected",
+      "Different or ambiguous local link rejected",
+      "Selected link changes rechecked in update transaction",
+      "Destination ownership rechecked in update transaction",
+      "Existing remote ID does not create duplicates",
+      "Concurrent link creation rechecked in create transaction",
+      "Nonunique remote names require an explicit ID; search retains candidates"
+    ],
+    "production_changed": false,
+    "remote_writes": 0
+  }
 }

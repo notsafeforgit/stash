@@ -60,6 +60,10 @@ func (t *stashBoxBatchPerformerTagTask) Start(ctx context.Context) {
 	}
 
 	if performer != nil {
+		if t.performer == nil && performer.StoredID != nil {
+			logger.Warnf("Performer %s already matches local performer %s; select that performer to refresh it", t.getName(), *performer.StoredID)
+			return
+		}
 		t.processMatchedPerformer(ctx, performer, excluded, merge)
 	} else {
 		logger.Infof("No match found for %s", t.getName())
@@ -83,18 +87,6 @@ func (t *stashBoxBatchPerformerTagTask) findStashBoxPerformer(ctx context.Contex
 		performer, err = client.FindPerformerByName(ctx, *t.name)
 	case t.stashID != nil:
 		performer, err = client.FindPerformerByID(ctx, *t.stashID)
-
-		if performer != nil && performer.RemoteMergedIntoId != nil {
-			mergedPerformer, err := t.handleMergedPerformer(ctx, performer, client)
-			if err != nil {
-				return nil, err
-			}
-
-			if mergedPerformer != nil {
-				logger.Infof("Performer id %s merged into %s, updating local performer", *t.stashID, *performer.RemoteMergedIntoId)
-				performer = mergedPerformer
-			}
-		}
 	case t.performer != nil: // tagging or updating existing performer
 		var remoteID string
 		if err := r.WithReadTxn(ctx, func(ctx context.Context) error {
@@ -118,53 +110,80 @@ func (t *stashBoxBatchPerformerTagTask) findStashBoxPerformer(ctx context.Contex
 
 		if remoteID != "" {
 			performer, err = client.FindPerformerByID(ctx, remoteID)
-
-			if performer != nil && performer.RemoteMergedIntoId != nil {
-				mergedPerformer, err := t.handleMergedPerformer(ctx, performer, client)
-				if err != nil {
-					return nil, err
-				}
-
-				if mergedPerformer != nil {
-					logger.Infof("Performer id %s merged into %s, updating local performer", remoteID, *performer.RemoteMergedIntoId)
-					performer = mergedPerformer
-				}
-			}
 		} else {
 			// find by performer name instead
 			performer, err = client.FindPerformerByName(ctx, t.performer.Name)
 		}
 	}
 
-	if performer != nil {
-		if err := r.WithReadTxn(ctx, func(ctx context.Context) error {
-			return match.ScrapedPerformer(ctx, r.Performer, performer, t.box.Endpoint)
-		}); err != nil {
-			return nil, err
-		}
+	if err != nil || performer == nil {
+		return nil, err
 	}
-
-	return performer, err
+	return t.resolveRemotePerformer(ctx, performer, client)
 }
 
-func (t *stashBoxBatchPerformerTagTask) handleMergedPerformer(ctx context.Context, performer *models.ScrapedPerformer, client *stashbox.Client) (mergedPerformer *models.ScrapedPerformer, err error) {
-	mergedPerformer, err = client.FindPerformerByID(ctx, *performer.RemoteMergedIntoId)
-	if err != nil {
-		return nil, fmt.Errorf("loading merged performer %s from stashbox", *performer.RemoteMergedIntoId)
-	}
+func (t *stashBoxBatchPerformerTagTask) matchRemotePerformer(ctx context.Context, p *models.ScrapedPerformer) error {
+	r := instance.Repository
+	return r.WithReadTxn(ctx, func(ctx context.Context) error {
+		if p.RemoteSiteID != nil {
+			matches, err := r.Performer.FindByStashID(ctx, models.StashID{Endpoint: t.box.Endpoint, StashID: *p.RemoteSiteID})
+			if err != nil {
+				return err
+			}
+			if len(matches) > 1 {
+				return fmt.Errorf("stash-box performer %s is linked to multiple local performers; review the links first", *p.RemoteSiteID)
+			}
+		}
+		return match.ScrapedPerformer(ctx, r.Performer, p, t.box.Endpoint)
+	})
+}
 
-	if mergedPerformer.StoredID != nil && *mergedPerformer.StoredID != *performer.StoredID {
-		logger.Warnf("Performer %s merged into %s, but both exist locally, not merging", *performer.StoredID, *mergedPerformer.StoredID)
-		return nil, nil
+func (t *stashBoxBatchPerformerTagTask) resolveRemotePerformer(ctx context.Context, p *models.ScrapedPerformer, client *stashbox.Client) (*models.ScrapedPerformer, error) {
+	var selectedID *string
+	if t.performer != nil {
+		id := strconv.Itoa(t.performer.ID)
+		selectedID = &id
 	}
-
-	mergedPerformer.StoredID = performer.StoredID
-	return mergedPerformer, nil
+	seen := make(map[string]bool)
+	for hops := 0; ; hops++ {
+		if p.RemoteSiteID == nil || *p.RemoteSiteID == "" || seen[*p.RemoteSiteID] {
+			return nil, fmt.Errorf("stash-box returned an invalid performer merge chain")
+		}
+		seen[*p.RemoteSiteID] = true
+		if err := t.matchRemotePerformer(ctx, p); err != nil {
+			return nil, err
+		}
+		if selectedID != nil && p.StoredID != nil && *selectedID != *p.StoredID {
+			return nil, fmt.Errorf("stash-box performer is already linked or matched to local performer %s instead of %s; review the local performers first", *p.StoredID, *selectedID)
+		}
+		if selectedID == nil {
+			selectedID = p.StoredID
+		}
+		if p.RemoteMergedIntoId == nil {
+			if p.RemoteDeleted {
+				return nil, fmt.Errorf("stash-box performer %s was deleted; local metadata is unchanged", *p.RemoteSiteID)
+			}
+			p.StoredID = selectedID
+			return p, nil
+		}
+		nextID := *p.RemoteMergedIntoId
+		if nextID == "" || seen[nextID] || hops >= 16 {
+			return nil, fmt.Errorf("stash-box returned an invalid or excessive performer merge chain")
+		}
+		next, err := client.FindPerformerByID(ctx, nextID)
+		if err != nil {
+			return nil, fmt.Errorf("loading merged performer %s from stash-box: %w", nextID, err)
+		}
+		if next == nil {
+			return nil, fmt.Errorf("merged performer %s is unavailable on stash-box; local metadata is unchanged", nextID)
+		}
+		p = next
+	}
 }
 
 func (t *stashBoxBatchPerformerTagTask) processMatchedPerformer(ctx context.Context, p *models.ScrapedPerformer, excluded map[string]bool, merge map[string]bool) {
 	if t.performer != nil {
-		storedID, _ := strconv.Atoi(*p.StoredID)
+		storedID := t.performer.ID
 
 		image, err := p.GetImage(ctx, excluded)
 		if err != nil {
@@ -179,6 +198,28 @@ func (t *stashBoxBatchPerformerTagTask) processMatchedPerformer(ctx context.Cont
 			existingStashIDs, err := qb.GetStashIDs(ctx, storedID)
 			if err != nil {
 				return err
+			}
+			expected := t.performer.StashIDs.ForEndpoint(t.box.Endpoint)
+			var current *models.StashID
+			for i := range existingStashIDs {
+				if existingStashIDs[i].Endpoint == t.box.Endpoint {
+					current = &existingStashIDs[i]
+					break
+				}
+			}
+			if (expected == nil) != (current == nil) || (expected != nil && expected.StashID != current.StashID) {
+				return fmt.Errorf("stash-box link changed during lookup; retry the refresh")
+			}
+			if p.RemoteSiteID != nil {
+				matches, err := qb.FindByStashID(ctx, models.StashID{Endpoint: t.box.Endpoint, StashID: *p.RemoteSiteID})
+				if err != nil {
+					return err
+				}
+				for _, other := range matches {
+					if other.ID != storedID {
+						return fmt.Errorf("stash-box performer became linked to another local performer; review the links first")
+					}
+				}
 			}
 
 			partial := p.ToPartial(t.box.Endpoint, excluded, merge, existingStashIDs)
@@ -235,6 +276,15 @@ func (t *stashBoxBatchPerformerTagTask) processMatchedPerformer(ctx context.Cont
 		err = r.WithTxn(ctx, func(ctx context.Context) error {
 			qb := r.Performer
 
+			if p.RemoteSiteID != nil {
+				matches, err := qb.FindByStashID(ctx, models.StashID{Endpoint: t.box.Endpoint, StashID: *p.RemoteSiteID})
+				if err != nil {
+					return err
+				}
+				if len(matches) != 0 {
+					return fmt.Errorf("stash-box performer became linked to a local performer; refresh the existing performer instead")
+				}
+			}
 			if err := performer.ValidateCreate(*newPerformer); err != nil {
 				return err
 			}

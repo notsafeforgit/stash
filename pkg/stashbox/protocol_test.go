@@ -105,6 +105,21 @@ func TestProtocolRemotePerformerStateAndMissingRecord(t *testing.T) {
 	assert.Nil(t, missing)
 }
 
+func TestProtocolExactPerformerNameRequiresUniqueMatch(t *testing.T) {
+	client, _ := protocolClient(t, func(request protocolRequest) any {
+		return map[string]any{"searchPerformer": []any{
+			map[string]any{"id": "remote-a", "name": "Example Name", "disambiguation": "First"},
+			map[string]any{"id": "remote-b", "name": "EXAMPLE NAME", "disambiguation": "Second"},
+		}}
+	})
+	performer, err := client.FindPerformerByName(context.Background(), "Example Name")
+	require.ErrorContains(t, err, "select a remote ID")
+	assert.Nil(t, performer)
+	candidates, err := client.QueryPerformer(context.Background(), "Example Name")
+	require.NoError(t, err)
+	assert.Len(t, candidates, 2, "interactive search must retain both candidates for review")
+}
+
 func TestProtocolFingerprintBatchesPreserveAlgorithmsAndPositions(t *testing.T) {
 	client, requests := protocolClient(t, func(request protocolRequest) any {
 		assert.Equal(t, "FindScenesBySceneFingerprints", request.Operation)

@@ -1,0 +1,113 @@
+{
+  "checked_at": "2026-10-08T11:57:44.268084+00:00",
+  "status": "schema97_application_migration_and_populated_startup_verified",
+  "source_revision": "9c0edb35660ae0a837318c717bff89e21b574387",
+  "native_schema": 1000097,
+  "production_changed": false,
+  "activated": false,
+  "images": {
+    "stash_source": "ghcr.io/notsafeforgit/stash@sha256:e8f047e5fb76921905b2515e7cfa29f01523f8115b4cc57b093043653546379c",
+    "stash_wrapper": "ghcr.io/notsafeforgit/stash-s6@sha256:bf336afa5112f6d2158bd259942daedc0baa8c84f94f23dbbd2ef92721191ae7",
+    "wrapper_source_revision": "90b835557cf7758156cfc36aa2bf279e2ebf7e43",
+    "validator_sha256": "949ad89e69cbea3b30845653cea907331910d915cf2c69d9e2391b80832aae81"
+  },
+  "migration": {
+    "opening_seconds": 312.652636091,
+    "migration_seconds": 231.817437834,
+    "reopening_seconds": 227.928483951,
+    "schema": 1000097
+  },
+  "reconciliation": {
+    "original_rows": 40513487,
+    "source_schema": 1000096,
+    "schema": 1000097,
+    "integrity": "ok",
+    "foreign_key_violations": 0,
+    "source_evidence_unchanged": true,
+    "saved_requests_unchanged": true,
+    "jobs_unchanged": true,
+    "seconds": 515.5223247670219
+  },
+  "populated_startup": {
+    "first_start_seconds": 149.68974823202007,
+    "restart_seconds": 186.7822641459643,
+    "original_tables": 309,
+    "table_counts_preserved": true,
+    "published_filter_state_preserved": true,
+    "entity_api_counts_verified": {
+      "findScenes": {
+        "count": 270760
+      },
+      "findImages": {
+        "count": 498646
+      },
+      "findGalleries": {
+        "count": 1887
+      },
+      "findPerformers": {
+        "count": 1426
+      }
+    },
+    "ui_served": true,
+    "native_api_served": true,
+    "source_database_unchanged": true,
+    "candidate_sha256_before": "779039d49b97e0cc4128f5f40129f5d145e71edde863503d4aad6cf5c0da8c60",
+    "candidate_sha256_after": "779039d49b97e0cc4128f5f40129f5d145e71edde863503d4aad6cf5c0da8c60",
+    "additional_full_database_allocations": 0,
+    "live_stash_and_n8n_unchanged": true
+  },
+  "ci": [
+    {
+      "conclusion": "success",
+      "databaseId": 37766301794,
+      "headSha": "9c0edb35660ae0a837318c717bff89e21b574387",
+      "status": "completed",
+      "url": "https://github.com/notsafeforgit/stash/actions/runs/37766301794"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 37766301822,
+      "headSha": "9c0edb35660ae0a837318c717bff89e21b574387",
+      "status": "completed",
+      "url": "https://github.com/notsafeforgit/stash/actions/runs/37766301822"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 37766301785,
+      "headSha": "9c0edb35660ae0a837318c717bff89e21b574387",
+      "status": "completed",
+      "url": "https://github.com/notsafeforgit/stash/actions/runs/37766301785"
+    }
+  ],
+  "evidence": [
+    {
+      "path": ".local/native-profile-release-20261008-v2/image-preparation.json",
+      "sha256": "c94b3c91356cebd838f19c7382733411862f391ff9a6c6ac655f4b389317acb1"
+    },
+    {
+      "path": ".local/native-profile-release-20261008-v2/wrapper-publication-chain.json",
+      "sha256": "78caaacea407be22f63b7ee40366b15d60245910f527f25a4066dcdd1289a372"
+    },
+    {
+      "path": ".local/native-profile-release-20261008-v2/startup-proof.json",
+      "sha256": "24e303f5b7a57cf62153174a2737f8fb01576356cd6275b32e2b30e8c5c60810"
+    },
+    {
+      "path": ".local/native-profile-release-20261008-v2/populated-startup-proof.json",
+      "sha256": "788d596078c989ceefab0b563e4e30e059315c82e4a9397ac0c2dfc27d9f4842"
+    },
+    {
+      "path": ".local/native-schema97-20261008/independent-reconciliation.json",
+      "sha256": "261ccb94e96d09b2959ee995761bb7effd70e8fb919204f3ee35efe0ae6d089c"
+    },
+    {
+      "path": ".local/native-schema97-20261008/migration-and-restart.json",
+      "sha256": "2f4adfb149a1c99eafea9a480ca91064b587b040af5ee4d906023c805c8fcefa"
+    }
+  ],
+  "limitations": [
+    "Isolated startup used a migrated historical candidate, an empty media mount, no published ports and no network. This is not a fresh coordinated production backup or deployment.",
+    "The schema96 ingestion/browsing workload remains the prior performance evidence; it is not relabeled as a schema97 workload.",
+    "Direct manual gallery-dl and the remaining yt-dlp/generic ingestion paths are incomplete. Changed producer packages, fingerprints, profiles and host/n8n deployment selections must be verified before activation."
+  ]
+}

@@ -224,9 +224,26 @@ Checkpoints retain the last completed source cursor during bounded replay. A
 missing saved cursor cannot report successful traversal. The worker entry point
 below supplies configuration, heartbeat, event delivery and attempt outcomes;
 production launcher conversion remains separate work.
-Only Reddit/Twitter attachment adapters are implemented so far; external linked
-sources and multi-entry yt-dlp output association still need integration. These
-SDK classes are not a production launcher and do not change installed hooks.
+Attachment and source-window adapters cover Reddit, Twitter, Instagram, Coomer,
+Kemono, Bluesky and TikTok. Other external linked sources and yt-dlp output
+association still need integration. The direct host `gallery-dl` command still
+uses legacy hooks; its native replacement is a required cutover step.
+
+The pinned yt-dlp bridge now checks native ownership and source reservations for
+its own HTTP requests, which bypass gallery-dl's `extractor.request`. Rate limits,
+transport failures, lease loss and cooperative turn limits cannot be swallowed
+by `ignoreerrors` or the bridge's error handling. Fatal extraction errors retain
+upstream logging/recovery actions and cannot report a partial playlist as a
+successful run. Optional HTTP probes can still fall back. An already prepared
+media transfer can finish after ownership loss; the next source request cannot.
+
+Direct `url`/`url_transparent` results are resolved with `download=False` before
+the first file message. This includes ThisVid's delegation to Generic, where the
+final video ID is otherwise unavailable until download. Playlist traversal keeps
+each child's identity. This source-request integration alone does not enable
+yt-dlp native downloads: retained post/attachment associations, handling of
+undated posts, supported cross-host source scopes and deployment profiles still
+need their complete integration. No publication date is invented.
 
 ## Worker profiles and execution
 

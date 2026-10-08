@@ -232,6 +232,9 @@ class NativeDownloadJob(job.DownloadJob):
             mirror.install(self.extractor)
         elif self.extractor.category in ('bluesky', 'tiktok'):
             social_media.install(self.extractor)
+        elif self.extractor.category in ('ytdl', 'ytdl-generic'):
+            from . import ytdl_source
+            ytdl_source.install(self.extractor, self.producer)
 
     def _source_operation(self, call, *args):
         try:

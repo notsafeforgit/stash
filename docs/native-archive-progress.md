@@ -14,7 +14,21 @@ compatible release is frozen and pinned; native development stays on
 entries below record the evidence available at their dates, including work that
 was incomplete then but has since finished. They are not the current task list.
 
-The fully verified checkpoint is schema 1000094, with the shared review queue,
+The latest application checkpoint is schema **1000097** at `9c0edb356`.
+Its populated migration and independent comparison preserved all 40,513,487
+existing rows. The published wrapper passed populated startup and restart with
+the entire database byte-identical before and after. Its profile URL import and
+after-commit plugin notifications are implemented and tested, but not deployed.
+The prior schema-96 checkpoint also passed browsing under concurrent ingestion.
+
+An audit of the actual manual command found a remaining implementation gap:
+`gallery-dl` still invokes legacy catalog hooks, and native download adapters do
+not yet cover ThisVid/yt-dlp and every generic extractor path required by the
+plan. The yt-dlp source-request guard described below is an implementation step,
+not complete downloader support. These paths must be finished and the changed
+producer runtimes/profiles rebuilt before coherent cutover.
+
+The earlier verified checkpoint is schema 1000094, with the shared review queue,
 Keep current value receipts, atomic post-merge review and shared archive activity.
 Its complete fork gate, populated migration, fresh reopen and independent
 comparison passed. The schema-94 rehearsal preserves all 40,512,443 original
@@ -140,8 +154,8 @@ Remaining release work:
 
 | Work | Required outcome |
 | --- | --- |
-| Populated release checks | Finish the existing schema-95 migration/reconciliation, policy API, exact-wrapper startup and ingestion/browsing performance chain. Preserve every original row and meet the declared latency budgets. |
-| Callers and compatibility | Activate the staged dedupe service/pre-backup replacement and verified state inventory with native cutover; finish sidecar cleanup, direct-scan/manual-helper handoff and real producer provisioning, verify live launch paths and retained external contracts, then remove residual legacy adapters and dependencies. |
+| Populated release checks | Schema-97 migration, reconciliation and exact-wrapper startup/restart passed; schema-96 ingestion/browsing budgets also passed. Carry these receipts into the final artifact selection and verify subsequent changes before deployment. |
+| Callers and compatibility | Finish direct `gallery-dl`, ThisVid/yt-dlp and the remaining actual generic extractor paths; rebuild affected producer runtimes and profiles. Activate staged dedupe/backup/manual helpers and provision producers at cutover, verify live launch paths, then retire residual legacy writers and dependencies. |
 | Backup and restore | Prove a complete common capture boundary, actual upload/request/storage costs, bounded retention/reclamation, and an isolated empty/relocated restore with pending producer and filesystem state. |
 | Production cutover | Pin artifacts, quiesce writers, take final coordinated snapshots, migrate/reconcile, switch native launchers and resume work gradually through verified launch paths. |
 | Observation and retirement | Verify scheduled scraping/recovery/backup cycles, preserve the rollback/export boundary, and retire obsolete catalog writers, mounts, services and packages. |
@@ -247,8 +261,8 @@ it does not remove source files or recovery inputs.
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | Compatible source/images are frozen and production is pinned. Final coordinated backup boundary, deployment inventory and measured release budgets remain. |
-| 1 Native schema and services | Implemented and repeatedly rehearsed through schema 94, including canonical identities, promoted sidecars, source evidence, field choices, file recovery, jobs, review receipts and post/performer merges. Final dependency and invariant audit remains. |
-| 2 Ingestion and producer adapter | Native transport, offline delivery, service pacing, source windows and the inventoried service adapters are implemented and tested. Actual host/n8n worker/profile installation and activation remain. |
+| 1 Native schema and services | Implemented and repeatedly rehearsed through schema 97, including canonical identities, promoted sidecars, source evidence, field choices, file recovery, jobs, review receipts, merges and captured profile links with persistent removal choices. Final dependency and invariant audit remains. |
+| 2 Ingestion and producer adapter | Transport, outboxes, pacing and Reddit/Twitter/Instagram/Coomer/Kemono/Bluesky/TikTok download adapters are implemented and tested. Direct manual invocation, ThisVid/yt-dlp and remaining generic paths still require integration before host/n8n activation. |
 | 3 Catalog importer | Frozen catalogs, policies and operational families are imported and reconciled on copies. Final live snapshots, current review outcomes and cutover reconciliation remain. |
 | 4 Native UI and client conversion | Core account/source/collection/metadata/album/manual-intake workflows, shared activity, import history, saved-action recovery and the current review queue are implemented and verified. Actual host/n8n caller conversion remains. |
 | 5 Compatibility removal and packaging | V3 is the sole embedded UI and v3 plugin contract. Remaining runtime/client compatibility removal and final pinned deployment artifacts require the dependency audit. |
@@ -12078,8 +12092,43 @@ Go linter passed. The full archive, SQLite and ingestion suites passed in
 after-commit plugin notifications, including late ownership links and account
 consolidation. Real SQLite and ingestion tests cover rollback, replay and no-op
 captures; API/producer checks and the pinned linter also passed. The populated
-schema-97 migration/reconciliation is running against a verified byte-identical
-copy reused from the completed startup fixture, avoiding another 20 GiB copy.
-Production is unchanged. This increment requires a new native application and
-backup validator release plus populated schema-97 migration/reconciliation
-before it can replace the verified schema-96 release selection.
+schema-97 migration/reconciliation passed using the prior startup fixture,
+avoiding another 20 GiB copy. It preserved every original cell value and SQLite
+type in all 40,513,487 rows, with clean integrity and no foreign-key violations.
+The `9c0edb356` application and backup validator were published and verified.
+The exact wrapper passed populated startup in 149.7 seconds and restart in
+186.8 seconds; all 309 table counts, published filters, entity counts and complete
+database bytes stayed unchanged. The corresponding [release proof](native-profile-release-verification.json)
+records its artifacts and local receipts. Final configuration selection, a fresh
+production boundary and coherent deployment remain outstanding.
+
+## Direct gallery-dl and yt-dlp source coverage — 2026-10-08
+
+Read-only inspection of the actual host command confirmed it is the unmodified
+upstream entry point. The shared config still calls legacy catalog preparation
+and completion processors; neither replacement is in the staged 73-file release.
+The native worker's post/attachment and publication-window adapters also reject
+yt-dlp and some generic categories. Existing publisher parsing or filename tests
+do not establish download support. This remains part of the original plan.
+
+The source HTTP boundary now includes the pinned yt-dlp bridge. Its separate
+YoutubeDL client checks native ownership and service reservations before source
+requests, restores rate-limit/timeout/lease/turn failures swallowed by upstream
+exception handling, and preserves fatal error logging/recovery behavior.
+Optional probes retain their fallback behavior. The guard stops checking when
+control passes to a prepared media download, allowing that file to finish after
+lease loss while refusing further source traversal. Construction overrides are
+restored on each yield, error and cancellation.
+
+Direct ThisVid extraction returns an unresolved reference to Generic, without a
+video ID. That reference is now resolved without downloading media before any
+file message. The real pinned ThisVid extractor and yt-dlp metadata merge run
+in a fixture with a local substitute for the final KVS result. Playlist fixtures
+exercise the real bridge and yt-dlp extractors. Native post/attachment identity,
+undated-source coverage, other cross-host scopes, the manual CLI and actual
+runtime/profile installation remain required; the tests do not claim them.
+
+Ten focused runtime tests, the full 628-test producer suite and the real
+Python/native-HTTP delivery test passed. This Python increment changes producer
+fingerprints, so the previously staged host and n8n packages must be rebuilt
+with the final adapter implementation before activation. Production is unchanged.

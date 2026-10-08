@@ -114,19 +114,24 @@ outstanding.
 
 Subsequent artwork and external-container capture changes pass 123 archive,
 304 backup and 27 focused session/store checks. Build, Lint and image-publication
-CI passed at `e047e57bc`; these Python changes do not alter the selected
-`bbcd61496` application. Its exact wrapper passed an isolated fresh start,
-restart, UI/native-route check and native snapshot validation at schema 1000095.
-Prepared Stash and daily-backup units are validated but uninstalled. Production
-still uses the compatible deployment.
+CI passed at `e047e57bc` and `74d96dc3a`. The latter corrects the container's
+update-check repository without changing Go, SQL or UI source. Its explicitly
+selected wrapper passed isolated fresh startup, restart, UI/native-route checks
+and native snapshot validation at schema 1000095. Prepared Stash and daily-backup
+units are validated but uninstalled. Production still uses the compatible
+deployment.
 
-The staged manual helpers also pass real ZIP/MP4 scanning, repeated scans,
-alias attachment, scoped tagging, title repair and unchanged dry runs against
-that exact isolated wrapper. Its startup log exposed an omitted container-build
-`UPDATE_REPO` setting: the publication workflow now matches the regular binary
-build and targets this fork. Publishing, selecting and verifying that corrected
-artifact remains required before cutover; the schema and application source did
-not change.
+The staged manual helpers pass real ZIP/MP4 scanning, repeated scans, alias
+attachment, scoped tagging, title repair and unchanged dry runs against the
+`bbcd61496` wrapper. Its startup log exposed an omitted container-build
+`UPDATE_REPO` setting. The corrected `74d96dc3a` image and wrapper are now pinned;
+their binaries match, and isolated runtime logs verify the fork's update URL.
+The refreshed uninstalled unit and backup declaration select those artifacts.
+The 518 local collection updates and one fixed-UUID creation now use
+UUID-qualified PUT routes; an actual API fixture verifies identity retention,
+stale-request rejection and manual-intake scope selection. Applying the complete
+1,038 collection/policy requests to the populated candidate still awaits the
+restore and schema-95 reconciliation gates.
 
 Remaining release work:
 
@@ -11764,3 +11769,25 @@ step omitted `UPDATE_REPO`, despite the regular binary build already setting it.
 That step now passes the repository identity through the existing Makefile linker
 flag. Corrected image publication and wrapper verification remain pending; frozen
 compatible images and the running restore binaries are untouched.
+
+## Corrected image selection and deployment checks — 2026-10-08
+
+Source `74d96dc3a` and wrapper revision `5dab1643965a` passed publication. The
+selected source digest is `sha256:befb9f77f1004d4581361b1e8893e6cf527aaf2dbdc48e51dbb325f80b2cec35`;
+the hardware-accelerated wrapper is
+`sha256:96a551cc2f1dc5159bc6259a667ba8cb5d4ceef23a0bd08f8322f828a4d93fdb`.
+Their binaries have identical SHA-256 values. The extracted validator accepts a
+native schema-95 fixture and rejects a foreign database without changing either.
+Fresh startup, restart, embedded UI, native routes and closed-snapshot validation
+pass in a network-isolated container with no production mounts or published
+ports. Startup logs verify that update requests target `notsafeforgit/stash`.
+The initial probe incorrectly expected linker flags in trimmed build metadata;
+its failed result is retained, and runtime verification supplies the actual proof.
+
+Evidence and fresh unit/configuration preparation are under
+`.local/native-stash-deployment-74d96dc3a-20261008`. Quadlet validation checks the
+exact image, native mounts and complete generated unit set. Only the validator
+path changed in the pending backup configuration; original restore binaries and
+inactive Python runtimes remain intact. These are staged deployment checks.
+The populated restore, full schema-95 reconciliation, live handoff and backup
+activation gates remain required.

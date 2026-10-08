@@ -13,6 +13,12 @@ import (
 
 func TestCaptureProfileURLsUseExistingMetadataAndPreserveRemovalOnRetry(t *testing.T) {
 	f := newCaptureFixture(t)
+	updates := 0
+	f.service.Repo.TxnManager = models.WithEntityUpdateNotifier(f.service.Repo.TxnManager, func(_ context.Context, kind models.ArchiveEntityKind, _ int, fields []string) {
+		require.Equal(t, models.ArchivePerformer, kind)
+		require.Equal(t, []string{"urls"}, fields)
+		updates++
+	})
 	event := f.event(t)
 	var source map[string]interface{}
 	require.NoError(t, json.Unmarshal(event.Source, &source))
@@ -62,6 +68,7 @@ func TestCaptureProfileURLsUseExistingMetadataAndPreserveRemovalOnRetry(t *testi
 		return result
 	}
 	require.Equal(t, []string{"https://site.invalid"}, urls())
+	require.Equal(t, 1, updates, "ownership review notifies once after its transaction commits")
 	require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		update := models.NewPerformerPartial()
 		update.URLs = &models.UpdateStrings{Mode: models.RelationshipUpdateModeSet, Values: []string{}}
@@ -74,12 +81,15 @@ func TestCaptureProfileURLsUseExistingMetadataAndPreserveRemovalOnRetry(t *testi
 	require.NoError(t, err)
 	require.Equal(t, first, replayed)
 	require.Empty(t, urls())
+	require.Equal(t, 1, updates, "capture replay is not another performer edit")
 	withProfile("123", "https://site.invalid https://new.invalid")
 	_, err = f.submit(t, event)
 	require.NoError(t, err)
 	require.Equal(t, []string{"https://new.invalid"}, urls())
+	require.Equal(t, 2, updates, "fresh capture notifies only for the newly added URL")
 	withProfile("different-feed-owner", "https://wrong.invalid")
 	_, err = f.submit(t, event)
 	require.NoError(t, err)
 	require.Equal(t, []string{"https://new.invalid"}, urls())
+	require.Equal(t, 2, updates)
 }

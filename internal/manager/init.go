@@ -41,11 +41,12 @@ func Initialize(cfg *config.Config, l *log.Logger) (*Manager, error) {
 	// start with empty paths
 	mgrPaths := &paths.Paths{}
 
-	scraperRepository := scraper.NewRepository(repo)
-	scraperCache := scraper.NewCache(cfg, scraperRepository)
-
 	pluginCache := plugin.NewCache(cfg)
 	repo.File = plugin.WithFileHooks(repo.File, pluginCache)
+	repo = plugin.WithEntityUpdateHooks(repo, pluginCache)
+
+	scraperRepository := scraper.NewRepository(repo)
+	scraperCache := scraper.NewCache(cfg, scraperRepository)
 
 	sceneService := &scene.Service{
 		File:             repo.File,

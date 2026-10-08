@@ -53,6 +53,13 @@ and generic publisher objects that contain a matching stable ID. Twitter's
 captured expanded links take precedence over their short-link spelling. Each
 capture supplies at most 128 distinct valid profile links.
 
+When importing profile links changes a performer, Stash sends the normal
+`Performer.Update.Post` plugin notification with `urls` in `inputFields` after
+the transaction commits. This also covers linking an owner after capture and
+consolidating accounts. Failed transactions and repeated evidence that adds no
+URL do not notify plugins. The notification follows the same delivery contract
+as an ordinary API edit; catalog consistency does not depend on its delivery.
+
 Removing a performer URL through full, partial or bulk edits records a persistent
 suppression for that performer and normalized URL. Later captures, retries,
 restarts, account relinking and performer merges respect it. Explicit manual

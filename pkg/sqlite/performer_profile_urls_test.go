@@ -10,9 +10,58 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/plugin"
+	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
+
+type profileURLHookRecorder struct {
+	observe func(context.Context, int, hook.TriggerEnum, []string)
+}
+
+func (*profileURLHookRecorder) HasHooks(hook.TriggerEnum) bool { return true }
+func (r *profileURLHookRecorder) ExecutePostHooks(ctx context.Context, id int, kind hook.TriggerEnum, _ interface{}, fields []string) {
+	r.observe(ctx, id, kind, fields)
+}
+
+func TestPerformerProfileURLNotificationsCommitReplayAndRollback(t *testing.T) {
+	_, repo := archiveTestDatabase(t)
+	var calls [][]string
+	repo = plugin.WithEntityUpdateHooks(repo, &profileURLHookRecorder{observe: func(ctx context.Context, id int, kind hook.TriggerEnum, fields []string) {
+		require.Equal(t, 71, id)
+		require.Equal(t, hook.PerformerUpdatePost, kind)
+		require.Equal(t, []string{"urls"}, fields)
+		// A fresh transaction proves the notification has no uncommitted handle
+		// and sees the same URLs that plugins receive after ordinary API edits.
+		require.NoError(t, repo.WithReadTxn(ctx, func(ctx context.Context) error {
+			urls, err := repo.Performer.GetURLs(ctx, id)
+			calls = append(calls, urls)
+			return err
+		}))
+	}})
+	first := profileCapture(t, repo, "https://site.invalid")
+	require.Empty(t, calls, "an unowned account must not emit a performer update")
+	profileOwner(t, repo, *first.AccountUUID, 71)
+	require.Equal(t, [][]string{{"https://site.invalid"}}, calls)
+	profileCapture(t, repo, "https://site.invalid")
+	require.Len(t, calls, 1, "repeated evidence with no new URL is not an edit")
+	capture := publisherCapture(t, repo, "native:twitter", "twitter", `{"category":"twitter","author":{"id":123,"url":"https://next.invalid"}}`)
+	request := publisherInput(publisherPreview(t, repo, capture.UUID, ""), "automatic")
+	require.Error(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, err := repo.CapturePublisher.Apply(ctx, request)
+		require.NoError(t, err)
+		require.Len(t, calls, 1)
+		return errors.New("late receipt failure")
+	}))
+	require.Len(t, calls, 1)
+	_, err := applyPublisher(repo, request)
+	require.NoError(t, err)
+	require.Equal(t, [][]string{{"https://site.invalid"}, {"https://site.invalid", "https://next.invalid"}}, calls)
+	_, err = applyPublisher(repo, request)
+	require.NoError(t, err)
+	require.Len(t, calls, 2, "request replay must not duplicate a notification")
+}
 
 func removePerformerProfileURLSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
@@ -168,6 +217,13 @@ func TestPerformerProfileURLPublicationRollsBackWithCaptureChoice(t *testing.T) 
 
 func TestPerformerProfileURLsFollowAccountConsolidation(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
+	updates := 0
+	repo.TxnManager = models.WithEntityUpdateNotifier(repo.TxnManager, func(_ context.Context, kind models.ArchiveEntityKind, id int, fields []string) {
+		require.Equal(t, models.ArchivePerformer, kind)
+		require.Equal(t, 71, id)
+		require.Equal(t, []string{"urls"}, fields)
+		updates++
+	})
 	first := profileCapture(t, repo, "https://site.invalid https://pruned.invalid")
 	destination := createSourceAccount(t, repo, "native:twitter")
 	profileOwner(t, repo, destination.UUID, 71)
@@ -178,6 +234,7 @@ func TestPerformerProfileURLsFollowAccountConsolidation(t *testing.T) {
 	_, err := consolidateAccount(repo, input)
 	require.NoError(t, err)
 	require.Equal(t, []string{"https://site.invalid"}, performerProfileURLs(t, repo, 71))
+	require.Equal(t, 1, updates, "consolidation uses the same committed performer notification")
 	_, err = consolidateAccount(repo, input)
 	require.NoError(t, err, "the original signed consolidation remains replayable")
 	profileCapture(t, repo, "https://site.invalid https://pruned.invalid https://new.invalid")

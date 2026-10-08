@@ -115,7 +115,10 @@ ORDER BY u.account_uuid,u.url_key LIMIT 128`, account.UUID, afterAccount, afterK
 	update := models.NewPerformerPartial()
 	update.URLs = &models.UpdateStrings{Mode: models.RelationshipUpdateModeAdd, Values: added}
 	_, err = NewPerformerStore(nil).UpdatePartial(ctx, *performer.LocalID, update)
-	return err
+	if err != nil {
+		return err
+	}
+	return models.NotifyEntityUpdate(ctx, models.ArchivePerformer, *performer.LocalID, []string{"urls"})
 }
 
 func profileURLKeys(urls []string) map[string]bool {

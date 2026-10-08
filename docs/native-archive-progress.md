@@ -12073,7 +12073,13 @@ new tables are included in database backup and removed from anonymized exports.
 
 Focused extraction/storage/ingestion tests, surrounding domain regressions,
 performer/account/ingest API checks, Python producer HTTP delivery and the pinned
-Go linter passed. Full affected-package regression suites are running.
+Go linter passed. The full archive, SQLite and ingestion suites passed in
+1,581 seconds. A follow-up connects automatic performer URL updates to ordinary
+after-commit plugin notifications, including late ownership links and account
+consolidation. Real SQLite and ingestion tests cover rollback, replay and no-op
+captures; API/producer checks and the pinned linter also passed. The populated
+schema-97 migration/reconciliation is running against a verified byte-identical
+copy reused from the completed startup fixture, avoiding another 20 GiB copy.
 Production is unchanged. This increment requires a new native application and
 backup validator release plus populated schema-97 migration/reconciliation
 before it can replace the verified schema-96 release selection.

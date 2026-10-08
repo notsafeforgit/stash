@@ -6,7 +6,7 @@ that plan's scope or replace its completion criteria. Development remains on
 `v3-rewrite`; merge into `develop` requires verification and the owner's success
 review. Production has not been migrated.
 
-## Current release position — 2026-10-07
+## Current release position — 2026-10-08 UTC
 
 Implementation spans phases 1–6. Production has not been migrated. The final
 compatible release is frozen and pinned; native development stays on
@@ -67,10 +67,12 @@ have not switched.
 The real host S3 publication, fresh download/restore and producer replay passed
 using a small native library and the actual frozen backup ledgers. The full
 populated coordinated rehearsal has sealed its checkpoint, verified all 769,643
-indexed media paths and is still packaging/restoring. Historical cold-video
-adoption passes 288 backup tests and three real checksum samples; complete
-media adoption, native daily-change measurement and metadata retention setup
-remain open.
+indexed media paths, restored the archive and completed the independent artwork
+checks. Its original child is now validating the restored native database;
+the complete restore/recovery/replay proof has not passed yet. The enclosing
+Go harness timed out after eight hours, and a guarded continuation preserves
+that failure while waiting for the original child. Complete cold-media adoption,
+native daily-change measurement and metadata retention setup remain open.
 
 The next development increment is schema 1000095, with the
 [fclones-backed deduplication service](native-file-deduplication.md). It
@@ -87,16 +89,17 @@ recovers committed deletions, previews pairs sequentially and holds backup and
 worker publication locks. Its real HTTP test spans a lost response and a server
 and client restart. Host service/pre-backup replacements are staged, including
 completion cooldown handling and coordinated backup of the compact SQLite
-journal. Live installation, scan/sidecar cleanup handoff, a populated schema-95
-migration check, image publication and activation remain outstanding.
+journal. The source and wrapper images are published and pinned. Live
+installation, scan/sidecar cleanup handoff, a populated schema-95 migration check
+and activation remain outstanding.
 
 Scheduled local-file discovery now has a native API client with a compact SQLite
 journal, resumable directory pagination, bounded pending admissions and private
 key-file authentication. It uses the existing manual-intake worker and metadata
-policies. Its real HTTP restart test, 614 producer tests, 294 backup tests and
-789 UI tests pass. That combined gate exceeded the 20-minute aggregate timeout
-in API/SQLite packages while running short-lived migration fixtures; no assertion
-failure was reported, but the gate did not pass. A complete rerun remains required.
+policies. The final scope correction and manual helper handoff passed the full
+`make GO_TEST_TIMEOUT=40m generate ui validate-fork` gate in 2,065 seconds,
+including 790 UI and 618 producer tests, the archive/backup/library suites,
+Go lint and full Go integration. This supersedes the earlier aggregate timeout.
 Service/timer templates validate but remain inactive. Actual folder coverage and
 policy activation must be reconciled before retiring the compatible scan helper;
 historical directory-membership collections are not filesystem scan grants.
@@ -106,7 +109,16 @@ protects producer-submitted paths, and rechecks those decisions before publishin
 manual imports. Focused SQLite/worker/HTTP and client/UI checks pass. A populated
 read-only audit covers 1,674 narrow source prefixes, 34 additional source-evidence
 folders, the root and an unassigned folder. Host configuration and base-scope API
-requests are staged; the complete release gate and activation remain outstanding.
+requests are staged; populated policy activation and live verification remain
+outstanding.
+
+Subsequent artwork and external-container capture changes pass 123 archive,
+304 backup and 27 focused session/store checks. Build, Lint and image-publication
+CI passed at `e047e57bc`; these Python changes do not alter the selected
+`bbcd61496` application. Its exact wrapper passed an isolated fresh start,
+restart, UI/native-route check and native snapshot validation at schema 1000095.
+Prepared Stash and daily-backup units are validated but uninstalled. Production
+still uses the compatible deployment.
 
 Remaining release work:
 
@@ -11686,3 +11698,39 @@ code and refuses to run before that child succeeds and both original processes
 are gone; it covers the remaining deletion-journal recovery and producer replay.
 The timeout is retained as a failed harness result. Full restore success remains
 unproven until the original child's receipt and those remaining checks pass.
+
+## Pinned runtime and deployment preparation — 2026-10-08
+
+The selected `bbcd61496` source image and its explicitly selected wrapper are
+recorded by digest under `.local/native-coordinated-restore-20261007`. The exact
+wrapper started a fresh native database and restarted it in an isolated container
+with networking disabled, no published ports and fixture-only mounts. Both runs
+reported schema 1000095; the embedded UI, native media-root route, native lineage
+and exported database validator passed. The live Stash container was unchanged.
+The first probe used an incorrect API path and failed; the corrected probe is
+retained separately under `.local/native-stash-deployment-20261008`.
+
+The staged Stash unit uses a separate native configuration/database directory,
+server checkpoints on `/tank`, an empty native plugin directory and the pinned
+wrapper. It removes obsolete catalog mounts and gives populated validation a
+30-minute startup allowance. The initial staging helper passed the wrong Quadlet
+environment variable and therefore inspected the existing units. Corrected
+validation uses `QUADLET_UNIT_DIRS`, checks the exact generated image and mounts,
+and verifies only the two intended units. Neither unit nor configuration is
+installed.
+
+The prepared daily backup service retains the existing 03:00 timer, pre-backup
+dedupe invocation and `--compact` setting. Its timeout grows from three to
+48 hours to accommodate the initial full native publication. The same oneshot
+service prevents overlapping timer invocations. Configuration now declares the
+health check and backup service/timer among 38 explicit components, in addition
+to resolved worker dependencies. This is preparation, not proof of a final
+common production capture.
+
+The original restore has finished its independent artifact checks and is running
+the frozen schema-94 snapshot validator. A guarded continuation chain waits for
+the original success receipt and process exit, then runs recovery/replay, a
+separate populated schema-95 copy/migration and full typed reconciliation. It
+resumes the same suspended cold-media auditor only after those checks pass.
+Each stage rechecks its frozen inputs. None of these checks changes production
+or replaces the pending full backup/cost and cutover evidence.

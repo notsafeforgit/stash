@@ -845,8 +845,8 @@
     "input_preparation": "passed",
     "catalogs": 1711,
     "native_import_status": "running",
-    "completed_catalogs_at_checkpoint": 554,
-    "completed_passes_at_checkpoint": 6653,
+    "completed_catalogs_at_checkpoint": 1095,
+    "completed_passes_at_checkpoint": 13148,
     "total_passes": 20532,
     "independent_reconciliation": "pending"
   },
@@ -869,7 +869,7 @@
     "owner_acceptance"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-08T21:25:57.212060+00:00",
+  "checked_at": "2026-10-08T21:59:53.423956+00:00",
   "n8n_staging": {
     "status": "passed_staged",
     "unchanged_tables": 142,
@@ -939,7 +939,8 @@
     "policies": "waiting_for_complete_import_boundary",
     "policy_import": "waiting_for_current_domain_migration",
     "local_manual_handoff": "waiting_for_verified_disabled_policy_import_then_prepare_only",
-    "source_registration": "waiting_for_current_policy_import"
+    "source_registration": "waiting_for_current_policy_import",
+    "operational_recovery_preparation": "waiting_for_current_policy_import_read_only"
   },
   "maintenance_journals": {
     "status": "passed",
@@ -1024,5 +1025,49 @@
     "registration_service": "waiting_for_current_policy_import",
     "account_links_require_current_native_identifiers": true,
     "canonical_root_remains_disabled": true
+  },
+  "scan_recovery_preparation": {
+    "status": "prepared_not_applied",
+    "sha256": "129ae29760c6602d935be9926307f16cc3de1ea879d91119d54dc3d09fd2ca81",
+    "scans": 207,
+    "profiles": {
+      "host-reddit": 131,
+      "host-twitter": 69,
+      "n8n-reddit-full-history": 7
+    },
+    "states": {
+      "queued": 38,
+      "deferred": 169
+    },
+    "retained_checkpoint": 1,
+    "explicit_replay": 206,
+    "ambiguous_checkpoint_replay": 5,
+    "cutoff": "2026-10-08T18:06:56.619Z",
+    "jobs_activated": 0,
+    "native_changed": false
+  },
+  "n8n_schedule_hold": {
+    "status": "passed_staged_paused",
+    "completed_at": "2026-10-08T21:56:03.899185+00:00",
+    "unchanged_other_workflows": 41,
+    "unchanged_other_tables": 147,
+    "unchanged_other_rows": 19694,
+    "nine_native_workflow_versions_preserved": true,
+    "no_scheduled_jobs_or_waiting_executions": true,
+    "original_pending_publications_preserved": true,
+    "live_database_changed": false,
+    "workflows_started": false,
+    "paused_parent_dispatch_schedules": 2,
+    "resume_after": "Coordinated native backup/restore and controlled runtime verification",
+    "inactive_archived_legacy_direct_workflows": 5,
+    "active_scheduled_scrape_triggers": 0
+  },
+  "producer_provisioning_preparation": {
+    "status": "prepared_not_applied",
+    "existing_producers": 2,
+    "environment_files": 3,
+    "required_live_root_revision": 2,
+    "credentials_issued": 0,
+    "existing_api_key_matches_final_configuration": true
   }
 }

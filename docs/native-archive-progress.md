@@ -75,6 +75,16 @@ usable checkpoint; five retain multiple candidates for an explicit replay
 decision. These prepared inputs are not completed source registration or scan
 activation.
 
+All 207 interrupted scans now have frozen recovery bindings against the installed
+profiles: 131 host Reddit, 69 host Twitter and seven n8n full-history Reddit
+requests. Independent expectations preserve the original lower bounds, retry
+deadlines and deferrals: 38 can queue normally and 169 remain deferred. One
+checkpoint is retained; 206 requests explicitly replay their saved windows,
+including the five ambiguous checkpoint groups. Activation waits for the verified
+live root and source registrations. A read-only dependent service will also
+review current enrichment, translation and discovery holds against the final
+imported scopes before any operational activation.
+
 The final inactive deployment's **78 files** and **32 worker profiles** are now
 installed with their original preimages retained. Both producer outboxes are at
 their final paths, including the 34 original n8n receipts; producer credentials
@@ -91,6 +101,17 @@ and Redis in its brief container pause and retains Redis's complete AOF director
 the captured queue passed the existing Redis runtime's AOF validation. No runtime
 code change or artifact rebuild was required. AWS access and metadata retention
 configuration are verified; bucket versioning remains unchanged.
+
+Two parent n8n queue-dispatch schedules are now paused in the staged database
+using the pinned offline CLI. Only their activation fields and update timestamps
+changed; all 41 other workflows and the values in 147 other tables remain
+unchanged. The nine converted workflow versions and their pending
+publications are preserved. Startup dependency review finds no active scheduled
+scrape trigger; five old direct gallery-dl workflows are already archived and
+inactive. The two dispatch schedules resume only after controlled runtime and
+backup/restore verification. Provisioning inputs for the two existing producer
+identities and three environment files are prepared; no credentials have been
+issued because root grants require an active live root.
 
 [Current production verification](native-production-cutover-verification.json)
 records this partial cutover checkpoint. Private input manifests, immutable

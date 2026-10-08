@@ -27,9 +27,11 @@ Tumblr/Chevereto/LeakGallery adapters are implemented and verified. Schema 10000
 adds captured origins for cross-host dependencies and permits explicit mixed
 download collections; its complete backend gate has passed. The manual caller is
 now integrated after passing the complete repository gate, real HTTP/restore
-checks and installed-package verification. Final
-installed producer runtimes/profiles, the populated schema rehearsal and the
-coordinated writer handoff remain required.
+checks and installed-package verification. The final host/n8n/backup packages,
+32 profiles and 77 deployment files are staged and verified. The populated
+schema-99 migration, image startup/restart and bounded real S3 restore passed.
+The final browsing/ingestion performance check is running. Fresh production
+migration, a current full coordinated backup and the writer handoff remain.
 
 The earlier verified checkpoint is schema 1000094, with the shared review queue,
 Keep current value receipts, atomic post-merge review and shared archive activity.
@@ -12342,3 +12344,48 @@ symlink and scraper configuration remain unchanged. Final installed runtimes,
 all host/n8n policy hashes, dispatcher
 selection, manual state provisioning and the combined backup/deployment manifest
 must be refreshed before the coordinated writer handoff.
+
+## Final schema-99 artifacts and cloud recovery — 2026-10-08
+
+[The release verification report](native-schema99-release-verification.json)
+records the final application image at `0ea2c05fb` and producer/backup packages
+at `d863a41af`. The intervening manual increment changes producer code and
+application tests, with no application implementation change. All application
+CI checks and the complete local repository gate passed.
+
+The populated migration preserves all 40,513,488 existing typed rows. Integrity
+and foreign-key checks pass. The exact published wrapper starts the migrated
+library in 173.9 seconds and restarts it in 232.4 seconds, preserving all 309
+tables, saved filter state and the complete database bytes. Scene, image,
+gallery and performer counts agree through the live isolated API.
+
+The final installed packages match the selected source. All 32 worker profiles
+preserve the reviewed scraper settings, including Coomer/Kemono originals.
+The combined inactive selection contains 77 files and nine verified n8n workflow
+graphs. Its four Quadlets and 16 generated/native service and timer definitions
+pass validation. Both manual profiles, their shared outbox and durable request
+state are included in the backup dependency inventory. No production launcher,
+workflow or service has switched to these artifacts.
+
+A real S3 rehearsal using schema 99 and the final installed backup package
+published approximately 103 MiB in 23 compressed objects, restored the database,
+frozen host ledgers and both producer queues, and recovered pending/lost-response
+deliveries without duplicates. After restarting the publisher, unchanged data
+required zero chunk HEADs, zero chunk tag reads and zero PUTs; only one inventory
+page and bounded metadata checks were needed. This verifies final-code cloud
+recovery, not a full current production backup or daily metadata churn.
+
+The daily backup user now has the missing `s3:GetBucketVersioning` permission
+scoped to the metadata bucket. The reviewed metadata lifecycle is installed and
+verified by the final backup runtime. Existing user policies and the media bucket
+are unchanged; metadata bucket versioning remains disabled. Retention expires
+explicitly retired native metadata while preserving the configured retained
+snapshots and their shared objects. Setup tagged or deleted no objects.
+
+The completed schema-96 load-test copy was reclaimed, freeing about 21 GiB while
+retaining its receipts and both migration baselines. The final schema-99 load
+measurement and complete row comparison use the original performance budgets
+and preserve at least 50 GiB of free space. The historical media audit continues
+in its original runtime. Current full backup verification, a fresh common
+production boundary, coherent writer activation, scheduled-cycle verification
+and owner acceptance remain before merging `develop`.

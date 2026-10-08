@@ -1,0 +1,164 @@
+{
+  "recorded_at": "2026-10-08T17:22:32.233387+00:00",
+  "status": "final_artifacts_migration_startup_and_bounded_cloud_restore_verified",
+  "source_revision": "0ea2c05fbc20356929c561f2173386a14870fdb7",
+  "producer_revision": "d863a41af893bcdc341bc3021cca02eff8ebeebd",
+  "schema": 1000099,
+  "application": {
+    "source_image": "ghcr.io/notsafeforgit/stash@sha256:bb201d70080b5cdd4c1c7f933e81fa2c75398cb44ee0255049ef360fd2719379",
+    "wrapper_image": "ghcr.io/notsafeforgit/stash-s6@sha256:f66f75f8af552df6556f5a3b0b57fe1cfd8b8a1f8a89e7a9a45112c3e4c7fc38",
+    "validator_sha256": "d73643e192057d3d7bb97c44d001130380a9fe3ab716dd0a541af90e6d211720",
+    "source_wrapper_validator_binary_identical": true,
+    "source_ci": "all_passed",
+    "source_ci_run_ids": [
+      37806374668,
+      37806374718,
+      37806374597,
+      37806374628
+    ],
+    "update_repository": "notsafeforgit/stash"
+  },
+  "complete_repository_gate": {
+    "result": "passed",
+    "ui_tests": 797,
+    "producer_tests": 657,
+    "library_tests": 12,
+    "archive_tests": 125,
+    "backup_tests": 304,
+    "go_packages": "all_passed",
+    "go_lint_issues": 0
+  },
+  "populated_migration": {
+    "source_schema": 1000097,
+    "schema": 1000099,
+    "original_rows": 40513488,
+    "added_rows_since_schema97": 2,
+    "foreign_key_violations": 0,
+    "integrity": "ok",
+    "source_evidence_unchanged": true,
+    "saved_requests_unchanged": true,
+    "jobs_unchanged": true
+  },
+  "populated_startup": {
+    "first_start_seconds": 173.86925337597495,
+    "restart_seconds": 232.35223724099342,
+    "original_tables": 309,
+    "table_counts_preserved": true,
+    "published_filter_state_preserved": true,
+    "source_database_unchanged": true,
+    "entity_api_counts_verified": {
+      "findScenes": {
+        "count": 270760
+      },
+      "findImages": {
+        "count": 498646
+      },
+      "findGalleries": {
+        "count": 1887
+      },
+      "findPerformers": {
+        "count": 1426
+      }
+    },
+    "ui_served": true,
+    "native_api_served": true,
+    "live_stash_and_n8n_unchanged": true
+  },
+  "inactive_runtimes": {
+    "host_producer_modules": 125,
+    "n8n_producer_modules": 125,
+    "backup_package_verification": {
+      "modules": {
+        "stash_archive": 20,
+        "stash_ingest": 125,
+        "host": 17
+      },
+      "versions": {
+        "boto3": "1.43.90",
+        "awscrt": "0.36.0",
+        "stash-native-archive": "0.1.0",
+        "stash-ingest": "0.1.0",
+        "stash-host-backup": "0.1.0"
+      }
+    },
+    "producer_packages_byte_identical": true,
+    "host_profiles": 22,
+    "n8n_profiles": 10,
+    "manual_profiles": 2,
+    "coomer_kemono_originals_preserved": true,
+    "deployment_files": 77,
+    "workflow_graphs": 9,
+    "quadlets_verified": 4,
+    "services_and_timers_verified": 16,
+    "manual_request_state_in_backup_inventory": true,
+    "live_launchers_changed": false
+  },
+  "bounded_real_s3_restore": {
+    "scope": "Isolated host S3 publication with a small native database, actual frozen host ledgers and one existing cold-media object; no production activation",
+    "result": "passed",
+    "encoded_objects": 23,
+    "encoded_bytes": 108309360,
+    "published_bytes": 108326240,
+    "initial_publication_requests": {
+      "GetObject": 2,
+      "HeadObject": 40,
+      "ListObjectsV2": 2,
+      "PutObject": 29
+    },
+    "unchanged_republication_requests": {
+      "GetObjectTagging": 3,
+      "HeadObject": 9,
+      "ListObjectsV2": 1
+    },
+    "unchanged_chunk_heads": 0,
+    "unchanged_chunk_tag_reads": 0,
+    "unchanged_puts": 0,
+    "producer_recovery": [
+      {
+        "duplicate_replay_added_events": 0,
+        "producer": "host",
+        "recovered_events": 2
+      },
+      {
+        "duplicate_replay_added_events": 0,
+        "producer": "n8n",
+        "recovered_events": 2
+      }
+    ],
+    "production_pointer_unchanged": true,
+    "media_uploads": 0,
+    "media_thaws": 0,
+    "full_current_library_backup": false
+  },
+  "metadata_retention": {
+    "status": "passed",
+    "added_permission": "s3:GetBucketVersioning",
+    "resource": "arn:aws:s3:::metadata-backup-andrew",
+    "existing_user_policies_unchanged": true,
+    "metadata_bucket_unversioned": true,
+    "lifecycle": "Reviewed native retirement tag expiration and noncurrent/delete-marker cleanup; no bucket versioning enabled.",
+    "daily_runtime_retention_verified": true,
+    "media_bucket_changed": false,
+    "cloud_configuration_changes": 2,
+    "objects_tagged_or_deleted_by_this_setup": 0
+  },
+  "disk_reserve": {
+    "minimum_free_GiB": 50,
+    "obsolete_completed_load_copy_reclaimed_bytes": 22415201984,
+    "migration_baselines_and_proofs_preserved": true
+  },
+  "final_populated_performance": {
+    "status": "running",
+    "budgets": "Unchanged from the compatible baseline; idle p95 <=100ms, ingestion p95 <=250ms, no request >5s.",
+    "original_row_comparison_required": true
+  },
+  "production_migrated": false,
+  "develop_merged": false,
+  "remaining": [
+    "Finish final populated browsing/ingestion measurement and complete typed-row preservation.",
+    "Finish historical cold-media audit and current full coordinated backup/restore with measured metadata churn.",
+    "Capture a fresh common compatible database/catalog/operating boundary and migrate/reconcile current data.",
+    "Provision and coherently activate the native application, host/manual/n8n producers, backup tools and nine workflow graphs.",
+    "Verify scheduled recovery/backup/scrape cycles, retire legacy writers, and obtain owner desktop/mobile acceptance before merging develop."
+  ]
+}

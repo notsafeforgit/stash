@@ -69,6 +69,7 @@ func TestIngestHTTPAuthenticationPartialBatchAndReceiptIsolation(t *testing.T) {
 	require.NotContains(t, supported.Namespaces, "native:onlyfans", "mirror evidence does not advertise native OnlyFans support")
 	require.Contains(t, supported.Prefixes, "mirror:coomer:")
 	require.Contains(t, supported.Prefixes, "mirror:kemono:")
+	require.Contains(t, supported.Prefixes, "ytdl:")
 	require.NotContains(t, good.Body.String(), credential.SecretHash)
 	require.Equal(t, 0, privateCalls)
 	for _, target := range []string{ingestPath + "/graphql", ingestPath + "/../graphql", ingestPath + "/batches/", ingestPath + "/%63apabilities"} {

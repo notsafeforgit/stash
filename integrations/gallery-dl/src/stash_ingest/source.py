@@ -4,7 +4,7 @@ import re
 from urllib.parse import urlsplit
 
 from .encoding import InvalidData
-from . import instagram, mirror, social_media
+from . import instagram, mirror, social_media, ytdl_media
 
 
 class UnsupportedSource(InvalidData):
@@ -77,6 +77,8 @@ def _bluesky(data):
 
 def post(source):
     data, category = _context(source)
+    if category in ('ytdl', 'ytdl-generic'):
+        return ytdl_media.post(data)
     if category == "reddit":
         value = _id(data.get("id"))
     elif category == "twitter":
@@ -124,6 +126,8 @@ def metadata(source):
     elif category in {"kemono", "coomer"}:
         # The extractor's date can mean mirror import time instead.
         date_keys = ("published",)
+    elif category in ('ytdl', 'ytdl-generic'):
+        text_keys, date_keys = ('description', 'title'), ()
     result = {}
     for field, keys in (("title", ("title",)), ("original_text", text_keys),
                         ("published_at", date_keys), ("language", ("lang", "language"))):
@@ -131,6 +135,10 @@ def metadata(source):
             if isinstance(data.get(key), str) and data[key]:
                 result[field] = data[key]
                 break
+    if category in ('ytdl', 'ytdl-generic'):
+        date = ytdl_media.publication(data)
+        if date is not None:
+            result['published_at'] = date
     if result.get("published_at"):
         result["date_basis"] = "source"
     return result
@@ -182,6 +190,8 @@ def attachment(source):
     ref = post(source)
     data, category = _context(source)
     download_url = source.get("_url")
+    if category in ('ytdl', 'ytdl-generic'):
+        return ytdl_media.attachment(data)
     if category == "reddit":
         parents = data.get("crosspost_parent_list")
         if parents:

@@ -197,6 +197,11 @@ func ExtractCapturedAlbum(raw []byte) (*CapturedAlbum, error) {
 		if err != nil || result == nil {
 			return nil, err
 		}
+	case "ytdl", "ytdl-generic":
+		result, err = capturedYTDLAlbum(data, path)
+		if err != nil || result == nil {
+			return nil, err
+		}
 	default:
 		return nil, nil
 	}

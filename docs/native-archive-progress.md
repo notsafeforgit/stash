@@ -24,9 +24,9 @@ The prior schema-96 checkpoint also passed browsing under concurrent ingestion.
 An audit of the actual manual command found a remaining implementation gap:
 `gallery-dl` still invokes legacy catalog hooks, and native download adapters do
 not yet cover ThisVid/yt-dlp and every generic extractor path required by the
-plan. The yt-dlp source-request guard described below is an implementation step,
-not complete downloader support. These paths must be finished and the changed
-producer runtimes/profiles rebuilt before coherent cutover.
+plan. The yt-dlp source-request guard and resolved-video identity adapters are
+implemented. Undated-source traversal and the remaining caller paths must be
+finished, then changed producer runtimes/profiles rebuilt before coherent cutover.
 
 The earlier verified checkpoint is schema 1000094, with the shared review queue,
 Keep current value receipts, atomic post-merge review and shared archive activity.
@@ -12132,3 +12132,42 @@ Ten focused runtime tests, the full 628-test producer suite and the real
 Python/native-HTTP delivery test passed. This Python increment changes producer
 fingerprints, so the previously staged host and n8n packages must be rebuilt
 with the final adapter implementation before activation. Production is unchanged.
+
+## Resolved yt-dlp post and attachment identity — 2026-10-08
+
+Producer and backend now identify resolved yt-dlp videos using the actual leaf
+extractor and video ID. Generic IDs also include their source webpage, preventing
+same-basename collisions across pages without using rotating download URLs or
+local filenames. The pinned bridge supplies a small `ytdl_media` v1 marker only
+after resolving the video. Playlist and member labels cannot become video IDs
+or declare albums. Publisher IDs retain their existing separate account semantics;
+neither publishers nor collectors automatically assign depicted performers.
+
+Source descriptions and actual publication timestamps now have matching
+producer/backend projections. An upload date without a timestamp stays day-only,
+and absent dates stay absent. Timestamped leaves use the existing half-open
+source windows. Undated/day-only traversal still requires explicit implementation;
+it currently fails visibly instead of certifying a publication-time window.
+
+Forty-five shared cases cover identities, retained attachment evidence, date
+precision, malformed inputs and URL normalization. These exposed a Go/Python
+path-rendering difference, corrected by preserving the original path spelling
+while normalizing the scheme/host and excluding fragments. The actual pinned
+ThisVid/Generic delegation produces matching retained post/attachment references.
+Real SQLite tests retain separate videos on separate pages, reuse a repeated
+post and share its publisher without assigning ownership.
+
+The native HTTP worker test now exercises a timestamped yt-dlp leaf through
+durable admission, download/file reporting, lost-response recovery and exported
+receipt restore. All four caller cases and the existing producer HTTP test
+passed. The 632-test producer suite and full archive suite passed; the final
+identity corrections passed the focused Python, Go, SQLite and HTTP checks.
+The complete ingestion package exceeded a ten-minute aggregate limit while
+creating an ordinary manual-intake fixture. That failed receipt is retained;
+its verbose rerun uses the repository's forty-minute migration-test budget and
+must finish before recording full-suite success.
+
+Native schema 1000097 is unchanged. The implementation remains uninstalled.
+Undated traversal, permitted cross-host source requests, actual direct/manual
+launch integration, remaining generic gallery-dl paths and refreshed host/n8n
+runtime/profile artifacts remain necessary before coherent cutover.

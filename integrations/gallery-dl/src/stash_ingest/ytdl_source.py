@@ -16,6 +16,7 @@ from yt_dlp.networking.exceptions import HTTPError, RequestError
 from .encoding import InvalidData
 from .outbox import Capacity
 from .runs import SourceFailure, SourcePaused, SourceTurnComplete
+from . import ytdl_media
 
 _CONSTRUCTION = threading.RLock()
 _CONTROL = (InvalidData, Capacity, SourceFailure, SourcePaused, SourceTurnComplete)
@@ -136,6 +137,7 @@ class SourceExtraction:
                     raise
                 if self.failure is not None:
                     raise self.failure
+                ytdl_media.mark_leaf(message[2])
                 yield message
         except StopIteration:
             return

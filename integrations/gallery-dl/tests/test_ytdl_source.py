@@ -22,6 +22,8 @@ from stash_ingest.outbox import Outbox
 from stash_ingest.producer import Producer
 from stash_ingest.runs import SourceFailure, SourcePaused, SourceTurnComplete
 from stash_ingest.ytdl_source import install
+from stash_ingest import source
+from stash_ingest.retention import retain
 from helpers import PRODUCER
 from test_producer import LeaseFixture
 
@@ -126,6 +128,9 @@ class YTDLSourceTests(unittest.TestCase):
         self.assertEqual(self.requests, ['https://fixture.invalid/account',
                                         'https://fixture.invalid/video/one', 'https://fixture.invalid/video/two'])
         self.assertEqual(self.reservations, self.requests)
+        posts = [source.post(retain(dict(item[2], category='ytdl'))) for item in records[::2]]
+        self.assertEqual(posts, [{'namespace': 'ytdl:nativevideofixture', 'value': 'one'},
+                                 {'namespace': 'ytdl:nativevideofixture', 'value': 'two'}])
         self.assertIs(ytdl.construct_YoutubeDL, self.construct)
         self.assertIsNone(self.producer.source_failure)
 
@@ -160,6 +165,10 @@ class YTDLSourceTests(unittest.TestCase):
         self.assertEqual(data['title'], 'Outer title')
         self.assertEqual(data['webpage_url'], target)
         self.assertNotIn('timestamp', data, 'undated metadata must stay undated')
+        kept = retain(dict(data, category='ytdl'))
+        self.assertEqual(source.post(kept), source.attachment(kept))
+        self.assertEqual(source.post(kept)['namespace'], 'ytdl:thisvid.com')
+        self.assertNotIn('published_at', source.metadata(kept))
         self.assertEqual(self.requests, [target], 'source resolution never downloads media')
         self.assertEqual(self.reservations, [target])
         self.assertIs(ytdl.construct_YoutubeDL, self.construct)

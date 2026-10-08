@@ -1,6 +1,6 @@
 """Real worker/API interoperability; only the website supplies fixture data."""
 
-from contextlib import closing, redirect_stdout
+from contextlib import closing, nullcontext, redirect_stdout
 from datetime import datetime, timedelta, timezone
 import io
 import json
@@ -11,6 +11,10 @@ import sys
 import time
 from unittest.mock import patch
 import uuid
+
+from gallery_dl import ytdl
+from gallery_dl.extractor.ytdl import YoutubeDLExtractor
+from yt_dlp.extractor.common import InfoExtractor
 
 from stash_ingest.client import Client, drain_once
 from stash_ingest.backfill_calls import BackfillCalls, advance_once
@@ -30,7 +34,13 @@ def main():
     directory = Path(setup["directory"])
     path, profile = profile_fixture(directory)
     profile["root"]["uuid"] = setup["root"]
-    if setup["adapter"] != "caller-cli":
+    native_ytdl = setup['adapter'] == 'ytdl'
+    if native_ytdl:
+        profile['source_category'] = 'ytdl-generic'
+        profile['gallery']['extractor']['filename'] = '{id}.{extension}'
+        profile['gallery']['extractor']['ytdl'] = {'module': 'yt_dlp', 'logging': False,
+                                                 'raw-options': {'quiet': True, 'no_warnings': True}}
+    elif setup["adapter"] != "caller-cli":
         profile["source_category"] = "reddit"
     native_backfill = setup["adapter"] == "n8n-backfill"
     if native_backfill:
@@ -61,7 +71,7 @@ def main():
                    "--identity", "Native_Fixture", "--profile", str(path), "--until", now.isoformat(timespec="milliseconds")]
 
     def record():
-        if setup["adapter"] != "caller-cli":
+        if setup["adapter"] not in ('caller-cli', 'ytdl'):
             result = subprocess.run(command, capture_output=True, text=True, timeout=30)
             assert result.returncode == 0, result.stderr
             value = json.loads(result.stdout)
@@ -91,11 +101,31 @@ def main():
     # Restart after local admission, before any network request. The dispatcher
     # must submit and discover the work without a run UUID supplied by a caller.
     with closing(Outbox(database, setup["endpoint"], setup["producer"])) as box:
+        class NativeVideoFixtureIE(InfoExtractor):
+            _VALID_URL = r'https://fixture\.invalid/video/(?P<id>one)'
+
+            def _real_extract(self, url):
+                return {'id': 'one', 'title': 'Resolved video', 'uploader_id': 'publisher',
+                        'timestamp': int((now - timedelta(days=1)).timestamp()),
+                        'ext': 'mp4', 'url': 'https://cdn.invalid/video.mp4'}
+
+        original_factory = ytdl.construct_YoutubeDL
+
+        def factory(*args, **kwargs):
+            client = original_factory(*args, **kwargs)
+            client.add_info_extractor(NativeVideoFixtureIE())
+            return client
+
         def job(target, *, producer, lock_directory):
             class CallerFixture(Fixture):
                 pattern = re.escape(setup["target"])
-            extractor = CallerFixture.from_url(target)
-            extractor.records, extractor.visited = [reddit_data(date=(now - timedelta(days=1)).isoformat())], []
+            if native_ytdl:
+                extractor = YoutubeDLExtractor.from_url('ytdl:' + target)
+                extractor.url = target
+                extractor.ytdl_ie_key = 'NativeVideoFixture'
+            else:
+                extractor = CallerFixture.from_url(target)
+                extractor.records, extractor.visited = [reddit_data(date=(now - timedelta(days=1)).isoformat())], []
             task = NativeDownloadJob(extractor, producer=producer, lock_directory=lock_directory)
 
             def download(url):
@@ -107,6 +137,9 @@ def main():
                 while box.receipt(row[0]) is None and time.monotonic() < until:
                     time.sleep(0.02)
                 assert box.receipt(row[0]) is not None, box.status()
+                if native_ytdl:
+                    task.pathfmt.set_extension('mp4')
+                    task.pathfmt.build_path()
                 task.pathfmt.part_enable()
                 with task.pathfmt.open("wb") as output:
                     output.write(b"fixture download " + url.encode())
@@ -115,7 +148,8 @@ def main():
             task.download = download
             return task
 
-        with patch("stash_ingest.gallery.NativeDownloadJob", side_effect=job):
+        with (patch("stash_ingest.gallery.NativeDownloadJob", side_effect=job),
+              patch('gallery_dl.ytdl.construct_YoutubeDL', factory) if native_ytdl else nullcontext()):
             output = io.StringIO()
             with redirect_stdout(output):
                 status = producer_cli(["--outbox", str(database), "--endpoint", setup["endpoint"],
@@ -186,7 +220,7 @@ def main():
         assert done_code == 0 and json.loads(output.getvalue()) == done, output.getvalue()
     print(json.dumps({"run_uuid": admitted["run_uuid"], "capture": capture_id, "file": file_id,
                       "started": start_id, "downloaded": end_id,
-                      "path": "Account/postabc123_abc123.jpg"}))
+                      "path": "Account/one.mp4" if native_ytdl else "Account/postabc123_abc123.jpg"}))
 
 
 if __name__ == "__main__":

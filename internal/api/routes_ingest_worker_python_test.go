@@ -25,7 +25,7 @@ import (
 )
 
 func TestPythonDownloadWorkerRecoversFinishAndDeliversFiles(t *testing.T) {
-	for _, adapter := range []string{"caller-cli", "host-launcher", "n8n-backfill"} {
+	for _, adapter := range []string{"caller-cli", "host-launcher", "n8n-backfill", "ytdl"} {
 		t.Run(adapter, func(t *testing.T) { runPythonDownloadWorker(t, adapter) })
 	}
 }
@@ -47,11 +47,14 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 	var root *models.MediaRoot
 	var collection *models.SourceCollection
 	target := "https://fixture.invalid/account"
+	namespace, attachmentKey := "native:reddit", "abc123"
 	switch adapter {
 	case "host-launcher":
 		target = "https://www.reddit.com/r/native_fixture/?sort=new"
 	case "n8n-backfill":
 		target = "https://www.reddit.com/user/Native_Fixture/submitted/?sort=new&t=all"
+	case "ytdl":
+		target, namespace, attachmentKey = "https://fixture.invalid/video/one", "ytdl:nativevideofixture", "one"
 	}
 	require.NoError(t, service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		producer, err = service.Repo.Ingest.CreateProducer(ctx, "Python download fixture")
@@ -65,7 +68,7 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 			return err
 		}
 		collection, err = service.Repo.SourceCollection.Put(ctx, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
-			Label: "Worker feed", Kind: "feed", Namespace: "native:reddit", State: "active", TargetURL: target,
+			Label: "Worker feed", Kind: "feed", Namespace: namespace, State: "active", TargetURL: target,
 			RootUUID: &root.UUID, PathPrefix: "Account",
 		}})
 		return err
@@ -172,7 +175,7 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 		require.NotNil(t, file)
 		require.Equal(t, capture.CaptureUUID, file.CaptureUUID)
 		require.NotEmpty(t, file.JobUUID)
-		attachment, err := service.Repo.SourceAttachment.Lookup(ctx, capture.PostUUID, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "abc123"})
+		attachment, err := service.Repo.SourceAttachment.Lookup(ctx, capture.PostUUID, models.SourcePostIdentifier{Namespace: namespace, Value: attachmentKey})
 		require.NoError(t, err)
 		require.NotNil(t, attachment)
 		attachmentID = attachment.UUID

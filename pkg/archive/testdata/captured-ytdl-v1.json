@@ -1,0 +1,1126 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "named leaf ignores playlist and download filename",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "playlist_id": "account",
+        "subcategory": "YoutubeTab",
+        "filename": "wrong",
+        "num": 99
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      }
+    },
+    {
+      "name": "same id on another extractor is another source",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Vimeo",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        }
+      },
+      "post": {
+        "namespace": "ytdl:vimeo",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:vimeo",
+        "value": "video"
+      }
+    },
+    {
+      "name": "source timestamp retains millisecond boundary",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "timestamp": 1790856000.123,
+        "epoch": 2000000000,
+        "upload_date": "20260101"
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description",
+        "published_at": "2026-10-01T12:00:00.123Z",
+        "date_basis": "source"
+      },
+      "attachment": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      }
+    },
+    {
+      "name": "day precision stays a day",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "upload_date": "20260228"
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description",
+        "published_at": "2026-02-28",
+        "date_basis": "source"
+      },
+      "attachment": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      }
+    },
+    {
+      "name": "zero timestamp is not missing",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "timestamp": 0
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description",
+        "published_at": "1970-01-01T00:00:00.000Z",
+        "date_basis": "source"
+      },
+      "attachment": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      }
+    },
+    {
+      "name": "generic source page first",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "123",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "webpage_url": "https://thisvid.com/videos/first/"
+      },
+      "post": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:d653c18c29a8acc502428331865d3d623c6f42e9249a70c7928d4626639bbe4f"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:d653c18c29a8acc502428331865d3d623c6f42e9249a70c7928d4626639bbe4f"
+      }
+    },
+    {
+      "name": "generic source page second",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "123",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "webpage_url": "https://thisvid.com/videos/second/"
+      },
+      "post": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:c6bfbceff3abaa0b3b86d8a621ee3fddfc94fa0f09303772e8b8adaf3b5fb615"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:c6bfbceff3abaa0b3b86d8a621ee3fddfc94fa0f09303772e8b8adaf3b5fb615"
+      }
+    },
+    {
+      "name": "generic page canonicalization ignores fragment and host case",
+      "source": {
+        "category": "ytdl-generic",
+        "extractor_key": "Generic",
+        "id": "123",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "webpage_url": "https://THISVID.com/videos/first/#player",
+        "url": "https://cdn.invalid/rotating.mp4?token=changed"
+      },
+      "post": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:d653c18c29a8acc502428331865d3d623c6f42e9249a70c7928d4626639bbe4f"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:d653c18c29a8acc502428331865d3d623c6f42e9249a70c7928d4626639bbe4f"
+      }
+    },
+    {
+      "name": "generic collection label cannot override publisher or video site",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "3533241",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "webpage_url": "https://thisvid.com/videos/fixture/",
+        "subcategory": "ThisVidMember",
+        "uploader_id": "150629",
+        "playlist_id": "other-person"
+      },
+      "post": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:f409a4a5953b2ad4af77a3b811c7e57e11535707f43afc34599b727a6a3b559c"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:f409a4a5953b2ad4af77a3b811c7e57e11535707f43afc34599b727a6a3b559c"
+      }
+    },
+    {
+      "name": "generic root URL normalized",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "123",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "webpage_url": "https://thisvid.com?#player"
+      },
+      "post": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:bb29230a916655b30f905dddbdbc835dbed50c7c634195a3e27db9898943b930"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:bb29230a916655b30f905dddbdbc835dbed50c7c634195a3e27db9898943b930"
+      }
+    },
+    {
+      "name": "missing key",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": null,
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "subcategory": "Youtube"
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "boolean id",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": true,
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        }
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "blank id",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": " ",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        }
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "control id",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "bad\n",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        }
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "invalid namespace",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "site/key",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        }
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "overlong namespace",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        }
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "generic no page",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "webpage_url": null,
+        "url": "https://cdn.invalid/1.mp4"
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "generic CDN does not substitute for source",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "webpage_url": null,
+        "url": "https://cdn.invalid/1.mp4"
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "generic URL credentials",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "webpage_url": "https://user:secret@thisvid.com/videos/first/",
+        "url": "https://cdn.invalid/1.mp4"
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "generic non HTTP",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "webpage_url": "file:///video.mp4",
+        "url": "https://cdn.invalid/1.mp4"
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "generic malformed escape",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "webpage_url": "https://thisvid.com/%xx",
+        "url": "https://cdn.invalid/1.mp4"
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "generic explicit port",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "webpage_url": "https://thisvid.com:443/video",
+        "url": "https://cdn.invalid/1.mp4"
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "generic empty port",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "webpage_url": "https://thisvid.com:/video",
+        "url": "https://cdn.invalid/1.mp4"
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "generic space in page",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "webpage_url": "https://thisvid.com/bad page",
+        "url": "https://cdn.invalid/1.mp4"
+      },
+      "post": null,
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "reject membership marker None",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": null
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "reject membership marker {'version': True, 'type': 'video'}",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": true,
+          "type": "video"
+        }
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "reject membership marker {'version': 1.0, 'type': 'video'}",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1.0,
+          "type": "video"
+        }
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "reject membership marker {'version': 2, 'type': 'video'}",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 2,
+          "type": "video"
+        }
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "reject membership marker {'version': 1, 'type': 'playlist'}",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "playlist"
+        }
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "reject membership marker {'version': 1, 'type': 'video', 'entries': []}",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video",
+          "entries": []
+        }
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": null
+    },
+    {
+      "name": "invalid timestamp True",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "timestamp": true
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata_error": true
+    },
+    {
+      "name": "invalid timestamp '1790856000'",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "timestamp": "1790856000"
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata_error": true
+    },
+    {
+      "name": "invalid timestamp 253402300800",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "timestamp": 253402300800
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata_error": true
+    },
+    {
+      "name": "invalid timestamp -62135596801",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "timestamp": -62135596801
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata_error": true
+    },
+    {
+      "name": "invalid day '20260230'",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "upload_date": "20260230"
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata_error": true
+    },
+    {
+      "name": "invalid day '00000101'",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "upload_date": "00000101"
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata_error": true
+    },
+    {
+      "name": "invalid day 20261001",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "upload_date": 20261001
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata_error": true
+    },
+    {
+      "name": "invalid day '2026-10-01'",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "upload_date": "2026-10-01"
+      },
+      "post": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      },
+      "attachment": {
+        "namespace": "ytdl:youtube",
+        "value": "video"
+      },
+      "metadata_error": true
+    },
+    {
+      "name": "membership marker cannot turn a playlist into a video",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Youtube",
+        "id": "playlist",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "playlist_id": "account",
+        "subcategory": "YoutubeTab",
+        "filename": "wrong",
+        "num": 99,
+        "entries": []
+      },
+      "post": null,
+      "metadata": {},
+      "attachment": null
+    },
+    {
+      "name": "escaped path",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "123",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "playlist_id": "account",
+        "subcategory": "YoutubeTab",
+        "filename": "wrong",
+        "num": 99,
+        "webpage_url": "https://thisvid.com/a%20b"
+      },
+      "post": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:f18eaf1bc826631b732fe9e1fd86acf0a42586068db141f938253127199ddb90"
+      },
+      "attachment": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:f18eaf1bc826631b732fe9e1fd86acf0a42586068db141f938253127199ddb90"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      }
+    },
+    {
+      "name": "uppercase scheme",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "123",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "playlist_id": "account",
+        "subcategory": "YoutubeTab",
+        "filename": "wrong",
+        "num": 99,
+        "webpage_url": "HTTPS://thisvid.com/video"
+      },
+      "post": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:3300535e8ee8782acaf8f91ed27374fab82576ad428c42c105abf14af26ab3ab"
+      },
+      "attachment": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:3300535e8ee8782acaf8f91ed27374fab82576ad428c42c105abf14af26ab3ab"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      }
+    },
+    {
+      "name": "literal path punctuation",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "123",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "playlist_id": "account",
+        "subcategory": "YoutubeTab",
+        "filename": "wrong",
+        "num": 99,
+        "webpage_url": "https://thisvid.com/a[1]|b"
+      },
+      "post": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:33cce5b882096f62f3a1275c84c11755bc9ebe76a5686157b8b052f896632b66"
+      },
+      "attachment": {
+        "namespace": "ytdl:thisvid.com",
+        "value": "page:33cce5b882096f62f3a1275c84c11755bc9ebe76a5686157b8b052f896632b66"
+      },
+      "metadata": {
+        "title": "Video",
+        "original_text": "Original description"
+      }
+    },
+    {
+      "name": "bad escape in query",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "playlist_id": "account",
+        "subcategory": "YoutubeTab",
+        "filename": "wrong",
+        "num": 99,
+        "webpage_url": "https://thisvid.com/video?bad%xx"
+      },
+      "post": null,
+      "attachment": null,
+      "metadata": {}
+    },
+    {
+      "name": "bad escape in fragment",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "Generic",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "playlist_id": "account",
+        "subcategory": "YoutubeTab",
+        "filename": "wrong",
+        "num": 99,
+        "webpage_url": "https://thisvid.com/video#bad%xx"
+      },
+      "post": null,
+      "attachment": null,
+      "metadata": {}
+    },
+    {
+      "name": "extractor keys are ASCII before case normalization",
+      "source": {
+        "category": "ytdl",
+        "extractor_key": "\u0130",
+        "id": "video",
+        "title": "Video",
+        "description": "Original description",
+        "ytdl_media": {
+          "version": 1,
+          "type": "video"
+        },
+        "playlist_id": "account",
+        "subcategory": "YoutubeTab",
+        "filename": "wrong",
+        "num": 99
+      },
+      "post": null,
+      "attachment": null,
+      "metadata": {}
+    }
+  ]
+}

@@ -225,8 +225,10 @@ missing saved cursor cannot report successful traversal. The worker entry point
 below supplies configuration, heartbeat, event delivery and attempt outcomes;
 production launcher conversion remains separate work.
 Attachment and source-window adapters cover Reddit, Twitter, Instagram, Coomer,
-Kemono, Bluesky and TikTok. Other external linked sources and yt-dlp output
-association still need integration. The direct host `gallery-dl` command still
+Kemono, Bluesky and TikTok. Resolved yt-dlp videos now have post/attachment
+adapters and can use source windows when an actual publication timestamp is
+present. Undated sources and other external linked sources still need complete
+traversal integration. The direct host `gallery-dl` command still
 uses legacy hooks; its native replacement is a required cutover step.
 
 The pinned yt-dlp bridge now checks native ownership and source reservations for
@@ -240,10 +242,26 @@ media transfer can finish after ownership loss; the next source request cannot.
 Direct `url`/`url_transparent` results are resolved with `download=False` before
 the first file message. This includes ThisVid's delegation to Generic, where the
 final video ID is otherwise unavailable until download. Playlist traversal keeps
-each child's identity. This source-request integration alone does not enable
-yt-dlp native downloads: retained post/attachment associations, handling of
-undated posts, supported cross-host source scopes and deployment profiles still
-need their complete integration. No publication date is invented.
+each child's identity. The actual leaf's `extractor_key` scopes named extractor
+IDs under `ytdl:<extractor>`. Generic results use `ytdl:<webpage-host>` and a
+SHA-256 key over the normalized source webpage plus video ID. This prevents
+same-basename collisions across pages and keeps rotating CDN URLs, filenames,
+collection labels and playlist owners out of video identity. Different video
+leaves remain separate posts; playlist membership does not declare an album.
+
+The bridge marks resolved leaves with `ytdl_media` version 1, carrying only the
+resolved type. Producer and backend independently validate the source identity
+and single attachment. The marker does not duplicate the full metadata and
+cannot certify an unresolved URL or playlist. Existing publisher extraction
+still records only explicit channel/uploader IDs and does not assign depicted
+performers or infer collection ownership.
+
+Source descriptions, titles and actual publication timestamps are retained.
+An `upload_date` without a timestamp stays a day-only date; an undated video
+stays undated. Neither can prove a publication-time window, so those download
+runs currently fail visibly rather than silently completing or inventing a
+timestamp. Undated traversal, supported cross-host source scopes, the direct
+manual command and final deployment profiles remain required before cutover.
 
 ## Worker profiles and execution
 

@@ -36,6 +36,12 @@ func CapturedMetadata(raw []byte) (models.SourcePostMetadata, error) {
 	case "kemono", "coomer":
 		// The extractor's date may fall back to the mirror's import time.
 		dateKeys = []string{"published"}
+	case "ytdl", "ytdl-generic":
+		textKeys, dateKeys = []string{"description", "title"}, nil
+		ret.PublishedAt, err = capturedYTDLPublication(data)
+		if err != nil {
+			return ret, err
+		}
 	}
 	for _, field := range []struct {
 		out  **string

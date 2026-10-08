@@ -1,0 +1,579 @@
+{
+  "cases": [
+    {
+      "name": "tumblr-photos",
+      "source": {
+        "category": "tumblr",
+        "id": 123,
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "caption": "Photo caption",
+        "blog": {
+          "uuid": "blog-one",
+          "name": "example"
+        },
+        "web_media": {
+          "version": 1,
+          "post_id": "123",
+          "items": [
+            {
+              "url": "https://64.media.tumblr.com/first.jpg",
+              "kind": "image"
+            },
+            {
+              "url": "https://64.media.tumblr.com/second.jpg",
+              "kind": "image"
+            }
+          ],
+          "complete": true,
+          "album": true
+        },
+        "web_media_url": "https://64.media.tumblr.com/second.jpg"
+      },
+      "post": {
+        "namespace": "native:tumblr",
+        "value": "123"
+      },
+      "items": [
+        {
+          "namespace": "native:tumblr",
+          "value": "url:8ab035639b768c11b632825d7cfe5de2f9d31fb61adcee0cbedea4cbd048c23b"
+        },
+        {
+          "namespace": "native:tumblr",
+          "value": "url:cde5c0f6b055bacbe7213bca1a8daeeebdde390130b81c5219a7fc25a09edec1"
+        }
+      ],
+      "complete": true,
+      "album": true,
+      "error": false
+    },
+    {
+      "name": "tumblr-inline-partial",
+      "source": {
+        "category": "tumblr",
+        "id": 456,
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "web_media": {
+          "version": 1,
+          "post_id": "456",
+          "items": [
+            {
+              "url": "https://64.media.tumblr.com/inline.mp4",
+              "kind": "video"
+            }
+          ],
+          "complete": false,
+          "album": false
+        },
+        "web_media_url": "https://64.media.tumblr.com/inline.mp4"
+      },
+      "post": {
+        "namespace": "native:tumblr",
+        "value": "456"
+      },
+      "items": [
+        {
+          "namespace": "native:tumblr",
+          "value": "url:c5c0792b8fa335eb66148cbead8afdc07dc58f40200c018a66a459ad2488f249"
+        }
+      ],
+      "complete": false,
+      "album": false,
+      "error": false
+    },
+    {
+      "name": "jpgfish-file",
+      "source": {
+        "category": "jpgfish",
+        "id": "AbCd",
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "user": "publisher",
+        "web_media": {
+          "version": 1,
+          "post_id": "AbCd",
+          "items": [
+            {
+              "url": "https://cdn.example/file.jpg",
+              "kind": "image"
+            }
+          ],
+          "complete": true,
+          "album": false
+        },
+        "web_media_url": "https://cdn.example/file.jpg",
+        "album": "A directory label"
+      },
+      "post": {
+        "namespace": "native:jpgfish",
+        "value": "AbCd"
+      },
+      "items": [
+        {
+          "namespace": "native:jpgfish",
+          "value": "url:df95e268e1b1ead9407fc9a16d15197cc8a2d0648d242063b7df999d3c3f9d89"
+        }
+      ],
+      "complete": true,
+      "album": false,
+      "error": false
+    },
+    {
+      "name": "imglike-file",
+      "source": {
+        "category": "imglike",
+        "id": "dEf",
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "web_media": {
+          "version": 1,
+          "post_id": "dEf",
+          "items": [
+            {
+              "url": "https://cdn.example/file.mp4",
+              "kind": "video"
+            }
+          ],
+          "complete": true,
+          "album": false
+        },
+        "web_media_url": "https://cdn.example/file.mp4"
+      },
+      "post": {
+        "namespace": "native:imglike",
+        "value": "dEf"
+      },
+      "items": [
+        {
+          "namespace": "native:imglike",
+          "value": "url:b01823bb455781032a71bd9d77a418d1d1e4b23d91808d72a217bff8ec37e12b"
+        }
+      ],
+      "complete": true,
+      "album": false,
+      "error": false
+    },
+    {
+      "name": "putmega-file",
+      "source": {
+        "category": "putmega",
+        "id": "Ghi",
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "web_media": {
+          "version": 1,
+          "post_id": "Ghi",
+          "items": [
+            {
+              "url": "https://cdn.example/file.png",
+              "kind": "image"
+            }
+          ],
+          "complete": true,
+          "album": false
+        },
+        "web_media_url": "https://cdn.example/file.png"
+      },
+      "post": {
+        "namespace": "native:putmega",
+        "value": "Ghi"
+      },
+      "items": [
+        {
+          "namespace": "native:putmega",
+          "value": "url:c7e0b9731f8900fa1c3bffad42506971ad583420e11e1b41dd91d9619098d213"
+        }
+      ],
+      "complete": true,
+      "album": false,
+      "error": false
+    },
+    {
+      "name": "leakgallery-page",
+      "source": {
+        "category": "leakgallery",
+        "id": "45",
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "creator": "Creator",
+        "web_media": {
+          "version": 1,
+          "post_id": "Creator/45",
+          "items": [
+            {
+              "url": "https://cdn.leakgallery.com/content/creator/one.jpg",
+              "kind": "image"
+            },
+            {
+              "url": "https://cdn.leakgallery.com/content/creator/two.mp4",
+              "kind": "video"
+            }
+          ],
+          "complete": false,
+          "album": false
+        },
+        "web_media_url": "https://cdn.leakgallery.com/content/creator/two.mp4"
+      },
+      "post": {
+        "namespace": "native:leakgallery",
+        "value": "Creator/45"
+      },
+      "items": [
+        {
+          "namespace": "native:leakgallery",
+          "value": "url:0ba497550c7cfc02413ebc61f70708fe088fcc9ae50c42b448f0749268425758"
+        },
+        {
+          "namespace": "native:leakgallery",
+          "value": "url:cfe7f6cd2ee37502be08d2bd2bb1d213d97a25bb0a74296ffed07462adbce5ff"
+        }
+      ],
+      "complete": false,
+      "album": false,
+      "error": false
+    },
+    {
+      "name": "wrong-post",
+      "source": {
+        "category": "tumblr",
+        "id": 123,
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "caption": "Photo caption",
+        "blog": {
+          "uuid": "blog-one",
+          "name": "example"
+        },
+        "web_media": {
+          "version": 1,
+          "post_id": "999",
+          "items": [
+            {
+              "url": "https://64.media.tumblr.com/first.jpg",
+              "kind": "image"
+            },
+            {
+              "url": "https://64.media.tumblr.com/second.jpg",
+              "kind": "image"
+            }
+          ],
+          "complete": true,
+          "album": true
+        },
+        "web_media_url": "https://64.media.tumblr.com/second.jpg"
+      },
+      "error": true
+    },
+    {
+      "name": "duplicate-reference",
+      "source": {
+        "category": "tumblr",
+        "id": 123,
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "caption": "Photo caption",
+        "blog": {
+          "uuid": "blog-one",
+          "name": "example"
+        },
+        "web_media": {
+          "version": 1,
+          "post_id": "123",
+          "items": [
+            {
+              "url": "https://64.media.tumblr.com/first.jpg",
+              "kind": "image"
+            },
+            {
+              "url": "https://64.media.tumblr.com/second.jpg",
+              "kind": "image"
+            },
+            {
+              "url": "https://64.media.tumblr.com/first.jpg",
+              "kind": "image"
+            }
+          ],
+          "complete": true,
+          "album": true
+        },
+        "web_media_url": "https://64.media.tumblr.com/second.jpg"
+      },
+      "error": true
+    },
+    {
+      "name": "version-bool",
+      "source": {
+        "category": "tumblr",
+        "id": 123,
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "caption": "Photo caption",
+        "blog": {
+          "uuid": "blog-one",
+          "name": "example"
+        },
+        "web_media": {
+          "version": true,
+          "post_id": "123",
+          "items": [
+            {
+              "url": "https://64.media.tumblr.com/first.jpg",
+              "kind": "image"
+            },
+            {
+              "url": "https://64.media.tumblr.com/second.jpg",
+              "kind": "image"
+            }
+          ],
+          "complete": true,
+          "album": true
+        },
+        "web_media_url": "https://64.media.tumblr.com/second.jpg"
+      },
+      "error": true
+    },
+    {
+      "name": "bad-url",
+      "source": {
+        "category": "tumblr",
+        "id": 123,
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "caption": "Photo caption",
+        "blog": {
+          "uuid": "blog-one",
+          "name": "example"
+        },
+        "web_media": {
+          "version": 1,
+          "post_id": "123",
+          "items": [
+            {
+              "url": "file:///media/a.jpg",
+              "kind": "image"
+            },
+            {
+              "url": "https://64.media.tumblr.com/second.jpg",
+              "kind": "image"
+            }
+          ],
+          "complete": true,
+          "album": true
+        },
+        "web_media_url": "https://64.media.tumblr.com/second.jpg"
+      },
+      "error": true
+    },
+    {
+      "name": "authority-credentials",
+      "source": {
+        "category": "tumblr",
+        "id": 123,
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "caption": "Photo caption",
+        "blog": {
+          "uuid": "blog-one",
+          "name": "example"
+        },
+        "web_media": {
+          "version": 1,
+          "post_id": "123",
+          "items": [
+            {
+              "url": "https://secret@example.com/a.jpg",
+              "kind": "image"
+            },
+            {
+              "url": "https://64.media.tumblr.com/second.jpg",
+              "kind": "image"
+            }
+          ],
+          "complete": true,
+          "album": true
+        },
+        "web_media_url": "https://64.media.tumblr.com/second.jpg"
+      },
+      "error": true
+    },
+    {
+      "name": "port",
+      "source": {
+        "category": "tumblr",
+        "id": 123,
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "caption": "Photo caption",
+        "blog": {
+          "uuid": "blog-one",
+          "name": "example"
+        },
+        "web_media": {
+          "version": 1,
+          "post_id": "123",
+          "items": [
+            {
+              "url": "https://example.com:8443/a.jpg",
+              "kind": "image"
+            },
+            {
+              "url": "https://64.media.tumblr.com/second.jpg",
+              "kind": "image"
+            }
+          ],
+          "complete": true,
+          "album": true
+        },
+        "web_media_url": "https://64.media.tumblr.com/second.jpg"
+      },
+      "error": true
+    },
+    {
+      "name": "malformed-escape",
+      "source": {
+        "category": "tumblr",
+        "id": 123,
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "caption": "Photo caption",
+        "blog": {
+          "uuid": "blog-one",
+          "name": "example"
+        },
+        "web_media": {
+          "version": 1,
+          "post_id": "123",
+          "items": [
+            {
+              "url": "https://example.com/%GG.jpg",
+              "kind": "image"
+            },
+            {
+              "url": "https://64.media.tumblr.com/second.jpg",
+              "kind": "image"
+            }
+          ],
+          "complete": true,
+          "album": true
+        },
+        "web_media_url": "https://64.media.tumblr.com/second.jpg"
+      },
+      "error": true
+    },
+    {
+      "name": "leakgallery-completeness",
+      "source": {
+        "category": "leakgallery",
+        "id": "45",
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "creator": "Creator",
+        "web_media": {
+          "version": 1,
+          "post_id": "Creator/45",
+          "items": [
+            {
+              "url": "https://cdn.leakgallery.com/content/creator/one.jpg",
+              "kind": "image"
+            },
+            {
+              "url": "https://cdn.leakgallery.com/content/creator/two.mp4",
+              "kind": "video"
+            }
+          ],
+          "complete": true,
+          "album": false
+        },
+        "web_media_url": "https://cdn.leakgallery.com/content/creator/two.mp4"
+      },
+      "error": true
+    },
+    {
+      "name": "chevereto-fabricated-album",
+      "source": {
+        "category": "jpgfish",
+        "id": "AbCd",
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "user": "publisher",
+        "web_media": {
+          "version": 1,
+          "post_id": "AbCd",
+          "items": [
+            {
+              "url": "https://cdn.example/file.jpg",
+              "kind": "image"
+            }
+          ],
+          "complete": true,
+          "album": true
+        },
+        "web_media_url": "https://cdn.example/file.jpg"
+      },
+      "error": true
+    },
+    {
+      "name": "creator-path",
+      "source": {
+        "category": "leakgallery",
+        "id": "45",
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "creator": "../../other",
+        "web_media": {
+          "version": 1,
+          "post_id": "Creator/45",
+          "items": [
+            {
+              "url": "https://cdn.leakgallery.com/content/creator/one.jpg",
+              "kind": "image"
+            },
+            {
+              "url": "https://cdn.leakgallery.com/content/creator/two.mp4",
+              "kind": "video"
+            }
+          ],
+          "complete": false,
+          "album": false
+        },
+        "web_media_url": "https://cdn.leakgallery.com/content/creator/two.mp4"
+      },
+      "error": true
+    },
+    {
+      "name": "tumblr-id-disagreement",
+      "source": {
+        "category": "tumblr",
+        "id": 123,
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00Z",
+        "caption": "Photo caption",
+        "blog": {
+          "uuid": "blog-one",
+          "name": "example"
+        },
+        "web_media": {
+          "version": 1,
+          "post_id": "123",
+          "items": [
+            {
+              "url": "https://64.media.tumblr.com/first.jpg",
+              "kind": "image"
+            },
+            {
+              "url": "https://64.media.tumblr.com/second.jpg",
+              "kind": "image"
+            }
+          ],
+          "complete": true,
+          "album": true
+        },
+        "web_media_url": "https://64.media.tumblr.com/second.jpg",
+        "id_string": "124"
+      },
+      "error": true
+    }
+  ]
+}

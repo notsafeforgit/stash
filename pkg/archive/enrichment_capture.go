@@ -2,6 +2,7 @@ package archive
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,6 +32,10 @@ func CapturedMetadata(raw []byte) (models.SourcePostMetadata, error) {
 		if data["type"] == "story" || data["type"] == "highlight" {
 			dateKeys = []string{"date"}
 		}
+	case "tumblr":
+		textKeys = []string{"caption", "body", "description", "summary"}
+	case "jpgfish", "imglike", "putmega", "leakgallery":
+		textKeys = []string{"description", "caption", "title"}
 	case "patreon":
 		dateKeys = []string{"published_at", "date"}
 	case "kemono", "coomer":
@@ -57,6 +62,12 @@ func CapturedMetadata(raw []byte) (models.SourcePostMetadata, error) {
 				*field.out = &value
 				break
 			}
+		}
+	}
+	if ret.PublishedAt != nil && strings.HasPrefix(*ret.PublishedAt, "0001-") {
+		switch category {
+		case "tumblr", "jpgfish", "imglike", "putmega", "leakgallery":
+			ret.PublishedAt = nil
 		}
 	}
 	if ret.PublishedAt != nil {

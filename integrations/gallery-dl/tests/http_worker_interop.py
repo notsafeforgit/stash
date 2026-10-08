@@ -10,10 +10,14 @@ import subprocess
 import sys
 import time
 from unittest.mock import patch
+from types import SimpleNamespace
 import uuid
 
 from gallery_dl import ytdl
 from gallery_dl.extractor.ytdl import YoutubeDLExtractor
+from gallery_dl.extractor.chevereto import CheveretoFileExtractor
+from gallery_dl.extractor.leakgallery import LeakgalleryPostExtractor
+from test_web_media import TumblrFixture
 from yt_dlp.extractor.common import InfoExtractor
 
 from stash_ingest.client import Client, drain_once
@@ -35,7 +39,8 @@ def main():
     path, profile = profile_fixture(directory)
     profile["root"]["uuid"] = setup["root"]
     native_ytdl = setup['adapter'] in ('ytdl', 'ytdl-traversal')
-    traversal = setup['adapter'] == 'ytdl-traversal'
+    native_web = setup['adapter'] in ('tumblr', 'jpgfish', 'leakgallery')
+    traversal = setup['adapter'] == 'ytdl-traversal' or native_web
     if traversal:
         profile['source_mode'] = 'traversal'
     if native_ytdl:
@@ -43,6 +48,9 @@ def main():
         profile['gallery']['extractor']['filename'] = '{id}.{extension}'
         profile['gallery']['extractor']['ytdl'] = {'module': 'yt_dlp', 'logging': False,
                                                  'raw-options': {'quiet': True, 'no_warnings': True}}
+    elif native_web:
+        profile["source_category"] = setup["adapter"]
+        profile["gallery"]["extractor"]["filename"] = "web.{extension}"
     elif setup["adapter"] != "caller-cli":
         profile["source_category"] = "reddit"
     native_backfill = setup["adapter"] == "n8n-backfill"
@@ -74,7 +82,7 @@ def main():
                    "--identity", "Native_Fixture", "--profile", str(path), "--until", now.isoformat(timespec="milliseconds")]
 
     def record():
-        if setup["adapter"] not in ('caller-cli', 'ytdl', 'ytdl-traversal'):
+        if setup["adapter"] not in ('caller-cli', 'ytdl', 'ytdl-traversal', 'tumblr', 'jpgfish', 'leakgallery'):
             result = subprocess.run(command, capture_output=True, text=True, timeout=30)
             assert result.returncode == 0, result.stderr
             value = json.loads(result.stdout)
@@ -126,6 +134,20 @@ def main():
                 extractor = YoutubeDLExtractor.from_url('ytdl:' + target)
                 extractor.url = target
                 extractor.ytdl_ie_key = 'NativeVideoFixture'
+            elif setup['adapter'] == 'tumblr':
+                extractor = TumblrFixture.from_url(target)
+                extractor.records = [{'id': 123, 'type': 'photo', 'timestamp': int((now - timedelta(days=1)).timestamp()),
+                                      'blog_name': 'example', 'blog': {'uuid': 'blog-one', 'name': 'example'}, 'photos': [{'original_size': {'url': 'https://64.media.tumblr.com/one.jpg',
+                                      'width': 1200, 'height': 1200}, 'alt_sizes': []}], 'caption': 'Source caption'}]
+            elif setup['adapter'] == 'jpgfish':
+                extractor = CheveretoFileExtractor.from_url(target)
+                extractor.request = lambda *args, **kwargs: SimpleNamespace(text=
+                    '<meta property="og:type" content="image"><meta property="og:title" content="Photo">'
+                    '<meta property="og:image" content="https://cdn.example/one.jpg">')
+            elif setup['adapter'] == 'leakgallery':
+                extractor = LeakgalleryPostExtractor.from_url(target)
+                extractor.request = lambda *args, **kwargs: SimpleNamespace(text=
+                    '<a href="https://cdn.leakgallery.com/content/creator/watermark_one.jpg">')
             else:
                 extractor = CallerFixture.from_url(target)
                 extractor.records, extractor.visited = [reddit_data(date=(now - timedelta(days=1)).isoformat())], []
@@ -152,7 +174,8 @@ def main():
             return task
 
         with (patch("stash_ingest.gallery.NativeDownloadJob", side_effect=job),
-              patch('gallery_dl.ytdl.construct_YoutubeDL', factory) if native_ytdl else nullcontext()):
+              patch('gallery_dl.ytdl.construct_YoutubeDL', factory) if native_ytdl else nullcontext(),
+              patch('requests.sessions.Session.request', side_effect=AssertionError('No live source requests')) if native_web else nullcontext()):
             output = io.StringIO()
             with redirect_stdout(output):
                 status = producer_cli(["--outbox", str(database), "--endpoint", setup["endpoint"],
@@ -223,7 +246,7 @@ def main():
         assert done_code == 0 and json.loads(output.getvalue()) == done, output.getvalue()
     print(json.dumps({"run_uuid": admitted["run_uuid"], "capture": capture_id, "file": file_id,
                       "started": start_id, "downloaded": end_id,
-                      "path": "Account/one.mp4" if native_ytdl else "Account/postabc123_abc123.jpg"}))
+                      "path": "Account/one.mp4" if native_ytdl else "Account/web.jpg" if native_web else "Account/postabc123_abc123.jpg"}))
 
 
 if __name__ == "__main__":

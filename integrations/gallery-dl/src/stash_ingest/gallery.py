@@ -14,7 +14,7 @@ from gallery_dl import config, exception, job, version
 from gallery_dl import path as gallery_path
 from gallery_dl.extractor.common import Message
 
-from . import filename, instagram, mirror, social_media
+from . import filename, instagram, mirror, social_media, web_media
 from .encoding import InvalidData
 from .filesystem import destination_lock
 from .runs import SourceFailure, SourcePaused, SourceTurnComplete
@@ -224,7 +224,9 @@ class NativeDownloadJob(job.DownloadJob):
         self.producer.check()
         self._native_scope = self.producer.reserve_source(self.extractor.url)
         self._source_operation(super()._init)
-        if self.extractor.category == "twitter":
+        if self.extractor.category in web_media.CATEGORIES:
+            web_media.install(self.extractor, self.producer, self._native_scope)
+        elif self.extractor.category == "twitter":
             twitter_evidence(self.extractor)
         elif self.extractor.category == "instagram":
             instagram.install(self.extractor)
@@ -394,7 +396,7 @@ class NativeDownloadJob(job.DownloadJob):
     def handle_url(self, url, kwdict):
         self.producer.check()
         self._native_prepared, self._native_phase = None, None
-        if self.extractor.category in ("kemono", "coomer") and kwdict.get('extension', '').lower() not in mirror.VISUAL:
+        if self.extractor.category in ("kemono", "coomer", *web_media.CATEGORIES) and kwdict.get('extension', '').lower() not in mirror.VISUAL:
             # Keep non-playable source evidence, but do not download audio or
             # archives which cannot produce a supported native file receipt.
             kept = dict(kwdict, _url=url, source_extractor_url=self.extractor.url,

@@ -117,6 +117,11 @@ func ExtractCapturedAlbum(raw []byte) (*CapturedAlbum, error) {
 	}
 	result := &CapturedAlbum{Policy: CapturedAlbumPolicy}
 	switch category {
+	case "tumblr", "jpgfish", "imglike", "putmega", "leakgallery":
+		result, err = capturedWebAlbum(data, path, category)
+		if err != nil || result == nil {
+			return nil, err
+		}
 	case "reddit":
 		post, err := capturedPostReference("native:reddit", capturedFieldAt(data, path, "id"))
 		if err != nil || post == nil {

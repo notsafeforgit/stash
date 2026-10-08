@@ -224,12 +224,13 @@ Checkpoints retain the last completed source cursor during bounded replay. A
 missing saved cursor cannot report successful traversal. The worker entry point
 below supplies configuration, heartbeat, event delivery and attempt outcomes;
 production launcher conversion remains separate work.
-Attachment and source-window adapters cover Reddit, Twitter, Instagram, Coomer,
-Kemono, Bluesky and TikTok. Resolved yt-dlp videos now have post/attachment
-adapters and can use source windows when an actual publication timestamp is
-present. Undated sources and other external linked sources still need complete
-traversal integration. The direct host `gallery-dl` command still
-uses legacy hooks; its native replacement is a required cutover step.
+Attachment adapters cover Reddit, Twitter, Instagram, Coomer, Kemono, Bluesky,
+TikTok, Tumblr, the Chevereto sites JPGfish/Imglike/Putmega, LeakGallery, and
+resolved yt-dlp videos. Publication windows require a usable source timestamp;
+configured traversal profiles also handle undated sources and collection routing.
+The direct host `gallery-dl` command still uses legacy hooks. Its native command
+handoff, permitted cross-host source requests, and final host/n8n profiles remain
+required cutover work.
 
 The pinned yt-dlp bridge now checks native ownership and source reservations for
 its own HTTP requests, which bypass gallery-dl's `extractor.request`. Rate limits,
@@ -2999,3 +3000,34 @@ reads only the receipt. After interruption, reuse the same file and digest;
 `apply` checks for a committed receipt before sending anything again. A 409
 requires review of the changed state. Successful review does not enable a root,
 issue credentials, admit a source job or claim that scraping completed.
+
+## Tumblr and gallery file sources
+
+The pinned Tumblr adapter retains a post's numeric ID and its complete ordered
+photos list before gallery-dl consumes it. Each downloaded photo refers to that
+shared membership and post body; per-file photo fields remain capture details.
+Only an explicit multi-photo list declares an album. Inline media and other
+selected outputs retain partial membership without claiming an exhaustive list.
+Avatar and external-link traversal need separate adapters and are rejected by
+this adapter; ordinary post photos, inline media, videos and audio exclusions
+are covered.
+
+Chevereto sources (`jpgfish`, `imglike`, `putmega`) use the actual file-page ID
+and its one observed attachment. An album label in a directory does not become
+an invented post or performer. Parent album/user traversal uses a configured
+scan; each file page keeps its own source identity.
+
+LeakGallery uses the creator-page path plus the post ID to avoid combining
+unrelated pages. All media URLs observed on one HTML post share one retained
+manifest, but an HTML scan does not establish complete membership or an album.
+API pagination failures now fail the native attempt even when the pinned
+extractor catches and logs the underlying error. Its earlier completed files
+and receipts remain durable for retry.
+
+These adapters use version-1 `web_media` evidence and URL-qualified attachment
+references, independently of local filenames and gallery-dl's output counters.
+Only explicit source identity is used; folder names and scrape targets do not
+establish depicted performers. Audio and other unsupported files retain an
+excluded outcome without a download. Missing dates and the extractor's year-one
+placeholder are not promoted to publication dates. Historical payloads without
+the new marker keep their original capture partitioning.

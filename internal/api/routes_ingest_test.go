@@ -66,6 +66,9 @@ func TestIngestHTTPAuthenticationPartialBatchAndReceiptIsolation(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(good.Body.Bytes(), &supported))
 	require.Contains(t, supported.Namespaces, "native:bluesky")
+	for _, namespace := range []string{"native:tumblr", "native:jpgfish", "native:imglike", "native:putmega", "native:leakgallery"} {
+		require.Contains(t, supported.Namespaces, namespace)
+	}
 	require.NotContains(t, supported.Namespaces, "native:onlyfans", "mirror evidence does not advertise native OnlyFans support")
 	require.Contains(t, supported.Prefixes, "mirror:coomer:")
 	require.Contains(t, supported.Prefixes, "mirror:kemono:")

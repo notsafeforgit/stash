@@ -4,7 +4,7 @@ import re
 from urllib.parse import urlsplit
 
 from .encoding import InvalidData
-from . import instagram, mirror, social_media, ytdl_media
+from . import instagram, mirror, social_media, ytdl_media, web_media
 
 
 class UnsupportedSource(InvalidData):
@@ -77,6 +77,8 @@ def _bluesky(data):
 
 def post(source):
     data, category = _context(source)
+    if category in web_media.CATEGORIES:
+        return web_media.post(data, category)
     if category in ('ytdl', 'ytdl-generic'):
         return ytdl_media.post(data)
     if category == "reddit":
@@ -121,6 +123,10 @@ def metadata(source):
         text_keys = ("desc", "title")
     elif category == "instagram":
         text_keys, date_keys = ("description",), (("date",) if data.get("type") in instagram.CONTAINERS else ("post_date",))
+    elif category == "tumblr":
+        text_keys = ("caption", "body", "description", "summary")
+    elif category in ("jpgfish", "imglike", "putmega", "leakgallery"):
+        text_keys = ("description", "caption", "title")
     elif category == "patreon":
         date_keys = ("published_at", "date")
     elif category in {"kemono", "coomer"}:
@@ -139,6 +145,8 @@ def metadata(source):
         date = ytdl_media.publication(data)
         if date is not None:
             result['published_at'] = date
+    if category in web_media.CATEGORIES and result.get("published_at", "").startswith("0001-"):
+        result.pop("published_at")
     if result.get("published_at"):
         result["date_basis"] = "source"
     return result
@@ -190,6 +198,8 @@ def attachment(source):
     ref = post(source)
     data, category = _context(source)
     download_url = source.get("_url")
+    if category in web_media.CATEGORIES:
+        return web_media.attachment(data, category)
     if category in ('ytdl', 'ytdl-generic'):
         return ytdl_media.attachment(data)
     if category == "reddit":

@@ -6,7 +6,7 @@ import math
 from .encoding import InvalidData
 from .source import _agree, _context, _id, _numeric, UnsupportedSource
 from .windows import normalize
-from . import ytdl_media
+from . import ytdl_media, web_media
 
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 PROTECTED_KEYWORDS = frozenset(("category", "subcategory", "date", "created_utc", "created_at",
@@ -30,9 +30,12 @@ def _datetime(value):
 def published(metadata, category):
     """Date of the source post, including its wrapper when it is a repost."""
     data, category = _context({**metadata, "category": category})
-    if category not in ("reddit", "twitter", "instagram", "coomer", "kemono", "bluesky", "tiktok", 'ytdl', 'ytdl-generic'):
+    if category not in ("reddit", "twitter", "instagram", "coomer", "kemono", "bluesky", "tiktok", 'ytdl', 'ytdl-generic', *web_media.CATEGORIES):
         raise UnsupportedSource("This extractor needs a native source-date adapter")
     try:
+        if category in web_media.CATEGORIES:
+            web_media.post(data, category)
+            return _datetime(data.get('date'))
         if category in ('ytdl', 'ytdl-generic'):
             value = ytdl_media.published(data)
             if value is None:
@@ -130,6 +133,9 @@ def validate_keywords(extractor):
     elif extractor.category in ('ytdl', 'ytdl-generic'):
         protected = protected | {'extractor_key', 'webpage_url', 'timestamp', 'upload_date', 'ytdl_media',
                                  'channel_id', 'uploader_id', '_type', 'entries'}
+    if extractor.category in web_media.CATEGORIES:
+        protected = protected | {'web_media', 'web_media_url', 'id_string', 'creator', 'photo', 'photos',
+                                 'url', 'video_url', 'audio_url', 'timestamp', 'native_file_exclusion'}
     for key in ("keywords", "keywords-global"):
         values = extractor.config(key)
         if values and (not isinstance(values, dict) or protected.intersection(values)):

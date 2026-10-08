@@ -168,7 +168,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 	ingestJSON(w, http.StatusOK, map[string]interface{}{
 		"protocol": ingest.ProtocolVersion, "producer_uuid": credential.ProducerUUID, "scopes": credential.Scopes,
 		"root_uuids": credential.RootUUIDs,
-		"kinds":      kinds, "post_namespaces": []string{"native:reddit", "native:twitter", "native:bluesky", "native:tiktok", "native:instagram", "native:patreon", "native:fansly"},
+		"kinds":      kinds, "post_namespaces": []string{"native:reddit", "native:twitter", "native:bluesky", "native:tiktok", "native:instagram", "native:patreon", "native:fansly", "native:tumblr", "native:jpgfish", "native:imglike", "native:putmega", "native:leakgallery"},
 		"post_namespace_prefixes": []string{"mirror:coomer:", "mirror:kemono:", "ytdl:"},
 		"retention_policy":        archive.SourceRetentionVersion, "max_event_bytes": ingest.MaxEventBytes, "max_batch_bytes": ingest.MaxBatchBytes, "max_batch_events": ingest.MaxBatchEvents,
 		"attachment_download_protocol": 1, "max_attachment_download_bytes": ingest.MaxAttachmentDownloadBytes,

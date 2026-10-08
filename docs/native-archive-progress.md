@@ -12228,3 +12228,46 @@ restarting it. The separate Chromium/WebKit activity suite passed all 16 checks.
 This validates the development increment, not a populated schema-98 migration
 or production activation. The remaining manual scraper adapters are being
 prepared in an isolated checkout while preserving this exact tested change.
+
+
+## Pinned Tumblr and gallery file intake — 2026-10-08
+
+The inspected manual gallery-dl configuration also enables Tumblr, JPGfish and
+LeakGallery. Their native post/attachment adapters now use captured source IDs
+and explicit membership evidence. Tumblr photos share the same source post and
+ordered album manifest. Chevereto pages retain individual file identities; their
+album/folder labels do not invent publishers or source-post groupings. LeakGallery
+HTML files share a partial manifest without claiming a complete album. The
+pinned extractor's swallowed pagination errors now fail the native attempt.
+Unsupported audio retains an exclusion without being downloaded.
+
+The new evidence marker preserves historical payload partitioning. The complete
+archive normalization suite passed, along with all 646 producer tests and three
+real HTTP worker/restore cases for Tumblr, JPGfish and LeakGallery. The latter
+exercise lost completion/report responses, capture/attachment association,
+durable file admission and exported/restored receipts. The shared Go/Python
+contract covers 17 valid/invalid metadata cases. Early failures were a fixture
+album-label/type error and missing generated/embedded files in the isolated
+checkout. The first main-checkout HTTP run exposed an incomplete Tumblr fixture
+which attempted a live blog-info request; the corrected fixture supplies that
+captured blog and now explicitly forbids live source requests.
+
+The preceding configured-scan increment passed the entire fork gate and was
+committed/pushed as `d2421ab9ef7544262339a273f743982398dc1fc5`. This adapter work
+is a separate verified development increment. No production
+configuration or scraper command has been switched. Cross-host source handling,
+the manual command handoff, final artifacts and the coherent migration remain.
+
+The complete gate's generation, UI (797), producer (646), manual-library (12),
+archive (125), and backup (304) stages also passed. It then reported one lint
+capitalization issue in a new error string, now corrected. The resumed
+`make validate-backend GO_TEST_TIMEOUT=60m` gate passed in 2,054.900 seconds,
+including lint and every Go integration package; earlier passed stages were
+retained rather than rerun. Six real catalog-import cases now verify identity
+continuity for JPGfish, Imglike, Putmega, LeakGallery and two yt-dlp namespaces.
+The existing importer adds a captured native identifier to a legacy-only post
+without changing its UUID, original captures or immutable snapshot proofs.
+Restart and acknowledged replay preserve those identities without duplication.
+Conflicting claims still require review. The final populated import must use a
+fresh common backup boundary; it cannot replace a completed catalog snapshot
+with a second snapshot UUID for the same catalog/source pair.

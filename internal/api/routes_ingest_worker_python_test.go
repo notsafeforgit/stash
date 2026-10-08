@@ -25,7 +25,7 @@ import (
 )
 
 func TestPythonDownloadWorkerRecoversFinishAndDeliversFiles(t *testing.T) {
-	for _, adapter := range []string{"caller-cli", "host-launcher", "n8n-backfill", "ytdl", "ytdl-traversal"} {
+	for _, adapter := range []string{"caller-cli", "host-launcher", "n8n-backfill", "ytdl", "ytdl-traversal", "tumblr", "jpgfish", "leakgallery"} {
 		t.Run(adapter, func(t *testing.T) { runPythonDownloadWorker(t, adapter) })
 	}
 }
@@ -49,6 +49,12 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 	target := "https://fixture.invalid/account"
 	namespace, attachmentKey := "native:reddit", "abc123"
 	switch adapter {
+	case "tumblr":
+		target, namespace, attachmentKey = "https://example.tumblr.com/", "native:tumblr", "url:b5ad9b7ba3b6d5f2029eb0cc302d9b4ca17c9fe3391c3926edb4acb149971450"
+	case "jpgfish":
+		target, namespace, attachmentKey = "https://jpg7.cr/img/Photo.AbCd", "native:jpgfish", "url:109590cc64a1ec6e2c80bd7eb311e80d5cfbba72613fa6bfef6a132be7650252"
+	case "leakgallery":
+		target, namespace, attachmentKey = "https://leakgallery.com/creator/123", "native:leakgallery", "url:31878403fea8221d5bdaa314c1690ec0af58224386d380b9c9f76ef3c92b36f7"
 	case "host-launcher":
 		target = "https://www.reddit.com/r/native_fixture/?sort=new"
 	case "n8n-backfill":
@@ -170,7 +176,7 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 		capture, err := service.Repo.Ingest.FindReceipt(ctx, producer.UUID, result.Capture)
 		require.NoError(t, err)
 		require.NotNil(t, capture)
-		if adapter == "ytdl-traversal" {
+		if adapter == "ytdl-traversal" || adapter == "jpgfish" || adapter == "leakgallery" {
 			require.Len(t, run.Completed, 1)
 			require.Equal(t, "traversal", run.Completed[0].Basis)
 			observed, err := service.Repo.SourceEvidence.FindCapture(ctx, capture.CaptureUUID)

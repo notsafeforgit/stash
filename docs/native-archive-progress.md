@@ -12171,3 +12171,60 @@ Native schema 1000097 is unchanged. The implementation remains uninstalled.
 Undated traversal, permitted cross-host source requests, actual direct/manual
 launch integration, remaining generic gallery-dl paths and refreshed host/n8n
 runtime/profile artifacts remain necessary before coherent cutover.
+
+## Configured scans without publication dates — 2026-10-08
+
+Native schema 1000098 adds an explicit `traversal` window basis for download
+profiles whose sources do not reliably supply publication timestamps. Its
+`until` is the frozen request time and `since` must be null. Completion means
+the configured scan finished with its reviewed filters and stop rules; it does
+not certify a publication interval or exhaustive historical coverage. Existing
+published requests keep their encoding and semantics. Date-based launchers and
+n8n backfills require published profiles.
+
+The server and durable offline queue distinguish these work identities even
+when policy hashes match. Pending scans coalesce to the newest request time,
+while a request newer than the active attempt remains pending. Target/root
+exclusion still prevents concurrent downloads. Worker capability negotiation,
+profile fingerprints and claimed-window checks prevent mode confusion. Database
+triggers reject unsupported or mixed bases; the schema version prevents an older
+binary from interpreting scans as date coverage. Migration fixtures preserve
+existing run, attempt and request rows and verify retries and restart behavior.
+
+The pinned ThisVid/Generic path now queues and finishes an undated video without
+inventing a timestamp or confusing the collection with its publisher. The native
+HTTP worker case covers an undated yt-dlp leaf, durable admission, lost-response
+recovery and exported receipt verification. Archive verification reconstructs
+the original Go digest, including the basis, after the producer releases its
+HTTP body. Eight shared digest cases and corruption tests cover that boundary.
+
+Archive activity uses the existing Base UI/shadcn presentation to distinguish
+pending/completed scans and their request times from publication windows. Mobile
+and desktop navigation and both Chromium/WebKit engines passed, including
+screenshots of scan coverage with no “all earlier history” claim.
+
+Validation passed: 640 producer tests, 125 portable-archive tests, the 797-test
+v3 validation suite, 16 browser checks, generation/build, embedded assets, Go
+lint, real SQLite source-run/backfill/migration checks and all five native HTTP
+worker variants. Initial checks exposed and corrected a schema-version parameter
+type, test setup errors and the archive verifier's older template assumption.
+One test run overlapped binding regeneration and failed on a temporarily missing
+generated file; subsequent runs use completed generation. The host browser cache
+was absent, so browser checks used the existing pinned Playwright container.
+The prior yt-dlp increment's original full ingestion rerun also passed in 695s.
+
+This remains development code. The latest verified populated application release
+is still schema 1000097. The new schema needs its populated migration/release
+proof. Host/n8n producer packages, reviewed profiles and backup verification
+packages must be rebuilt from the final code before activation. The actual
+manual gallery-dl entry point, remaining generic extractor paths and permitted
+cross-host source requests still require integration before coherent cutover.
+
+The original complete gate subsequently passed: `make validate-fork
+GO_TEST_TIMEOUT=40m`, including all Go integration packages, producer (640),
+manual-library (12), archive (125), backup (304), and UI (797) tests plus lint.
+The gate completed in 2,400.995 seconds; it was observed to completion without
+restarting it. The separate Chromium/WebKit activity suite passed all 16 checks.
+This validates the development increment, not a populated schema-98 migration
+or production activation. The remaining manual scraper adapters are being
+prepared in an isolated checkout while preserving this exact tested change.

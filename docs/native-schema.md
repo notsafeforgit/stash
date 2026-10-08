@@ -1,7 +1,15 @@
 # Native schema promotion
 
-The current development schema is 1000097. Production promotion remains a
+The current development schema is 1000098. Production promotion remains a
 separate reviewed cutover; development migrations are rehearsed on copies.
+
+Schema 1000098 distinguishes configured source scans from publication windows.
+The existing run/attempt window envelopes carry optional `basis: "traversal"`;
+new triggers reject invalid bases, mixed run coverage and traversal enrichment.
+Existing published runs, requests and attempts retain their original bytes.
+The version advance prevents an older binary from discarding the basis and
+mistaking a completed scan for historical publication coverage. No table copy
+or rewritten source evidence is required.
 
 Schema 1000097 adds `account_profile_urls` and
 `performer_profile_url_suppressions` for [captured profile links](native-ingestion.md#performer-links-from-captured-profiles).
@@ -11,8 +19,9 @@ The migration creates empty tables and retains all existing performer URLs;
 it cannot infer historical removals from missing links. Schema 1000096 added
 provider metadata import receipts, following schema 1000095's
 [file deduplication receipts](native-file-deduplication.md).
-The populated verified release remains at schema 1000096; this new increment
-requires its populated migration check before deployment.
+The [populated verified release](native-profile-release-verification.json)
+remains at schema 1000097; schema 1000098 requires its populated migration and
+release checks before deployment.
 
 The independent schema begins at primary migration 1000000 and identifies itself
 with `native_schema.lineage = org.notsafeforgit.stash.native-archive`. New

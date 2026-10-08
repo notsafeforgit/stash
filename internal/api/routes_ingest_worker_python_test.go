@@ -25,7 +25,7 @@ import (
 )
 
 func TestPythonDownloadWorkerRecoversFinishAndDeliversFiles(t *testing.T) {
-	for _, adapter := range []string{"caller-cli", "host-launcher", "n8n-backfill", "ytdl"} {
+	for _, adapter := range []string{"caller-cli", "host-launcher", "n8n-backfill", "ytdl", "ytdl-traversal"} {
 		t.Run(adapter, func(t *testing.T) { runPythonDownloadWorker(t, adapter) })
 	}
 }
@@ -53,7 +53,7 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 		target = "https://www.reddit.com/r/native_fixture/?sort=new"
 	case "n8n-backfill":
 		target = "https://www.reddit.com/user/Native_Fixture/submitted/?sort=new&t=all"
-	case "ytdl":
+	case "ytdl", "ytdl-traversal":
 		target, namespace, attachmentKey = "https://fixture.invalid/video/one", "ytdl:nativevideofixture", "one"
 	}
 	require.NoError(t, service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
@@ -170,6 +170,13 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 		capture, err := service.Repo.Ingest.FindReceipt(ctx, producer.UUID, result.Capture)
 		require.NoError(t, err)
 		require.NotNil(t, capture)
+		if adapter == "ytdl-traversal" {
+			require.Len(t, run.Completed, 1)
+			require.Equal(t, "traversal", run.Completed[0].Basis)
+			observed, err := service.Repo.SourceEvidence.FindCapture(ctx, capture.CaptureUUID)
+			require.NoError(t, err)
+			require.Nil(t, observed.Metadata.PublishedAt, "scan request time must never become a publication date")
+		}
 		file, err := service.Repo.Ingest.FindReceipt(ctx, producer.UUID, result.File)
 		require.NoError(t, err)
 		require.NotNil(t, file)

@@ -56,6 +56,21 @@ class ConfigurationTests(unittest.TestCase):
     def write(self):
         self.path.write_text(json.dumps(self.value))
 
+    def test_reviewed_source_mode_has_a_distinct_policy(self):
+        original = Configuration(self.path)
+        self.assertEqual(original.source_mode, 'published')
+        self.value['source_mode'] = 'published'
+        self.write()
+        self.assertEqual(original.policy_sha256, Configuration(self.path).policy_sha256)
+        self.value['source_mode'] = 'traversal'
+        self.write()
+        self.assertNotEqual(original.policy_sha256, Configuration(self.path).policy_sha256)
+        for mode in ('unknown', None, [], True):
+            self.value['source_mode'] = mode
+            self.write()
+            with self.subTest(mode=mode), self.assertRaises(InvalidData):
+                Configuration(self.path)
+
     def test_equivalent_host_container_paths_and_rotated_access_keep_one_policy(self):
         host = Configuration(self.path)
         container_path, _ = profile_fixture(self.directory / "container")

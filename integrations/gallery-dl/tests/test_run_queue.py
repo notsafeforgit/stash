@@ -57,6 +57,46 @@ class RunQueueTests(unittest.TestCase):
     def pending(self, intent):
         return decode(self.box.db.execute("SELECT windows FROM run_intents WHERE uuid=?", (intent,)).fetchone()[0])
 
+    def test_traversals_coalesce_separately_and_newer_requests_survive_frozen_retries(self):
+        def scan(day):
+            return request(window={**window(None, day), 'basis': 'traversal'})
+
+        intent = self.queue.enqueue(scan(20))
+        self.assertEqual(intent, self.queue.enqueue(scan(21)))
+        self.assertEqual(self.pending(intent), [scan(21)['window']])
+        frozen = self.claim()
+        self.assertEqual(decode(frozen.body)['window'], scan(21)['window'])
+        self.queue.fail(frozen, 'network_unavailable')
+        self.assertEqual(intent, self.queue.enqueue(scan(22)))
+        self.assertEqual(self.pending(intent), [scan(22)['window']])
+        self.assertNotEqual(intent, self.queue.enqueue(request(None, 22)))
+        self.box.close()
+        self.box = self.open()
+        self.queue = RunQueue(self.box)
+        self.now[0] += 5
+        # The publication run can be submitted first; it cannot consume scans.
+        delivery = self.claim()
+        if delivery.request_uuid != frozen.request_uuid:
+            self.assertNotIn('basis', decode(delivery.body)['window'])
+            self.queue.admit(delivery, admission(delivery.body))
+            delivery = self.claim()
+        self.assertEqual(delivery.body, frozen.body)
+        self.queue.admit(delivery, admission(delivery.body))
+        newest = self.claim()
+        self.assertEqual(decode(newest.body)['window'], scan(22)['window'])
+
+    def test_traversal_needs_negotiated_support_and_cannot_be_enrichment(self):
+        value = request(window={**window(None, 22), 'basis': 'traversal'})
+        with self.assertRaises(InvalidData):
+            self.queue.enqueue({**value, 'operation': 'enrich'})
+        self.queue.enqueue(value)
+        result = submit_once(self.queue, self.client)
+        self.assertEqual(result['error_code'], 'native_source_traversal_unavailable')
+        self.client._request.assert_not_called()
+        self.client.capabilities.return_value['source_run_traversal_protocol'] = 1
+        self.now[0] += 5
+        self.assertEqual(submit_once(self.queue, self.client)['state'], 'admitted')
+
     def test_many_offline_timers_coalesce_before_any_request_is_frozen(self):
         intent = self.queue.enqueue(request())
         for day in range(11, 200):

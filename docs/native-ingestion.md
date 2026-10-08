@@ -1299,7 +1299,7 @@ from portable settings, reviewed helper assets and the pinned runtime; local pat
 bindings and website-access values stay in its environment. Claim requires the matching fingerprint.
 No API argument supplies a command line.
 
-Windows are half-open published-time ranges `[since, until)`, with millisecond
+By default, windows are half-open published-time ranges `[since, until)`, with millisecond
 precision. `since: null` requests all history before the explicit `until`.
 Persist absolute cutoffs with the local request before transmission; a network
 retry must not quietly become a newer request. A producer/request UUID is an
@@ -1307,8 +1307,29 @@ immutable acknowledgement: replay returns its original run, and changed request
 contents return 409. A fresh scheduled request may create a run after the prior
 one succeeds.
 
+For sources without reliable publication timestamps, capability
+`source_run_traversal_protocol: 1` permits a download window such as
+`{"basis":"traversal","since":null,"until":"2026-10-08T12:00:00Z"}`.
+Here `until` is the frozen request time, not a publication cutoff. Completion
+means the reviewed profile's configured traversal finished, including its
+filters and archive/stop rules. It does not claim exhaustive history. Source
+publication dates remain as captured, including day-only or missing values.
+Profiles opt in with `source_mode: "traversal"`; default `published` profiles
+retain the strict date requirements. Workers verify this mode against their
+claimed window before starting work. Native schema 1000098 fences old binaries
+that cannot interpret the distinction.
+
+Pending scans coalesce to the latest request time. An already claimed older scan
+cannot finish a later request; the later scan remains queued. Scans and date
+ranges use distinct work identities even if the caller reuses its policy hash,
+while destination/target leases continue to exclude overlap. Neither basis
+satisfies the other, and scans cannot complete historical-backfill decisions.
+Archive activity displays scans by request time separately from publication
+coverage.
+
 Equivalent work shares one active run across producers. Its identity includes
-collection and root revisions, operation, policy fingerprint and cooldown.
+collection and root revisions, operation, policy fingerprint, cooldown and
+coverage basis.
 Every launch path must reference the same configured collection UUID for the
 same target. Distinct collections remain distinct provenance, even when a shared
 URL forces them to serialize. Queued windows merge without filling unrequested

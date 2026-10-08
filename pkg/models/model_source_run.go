@@ -6,11 +6,14 @@ import (
 	"time"
 )
 
-// SourceWindow is a half-open published-time interval. A nil Since means all
-// history before Until. Until is always explicit so a replay has stable meaning.
+// SourceWindow normally describes a half-open publication-time interval. With
+// Basis="traversal", Since must be nil and Until is the frozen request time:
+// completing the reviewed traversal satisfies that scan, not a published range.
+// A later scan request needs another traversal; neither basis covers the other.
 type SourceWindow struct {
 	Since *time.Time `json:"since"`
 	Until time.Time  `json:"until"`
+	Basis string     `json:"basis,omitempty"`
 }
 
 // PolicySHA256 identifies the effective, secret-free worker configuration and

@@ -324,6 +324,8 @@ def main(argv=None):
     parser.add_argument("--working-directory", default=os.getcwd(), help="Original gallery-dl working directory")
     parser.add_argument("--asset", action="append", default=[], help="Additional local exec helper to fingerprint")
     parser.add_argument("--category", help="Scope settings and helper definitions to one root extractor category")
+    parser.add_argument("--source-mode", choices=("published", "traversal"), default="published",
+                        help="Publication-date window or configured scan without publication coverage")
     parser.add_argument("--full-history", action="store_true", help="Preserve the wrappers' global skip=true override in this profile")
     parser.add_argument("--output", required=True, help="New, inactive profile file; must not exist")
     args = parser.parse_args(argv)
@@ -332,6 +334,7 @@ def main(argv=None):
                               {"path": args.locks, "identity": args.lock_identity}, working_directory=args.working_directory,
                               assets=args.asset, category=args.category)
         value = converter.convert()
+        value['source_mode'] = args.source_mode
         if args.full_history:
             value["gallery"]["skip"] = True
         checked = Configuration.from_document(value, Path(args.output).absolute().parent)

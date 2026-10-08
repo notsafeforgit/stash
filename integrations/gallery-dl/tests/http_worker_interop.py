@@ -34,7 +34,10 @@ def main():
     directory = Path(setup["directory"])
     path, profile = profile_fixture(directory)
     profile["root"]["uuid"] = setup["root"]
-    native_ytdl = setup['adapter'] == 'ytdl'
+    native_ytdl = setup['adapter'] in ('ytdl', 'ytdl-traversal')
+    traversal = setup['adapter'] == 'ytdl-traversal'
+    if traversal:
+        profile['source_mode'] = 'traversal'
     if native_ytdl:
         profile['source_category'] = 'ytdl-generic'
         profile['gallery']['extractor']['filename'] = '{id}.{extension}'
@@ -71,7 +74,7 @@ def main():
                    "--identity", "Native_Fixture", "--profile", str(path), "--until", now.isoformat(timespec="milliseconds")]
 
     def record():
-        if setup["adapter"] not in ('caller-cli', 'ytdl'):
+        if setup["adapter"] not in ('caller-cli', 'ytdl', 'ytdl-traversal'):
             result = subprocess.run(command, capture_output=True, text=True, timeout=30)
             assert result.returncode == 0, result.stderr
             value = json.loads(result.stdout)
@@ -106,7 +109,7 @@ def main():
 
             def _real_extract(self, url):
                 return {'id': 'one', 'title': 'Resolved video', 'uploader_id': 'publisher',
-                        'timestamp': int((now - timedelta(days=1)).timestamp()),
+                        **({} if traversal else {'timestamp': int((now - timedelta(days=1)).timestamp())}),
                         'ext': 'mp4', 'url': 'https://cdn.invalid/video.mp4'}
 
         original_factory = ytdl.construct_YoutubeDL

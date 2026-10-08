@@ -8,6 +8,7 @@ import type {
   RunActivityDetail,
 } from "@/core/native-archive/activity-schema";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardHeader,
@@ -30,43 +31,68 @@ import { AttemptHistory } from "./attempts";
 
 function RunWindows({ detail }: { detail: RunActivityDetail }) {
   const msg = useMsg();
+  const traversal = [
+    detail.window,
+    ...detail.pending,
+    ...detail.completed,
+  ].some((window) => window?.basis === "traversal");
   const groups = [
     {
-      label: msg("archive_activity.current_window", "Current time window"),
+      label: traversal
+        ? msg("archive_activity.current_scan", "Current scan")
+        : msg("archive_activity.current_window", "Current time window"),
       rows: detail.window ? [detail.window] : [],
     },
     {
-      label: msg("archive_activity.pending_windows", "Pending time windows"),
+      label: traversal
+        ? msg("archive_activity.pending_scans", "Pending scans")
+        : msg("archive_activity.pending_windows", "Pending time windows"),
       rows: detail.pending,
     },
     {
-      label: msg(
-        "archive_activity.completed_windows",
-        "Completed time windows",
-      ),
+      label: traversal
+        ? msg("archive_activity.completed_scans", "Completed scans")
+        : msg("archive_activity.completed_windows", "Completed time windows"),
       rows: detail.completed,
     },
   ];
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        {msg(
-          "archive_activity.windows_help",
-          "A window includes its start and stops just before its end. Finishing one window does not finish a run with other windows pending.",
-        )}
+        {traversal
+          ? msg(
+              "archive_activity.scans_help",
+              "A scan follows the source profile's filters and stopping rules. Its timestamp is the request time. Completion does not establish publication-date coverage or a complete historical backfill.",
+            )
+          : msg(
+              "archive_activity.windows_help",
+              "A window includes its start and stops just before its end. Finishing one window does not finish a run with other windows pending.",
+            )}
       </p>
       {groups.map((group) => (
         <div key={group.label} className="flex flex-col gap-2">
           <h3 className="font-medium">{group.label}</h3>
           {group.rows.length ? (
             group.rows.map((row) => (
-              <p key={`${row.since}:${row.until}`} className="text-sm">
-                {row.since ? (
-                  <ActivityTime value={row.since} />
+              <p
+                key={`${row.basis}:${row.since}:${row.until}`}
+                className="flex flex-wrap items-center gap-2 text-sm"
+              >
+                {row.basis === "traversal" ? (
+                  <Badge variant="secondary">
+                    {msg("archive_activity.scan_requested", "Scan requested")}
+                  </Badge>
                 ) : (
-                  msg("archive_activity.all_history", "All earlier history")
-                )}{" "}
-                — <ActivityTime value={row.until} />
+                  <>
+                    {row.since ? (
+                      <ActivityTime value={row.since} />
+                    ) : (
+                      msg("archive_activity.all_history", "All earlier history")
+                    )}{" "}
+                    —{" "}
+                  </>
+                )}
+                <ActivityTime value={row.until} />
               </p>
             ))
           ) : (
@@ -242,7 +268,7 @@ export function ActivityDetail({
                   </Link>
                 </div>
                 <PostSection
-                  title={msg("archive_activity.windows", "Scrape time windows")}
+                  title={msg("archive_activity.coverage", "Scrape coverage")}
                 >
                   <RunWindows detail={run} />
                 </PostSection>

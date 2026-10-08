@@ -24,6 +24,8 @@ from stash_ingest.runs import SourceFailure, SourcePaused, SourceTurnComplete
 from stash_ingest.ytdl_source import install
 from stash_ingest import source
 from stash_ingest.retention import retain
+from stash_ingest.encoding import decode
+from stash_ingest.source_window import SourceWindow
 from helpers import PRODUCER
 from test_producer import LeaseFixture
 
@@ -172,6 +174,39 @@ class YTDLSourceTests(unittest.TestCase):
         self.assertEqual(self.requests, [target], 'source resolution never downloads media')
         self.assertEqual(self.reservations, [target])
         self.assertIs(ytdl.construct_YoutubeDL, self.construct)
+
+    def test_configured_thisvid_scan_delivers_undated_video_with_original_identity(self):
+        target = 'https://thisvid.com/videos/fixture/'
+        self.responses[target] = '''<html><title>Video: Outer title - ThisVid.com</title>
+        <span>Added by: </span><a class="author" href="https://thisvid.com/members/150629/">Publisher</a></html>'''
+        self.lease.run.update(target_url=target, path_prefix='Account')
+        self.lease.run['window'] = {**self.lease.run['window'], 'basis': 'traversal'}
+        self.producer.window = SourceWindow(self.lease.run['window'])
+        config.set(('extractor',), 'base-directory', str(self.producer.root.path))
+        config.set(('extractor',), 'directory', ['Account'])
+        config.set(('extractor',), 'filename', '{id}.{extension}')
+        extractor = YoutubeDLExtractor.from_url('ytdl:' + target)
+        extractor.url = target
+        task = NativeDownloadJob(extractor, producer=self.producer, lock_directory=self.locks)
+
+        def download(url):
+            task.pathfmt.set_extension('mp4')
+            task.pathfmt.build_path()
+            task.pathfmt.part_enable()
+            with task.pathfmt.open('wb') as output:
+                output.write(b'fixture undated video')
+            return True
+
+        task.download = download
+        self.assertEqual(task.run(), 0)
+        events = [decode(row[0]) for row in self.box.db.execute('SELECT body FROM events ORDER BY seq')]
+        self.assertEqual([e['kind'] for e in events], ['source.capture', 'attachment.download', 'file.completed', 'attachment.download'])
+        self.assertEqual(events[0]['post']['namespace'], 'ytdl:thisvid.com')
+        self.assertEqual(events[0]['source']['uploader_id'], '150629')
+        self.assertNotIn('published_at', events[0]['metadata'])
+        self.assertNotIn('timestamp', events[0]['source'])
+        self.assertEqual(events[2]['relative_path'], 'Account/3533241.mp4')
+        self.assertEqual((self.producer.root.path / events[2]['relative_path']).read_bytes(), b'fixture undated video')
 
     def test_rate_limit_cannot_be_swallowed_by_ignoreerrors_or_the_bridge(self):
         self.responses['https://fixture.invalid/video/one'] = HTTPError(

@@ -21,8 +21,11 @@ def producer_bytes(value):
 
 
 def window(value):
-    if not isinstance(value, dict) or set(value) != {"since", "until"}:
+    if not isinstance(value, dict) or set(value) not in ({"since", "until"}, {"since", "until", "basis"}):
         raise InvalidArchive("Invalid retained source window")
+    basis = value.get('basis', '')
+    if basis not in ('', 'traversal') or (basis == 'traversal' and value['since'] is not None):
+        raise InvalidArchive('Invalid retained source coverage basis')
     def stamp(raw):
         match = STAMP.fullmatch(raw) if isinstance(raw, str) else None
         if match is None or any(c != "0" for c in (match.group(1) or "")[3:]):
@@ -32,6 +35,8 @@ def window(value):
         except (ValueError, OverflowError) as error:
             raise InvalidArchive("Invalid source window timestamp") from error
     result = {"since": stamp(value["since"]) if value["since"] is not None else None, "until": stamp(value["until"])}
+    if basis:
+        result['basis'] = basis
     if (result["until"] == "0001-01-01T00:00:00.000Z"
             or result["since"] is not None and result["since"] >= result["until"]):
         raise InvalidArchive("Source window does not end after its start")
@@ -61,6 +66,8 @@ def native_request_digest(value):
     identifier(value["request_uuid"])
     definition = template({key: value[key] for key in FIELDS})
     normalized = window(value["window"])
+    if normalized.get('basis') and definition['operation'] != 'download':
+        raise InvalidArchive('Retained traversal is not a download request')
     def go_time(stamp):
         if stamp is None:
             return None
@@ -72,17 +79,23 @@ def native_request_digest(value):
                "operation": definition["operation"], "policy_sha256": definition["policy_sha256"],
                "window": {"since": go_time(normalized["since"]), "until": go_time(normalized["until"])},
                "cooldown_seconds": definition["cooldown_seconds"]}
+    if normalized.get('basis'):
+        ordered['window']['basis'] = normalized['basis']
     raw = json.dumps(ordered, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode()
     return hashlib.sha256(raw).hexdigest()
 
 
 def retained_template(row):
     value = template(checked_json(row["template"], MAX_REQUEST))
+    bases = {'': hashlib.sha256(producer_bytes(value)).hexdigest()}
+    if value['operation'] == 'download':
+        bases['traversal'] = hashlib.sha256(producer_bytes([value, 'traversal'])).hexdigest()
+    basis = next((basis for basis, digest in bases.items() if digest == row['config_sha256']), None)
     if (not isinstance(row["template"], bytes) or producer_bytes(value) != row["template"]
-            or hashlib.sha256(row["template"]).hexdigest() != row["config_sha256"]
+            or basis is None
             or value["operation"] != row["operation"]):
         raise InvalidArchive("Retained source template lost its original identity")
-    return value
+    return value, basis
 
 
 def verify_run_admissions(library, queue, producer, version):
@@ -98,7 +111,7 @@ def verify_run_admissions(library, queue, producer, version):
             CASE WHEN length(template)<=8192 THEN template END AS template,
             CASE WHEN length(windows)<=16384 THEN windows END AS windows FROM run_intents ORDER BY uuid"""):
         identifier(row["uuid"])
-        retained_template(row)
+        _, basis = retained_template(row)
         if not isinstance(row["windows"], bytes):
             raise InvalidArchive("Source intent has no bounded retained windows")
         pending = decode_json(row["windows"])
@@ -106,7 +119,8 @@ def verify_run_admissions(library, queue, producer, version):
             raise InvalidArchive("Source intent window count differs from its retained work")
         previous = None
         for item in pending:
-            if item != window(item) or previous is not None and (item["since"] is None or item["since"] <= previous):
+            if (item != window(item) or item.get('basis', '') != basis
+                    or previous is not None and (item["since"] is None or item["since"] <= previous)):
                 raise InvalidArchive("Source intent windows are not normalized and disjoint")
             previous = item["until"]
         if row["latest_until"] != (previous or ""):
@@ -133,7 +147,10 @@ def verify_run_admissions(library, queue, producer, version):
         selected_window = checked_json(row["window_body"], MAX_REQUEST)
         if selected_window != window(selected_window) or row["until_stamp"] != selected_window["until"]:
             raise InvalidArchive("Source request lost its original normalized window")
-        request = dict(retained_template(row), request_uuid=row["request_uuid"], window=selected_window)
+        definition, basis = retained_template(row)
+        if selected_window.get('basis', '') != basis:
+            raise InvalidArchive('Source request changed its retained coverage basis')
+        request = dict(definition, request_uuid=row["request_uuid"], window=selected_window)
         raw = producer_bytes(request)
         if hashlib.sha256(raw).hexdigest() != row["sha256"]:
             raise InvalidArchive("Source request cannot be reconstructed from its retained template and window")

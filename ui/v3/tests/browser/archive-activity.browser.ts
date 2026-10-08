@@ -22,6 +22,7 @@ async function archive(page: Page, many = false) {
     failDetail: false,
     failCollection: false,
     malformed: false,
+    traversal: false,
   };
   await page.route("**/api/v3/archive/**", async (route) => {
     const request = route.request();
@@ -72,6 +73,19 @@ async function archive(page: Page, many = false) {
       detail.pending = [
         { since: "2026-10-02T00:00:00Z", until: "2026-10-06T12:00:00Z" },
       ];
+      if (control.traversal) {
+        detail.summary.operation = "download";
+        detail.completed = detail.completed.map((row) => ({
+          ...row,
+          since: null,
+          basis: "traversal",
+        }));
+        detail.pending = detail.pending.map((row) => ({
+          ...row,
+          since: null,
+          basis: "traversal",
+        }));
+      }
       result = detail;
     } else if (path.endsWith("/attempts")) {
       result = path.startsWith("activity/runs/")
@@ -293,7 +307,7 @@ test("a completed scrape attempt with pending windows still displays a queued ru
     page.getByText("Queued", { exact: true }).filter({ visible: true }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Scrape time windows", exact: true })
+    .getByRole("button", { name: "Scrape coverage", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "Pending time windows", exact: true }),
@@ -344,5 +358,40 @@ test("a failed collection lookup keeps its filter visible and permits clearing",
       ),
     )
     .toBe(true);
+  expect(remote.writes).toEqual([]);
+});
+
+test("configured scans do not claim all-history or publication coverage", async ({
+  page,
+}, testInfo) => {
+  const remote = await archive(page);
+  remote.control.traversal = true;
+  await page.goto(`/archive-activity?view=runs&item=${activityIds.run}`);
+  await page
+    .getByRole("button", { name: "Scrape coverage", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Pending scans", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Completed scans", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Scan requested", { exact: true })).toHaveCount(
+    2,
+  );
+  await expect(
+    page.getByText(/Completion does not establish publication-date coverage/),
+  ).toBeVisible();
+  await expect(
+    page.getByText("All earlier history", { exact: true }),
+  ).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    )
+    .toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("configured-scan.png") });
   expect(remote.writes).toEqual([]);
 });

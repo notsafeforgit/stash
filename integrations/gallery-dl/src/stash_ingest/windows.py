@@ -1,4 +1,4 @@
-"""Canonical half-open source windows; the server uses the same fixture corpus."""
+"""Publication windows and configured scan requests, with shared Go fixtures."""
 
 from datetime import datetime, timezone
 import re
@@ -21,21 +21,25 @@ def timestamp(value):
 
 
 def normalize(window):
-    if not isinstance(window, dict) or set(window) != {"since", "until"}:
+    if not isinstance(window, dict) or set(window) not in ({"since", "until"}, {"since", "until", "basis"}):
         raise InvalidData("A source window requires since and until")
+    basis = window.get('basis', '')
+    if basis not in ('', 'traversal') or (basis == 'traversal' and window['since'] is not None):
+        raise InvalidData('A traversal request requires no publication-date lower bound')
     since = timestamp(window["since"]) if window["since"] is not None else None
     until = timestamp(window["until"])
     if until == "0001-01-01T00:00:00.000Z" or (since is not None and since >= until):
         raise InvalidData("A source window must end after its start")
-    return {"since": since, "until": until}
+    return {"since": since, "until": until, **({'basis': basis} if basis else {})}
 
 
 def union(*groups):
     values = sorted((normalize(w) for group in groups for w in group),
-                    key=lambda w: (w["since"] is not None, w["since"] or "", w["until"]))
+                    key=lambda w: (w.get('basis', ''), w["since"] is not None, w["since"] or "", w["until"]))
     result = []
     for window in values:
-        if not result or (window["since"] is not None and window["since"] > result[-1]["until"]):
+        if (not result or window.get('basis', '') != result[-1].get('basis', '')
+                or (window["since"] is not None and window["since"] > result[-1]["until"])):
             result.append(window)
         elif window["until"] > result[-1]["until"]:
             result[-1]["until"] = window["until"]
@@ -47,6 +51,13 @@ def subtract(wanted, covered):
     for cover in union(covered):
         remaining = []
         for window in result:
+            if window.get('basis', '') != cover.get('basis', ''):
+                remaining.append(window)
+                continue
+            if window.get('basis') == 'traversal':
+                if window['until'] > cover['until']:
+                    remaining.append(window)
+                continue
             if ((cover["since"] is not None and window["until"] <= cover["since"])
                     or (window["since"] is not None and window["since"] >= cover["until"])):
                 remaining.append(window)

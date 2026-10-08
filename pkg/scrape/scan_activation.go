@@ -87,7 +87,7 @@ func PrepareScanActivation(input models.ScanJournalActivationInput, journal *mod
 }
 
 func SameWindow(a, b models.SourceWindow) bool {
-	return a.Until.Equal(b.Until) && ((a.Since == nil && b.Since == nil) || (a.Since != nil && b.Since != nil && a.Since.Equal(*b.Since)))
+	return a.Basis == b.Basis && a.Until.Equal(b.Until) && ((a.Since == nil && b.Since == nil) || (a.Since != nil && b.Since != nil && a.Since.Equal(*b.Since)))
 }
 
 func legacyScanWindow(command string, cutoff time.Time) (models.SourceWindow, string, error) {

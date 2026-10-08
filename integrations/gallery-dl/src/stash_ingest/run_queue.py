@@ -20,7 +20,10 @@ def specification(value):
             or value["operation"] not in ("download", "enrich") or not sha256(value["policy_sha256"])
             or type(value["cooldown_seconds"]) is not int or not 0 <= value["cooldown_seconds"] <= 86400):
         raise InvalidData("Invalid source request definition")
-    return {**value, "window": windows.normalize(value["window"])}
+    window = windows.normalize(value['window'])
+    if window.get('basis') == 'traversal' and value['operation'] != 'download':
+        raise InvalidData('Configured traversal currently requires a download operation')
+    return {**value, "window": window}
 
 
 @dataclass(frozen=True)
@@ -49,7 +52,7 @@ class RunQueue:
         self.db.execute("""UPDATE run_intents SET
                         pending_since=CASE WHEN ?=0 THEN NULL WHEN window_count=0 THEN ? ELSE pending_since END,
                         windows=?,window_count=?,latest_until=?,updated_at=? WHERE uuid=?""",
-                        (len(pending), self.box.clock(), encode(pending, 16384), len(pending), pending[-1]["until"] if pending else "",
+                        (len(pending), self.box.clock(), encode(pending, 16384), len(pending), max((w['until'] for w in pending), default=''),
                          self.box.clock(), intent))
 
     def enqueue(self, value, *, ticket_uuid=None):
@@ -65,7 +68,8 @@ class RunQueue:
         ticket_digest = digest(encode(spec, 8192))
         template = {k: v for k, v in spec.items() if k != "window"}
         body = encode(template, 8192)
-        key = digest(body)
+        basis = spec['window'].get('basis')
+        key = digest(encode([template, basis], 8192)) if basis else digest(body)
         if ticket_uuid is not None:
             previous = self.db.execute("SELECT * FROM run_intent_tickets WHERE uuid=?", (ticket_uuid,)).fetchone()
             if previous is not None:
@@ -230,6 +234,9 @@ def submit_once(queue, client, *, owner=None):
         if (capabilities.get("source_runs") is not True or capabilities.get("source_run_protocol") != 1
                 or capabilities.get("source_run_submission_receipts") is not True):
             raise Unavailable("incompatible_source_runs")
+        if (decode(delivery.body)['window'].get('basis') == 'traversal'
+                and capabilities.get('source_run_traversal_protocol') != 1):
+            raise Unavailable('native_source_traversal_unavailable')
         receipt = client._request("POST", "/runs", delivery.body)
         queue.admit(delivery, receipt)
         return {"state": "admitted", "request_uuid": delivery.request_uuid, "run_uuid": receipt["uuid"]}

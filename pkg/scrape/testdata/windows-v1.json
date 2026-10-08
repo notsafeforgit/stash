@@ -200,6 +200,198 @@
           "until": "2026-01-01T01:00:00.000Z"
         }
       ]
+    },
+    {
+      "name": "scan requests coalesce to latest request time",
+      "wanted": [
+        {
+          "since": null,
+          "until": "2026-01-02T00:00:00.000Z",
+          "basis": "traversal"
+        },
+        {
+          "since": null,
+          "until": "2026-01-01T00:00:00.000Z",
+          "basis": "traversal"
+        },
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ],
+      "covered": [],
+      "union": [
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ],
+      "remaining": [
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ]
+    },
+    {
+      "name": "old scan cannot complete newer request",
+      "wanted": [
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ],
+      "covered": [
+        {
+          "since": null,
+          "until": "2026-01-02T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ],
+      "union": [
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ],
+      "remaining": [
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ]
+    },
+    {
+      "name": "new scan completes earlier request",
+      "wanted": [
+        {
+          "since": null,
+          "until": "2026-01-01T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ],
+      "covered": [
+        {
+          "since": null,
+          "until": "2026-01-02T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ],
+      "union": [
+        {
+          "since": null,
+          "until": "2026-01-01T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ],
+      "remaining": []
+    },
+    {
+      "name": "scan cannot prove publication history",
+      "wanted": [
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z"
+        }
+      ],
+      "covered": [
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ],
+      "union": [
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z"
+        }
+      ],
+      "remaining": [
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "name": "dated history cannot satisfy scan",
+      "wanted": [
+        {
+          "since": null,
+          "until": "2026-01-02T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ],
+      "covered": [
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z"
+        }
+      ],
+      "union": [
+        {
+          "since": null,
+          "until": "2026-01-02T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ],
+      "remaining": [
+        {
+          "since": null,
+          "until": "2026-01-02T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ]
+    },
+    {
+      "name": "mixed coverage remains separate",
+      "wanted": [
+        {
+          "since": null,
+          "until": "2026-01-02T00:00:00.000Z",
+          "basis": "traversal"
+        },
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z"
+        }
+      ],
+      "covered": [
+        {
+          "since": null,
+          "until": "2026-01-01T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ],
+      "union": [
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z"
+        },
+        {
+          "since": null,
+          "until": "2026-01-02T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ],
+      "remaining": [
+        {
+          "since": null,
+          "until": "2026-01-03T00:00:00.000Z"
+        },
+        {
+          "since": null,
+          "until": "2026-01-02T00:00:00.000Z",
+          "basis": "traversal"
+        }
+      ]
     }
   ],
   "invalid": [
@@ -234,6 +426,16 @@
     {
       "since": "0001-01-01T00:00:00+01:00",
       "until": "2026-01-02T00:00:00.000Z"
+    },
+    {
+      "since": "2026-01-01T00:00:00.000Z",
+      "until": "2026-01-02T00:00:00.000Z",
+      "basis": "traversal"
+    },
+    {
+      "since": null,
+      "until": "2026-01-02T00:00:00.000Z",
+      "basis": "future"
     }
   ]
 }

@@ -170,8 +170,8 @@ func (s *SourceRunStore) Submit(ctx context.Context, producer string, input mode
 		return nil, models.ErrSourceRunInvalid
 	}
 	window, err := scrape.NormalizeWindow(input.Window)
-	if err != nil {
-		return nil, err
+	if err != nil || (window.Basis == scrape.TraversalBasis && input.Operation != "download") {
+		return nil, models.ErrSourceRunInvalid
 	}
 	input.Window = window
 	digest, err := sourceRunHash(input)
@@ -228,7 +228,11 @@ func (s *SourceRunStore) enqueue(ctx context.Context, input models.SourceRunRequ
 		}
 		rootRevision = root.Revision
 	}
-	work, err := sourceRunHash([]any{c.UUID, c.Revision, rootRevision, input.Operation, input.PolicySHA256, input.CooldownSeconds})
+	workDefinition := []any{c.UUID, c.Revision, rootRevision, input.Operation, input.PolicySHA256, input.CooldownSeconds}
+	if input.Window.Basis != "" {
+		workDefinition = append(workDefinition, input.Window.Basis)
+	}
+	work, err := sourceRunHash(workDefinition)
 	if err != nil {
 		return nil, false, err
 	}

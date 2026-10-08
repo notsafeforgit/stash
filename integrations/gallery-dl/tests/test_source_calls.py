@@ -11,7 +11,7 @@ import uuid
 from stash_ingest.caller_input import record_file_call
 from stash_ingest.client import Client, Unavailable
 from stash_ingest.completion import inspect_call
-from stash_ingest.encoding import decode
+from stash_ingest.encoding import InvalidData, decode
 from stash_ingest.outbox import Capacity, Conflict, LeaseLost, Outbox
 from stash_ingest.run_queue import RunQueue
 from stash_ingest.source_calls import SourceCalls, resolve_once
@@ -105,6 +105,25 @@ class SourceCallTests(unittest.TestCase):
         self.assertEqual(record_file_call(self.calls, args), original)
         self.assertEqual([row["target_url"] for row in self.calls.page(self.call_uuid)], [target(0), target(1)])
         args.lookback_seconds = 900
+        with self.assertRaises(Conflict):
+            record_file_call(self.calls, args)
+        self.client.capabilities.assert_not_called()
+
+    def test_scan_request_time_is_frozen_and_cannot_mix_with_a_date_range(self):
+        path = Path(self.temp.name) / 'sources.txt'
+        path.write_text(target(0))
+        args = SimpleNamespace(call=self.call_uuid, targets_file=str(path), profile=None, policy='a' * 64,
+            root=ROOT, operation='download', cooldown=30, since=None, lookback_seconds=None, until=None,
+            source_mode='traversal')
+        for overrides in ({'since': '1960-01-01T00:00:00Z'}, {'lookback_seconds': 60}, {'operation': 'enrich'}):
+            with self.subTest(overrides=overrides), self.assertRaises(InvalidData):
+                record_file_call(self.calls, SimpleNamespace(**{**vars(args), **overrides}))
+        original = record_file_call(self.calls, args)
+        self.assertEqual(original['definition']['window'], {'basis': 'traversal', 'since': None, 'until': '1970-01-01T00:16:40.000Z'})
+        self.now += 100
+        path.unlink()
+        self.assertEqual(record_file_call(self.calls, args), original)
+        args.source_mode = 'published'
         with self.assertRaises(Conflict):
             record_file_call(self.calls, args)
         self.client.capabilities.assert_not_called()

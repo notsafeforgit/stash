@@ -134,6 +134,8 @@ def main(service, argv=None):
                 profile.check()
                 if profile.source_category != service:
                     raise InvalidData("Launcher requires a reviewed profile for its source category")
+                if profile.source_mode != 'published':
+                    raise InvalidData('Date-based launchers require a publication-window profile')
                 if value["full_history"] and profile._gallery.get("skip") is not True:
                     raise InvalidData("Full-history and top scans require a reviewed profile with global skip=true")
                 targets, window, ignored = expand(service, value, box.clock())

@@ -258,10 +258,11 @@ performers or infer collection ownership.
 
 Source descriptions, titles and actual publication timestamps are retained.
 An `upload_date` without a timestamp stays a day-only date; an undated video
-stays undated. Neither can prove a publication-time window, so those download
-runs currently fail visibly rather than silently completing or inventing a
-timestamp. Undated traversal, supported cross-host source scopes, the direct
-manual command and final deployment profiles remain required before cutover.
+stays undated. Neither can prove a publication-time window. A profile with
+`source_mode: "traversal"` supports these downloads as configured scans instead;
+the default `published` mode still rejects missing precise timestamps. Supported
+cross-host source scopes, the direct manual command and final deployment profiles
+remain required before cutover.
 
 ## Worker profiles and execution
 
@@ -337,7 +338,7 @@ profile file. Keep one worker in each process: gallery-dl configuration is
 process-global, and simultaneous activation is rejected.
 
 `worker-policy --profile FILE` validates the local profile and prints its policy
-digest and root UUID. `queue-run --profile FILE` uses that digest in place of
+digest, root UUID and source mode. `queue-run --profile FILE` uses that digest in place of
 `--policy`. `execute-run RUN_UUID --profile FILE` first checks server download
 capability, root/operation/policy agreement and live ownership. It starts the
 heartbeat and a drainer with its own SQLite connection, then runs gallery-dl.
@@ -527,6 +528,23 @@ replaced. Missing mounts, helpers or pinned runtime prevent publication. Deployi
 the new profiles and converting host/n8n/recovery launchers remain separate steps.
 
 ## Offline source requests
+
+Profiles may set `source_mode` to `published` (default) or `traversal`.
+`stash-ingest-config --source-mode traversal` selects the latter when
+preparing an inactive profile. The mode is part of the reviewed policy digest.
+Date-based host launchers and n8n backfills require `published` profiles.
+`queue-run` and `queue-sources` derive the mode from `--profile`; a low-level
+caller using `--policy` can explicitly pass `--source-mode traversal`.
+
+For a configured scan, omit `--since` and `--lookback-seconds`. `--until` records
+the frozen request time, not a source date. The resulting window contains
+`basis: "traversal"`, `since: null` and that timestamp. It preserves the profile's
+filters, date settings, skip rules and stopping behavior. Completion certifies
+only that configured scan, never a complete historical backfill. No publication
+timestamp is invented. Pending requests coalesce to the latest timestamp, but a
+newer request remains pending while an older scan runs. Published requests remain
+separate, and neither kind supplies coverage for the other. Submission and
+execution require server capability `source_run_traversal_protocol: 1`.
 
 `run_queue.RunQueue` shares the event outbox database and producer/origin binding.
 It accepts only a collection UUID/revision, operation, configuration fingerprint,

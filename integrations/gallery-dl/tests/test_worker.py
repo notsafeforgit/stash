@@ -129,6 +129,27 @@ class WorkerTests(unittest.TestCase):
         self.delivery.close.assert_called_once()
         self.lease.close.assert_called_once()
 
+    def test_claimed_basis_must_match_the_reviewed_profile_before_work_starts(self):
+        self.lease.run['window']['basis'] = 'traversal'
+        self.assertEqual(self.run_worker()['state'], 'deferred')
+        self.delivery.start.assert_not_called()
+        self.lease.start.assert_not_called()
+        self.assertEqual(self.downloaded, [])
+
+    def test_traversal_profile_requires_capability_and_accepts_a_scan_lease(self):
+        value = json.loads((self.directory / 'worker.json').read_text())
+        value['source_mode'] = 'traversal'
+        self.profile = Configuration.from_document(value, self.directory)
+        self.lease.run.update(policy_sha256=self.profile.policy_sha256)
+        self.lease.run['window']['basis'] = 'traversal'
+        self.client._request.return_value = self.lease.run
+        with self.assertRaises(Unavailable):
+            self.run_worker()
+        self.claim.assert_not_called()
+        self.client.capabilities.return_value['source_run_traversal_protocol'] = 1
+        self.assertEqual(self.run_worker()['state'], 'source_succeeded')
+        self.assertEqual(len(self.downloaded), 2)
+
     def test_scoped_profile_refuses_a_different_root_extractor_before_download(self):
         path = self.directory / "worker.json"
         value = json.loads(path.read_text())

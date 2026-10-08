@@ -278,13 +278,14 @@ class ConfigMigrationTests(unittest.TestCase):
         destination = self.directory / "native-worker.json"
         args = ["--config", str(self.path), "--root", ROOT, "--root-path", self.root["path"], "--root-identity",
                 *map(str, self.root["identity"]), "--locks", self.locks["path"], "--lock-identity",
-                *map(str, self.locks["identity"]), "--output", str(destination)]
+                *map(str, self.locks["identity"]), "--output", str(destination), "--source-mode", "traversal"]
         output, errors = io.StringIO(), io.StringIO()
         with redirect_stdout(output), redirect_stderr(errors):
             self.assertEqual(main(args), 0, errors.getvalue())
         report = json.loads(output.getvalue())
         self.assertEqual(report["state"], "converted")
         self.assertEqual(report["policy_sha256"], Configuration(destination).policy_sha256)
+        self.assertEqual(Configuration(destination).source_mode, 'traversal')
         saved = destination.read_bytes()
         with redirect_stdout(output), redirect_stderr(errors):
             self.assertEqual(main(args), 1)

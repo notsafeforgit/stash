@@ -137,6 +137,34 @@ class RunReceiptTests(ReceiptFixture):
         with self.assertRaisesRegex(InvalidArchive,'exact original bytes'):
             self.admissions()
 
+    def test_traversal_admissions_restore_without_becoming_published_windows(self):
+        first = self.request(window={'since': None, 'until': '2026-10-01T00:00:00Z', 'basis': 'traversal'})
+        self.queue.enqueue(first)
+        self.assertEqual(self.admissions()['pending_windows'], 1)
+        delivery = self.queue.claim(str(uuid.uuid4()))
+        self.admit(delivery)
+        self.assertEqual(self.admissions()['counts']['admitted'], 1)
+        self.assertIsNone(self.box.db.execute('SELECT body FROM run_requests').fetchone()[0])
+        self.queue.enqueue(self.request(window={'since': None, 'until': '2026-10-02T00:00:00Z', 'basis': 'traversal'}))
+        self.queue.enqueue(self.request())
+        self.assertEqual(self.admissions()['intents'], 2)
+        self.assertEqual(self.admissions()['pending_windows'], 2)
+        row = self.box.db.execute('SELECT intent_uuid,"window" FROM run_requests').fetchone()
+        original = decode(row[1])
+        self.box.db.execute('UPDATE run_intents SET windows=? WHERE uuid=?',
+                            (encode([{**original, 'basis': ''}]), row[0]))
+        with self.assertRaisesRegex(InvalidArchive, 'normalized and disjoint'):
+            self.admissions()
+
+    def test_traversal_basis_cannot_be_discarded_after_releasing_the_http_body(self):
+        delivery = self.submit(self.request(window={'since': None, 'until': '2026-10-01T00:00:00Z', 'basis': 'traversal'}))
+        self.admit(delivery)
+        kept = decode(self.box.db.execute('SELECT "window" FROM run_requests').fetchone()[0])
+        kept.pop('basis')
+        self.box.db.execute('UPDATE run_requests SET "window"=?', (encode(kept),))
+        with self.assertRaisesRegex(InvalidArchive, 'coverage basis'):
+            self.admissions()
+
     def test_template_window_and_retained_receipt_cannot_drift(self):
         delivery = self.submit()
         receipt = self.admit(delivery)

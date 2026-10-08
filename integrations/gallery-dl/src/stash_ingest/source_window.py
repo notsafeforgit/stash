@@ -83,9 +83,15 @@ class SourceWindow:
         self.window = normalize(value)
         self.since = datetime.fromisoformat(self.window["since"]) if self.window["since"] else None
         self.until = datetime.fromisoformat(self.window["until"])
+        self.traversal = self.window.get('basis') == 'traversal'
 
     def contains(self, value):
-        return (self.since is None or value >= self.since) and value < self.until
+        return self.traversal or ((self.since is None or value >= self.since) and value < self.until)
+
+    def published(self, metadata, category):
+        # None is an explicit absence of a date requirement for a configured
+        # scan, never a replacement publication timestamp in source metadata.
+        return None if self.traversal else published(metadata, category)
 
     def configure(self, extractor, *, inherited=False):
         """Override obsolete date limits on this instance, leaving global config alone."""
@@ -96,6 +102,8 @@ class SourceWindow:
                 # File/post hooks need an accepted source post and its checked
                 # destination, even when the inherited config requests eager init.
                 return "lazy"
+            if self.traversal:
+                return original(key, default)
             if key in ("date-after", "date-before"):
                 # These generic gallery-dl predicates can stop at an old pinned
                 # post. Our predicate handles out-of-order posts without abort.

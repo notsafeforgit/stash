@@ -20,7 +20,7 @@ from .filesystem import destination_lock
 from .runs import SourceFailure, SourcePaused, SourceTurnComplete
 from .outbox import Capacity
 from .publication_lock import publication_lock
-from .source_window import published, validate_keywords
+from .source_window import validate_keywords
 from .scan_resume import legacy_cursor
 
 SUPPORTED_VERSION = "1.32.15-dev"
@@ -183,7 +183,7 @@ class NativeDownloadJob(job.DownloadJob):
             raise InvalidData("Extractor does not match this worker profile's source category")
         if parent is None and extractor.url != self.producer.lease.run["target_url"]:
             raise InvalidData("Extractor target differs from the claimed collection")
-        if (parent is not None and self._native_source_date is None
+        if (parent is not None and self._native_source_date is None and not self.producer.window.traversal
                 and not (parent._native_collection_child and extractor.category == parent.extractor.category
                          and extractor.category in ('instagram', 'bluesky', 'tiktok'))):
             raise InvalidData("Child extraction has no approved source-post window")
@@ -280,7 +280,7 @@ class NativeDownloadJob(job.DownloadJob):
                     finally:
                         self._native_collection_route = None
                     continue
-                value = self._native_source_date or published(data, self.extractor.category)
+                value = self._native_source_date or self.producer.window.published(data, self.extractor.category)
                 if self.producer.window.contains(value):
                     # Upstream augments/mutates keywords in place. Preserve the
                     # extractor's post for its subsequent attachment messages.
@@ -441,7 +441,7 @@ class NativeDownloadJob(job.DownloadJob):
                 return super().handle_queue(url, kwdict)
             finally:
                 self._native_collection_child = False
-        value = self._native_source_date or published(kwdict, self.extractor.category)
+        value = self._native_source_date or self.producer.window.published(kwdict, self.extractor.category)
         if not self.producer.window.contains(value):
             return
         self._native_queued_date = value

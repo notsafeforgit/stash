@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import unittest
+from types import SimpleNamespace
 
 from stash_ingest.encoding import InvalidData
 from stash_ingest.source import UnsupportedSource
@@ -13,6 +14,22 @@ def snowflake(stamp):
 
 
 class SourceWindowTests(unittest.TestCase):
+    def test_configured_traversal_keeps_missing_dates_and_reviewed_stop_rules(self):
+        scope = SourceWindow({'since': None, 'until': '2026-10-01T00:00:00Z', 'basis': 'traversal'})
+        settings = {'init': 'eager', 'date-after': '2020-01-01', 'date-before': '2027-01-01',
+                    'date-min': 123, 'date-max': 456, 'skip': 'abort:4', 'image-filter': 'extension == "mp4"'}
+        for inherited in (False, True):
+            extractor = SimpleNamespace(config=lambda key, default=None: settings.get(key, default))
+            scope.configure(extractor, inherited=inherited)
+            for key, value in settings.items():
+                self.assertEqual(extractor.config(key), 'lazy' if key == 'init' else value)
+        for value in (None, datetime(1990, 1, 1, tzinfo=timezone.utc), datetime(2028, 1, 1, tzinfo=timezone.utc)):
+            self.assertTrue(scope.contains(value))
+        for data in ({}, {'upload_date': '20260901'}, {'timestamp': 123}):
+            original = dict(data)
+            self.assertIsNone(scope.published(data, 'ytdl'))
+            self.assertEqual(data, original, 'request time is never a publication timestamp')
+
     def test_half_open_boundaries_keep_milliseconds_in_both_twitter_formats(self):
         scope = SourceWindow({"since": "2026-10-01T00:00:00.100Z", "until": "2026-10-01T00:00:00.300Z"})
         for fraction, matches in (("099", False), ("100", True), ("200", True), ("299", True), ("300", False)):

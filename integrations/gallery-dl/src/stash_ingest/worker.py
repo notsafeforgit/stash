@@ -82,6 +82,8 @@ def execute(box, client, configuration, run_uuid):
             or "attachment.download" not in capabilities.get("kinds", [])
             or capabilities.get("file_ingestion") is not True):
         raise Unavailable("native_download_worker_unavailable")
+    if configuration.source_mode == 'traversal' and capabilities.get('source_run_traversal_protocol') != 1:
+        raise Unavailable('native_source_traversal_unavailable')
     current = client._request("GET", "/runs/" + run_uuid)
     if (not isinstance(current, dict) or current.get("uuid") != run_uuid
             or current.get("policy_sha256") != configuration.policy_sha256
@@ -100,6 +102,9 @@ def execute(box, client, configuration, run_uuid):
         try:
             if lease.run.get("root_uuid") != configuration.root_uuid or lease.run.get("operation") != "download":
                 raise InvalidData("Claimed run changed its worker root or operation")
+            expected_basis = 'traversal' if configuration.source_mode == 'traversal' else ''
+            if (lease.run.get('window') or {}).get('basis', '') != expected_basis:
+                raise InvalidData('Claimed source coverage differs from the reviewed worker mode')
             lease.start()
             delivery.start()
 

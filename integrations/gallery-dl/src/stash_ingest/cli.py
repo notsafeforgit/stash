@@ -60,7 +60,8 @@ def main(argv=None):
     start = sources.add_mutually_exclusive_group()
     start.add_argument("--since", help="Absolute RFC3339 lower bound")
     start.add_argument("--lookback-seconds", type=int, help="Look back from the frozen upper bound")
-    sources.add_argument("--until", help="RFC3339 upper bound; omitted means the first admission time")
+    sources.add_argument("--until", help="RFC3339 exclusive publication bound or traversal request time; default: first admission time")
+    sources.add_argument('--source-mode', choices=('published', 'traversal'), help='Publication window or configured scan; otherwise use the profile mode')
     commands.add_parser("resolve-sources", help="Bind up to 50 pending caller targets and queue their source tickets")
     calls_status = commands.add_parser("calls-status", help="Local caller state and paginated source bindings")
     calls_status.add_argument("--call")
@@ -82,8 +83,9 @@ def main(argv=None):
     policy_source.add_argument("--profile", help="Native worker JSON; computes the effective configuration digest")
     request.add_argument("--operation", choices=("download", "enrich"), default="download")
     request.add_argument("--cooldown", type=int, default=0)
-    request.add_argument("--since", help="Absolute RFC3339 lower bound; omitted means all earlier history")
-    request.add_argument("--until", required=True, help="Explicit RFC3339 exclusive upper bound")
+    request.add_argument("--since", help="RFC3339 publication lower bound; omit for all earlier history or traversal mode")
+    request.add_argument("--until", required=True, help="RFC3339 exclusive publication bound or traversal request time")
+    request.add_argument('--source-mode', choices=('published', 'traversal'), help='Publication window or configured scan; otherwise use the profile mode')
     request.add_argument("--ticket", help="Stable caller execution UUID for command-response retries")
     commands.add_parser("submit-runs", help="Submit one ready source request; admission is not completion")
     runs_status = commands.add_parser("runs-status", help="Local source request state and optional paginated history")
@@ -181,14 +183,19 @@ def main(argv=None):
             output = client.receipt_status(args.event_uuid)
         elif args.command == "queue-run":
             policy = args.policy
+            mode = args.source_mode or 'published'
             if args.profile:
                 from .configuration import Configuration
                 if args.operation != "download":
                     raise InvalidData("This worker profile currently supports download operations")
-                policy = Configuration(args.profile).policy_sha256
+                profile = Configuration(args.profile)
+                if args.source_mode is not None and mode != profile.source_mode:
+                    raise InvalidData('Caller mode differs from the reviewed worker profile')
+                policy, mode = profile.policy_sha256, profile.source_mode
             intent = requests.enqueue({"collection_uuid": args.collection, "collection_revision": args.revision,
                 "policy_sha256": policy, "operation": args.operation, "cooldown_seconds": args.cooldown,
-                "window": {"since": args.since, "until": args.until}}, ticket_uuid=args.ticket)
+                "window": {"since": args.since, "until": args.until,
+                           **({'basis': 'traversal'} if mode == 'traversal' else {})}}, ticket_uuid=args.ticket)
             output = {"intent_uuid": intent, "ticket_uuid": args.ticket, "state": "recorded", "requests": requests.status()}
         elif args.command == "submit-runs":
             output = {"submission": submit_once(requests, client), "requests": requests.status()}
@@ -214,7 +221,7 @@ def main(argv=None):
             from .configuration import Configuration
             profile = Configuration(args.profile)
             output = {"policy_sha256": profile.policy_sha256, "root_uuid": profile.root_uuid,
-                      "operation": "download", "state": "validated"}
+                      "operation": "download", "source_mode": profile.source_mode, "state": "validated"}
         elif args.command == "execute-run":
             from .configuration import Configuration
             from .worker import execute as execute_source

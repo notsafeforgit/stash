@@ -141,6 +141,36 @@ it("reads attempt history newest first and validates outcome and time semantics"
   ).toHaveLength(1);
 });
 
+it("retains configured scan semantics and rejects mixed or invented coverage", async () => {
+  const detail = activityRunDetail();
+  detail.summary.operation = "download";
+  detail.pending = [
+    { since: null, until: "2026-10-06T12:00:00Z", basis: "traversal" },
+  ];
+  expect(await client(detail).api.run(activityIds.run)).toEqual(detail);
+  for (const window of [
+    { ...detail.pending[0], basis: "unknown" },
+    { ...detail.pending[0], since: "2026-10-01T00:00:00Z" },
+  ]) {
+    await expect(
+      client({ ...detail, pending: [window] }).api.run(activityIds.run),
+    ).rejects.toThrow();
+  }
+  await expect(
+    client({
+      ...detail,
+      summary: { ...detail.summary, operation: "enrich" },
+    }).api.run(activityIds.run),
+  ).rejects.toThrow();
+  await expect(
+    client({
+      ...detail,
+      summary: { ...detail.summary, completed_windows: 1 },
+      completed: [{ since: null, until: "2026-10-05T12:00:00Z" }],
+    }).api.run(activityIds.run),
+  ).rejects.toThrow();
+});
+
 it("rejects invalid page inputs before transport and strips unrelated response data", async () => {
   const { api, transport } = client([]);
   for (const before of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1])

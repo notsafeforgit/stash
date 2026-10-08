@@ -249,7 +249,7 @@ func (s *SourceBackfillStore) Complete(ctx context.Context, producer string, inp
 		return nil, err
 	}
 	input.Window, err = scrape.NormalizeWindow(input.Window)
-	if err != nil || input.Window.Since != nil || input.Window.Until.After(now.Add(time.Minute)) {
+	if err != nil || input.Window.Basis != "" || input.Window.Since != nil || input.Window.Until.After(now.Add(time.Minute)) {
 		return nil, models.ErrBackfillInvalid
 	}
 	input.Requests = append([]models.SourceRunRequest(nil), input.Requests...)

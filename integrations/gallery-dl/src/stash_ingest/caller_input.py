@@ -13,15 +13,21 @@ def record_file_call(calls, args):
                   "root_uuid": args.root, "policy_sha256": args.policy, "operation": args.operation,
                   "cooldown_seconds": args.cooldown, "since": args.since,
                   "lookback_seconds": args.lookback_seconds, "until": args.until}
+    if getattr(args, 'source_mode', None) is not None:
+        parameters['source_mode'] = args.source_mode
 
     def prepare():
         root, policy = args.root, args.policy
+        mode = parameters.get('source_mode') or 'published'
         if args.profile:
             from .configuration import Configuration
             profile = Configuration(parameters["profile"])
             if args.operation != "download" or (root is not None and root != profile.root_uuid):
                 raise InvalidData("Caller profile must match the requested operation and root")
             root, policy = profile.root_uuid, profile.policy_sha256
+            if parameters.get('source_mode') is not None and mode != profile.source_mode:
+                raise InvalidData('Caller mode differs from the reviewed worker profile')
+            mode = profile.source_mode
         with open(parameters["targets_file"], "rb") as stream:
             raw = stream.read((8 << 20) + 1)
         if len(raw) > 8 << 20:
@@ -40,7 +46,10 @@ def record_file_call(calls, args):
                 since = (datetime.fromisoformat(until) - timedelta(seconds=args.lookback_seconds)).isoformat(timespec="milliseconds")
             except (ValueError, OverflowError):
                 raise InvalidData("Lookback exceeds the source timestamp range") from None
+        if mode == 'traversal' and (since is not None or args.lookback_seconds is not None or args.operation != 'download'):
+            raise InvalidData('A traversal scan cannot request a publication-time range or enrichment operation')
+        window = windows.normalize({'since': since, 'until': until, **({'basis': 'traversal'} if mode == 'traversal' else {})})
         return {"targets": targets, "root_uuid": root, "policy_sha256": policy, "operation": args.operation,
-                "cooldown_seconds": args.cooldown, "window": {"since": since, "until": until}}
+                "cooldown_seconds": args.cooldown, "window": window}
 
     return calls.record(args.call, digest(encode(parameters, 16384)), prepare)

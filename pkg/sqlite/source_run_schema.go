@@ -6,7 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateSourceRunSchema(conn *sqlx.DB) error {
+func validateSourceRunSchema(conn *sqlx.DB, version uint) error {
 	for _, name := range []string{"source_runs", "source_runs_active_work", "source_runs_running_collection", "source_runs_running_target", "source_runs_running_destination", "source_runs_running_root", "source_runs_expired", "source_runs_collection_page", "source_runs_scope_page", "source_runs_active", "source_run_scope", "source_run_identity", "source_run_transition", "source_run_requests", "source_run_requests_run", "source_run_request_immutable", "source_run_attempts", "source_run_attempt_valid", "source_run_attempt_immutable", "source_run_cooldowns", "source_run_reviews", "source_run_review_immutable"} {
 		var exists bool
 		if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -24,6 +24,18 @@ OR EXISTS(SELECT 1 FROM source_run_attempts a JOIN source_runs r ON r.uuid=a.run
 	}
 	if unfinished {
 		return errors.New("native database has inconsistent source run ownership")
+	}
+	if version < NativeSchemaBaseline+98 {
+		return nil
+	}
+	for _, name := range []string{"source_run_basis_insert", "source_run_basis_update", "source_run_attempt_basis"} {
+		var exists bool
+		if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+			return err
+		}
+		if !exists {
+			return fmt.Errorf("native database schema is incomplete: missing %s", name)
+		}
 	}
 	return nil
 }

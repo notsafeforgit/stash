@@ -94,5 +94,39 @@
       "cooldown_seconds": 86400
     },
     "native_sha256": "b3165d107483e830b0013a8d27493d7c6311600b016f15a92c071a67d259c4c2"
+  },
+  {
+    "name": "configured_scan",
+    "input": {
+      "request_uuid": "33333333-3333-4333-8333-333333333333",
+      "collection_uuid": "22222222-2222-4222-8222-222222222222",
+      "collection_revision": 7,
+      "operation": "download",
+      "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "window": {
+        "since": null,
+        "until": "2026-10-01T00:00:00Z",
+        "basis": "traversal"
+      },
+      "cooldown_seconds": 30
+    },
+    "native_sha256": "36bc3c9b43e59cb23bb03529ad188e697e3f2d7524680f7a370945f6df2313d4"
+  },
+  {
+    "name": "configured_scan_with_offset",
+    "input": {
+      "request_uuid": "33333333-3333-4333-8333-333333333333",
+      "collection_uuid": "22222222-2222-4222-8222-222222222222",
+      "collection_revision": 7,
+      "operation": "download",
+      "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "window": {
+        "since": null,
+        "until": "2026-10-01T03:04:05.12-07:00",
+        "basis": "traversal"
+      },
+      "cooldown_seconds": 30
+    },
+    "native_sha256": "30d5b056309ed758cb0b02e51f31899f7c57856a6e64f0cd9dfdc7e25a69924a"
   }
 ]

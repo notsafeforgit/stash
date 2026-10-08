@@ -80,10 +80,16 @@ export const runActivitySchema = common
       (row.state !== "succeeded" || row.pending_windows === 0),
   );
 const sourceWindowSchema = z
-  .object({ since: timestamp.nullable(), until: timestamp })
+  .object({
+    since: timestamp.nullable(),
+    until: timestamp,
+    basis: z.literal("traversal").optional(),
+  })
   .refine(
     (row) =>
-      row.since === null || Date.parse(row.since) < Date.parse(row.until),
+      row.since === null ||
+      (row.basis !== "traversal" &&
+        Date.parse(row.since) < Date.parse(row.until)),
   );
 export const runActivityDetailSchema = z
   .object({
@@ -106,7 +112,20 @@ export const runActivityDetailSchema = z
     (row) =>
       row.pending.length === row.summary.pending_windows &&
       row.completed.length === row.summary.completed_windows &&
-      (row.summary.state === "running") === (row.window !== null),
+      (row.summary.state === "running") === (row.window !== null) &&
+      new Set(
+        [
+          ...row.pending,
+          ...row.completed,
+          ...(row.window ? [row.window] : []),
+        ].map((window) => window.basis),
+      ).size <= 1 &&
+      (row.summary.operation === "download" ||
+        [
+          ...row.pending,
+          ...row.completed,
+          ...(row.window ? [row.window] : []),
+        ].every((window) => !window.basis)),
   );
 export const activityAttemptSchema = z
   .object({

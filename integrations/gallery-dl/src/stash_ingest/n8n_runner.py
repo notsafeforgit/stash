@@ -90,6 +90,8 @@ def main(argv=None):
                 def prepare():
                     profile = Configuration(options["profile"])
                     profile.check()
+                    if profile.source_mode != 'published':
+                        raise InvalidData('n8n date backfills require a publication-window profile')
                     if profile.source_category != platform or profile._gallery.get("skip") is not True:
                         raise InvalidData("n8n backfills require a reviewed service profile with global skip=true")
                     return {"version": 1, "root_uuid": profile.root_uuid, "platform": platform, "account": args.identity,

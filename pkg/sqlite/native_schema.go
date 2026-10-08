@@ -371,7 +371,7 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+23 {
-			if err := validateSourceRunSchema(conn); err != nil {
+			if err := validateSourceRunSchema(conn, version); err != nil {
 				return err
 			}
 		}

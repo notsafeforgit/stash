@@ -21,7 +21,7 @@ func TestNativeArchiveSourceRunDigests(t *testing.T) {
 		NativeSHA256 string                  `json:"native_sha256"`
 	}
 	require.NoError(t, json.Unmarshal(body, &cases))
-	require.Len(t, cases, 6)
+	require.Len(t, cases, 8)
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
 			input := tc.Input

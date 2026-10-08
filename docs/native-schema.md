@@ -1,14 +1,18 @@
 # Native schema promotion
 
-The current development schema is 1000095. Production promotion remains a
+The current development schema is 1000097. Production promotion remains a
 separate reviewed cutover; development migrations are rehearsed on copies.
 
-Schema 1000095 adds signed `file_deduplications` receipts for verified redundant
-physical locations. It preserves original content/source proofs and logical
-media identities, with journaled filesystem recovery. See
-[native file deduplication](native-file-deduplication.md). The populated verified
-checkpoint and still-running coordinated restore remain at schema 1000094;
-the new increment requires its populated migration check before deployment.
+Schema 1000097 adds `account_profile_urls` and
+`performer_profile_url_suppressions` for [captured profile links](native-ingestion.md#performer-links-from-captured-profiles).
+The former shares link evidence across captures of one account; the latter
+preserves explicit URL removals across scrapes, restarts and performer merges.
+The migration creates empty tables and retains all existing performer URLs;
+it cannot infer historical removals from missing links. Schema 1000096 added
+provider metadata import receipts, following schema 1000095's
+[file deduplication receipts](native-file-deduplication.md).
+The populated verified release remains at schema 1000096; this new increment
+requires its populated migration check before deployment.
 
 The independent schema begins at primary migration 1000000 and identifies itself
 with `native_schema.lineage = org.notsafeforgit.stash.native-archive`. New

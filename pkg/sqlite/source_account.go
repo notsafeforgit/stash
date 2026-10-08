@@ -416,5 +416,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?)`, id, account.UUID, account.Revision+1, input.State
 ON CONFLICT(account_uuid) DO UPDATE SET decision_uuid = excluded.decision_uuid`, account.UUID, id); err != nil {
 		return nil, err
 	}
+	if input.State == models.AccountOwnershipLinked {
+		if err := syncAccountProfileURLs(ctx, account.UUID); err != nil {
+			return nil, err
+		}
+	}
 	return s.Ownership(ctx, account.UUID)
 }

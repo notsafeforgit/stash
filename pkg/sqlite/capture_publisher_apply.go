@@ -153,6 +153,11 @@ VALUES(?,?,?,?,?,?,?,?,?)`, input.UUID, input.CaptureUUID, revision, state, acco
 	if _, err := dbWrapper.Exec(ctx, "DELETE FROM capture_publisher_write_context WHERE request_uuid=?", input.UUID); err != nil {
 		return nil, err
 	}
+	if state == "linked" {
+		if err := recordAccountProfileURLs(ctx, *account, input.CaptureUUID); err != nil {
+			return nil, err
+		}
+	}
 	return s.Current(ctx, input.CaptureUUID)
 }
 

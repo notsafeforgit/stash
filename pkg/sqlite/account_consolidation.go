@@ -307,7 +307,7 @@ func (s *SourceAccountStore) Consolidate(ctx context.Context, input models.Accou
 			return err
 		}
 		ret = row.resolve()
-		return nil
+		return syncAccountProfileURLs(ctx, preview.Destination.UUID)
 	})
 	return ret, err
 }

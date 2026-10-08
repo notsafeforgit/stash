@@ -186,6 +186,11 @@ func (s *ArchiveEntityStore) Redirect(ctx context.Context, sourceUUID, destinati
 	if source.UUID == destination.UUID || source.Kind != destination.Kind {
 		return errors.New("merge requires distinct archive entities of the same kind")
 	}
+	if source.Kind == models.ArchivePerformer {
+		if err := mergePerformerProfileURLSuppressions(ctx, source.UUID, destination.UUID); err != nil {
+			return err
+		}
+	}
 	result, err := dbWrapper.Exec(ctx, `UPDATE archive_entities SET state = 'redirected', revision = revision + 1,
 performer_id = NULL, scene_id = NULL, image_id = NULL, file_id = NULL, gallery_id = NULL,
 tag_id = NULL, studio_id = NULL, group_id = NULL, redirect_to = ?, retired_at = CURRENT_TIMESTAMP

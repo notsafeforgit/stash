@@ -12052,3 +12052,28 @@ the images, measurements, corrections and evidence hashes. Production remains
 on the compatible Stash release. Whole-media verification, real native cloud
 publication/retention verification, a fresh common production boundary,
 migration, coherent activation and owner acceptance remain required.
+
+## Captured performer profile links — 2026-10-08
+
+Schema 1000097 adds profile URL importing to native capture publication and
+account ownership review. It reads only bio, website and profile link fields
+already present in gallery-dl metadata, requires the captured profile's stable
+ID to match the publisher, and appends distinct URLs to that account's linked
+performer. Feed owners, depicted-performer associations and display-name matches
+do not select the recipient. Host/n8n producer configuration and retention policy
+are unchanged; no extra profile fetch or redirect resolution is introduced.
+
+Per-account link evidence is shared across captures. Full, partial and bulk
+performer edits remember removed URLs in the primary database, including URLs
+removed before their first automatic import. Retrying a capture, restarting,
+relinking an account, adopting a UUID or merging performers cannot restore these
+links. Explicit manual re-addition remains available. Merge choices also retain
+removals when a source performer's URL is omitted from the destination. Both
+new tables are included in database backup and removed from anonymized exports.
+
+Focused extraction/storage/ingestion tests, surrounding domain regressions,
+performer/account/ingest API checks, Python producer HTTP delivery and the pinned
+Go linter passed. Full affected-package regression suites are running.
+Production is unchanged. This increment requires a new native application and
+backup validator release plus populated schema-97 migration/reconciliation
+before it can replace the verified schema-96 release selection.

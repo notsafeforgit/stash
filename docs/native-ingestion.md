@@ -35,6 +35,40 @@ UI remain required.
 Existing scrapes have not switched to this interface. Root, collection and policy
 administration endpoints are described below.
 
+## Performer links from captured profiles
+
+When gallery-dl includes profile or bio metadata, Stash appends its HTTP(S) links
+to the source account's linked performer. The captured profile must identify the
+post's publisher by stable service ID. A feed owner's profile on someone else's
+post, captions, preview URLs, and artwork do not supply performer links. Existing
+performer URLs stay in their original order, and equivalent URLs are not added
+twice. Known account locators such as `x.com/name` and `twitter.com/name` compare
+as the same link; other websites retain meaningful path/query differences.
+
+This uses metadata already supplied by the configured extractor. Neither Stash
+nor the adapter enables additional profile requests, follows links, or changes
+gallery-dl's user/bio settings. It recognizes captured bio/website/link-list
+fields on Reddit, Twitter, Instagram, Bluesky, TikTok, Fansly, mirror profiles
+and generic publisher objects that contain a matching stable ID. Twitter's
+captured expanded links take precedence over their short-link spelling. Each
+capture supplies at most 128 distinct valid profile links.
+
+Removing a performer URL through full, partial or bulk edits records a persistent
+suppression for that performer and normalized URL. Later captures, retries,
+restarts, account relinking and performer merges respect it. Explicit manual
+re-addition still works. This is additive: a link disappearing from a later bio
+does not delete a Stash URL. Removals made before this feature was installed
+cannot be reconstructed from a URL's absence.
+
+Captured links can also be applied when an account is linked to its performer
+after capture, or when source accounts are consolidated. Unlinked, undecided or
+deleted owners are skipped. These links do not establish other account ownership
+or assign people depicted in the post. The normalized per-account link evidence
+and per-performer removals live in `account_profile_urls` and
+`performer_profile_url_suppressions` in the native SQLite database, alongside
+their referenced source captures and UUIDs. Normal database backups include both;
+anonymized exports remove their private data. Schema 1000097 is required.
+
 ## Authentication and scope
 
 These are access tokens for Stash's ingestion API. Stash does not manage the

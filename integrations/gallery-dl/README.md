@@ -69,6 +69,12 @@ The envelope has no plugin-settings field. Retention removes known secret-bearin
 fields and private runtime handles; unsupported public runtime objects are
 rejected. Server source-identity and domain checks remain authoritative.
 
+When the configured extractor already yields a publisher's profile/bio, the
+native server can [append its links to the linked performer](../../docs/native-ingestion.md#performer-links-from-captured-profiles).
+The server remembers URLs removed in Stash so new captures do not restore them.
+This requires native schema 1000097; it needs no producer setting or additional
+gallery-dl profile fetching and applies equally to host and n8n delivery.
+
 A `file.completed` event requires the actual final relative path, positive size,
 SHA-256, and image/scene kind after transformations and filesystem flushes. Its
 source capture must already be queued for the same run, collection revision and root.

@@ -339,7 +339,7 @@ func (qb *PerformerStore) UpdatePartial(ctx context.Context, id int, partial mod
 	}
 
 	if partial.URLs != nil {
-		if err := performersURLsTableMgr.modifyJoins(ctx, id, partial.URLs.Values, partial.URLs.Mode); err != nil {
+		if err := updatePerformerURLs(ctx, id, *partial.URLs); err != nil {
 			return nil, err
 		}
 	}
@@ -379,7 +379,7 @@ func (qb *PerformerStore) Update(ctx context.Context, updatedObject *models.Upda
 	}
 
 	if updatedObject.URLs.Loaded() {
-		if err := performersURLsTableMgr.replaceJoins(ctx, updatedObject.ID, updatedObject.URLs.List()); err != nil {
+		if err := updatePerformerURLs(ctx, updatedObject.ID, models.UpdateStrings{Values: updatedObject.URLs.List(), Mode: models.RelationshipUpdateModeSet}); err != nil {
 			return err
 		}
 	}
@@ -1020,6 +1020,14 @@ func (qb *PerformerStore) Merge(ctx context.Context, source []int, destination i
 			return errors.New("cannot merge where source == destination")
 		}
 		srcArgs[i] = id
+		urls, err := qb.GetURLs(ctx, id)
+		if err != nil {
+			return err
+		}
+		// URLs omitted from the reviewed destination are removals too.
+		if err := rememberRemovedPerformerURLs(ctx, destination, urls); err != nil {
+			return err
+		}
 	}
 
 	args = append(args, srcArgs...)

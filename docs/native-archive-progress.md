@@ -11930,3 +11930,46 @@ This checkpoint does not complete the plan's stash-box metadata requirement.
 The existing schema-95 populated rehearsal retains its frozen runtime and inputs;
 the later schema-96 application needs its own populated migration/image checks.
 Production, producer launchers and the compatible release tags remain unchanged.
+
+## Provider attribution in batch imports and identification — 2026-10-08
+
+Studio/tag batches now record accepted fields and parent/category imports.
+Scene identification records the scene and every newly created related entity
+within its existing transaction. Missing or failed provider receipts abort the
+operation, with no successful hook notification. A fixture deliberately fails
+the final scene receipt after related imports, proves the entire operation rolls
+back, and retries successfully using the same source result. Ordinary scrapers
+without a stash-box endpoint retain their separate behavior.
+
+Creation receipts include required names while excluding invalid optional
+values that creation discarded. Tag parent values use native UUIDs. Studio image
+loading now uses the selected `images` entry directly rather than dereferencing
+the deprecated optional single-image field. The real identification fixture
+loads an image with only the current array present and records its digest.
+
+Studio refreshes retain the explicitly selected local ID when matching supplies
+no stored ID. Studio/tag batches reject conflicting matched or endpoint-linked
+owners and refuse to replace a different current provider link. Duplicate exact
+tag-name results require selection by remote ID. A failed parent creation leaves
+no stale stored ID in its reusable source result. Identification's create-missing
+option now preserves an already matched parent studio's curated metadata.
+
+The complete identification package passed in 11.3 seconds; all focused
+Stash-box manager tests passed in 67.1 seconds. SQLite fixtures cover exclusions,
+parent/category relationships, rollback/retry, matched-parent preservation,
+invalid optional values, provider ownership conflicts and remote tag ambiguity.
+The pinned linter reports zero issues. Initial identification fixture failures
+were test setup errors: a configuration import cycle, omitted migration
+registration, and an invalid qualified struct field after moving the tests to an
+external package. Original results are retained. The follow-up evidence is in
+[native-provider-import-paths-verification.json](native-provider-import-paths-verification.json).
+Interactive selection/save and attribution UI remain required; production and
+the frozen populated verification inputs are unchanged.
+
+Separately, the original populated schema-95 migration finished its fresh reopen
+at 05:38 UTC. The full run took 7,127 seconds; opening validation took 2,095
+seconds, migration 2,443 seconds, and fresh reopening 2,589 seconds. No jobs or
+policies were activated. Its existing owner automatically advanced to full typed
+reconciliation, with that child process confirmed live. These long validation
+times do not establish acceptable application startup performance; the queued
+wrapper/performance gates and later schema-96 verification still apply.

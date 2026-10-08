@@ -132,7 +132,7 @@ func Test_getPerformerID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getPerformerID(testCtx, tt.args.endpoint, db.Performer, tt.args.p, tt.args.createMissing, tt.args.skipSingleName)
+			got, err := getPerformerID(testCtx, tt.args.endpoint, db.Performer, tt.args.p, tt.args.createMissing, tt.args.skipSingleName, testMetadataRecorder)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getPerformerID() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -214,7 +214,7 @@ func Test_createMissingPerformer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := createMissingPerformer(testCtx, tt.args.endpoint, db.Performer, tt.args.p)
+			got, err := createMissingPerformer(testCtx, tt.args.endpoint, db.Performer, tt.args.p, testMetadataRecorder)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("createMissingPerformer() error = %v, wantErr %v", err, tt.wantErr)
 				return

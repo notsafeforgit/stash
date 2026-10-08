@@ -208,5 +208,10 @@
     "report": "native-provider-metadata-verification.json",
     "status": "storage_api_and_performer_batch_passed_other_paths_pending",
     "native_schema": 1000096
+  },
+  "metadata_attribution_import_paths": {
+    "report": "native-provider-import-paths-verification.json",
+    "status": "automated_import_paths_verified_interactive_and_ui_pending",
+    "native_schema": 1000096
   }
 }

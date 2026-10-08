@@ -14,6 +14,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/scene"
 	"github.com/stashapp/stash/pkg/sliceutil"
+	"github.com/stashapp/stash/pkg/stashbox"
 	"github.com/stashapp/stash/pkg/txn"
 	"github.com/stashapp/stash/pkg/utils"
 )
@@ -55,6 +56,7 @@ type SceneIdentifier struct {
 	DefaultOptions              *MetadataOptions
 	Sources                     []ScraperSource
 	SceneUpdatePostHookExecutor SceneUpdatePostHookExecutor
+	RecordProviderMetadata      stashbox.MetadataRecorder
 }
 
 func (t *SceneIdentifier) Identify(ctx context.Context, scene *models.Scene) error {
@@ -193,6 +195,7 @@ func (t *SceneIdentifier) getSceneUpdater(ctx context.Context, s *models.Scene, 
 		result:                   result,
 		fieldOptions:             fieldOptions,
 		skipSingleNamePerformers: utils.IsTrue(options.SkipSingleNamePerformers),
+		recordProviderMetadata:   t.RecordProviderMetadata,
 	}
 
 	setOrganized := utils.IsTrue(options.SetOrganized)
@@ -313,6 +316,9 @@ func (t *SceneIdentifier) modifyScene(ctx context.Context, s *models.Scene, resu
 
 		if _, err := updater.Update(ctx, t.SceneReaderUpdater); err != nil {
 			return fmt.Errorf("error updating scene: %w", err)
+		}
+		if err := t.RecordProviderMetadata.Record(ctx, models.ArchiveScene, s.ID, result.source.RemoteSite, result.result.RemoteSiteID, stashbox.SceneImportFields(updater.Partial, len(updater.CoverImage) > 0)); err != nil {
+			return fmt.Errorf("recording provider metadata: %w", err)
 		}
 
 		as := ""

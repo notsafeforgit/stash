@@ -299,11 +299,7 @@ func (t *stashBoxBatchPerformerTagTask) processMatchedPerformer(ctx context.Cont
 				}
 			}
 
-			selected := p.ToPartial(t.box.Endpoint, excluded, nil, nil)
-			// Creation always accepts the required name, even if name updates
-			// were excluded in the batch's refresh settings.
-			selected.Name = models.NewOptionalString(newPerformer.Name)
-			return stashbox.RecordMetadataImport(ctx, r, models.ArchivePerformer, newPerformer.ID, t.box.Endpoint, p.RemoteSiteID, "batch", stashbox.PerformerImportFields(selected, len(image) > 0))
+			return stashbox.RecordMetadataImport(ctx, r, models.ArchivePerformer, newPerformer.ID, t.box.Endpoint, p.RemoteSiteID, "batch", stashbox.PerformerCreateImportFields(p, newPerformer, excluded, len(image) > 0))
 		})
 		if err != nil {
 			logger.Errorf("Failed to create performer %s: %v", *p.Name, err)
@@ -425,8 +421,16 @@ func (t *stashBoxBatchStudioTagTask) findStashBoxStudio(ctx context.Context) (*m
 }
 
 func (t *stashBoxBatchStudioTagTask) processMatchedStudio(ctx context.Context, s *models.ScrapedStudio, excluded map[string]bool) {
+	if t.studio == nil && s.StoredID != nil {
+		logger.Warnf("Studio %s already matches local studio %s; select that studio to refresh it", s.Name, *s.StoredID)
+		return
+	}
 	if t.studio != nil {
-		storedID, _ := strconv.Atoi(*s.StoredID)
+		storedID := t.studio.ID
+		if s.StoredID != nil && *s.StoredID != strconv.Itoa(storedID) {
+			logger.Errorf("Provider studio matches another local studio; review the links before refreshing %s", t.studio.Name)
+			return
+		}
 
 		if s.Parent != nil && t.createParent {
 			err := t.processParentStudio(ctx, s.Parent, excluded)
@@ -450,7 +454,10 @@ func (t *stashBoxBatchStudioTagTask) processMatchedStudio(ctx context.Context, s
 				return err
 			}
 
-			partial := s.ToPartial(*s.StoredID, t.box.Endpoint, excluded, existingStashIDs)
+			if err := validateProviderEntityOwner(ctx, r, models.ArchiveStudio, storedID, t.box.Endpoint, s.RemoteSiteID, existingStashIDs); err != nil {
+				return err
+			}
+			partial := s.ToPartial(strconv.Itoa(storedID), t.box.Endpoint, excluded, existingStashIDs)
 
 			if err := studio.ValidateModify(ctx, partial, qb); err != nil {
 				return err
@@ -466,7 +473,7 @@ func (t *stashBoxBatchStudioTagTask) processMatchedStudio(ctx context.Context, s
 				}
 			}
 
-			return nil
+			return stashbox.RecordMetadataImport(ctx, r, models.ArchiveStudio, partial.ID, t.box.Endpoint, s.RemoteSiteID, "batch", stashbox.StudioImportFields(partial, len(image) > 0))
 		})
 		if err != nil {
 			logger.Errorf("Failed to update studio %s: %v", s.Name, err)
@@ -493,6 +500,9 @@ func (t *stashBoxBatchStudioTagTask) processMatchedStudio(ctx context.Context, s
 		err = r.WithTxn(ctx, func(ctx context.Context) error {
 			qb := r.Studio
 
+			if err := validateProviderEntityOwner(ctx, r, models.ArchiveStudio, 0, t.box.Endpoint, s.RemoteSiteID, nil); err != nil {
+				return err
+			}
 			if err := studio.ValidateCreate(ctx, *newStudio, qb); err != nil {
 				return err
 			}
@@ -507,7 +517,7 @@ func (t *stashBoxBatchStudioTagTask) processMatchedStudio(ctx context.Context, s
 				}
 			}
 
-			return nil
+			return stashbox.RecordMetadataImport(ctx, r, models.ArchiveStudio, newStudio.ID, t.box.Endpoint, s.RemoteSiteID, "batch", stashbox.StudioCreateImportFields(s, newStudio, excluded, len(studioImage) > 0))
 		})
 		if err != nil {
 			logger.Errorf("Failed to create studio %s: %v", s.Name, err)
@@ -531,6 +541,9 @@ func (t *stashBoxBatchStudioTagTask) processParentStudio(ctx context.Context, pa
 		err = r.WithTxn(ctx, func(ctx context.Context) error {
 			qb := r.Studio
 
+			if err := validateProviderEntityOwner(ctx, r, models.ArchiveStudio, 0, t.box.Endpoint, parent.RemoteSiteID, nil); err != nil {
+				return err
+			}
 			if err := qb.Create(ctx, newParentStudio); err != nil {
 				return err
 			}
@@ -541,13 +554,13 @@ func (t *stashBoxBatchStudioTagTask) processParentStudio(ctx context.Context, pa
 				}
 			}
 
-			storedId := strconv.Itoa(newParentStudio.ID)
-			parent.StoredID = &storedId
-			return nil
+			return stashbox.RecordMetadataImport(ctx, r, models.ArchiveStudio, newParentStudio.ID, t.box.Endpoint, parent.RemoteSiteID, "batch", stashbox.StudioCreateImportFields(parent, newParentStudio, excluded, len(image) > 0))
 		})
 		if err != nil {
 			logger.Errorf("Failed to create studio %s: %v", parent.Name, err)
 		} else {
+			storedID := strconv.Itoa(newParentStudio.ID)
+			parent.StoredID = &storedID
 			logger.Infof("Created studio %s", parent.Name)
 		}
 		return err
@@ -569,6 +582,9 @@ func (t *stashBoxBatchStudioTagTask) processParentStudio(ctx context.Context, pa
 				return err
 			}
 
+			if err := validateProviderEntityOwner(ctx, r, models.ArchiveStudio, storedID, t.box.Endpoint, parent.RemoteSiteID, existingStashIDs); err != nil {
+				return err
+			}
 			partial := parent.ToPartial(*parent.StoredID, t.box.Endpoint, excluded, existingStashIDs)
 
 			if err := studio.ValidateModify(ctx, partial, qb); err != nil {
@@ -585,7 +601,7 @@ func (t *stashBoxBatchStudioTagTask) processParentStudio(ctx context.Context, pa
 				}
 			}
 
-			return nil
+			return stashbox.RecordMetadataImport(ctx, r, models.ArchiveStudio, partial.ID, t.box.Endpoint, parent.RemoteSiteID, "batch", stashbox.StudioImportFields(partial, len(image) > 0))
 		})
 		if err != nil {
 			logger.Errorf("Failed to update studio %s: %v", parent.Name, err)
@@ -703,11 +719,16 @@ func (t *stashBoxBatchTagTagTask) findStashBoxTag(ctx context.Context) (*models.
 	if nameQuery != "" {
 		for _, r := range results {
 			if strings.EqualFold(r.Name, nameQuery) {
+				if result != nil {
+					return nil, fmt.Errorf("multiple provider tags exactly match %q; select a remote ID", nameQuery)
+				}
 				result = r
-				break
 			}
 		}
 	} else {
+		if len(results) != 1 {
+			return nil, fmt.Errorf("provider tag ID lookup returned multiple results")
+		}
 		result = results[0]
 	}
 
@@ -733,6 +754,9 @@ func (t *stashBoxBatchTagTagTask) processParentTag(ctx context.Context, parent *
 		err := r.WithTxn(ctx, func(ctx context.Context) error {
 			qb := r.Tag
 
+			if err := validateProviderEntityOwner(ctx, r, models.ArchiveTag, 0, t.box.Endpoint, parent.RemoteSiteID, nil); err != nil {
+				return err
+			}
 			if err := tag.ValidateCreate(ctx, *newParentTag, qb); err != nil {
 				return err
 			}
@@ -741,13 +765,13 @@ func (t *stashBoxBatchTagTagTask) processParentTag(ctx context.Context, parent *
 				return err
 			}
 
-			storedID := strconv.Itoa(newParentTag.ID)
-			parent.StoredID = &storedID
-			return nil
+			return stashbox.RecordMetadataImport(ctx, r, models.ArchiveTag, newParentTag.ID, t.box.Endpoint, parent.RemoteSiteID, "batch", stashbox.TagCreateImportFields(parent, newParentTag, excluded))
 		})
 		if err != nil {
 			logger.Errorf("Failed to create parent tag %s: %v", parent.Name, err)
 		} else {
+			storedID := strconv.Itoa(newParentTag.ID)
+			parent.StoredID = &storedID
 			logger.Infof("Created parent tag %s", parent.Name)
 		}
 		return err
@@ -764,6 +788,10 @@ func (t *stashBoxBatchTagTagTask) processMatchedTag(ctx context.Context, s *mode
 	tagID := 0
 	if t.tag != nil {
 		tagID = t.tag.ID
+		if s.StoredID != nil && *s.StoredID != strconv.Itoa(tagID) {
+			logger.Errorf("Provider tag matches another local tag; review the links before refreshing %s", t.tag.Name)
+			return
+		}
 	} else if s.StoredID != nil {
 		tagID, _ = strconv.Atoi(*s.StoredID)
 	}
@@ -785,6 +813,9 @@ func (t *stashBoxBatchTagTagTask) processMatchedTag(ctx context.Context, s *mode
 			}
 
 			storedID := strconv.Itoa(tagID)
+			if err := validateProviderEntityOwner(ctx, r, models.ArchiveTag, tagID, t.box.Endpoint, s.RemoteSiteID, existingStashIDs); err != nil {
+				return err
+			}
 			partial := s.ToPartial(storedID, t.box.Endpoint, excluded, existingStashIDs)
 
 			if err := tag.ValidateUpdate(ctx, tagID, partial, qb); err != nil {
@@ -795,7 +826,7 @@ func (t *stashBoxBatchTagTagTask) processMatchedTag(ctx context.Context, s *mode
 				return err
 			}
 
-			return nil
+			return stashbox.RecordMetadataImport(ctx, r, models.ArchiveTag, tagID, t.box.Endpoint, s.RemoteSiteID, "batch", stashbox.TagImportFields(partial))
 		})
 		if err != nil {
 			logger.Errorf("Failed to update tag %s: %v", s.Name, err)
@@ -810,6 +841,9 @@ func (t *stashBoxBatchTagTagTask) processMatchedTag(ctx context.Context, s *mode
 		err := r.WithTxn(ctx, func(ctx context.Context) error {
 			qb := r.Tag
 
+			if err := validateProviderEntityOwner(ctx, r, models.ArchiveTag, 0, t.box.Endpoint, s.RemoteSiteID, nil); err != nil {
+				return err
+			}
 			if err := tag.ValidateCreate(ctx, *newTag, qb); err != nil {
 				return err
 			}
@@ -818,7 +852,7 @@ func (t *stashBoxBatchTagTagTask) processMatchedTag(ctx context.Context, s *mode
 				return err
 			}
 
-			return nil
+			return stashbox.RecordMetadataImport(ctx, r, models.ArchiveTag, newTag.ID, t.box.Endpoint, s.RemoteSiteID, "batch", stashbox.TagCreateImportFields(s, newTag, excluded))
 		})
 		if err != nil {
 			logger.Errorf("Failed to create tag %s: %v", s.Name, err)
@@ -826,4 +860,44 @@ func (t *stashBoxBatchTagTagTask) processMatchedTag(ctx context.Context, s *mode
 			logger.Infof("Created tag %s", s.Name)
 		}
 	}
+}
+
+// Studios and tags do not have the performer's explicitly resolved merge chain.
+// A batch must not replace a different current provider link or claim an entity
+// already owned by another local record.
+func validateProviderEntityOwner(ctx context.Context, r models.Repository, kind models.ArchiveEntityKind, id int, endpoint string, remoteID *string, current []models.StashID) error {
+	if remoteID == nil || *remoteID == "" || endpoint == "" {
+		return models.ErrProviderMetadataInvalid
+	}
+	for _, link := range current {
+		if link.Endpoint == endpoint && link.StashID != *remoteID {
+			return fmt.Errorf("current provider link differs from the fetched %s; review the links first", kind)
+		}
+	}
+	key := models.StashID{Endpoint: endpoint, StashID: *remoteID}
+	switch kind {
+	case models.ArchiveStudio:
+		matches, err := r.Studio.FindByStashID(ctx, key)
+		if err != nil {
+			return err
+		}
+		for _, match := range matches {
+			if match.ID != id {
+				return fmt.Errorf("provider studio is linked to another local studio; review the links first")
+			}
+		}
+	case models.ArchiveTag:
+		matches, err := r.Tag.FindByStashID(ctx, key)
+		if err != nil {
+			return err
+		}
+		for _, match := range matches {
+			if match.ID != id {
+				return fmt.Errorf("provider tag is linked to another local tag; review the links first")
+			}
+		}
+	default:
+		return models.ErrProviderMetadataInvalid
+	}
+	return nil
 }

@@ -32,8 +32,9 @@ func Test_sceneRelationships_studio(t *testing.T) {
 	}).Return(nil)
 
 	tr := sceneRelationships{
-		studioReaderWriter: db.Studio,
-		fieldOptions:       make(map[string]*FieldOptions),
+		recordProviderMetadata: testMetadataRecorder,
+		studioReaderWriter:     db.Studio,
+		fieldOptions:           make(map[string]*FieldOptions),
 	}
 
 	tests := []struct {
@@ -178,8 +179,9 @@ func Test_sceneRelationships_performers(t *testing.T) {
 	db := mocks.NewDatabase()
 
 	tr := sceneRelationships{
-		sceneReader:  db.Scene,
-		fieldOptions: make(map[string]*FieldOptions),
+		recordProviderMetadata: testMetadataRecorder,
+		sceneReader:            db.Scene,
+		fieldOptions:           make(map[string]*FieldOptions),
 	}
 
 	tests := []struct {
@@ -379,9 +381,10 @@ func Test_sceneRelationships_tags(t *testing.T) {
 	})).Return(errors.New("error creating tag"))
 
 	tr := sceneRelationships{
-		sceneReader:  db.Scene,
-		tagCreator:   db.Tag,
-		fieldOptions: make(map[string]*FieldOptions),
+		recordProviderMetadata: testMetadataRecorder,
+		sceneReader:            db.Scene,
+		tagCreator:             db.Tag,
+		fieldOptions:           make(map[string]*FieldOptions),
 	}
 
 	tests := []struct {
@@ -558,8 +561,9 @@ func Test_sceneRelationships_stashIDs(t *testing.T) {
 	db := mocks.NewDatabase()
 
 	tr := sceneRelationships{
-		sceneReader:  db.Scene,
-		fieldOptions: make(map[string]*FieldOptions),
+		recordProviderMetadata: testMetadataRecorder,
+		sceneReader:            db.Scene,
+		fieldOptions:           make(map[string]*FieldOptions),
 	}
 
 	setTime := time.Now()
@@ -773,8 +777,9 @@ func Test_sceneRelationships_cover(t *testing.T) {
 	db.Scene.On("GetCover", testCtx, errSceneID).Return(nil, errors.New("error getting cover"))
 
 	tr := sceneRelationships{
-		sceneReader:  db.Scene,
-		fieldOptions: make(map[string]*FieldOptions),
+		recordProviderMetadata: testMetadataRecorder,
+		sceneReader:            db.Scene,
+		fieldOptions:           make(map[string]*FieldOptions),
 	}
 
 	tests := []struct {

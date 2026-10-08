@@ -78,7 +78,7 @@ func (s *ScrapedStudio) GetImage(ctx context.Context, excluded map[string]bool) 
 	// Process the base 64 encoded image string
 	if len(s.Images) > 0 && !excluded["image"] {
 		var err error
-		img, err := utils.ProcessImageInput(ctx, *s.Image)
+		img, err := utils.ProcessImageInput(ctx, s.Images[0])
 		if err != nil {
 			return nil, err
 		}

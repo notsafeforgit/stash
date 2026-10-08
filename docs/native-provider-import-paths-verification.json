@@ -1,0 +1,90 @@
+{
+  "recorded_at": "2026-10-08T06:01:51.122574+00:00",
+  "status": "passed_for_stated_scope",
+  "parent_revision": "22ff11588abd50385aef23136037f88787b26321",
+  "native_schema": 1000096,
+  "tested_files_sha256": {
+    "pkg/stashbox/metadata.go": "e6aaeba99d92813b2df8486e7f6e81c8195c961e3ff6cabdcb56b9ab49f8edb4",
+    "pkg/models/model_provider_metadata.go": "17500f9c522a0c0af71c894b97277f83f15198f2b320a07cea9768297469cb32",
+    "pkg/models/model_scraped_item.go": "32da0f7ac595111423648c13ee416e6da460fda57a0e745d94bca4d3f749dc52",
+    "pkg/sqlite/provider_metadata.go": "a516a9f7aef2c7536f50ed080b8631ed9fd63803852955f25f352e89b3b1af02",
+    "internal/manager/task_stash_box_tag.go": "b570841886cd6089d42fd7bbacccd1317e82138f2457ad5f0e2b56451574574d",
+    "internal/manager/task_stash_box_provider_test.go": "891d0e02ff265b0612ee797ed5821cf4382c82efe6c8d6a5e86b4fa1f7f4a6ce",
+    "internal/manager/task_identify.go": "94d6a3e5081339027edd483a491facd71c59711bb8d502eeeeabce1e68a468a4",
+    "internal/identify/identify.go": "435fda65f6df64c9cccf47f83010971c518b4a754bcb343ce5f7f8ef06dfea7b",
+    "internal/identify/scene.go": "8251fbd149c72e2a0c252e790687a8785d8aea153513af77b29c06130093e8a6",
+    "internal/identify/performer.go": "bf80d1f1e4dd86945183bb699b5f37843dfa4b6a811ad88fa29153dd8e55505c",
+    "internal/identify/studio.go": "ae1b0152002e4ac96946c4f4afc5fcdc2b3551f4627456c25ddd1371ccee4028",
+    "internal/identify/provider_metadata_test.go": "8a217c4e91146ef7dcbbf7092d3e17a5780f1facea780bf7ec35ba94175e91ac",
+    "internal/identify/provider_metadata_unit_test.go": "b3364af7499610271090d12d1d0ca3836bc63fc9aabbe829612ce39fecf2258f",
+    "internal/identify/scene_test.go": "0be6f1537c3eda0671796092a62efd4870227b7fc396896953de6dc8edff687e",
+    "internal/identify/performer_test.go": "00e5c96ba72e04ac8abb6a69087a0e675435a28e6fe84ae962460fc09919e7c0",
+    "internal/identify/studio_test.go": "1e668cec7e0eae724b3bbc8dd129613a58356847e05171fed3187ed22a2110bc"
+  },
+  "checks": [
+    {
+      "command": [
+        "go",
+        "test",
+        "./internal/identify",
+        "-count=1",
+        "-timeout=5m"
+      ],
+      "exit_code": 0,
+      "seconds": 11.269666416977998
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "./internal/manager",
+        "-run",
+        "TestStashBox",
+        "-count=1",
+        "-timeout=5m"
+      ],
+      "exit_code": 0,
+      "seconds": 67.11501646001125
+    },
+    {
+      "command": [
+        "go",
+        "run",
+        "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2",
+        "run",
+        "./internal/identify/...",
+        "./internal/manager/...",
+        "./pkg/stashbox/...",
+        "./pkg/models/...",
+        "./pkg/sqlite/..."
+      ],
+      "exit_code": 0,
+      "seconds": 10.024510621035006
+    }
+  ],
+  "verified_scope": [
+    "Studio/tag batch creation and refresh receipts",
+    "Parent studio/category receipts and native relationship UUIDs",
+    "Scene identification with newly created related entities in one transaction",
+    "Whole identification rollback and retry after final receipt failure",
+    "Required recorder for provider sources; ordinary scrapers remain separate",
+    "No metadata refresh of a matched parent under create-missing",
+    "Current image-array loading and digest attribution",
+    "Invalid optional creation values are not attributed",
+    "Conflicting studio/tag owners and changed provider links are rejected",
+    "Exact tag-name ambiguity requires explicit ID"
+  ],
+  "remaining_scope": [
+    "Interactive scrape selection and save paths",
+    "History UI and accurate current-field attribution",
+    "Populated schema-96 migration, selected application image and startup/performance gates"
+  ],
+  "failed_attempts_retained": [
+    "native_provider_import_paths_integration",
+    "native_provider_identification_sqlite",
+    "native_provider_identification_external"
+  ],
+  "production_changed": false,
+  "live_provider_requests": 0,
+  "frozen_schema95_rehearsal_changed": false
+}

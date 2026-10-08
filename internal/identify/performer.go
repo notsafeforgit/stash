@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/stashbox"
 )
 
 type PerformerCreator interface {
@@ -14,7 +15,7 @@ type PerformerCreator interface {
 	UpdateImage(ctx context.Context, performerID int, image []byte) error
 }
 
-func getPerformerID(ctx context.Context, endpoint string, w PerformerCreator, p *models.ScrapedPerformer, createMissing bool, skipSingleNamePerformers bool) (*int, error) {
+func getPerformerID(ctx context.Context, endpoint string, w PerformerCreator, p *models.ScrapedPerformer, createMissing bool, skipSingleNamePerformers bool, record stashbox.MetadataRecorder) (*int, error) {
 	if p.StoredID != nil {
 		// existing performer, just add it
 		performerID, err := strconv.Atoi(*p.StoredID)
@@ -28,13 +29,13 @@ func getPerformerID(ctx context.Context, endpoint string, w PerformerCreator, p 
 		if skipSingleNamePerformers && !strings.Contains(*p.Name, " ") && (p.Disambiguation == nil || len(*p.Disambiguation) == 0) {
 			return nil, ErrSkipSingleNamePerformer
 		}
-		return createMissingPerformer(ctx, endpoint, w, p)
+		return createMissingPerformer(ctx, endpoint, w, p, record)
 	}
 
 	return nil, nil
 }
 
-func createMissingPerformer(ctx context.Context, endpoint string, w PerformerCreator, p *models.ScrapedPerformer) (*int, error) {
+func createMissingPerformer(ctx context.Context, endpoint string, w PerformerCreator, p *models.ScrapedPerformer, record stashbox.MetadataRecorder) (*int, error) {
 	newPerformer := p.ToPerformer(endpoint, nil)
 	performerImage, err := p.GetImage(ctx, nil)
 	if err != nil {
@@ -51,6 +52,9 @@ func createMissingPerformer(ctx context.Context, endpoint string, w PerformerCre
 		if err := w.UpdateImage(ctx, newPerformer.ID, performerImage); err != nil {
 			return nil, err
 		}
+	}
+	if err := record.Record(ctx, models.ArchivePerformer, newPerformer.ID, endpoint, p.RemoteSiteID, stashbox.PerformerCreateImportFields(p, newPerformer, nil, len(performerImage) > 0)); err != nil {
+		return nil, err
 	}
 
 	return &newPerformer.ID, nil

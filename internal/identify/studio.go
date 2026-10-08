@@ -6,13 +6,24 @@ import (
 
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
-	"github.com/stashapp/stash/pkg/studio"
+	"github.com/stashapp/stash/pkg/stashbox"
 )
 
-func createMissingStudio(ctx context.Context, endpoint string, w models.StudioReaderWriter, s *models.ScrapedStudio) (*int, error) {
+func createMissingStudio(ctx context.Context, endpoint string, w models.StudioReaderWriter, s *models.ScrapedStudio, record stashbox.MetadataRecorder) (*int, error) {
 	var err error
+	// A failed enclosing identification must not leave a created parent's local
+	// ID in the reusable remote result after SQLite rolls that creation back.
+	local := *s
+	s = &local
+	if s.Parent != nil {
+		parent := *s.Parent
+		s.Parent = &parent
+	}
 
 	if s.Parent != nil {
+		// Create-missing authorizes new studios. A matched parent is only a
+		// relationship target; its existing metadata has not been selected for
+		// refresh by the scene's field options.
 		if s.Parent.StoredID == nil {
 			// The parent needs to be created
 			newParentStudio := s.Parent.ToStudio(endpoint, nil)
@@ -37,34 +48,8 @@ func createMissingStudio(ctx context.Context, endpoint string, w models.StudioRe
 
 			storedId := strconv.Itoa(newParentStudio.ID)
 			s.Parent.StoredID = &storedId
-		} else {
-			// The parent studio matched an existing one and the user has chosen in the UI to link and/or update it
-			storedID, _ := strconv.Atoi(*s.Parent.StoredID)
-
-			existingStashIDs, err := w.GetStashIDs(ctx, storedID)
-			if err != nil {
+			if err := record.Record(ctx, models.ArchiveStudio, newParentStudio.ID, endpoint, s.Parent.RemoteSiteID, stashbox.StudioCreateImportFields(s.Parent, newParentStudio, nil, len(parentImage) > 0)); err != nil {
 				return nil, err
-			}
-
-			studioPartial := s.Parent.ToPartial(*s.Parent.StoredID, endpoint, nil, existingStashIDs)
-			parentImage, err := s.Parent.GetImage(ctx, nil)
-			if err != nil {
-				return nil, err
-			}
-
-			if err := studio.ValidateModify(ctx, studioPartial, w); err != nil {
-				return nil, err
-			}
-
-			_, err = w.UpdatePartial(ctx, studioPartial)
-			if err != nil {
-				return nil, err
-			}
-
-			if len(parentImage) > 0 {
-				if err := w.UpdateImage(ctx, studioPartial.ID, parentImage); err != nil {
-					return nil, err
-				}
 			}
 		}
 	}
@@ -85,6 +70,9 @@ func createMissingStudio(ctx context.Context, endpoint string, w models.StudioRe
 		if err := w.UpdateImage(ctx, newStudio.ID, studioImage); err != nil {
 			return nil, err
 		}
+	}
+	if err := record.Record(ctx, models.ArchiveStudio, newStudio.ID, endpoint, s.RemoteSiteID, stashbox.StudioCreateImportFields(s, newStudio, nil, len(studioImage) > 0)); err != nil {
+		return nil, err
 	}
 
 	return &newStudio.ID, nil

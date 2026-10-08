@@ -242,9 +242,16 @@ func (s *ProviderMetadataStore) value(ctx context.Context, entity *models.Archiv
 		}
 	case models.ArchiveTag:
 		store := s.db.Tag
-		if field == "aliases" {
+		switch field {
+		case "aliases":
 			value, err = store.GetAliases(ctx, id)
-		} else {
+		case "parents":
+			var ids []int
+			ids, err = store.GetParentIDs(ctx, id)
+			if err == nil {
+				return providerMetadataReference(ctx, models.ArchiveTag, ids)
+			}
+		default:
 			scalar, err = store.Find(ctx, id)
 		}
 	}

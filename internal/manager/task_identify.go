@@ -148,6 +148,7 @@ func (j *IdentifyJob) identifyScene(ctx context.Context, s *models.Scene, source
 			DefaultOptions:              j.input.Options,
 			Sources:                     sources,
 			SceneUpdatePostHookExecutor: j.postHookExecutor,
+			RecordProviderMetadata:      stashbox.NewMetadataRecorder(r, "identify"),
 		}
 
 		taskError = task.Identify(ctx, s)

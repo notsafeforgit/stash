@@ -43,15 +43,31 @@ Invalid identities/cursors are rejected; unknown identities return 404.
 
 ## Integration status
 
-Batch performer creation and refresh record accepted fields, including the final
-remote ID after a provider merge. Existing field exclusions and alias/URL merge
-settings continue to control the edit. Required names accepted during creation
-are recorded even if name changes are excluded from refresh settings.
+Batch performer, studio and tag creation/refresh record accepted fields,
+including parent/category relationships and the final performer ID after a
+provider merge. Existing field exclusions and alias/URL merge settings continue
+to control the edit. Required names accepted during creation are recorded even
+if name changes are excluded from refresh settings. Invalid optional values
+ignored during creation do not receive attribution.
 
-The storage contract and API are implemented and covered by SQLite/HTTP tests.
-Studio/tag batches, scene identification and related entity creation, interactive
-scrape selection and the history UI still need integration. Existing field
+Scene identification records the accepted scene fields and newly created
+performers, tags, studios and parent studios in the same transaction. A failure
+in any import receipt rolls back the complete scene identification, including
+related creations; successful hooks run afterward. Provider sources require a
+recorder. Ordinary scrapers, which have no stash-box endpoint, continue using
+their existing path. Identifying a scene may link an existing parent studio;
+the create-missing setting does not authorize replacing that parent's metadata.
+
+Studio refreshes retain the explicitly selected local identity. Studio/tag
+batches reject source results matched or linked to another local entity, and
+reject replacement of a different current link at the same provider. Ambiguous
+exact tag-name results require an explicit remote ID. Failed parent creation
+does not leave a stale local ID in the source result.
+
+The storage contract, API, batches and identification paths are implemented and
+covered by SQLite/HTTP tests. Interactive scrape selection and the history UI
+still need integration. Existing field
 decision views must distinguish historical imports from current field provenance.
 These remaining paths are part of the transition requirement; the initial
-performer integration does not complete it. Production remains on the compatible
+automated import integration does not complete it. Production remains on the compatible
 release until the full cutover gates pass.

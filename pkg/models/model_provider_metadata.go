@@ -55,7 +55,7 @@ func ProviderMetadataFields(kind ArchiveEntityKind) []string {
 	case ArchiveStudio:
 		return []string{"name", "details", "urls", "aliases", "parent", "tags", "image"}
 	case ArchiveTag:
-		return []string{"name", "description", "aliases", "image"}
+		return []string{"name", "description", "aliases", "parents", "image"}
 	default:
 		return nil
 	}

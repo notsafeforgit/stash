@@ -13,6 +13,7 @@ import (
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sliceutil"
+	"github.com/stashapp/stash/pkg/stashbox"
 	"github.com/stashapp/stash/pkg/utils"
 )
 
@@ -38,6 +39,7 @@ type sceneRelationships struct {
 	result                   *scrapeResult
 	fieldOptions             map[string]*FieldOptions
 	skipSingleNamePerformers bool
+	recordProviderMetadata   stashbox.MetadataRecorder
 }
 
 func (g sceneRelationships) studio(ctx context.Context) (*int, error) {
@@ -64,7 +66,7 @@ func (g sceneRelationships) studio(ctx context.Context) (*int, error) {
 			return &studioID, nil
 		}
 	} else if createMissing {
-		return createMissingStudio(ctx, endpoint, g.studioReaderWriter, scraped)
+		return createMissingStudio(ctx, endpoint, g.studioReaderWriter, scraped, g.recordProviderMetadata)
 	}
 
 	return nil, nil
@@ -105,7 +107,7 @@ func (g sceneRelationships) performers(ctx context.Context, allowedGenders []mod
 			}
 		}
 
-		performerID, err := getPerformerID(ctx, endpoint, g.performerCreator, p, createMissing, g.skipSingleNamePerformers)
+		performerID, err := getPerformerID(ctx, endpoint, g.performerCreator, p, createMissing, g.skipSingleNamePerformers, g.recordProviderMetadata)
 		if err != nil {
 			if errors.Is(err, ErrSkipSingleNamePerformer) {
 				singleNamePerformerSkipped = true
@@ -176,6 +178,9 @@ func (g sceneRelationships) tags(ctx context.Context) ([]int, error) {
 			})
 			if err != nil {
 				return nil, fmt.Errorf("error creating tag: %w", err)
+			}
+			if err := g.recordProviderMetadata.Record(ctx, models.ArchiveTag, newTag.ID, endpoint, t.RemoteSiteID, stashbox.TagCreateImportFields(t, newTag, nil)); err != nil {
+				return nil, err
 			}
 
 			tagIDs = append(tagIDs, newTag.ID)

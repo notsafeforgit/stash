@@ -107,7 +107,7 @@ func Test_createMissingStudio(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := createMissingStudio(testCtx, tt.args.endpoint, db.Studio, tt.args.studio)
+			got, err := createMissingStudio(testCtx, tt.args.endpoint, db.Studio, tt.args.studio, testMetadataRecorder)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("createMissingStudio() error = %v, wantErr %v", err, tt.wantErr)
 				return

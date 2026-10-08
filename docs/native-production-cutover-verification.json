@@ -821,7 +821,7 @@
     "installed_outboxes": 2
   },
   "deployment": {
-    "files": 78,
+    "files": 80,
     "profiles": 32,
     "workflow_replacements": 9,
     "freshness_check": "passed",
@@ -829,7 +829,9 @@
     "services_started": false,
     "systemd_reloaded": false,
     "all_installed_hashes_equal": true,
-    "native_database_promoted": false
+    "native_database_promoted": false,
+    "base_selection_files": 78,
+    "backup_recovery_unit_overlay_files": 2
   },
   "backup_queue": {
     "redis_files": 4,
@@ -848,7 +850,7 @@
     "completed_catalogs_at_checkpoint": 1711,
     "completed_passes_at_checkpoint": 20532,
     "total_passes": 20532,
-    "independent_reconciliation": "pending",
+    "independent_reconciliation": "passed",
     "phase_outcomes": {
       "upload:received": 1711,
       "evidence:mapped": 1711,
@@ -875,7 +877,6 @@
     "manifest_sha256": "091b55067fe1f2932450f2f8ac9274301242ffec1961c74850d9ca56dcf43c6c"
   },
   "remaining": [
-    "current_catalog_and_operational_imports",
     "domain_and_policy_reconciliation",
     "pending_work_handoff",
     "scoped_credentials_and_installed_inventory",
@@ -885,7 +886,7 @@
     "owner_acceptance"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-08T23:02:57.276044+00:00",
+  "checked_at": "2026-10-08T23:35:52.780073+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -908,7 +909,10 @@
     "explicit_folder_defaults": 7,
     "qualified_local_directories": 516,
     "nonportable_historical_paths": 49,
-    "native_definitions_applied": false
+    "native_definitions_applied": false,
+    "preparation_status": "passed",
+    "prepared_catalog_policies": 1711,
+    "prepared_folder_policies": 7
   },
   "historical_media_audit": {
     "status": "finished_with_diagnosed_exceptions",
@@ -950,13 +954,45 @@
     "all_current_video_bytes_verified": true
   },
   "domain_services": {
-    "post_media": "waiting_for_import_reconciliation",
-    "albums": "waiting_for_post_media_reconciliation",
-    "policies": "waiting_for_complete_import_boundary",
-    "policy_import": "waiting_for_current_domain_migration",
-    "local_manual_handoff": "waiting_for_verified_disabled_policy_import_then_prepare_only",
-    "source_registration": "waiting_for_current_policy_import",
-    "operational_recovery_preparation": "waiting_for_current_policy_import_read_only"
+    "post_media": {
+      "status": "running",
+      "stage": "preview",
+      "started_at": "2026-10-08T23:25:56.423869+00:00",
+      "preview_progress": {
+        "posts": 220000,
+        "batches": 220,
+        "review_limit_posts": 0,
+        "statuses": {
+          "matched": 356518
+        }
+      }
+    },
+    "albums": {
+      "status": "running",
+      "stage": "waiting_for_current_post_media_links",
+      "started_at": "2026-10-08T23:25:56.653257+00:00"
+    },
+    "policies": "prepared_1718_disabled_definitions",
+    "policy_import": {
+      "status": "running",
+      "stage": "waiting_for_current_domain_migration",
+      "started_at": "2026-10-08T23:25:56.870235+00:00"
+    },
+    "local_manual_handoff": {
+      "status": "running",
+      "stage": "waiting_for_current_disabled_policies",
+      "started_at": "2026-10-08T23:25:57.269246+00:00"
+    },
+    "source_registration": {
+      "status": "running",
+      "stage": "waiting_for_current_policy_import",
+      "started_at": "2026-10-08T23:25:57.083468+00:00"
+    },
+    "operational_recovery_preparation": {
+      "status": "running",
+      "stage": "waiting_for_current_policy_import",
+      "started_at": "2026-10-08T23:25:57.544386+00:00"
+    }
   },
   "maintenance_journals": {
     "status": "passed",
@@ -982,7 +1018,7 @@
     "total_units": 1342,
     "extension_only_filenames_included": 2,
     "source_media_unchanged": true,
-    "production_backup_ledger_unchanged": true,
+    "production_backup_ledger_unchanged": false,
     "master_manifest_published": false,
     "verification_requests_at_checkpoint": {
       "ListObjectsV2": 301,
@@ -992,7 +1028,8 @@
     "verified_new_archive_bytes": 1452933120,
     "all_current_supported_image_bytes_backed_up": true,
     "current_verified_videos": 274466,
-    "publication_completed_at": "2026-10-08T20:51:38.379645+00:00"
+    "publication_completed_at": "2026-10-08T20:51:38.379645+00:00",
+    "verified_ledger_adopted": true
   },
   "outside_existing_media_extension_policy": {
     "untracked_matroska_files": 1,
@@ -1181,8 +1218,8 @@
     "running_container_and_open_descriptor_checks_passed": true
   },
   "automation_import": {
-    "status": "running",
-    "phase": "translations",
+    "status": "passed",
+    "stage": "all_automation_passes_recorded",
     "snapshot_uuid": "e8800d56-376d-5f93-9eb1-37d9a7abf689",
     "manifest_sha256": "d8778fad513c3ade9f1fd7dcc85eaff535cbee0a0f8804dda94b6f677bb9a07f",
     "completed": [
@@ -1206,9 +1243,24 @@
         "records": 0,
         "review_records": 0,
         "receipt_sha256": "2d8c5c8f5298de4dccdc175dc6d360e27985b0fa317a1a662e447bfc34a269f9"
+      },
+      {
+        "phase": "translations",
+        "state": "mapped",
+        "records": 667059,
+        "review_records": 0,
+        "receipt_sha256": "013a632633b43542d5aef06fcb0b7f605142abe0b84d083551bf9577a922c0a8"
+      },
+      {
+        "phase": "discovery",
+        "state": "review",
+        "records": 6744,
+        "review_records": 176,
+        "receipt_sha256": "d4ce2bb034d7b7b382e406921fd9f0241862f2312ce482c49d0be3df22fd3a38"
       }
     ],
-    "updated_at": "2026-10-08T23:01:53.248960+00:00",
+    "completed_at": "2026-10-08T23:10:11.549056+00:00",
+    "operating_work_activated": false,
     "uploaded_records": 925869
   },
   "compatible_release_reverification": {
@@ -1298,5 +1350,34 @@
     "legacy_catalog_dependency_removed": true,
     "services_still_held": true,
     "native_builds_unchanged": true
-  }
+  },
+  "post_import_reconciliation": {
+    "status": "passed",
+    "completed_at": "2026-10-08T23:25:56.357257+00:00",
+    "snapshots": {
+      "catalogs": 1711,
+      "automation": 1,
+      "chunks": 7127,
+      "rows": 5937272,
+      "bytes": 3683918067
+    },
+    "original_typed_rows_reconciled": 8290833,
+    "unchanged_typed_rows": 8290831,
+    "performer_names": 1941,
+    "exact_frozen_source_bytes": true,
+    "automation_matches_original_values_and_types": true,
+    "integrity": "ok",
+    "foreign_key_violations": 0,
+    "operating_work_activated": false,
+    "report_sha256": "f8b4fb894a163bee6a1ca21edb4c4265e1c42c31f547875c2fe144c443da39e7",
+    "catalog_source_records": 5011403,
+    "all_catalog_record_families_covered": true,
+    "verified_profile_url_additions": 2,
+    "verified_performer_timestamp_changes": 2,
+    "original_performer_urls_preserved": 1510,
+    "verification": "Each new profile URL is backed by an explicit performer/account association, stable source ID, captured profile URL and original snapshot record. Only the two exact publisher timestamps differ in existing rows; all other original values and SQLite types match.",
+    "failed_comparison_retained": true,
+    "imports_replayed": false
+  },
+  "root_free_GiB": 117.78
 }

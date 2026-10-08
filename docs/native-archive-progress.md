@@ -12432,3 +12432,21 @@ startup and actual n8n publication verification have prepared guarded drivers;
 none of those handoffs has run yet. The private native API remains active while
 public Stash and scraper schedules remain stopped. See the updated
 [production verification report](native-production-cutover-verification.json).
+
+All automation phases subsequently completed. Independent reconciliation now
+verifies 5,937,272 retained source records across 7,127 chunks, including every
+catalog record family and the original automation values and SQLite types.
+All 8,290,833 original library rows are accounted for; integrity and foreign-key
+checks pass. The comparison initially stopped on two URLs added by the requested
+captured-profile-link feature. Both additions are backed by explicit account
+ownership, stable source IDs and the original captured profile records. The
+associated two performer timestamps match their publisher decisions. All 1,510
+original performer URLs, 1,941 performer names and other original values remain
+unchanged. The failed comparison was retained and the verifier was corrected to
+check this specific evidence; no data was reverted or imports replayed.
+
+The six dependent domain services resumed only after that comparison passed.
+Post/media previews cover a scope of 261,642 posts, with independent preview and
+receipt checks before source albums and the 1,718 disabled policy definitions
+are applied. Source registration and operational recovery remain gated on these
+steps; the public application and scraper schedules are still held.

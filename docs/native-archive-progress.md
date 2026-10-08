@@ -12013,3 +12013,42 @@ supervisors remain intact. A separately compiled continuation uses the original
 schema-95 source and identical 1,038 policy requests with the corrected count.
 Its first supervisor stopped at an outdated result-path guard before invoking
 the test; the corrected supervisor is now running. Production is unchanged.
+
+## Populated release checks and current n8n handoff — 2026-10-08
+
+The policy handoff and schema-96 migration/reconciliation passed. The selected
+`15b45e2cd` source image and `90b8355` wrapper passed populated startup and restart
+in 262 and 172 seconds, preserving all table counts and published filter state.
+The wrapper no longer downloads the retired plugin dependency bundle at startup;
+Python requirements require an explicit opt-in and an explicit file.
+
+The separate populated load completed 344 captures and 24 image/video jobs
+alongside 180 browsing requests. Scene, image and performer list p95 latencies
+under ingestion were 20, 37 and 22 milliseconds, within the predefined budgets.
+The full comparison then preserved every original value and SQLite type across
+40,513,487 rows in 307 tables; the fixture added 8,380 rows and had no foreign-key
+violations. These are isolated API measurements, not browser or website timing.
+
+The original fixture/configuration and comparison failures remain recorded. The
+startup fixture initially omitted the marker for its already-published filter
+migration. The first row-comparison guard incorrectly rejected a retained WAL;
+the corrected comparison reads committed WAL through SQLite and verifies it
+unchanged. A final expected-total guard used the schema-95 input count, omitting
+schema 96's single migration-history row. Every table's count was reconciled
+against the migration report without repeating the successful comparison or
+load. No database contents or release budgets were changed for these fixes.
+
+Production n8n updated to 2.42.4 while the earlier native extension used 2.42.3.
+A separate extension now preserves the current base image's layers and runtime
+settings. Its 121 installed producer modules match source; all nine converted
+workflow graphs and ten container profiles passed their runtime checks.
+Both main n8n and its native worker are staged on this exact image. The existing
+Twitter/Reddit host command names and four scheduled submitters are also staged,
+with offline checks and systemd validation. The 73-file release includes these
+paths and adds their six missing backup components without changing cloud policy.
+
+The [verification report](native-populated-release-verification.json) records
+the images, measurements, corrections and evidence hashes. Production remains
+on the compatible Stash release. Whole-media verification, real native cloud
+publication/retention verification, a fresh common production boundary,
+migration, coherent activation and owner acceptance remain required.

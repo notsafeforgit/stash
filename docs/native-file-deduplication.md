@@ -219,4 +219,8 @@ and after commit. Python tests cover candidate bounds, locks, private saved
 intents, changed responses, known rejections and uncertain replay. A real
 Go/Python HTTP test drops a committed deletion response, reopens the database,
 restarts the client and verifies recovery plus the next pair's new preview.
-Host activation and the populated schema-95 rehearsal remain release work.
+The populated schema migration, final-image startup and post-ingestion row
+preservation checks have passed; see the
+[populated release verification](native-populated-release-verification.json).
+Installing the fclones-backed host launcher remains part of the coordinated
+production cutover.

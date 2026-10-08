@@ -1,0 +1,182 @@
+{
+  "checked_at": "2026-10-08T09:39:27.286192+00:00",
+  "status": "isolated_populated_release_and_staged_runtime_verified",
+  "source_revision": "15b45e2cd41eefdcdc987c7c8d581e187c834e33",
+  "native_schema": 1000096,
+  "production_changed": false,
+  "activated": false,
+  "images": {
+    "stash_source": "ghcr.io/notsafeforgit/stash@sha256:eef013c412c5f29865998e11d189f1ff41aca596c99c559f61c73f90606cfbcd",
+    "stash_wrapper": "ghcr.io/notsafeforgit/stash-s6@sha256:fffc068ff1a819350748bd599fcd916a46145c24a27bc4b4fc176bcfb354e16c",
+    "wrapper_source_revision": "90b835557cf7758156cfc36aa2bf279e2ebf7e43",
+    "n8n_native_local_image": "55c3fd914b40f55611d65766a1d1b7c10b6028c51cb28942367ebc782c3b1498",
+    "n8n_base_image": "157a2468e9ed11b3af32656396a9810ee8a201acb76c8b6d312dc14f526fd896",
+    "n8n_version": "2.42.4"
+  },
+  "populated_startup": {
+    "first_start_seconds": 261.5808303770027,
+    "restart_seconds": 171.58985095098615,
+    "original_tables": 307,
+    "table_counts_preserved": true,
+    "published_filter_state_preserved": true,
+    "entity_api_counts_verified": {
+      "findScenes": {
+        "count": 270760
+      },
+      "findImages": {
+        "count": 498646
+      },
+      "findGalleries": {
+        "count": 1887
+      },
+      "findPerformers": {
+        "count": 1426
+      }
+    },
+    "ui_served": true,
+    "native_api_served": true,
+    "source_database_unchanged": true,
+    "live_stash_and_n8n_unchanged": true
+  },
+  "concurrent_ingestion": {
+    "startup_seconds": 293.9366434039548,
+    "source_captures": 344,
+    "completed_file_jobs": 24,
+    "concurrent_browse_requests": 180,
+    "foreign_key_violations": 0,
+    "populated_performance_verified": true
+  },
+  "api_latencies_ms": {
+    "scenes": {
+      "first_request": 147.5322000333108,
+      "idle": {
+        "samples": 60,
+        "min_ms": 4.172257031314075,
+        "median_ms": 5.422292975708842,
+        "p95_ms": 11.788281961344182,
+        "max_ms": 13.711556035559624
+      },
+      "ingestion": {
+        "samples": 60,
+        "min_ms": 11.061785044148564,
+        "median_ms": 12.934892991324887,
+        "p95_ms": 20.131775992922485,
+        "max_ms": 24.351263011340052
+      }
+    },
+    "images": {
+      "first_request": 1147.3239779588766,
+      "idle": {
+        "samples": 60,
+        "min_ms": 3.9020769763737917,
+        "median_ms": 4.873574507655576,
+        "p95_ms": 28.679199051111937,
+        "max_ms": 29.707116016652435
+      },
+      "ingestion": {
+        "samples": 60,
+        "min_ms": 27.777241019066423,
+        "median_ms": 32.365881983423606,
+        "p95_ms": 37.18021197710186,
+        "max_ms": 40.021113003604114
+      }
+    },
+    "performers": {
+      "first_request": 13.854896009434015,
+      "idle": {
+        "samples": 60,
+        "min_ms": 9.21268097590655,
+        "median_ms": 11.444468516856432,
+        "p95_ms": 14.90466296672821,
+        "max_ms": 38.086358981672674
+      },
+      "ingestion": {
+        "samples": 60,
+        "min_ms": 9.705498989205807,
+        "median_ms": 12.639215012313798,
+        "p95_ms": 21.83145104208961,
+        "max_ms": 23.250215977896005
+      }
+    }
+  },
+  "original_row_preservation": {
+    "original_rows": 40513487,
+    "added_rows": 8380,
+    "native_schema_unchanged": true,
+    "original_rows_preserved": true,
+    "foreign_key_violations": 0,
+    "original_wals_unchanged": true,
+    "source_unchanged": true,
+    "target_unchanged_during_comparison": true,
+    "seconds": 410.67187916097464
+  },
+  "n8n_handoff": {
+    "installed_modules_match_source": 121,
+    "profiles_verified": 10,
+    "workflow_graphs_verified": 9,
+    "source_workflow_expression_checks": 37,
+    "child_workflow_expression_checks": 62,
+    "heartbeat_expression_checks": 7,
+    "base_layers_preserved": true,
+    "n8n_configuration_preserved": true,
+    "main_and_worker_share_exact_image": true,
+    "live_n8n_unchanged": true
+  },
+  "deployment_preparation": {
+    "files": 73,
+    "native_workflow_changes": 9,
+    "new_host_launcher_and_service_files": 6,
+    "added_backup_components": 6,
+    "all_previous_backup_components_preserved": true,
+    "units_verified": true,
+    "installed": false
+  },
+  "corrections_preserved": [
+    {
+      "scope": "First populated startup fixture",
+      "cause": "Minimal fixture omitted the publication marker for already-migrated default filters. Runtime correctly refused the mismatch.",
+      "correction": "A new isolated fixture includes the database-matching marker and verifies all filter/checkpoint rows after startup and restart. Production migration still uses its real source configuration."
+    },
+    {
+      "scope": "First original-row comparison guard",
+      "cause": "Closed performance database retained166765272bytes of committed WAL. The original harness refused it before opening SQLite.",
+      "correction": "Read the original fixture through mode=ro SQLite with WAL identity/digest checks before and after; retain the original failure and do not checkpoint, delete the WAL or repeat the workload."
+    },
+    {
+      "scope": "Comparison completion guard",
+      "cause": "Expected total40513486 referred to the schema95 input. Schema96 adds exactly one migration-history row.",
+      "correction": "Reconcile every baseline table with the completed schema96 migration report. The passed comparison covers40513487original rows; no test or database operation repeated."
+    },
+    {
+      "scope": "Staged n8n base",
+      "cause": "Production updated to2.42.4 while the earlier extension was based on2.42.3.",
+      "correction": "Build a separate extension of the current exact base, compare all121installed modules, preserve its entry point/user/environment and validate all9converted graphs plus10profiles."
+    }
+  ],
+  "scope": [
+    "Copied full native database, synthetic capture/file ingestion and HTTP browsing through the exact wrapper with no network or production media mounts.",
+    "API latency measurements do not establish browser-rendering or remote-source latency.",
+    "All checks are rehearsal/staging evidence; this is not a current production backup or a production migration.",
+    "The preserved failures and successful checks have separate receipts. No workload was repeated to change a measurement."
+  ],
+  "remaining": [
+    "Finish the original whole-media verification and real native S3 publication/retention/cost checks; administrator login remains pending.",
+    "Capture a fresh common boundary, migrate and reconcile current production inputs, and provision native worker identities/outboxes/tokens.",
+    "Apply all prepared runtimes/workflows/configuration together, verify actual scrape/intake/recovery/backup cycles, retire old writers.",
+    "Obtain desktop/mobile owner acceptance before merging develop."
+  ],
+  "evidence_sha256": {
+    ".local/native-wrapper-retirement-20261008/populated-startup-proof.json": "cd1589c235ad728d62315610bcfcd4d3d3064ce170be8abc2d12d8cb13329b51",
+    ".local/native-wrapper-performance-20261008/populated-v1/proof.json": "b09bb2fcbf08fcdf6413b7c25b42b851a4f934e279388b90ea83e010521475c0",
+    ".local/native-wrapper-performance-20261008/populated-v1/performance/api-performance-progress.json": "b19483cd8cba30b47303f99ea8a966c9cceea9e501bd5071509fb6648e778c50",
+    ".local/native-wrapper-performance-20261008/populated-v1/original-row-preservation-v2.json": "2aa34a39610318096b8a8aa921cff8b3ab36ffb59cb8027b73d82abc66f80d30",
+    ".local/native-wrapper-performance-20261008/performance-chain-v3.json": "65090331d8c2e3eeb22055605fb1315a8d39b37fabf1e3cef0d6fefce856c707",
+    ".local/native-cutover-readiness-20261008/n8n-preparation.json": "23b9a662dbd5a8321d227b25deefc3661e1f114334eb6d35b710943e616376ca",
+    ".local/native-cutover-readiness-20261008/n8n-profile-readiness.json": "09c1da2fac033b3920884b8ea0b365ec88765743b7036851212be1fd414fda12",
+    ".local/native-cutover-readiness-20261008/n8n-unit-preparation.json": "d9079685f8b3ac8bfca2d05f0f31bb9e677a0c51613ec76b0901201ce2c645b9",
+    ".local/native-cutover-readiness-20261008/host-launcher-preparation.json": "b5c7692a265d1d70457d6b5594948d90901886c01d1bda4ac0b90775569ddfce",
+    ".local/native-cutover-readiness-20261008/host-systemd-verification.json": "95638c5b4ca5278820bd23ff60a31ec58601d14b1286d5d6d8977419d50ba6e0",
+    ".local/native-cutover-readiness-20261008/backup-component-extension.json": "01669b0349b4501bf1f00ddfaff3b69f8981c727a9ca18c92faa052dcdbd0bac",
+    ".local/native-cutover-readiness-20261008/release-selection.json": "05648dc4b9f9e38a9a1ca5561b21360897a07c1fd7845f29c265628a42575c61"
+  }
+}

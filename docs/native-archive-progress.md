@@ -45,6 +45,16 @@ Completion requires agreement between the imported database slice and the full h
 independent source-byte and domain reconciliation. The same snapshot remains
 held and mounted read-only; the original compatible database is unchanged.
 
+The private candidate now uses SSD storage behind its original logical path.
+The closed database and search files were copied and checksum-verified, with the
+original directory retained and SQLite checks passing. Recovery corrected an
+unavailable automatic ZFS snapshot path and the temporary container supervisor's
+lifetime. The replacement private container uses the existing stable read-only
+mount of the same held snapshot. Import resumed from all 4,563 saved phase
+receipts with unchanged snapshot identities; the dependent services were restored
+without repeating completed work. Final promotion must move this candidate on
+the same SSD filesystem rather than allocate another full database copy.
+
 Current settings match the rehearsed conversion exactly: 38 retained layered
 values and 27 effective settings. All seven explicit folder defaults resolve
 against the current library. A fresh assessment qualifies 516 catalog groupings
@@ -54,6 +64,16 @@ prepared to use current imported records. Their preparation does not constitute
 completed domain migration or policy activation. A dependent service will retain
 the converted policies through the API and independently compare their receipts,
 leaving them disabled for the final scope and worker handoff.
+
+Frozen subscription lists and interrupted scan evidence identify **3,106 exact
+source URLs**: 2,566 Reddit, 500 Twitter, 39 Coomer and one Instagram. Registration
+is sequenced after policy reconciliation, with account links resolved through
+current native identifiers and existing source metadata defaults. It leaves the
+canonical root disabled and starts no jobs. The **207 interrupted scan groups**
+retain their original windows, retries and deferrals. One group has a unique
+usable checkpoint; five retain multiple candidates for an explicit replay
+decision. These prepared inputs are not completed source registration or scan
+activation.
 
 The final inactive deployment's **78 files** and **32 worker profiles** are now
 installed with their original preimages retained. Both producer outboxes are at
@@ -101,7 +121,7 @@ Remaining release work:
 | --- | --- |
 | Current import | Finish all catalog record families; independently reconcile current domain references, operational work, policies and source scopes. |
 | Writer handoff | Provision scoped credentials and final paths, preserve pending work, replace obsolete workflow execution paths and switch the pinned application/host/manual/n8n runtimes together. |
-| Backup and restore | Publish current image deltas and the coordinated native backup and verify isolated restoration with original images, queues and pending filesystem work. |
+| Backup and restore | Adopt the verified media ledger, publish the coordinated native backup and verify isolated restoration with original images, queues and pending filesystem work. |
 | Observation and retirement | Verify actual scrape, enrichment, manual intake and scheduled recovery/backup cycles; then retire obsolete catalog writers, mounts, services and packages. |
 | Acceptance | Publish final evidence and limitations for desktop/mobile owner review; merge into `develop` only after success is accepted. |
 

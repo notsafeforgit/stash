@@ -845,8 +845,8 @@
     "input_preparation": "passed",
     "catalogs": 1711,
     "native_import_status": "running",
-    "completed_catalogs_at_checkpoint": 284,
-    "completed_passes_at_checkpoint": 3416,
+    "completed_catalogs_at_checkpoint": 554,
+    "completed_passes_at_checkpoint": 6653,
     "total_passes": 20532,
     "independent_reconciliation": "pending"
   },
@@ -869,7 +869,7 @@
     "owner_acceptance"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-08T20:53:16.650963+00:00",
+  "checked_at": "2026-10-08T21:25:57.212060+00:00",
   "n8n_staging": {
     "status": "passed_staged",
     "unchanged_tables": 142,
@@ -938,7 +938,8 @@
     "albums": "waiting_for_post_media_reconciliation",
     "policies": "waiting_for_complete_import_boundary",
     "policy_import": "waiting_for_current_domain_migration",
-    "local_manual_handoff": "waiting_for_verified_disabled_policy_import_then_prepare_only"
+    "local_manual_handoff": "waiting_for_verified_disabled_policy_import_then_prepare_only",
+    "source_registration": "waiting_for_current_policy_import"
   },
   "maintenance_journals": {
     "status": "passed",
@@ -990,5 +991,38 @@
     "authentication_and_stashboxes_preserved": true,
     "published_default_filter_checkpoint_preserved": true,
     "translation_worker_enabled": false
+  },
+  "private_database_storage": {
+    "status": "running_on_verified_ssd_copy",
+    "copied_bytes": 6132056736,
+    "original_directory_retained": true,
+    "closed_file_checksums_verified": true,
+    "sqlite_quick_check": "ok",
+    "same_frozen_snapshot": true,
+    "stable_read_only_snapshot_mount": true,
+    "private_runtime_remain_after_exit": true,
+    "import_resumed_from_saved_passes": 4563,
+    "snapshot_identities_unchanged": true,
+    "recovered_waiting_services": 6,
+    "final_promotion_requires_same_filesystem_move": true
+  },
+  "source_registration_preparation": {
+    "status": "prepared_not_applied",
+    "targets": 3106,
+    "by_category": {
+      "coomer": 39,
+      "instagram": 1,
+      "reddit": 2566,
+      "twitter": 500
+    },
+    "pending_scan_groups": 207,
+    "unique_checkpoint_choices": 1,
+    "ambiguous_checkpoints": 5,
+    "deferred_groups": 169,
+    "jobs_activated": 0,
+    "native_changed": false,
+    "registration_service": "waiting_for_current_policy_import",
+    "account_links_require_current_native_identifiers": true,
+    "canonical_root_remains_disabled": true
   }
 }

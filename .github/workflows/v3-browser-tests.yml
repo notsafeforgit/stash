@@ -27,7 +27,7 @@ jobs:
     # Fresh WebKit runners can spend over 20 minutes installing dependencies.
     # Keep separate setup and test limits so provisioning cannot consume the
     # test shard's budget; playback assertions retain their own deadlines.
-    timeout-minutes: 50
+    timeout-minutes: 65
     strategy:
       fail-fast: false
       matrix:
@@ -69,7 +69,8 @@ jobs:
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
         timeout-minutes: 25
       - run: pnpm run test:browser --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
-        timeout-minutes: 20
+        # Chromium's 327-test shards take more than 20 minutes on these runners.
+        timeout-minutes: 35
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

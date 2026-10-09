@@ -98,6 +98,12 @@ func TestThreadGalleryOutOfOrderRepliesAndMissingRoot(t *testing.T) {
 	defer raw.Close()
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
 	require.EqualValues(t, 3, queryUint(t, raw, "SELECT count(*) FROM source_post_threads"))
+	require.NoError(t, db.Close())
+	require.NoError(t, db.Open(db.DatabasePath()))
+	repo = db.Repository()
+	restored := syncSourceGallery(t, repo, third)
+	require.Equal(t, album.GalleryUUID, restored.GalleryUUID)
+	require.Empty(t, restored.Added, "reopening preserves shared thread membership")
 }
 
 func TestThreadGalleryKeepsAuthorsAndManualExclusionsSeparate(t *testing.T) {

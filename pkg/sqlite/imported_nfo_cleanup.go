@@ -20,6 +20,7 @@ const nfoSourceTables = "('sidecars','sidecar_documents','sidecar_sources','side
 
 type NFOCleanupResult struct {
 	Captures, Documents, RecoveredDocuments, RecoveredMedia, MissingMedia, StagingRows, Catalogs int
+	Policies                                                                                     int
 }
 
 // CompactImportedNFO is an explicit, offline maintenance operation. All changes,
@@ -74,6 +75,9 @@ func (db *Database) CompactImportedNFO(ctx context.Context, progress func(string
 			return err
 		}
 		if err := db.collateNFODocuments(ctx, r, progress); err != nil {
+			return err
+		}
+		if err := compactNFOPolicies(ctx, r); err != nil {
 			return err
 		}
 		if err := compactNFOStaging(ctx, r, progress); err != nil {
@@ -152,6 +156,9 @@ func nfoDomainPayload(data *archive.LegacyNFOPostData) (json.RawMessage, error) 
 	}
 	if data.Studio != nil {
 		payload["studio"] = *data.Studio
+	}
+	if len(data.DisplayTranslations) > 0 {
+		payload["display_translations"] = data.DisplayTranslations
 	}
 	return archive.EncodeSourceJSON(payload)
 }

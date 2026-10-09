@@ -23,6 +23,9 @@ type LegacyNFOPostData struct {
 	Performers   []string
 	Studio       *string
 	Translations []models.SourceTranslationInput
+	// A UUID selects a shared translation; null explicitly keeps the original.
+	// These references preserve the saved display choice without copying text.
+	DisplayTranslations map[string]*string `json:",omitempty"`
 }
 
 // RecoverGeneratedNFOFields handles the old writer's unescaped text bug. The
@@ -124,11 +127,11 @@ func CollateLegacyNFOFields(parsed json.RawMessage) (*LegacyNFOPostData, error) 
 	// translation results already share identical pairs between posts.
 	seenTranslations := make(map[string]bool)
 	for _, field := range []struct {
-		original, display string
-		out               **string
+		original, display, metadataField string
+		out                              **string
 	}{
-		{"original-title", "title", &ret.Metadata.Title},
-		{"original-plot", "plot", &ret.Metadata.OriginalText},
+		{"original-title", "title", "title", &ret.Metadata.Title},
+		{"original-plot", "plot", "original_text", &ret.Metadata.OriginalText},
 	} {
 		original, display := value(field.original), value(field.display)
 		*field.out = display
@@ -140,6 +143,12 @@ func CollateLegacyNFOFields(parsed json.RawMessage) (*LegacyNFOPostData, error) 
 			continue
 		}
 		language, provider := value("translation-language"), value("translation-provider")
+		if *original != "" && *display != "" {
+			if ret.DisplayTranslations == nil {
+				ret.DisplayTranslations = map[string]*string{}
+			}
+			ret.DisplayTranslations[field.metadataField] = nil
+		}
 		if *display == *original && language == nil && provider == nil {
 			continue
 		}
@@ -148,6 +157,9 @@ func CollateLegacyNFOFields(parsed json.RawMessage) (*LegacyNFOPostData, error) 
 		translation, err := PrepareSourceTranslation(input)
 		if err != nil {
 			return nil, err
+		}
+		if *original != "" && *display != "" {
+			ret.DisplayTranslations[field.metadataField] = &translation.UUID
 		}
 		if !seenTranslations[translation.UUID] {
 			ret.Translations = append(ret.Translations, input)

@@ -38,6 +38,7 @@ func TestCollateLegacyNFOFieldsKeepsOriginalsAndSharesTranslations(t *testing.T)
 	require.Equal(t, "en", *translation.TargetLanguage)
 	require.Equal(t, "saved-provider", *translation.Provider)
 	require.Nil(t, translation.SourceLanguage)
+	require.Equal(t, result.DisplayTranslations["title"], result.DisplayTranslations["original_text"])
 
 	result, err = CollateLegacyNFOFields(json.RawMessage(`{"plot":["Translation"],"original-plot":["Original"]}`))
 	require.NoError(t, err)
@@ -49,6 +50,8 @@ func TestCollateLegacyNFOFieldsKeepsOriginalsAndSharesTranslations(t *testing.T)
 	require.NoError(t, err)
 	require.Equal(t, "Unchanged", *result.Metadata.OriginalText)
 	require.Empty(t, result.Translations)
+	require.Contains(t, result.DisplayTranslations, "original_text")
+	require.Nil(t, result.DisplayTranslations["original_text"], "the saved choice keeps the original without duplicating its text")
 }
 
 func TestCollateLegacyNFOFieldsPreservesMissingAndEmptyValues(t *testing.T) {

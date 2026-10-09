@@ -59,7 +59,6 @@ func TestImportedNFOCleanupPreservesMetadataAndTranslations(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, post, capture.PostUUID)
 		require.Equal(t, "Original text", *capture.Metadata.OriginalText)
-		require.JSONEq(t, `{}`, string(capture.Payload.Shared))
 		require.JSONEq(t, `{}`, string(capture.Payload.Patch))
 		evidence, err := repo.SourceTranslation.PostEvidence(ctx, models.SourceTranslationQuery{PostUUID: post})
 		require.NoError(t, err)
@@ -67,6 +66,8 @@ func TestImportedNFOCleanupPreservesMetadataAndTranslations(t *testing.T) {
 		translation, err := repo.SourceTranslation.Find(ctx, evidence[0].TranslationUUID)
 		require.NoError(t, err)
 		require.Equal(t, "Translated text", translation.TranslatedText)
+		require.Nil(t, translation.TargetLanguage)
+		require.JSONEq(t, `{"display_translations":{"original_text":"`+translation.UUID+`"}}`, string(capture.Payload.Shared))
 		return nil
 	}))
 	second, err := db.CompactImportedNFO(t.Context(), nil)

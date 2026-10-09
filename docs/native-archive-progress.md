@@ -19,12 +19,20 @@ snapshot. Existing capture/post/media identities and native policies survive;
 no per-NFO retirement ledger is created. A strict recovery path handles the old
 writer's unescaped text without treating it as arbitrary XML. Recovered posts
 are matched to existing media only through unambiguous current file matches.
+Saved display translations become references to shared native translation
+results, retaining unknown language/provider values. A saved choice of original
+text needs only a null reference. Known default title/details mappings receive
+new native policy revisions; their history and all other settings stay intact.
+Custom expressions that still depend on discarded NFO inputs stop cleanup.
 
-Focused recovery, rollback, repeat-run and database-reopen tests pass, as do
-the affected snapshot/document/evidence import tests. A production-data copy is
-being exercised before deployment. Production cleanup and the new deployment
-remain pending; the previously checked 520 malformed documents and one empty
-document have not yet been removed from production.
+The complete backend gate and a full production-copy cleanup passed. Focused
+tests also cover capture-specific saved translations, original-text choices,
+policy history and custom-expression rollback. The copy is being refreshed for
+the final display-selection change. Production cleanup and deployment remain
+pending. GitHub reports Actions enabled and the workflow active, but workflow
+dispatch returns HTTP 422 claiming Actions is disabled. A local digest-pinned
+build is prepared; this API failure is not evidence that the repository setting
+is disabled.
 
 All 1,711 catalogs and 925,869 automation records are imported and reconciled.
 Post/media associations, source albums, disabled policies and source URL

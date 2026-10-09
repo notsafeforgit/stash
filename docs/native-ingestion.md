@@ -1621,6 +1621,17 @@ are not copied into each choice. A different post, a changed original caption
 or an unknown original cannot supply a match. Language is never inferred:
 unknown-language evidence does not match an English selection.
 
+Cleaned imported metadata can also retain
+`source.payload.display_translations`, keyed by `title` or `original_text`.
+A UUID explicitly selects an existing shared translation from this capture's
+matching choices; null explicitly selects the original field. An absent key
+leaves selection to the mapping's normal language/fallback rule. These compact
+references preserve a previously saved display value even when its language
+was never recorded, without copying the text or retaining an NFO document.
+The cleanup revises the installed default policies to respect these choices;
+it preserves earlier policy revisions and rejects unrecognized custom NFO
+expressions for review.
+
 Indexed 100-row pages inspect only this post and at most two exact originals.
 The complete set is limited to 128 distinct results, 4,096 evidence assertions
 and 1 MiB of encoded choices. Exceeding any limit returns `translations: null`

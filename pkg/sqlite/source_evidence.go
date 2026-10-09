@@ -338,8 +338,25 @@ func canonicalCaptureInput(input *models.SourceCaptureInput) (string, string, er
 			return "", "", err
 		}
 		for key := range object {
-			if key != "performers" && key != "studio" {
+			if key != "performers" && key != "studio" && key != "display_translations" {
 				return "", "", errors.New("invalid imported metadata payload")
+			}
+		}
+		if raw, ok := object["display_translations"]; ok {
+			choices, ok := raw.(map[string]interface{})
+			if !ok {
+				return "", "", errors.New("invalid imported display translations")
+			}
+			for field, value := range choices {
+				if field != "title" && field != "original_text" {
+					return "", "", errors.New("invalid imported display field")
+				}
+				if value != nil {
+					id, ok := value.(string)
+					if _, err := archiveUUID(id); !ok || err != nil {
+						return "", "", errors.New("invalid imported display translation reference")
+					}
+				}
 			}
 		}
 	default:

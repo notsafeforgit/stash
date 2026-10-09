@@ -10,8 +10,28 @@ in progress.
 ## Current release position — 2026-10-09 UTC
 
 Production is healthy on schema **1000105**, source
-`7ba77242ebbd21d1fc6fcde8329745f3b0c89f21`, pinned wrapper
-`localhost/stash-native-s6@sha256:ed8b20e5b42657653f78658ab76ca26fecdd735ec31002dc5f4d8a1212191a45`.
+`8d9979b6f42969ab2a53cea5448114b199810e7b`, pinned wrapper
+`localhost/stash-native-s6@sha256:db7a76fa53d09062a0aa2ede193e8d89aa03a3a0bed0dea07ec7fd89f2fc17cd`.
+The explicit [catalog association repair](catalog-association-repair.md) now
+promotes unambiguous imported post-account claims and known author directories
+to ordinary publisher decisions. Accounts without an ownership choice can link
+to a unique existing performer name or alias. Conflicting authors, ambiguous
+performers, saved/subreddit directories and existing choices remain protected.
+Publisher ownership does not add depicted-performer tags to media. The example
+post `0000e604-6fd6-5f99-8512-ad9409be43f6` now exposes its Reddit account and
+the existing CuteLilAsya performer link; live desktop/mobile checks passed.
+The full imported-post repair is running in resumable batches of 25 through the
+admin API. Its receipts and unresolved matches are recorded under
+`.local/catalog-association-20261009/`.
+
+All fork-gate components passed for this release. The backup fixture suite used
+disk-backed scratch for its free-space requirements; Go integration tests were
+rerun in `/tmp` after the disk-backed test phase was interrupted for excessive
+filesystem latency. The complete Go run passed there. No database migration was
+needed for this application update. The worker timer resumed after readiness,
+and the pending future-backup runtime selector now targets this release while
+the running backup retains its original sealed configuration.
+
 New Twitter captures retain exact conversation, parent-post and publisher IDs.
 The **Thread and replies** section provides local links or source-site links for
 missing ancestors. Same-account self-replies share one gallery while retaining
@@ -78,6 +98,15 @@ gallery membership is not inferred from filenames. The QSV GIF helper pads odd
 dimensions before encoding; temporary copies of both failing library GIFs
 converted successfully and the originals were unchanged. The host producer
 runtime and eight helper-asset bindings were updated together.
+
+External hosting is not an exclusion policy. The earlier Reddit failures were
+attachment-matching gaps for linked Redgifs clips/images and a legacy iframe
+hostname. Both installed host and n8n runtimes pass all 29 shared external-media
+fixtures. Previously rejected controlled host and n8n windows subsequently
+completed with four and 47 media files respectively. A live check found no
+current `source_rejected` run; recent Redgifs API errors report deleted source
+items. This does not establish support for every external album format or
+completion of the remaining source queue.
 
 Schema 1000103 adds owner-approved execution-policy upgrades for queued or
 deferred source runs. This preserves their original admission, UUID, coverage,

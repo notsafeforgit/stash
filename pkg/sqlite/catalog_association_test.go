@@ -161,6 +161,30 @@ func TestCatalogAssociationMirrorFoldersStayWithinTheirService(t *testing.T) {
 	require.Equal(t, account.UUID, result.AccountUUID)
 }
 
+func TestCatalogAssociationMirrorFolderResolvesRetainedUsernameOfNumericAccount(t *testing.T) {
+	db, repo := archiveTestDatabase(t)
+	account := createSourceAccount(t, repo, "mirror:coomer:onlyfans")
+	for _, kind := range []string{"user", "legacy_label"} {
+		observeAccount(t, repo, account.UUID, models.AccountReference{Namespace: account.Namespace, Kind: kind, Value: "oldusername"}, accountEvidence())
+	}
+	attachmentSQL(t, db, "INSERT INTO performer_names(performer_id,name,position) VALUES(71,'oldusername',1)")
+	foreign := createSourceAccount(t, repo, "mirror:kemono:patreon")
+	observeAccount(t, repo, foreign.UUID, models.AccountReference{Namespace: foreign.Namespace, Kind: "legacy_label", Value: "oldusername"}, accountEvidence())
+	capture := publisherCapture(t, repo, account.Namespace, "coomer", `{"category":"coomer","service":"onlyfans"}`)
+	catalogPostFolder(t, repo, capture.PostUUID, "oldusername, onlyfans")
+	result := catalogAssociationBackfill(t, repo, capture.PostUUID, true)
+	require.Equal(t, "linked", result.Action)
+	require.Equal(t, account.UUID, result.AccountUUID)
+	require.Equal(t, "linked", result.Ownership)
+	require.Equal(t, archiveFind(t, repo, models.ArchivePerformer, 71).UUID, result.PerformerUUID)
+
+	other := createSourceAccount(t, repo, account.Namespace)
+	observeAccount(t, repo, other.UUID, models.AccountReference{Namespace: other.Namespace, Kind: "legacy_label", Value: "oldusername"}, accountEvidence())
+	ambiguous := publisherCapture(t, repo, account.Namespace, "coomer", `{"category":"coomer","service":"onlyfans"}`)
+	catalogPostFolder(t, repo, ambiguous.PostUUID, "oldusername, onlyfans")
+	require.Equal(t, "conflicting_imported_accounts", catalogAssociationBackfill(t, repo, ambiguous.PostUUID, true).Reason)
+}
+
 func TestCatalogAssociationRollsBackPublisherIfOwnershipFails(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	capture := publisherCapture(t, repo, "native:reddit", "reddit", `{"category":"reddit"}`)

@@ -10,8 +10,9 @@ directory membership. Known gallery-dl directory templates supply Reddit,
 Twitter, Instagram, Bluesky and TikTok handles; Twitter numeric IDs and Bluesky
 DIDs also participate when present. Saved feeds, subreddit folders and arbitrary
 display-name directories are not author evidence. Coomer/Kemono folder usernames
-can resolve existing accounts within the post's mirror service namespace; they
-never establish native OnlyFans, Fansly or Patreon numeric IDs.
+can resolve existing accounts within the post's mirror service namespace,
+including retained username/label identifiers when the account is labeled with
+a numeric ID. They never establish native OnlyFans, Fansly or Patreon numeric IDs.
 
 Exactly one canonical account must match. A conflicting captured author, multiple
 account candidates, an existing publisher choice or an explicit unlink prevents
@@ -21,7 +22,8 @@ does not create accounts or fabricate captures when evidence is missing.
 
 Optionally, an account without an ownership decision is linked to the unique
 existing performer whose canonical name or alias exactly matches its label or
-retained handle, ignoring ASCII case. All matching names participate: a canonical
+retained handle (or an imported mirror-account label), ignoring ASCII case. All
+matching names participate: a canonical
 name does not take precedence over somebody else's alias. Multiple performers
 remain unresolved and their candidate UUIDs are reported. Existing ownership
 choices, including an explicit unlink or return to undecided review, are retained.

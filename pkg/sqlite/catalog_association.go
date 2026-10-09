@@ -109,8 +109,15 @@ func catalogAssociationEvidence(ctx context.Context, post string, ret *models.Ca
 		for _, ref := range refs {
 			if ref.Kind == "catalog_label" {
 				var ids []string
-				if err := dbWrapper.Select(ctx, &ids, `SELECT DISTINCT canonical_uuid FROM source_accounts
- WHERE namespace=? AND label=? COLLATE NOCASE ORDER BY canonical_uuid LIMIT 101`, ref.Namespace, ref.Value); err != nil {
+				// Catalog imports can retain the username as an identifier while
+				// the account's display label becomes its numeric service ID.
+				// Use only existing aliases in this exact mirror namespace;
+				// opaque user identifiers retain their original spelling.
+				if err := dbWrapper.Select(ctx, &ids, `SELECT canonical_uuid FROM source_accounts
+ WHERE namespace=? AND label=? COLLATE NOCASE
+ UNION SELECT canonical_uuid FROM source_account_identifiers
+ WHERE namespace=? AND kind IN ('legacy_label','handle','user') AND value=?
+ ORDER BY canonical_uuid LIMIT 101`, ref.Namespace, ref.Value, ref.Namespace, ref.Value); err != nil {
 					return err
 				}
 				if len(ids) > catalogAssociationLimit {
@@ -358,7 +365,9 @@ func catalogAssociationOwner(ctx context.Context, ret *models.CatalogAssociation
 	}
 	names := []string{account.Label}
 	for _, identifier := range identifiers {
-		if identifier.Reference.Kind == "handle" && identifier.Reference.Namespace == account.Namespace {
+		ref := identifier.Reference
+		if ref.Namespace == account.Namespace && (ref.Kind == "handle" ||
+			(ref.Kind == "legacy_label" && strings.HasPrefix(account.Namespace, "mirror:"))) {
 			names = append(names, identifier.Reference.Value)
 		}
 	}

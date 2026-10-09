@@ -106,6 +106,12 @@ func sourceAlbumEvidenceBasis(row sourceAlbumEvidence, attachment models.SourceA
 		return ""
 	}
 	ref := attachment.Reference
+	if policy == models.SourceAlbumTwitterFilenameV1 && ref.Namespace == twitterFilenameNamespace &&
+		(!row.SourceMediaType.Valid || row.SourceMediaType.String == "null") {
+		if key, _, ok := twitterFilenameSlot(row.RelativePath.String, posts); ok && key == ref.Value {
+			return "legacy-twitter-filename"
+		}
+	}
 	prefix := map[string]string{"native:reddit": "reddit:media:", "native:twitter": "twitter:media:"}[ref.Namespace]
 	for _, post := range posts {
 		if post.Namespace != ref.Namespace {
@@ -216,8 +222,37 @@ func (s *SourceGalleryStore) PreviewBackfill(ctx context.Context, post, policy s
 		return nil, err
 	}
 	ret := &models.SourceAlbumBackfillPreview{PostUUID: gallery.PostUUID, Policy: policy, Gallery: gallery, Matches: []models.SourceAlbumMatch{}}
-	if gallery.Action == "create" || gallery.Action == "sync" {
-		ret.Matches, err = s.backfillMatches(ctx, gallery.PostUUID, policy)
+	if policy == models.SourceAlbumTwitterFilenameV1 && gallery.Action != "disabled" && gallery.Action != "review" {
+		var review bool
+		ret.Recovery, review, err = s.previewFilenameSelection(ctx, gallery.PostUUID)
+		if err != nil {
+			return nil, err
+		}
+		if ret.Recovery != nil {
+			members, err := sourceThreadMembers(ctx, gallery.PostUUID)
+			if err != nil {
+				return nil, err
+			}
+			if len(members) > 1 {
+				review = true
+				ret.Recovery = nil
+			}
+		}
+		if review {
+			ret.Gallery.Action = "review"
+			ret.Gallery, err = finishSourceGalleryPreview(ret.Gallery)
+			if err != nil {
+				return nil, err
+			}
+		} else if ret.Recovery != nil {
+			ret.Gallery, err = s.previewSinglePostSelection(ctx, gallery.PostUUID, nil, nil, false, ret.Recovery)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if ret.Gallery.Action == "create" || ret.Gallery.Action == "sync" {
+		ret.Matches, err = s.backfillMatchesSelection(ctx, gallery.PostUUID, policy, ret.Recovery)
 		if err != nil {
 			return nil, err
 		}
@@ -227,19 +262,39 @@ func (s *SourceGalleryStore) PreviewBackfill(ctx context.Context, post, policy s
 				proposed[match.AttachmentUUID] = sourceAlbumMediaChoice{AttachmentUUID: match.AttachmentUUID, State: "linked", MediaUUID: sql.NullString{String: match.Candidates[0].MediaUUID, Valid: true}}
 			}
 		}
-		ret.Gallery, err = s.previewWithMediaChoices(ctx, gallery.PostUUID, proposed)
+		if ret.Recovery != nil {
+			ret.Gallery, err = s.previewSinglePostSelection(ctx, gallery.PostUUID, proposed, nil, false, ret.Recovery)
+		} else {
+			ret.Gallery, err = s.previewWithMediaChoices(ctx, gallery.PostUUID, proposed)
+		}
 		if err != nil {
 			return nil, err
 		}
 	}
-	ret.Signature, err = sourceSignature("stash-source-album-backfill-v1", []any{ret.PostUUID, ret.Policy, ret.Gallery.Signature, ret.Matches})
+	if ret.Recovery != nil && ret.Gallery.Action == "create" && len(ret.Gallery.Add) == 0 {
+		// Filename evidence alone must not create an empty gallery when none
+		// of its surviving media can currently be associated safely.
+		ret.Gallery.Action = "review"
+		ret.Gallery, err = finishSourceGalleryPreview(ret.Gallery)
+		if err != nil {
+			return nil, err
+		}
+	}
+	guard := []any{ret.PostUUID, ret.Policy, ret.Gallery.Signature, ret.Matches}
+	if ret.Recovery != nil {
+		guard = append(guard, ret.Recovery)
+	}
+	ret.Signature, err = sourceSignature("stash-source-album-backfill-v1", guard)
 	return ret, err
 }
 
-func (s *SourceGalleryStore) backfillMatches(ctx context.Context, post, policy string) ([]models.SourceAlbumMatch, error) {
-	selection, err := (&SourceAttachmentStore{}).Selection(ctx, post)
-	if err != nil {
-		return nil, err
+func (s *SourceGalleryStore) backfillMatchesSelection(ctx context.Context, post, policy string, selection *models.AttachmentSelection) ([]models.SourceAlbumMatch, error) {
+	if selection == nil {
+		var err error
+		selection, err = (&SourceAttachmentStore{}).Selection(ctx, post)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if selection == nil || len(selection.Entries) > maxSourceGalleryMembers {
 		return nil, models.ErrSourceAlbumLimit
@@ -354,6 +409,11 @@ func (s *SourceGalleryStore) Backfill(ctx context.Context, post, policy, signatu
 		return nil
 	})
 	result := &models.SourceAlbumBackfillResult{}
+	if preview.Recovery != nil {
+		if err := s.recoverFilenameSelection(ctx, post, preview.Recovery); err != nil {
+			return nil, err
+		}
+	}
 	proofs := make(map[string]models.SourceAlbumCandidate)
 	store := &SourceAttachmentStore{}
 	for _, match := range preview.Matches {

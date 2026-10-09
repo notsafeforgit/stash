@@ -14,6 +14,7 @@ const timestamp = z.string().datetime({ offset: true });
 export const albumPolicySchema = z.enum([
   "source-identifiers-v1",
   "legacy-reddit-filename-v1",
+  "legacy-twitter-filename-v1",
 ]);
 const action = z.enum(["create", "sync", "disabled", "ineligible"]);
 export const albumIdentitySchema = z
@@ -37,7 +38,12 @@ const proof = z.object({
   archive_file_uuid: uuid.optional(),
   archive_generation: revision.optional(),
   relative_path: z.string().optional(),
-  basis: z.enum(["source-id", "legacy-reddit-filename", "attachment-evidence"]),
+  basis: z.enum([
+    "source-id",
+    "legacy-reddit-filename",
+    "legacy-twitter-filename",
+    "attachment-evidence",
+  ]),
   status: z.enum([
     "valid",
     "file-changed",

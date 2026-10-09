@@ -80,6 +80,7 @@ type GalleryMembershipEvent struct {
 var ErrSourceGalleryConflict = errors.New("source album or gallery changed; review a fresh preview")
 
 type SourceGalleryReaderWriter interface {
+	FilenameBackfillPosts(context.Context, string, int) ([]SelectedSourcePost, error)
 	PreviewAssociationReview(context.Context, GalleryAssociationReviewInput) (*GalleryAssociationReviewPreview, error)
 	ApplyAssociationReview(context.Context, GalleryAssociationReviewApplyInput) (*GalleryAssociationReview, bool, error)
 	AssociationReview(context.Context, string) (*GalleryAssociationReview, error)

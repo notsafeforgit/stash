@@ -120,7 +120,7 @@ def prepare(client, output, policy, posts=None):
                 yield {"post_uuid": post, "post_state": "active"}
         rows = current_rows()
     else:
-        rows = client.selected_posts()
+        rows = client.selected_posts(policy) if policy == "legacy-twitter-filename-v1" else client.selected_posts()
 
     def records():
         for row in rows:
@@ -245,7 +245,7 @@ def main(argv=None):
         if name == "prepare":
             command.add_argument("--policy", choices=POLICIES, required=True)
             source = command.add_mutually_exclusive_group(required=True)
-            source.add_argument("--all-selected", action="store_true")
+            source.add_argument("--all-selected", action="store_true", help="Discover selected posts, or historical filename candidates for the Twitter filename policy")
             source.add_argument("--post", action="append", help="Native post UUID; may be repeated")
             source.add_argument("--posts-file", help="JSON array of native post UUIDs")
         if name in ("show", "prepare-retry", "cancel"):

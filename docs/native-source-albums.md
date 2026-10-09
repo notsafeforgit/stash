@@ -61,7 +61,9 @@ The parser returns the qualified post reference, policy version, evidence JSON
 pointer, and normalized attachment manifest. Its capture UUID is assigned only
 when the caller records the matching capture in a transaction. Source IDs are
 exact; contradictory aliases and malformed lists are reported for review. No
-directory, caption, filename, or local download count identifies an album.
+directory, caption, filename, or local download count identifies an album in
+the automatic capture parser. Explicit historical filename recovery is described
+below.
 
 The gallery-dl 1.32.15-dev extractor code used for the local fixtures exposes two
 relevant distinctions:
@@ -82,6 +84,44 @@ are not guessed into complete source lists. Catalog import must report missing
 evidence, use a verified retained source list where available, or offer review.
 Other extractors can supply the existing typed attachment-manifest contract;
 this parser does not assume their file counters have post-level semantics.
+
+## Recovering historical Twitter albums
+
+The application-authorized `legacy-twitter-filename-v1` album backfill policy
+supports the archive's known historical `<tweet-id>_<number>.<extension>` naming
+convention. It requires a matching retained `native:twitter` post ID and original
+catalog file evidence. A generic download counter or an unrelated filename is
+insufficient. The original observation supplies order even when deduplication or
+conversion left the file under a different name or another post's directory.
+Existing registered file matches must still verify the file generation and its
+unique current media owner before the backfill links it.
+
+The policy fills missing source lists only. `_1`, `_3` become zero-based positions
+0 and 2, with a visible gap. The list is always partial, its expected total stays
+unknown, and a lone `_1` does not create an album. A later ordinal establishes
+album evidence without proving that all earlier or later attachments were
+downloaded. Slots have `legacy:twitter:filename` references, not invented Twitter
+media IDs. Conflicting explicit IDs, ambiguous media, changed files, existing
+captured lists and saved choices are preserved for review. No usable local
+matches means no new empty gallery.
+
+Recovery stores one immutable attachment list and a migration selection in the
+normal native tables, alongside attachment-to-media proof references. It creates
+no source capture, duplicated post payload or media file. The selection's capture
+reference is an existing **metadata anchor**, not a claim that this capture
+contained the recovered list. New galleries use retained original post text,
+then a meaningful title, then the tweet ID. Existing gallery and media titles
+are preserved. The current recovered order is visible in Source albums; the
+source-list picker offers actual captured alternatives. If a later captured list
+conflicts with recovered slot identities, ordinary selection review resolves it;
+the backfill does not equate ordinals with native media IDs.
+
+Choose **Twitter file names** in album review, or use
+`stash-backfill-source-albums prepare --policy legacy-twitter-filename-v1` with
+explicit post IDs. Bulk discovery with this policy includes posts without a
+selection; previews and durable apply jobs remain separate. Publication, replay,
+manual membership protection and after-success notifications use the existing
+album worker. These records are included in normal database backups.
 
 The native association repository can retain a post-to-media link even when no
 ordered list survives. Schema 1000036 permits legacy/review evidence without an

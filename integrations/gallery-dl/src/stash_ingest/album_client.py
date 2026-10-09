@@ -13,7 +13,7 @@ from .client import Unavailable
 from .encoding import InvalidData, decode, encode, identifier
 from .post_identity import current_post
 
-POLICIES = ("source-identifiers-v1", "legacy-reddit-filename-v1")
+POLICIES = ("source-identifiers-v1", "legacy-reddit-filename-v1", "legacy-twitter-filename-v1")
 MAX_PREVIEW_BYTES = 64 << 20
 MAX_POSTS = 100000
 ACTIONS = {"create", "sync", "disabled", "ineligible", "review"}
@@ -159,17 +159,25 @@ class AlbumClient(ImportClient):
         except InvalidData:
             raise Unavailable("invalid_album_response") from None
 
-    def selected_posts(self):
+    def selected_posts(self, policy=None):
+        if policy is not None and policy not in POLICIES:
+            raise InvalidData("Unsupported album matching policy")
         after, count = "", 0
         while True:
-            _, page = self.request("GET", f"/album-backfill-posts?limit=100&after={after}")
+            _, page = self.request("GET", f"/album-backfill-posts?limit=100&after={after}" + (f"&policy={policy}" if policy else ""))
             if not isinstance(page, list) or len(page) > 100:
                 raise Unavailable("invalid_album_discovery")
             for row in page:
                 try:
                     post = identifier(row["post_uuid"])
-                    identifier(row["selection_uuid"])
-                    if post <= after or row["post_state"] not in ("active", "forgotten") or row["mode"] not in ("automatic", "pinned", "disabled"):
+                    if row["mode"] == "unselected" and policy == "legacy-twitter-filename-v1":
+                        if row.get("selection_uuid"):
+                            raise InvalidData("Unselected post has a saved selection")
+                    else:
+                        identifier(row["selection_uuid"])
+                        if row["mode"] == "unselected":
+                            raise InvalidData("Unexpected unselected post")
+                    if post <= after or row["post_state"] not in ("active", "forgotten") or row["mode"] not in ("automatic", "pinned", "disabled", "unselected"):
                         raise InvalidData("Invalid selected-post page")
                 except (KeyError, TypeError, InvalidData):
                     raise Unavailable("invalid_album_discovery") from None

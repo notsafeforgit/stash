@@ -58,6 +58,21 @@ it("rejects crossed preview identities and policies", async () => {
     api.preview(albumReviewPost, "source-identifiers-v1"),
   ).rejects.toMatchObject({ code: "invalid_response" });
 });
+it("accepts partial Twitter filename recovery with its original evidence and gaps", async () => {
+  const result = albumPreview();
+  result.policy = "legacy-twitter-filename-v1";
+  result.matches[0]!.reference = {
+    namespace: "legacy:twitter:filename",
+    value: "1575550205214134278_3",
+  };
+  result.matches[0]!.candidates[0]!.proofs[0]!.basis =
+    "legacy-twitter-filename";
+  result.entries.forEach((entry, index) => {
+    entry.position = index * 2 + 2;
+  });
+  const api = createAlbumReviewAPI(endpoint, async () => Response.json(result));
+  expect(await api.preview(albumReviewPost, result.policy)).toEqual(result);
+});
 it("keeps repeated attachments and gaps but rejects duplicate positions, partial candidates and overlapping changes", () => {
   const preview = albumPreview();
   preview.entries.push({ ...preview.entries[0]!, position: 99 });

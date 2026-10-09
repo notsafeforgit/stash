@@ -3,14 +3,16 @@ package models
 import "errors"
 
 const (
-	SourceAlbumIdentifiersV1    = "source-identifiers-v1"
-	SourceAlbumRedditFilenameV1 = "legacy-reddit-filename-v1"
+	SourceAlbumIdentifiersV1     = "source-identifiers-v1"
+	SourceAlbumRedditFilenameV1  = "legacy-reddit-filename-v1"
+	SourceAlbumTwitterFilenameV1 = "legacy-twitter-filename-v1"
 )
 
 // Filename matching is an explicit historical policy. It binds an existing
-// typed attachment to a file observation; it never establishes album order.
+// typed attachment to a file observation. The Twitter policy can also recover
+// an incomplete source list from retained, post-qualified original filenames.
 func ValidSourceAlbumPolicy(policy string) bool {
-	return policy == SourceAlbumIdentifiersV1 || policy == SourceAlbumRedditFilenameV1
+	return policy == SourceAlbumIdentifiersV1 || policy == SourceAlbumRedditFilenameV1 || policy == SourceAlbumTwitterFilenameV1
 }
 
 type SourceAlbumProof struct {
@@ -22,7 +24,7 @@ type SourceAlbumProof struct {
 	ArchiveFileUUID   *string `json:"archive_file_uuid,omitempty"`
 	ArchiveGeneration *int64  `json:"archive_generation,omitempty"`
 	RelativePath      string  `json:"relative_path,omitempty"`
-	Basis             string  `json:"basis"`  // source-id, legacy-reddit-filename, attachment-evidence
+	Basis             string  `json:"basis"`  // source-id, legacy-reddit-filename, legacy-twitter-filename, attachment-evidence
 	Status            string  `json:"status"` // valid, file-changed, owner-changed, media-unavailable, evidence-only
 }
 
@@ -49,6 +51,9 @@ type SourceAlbumBackfillPreview struct {
 	Signature string                `json:"signature"`
 	Gallery   *SourceGalleryPreview `json:"gallery"`
 	Matches   []SourceAlbumMatch    `json:"matches"`
+	// Recovery is a proposed source list, not a new remote capture. Its capture
+	// reference supplies existing post metadata only.
+	Recovery *AttachmentSelection `json:"recovery,omitempty"`
 }
 
 type SourceAlbumBackfillResult struct {

@@ -301,7 +301,7 @@ filesystem inspection and do not require FFmpeg.
 
 | Method and route | Request or result |
 |---|---|
-| `GET /album-backfill-posts` | Selected post UUID, state, selection UUID and mode; `after` post UUID and `limit` (default 50, maximum 100) |
+| `GET /album-backfill-posts` | Selected post UUID, state, selection UUID and mode; `after` post UUID and `limit` (default 50, maximum 100). `policy=legacy-twitter-filename-v1` instead discovers historical Twitter filename candidates, including `mode: unselected` with an empty selection UUID. |
 | `POST /posts/{post}/album-backfill/preview` | `{ "policy": "legacy-reddit-filename-v1" }`; read-only action, signature, proposed choices, ordered slots and membership changes |
 | `POST /posts/{post}/album-backfills` | `{ "request_uuid": "…", "policy": "…", "signature": "…" }`; queues the reviewed preview |
 | `GET /album-backfill-requests/{request}` | Looks up the original submission, including after a lost response |

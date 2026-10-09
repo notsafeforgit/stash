@@ -39,7 +39,7 @@ class MemoryAlbumClient(AlbumClient):
         if path.startswith("/album-backfill-posts?"):
             if self.discovery_override is not None:
                 return 200, self.discovery_override
-            after = path.split("after=")[1]
+            after = path.split("after=")[1].split("&")[0]
             return 200, [{"post_uuid": post, "post_state": "active", "selection_uuid": str(uuid.uuid4()), "mode": "pinned"}
                          for post in self.previews if post > after][:100]
         if path.endswith("/album-backfill/preview"):
@@ -209,6 +209,20 @@ class AlbumBackfillTests(unittest.TestCase):
             client.discovery_override = bad
             with self.subTest(bad=bad), self.assertRaises(Unavailable):
                 list(client.selected_posts())
+
+    def test_filename_discovery_includes_posts_without_source_lists(self):
+        client = MemoryAlbumClient()
+        post = next(iter(client.previews))
+        client.discovery_override = [{"post_uuid": post, "post_state": "active", "selection_uuid": "", "mode": "unselected"}]
+        self.assertEqual(1, len(list(client.selected_posts("legacy-twitter-filename-v1"))))
+        self.assertIn("policy=legacy-twitter-filename-v1", client.calls[-1][1])
+        with self.assertRaises(Unavailable):
+            list(client.selected_posts())
+        client.previews[post]["policy"] = "legacy-twitter-filename-v1"
+        with tempfile.TemporaryDirectory() as directory:
+            report = prepare(client, Path(directory) / "plan", "legacy-twitter-filename-v1")
+            self.assertEqual(1, report["posts"])
+            self.assertFalse(client.jobs, "preparing a recovery does not mutate the library")
 
     def test_forgotten_and_review_items_are_retained_without_submission(self):
         with tempfile.TemporaryDirectory() as directory:

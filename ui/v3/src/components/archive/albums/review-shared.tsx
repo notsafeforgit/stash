@@ -15,6 +15,10 @@ export function useAlbumLabels() {
         "album_review.reddit_names",
         "Reddit file names",
       ),
+      "legacy-twitter-filename-v1": msg(
+        "album_review.twitter_names",
+        "Twitter file names",
+      ),
     },
     action: {
       create: msg("album_review.create", "Create album gallery"),
@@ -85,6 +89,10 @@ export function useAlbumLabels() {
       "legacy-reddit-filename": msg(
         "album_review.filename_basis",
         "Original Reddit file name",
+      ),
+      "legacy-twitter-filename": msg(
+        "album_review.twitter_filename_basis",
+        "Original numbered Twitter file name",
       ),
       "attachment-evidence": msg(
         "album_review.attachment_basis",

@@ -7,6 +7,40 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement is running; the controlled worker rollout remains
 in progress.
 
+## Historical Twitter filename recovery — 2026-10-09 UTC
+
+The `legacy-twitter-filename-v1` album policy now implements recovery of missing
+partial source lists from the archive's known original `<tweet-id>_<number>`
+filenames. It follows imported file matches to surviving media, retains gaps and
+unknown totals, preserves saved choices, and uses the existing durable album
+worker and after-success notifications. It creates no duplicate source captures
+or media. [Recovery semantics](native-source-albums.md#recovering-historical-twitter-albums)
+describe the provenance and review boundaries.
+
+A read-only production audit found **11,924** posts with album numbering:
+**11,892** unselected posts with registered media evidence, **31** without that
+evidence, and **one** with an existing source list. **343** candidate posts have
+numbering gaps. These are candidates, not a claim that all will pass current
+file/ownership and ambiguity checks. The example
+`00005ea0-989f-5bce-888d-b6c9884a68f2` retains slots 1 and 2 for images
+276637 and 276638. The private scope is saved under
+`.local/twitter-album-recovery-20261009/`.
+
+**Production backfill remains unapplied.** The running server rejects the new
+policy; the previously recorded GitHub Actions publication restriction must be
+resolved before the approved registry release and queued application can run.
+No local-image deployment or direct production SQL repair substitutes for that
+release. The existing runtime, scrapers and backup jobs remain in place.
+
+Validation passed: binding generation and UI build, Go lint and the full Go
+integration suite, UI validation (802 tests), producer/library/archive tests,
+and backup tests. One backup fixture needed its temporary destination on the
+media volume to satisfy its reserved-space check; the isolated rerun passed.
+Focused SQLite regressions cover original paths, deduplicated/repeated survivors,
+numbering gaps, ambiguous candidates, stale previews, existing choices and
+durable job replay. Chromium desktop/mobile review and policy-switching checks
+also passed.
+
 ## Current release position — 2026-10-09 UTC
 
 Production is healthy on schema **1000105**, source

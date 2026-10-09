@@ -132,6 +132,7 @@ type SourceAttachmentReaderWriter interface {
 
 // SelectedSourcePost is a bounded discovery row, not a materialized manifest.
 // Forgotten posts remain visible so migration plans can account for exclusions.
+// Filename discovery also returns unselected posts with an empty SelectionUUID.
 type SelectedSourcePost struct {
 	PostUUID      string `json:"post_uuid"`
 	PostState     string `json:"post_state"`

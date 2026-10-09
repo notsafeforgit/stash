@@ -3454,6 +3454,9 @@
     "manual_help": "Images and videos grouped without a linked source post or backing folder or archive."
   },
   "album_review": {
+    "twitter_names": "Twitter file names",
+    "twitter_filename_basis": "Original numbered Twitter file name",
+    "twitter_filename_help": "Recover missing source order from original numbered Twitter file names. Missing positions remain gaps and the total attachment count stays unknown. Existing source lists and saved choices are preserved.",
     "candidate_identity": "Library item identity",
     "reason_unknown": "This candidate needs additional review before it can be linked.",
     "preserved_help": "The saved attachment choice stays unchanged, including rejected or undecided links.",

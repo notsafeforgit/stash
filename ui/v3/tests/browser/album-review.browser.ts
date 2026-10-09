@@ -771,6 +771,17 @@ test("changing matching policy clears the old preview and no-op or blocked previ
     "source-identifiers-v1",
     "legacy-reddit-filename-v1",
   ]);
+  await page
+    .getByRole("button", { name: "Twitter file names", exact: true })
+    .click();
+  await expect(page.locator("[data-album-preview]")).toHaveCount(0);
+  await expect(
+    page.getByText(
+      /Missing positions remain gaps and the total attachment count stays unknown/,
+    ),
+  ).toBeVisible();
+  await preview(page);
+  expect(remote.previews.at(-1)).toBe("legacy-twitter-filename-v1");
   for (const action of ["disabled", "ineligible", "review"] as const) {
     remote.action(action);
     await preview(page);

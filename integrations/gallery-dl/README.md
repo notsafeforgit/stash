@@ -1911,6 +1911,15 @@ every operation. Choose `source-identifiers-v1` for retained qualified source
 media IDs. Use `legacy-reddit-filename-v1` only when explicitly accepting the
 historical Reddit `post-id_media-id` filename convention as matching evidence.
 
+`legacy-twitter-filename-v1` also recovers missing partial attachment lists from
+the archive's known original `<tweet-id>_<number>` filenames. It follows retained
+file matches to deduplicated survivors, preserves numbering gaps, and never
+infers a complete list or total count. Existing source selections remain intact.
+With this policy, `--all-selected` discovers historical filename candidates,
+including posts that have no selection yet. Use `--posts-file` for a bounded
+explicit JSON array of post UUIDs. No new captures or duplicate payloads are
+created. See [recovery semantics](../../docs/native-source-albums.md#recovering-historical-twitter-albums).
+
 ```sh
 stash-backfill-source-albums prepare --endpoint STASH_ORIGIN \
   --policy legacy-reddit-filename-v1 --all-selected \

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 
 	"github.com/stashapp/stash/pkg/models"
 )
@@ -201,6 +202,10 @@ func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value 
 }
 
 func (s *SourceGalleryStore) previewSinglePost(ctx context.Context, value string, proposed map[string]sourceAlbumMediaChoice, shared *models.ArchiveEntity, forceAlbum bool) (*models.SourceGalleryPreview, error) {
+	return s.previewSinglePostSelection(ctx, value, proposed, shared, forceAlbum, nil)
+}
+
+func (s *SourceGalleryStore) previewSinglePostSelection(ctx context.Context, value string, proposed map[string]sourceAlbumMediaChoice, shared *models.ArchiveEntity, forceAlbum bool, selection *models.AttachmentSelection) (*models.SourceGalleryPreview, error) {
 	post, err := currentSourcePost(ctx, value)
 	if err != nil {
 		return nil, err
@@ -226,9 +231,11 @@ func (s *SourceGalleryStore) previewSinglePost(ctx context.Context, value string
 	if shared != nil && ret.Gallery == nil {
 		ret.Gallery = shared
 	}
-	selection, err := (&SourceAttachmentStore{}).Selection(ctx, post.UUID)
-	if err != nil {
-		return nil, err
+	if selection == nil {
+		selection, err = (&SourceAttachmentStore{}).Selection(ctx, post.UUID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if selection == nil {
 		return finishSourceGalleryPreview(ret)
@@ -323,6 +330,16 @@ func sourceGallerySelectPreview(ctx context.Context, ret *models.SourceGalleryPr
 		}
 		if metadata.Title != nil && *metadata.Title != "" {
 			ret.Title = *metadata.Title
+		}
+		// Imported Twitter titles often contain only the downloader filename.
+		// A filename recovery uses the retained post text, then the post ID.
+		if filenameSelection(selection) {
+			ret.Title = strings.Split(selection.Entries[0].Attachment.Reference.Value, "_")[0]
+			if metadata.OriginalText != nil && strings.TrimSpace(*metadata.OriginalText) != "" {
+				ret.Title = strings.TrimSpace(*metadata.OriginalText)
+			} else if metadata.Title != nil && !twitterFilenameTitle(*metadata.Title) {
+				ret.Title = *metadata.Title
+			}
 		}
 		if metadata.OriginalText != nil {
 			ret.Details = *metadata.OriginalText

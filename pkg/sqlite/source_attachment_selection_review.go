@@ -56,12 +56,16 @@ func attachmentSelectionReviewList(selected *models.AttachmentSelection) *models
 }
 
 // Take at most one page per original owner before sorting the small union.
+// This is the capture picker: independently recovered lists remain visible in
+// the current selection, but cannot pretend to have a captured witness here.
 // A merged post can retain many captures, but listing its first page must not
 // sort or reconstruct every source list retained under those original posts.
 const selectionReviewManifestsQuery = `WITH candidates AS MATERIALIZED (
  SELECT item.value AS uuid FROM source_post_identities i
  CROSS JOIN json_each((SELECT json_group_array(uuid) FROM (
-  SELECT uuid FROM source_attachment_manifests WHERE post_uuid=i.post_uuid AND uuid>? ORDER BY uuid LIMIT ?
+  SELECT uuid FROM source_attachment_manifests m WHERE post_uuid=i.post_uuid AND uuid>?
+   AND EXISTS(SELECT 1 FROM source_capture_attachment_manifests c WHERE c.manifest_uuid=m.uuid)
+  ORDER BY uuid LIMIT ?
  ))) item WHERE i.canonical_uuid=(SELECT canonical_uuid FROM source_post_identities WHERE post_uuid=?)
 ), selected AS (SELECT uuid FROM candidates ORDER BY uuid LIMIT ?)
 SELECT m.*,

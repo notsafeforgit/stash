@@ -970,8 +970,15 @@ scrapes, infer URLs or create galleries from these group labels.
 selected post's imported appearance/file evidence. `source-identifiers-v1`
 requires qualified retained Reddit/Twitter media IDs; the explicit
 `legacy-reddit-filename-v1` policy also accepts the original Reddit
-`post-id_media-id_...` filename convention. Filenames never establish album
-identity or order. Preserve every existing attachment decision, including a
+`post-id_media-id_...` filename convention. The explicit historical
+`legacy-twitter-filename-v1` policy can recover a missing partial list from the
+known `<tweet-id>_<number>` original-filename convention. It follows retained
+file matches through deduplication, preserves gaps, leaves total count unknown,
+and uses `legacy:twitter:filename` slot references rather than invented native
+media IDs. It creates no captures or copied post payloads. Existing selections
+and captured lists win; recovery's existing capture reference supplies metadata
+only. See [source albums](docs/native-source-albums.md#recovering-historical-twitter-albums).
+Preserve every existing attachment decision, including a
 deliberately undecided review. Ambiguous candidates, changed file generations,
 changed ownership and media-kind disagreements remain unresolved. A bounded
 query must fail rather than present a truncated candidate set as unique.

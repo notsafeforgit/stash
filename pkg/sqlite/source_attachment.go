@@ -208,20 +208,45 @@ JOIN source_posts p ON p.uuid = c.post_uuid WHERE c.uuid = ?`, input.CaptureUUID
 	if post.State != "active" {
 		return nil, models.ErrSourcePostForgotten
 	}
+	manifest, err := s.recordManifestForPost(ctx, post.UUID, input, func(string, models.SourcePostIdentifier) string { return uuid.NewString() })
+	if err != nil {
+		return nil, err
+	}
+	if _, err := dbWrapper.Exec(ctx, "INSERT INTO source_capture_attachment_manifests(capture_uuid, post_uuid, manifest_uuid) VALUES (?, ?, ?)", input.CaptureUUID, post.UUID, manifest.UUID); err != nil {
+		return nil, err
+	}
+	if _, err := dbWrapper.Exec(ctx, "UPDATE source_posts SET revision = revision + 1 WHERE uuid = ?", post.UUID); err != nil {
+		return nil, err
+	}
+	return manifest, nil
+}
+
+// recordManifestForPost stores an immutable list independently of its witness.
+// Captured lists and filename recovery both use this writer; recovery does not
+// claim that a remote capture supplied a list it never contained.
+func (s *SourceAttachmentStore) recordManifestForPost(ctx context.Context, post string, input models.SourceAttachmentManifestInput, attachmentID func(string, models.SourcePostIdentifier) string) (*models.SourceAttachmentManifest, error) {
+	input, err := archive.NormalizeAttachmentManifest(input)
+	if err != nil {
+		return nil, err
+	}
+	signature, err := sourceSignature("stash-source-attachments-v1", archive.AttachmentManifestSignatureInput(input))
+	if err != nil {
+		return nil, err
+	}
 	var manifestID string
-	err = dbWrapper.Get(ctx, &manifestID, "SELECT uuid FROM source_attachment_manifests WHERE post_uuid = ? AND signature = ?", post.UUID, signature)
+	err = dbWrapper.Get(ctx, &manifestID, "SELECT uuid FROM source_attachment_manifests WHERE post_uuid = ? AND signature = ?", post, signature)
 	if errors.Is(err, sql.ErrNoRows) {
 		manifestID = uuid.NewString()
 		if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_attachment_manifests(uuid, post_uuid, version, signature, complete, declared_album, expected_count, entry_count)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, manifestID, post.UUID, archive.AttachmentManifestVersion, signature, input.Complete, input.DeclaredAlbum, input.ExpectedCount, len(input.Entries)); err != nil {
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, manifestID, post, archive.AttachmentManifestVersion, signature, input.Complete, input.DeclaredAlbum, input.ExpectedCount, len(input.Entries)); err != nil {
 			return nil, err
 		}
 		for _, entry := range input.Entries {
 			if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_attachments(uuid, post_uuid, namespace, value)
-VALUES (?, ?, ?, ?) ON CONFLICT(post_uuid, namespace, value) DO NOTHING`, uuid.NewString(), post.UUID, entry.Reference.Namespace, entry.Reference.Value); err != nil {
+VALUES (?, ?, ?, ?) ON CONFLICT(post_uuid, namespace, value) DO NOTHING`, attachmentID(post, entry.Reference), post, entry.Reference.Namespace, entry.Reference.Value); err != nil {
 				return nil, err
 			}
-			attachment, err := s.Lookup(ctx, post.UUID, entry.Reference)
+			attachment, err := s.Lookup(ctx, post, entry.Reference)
 			if err != nil {
 				return nil, err
 			}
@@ -229,25 +254,14 @@ VALUES (?, ?, ?, ?) ON CONFLICT(post_uuid, namespace, value) DO NOTHING`, uuid.N
 				return nil, models.ErrSourcePayloadCorrupt
 			}
 			if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_attachment_entries(manifest_uuid, post_uuid, position, attachment_uuid, media_kind)
-VALUES (?, ?, ?, ?, ?)`, manifestID, post.UUID, entry.Position, attachment.UUID, entry.MediaKind); err != nil {
+VALUES (?, ?, ?, ?, ?)`, manifestID, post, entry.Position, attachment.UUID, entry.MediaKind); err != nil {
 				return nil, err
 			}
 		}
 	} else if err != nil {
 		return nil, err
 	}
-	// Validate existing snapshots as well as newly written ones before linking.
-	manifest, err := s.FindManifest(ctx, manifestID)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := dbWrapper.Exec(ctx, "INSERT INTO source_capture_attachment_manifests(capture_uuid, post_uuid, manifest_uuid) VALUES (?, ?, ?)", input.CaptureUUID, post.UUID, manifestID); err != nil {
-		return nil, err
-	}
-	if _, err := dbWrapper.Exec(ctx, "UPDATE source_posts SET revision = revision + 1 WHERE uuid = ?", post.UUID); err != nil {
-		return nil, err
-	}
-	return manifest, nil
+	return s.FindManifest(ctx, manifestID)
 }
 
 func activeAttachmentPost(ctx context.Context, attachment *models.SourceAttachment) error {

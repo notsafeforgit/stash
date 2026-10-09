@@ -326,6 +326,7 @@ export function AlbumPreviewForm({
               </FieldLabel>
               <ToggleGroup
                 variant="outline"
+                className="max-w-full flex-wrap"
                 aria-labelledby={`${id}-policy`}
                 value={[field.state.value]}
                 disabled={blocked}
@@ -348,10 +349,15 @@ export function AlbumPreviewForm({
                       "album_review.source_ids_help",
                       "Match qualified source media IDs against retained evidence and verified library files.",
                     )
-                  : msg(
-                      "album_review.reddit_names_help",
-                      "Also recognize original Reddit file names containing both the post ID and media ID. Conflicting explicit IDs never fall back to a file name.",
-                    )}
+                  : field.state.value === "legacy-twitter-filename-v1"
+                    ? msg(
+                        "album_review.twitter_filename_help",
+                        "Recover missing source order from original numbered Twitter file names. Missing positions remain gaps and the total attachment count stays unknown. Existing source lists and saved choices are preserved.",
+                      )
+                    : msg(
+                        "album_review.reddit_names_help",
+                        "Also recognize original Reddit file names containing both the post ID and media ID. Conflicting explicit IDs never fall back to a file name.",
+                      )}
               </FieldDescription>
             </Field>
           )}

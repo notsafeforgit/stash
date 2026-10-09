@@ -869,8 +869,9 @@ The core `SourceGallery.PreviewBackfill` service operates on one post's selected
 attachment list. It proposes media choices and shows the resulting gallery
 membership without writing. The post UUID identifies the album; the selected
 source manifest supplies attachment positions, including repeated attachments
-and missing slots. Folder labels, filenames and download counters cannot create
-an album or determine its order.
+and missing slots. Ordinary matching does not derive order from folder labels
+or download counters. An explicit historical Twitter policy can recover a
+missing partial list from the known original-filename convention.
 
 Callers must choose a matching policy explicitly:
 
@@ -878,8 +879,9 @@ Callers must choose a matching policy explicitly:
 |---|---|
 | `source-identifiers-v1` | A retained qualified Reddit or Twitter media ID equal to the typed attachment ID, plus an imported file match for the same post |
 | `legacy-reddit-filename-v1` | The identifier policy, plus the original Reddit `post-id_media-id_...` or `post-id_media-id.ext` filename convention when no explicit media ID was retained |
+| `legacy-twitter-filename-v1` | Recover missing partial order from original `<tweet-id>_<number>.<extension>` evidence and associate verified surviving media; preserve gaps, unknown total, existing selections and conflicting evidence |
 
-The filename policy checks both IDs against existing native post/attachment
+The Reddit filename policy checks both IDs against existing native post/attachment
 records. It uses the original file observation, which can differ from the
 surviving file after deduplication or conversion. A conflicting or malformed
 explicit ID suppresses filename fallback. Unsupported namespaces and delegated

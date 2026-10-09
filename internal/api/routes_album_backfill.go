@@ -27,9 +27,18 @@ func (rs *nativeArchiveRoutes) albumPosts(w http.ResponseWriter, r *http.Request
 		}
 	}
 	var rows []models.SelectedSourcePost
+	policy := r.URL.Query().Get("policy")
+	if policy != "" && !models.ValidSourceAlbumPolicy(policy) {
+		albumError(w, models.ErrSourceAlbumPolicy)
+		return
+	}
 	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
 		var err error
-		rows, err = rs.repo.SourceAttachment.SelectedPosts(ctx, after, limit)
+		if policy == models.SourceAlbumTwitterFilenameV1 {
+			rows, err = rs.repo.SourceGallery.FilenameBackfillPosts(ctx, after, limit)
+		} else {
+			rows, err = rs.repo.SourceAttachment.SelectedPosts(ctx, after, limit)
+		}
 		return err
 	})
 	if err != nil {

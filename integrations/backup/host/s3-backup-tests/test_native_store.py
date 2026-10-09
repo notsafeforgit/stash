@@ -240,6 +240,87 @@ class NativeStoreTests(unittest.TestCase):
         self.assertFalse((session.root / 'publication.json').exists())
         self.assertFalse(any(op[0] == 'put' and op[1].endswith('/manifest.json') for op in self.s3.operations))
 
+    def test_published_archive_resume_reuses_remote_proof_without_recapture_or_audit(self):
+        session = self.captured_session()
+        self.store = session.store = self.cached_store()
+        reference = session.publish(self.catalog, [])
+        (session.archive / 'capture-verification.json').unlink()
+        self.s3.operations.clear()
+        # Restart with only the original durable run state. A missing object
+        # must be repaired, while every other verified object is reused.
+        resumed = NativeBackupSession.__new__(NativeBackupSession)
+        resumed.root, resumed.publication, resumed.store = session.root, reference, self.cached_store()
+        resumed.client = session.client
+        resumed.view, resumed.check_source = Mock(), Mock()
+        missing = next((session.archive / 'objects').iterdir())
+        key = 'prefix/' + PREFIX + 'objects/' + missing.name
+        (self.cloud / key).unlink()
+        def publication_input(path):
+            if Path(path).parent == session.archive / 'objects':
+                self.assertEqual(Path(path), missing, 'Verified remote objects must not reread local bytes')
+            return open_regular(path)
+        with patch('native_backup.load_capture_verification', side_effect=AssertionError('already published')), \
+             patch('native_backup.verify_archive_contents', side_effect=AssertionError('no repeated audit')), \
+             patch('native_backup.copy_ledger', side_effect=AssertionError('no recapture')), \
+             patch('native_store.open_regular', side_effect=publication_input):
+            self.assertEqual(resumed.publish(self.catalog, [self.root / 'changed-ledger']), reference)
+        self.assertEqual(resumed.generated, session.generated)
+        self.assertEqual(self.object_requests('put'), [('put', key)])
+        self.assertEqual(self.object_requests('head'), [('head', key)])
+        self.assertIn(('get', 'prefix/' + reference['verification']['key']), self.s3.operations)
+        self.assertFalse((session.root / 'scratch-verify').exists())
+
+    def test_published_archive_resume_rejects_changed_remote_proof_before_upload(self):
+        session = self.captured_session()
+        reference = session.publish(self.catalog, [])
+        remote = self.cloud / ('prefix/' + reference['verification']['key'])
+        original = remote.read_bytes()
+        remote.write_bytes(b'X' * len(original))
+        self.s3.operations.clear()
+        with patch('native_backup.verify_archive_contents', side_effect=AssertionError('do not replace evidence')):
+            with self.assertRaises(InvalidArchive):
+                session.publish(self.catalog, [])
+        self.assertFalse(any(op[0] == 'put' for op in self.s3.operations))
+
+    def source_view_session(self):
+        session = NativeBackupSession.__new__(NativeBackupSession)
+        session.view, session.media_path = Mock(), Mock()
+        session.view.root.stat.return_value = SimpleNamespace(st_dev=20, st_ino=1)
+        session.media_path.stat.return_value = SimpleNamespace(st_dev=20, st_ino=2)
+        session.media_path.is_dir.return_value = True
+        session.media_path.relative_to.return_value = Path('porn')
+        session.view.resolve.return_value = session.media_path
+        session.view_identity = (10, 1)
+        return session
+
+    def test_expired_mount_rebind_requires_original_snapshot_verification(self):
+        session = self.source_view_session()
+        with patch('native_backup.os.statvfs', return_value=SimpleNamespace(f_flag=os.ST_RDONLY)):
+            session.check_source()
+            session.check_source()
+        session.view.verify.assert_called_once_with()
+        session.view.resolve.assert_called_once_with(Path('porn'))
+        self.assertEqual(session.view_identity, (20, 1))
+
+    def test_rebinding_never_accepts_changed_snapshot_writable_or_foreign_media(self):
+        for failure in ('snapshot', 'path', 'writable', 'device', 'missing'):
+            session = self.source_view_session()
+            flag = os.ST_RDONLY
+            if failure == 'snapshot':
+                session.view.verify.side_effect = InvalidArchive('snapshot GUID changed')
+            elif failure == 'path':
+                session.view.resolve.return_value = Path('/other')
+            elif failure == 'writable':
+                flag = 0
+            elif failure == 'device':
+                session.media_path.stat.return_value.st_dev = 30
+            else:
+                session.media_path.is_dir.return_value = False
+            with patch('native_backup.os.statvfs', return_value=SimpleNamespace(f_flag=flag)):
+                with self.subTest(failure=failure), self.assertRaises(InvalidArchive):
+                    session.check_source()
+            self.assertEqual(session.view_identity, (10, 1))
+
     def cached_store(self, *, bucket='metadata'):
         return NativeStore(self.s3, bucket, 'prefix', receipts_path=self.root / 'object-receipts.sqlite3')
 

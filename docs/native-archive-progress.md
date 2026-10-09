@@ -16,8 +16,10 @@ and scraper schedules are still stopped.
 
 The first coordinated native backup has sealed and packed its checkpoint with
 the 22.2 GB database, 240,872 saved artwork files and coordinated host state.
-Its streaming verification and publication are in progress; cloud publication
-and the separate cloud restore are pending. AWS access is verified. Following
+Its streaming verification and native archive upload completed. Final coordinated
+publication failed at the media-view guard before writing the master manifest;
+the same sealed run is retained for finalization. The held ZFS snapshot still
+passes its durable identity and read-only checks. AWS access is verified. Following
 explicit owner approval, the original publisher stopped gracefully and the new
 publisher resumed the same sealed generation. No live-root activation, producer
 credential issuance or database promotion has occurred.
@@ -39,6 +41,15 @@ verification, home-backup capture/upload and desktop/mobile owner acceptance
 remain. `develop` has not been merged and the frozen compatible release is unchanged.
 
 ### Separate application audits from publication — 2026-10-09
+
+A completed native archive publication can now resume finalization using its
+saved remote verification record, upload receipts and a fresh object listing.
+It does not recapture state, reconstruct databases or repeat the completed audit.
+An expired ZFS snapshot mount is accepted only after rechecking the original
+snapshot GUID, creation transaction, checkpoint properties, hold and read-only
+topology. All 317 backup tests pass, including missing-object repair, altered
+remote proof rejection and snapshot revalidation failures. The failed controller
+and its original publication receipt remain intact; finalization is pending.
 
 Capture evidence reuse now also removes the repeated reconstruction and
 SQLite/producer audit from new backups. The exporter records its successful

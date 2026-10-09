@@ -377,11 +377,23 @@ class NativeBackupSession:
         return result
 
     def check_source(self):
+        # Traversing the media path can remount an expired ZFS snapshot. A
+        # device number is a mount-lifetime identity, not a snapshot identity.
+        media_info = self.media_path.stat()
         info = self.view.root.stat()
-        if ((info.st_dev, info.st_ino) != self.view_identity
-                or not os.statvfs(self.view.root).f_flag & os.ST_RDONLY
-                or not self.media_path.is_dir() or self.media_path.stat().st_dev != info.st_dev):
+        identity = (info.st_dev, info.st_ino)
+        if identity != self.view_identity:
+            # Rebind only after checking the original GUID, creation txg,
+            # checkpoint properties, hold, topology and read-only root.
+            self.view.verify()
+            if self.view.resolve(self.media_path.relative_to(self.view.root)) != self.media_path:
+                raise InvalidArchive("Retained native media path changed")
+            media_info, info = self.media_path.stat(), self.view.root.stat()
+            identity = (info.st_dev, info.st_ino)
+        if (not os.statvfs(self.view.root).f_flag & os.ST_RDONLY
+                or not self.media_path.is_dir() or media_info.st_dev != info.st_dev):
             raise InvalidArchive("Retained native media view became unavailable or changed")
+        self.view_identity = identity
 
     def publish(self, catalog, ledger_paths):
         self.view.verify()
@@ -390,6 +402,22 @@ class NativeBackupSession:
         same_or_publish(self.root / "catalog.json", json_bytes(retained))
         self.catalog = retained
         selection = selection_digest(catalog)
+        if getattr(self, "publication", None) is not None:
+            # The native archive may have completed before the enclosing media
+            # manifest failed. Reuse its exact remote verification record, then
+            # reconcile immutable objects using upload receipts and a fresh LIST.
+            # Do not reconstruct snapshots, recapture ledgers or repeat audits.
+            validate_reference(self.publication)
+            if (self.publication["checkpoint_uuid"] != self.client.request_id
+                    or self.publication["selection_sha256"] != selection):
+                raise InvalidArchive("Retained native publication differs from the original media selection")
+            self.archive = self.root / "archive"
+            self.generated = self.read_generated()
+            proof = decode_json(self.store.read(self.publication["verification"]))
+            publication = self.store.publish_archive(self.archive, proof, self.client.request_id, selection)
+            if publication != self.publication:
+                raise InvalidArchive("Resumed native publication differs from its saved receipt")
+            return self.publication
         media_document = {"format": MEDIA_FORMAT, "version": 1,
                           "checkpoint_uuid": self.client.request_id,
                           "filesystem_boundary_sha256": hashlib.sha256(self.client.boundary_bytes).hexdigest(),

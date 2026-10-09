@@ -87,9 +87,18 @@ an existing restore fixture's 50 GiB reserve. The original failure is retained;
 production reserves were not reduced. Coverage includes corruption in streamed
 artwork/configuration, missing artwork, database identity/integrity failures,
 exact producer proofs, no artwork materialization, historical proof reads and a
-stream-verified publication followed by an independent full restore. The new
-backup runtime must be installed and selected before daily jobs resume; no
-production runtime or current sealed generation has been changed by these tests.
+stream-verified publication followed by an independent full restore.
+
+The new package is installed as an inactive versioned runtime. The prepared
+launch cleanup now routes the existing daily service and three manual commands
+through it and updates the inventoried release record. Its 12 prepared files
+retain the original preimages, and the backup configuration still has 209
+effective components. Thirteen fixture checks and five actual launcher checks
+pass; the installed daily module uses streaming and the explicit restore module
+uses full reconstruction. The future controlled backup selects that same reviewed
+runtime. The cloud-restore receipt gate explicitly rejects streamed-only proof.
+Installation of these launch changes still waits for the current publication;
+no active service, current runtime or sealed generation has changed.
 
 The Standard download was measured at 40.2 GiB across 241,410 unique content
 objects, plus three metadata objects. One HEAD and GET per object yields about

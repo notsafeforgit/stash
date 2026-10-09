@@ -9,6 +9,14 @@ in progress.
 
 ## Current release position — 2026-10-09 UTC
 
+Schema 1000105 is implemented for incoming Twitter thread relationships and
+shared self-reply galleries. Parent/root links and paged thread navigation work
+on desktop and mobile. Each post retains its own metadata and attachment order;
+manual exclusions and deleted galleries remain protected. The migration leaves
+existing albums unchanged and performs no historical capture scan. Focused
+SQLite/ingestion/API tests and all 50 affected Chromium/WebKit browser checks
+pass; production deployment is pending the remaining release checks.
+
 Production is healthy on schema **1000104**, source
 `2f81070dc3d4bbd1f2ecab7bd52ab90bb0989b83`, pinned wrapper
 `localhost/stash-native-s6@sha256:374a5ade4b402912d3509e3dc53cce85089b61ae04cf6ce91a9cdc9482f32258`.

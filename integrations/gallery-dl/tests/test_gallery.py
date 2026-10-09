@@ -771,6 +771,8 @@ class GalleryTests(unittest.TestCase):
                 extractor = TwitterFixture.from_url(self.lease.run["target_url"])
                 extractor.records = [{"rest_id": lower, "legacy": {
                     "id_str": lower, "lang": "en", "full_text": "Album caption", "entities": {},
+                    "conversation_id_str": "1900000000000000000", "in_reply_to_status_id_str": "1900000000000000001",
+                    "in_reply_to_user_id_str": "99", "user_id_str": "99",
                     "extended_entities": {"media": [
                         {"id_str": "101", "type": "photo", "media_url_https": "https://pbs.twimg.com/media/first.jpg",
                          "original_info": {"width": 100, "height": 200}},
@@ -803,6 +805,7 @@ class GalleryTests(unittest.TestCase):
                 for capture in captures:
                     data = capture["source"].get("legacy", capture["source"])
                     self.assertEqual([item["type"] for item in data["extended_entities"]["media"]], ["photo", "video"])
+                    self.assertEqual(capture["source"]["reply_user_id"], "99")
 
 
 if __name__ == "__main__":

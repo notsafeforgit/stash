@@ -51,6 +51,9 @@ type SourceGalleryPreview struct {
 	Entries       []SourceAlbumEntry
 	Add           []ArchiveEntity
 	Remove        []ArchiveEntity
+	// ThreadPlans retain each post's own selection and guards. They are computed
+	// by a read-only preview and committed together by Sync.
+	ThreadPlans []*SourceGalleryPreview
 }
 
 type SourceGallerySyncResult struct {

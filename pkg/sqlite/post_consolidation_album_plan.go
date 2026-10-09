@@ -48,7 +48,7 @@ func (p *postConsolidationPlan) prepareAlbum(ctx context.Context) error {
 	if p.selection == nil {
 		return p.setAlbumPlan(ret)
 	}
-	ready, err = sourceGallerySelectPreview(ctx, ret, p.selection, owners)
+	ready, err = sourceGallerySelectPreview(ctx, ret, p.selection, owners, false)
 	if err != nil {
 		return err
 	}

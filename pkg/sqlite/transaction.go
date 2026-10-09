@@ -230,6 +230,7 @@ func (db *Database) Repository() models.Repository {
 		CatalogTranslationImport:    &CatalogTranslationImportStore{},
 		CatalogDocumentImport:       &CatalogDocumentImportStore{},
 		SourcePostLinks:             &SourcePostLinksStore{},
+		SourceThread:                &SourceThreadStore{},
 		SourceAttachment:            &SourceAttachmentStore{},
 		SourcePostMedia:             &SourcePostMediaStore{gallery: db.Gallery},
 		SourceFile:                  &SourceFileStore{},

@@ -80,6 +80,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/posts/{post}/publishers", rs.sourcePostPublishers)
 	r.Get("/posts/{post}/media", rs.sourcePostMedia)
 	r.Get("/posts/{post}/album", rs.sourcePostAlbum)
+	r.Get("/posts/{post}/thread", rs.sourcePostThread)
 	r.Get("/posts/{post}/album-media", rs.sourceAlbumMedia)
 	r.Get("/posts/{post}/attachment-manifests", rs.attachmentSelectionManifests)
 	r.Get("/posts/{post}/attachment-selection-history", rs.attachmentSelectionHistory)

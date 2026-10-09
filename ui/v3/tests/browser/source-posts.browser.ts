@@ -22,6 +22,7 @@ async function archive(
     disabledAlbum?: boolean;
     unsafeURL?: boolean;
     merged?: boolean;
+    thread?: boolean;
   } = {},
 ) {
   const requests: URL[] = [];
@@ -72,6 +73,49 @@ async function archive(
           ? []
           : [post];
     } else if (/^posts\/[^/]+$/.test(path)) result = post;
+    else if (path.endsWith("/thread"))
+      result = {
+        requested_uuid: post.requested_uuid,
+        thread: {
+          post_uuid: post.uuid,
+          conflict: false,
+          facts: options.thread
+            ? {
+                namespace: "native:twitter",
+                post_id: "103",
+                conversation_id: "100",
+                reply_id: "102",
+                author_id: "99",
+                reply_author_id: "99",
+              }
+            : null,
+          root: options.thread
+            ? {
+                source_id: "100",
+                url: "https://x.com/i/status/100",
+                post: null,
+              }
+            : null,
+          parent: options.thread
+            ? {
+                source_id: "102",
+                url: "https://x.com/i/status/102",
+                post: {
+                  ...post,
+                  requested_uuid: postIds.otherPost,
+                  uuid: postIds.otherPost,
+                  latest_capture: {
+                    ...post.latest_capture,
+                    title: "Earlier reply",
+                  },
+                },
+              }
+            : null,
+          posts: options.thread
+            ? [{ source_id: "103", url: "https://x.com/i/status/103", post }]
+            : [],
+        },
+      };
     else if (path.endsWith("/publishers")) result = [account()];
     else if (path.endsWith("/media")) {
       if (failMedia) {
@@ -115,12 +159,16 @@ async function archive(
           : album,
         path.split("/")[1],
       );
-    } else if (path.endsWith("/capture-summaries"))
+    } else if (path.endsWith("/capture-history"))
       result = {
         requested_uuid: path.split("/").at(-2),
         revisions: [
           {
             uuid: postIds.revision,
+            count: 2,
+            unknown_count: 1,
+            first_seen: "2026-10-01T01:00:00Z",
+            last_seen: "2026-10-01T01:00:00Z",
             metadata: {
               title: "Full retained caption",
               original_text: "One shared description",
@@ -166,6 +214,34 @@ async function archive(
 }
 
 for (const desktop of [false, true]) {
+  test(`thread navigation on ${desktop ? "desktop" : "mobile"} retains missing ancestors and local reply links`, async ({
+    page,
+  }, testInfo) => {
+    if (desktop) await page.setViewportSize({ width: 1280, height: 900 });
+    const remote = await archive(page, { thread: true });
+    await page.goto(`/source-posts?post=${postIds.post}`);
+    await page
+      .getByRole("button", { name: "Thread and replies", exact: true })
+      .click();
+    await expect(
+      page.getByRole("link", { name: "100", exact: true }),
+    ).toHaveAttribute("href", "https://x.com/i/status/100");
+    await expect(
+      page.getByText("Not in this archive; opens the source website."),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Earlier reply", exact: true }),
+    ).toHaveAttribute("href", new RegExp(postIds.otherPost));
+    await expect(page.locator('a[aria-current="page"]')).toHaveCount(1);
+    await page.screenshot({
+      path: testInfo.outputPath("thread-navigation.png"),
+    });
+    await page
+      .getByRole("link", { name: "Earlier reply", exact: true })
+      .click();
+    await expect(page).toHaveURL(new RegExp(postIds.otherPost));
+    expect(remote.writes).toEqual([]);
+  });
   test(`post browse and detail on ${desktop ? "desktop" : "mobile"} expands only requested shared data`, async ({
     page,
   }) => {
@@ -193,11 +269,9 @@ for (const desktop of [false, true]) {
     await expect(
       page.getByText("One shared description", { exact: true }),
     ).toHaveCount(1);
-    await page
-      .getByRole("button", { name: "2 loaded captures", exact: true })
-      .click();
+    await expect(page.getByText("2 observations", { exact: true })).toBeVisible();
     await expect(
-      page.getByText(/Observation time unknown · stored/),
+      page.getByText("Observation time unknown for 1 imported record."),
     ).toBeVisible();
     await page
       .getByRole("button", { name: "Publisher accounts", exact: true })

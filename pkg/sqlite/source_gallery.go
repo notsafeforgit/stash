@@ -150,7 +150,16 @@ func (s *SourceGalleryStore) prepareAssociationChoice(ctx context.Context, input
 			return nil, nil, err
 		}
 		if claimed {
-			return nil, nil, models.ErrSourceGalleryConflict
+			shared := false
+			if input.Origin == "source" {
+				shared, err = sourceThreadSharesGallery(ctx, identity.UUID, post.UUID)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+			if !shared {
+				return nil, nil, models.ErrSourceGalleryConflict
+			}
 		}
 		gallery = identity
 	case "disabled":

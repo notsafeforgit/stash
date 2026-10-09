@@ -1,4 +1,5 @@
 import { SourceAlbum } from "../albums/ordered";
+import { PostThread } from "./thread";
 import { PostMerge } from "./merge";
 import { LibraryLink } from "./library-link";
 import { useCallback, useState } from "react";
@@ -432,6 +433,11 @@ export function PostDetail({
           </PostSection>
           <PostSection title={msg("source_posts.media", "Media associations")}>
             <PostMediaList id={id} api={api} />
+          </PostSection>
+          <PostSection
+            title={msg("source_threads.title", "Thread and replies")}
+          >
+            <PostThread key={id} id={id} api={api} />
           </PostSection>
           <PostSection title={msg("source_albums.order", "Source order")}>
             <SourceAlbum

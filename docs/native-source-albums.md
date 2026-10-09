@@ -1,7 +1,8 @@
 # Native source albums
 
-The native gallery repository can maintain one logical gallery for a source
-post, with ordered image/video attachments and explicit membership choices.
+The native gallery repository can maintain a logical gallery for a source
+post or an evidenced Twitter thread, with ordered image/video attachments and
+explicit membership choices.
 `pkg/archive.ExtractCapturedAlbum` derives the source list under
 `captured-attachments-v2`. Native intake and the application-authorized
 [historical album backfill](native-ingestion.md#historical-source-album-backfill)
@@ -20,6 +21,31 @@ can retain multiple parent posts; the Source albums tab shows all of them and
 their individual attachment order. Shared media can retain titles from other
 posts. The summary and tab reuse one paginated lookup, and viewing them changes
 no metadata or membership.
+
+## Twitter threads and replies
+
+New native captures retain the exact numeric conversation, parent-post, author
+and reply-target author IDs. The producer preserves the reply-target ID before
+gallery-dl's normal transformation drops it. Root and parent links navigate to
+local source posts when present, or to the source website when absent. The
+**Thread and replies** section lists captured conversation posts oldest first,
+25 at a time. It does not create placeholder posts or fetch missing ancestors.
+
+Self-replies by the same numeric publishing account share one source gallery.
+Each post retains its own text, captures, attachment order and associations;
+reused media appears only once in the gallery. A thread can start with two
+single-media posts, and replies can arrive before the root. Other authors'
+replies remain navigable but do not automatically join that creator's gallery.
+Missing or conflicting identity evidence requires review. Already separate
+galleries are not silently merged, and manual gallery choices, exclusions and
+deletions remain protected. Thread planning is bounded to 256 posts.
+
+Schema 1000105 begins recording these relationships on incoming native captures;
+it does not scan historical catalogs or infer reply relationships from filenames.
+The read-only endpoint is `GET /api/v3/archive/posts/{uuid}/thread`, with optional
+numeric `after` and bounded `limit` parameters. The database, including thread
+relationships and shared gallery associations, remains part of normal native
+backups.
 
 ## Evidence accepted by the parser
 

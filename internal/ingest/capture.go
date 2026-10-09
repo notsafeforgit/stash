@@ -285,6 +285,13 @@ func (s *Service) recordCaptureEffects(ctx context.Context, capture *models.Sour
 	if err := s.capturePublisher(ctx, capture.UUID, result); err != nil {
 		return nil, nil, err
 	}
+	thread, err := s.Repo.SourceThread.ObserveCapture(ctx, capture)
+	if err != nil {
+		return nil, nil, err
+	}
+	if thread == "review" {
+		result.Review = append(result.Review, "thread_relationship")
+	}
 	if album != nil {
 		if err := s.captureAlbum(ctx, capture, album, result); err != nil {
 			return nil, nil, err

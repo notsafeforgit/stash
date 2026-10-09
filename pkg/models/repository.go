@@ -75,6 +75,7 @@ type Repository struct {
 	CatalogTranslationImport    CatalogTranslationImportReaderWriter
 	CatalogDocumentImport       CatalogDocumentImportReaderWriter
 	SourcePostLinks             SourcePostLinksReaderWriter
+	SourceThread                SourceThreadReaderWriter
 	SourceFile                  SourceFileReaderWriter
 	SourceFileHistory           SourceFileHistoryReaderWriter
 	CatalogFileHistoryImport    CatalogFileHistoryImportReaderWriter

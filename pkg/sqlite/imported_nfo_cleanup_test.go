@@ -20,6 +20,7 @@ import (
 
 func removeImportedNFOSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSourceThreadSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE metadata_worker_attempt_policies;
 DROP TABLE metadata_worker_policy_upgrades;
 DROP TABLE source_run_policy_upgrades;

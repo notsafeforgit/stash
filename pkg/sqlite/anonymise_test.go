@@ -122,6 +122,7 @@ WHERE source.original_id=81 AND source.kind='tag' AND source.state='redirected' 
 
 func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	source, repo := archiveTestDatabase(t)
+	thread := threadPost(t, repo, "125", "100", "100", "99", "99")
 	collection := putSourceCollection(t, repo, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{Label: "private-account-policy", Kind: "manual_batch", State: "active"}})
 	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error {
 		policy, err := repo.MetadataPolicy.Put(ctx, models.MetadataPolicyInput{CollectionUUID: collection.UUID, ExpectedCollectionRevision: collection.Revision, Origin: "review", Reason: "private-account-policy", Definition: models.MetadataPolicyDefinition{Enabled: true}})
@@ -198,6 +199,7 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	require.NoError(t, anonymiser.Anonymise(context.Background()))
 	contents, err := os.ReadFile(output)
 	require.NoError(t, err)
+	require.NotContains(t, string(contents), thread)
 	for _, value := range []string{account.UUID, performer.UUID, post.UUID, capture.UUID, capture.RevisionUUID, manifest.UUID, attachment.UUID, mediaEvidence.UUID, selection.Decision.UUID, album.GalleryUUID, membership[0].UUID, claim.UUID, observation.UUID, fileMatch.UUID, postFile.UUID, "private-account-"} {
 		require.NotContains(t, string(contents), value)
 	}
@@ -223,6 +225,7 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	}))
 	raw := openRawDB(t, output)
 	defer raw.Close()
+	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM source_post_threads"))
 	for _, table := range []string{"metadata_policies", "metadata_policy_revisions", "metadata_decision_policies", "source_accounts", "source_account_identifiers", "source_account_identifier_evidence", "account_performer_decisions", "account_performer_links", "source_posts", "source_post_identifiers", "source_post_revisions", "source_captures", "source_capture_profiles", "source_profile_bodies", "source_payloads"} {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
 	}

@@ -168,6 +168,39 @@ export type PostMedia = z.infer<typeof postMediaSchema>;
 export type PostAlbum = z.infer<typeof postAlbumSchema>;
 export type PostLibraryItem = z.infer<typeof postLibraryItemSchema>;
 
+const twitterID = z
+  .string()
+  .regex(/^[1-9][0-9]{0,19}$/)
+  .refine((v) => BigInt(v) <= 18446744073709551615n);
+const optionalTwitterID = z.union([z.literal(""), twitterID]);
+const threadLinkSchema = z
+  .object({
+    source_id: twitterID,
+    url: z.string(),
+    post: postSummarySchema.nullable(),
+  })
+  .refine((v) => v.url === `https://x.com/i/status/${v.source_id}`);
+export const postThreadSchema = z.object({
+  post_uuid: uuid,
+  facts: z
+    .object({
+      namespace: z.literal("native:twitter"),
+      post_id: twitterID,
+      conversation_id: twitterID,
+      reply_id: optionalTwitterID,
+      author_id: twitterID,
+      reply_author_id: optionalTwitterID,
+    })
+    .nullable(),
+  conflict: z.boolean(),
+  root: threadLinkSchema.nullable(),
+  parent: threadLinkSchema.nullable(),
+  posts: z.array(threadLinkSchema).max(25),
+  next: twitterID.optional(),
+});
+export type PostThread = z.infer<typeof postThreadSchema>;
+export type ThreadLink = z.infer<typeof threadLinkSchema>;
+
 function invalidResponse(): never {
   throw new NativeArchiveError(0, "invalid_response");
 }
@@ -313,6 +346,28 @@ export function createSourcePostAPI(
       );
       if (value.requested_uuid !== post) invalidResponse();
       return value.album;
+    },
+    async thread(post: string, after?: string, signal?: AbortSignal) {
+      const query = new URLSearchParams({ limit: String(pageLimit) });
+      if (after) query.set("after", twitterID.parse(after));
+      const value = await request(
+        `${path(post)}/thread?${query}`,
+        z.object({ requested_uuid: uuid, thread: postThreadSchema }),
+        undefined,
+        signal,
+      );
+      if (value.requested_uuid !== post) invalidResponse();
+      let previous = BigInt(after || "0");
+      for (const row of value.thread.posts) {
+        if (BigInt(row.source_id) <= previous) invalidResponse();
+        previous = BigInt(row.source_id);
+      }
+      if (
+        value.thread.next &&
+        value.thread.next !== value.thread.posts.at(-1)?.source_id
+      )
+        invalidResponse();
+      return value.thread;
     },
   };
 }

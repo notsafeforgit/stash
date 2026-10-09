@@ -17,6 +17,54 @@ function client(value: unknown) {
   return { api: createSourcePostAPI(endpoint, transport), transport };
 }
 
+it("reads exact thread IDs without rounding and rejects unsafe links and stale cursors", async () => {
+  const id = "1900000000000000003";
+  const thread = {
+    post_uuid: postIds.post,
+    conflict: false,
+    facts: {
+      namespace: "native:twitter",
+      post_id: id,
+      conversation_id: "1900000000000000001",
+      reply_id: "1900000000000000002",
+      author_id: "99",
+      reply_author_id: "99",
+    },
+    root: {
+      source_id: "1900000000000000001",
+      url: "https://x.com/i/status/1900000000000000001",
+      post: null,
+    },
+    parent: null,
+    posts: [
+      {
+        source_id: id,
+        url: `https://x.com/i/status/${id}`,
+        post: postSummary(),
+      },
+    ],
+    next: id,
+  };
+  const response = { requested_uuid: postIds.post, thread };
+  const { api, transport } = client(response);
+  expect((await api.thread(postIds.post)).next).toBe(id);
+  expect(transport.mock.calls[0]?.[1]?.method).toBe("GET");
+  await expect(api.thread(postIds.post, id)).rejects.toThrow();
+  await expect(api.thread(postIds.otherPost)).rejects.toThrow();
+  await expect(
+    client({
+      ...response,
+      thread: { ...thread, root: { ...thread.root, url: "javascript:bad" } },
+    }).api.thread(postIds.post),
+  ).rejects.toThrow();
+  await expect(
+    client({
+      ...response,
+      thread: { ...thread, next: "1900000000000000004" },
+    }).api.thread(postIds.post),
+  ).rejects.toThrow();
+});
+
 it("checks both the requested post identity and the current canonical identity", async () => {
   const value = postIdentity(postIds.post, postIds.otherPost, 7);
   const { api, transport } = client(value);

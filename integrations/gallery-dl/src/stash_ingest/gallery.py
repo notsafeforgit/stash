@@ -143,6 +143,11 @@ def twitter_evidence(extractor):
 
     def transform_tweet(self, tweet):
         data = dict(transform(tweet))
+        # The public transformer keeps reply_id/conversation_id but otherwise
+        # loses the stable account ID needed to distinguish self-replies.
+        legacy = tweet.get("legacy", tweet)
+        if legacy.get("in_reply_to_user_id_str"):
+            data["reply_user_id"] = legacy["in_reply_to_user_id_str"]
         if captured.get("tweet") is tweet and captured.get("media") is not None:
             if isinstance(data.get("legacy"), dict):
                 data["legacy"] = {**data["legacy"], "extended_entities": {"media": captured["media"]}}

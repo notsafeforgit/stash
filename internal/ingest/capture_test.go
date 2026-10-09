@@ -75,6 +75,46 @@ func (f captureFixture) submit(t *testing.T, event ingest.CaptureEvent) (*models
 	return f.service.Capture(context.Background(), f.token, raw, ingest.Digest(raw))
 }
 
+func TestCaptureTwitterThreadReplayConflictAndReceiptRollback(t *testing.T) {
+	f := newCaptureFixtureForNamespace(t, "native:twitter")
+	event := f.event(t)
+	event.Post = ingest.PostReference{Namespace: "native:twitter", Value: "103"}
+	event.Source = []byte(`{"category":"twitter","tweet_id":"103","conversation_id":"100","reply_id":"102","reply_user_id":"99","author":{"id":"99","name":"example"}}`)
+	store := f.service.Repo.Ingest
+	f.service.Repo.Ingest = failingReceiptStore{store}
+	_, err := f.submit(t, event)
+	require.ErrorContains(t, err, "receipt storage failed")
+	f.service.Repo.Ingest = store
+	first, err := f.submit(t, event)
+	require.NoError(t, err)
+	replay, err := f.submit(t, event)
+	require.NoError(t, err)
+	require.Equal(t, first, replay)
+	read := func() *models.SourceThreadView {
+		var view *models.SourceThreadView
+		require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+			var err error
+			view, err = f.service.Repo.SourceThread.Read(ctx, first.PostUUID, "", 25)
+			return err
+		}))
+		return view
+	}
+	view := read()
+	require.False(t, view.Conflict)
+	require.Equal(t, "102", view.Parent.SourceID)
+	require.Len(t, view.Posts, 1)
+	event.EventUUID = uuid.NewString()
+	event.Source = []byte(strings.Replace(string(event.Source), `"reply_id":"102"`, `"reply_id":"101"`, 1))
+	conflict, err := f.submit(t, event)
+	require.NoError(t, err)
+	var result ingest.CaptureResult
+	require.NoError(t, json.Unmarshal(conflict.Result, &result))
+	require.Contains(t, result.Review, "thread_relationship")
+	view = read()
+	require.True(t, view.Conflict)
+	require.Equal(t, "102", view.Parent.SourceID, "conflicting captures never rewrite recorded ancestry")
+}
+
 func TestCaptureIntakeCommitsEvidenceAlbumAndStableReceipt(t *testing.T) {
 	f := newCaptureFixture(t)
 	event := f.event(t)

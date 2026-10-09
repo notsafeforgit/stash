@@ -2963,3 +2963,21 @@ original event identity across explicit retries, and cannot substitute a newly
 created gallery that happens to reuse an old local integer ID. Historical
 captures, revisions and successful producer/backfill receipts keep their
 original ownership and recovery semantics.
+
+## Captured reply relationships
+
+Migration 1000105 adds `source_post_threads` for incoming Twitter conversation,
+parent-post and numeric publisher IDs. One row references its supporting capture;
+repeat captures reuse that row. A later capture may fill a missing reply-target
+account ID, while contradictory identity evidence marks the relationship for
+review without overwriting it. Conversation and author indexes support bounded
+thread reads and gallery planning. Historical captures are not scanned.
+
+The post-gallery index now permits multiple evidenced self-replies to share a
+gallery. Database guards reject unrelated sharing. The gallery service retains
+explicit per-post decisions, deduplicates physical membership, and respects
+manual exclusions and deletion. Thread sync validates every participating plan
+and commits all associations and membership changes in one transaction. It does
+not merge post identities or silently combine independently created galleries.
+Anonymization removes thread rows before their capture dependencies; native
+backups include the new table and normal gallery records automatically.

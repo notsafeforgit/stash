@@ -133,6 +133,12 @@ directory/finalization work and callbacks outside a file are guarded too. A
 current file can finish after lease loss; new file work still checks the lease.
 The locks are reentrant within a worker thread, including nested callbacks.
 
+The Twitter adapter also preserves `reply_user_id` from the raw API response,
+alongside the extractor's `conversation_id` and `reply_id`. Native capture intake
+uses these exact numeric account and post IDs for navigable threads and shared
+self-reply galleries. Screen names and retweet/quote references do not establish
+a reply relationship.
+
 The host backup coordinator uses
 `stash_ingest.publication_lock.PublicationBarrier(lock_directories)` to exclude
 these mutations across every reviewed worker lock root. It acquires the barrier

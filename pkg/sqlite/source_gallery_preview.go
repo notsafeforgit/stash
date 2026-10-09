@@ -182,6 +182,25 @@ func (s *SourceGalleryStore) Preview(ctx context.Context, value string) (*models
 // Proposed choices exist only in a read-only backfill preview. Normal sync
 // always reads the actual persisted decisions.
 func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value string, proposed map[string]sourceAlbumMediaChoice) (*models.SourceGalleryPreview, error) {
+	members, err := sourceThreadMembers(ctx, value)
+	if errors.Is(err, models.ErrSourceGalleryConflict) || errors.Is(err, models.ErrSourceAlbumLimit) {
+		ret, readErr := s.previewSinglePost(ctx, value, proposed, nil, false)
+		if readErr != nil {
+			return nil, readErr
+		}
+		ret.Action = "review"
+		return finishSourceGalleryPreview(ret)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(members) > 1 {
+		return s.previewThread(ctx, value, proposed, members)
+	}
+	return s.previewSinglePost(ctx, value, proposed, nil, false)
+}
+
+func (s *SourceGalleryStore) previewSinglePost(ctx context.Context, value string, proposed map[string]sourceAlbumMediaChoice, shared *models.ArchiveEntity, forceAlbum bool) (*models.SourceGalleryPreview, error) {
 	post, err := currentSourcePost(ctx, value)
 	if err != nil {
 		return nil, err
@@ -204,6 +223,9 @@ func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value 
 	if !ready {
 		return finishSourceGalleryPreview(ret)
 	}
+	if shared != nil && ret.Gallery == nil {
+		ret.Gallery = shared
+	}
 	selection, err := (&SourceAttachmentStore{}).Selection(ctx, post.UUID)
 	if err != nil {
 		return nil, err
@@ -215,7 +237,7 @@ func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value 
 	if err != nil {
 		return nil, err
 	}
-	ready, err = sourceGallerySelectPreview(ctx, ret, selection, owners)
+	ready, err = sourceGallerySelectPreview(ctx, ret, selection, owners, forceAlbum)
 	if err != nil {
 		return nil, err
 	}
@@ -278,14 +300,14 @@ func sourceGalleryPreviewReady(ctx context.Context, ret *models.SourceGalleryPre
 	return true, nil
 }
 
-func sourceGallerySelectPreview(ctx context.Context, ret *models.SourceGalleryPreview, selection *models.AttachmentSelection, owners map[string]bool) (bool, error) {
+func sourceGallerySelectPreview(ctx context.Context, ret *models.SourceGalleryPreview, selection *models.AttachmentSelection, owners map[string]bool, forceAlbum bool) (bool, error) {
 	ret.SelectionUUID = selection.Decision.UUID
 	if selection.Decision.Mode == "disabled" {
 		ret.Action = "disabled"
 		return false, nil
 	}
 	if ret.Gallery == nil {
-		if !selection.IsAlbum() {
+		if !selection.IsAlbum() && !forceAlbum {
 			return false, nil
 		}
 		ret.Action, ret.Title = "create", "Source album"

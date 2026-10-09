@@ -14,6 +14,13 @@ func (s *SourceGalleryStore) Sync(ctx context.Context, post, signature string) (
 	if signature == "" || signature != preview.Signature || preview.Action == "review" {
 		return nil, models.ErrSourceGalleryConflict
 	}
+	if len(preview.ThreadPlans) > 0 {
+		return s.syncThread(ctx, preview)
+	}
+	return s.syncPreview(ctx, preview)
+}
+
+func (s *SourceGalleryStore) syncPreview(ctx context.Context, preview *models.SourceGalleryPreview) (*models.SourceGallerySyncResult, error) {
 	ret := &models.SourceGallerySyncResult{Action: preview.Action, Added: []string{}, Removed: []string{}}
 	if preview.Gallery != nil {
 		ret.GalleryUUID, ret.GalleryID = preview.Gallery.UUID, preview.Gallery.LocalID
@@ -47,10 +54,16 @@ func (s *SourceGalleryStore) Sync(ctx context.Context, post, signature string) (
 		}
 		ret.GalleryUUID, ret.GalleryID, ret.Created = identity.UUID, identity.LocalID, true
 	}
+	if preview.Action == "sync" && preview.Association == nil {
+		if _, err := s.decideAssociation(ctx, models.SourceGalleryChoiceInput{PostUUID: preview.PostUUID, ExpectedPostRevision: preview.PostRevision,
+			State: "linked", GalleryUUID: preview.Gallery.UUID, ExpectedGalleryRevision: preview.Gallery.Revision, Origin: "source", Reason: "Shared gallery for captured self-replies"}, &preview.SelectionUUID); err != nil {
+			return nil, err
+		}
+	}
 	if len(preview.Add) == 0 && len(preview.Remove) == 0 {
 		return ret, nil
 	}
-	err = withSourceGalleryWrite(ctx, ret.GalleryUUID, preview.PostUUID, preview.SelectionUUID, func() error {
+	err := withSourceGalleryWrite(ctx, ret.GalleryUUID, preview.PostUUID, preview.SelectionUUID, func() error {
 		for _, media := range preview.Remove {
 			if media.Kind == models.ArchiveImage {
 				if err := s.gallery.RemoveImages(ctx, *ret.GalleryID, *media.LocalID); err != nil {

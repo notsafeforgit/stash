@@ -139,6 +139,7 @@ func TestMetadataWorkerRepairMigrationPreservesExistingCheckpoint(t *testing.T) 
 	require.NoError(t, f.db.Close())
 	raw := openRawDB(t, f.db.DatabasePath())
 	defer raw.Close()
+	removeSourceThreadSchema(t, raw)
 	_, err = raw.Exec(`DROP TABLE metadata_worker_attempt_policies;
 DROP TABLE metadata_worker_policy_upgrades;
 DELETE FROM native_migration_history WHERE version=1000104;

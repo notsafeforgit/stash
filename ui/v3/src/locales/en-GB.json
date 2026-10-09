@@ -1,4 +1,15 @@
 {
+  "source_threads": {
+    "title": "Thread and replies",
+    "loading": "Loading thread",
+    "missing": "Not in this archive; opens the source website.",
+    "none": "No captured thread relationship. Older imports may not contain reply metadata.",
+    "help": "Posts are shown oldest first. Captured self-replies from the same account share an album gallery; each post retains its own attachment order.",
+    "conflict": "Captured thread relationships disagree. Automatic gallery grouping is paused for this post.",
+    "root": "Thread start",
+    "parent": "In reply to",
+    "more": "Load more thread posts"
+  },
   "downloads": {
     "capture": "Source capture",
     "checked": "Download reports checked {time}",

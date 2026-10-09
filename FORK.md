@@ -4,8 +4,9 @@ This repository develops an independent native media archive based on Stash.
 The [native archive transition plan](docs/native-archive-transition-plan.md)
 defines the full migration scope and acceptance criteria.
 [Implementation progress](docs/native-archive-progress.md) records completed
-work, verification, and deployment status. The compatible production deployment
-remains separate from development until the cutover gates pass.
+work, verification, and deployment status. The native application is running in
+production. The original compatible database and recovery artifacts remain
+retained while the worker rollout and independent restore finish.
 
 ## Branch and release policy
 

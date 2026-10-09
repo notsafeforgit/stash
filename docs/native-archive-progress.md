@@ -9,6 +9,64 @@ in progress.
 
 ## Current release position — 2026-10-09 UTC
 
+Production is healthy on schema **1000103**, source
+`d1f15e9fae3d0d2573ed50f5c5f342d02a864e81`, pinned wrapper
+`localhost/stash-native-s6@sha256:49f9b2c1c9b39b38d9f7955a2fd67bc2227724e1099d646a879a3f6fd27472b8`.
+The matching backup validator and binary reconstruction components are installed
+for the next backup. The original published backup and its separately running
+restore still use their sealed configuration.
+
+Schema 1000101 consolidated 37,434 redundant post versions while preserving
+source text, media links, first/last sightings and repeat counts. Schema 1000102
+makes collection and media-root retirement reversible through a new revision;
+the UUID, media associations and prior history survive restoration. The UI now
+allows editing retired entries and explains active, disabled and retired states.
+Explicit source recovery can restore a retired collection; automatic source
+registration never silently reactivates a paused or retired one.
+
+All 3,090 targets matched from the live gallery-dl lists were already active.
+The confusing disabled entries were imported catalog groupings, distinct from
+the URL-bearing scrape targets. A reviewed repair activated 138 such groupings
+with exact migration-generated state, an active root and an active listed
+target for the same account and directory. This includes the `lila-gw, reddit`
+grouping; its six scrape targets were already active. Unrelated disabled or
+retired entries were left unchanged. Desktop and mobile checks passed.
+
+The n8n producer now runs image
+`sha256:dc7c2c1c2c6488c7484b23b0ec8bd07240043f26a75ac61edc8acd70f38800ed`.
+Captured Reddit Redgifs/direct-file references can identify their downloaded
+attachments, including retained Reddit fallback previews. Unsupported external
+gallery membership is not inferred from filenames. The QSV GIF helper pads odd
+dimensions before encoding; temporary copies of both failing library GIFs
+converted successfully and the originals were unchanged. The host producer
+runtime and eight helper-asset bindings were updated together.
+
+Schema 1000103 adds owner-approved execution-policy upgrades for queued or
+deferred source runs. This preserves their original admission, UUID, coverage,
+progress and retry deadlines. All 38 current pending n8n runs were upgraded;
+the ten attachment-error deferrals were reopened through the existing review
+API. The 169 imported review holds remain unchanged. n8n and its download timer
+are active. Existing service cooldowns currently prevent the first repaired
+attempt; actual post-repair download/intake verification is still pending.
+
+The release passed 663 producer tests and focused backend matching, policy,
+migration and API checks. The broader backend run's failures were corrected and
+rechecked: export cleanup omitted shared-capture tables, one retirement test
+expected the former permanent state, and Python API fixtures needed the pinned
+producer interpreter. Subsequent diagnosis found a separate Reddit discovery
+initialization error before network access. Its fix and actual-extractor
+regression are in source; deploying it requires preserving the policies of the
+already admitted metadata jobs and imported account listings. The retained
+metadata worker definition is installed but remains inactive.
+
+The remaining rollout includes metadata-worker continuity, controlled host and
+manual intake checks, translation activation, a fresh incremental post-write
+backup, and resumption/observation of the held schedules. The independent
+baseline restore is still running. No merge into `develop` or change to the
+frozen compatible release has occurred.
+
+## Earlier cutover and NFO cleanup — schema 1000100
+
 The NFO-to-catalog import and subsequent catalog-to-native import are already
 complete. The requested NFO work removes redundant storage from that completed
 import. Schema 1000100 and the explicit offline `cmd/nfo-cleanup` command now

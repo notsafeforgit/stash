@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Stash is a self-hosted media organizer written in Go (backend) + React/TypeScript (frontend). It exposes a GraphQL API, manages a SQLite database, and wraps FFmpeg for video processing.
 
-This repository is now an **independent fork** of upstream stashapp/stash. Work continues on `v3-rewrite` under the [native archive transition plan](docs/native-archive-transition-plan.md); merge into `develop` follows migration verification and the owner's success review. Read [FORK.md](FORK.md) for migration, release, and upstream-import policy. V2.5 compatibility is frozen at `v2.5-compatible-final`, not a constraint on new code. [Transition progress](docs/native-archive-progress.md) distinguishes completed work from the still-running compatible production deployment. The [documentation index](docs/README.md) links current guides.
+This repository is now an **independent fork** of upstream stashapp/stash. Work continues on `v3-rewrite` under the [native archive transition plan](docs/native-archive-transition-plan.md); merge into `develop` follows migration verification and the owner's success review. Read [FORK.md](FORK.md) for migration, release, and upstream-import policy. V2.5 compatibility is frozen at `v2.5-compatible-final`, not a constraint on new code. The native application is running in production; [transition progress](docs/native-archive-progress.md) records the remaining worker rollout and restore verification. The [documentation index](docs/README.md) links current guides.
 
 New plugins use the independent [`apiVersion: 3` contract](docs/plugin-manifests.md). Preserve its settings, UI contributions, capability checks, and after-success notifications. Only `apiVersion: 3` manifests load. Unversioned manifests and legacy UI injection are rejected and reported through `pluginLoadErrorsV3` and Settings → Plugins. Native catalog invariants belong in core services.
 
@@ -77,7 +77,10 @@ redirect pip's uninstall discovery. Producer wheel builds discard obsolete
 `build/lib` modules, and both setup targets verify installed source files with
 `scripts/verify_producer_install.py`. A staged worker policy must fingerprint the
 same code as the actual installed runtime; source-import tests alone cannot prove it.
-Host/n8n launch paths have not switched to the native adapter.
+Host/n8n launch paths now select the native adapter. The n8n initial-profile
+queue and native download worker are running; the remaining host schedules are
+still held for their controlled rollout checks. Do not equate an installed
+launcher, active timer or admitted job with completed ingestion.
 `integrations/archive` provides the standard-library `stash-archive` tool for
 compressed native SQLite snapshots, original artwork and explicit configuration
 or operating-state components. See the [portable archive format](docs/native-archive-format.md).

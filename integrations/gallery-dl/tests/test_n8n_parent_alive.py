@@ -20,10 +20,11 @@ class N8nParentTests(unittest.TestCase):
                 db.execute("CREATE TABLE execution_entity(id INTEGER PRIMARY KEY,status TEXT,stoppedAt TEXT)")
                 db.executemany("INSERT INTO execution_entity VALUES(?,?,?)", [
                     (1, "new", None), (2, "running", None), (3, "waiting", None), (4, "success", None),
-                    (5, "error", None), (6, "canceled", None), (7, "crashed", None), (8, "running", "2026-10-07")])
+                    (5, "error", None), (6, "canceled", None), (7, "crashed", None), (8, "running", "2026-10-07"),
+                    (9, "waiting", "2026-10-09T14:06:27Z"), (10, "canceled", "2026-10-09T14:07:00Z")])
             before = path.read_bytes()
-            for identity in range(1, 10):
-                self.assertEqual(alive(str(identity), path), identity in (1, 2, 3))
+            for identity in range(1, 12):
+                self.assertEqual(alive(str(identity), path), identity in (1, 2, 3, 9))
             self.assertEqual(path.read_bytes(), before)
             output = io.StringIO()
             with redirect_stdout(output):

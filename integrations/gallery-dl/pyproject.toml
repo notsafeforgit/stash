@@ -15,7 +15,7 @@ gallery = [
 ]
 
 [project.scripts]
-stash-ingest = "stash_ingest.cli:main"
+stash-ingest = "stash_ingest_bootstrap:main"
 stash-gallery-dl = "stash_ingest.manual:main"
 stash-ingest-config = "stash_ingest.config_migration:main"
 stash-ingest-twitter = "stash_ingest.launchers:twitter_main"
@@ -65,6 +65,9 @@ stash-backfill-post-media = "stash_ingest.post_media_backfill:main"
 stash-dedupe = "stash_ingest.dedupe:main"
 stash-dedupe-host = "stash_ingest.dedupe_host:main"
 stash-intake-folders = "stash_ingest.intake_folder:main"
+
+[tool.setuptools]
+py-modules = ["stash_ingest_bootstrap"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

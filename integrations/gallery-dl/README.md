@@ -480,6 +480,11 @@ profiles, outboxes, download archives and media are deployment mounts, never
 image build inputs. Select the new image only at the verified cutover after
 converting workflow/host entry points and their receipts.
 
+Use the `stash-ingest` console command for download workers. Its bootstrap
+initializes gallery-dl logging once, including the lowercase levels used by
+configured actions such as `error:network security`. Logs go to stderr while
+the command's JSON result stays on stdout.
+
 ## Converting existing gallery-dl settings
 
 `stash-ingest-config` reads ordered JSON config layers and writes a **new,

@@ -7,6 +7,7 @@ FROM ${N8N_BASE_IMAGE}
 USER root
 COPY pyproject.toml README.md /tmp/stash-ingest-package/
 COPY src/stash_ingest /tmp/stash-ingest-package/src/stash_ingest
+COPY src/stash_ingest_bootstrap.py /tmp/stash-ingest-package/src/stash_ingest_bootstrap.py
 RUN uv --no-cache venv --python /usr/bin/python3 /opt/stash-ingest \
     && uv --no-cache pip install --python /opt/stash-ingest/bin/python \
        "/tmp/stash-ingest-package[gallery]" \

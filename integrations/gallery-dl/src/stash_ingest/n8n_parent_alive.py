@@ -17,7 +17,9 @@ def alive(identity, database):
         db.execute("PRAGMA query_only=ON")
         db.execute("PRAGMA trusted_schema=OFF")
         row = db.execute("SELECT status,stoppedAt FROM execution_entity WHERE id=?", (identity,)).fetchone()
-        return row is not None and row[0] in ("new", "running", "waiting") and row[1] is None
+        # n8n records stoppedAt when a Wait node suspends execution. Waiting
+        # remains live and must keep the queue lease until it resumes or ends.
+        return row is not None and (row[0] == "waiting" or (row[0] in ("new", "running") and row[1] is None))
 
 
 def main(argv=None):

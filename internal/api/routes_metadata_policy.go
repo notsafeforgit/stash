@@ -105,6 +105,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/entities/{entity}/source-posts", rs.mediaSourcePosts)
 	r.Get("/posts/{post}/urls", rs.reviewPostURLs)
 	r.Get("/posts/{post}/capture-summaries", rs.reviewPostCaptures)
+	r.Get("/posts/{post}/capture-history", rs.reviewCaptureHistory)
 	r.Put("/posts/{post}/media/{entity}", rs.decidePostMedia)
 	r.Get("/posts/{post}/media/{entity}/history", rs.postMediaHistory)
 	r.Get("/post-media-decisions/{decision}", rs.postMediaDecision)

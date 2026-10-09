@@ -3259,7 +3259,7 @@
     "attachments_help": "Clear the explicit post choice and use the existing attachment links. Retained file evidence alone does not select a link.",
     "capture_count": "{count, plural, one {# loaded capture} other {# loaded captures}}",
     "captures": "Post text and captures",
-    "captures_help": "Each revision holds shared post text. Captures record observations of that revision; repeated observations are grouped below.",
+    "captures_help": "Each version stores the post content once. Repeat observations share that content; counts can include separate media from the same scrape.",
     "choice": "Post link",
     "conflict": "Conflicting link choices",
     "empty": "No source posts for this item",
@@ -3300,7 +3300,11 @@
     "unlink_help": "Exclude this post as a source for this item, including its attachment links. Existing source albums may remove automatic membership; manual gallery choices are kept.",
     "unlinked": "Explicitly unlinked",
     "untitled": "Untitled source post",
-    "unverified_date": "Unverified historical date"
+    "unverified_date": "Unverified historical date",
+    "sighting_count": "{count, plural, one {# observation} other {# observations}}",
+    "sighting_range": "First seen {first} · Last seen {last}",
+    "unknown_sighting_count": "Observation time unknown for {count, plural, one {# imported record} other {# imported records}}.",
+    "more_versions": "Load more versions"
   },
   "source_posts": {
     "title": "Source posts",

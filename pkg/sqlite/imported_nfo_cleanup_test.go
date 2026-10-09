@@ -20,7 +20,10 @@ import (
 
 func removeImportedNFOSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
-	_, err := raw.Exec(`DROP TRIGGER catalog_nfo_compaction_guard;
+	_, err := raw.Exec(`DROP TABLE source_capture_sightings;
+DROP TABLE source_capture_content;
+DELETE FROM native_migration_history WHERE version=1000101;
+DROP TRIGGER catalog_nfo_compaction_guard;
 DROP VIEW catalog_document_pending_imports;
 ALTER TABLE catalog_snapshots DROP COLUMN nfo_compacted;
 DELETE FROM native_migration_history WHERE version=1000100`)

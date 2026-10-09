@@ -100,6 +100,29 @@ export const sourceRevisionSchema = z.object({
     language: z.string().optional(),
   }),
 });
+const captureHistorySchema = sourceRevisionSchema
+  .extend({
+    count: z.number().int().positive(),
+    unknown_count: z.number().int().nonnegative(),
+    first_seen: time.nullable(),
+    last_seen: time.nullable(),
+  })
+  .refine(
+    (r) =>
+      r.unknown_count <= r.count &&
+      ((r.first_seen === null &&
+        r.last_seen === null &&
+        r.unknown_count === r.count) ||
+        (r.first_seen !== null &&
+          r.last_seen !== null &&
+          Date.parse(r.first_seen) <= Date.parse(r.last_seen) &&
+          r.unknown_count < r.count)),
+  );
+export type CaptureHistory = z.infer<typeof captureHistorySchema>;
+const captureHistoryPageSchema = z.object({
+  requested_uuid: uuid,
+  revisions: z.array(captureHistorySchema).max(100),
+});
 const capturesSchema = z
   .object({
     requested_uuid: uuid,
@@ -253,6 +276,25 @@ export function createSourceReviewAPI(
         previous = row.uuid;
       }
       return rows;
+    },
+    async captureHistory(post: string, after?: string, signal?: AbortSignal) {
+      const query = new URLSearchParams({ limit: String(pageLimit) });
+      if (after) query.set("after", uuid.parse(after));
+      const result = await request(
+        `posts/${uuid.parse(post)}/capture-history?${query}`,
+        captureHistoryPageSchema,
+        undefined,
+        signal,
+      );
+      if (result.requested_uuid !== post)
+        throw new NativeArchiveError(0, "invalid_response");
+      let previous = after ?? "";
+      for (const row of result.revisions) {
+        if (row.uuid <= previous)
+          throw new NativeArchiveError(0, "invalid_response");
+        previous = row.uuid;
+      }
+      return result.revisions;
     },
     async captures(post: string, after?: SourceCapture, signal?: AbortSignal) {
       const query = new URLSearchParams({ limit: String(pageLimit) });

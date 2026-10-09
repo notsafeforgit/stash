@@ -322,3 +322,68 @@ func TestProducerExpiryAndRootScope(t *testing.T) {
 	_, _, err = f.service.IssueCredential(context.Background(), f.producer.UUID, f.credential.Scopes, nil)
 	require.NoError(t, err, "rotation can retain an explicitly requested historical root grant")
 }
+
+func TestCaptureContentRepeatDoesNotDuplicateEvidenceOrReplayCount(t *testing.T) {
+	f := newCaptureFixture(t)
+	event := f.event(t)
+	first, err := f.submit(t, event)
+	require.NoError(t, err)
+	repeated := event
+	repeated.EventUUID = uuid.NewString()
+	repeated.ObservedAt = event.ObservedAt.Add(time.Hour)
+	var object map[string]any
+	require.NoError(t, json.Unmarshal(event.Source, &object))
+	object["score"] = 42
+	object["search_tags"] = "author:Example"
+	repeated.Source, err = json.Marshal(object)
+	require.NoError(t, err)
+	second, err := f.submit(t, repeated)
+	require.NoError(t, err)
+	require.Equal(t, first.CaptureUUID, second.CaptureUUID)
+	replay, err := f.submit(t, repeated)
+	require.NoError(t, err)
+	require.Equal(t, second, replay)
+	require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		history, err := f.service.Repo.SourceEvidence.CaptureHistory(ctx, first.PostUUID, "", 25)
+		require.NoError(t, err)
+		require.Len(t, history, 1)
+		require.Equal(t, 2, history[0].Count)
+		require.Equal(t, repeated.ObservedAt, *history[0].LastSeen)
+		selection, err := f.service.Repo.SourceAttachment.Selection(ctx, first.PostUUID)
+		require.NoError(t, err)
+		require.Len(t, selection.Entries, 2)
+		publisher, err := f.service.Repo.CapturePublisher.Current(ctx, first.CaptureUUID)
+		require.NoError(t, err)
+		require.NotNil(t, publisher.AccountUUID)
+		return nil
+	}))
+	// A text edit, followed by a real reversion, must still advance current
+	// evidence even though the reverted post body already exists.
+	edited := repeated
+	edited.EventUUID = uuid.NewString()
+	edited.ObservedAt = event.ObservedAt.Add(2 * time.Hour)
+	title := "Edited post"
+	edited.Metadata.Title = &title
+	object["title"] = title
+	edited.Source, err = json.Marshal(object)
+	require.NoError(t, err)
+	third, err := f.submit(t, edited)
+	require.NoError(t, err)
+	require.NotEqual(t, first.CaptureUUID, third.CaptureUUID)
+	reverted := event
+	reverted.EventUUID = uuid.NewString()
+	reverted.ObservedAt = event.ObservedAt.Add(3 * time.Hour)
+	fourth, err := f.submit(t, reverted)
+	require.NoError(t, err)
+	require.NotEqual(t, first.CaptureUUID, fourth.CaptureUUID)
+	require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		history, err := f.service.Repo.SourceEvidence.CaptureHistory(ctx, first.PostUUID, "", 25)
+		require.NoError(t, err)
+		require.Len(t, history, 2)
+		captures, err := f.service.Repo.SourceEvidence.CurrentCaptures(ctx, first.PostUUID, nil, 25)
+		require.NoError(t, err)
+		require.Len(t, captures, 3)
+		require.Equal(t, fourth.CaptureUUID, captures[2].UUID)
+		return nil
+	}))
+}

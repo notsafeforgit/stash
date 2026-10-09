@@ -4,18 +4,15 @@ import { useMsg } from "@/hooks/message";
 import type {
   SourceCapture,
   SourceDecision,
-  SourceRevision,
+  CaptureHistory,
   SourceReviewAPI,
 } from "@/core/native-archive/source-review-api";
-import {
-  AccountOrigin,
-  AccountService,
-} from "@/components/archive/accounts/shared";
+import { AccountOrigin } from "@/components/archive/accounts/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Expandable, ReviewError } from "../native-metadata/shared";
+import { ReviewError } from "../native-metadata/shared";
 
 export function LinkState({
   state,
@@ -78,20 +75,18 @@ export function SourceCaptures({
 }) {
   const msg = useMsg();
   const intl = useIntl();
-  const [captures, setCaptures] = useState<SourceCapture[]>([]);
-  const [revisions, setRevisions] = useState<SourceRevision[]>([]);
+  const [revisions, setRevisions] = useState<CaptureHistory[]>([]);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<unknown>();
   useEffect(() => {
     const controller = new AbortController();
     void api
-      .captures(post, undefined, controller.signal)
+      .captureHistory(post, undefined, controller.signal)
       .then((page) => {
         if (controller.signal.aborted) return;
-        setCaptures(page.captures);
-        setRevisions(page.revisions);
-        setMore(page.captures.length === api.pageLimit);
+        setRevisions(page);
+        setMore(page.length === api.pageLimit);
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setError(error);
@@ -105,16 +100,12 @@ export function SourceCaptures({
     setBusy(true);
     setError(undefined);
     try {
-      const page = await api.captures(post, captures.at(-1));
-      setCaptures((prior) => [
-        ...prior,
-        ...page.captures.filter((c) => !prior.some((p) => p.uuid === c.uuid)),
-      ]);
+      const page = await api.captureHistory(post, revisions.at(-1)?.uuid);
       setRevisions((prior) => [
         ...prior,
-        ...page.revisions.filter((r) => !prior.some((p) => p.uuid === r.uuid)),
+        ...page.filter((r) => !prior.some((p) => p.uuid === r.uuid)),
       ]);
-      setMore(page.captures.length === api.pageLimit);
+      setMore(page.length === api.pageLimit);
     } catch (error) {
       setError(error);
     } finally {
@@ -126,7 +117,7 @@ export function SourceCaptures({
       <p className="text-sm text-muted-foreground">
         {msg(
           "source_review.captures_help",
-          "Each revision holds shared post text. Captures record observations of that revision; repeated observations are grouped below.",
+          "Each version stores the post content once. Repeat observations share that content; counts can include separate media from the same scrape.",
         )}
       </p>
       {busy && (
@@ -135,7 +126,7 @@ export function SourceCaptures({
       {error !== undefined && (
         <ReviewError error={error} retry={() => void loadMore()} />
       )}
-      {!busy && !error && captures.length === 0 && (
+      {!busy && !error && revisions.length === 0 && (
         <p>
           {msg(
             "source_review.no_captures",
@@ -144,9 +135,6 @@ export function SourceCaptures({
         </p>
       )}
       {revisions.map((revision) => {
-        const observations = captures.filter(
-          (c) => c.revision_uuid === revision.uuid,
-        );
         const metadata = revision.metadata;
         return (
           <Card key={revision.uuid} size="sm">
@@ -185,50 +173,48 @@ export function SourceCaptures({
                   )}
                 </Badge>
               )}
-              <Expandable
-                title={intl.formatMessage(
+              <p className="text-sm text-muted-foreground">
+                {intl.formatMessage(
                   {
-                    id: "source_review.capture_count",
+                    id: "source_review.sighting_count",
                     defaultMessage:
-                      "{count, plural, one {# loaded capture} other {# loaded captures}}",
+                      "{count, plural, one {# observation} other {# observations}}",
                   },
-                  { count: observations.length },
+                  { count: revision.count },
                 )}
-              >
-                <ul className="flex flex-col gap-3">
-                  {observations.map((capture) => (
-                    <li
-                      key={capture.uuid}
-                      className="flex flex-col gap-1 text-sm"
-                    >
-                      <span>
-                        <CaptureTime capture={capture} />
-                      </span>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <AccountService
-                          namespace={`native:${capture.platform}`}
-                        />
-                        {capture.origin === "legacy-nfo" ? (
-                          msg("source_review.origin_nfo", "Retained NFO")
-                        ) : (
-                          <AccountOrigin origin={capture.origin} />
-                        )}
-                      </div>
-                      {capture.extractor_version && (
-                        <span data-selectable-text>
-                          {intl.formatMessage(
-                            {
-                              id: "source_review.extractor_version",
-                              defaultMessage: "Extractor version: {version}",
-                            },
-                            { version: capture.extractor_version },
-                          )}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </Expandable>
+              </p>
+              {revision.first_seen && revision.last_seen && (
+                <p className="text-sm" data-selectable-text>
+                  {intl.formatMessage(
+                    {
+                      id: "source_review.sighting_range",
+                      defaultMessage: "First seen {first} · Last seen {last}",
+                    },
+                    {
+                      first: intl.formatDate(revision.first_seen, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      }),
+                      last: intl.formatDate(revision.last_seen, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      }),
+                    },
+                  )}
+                </p>
+              )}
+              {revision.unknown_count > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {intl.formatMessage(
+                    {
+                      id: "source_review.unknown_sighting_count",
+                      defaultMessage:
+                        "Observation time unknown for {count, plural, one {# imported record} other {# imported records}}.",
+                    },
+                    { count: revision.unknown_count },
+                  )}
+                </p>
+              )}
             </CardContent>
           </Card>
         );
@@ -239,7 +225,7 @@ export function SourceCaptures({
           disabled={busy}
           onClick={() => void loadMore()}
         >
-          {msg("source_review.more_captures", "Load more captures")}
+          {msg("source_review.more_versions", "Load more versions")}
         </Button>
       )}
     </div>

@@ -91,6 +91,15 @@ type SourceCaptureContext struct {
 	ParentUUID  string `json:"parent_capture_uuid" db:"parent_capture_uuid"`
 }
 
+type SourceCaptureHistory struct {
+	UUID         string             `json:"uuid"`
+	Metadata     SourcePostMetadata `json:"metadata"`
+	Count        int                `json:"count"`
+	UnknownCount int                `json:"unknown_count"`
+	FirstSeen    *time.Time         `json:"first_seen"`
+	LastSeen     *time.Time         `json:"last_seen"`
+}
+
 type SourceCaptureCursor struct {
 	CapturedAt time.Time
 	RecordedAt *time.Time
@@ -137,6 +146,8 @@ type SourceEvidenceReaderWriter interface {
 	AddPostIdentifier(context.Context, string, SourcePostIdentifier, int) error
 	PostIdentifiers(context.Context, string, *SourcePostIdentifier, int) ([]SourcePostIdentifier, error)
 	CurrentPostIdentifiers(context.Context, string, *SourcePostIdentifier, int) ([]SourcePostIdentifier, error)
+	RecordContentCapture(context.Context, SourceCaptureInput) (*SourceCapture, error)
+	CaptureHistory(context.Context, string, string, int) ([]SourceCaptureHistory, error)
 	RecordCapture(context.Context, SourceCaptureInput) (*SourceCapture, error)
 	CaptureContexts(context.Context, string) ([]SourceCaptureContext, error)
 	RetainProfile(context.Context, string, json.RawMessage) (*SourceProfileBody, error)

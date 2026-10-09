@@ -126,3 +126,48 @@ it("compares every receipt guard and never treats a malformed success as permiss
     });
   }
 });
+
+it("pages complete version summaries and preserves unknown observation times", async () => {
+  const summary = {
+    uuid: sourceIds.revision,
+    metadata: { title: "Shared title" },
+    count: 200,
+    unknown_count: 2,
+    first_seen: "2026-10-01T01:00:00Z",
+    last_seen: "2026-10-08T01:00:00Z",
+  };
+  const transport = vi
+    .fn<typeof fetch>()
+    .mockResolvedValue(
+      Response.json({ requested_uuid: sourceIds.post, revisions: [summary] }),
+    );
+  const api = createSourceReviewAPI(endpoint, transport);
+  expect(await api.captureHistory(sourceIds.post)).toEqual([summary]);
+  expect(String(transport.mock.calls[0]?.[0])).toContain(
+    "/capture-history?limit=25",
+  );
+  transport.mockResolvedValue(
+    Response.json({ requested_uuid: sourceIds.post, revisions: [summary] }),
+  );
+  await expect(
+    api.captureHistory(sourceIds.post, summary.uuid),
+  ).rejects.toMatchObject({ code: "invalid_response" });
+  transport.mockResolvedValue(
+    Response.json({
+      requested_uuid: sourceIds.post,
+      revisions: [
+        { ...summary, unknown_count: 200, first_seen: null, last_seen: null },
+      ],
+    }),
+  );
+  expect((await api.captureHistory(sourceIds.post))[0]?.first_seen).toBeNull();
+  transport.mockResolvedValue(
+    Response.json({
+      requested_uuid: sourceIds.post,
+      revisions: [{ ...summary, unknown_count: 201 }],
+    }),
+  );
+  await expect(api.captureHistory(sourceIds.post)).rejects.toMatchObject({
+    code: "invalid_response",
+  });
+});

@@ -2914,3 +2914,28 @@ cannot display a late response from the previous scope. An empty intermediate
 media page offers **Continue checking**. Explicit refresh removes items whose
 decisions have since been resolved. Import history retains historical warnings,
 and Saved actions retains uncertain browser submissions independently.
+
+### Shared post content and repeat observations
+
+The native HTTP capture boundary validates the producer's existing transport
+policy, then applies `post-content-v1` for storage. Engagement counters,
+viewer state and Reddit/Twitter search-route context do not create post
+versions. Post text, publication dates, attachment identity/order, thread
+relationships and meaningful profile data remain retained. Profile bodies
+remain shared separately from post bodies.
+
+Identical content for the same attachment reuses its capture and updates a
+first-seen/last-seen range and observation count. The producer event receipt
+still makes delivery retries idempotent. Text edits, profile edits and actual
+reversions remain distinguishable. The capture-history endpoint pages complete
+version summaries, so a page limit does not truncate a version's observation
+count. Counts include per-media observations from the same scrape; unknown
+historical observation times remain explicitly unknown.
+
+For existing libraries, `go run ./cmd/capture-cleanup --database PATH --apply`
+is an offline, transactional cleanup: stop writers and retain a current backup
+first. It shares equivalent post bodies/revisions and removes replaced,
+unreferenced payloads. Existing capture IDs referenced by media, translations
+and saved field choices remain valid. Inputs bound to published enrichment or
+checkpoint proofs keep their original byte representation and are reported as
+protected; these internal proof workflows retain their existing policy.

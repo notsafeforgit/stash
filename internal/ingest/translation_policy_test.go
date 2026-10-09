@@ -40,8 +40,11 @@ func TestCaptureTranslationSchedulingCommitsWithReceiptAndSurvivesReplay(t *test
 	second, err := f.submit(t, event)
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(second.Result, &result))
+	// An unchanged capture reuses the original translation decision, including
+	// its historical creation status, rather than making another scheduling row.
+	require.Equal(t, first.CaptureUUID, second.CaptureUUID)
 	for _, entry := range result.Translation.Entries {
-		require.Equal(t, "retained", entry.Status)
+		require.Equal(t, "created", entry.Status)
 	}
 	require.NoError(t, f.db.Close())
 	require.NoError(t, f.db.Open(f.db.DatabasePath()))

@@ -82,6 +82,19 @@ func TestSourcePostReviewHTTPSharedCapturesAndTargetedPagination(t *testing.T) {
 	for _, query := range []string{"limit=0", "limit=101", "limit=bad", "after=bad"} {
 		get(base+"?"+query, 400)
 	}
+	historyPath := "/posts/" + post.UUID + "/capture-history"
+	var history struct {
+		Revisions []models.SourceCaptureHistory `json:"revisions"`
+	}
+	require.NoError(t, json.Unmarshal(get(historyPath+"?limit=1", 200).Body.Bytes(), &history))
+	require.Len(t, history.Revisions, 1)
+	require.Equal(t, 3, history.Revisions[0].Count)
+	require.Equal(t, 1, history.Revisions[0].UnknownCount)
+	require.Equal(t, clock, *history.Revisions[0].FirstSeen)
+	require.Equal(t, clock.Add(time.Hour), *history.Revisions[0].LastSeen)
+	require.NoError(t, json.Unmarshal(get(historyPath+"?after="+history.Revisions[0].UUID, 200).Body.Bytes(), &history))
+	require.Empty(t, history.Revisions)
+	get(historyPath+"?after=invalid", 400)
 	path := "/posts/" + post.UUID + "/capture-summaries"
 	w = get(path+"?limit=3", 200)
 	var page struct {

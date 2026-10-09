@@ -332,6 +332,9 @@ func canonicalCaptureInput(input *models.SourceCaptureInput) (string, string, er
 	case legacyRetentionPolicy:
 		// This policy belongs to the trusted catalog import boundary. Network
 		// producers must negotiate the current source retention policy instead.
+	case archive.PostContentRetentionVersion:
+		// The HTTP boundary validates the producer transport policy before
+		// applying this independent native storage policy.
 	case importedMetadataPolicy:
 		object, err := archive.DecodeJSONObject(retained, archive.MaxSourcePayloadBytes)
 		if err != nil {
@@ -361,6 +364,12 @@ func canonicalCaptureInput(input *models.SourceCaptureInput) (string, string, er
 		}
 	default:
 		return "", "", errors.New("unsupported source retention policy")
+	}
+	if input.RetentionPolicy == archive.PostContentRetentionVersion {
+		clean, err := archive.RetainPostContent(retained)
+		if err != nil || !bytes.Equal(clean, retained) {
+			return "", "", errors.New("source capture does not satisfy its post content policy")
+		}
 	}
 	// Partition again from verified evidence so callers cannot manufacture a
 	// different post revision by placing arbitrary keys in the attachment patch.
@@ -518,6 +527,15 @@ VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(post_uuid, signature) DO NOTHING`, uuid.Ne
 	}
 	if _, err := dbWrapper.Exec(ctx, "INSERT INTO source_captures("+columns+") VALUES("+placeholders+")", args...); err != nil {
 		return nil, err
+	}
+	if input.RetentionPolicy == archive.PostContentRetentionVersion {
+		digest, err := captureContentDigest(input, revisionSignature)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_capture_content(capture_uuid,post_uuid,digest) VALUES(?,?,?)`, input.UUID, input.PostUUID, digest); err != nil {
+			return nil, err
+		}
 	}
 	for _, ref := range input.Payload.Refs {
 		if _, err := dbWrapper.Exec(ctx, "INSERT INTO source_capture_profiles(capture_uuid, part, path, profile_hash) VALUES (?, ?, ?, ?)", input.UUID, ref.Part, ref.Path, ref.Hash); err != nil {

@@ -239,7 +239,7 @@ func (s *Service) Capture(ctx context.Context, token string, raw []byte, digest 
 			return models.ErrSourcePostForgotten
 		}
 		captureID := uuid.NewSHA1(uuid.MustParse(event.ProducerUUID), []byte("source.capture\x00"+event.EventUUID)).String()
-		capture, result, err := s.recordPreparedCapture(ctx, models.SourceCaptureInput{UUID: captureID, PostUUID: post.UUID, Origin: "gallery-dl", Platform: archive.CapturedPostPlatform(models.SourcePostIdentifier{Namespace: event.Post.Namespace, Value: event.Post.Value}), CapturedAt: event.ObservedAt, ExtractorVersion: &event.ExtractorVersion, RetentionPolicy: event.RetentionPolicy, Metadata: event.Metadata, Payload: *prepared.payload}, prepared.album, collection, time.Now())
+		capture, result, err := s.recordContentCapture(ctx, models.SourceCaptureInput{UUID: captureID, PostUUID: post.UUID, Origin: "gallery-dl", Platform: archive.CapturedPostPlatform(models.SourcePostIdentifier{Namespace: event.Post.Namespace, Value: event.Post.Value}), CapturedAt: event.ObservedAt, ExtractorVersion: &event.ExtractorVersion, RetentionPolicy: event.RetentionPolicy, Metadata: event.Metadata, Payload: *prepared.payload}, prepared.album, collection, time.Now())
 		if err != nil {
 			return err
 		}
@@ -264,6 +264,19 @@ func (s *Service) recordPreparedCapture(ctx context.Context, input models.Source
 	if err != nil {
 		return nil, nil, err
 	}
+	return s.recordCaptureEffects(ctx, capture, album, collection, now)
+}
+
+func (s *Service) recordContentCapture(ctx context.Context, input models.SourceCaptureInput, album *archive.CapturedAlbum, collection *models.SourceCollection, now time.Time) (*models.SourceCapture, *CaptureResult, error) {
+	capture, err := s.Repo.SourceEvidence.RecordContentCapture(ctx, input)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s.recordCaptureEffects(ctx, capture, album, collection, now)
+}
+
+func (s *Service) recordCaptureEffects(ctx context.Context, capture *models.SourceCapture, album *archive.CapturedAlbum, collection *models.SourceCollection, now time.Time) (*models.SourceCapture, *CaptureResult, error) {
+	var err error
 	provenance := models.CollectionCapture{CaptureUUID: capture.UUID, CollectionUUID: collection.UUID, CollectionRevision: collection.Revision}
 	if err := s.Repo.SourceCollection.RecordCapture(ctx, provenance); err != nil {
 		return nil, nil, err

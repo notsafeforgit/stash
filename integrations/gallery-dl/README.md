@@ -198,7 +198,8 @@ Extractor keywords cannot replace the source identity or publication date.
 
 Before downloading, the adapter queues a retained source capture and derives the
 attachment from source evidence. Reddit galleries use their media IDs; ordinary
-Reddit images and videos use direct service URLs. Linked Redgifs clips use the
+Reddit images and videos use direct service URLs. Linked Redgifs clips, including
+legacy `v3.redgifs.com/ifr/` links, use the
 captured watch/iframe ID; direct external files use their full source URL.
 Redgifs image permalinks retain that direct URL identity while their captured
 API item ID and rendition URLs connect the actual CDN download to it.

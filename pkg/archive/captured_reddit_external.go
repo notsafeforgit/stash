@@ -29,7 +29,7 @@ func redditExternalReference(raw interface{}) (*models.SourcePostIdentifier, str
 		return nil, "", false
 	}
 	switch strings.ToLower(u.Hostname()) {
-	case "redgifs.com", "www.redgifs.com", "m.redgifs.com":
+	case "redgifs.com", "www.redgifs.com", "m.redgifs.com", "v3.redgifs.com":
 		if match := capturedRedgifsWatch.FindStringSubmatch(u.EscapedPath()); match != nil {
 			return &models.SourcePostIdentifier{Namespace: "native:redgifs", Value: strings.ToLower(match[1])}, "unknown", false
 		}

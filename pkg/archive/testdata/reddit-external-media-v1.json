@@ -608,6 +608,176 @@
       "complete": true,
       "kind": "image",
       "manifest_error": false
+    },
+    {
+      "name": "legacy v3 iframe resolves the captured clip",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com/ifr/GentleExampleAnimal",
+          "url_overridden_by_dest": "https://v3.redgifs.com/ifr/GentleExampleAnimal"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal.mp4"
+      },
+      "attachment": {
+        "namespace": "native:redgifs",
+        "value": "gentleexampleanimal"
+      },
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "gentleexampleanimal"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "legacy iframe and current watch URL share clip identity",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com/ifr/GentleExampleAnimal",
+          "url_overridden_by_dest": "https://www.redgifs.com/watch/gentleexampleanimal"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal.mp4"
+      },
+      "attachment": {
+        "namespace": "native:redgifs",
+        "value": "gentleexampleanimal"
+      },
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "gentleexampleanimal"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "legacy iframe retains its Reddit fallback identity",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://v3.redgifs.com/ifr/gentleexampleanimal",
+        "url_overridden_by_dest": "https://v3.redgifs.com/ifr/gentleexampleanimal",
+        "preview": {
+          "reddit_video_preview": {
+            "fallback_url": "https://v.redd.it/fallback1/CMAF_1080.mp4?source=fallback",
+            "dash_url": "https://v.redd.it/fallback1/DASHPlaylist.mpd"
+          }
+        },
+        "_url": "ytdl:https://v.redd.it/fallback1/CMAF_720.mp4"
+      },
+      "attachment": {
+        "namespace": "native:redgifs",
+        "value": "gentleexampleanimal"
+      },
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "gentleexampleanimal"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "legacy iframe lookalike host does not prove the captured clip",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com.example.test/ifr/gentleexampleanimal",
+          "url_overridden_by_dest": "https://v3.redgifs.com.example.test/ifr/gentleexampleanimal"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal.mp4"
+      },
+      "attachment": null,
+      "manifest": null,
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "legacy iframe still rejects a different API clip",
+      "source": {
+        "category": "redgifs",
+        "id": "otherclip",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com/ifr/GentleExampleAnimal",
+          "url_overridden_by_dest": "https://v3.redgifs.com/ifr/GentleExampleAnimal"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal.mp4"
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "gentleexampleanimal"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "legacy iframe requires an observed rendition",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com/ifr/GentleExampleAnimal",
+          "url_overridden_by_dest": "https://v3.redgifs.com/ifr/GentleExampleAnimal"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal-unknown.mp4"
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "gentleexampleanimal"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
     }
   ]
 }

@@ -25,7 +25,7 @@ def linked(value):
     except InvalidData:
         return None
     parsed = urlsplit(value)
-    if parsed.hostname in ('redgifs.com', 'www.redgifs.com', 'm.redgifs.com'):
+    if parsed.hostname in ('redgifs.com', 'www.redgifs.com', 'm.redgifs.com', 'v3.redgifs.com'):
         match = re.fullmatch(r'/(?:watch|ifr)/([A-Za-z]{1,256})/?', parsed.path)
         if match:
             return {'namespace': 'native:redgifs', 'value': match[1].lower()}, 'unknown'

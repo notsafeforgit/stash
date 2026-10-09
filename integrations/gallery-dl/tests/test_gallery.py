@@ -292,9 +292,15 @@ class GalleryTests(unittest.TestCase):
             NativeDownloadJob(ChildFixture.from_url("https://fixture.invalid/child"), task)
 
     def test_reddit_linked_redgifs_download_and_skip_keep_parent_and_attachment(self):
+        self.check_reddit_linked_redgifs_download_and_skip("https://www.redgifs.com/watch/LinkedClip")
+
+    def test_reddit_legacy_redgifs_iframe_download_and_replay(self):
+        self.check_reddit_linked_redgifs_download_and_skip("https://v3.redgifs.com/ifr/LinkedClip")
+
+    def check_reddit_linked_redgifs_download_and_skip(self, url):
         self.narrow_window()
         config.set(("extractor", "reddit"), "parent-metadata", "_reddit")
-        post = reddit_data(id="redditpost", url="https://www.redgifs.com/watch/LinkedClip",
+        post = reddit_data(id="redditpost", url=url,
                            date="2026-10-01T00:00:00.200Z")
         clip = {"id": "linkedclip", "createDate": 1577836800, "gallery": None,
                 "userName": "different-host-account",

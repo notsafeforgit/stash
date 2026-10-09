@@ -119,6 +119,22 @@ class PublicationGateTest(unittest.TestCase):
         state = {**self.controller(), "status": "failed", "child": None, "child_exit_code": 0}
         gate.check_restore_finished(state, "restore", "complete")
 
+    def test_restore_requires_native_audit_even_when_publication_allows_sqlite_only(self):
+        proof = {"contents_verified": True, "verification_method": "isolated-restore",
+                 "native_snapshot": {"database_verified": True}}
+        gate.check_restore_audit(proof)
+        historical = copy.deepcopy(proof)
+        del historical["verification_method"]
+        gate.check_restore_audit(historical)
+        for change in ({"verification_method": "streamed-contents"}, {"contents_verified": False},
+                       {"native_snapshot": None}, {"native_snapshot": {}},
+                       {"native_snapshot": {"database_verified": False}},
+                       {"native_snapshot": {"database_verified": 1}}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                gate.check_restore_audit(proof | change)
+        with self.assertRaises(ValueError):
+            gate.check_restore_audit({"contents_verified": True, "sqlite_snapshots": {}})
+
     def test_foreign_controller_publication_is_rejected(self):
         for key in ("run_id", "checkpoint_uuid", "master_manifest", "master_sha256"):
             with self.subTest(key=key):

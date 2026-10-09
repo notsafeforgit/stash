@@ -120,3 +120,12 @@ def check_restore_finished(controller, restore_stage, completed_stage):
         raise GatePending("The isolated restore controller is still active")
     if type(controller.get("child_exit_code")) is not int or controller["child_exit_code"] != 0:
         raise ValueError("The isolated restore command failed or has no exit receipt")
+
+
+def check_restore_audit(proof):
+    """Require full restore/audit scope in addition to the archive byte binding."""
+    if (not isinstance(proof, dict) or proof.get("contents_verified") is not True
+            or proof.get("verification_method", "isolated-restore") != "isolated-restore"
+            or not isinstance(proof.get("native_snapshot"), dict)
+            or proof["native_snapshot"].get("database_verified") is not True):
+        raise ValueError("Restore completion requires an isolated restore and successful native application audit")

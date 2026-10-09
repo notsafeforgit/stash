@@ -56,11 +56,21 @@ audit can fail independently of the successful publication. Full archive reads,
 SQLite checks and historical producer scans remain; this change does not finish
 the broader recurring-cost work.
 
-The running baseline uses its original installed runtime. Its native validator
-has exited and the publisher remains active, with no publication receipt as of
-09:41 UTC. This source change has not restarted or modified that run. The future
-daily/manual launch preparation still needs the newly tested runtime before
-schedule activation.
+The `37331d454` runtime is installed separately and verified inactive. All 162
+installed modules match the tested source, and the installed publisher omits the
+native validator while the explicit restore command still invokes it. The new
+launch preparation passes 13 fixture and five actual launcher checks, retaining
+the same 209-component configuration and all 32 worker profiles/79 private
+bindings. Six schedule-guard checks select this runtime for future backups.
+Use `install-publication-launch-cleanup.py` after confirmed publication and the
+n8n/home overlays; it supersedes the earlier incremental/streamed preparations.
+
+The independent restore gate now explicitly requires the native audit as well
+as `isolated-restore`, with 12 gate tests passing. It still rejects the real
+unfinished baseline for rollout. The running baseline uses its original
+installed runtime; its validator has exited and the publisher remains active,
+with no publication receipt as of 09:46 UTC. No running publisher, installed
+launcher or schedule was changed.
 
 ### Owner-approved publication gate — 2026-10-09
 

@@ -152,6 +152,8 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"missing attachment selection", "DROP TABLE post_attachment_selections", "missing post_attachment_selections"},
 		{"missing attachment selection guard", "DROP TRIGGER post_attachment_selection_forward", "missing post_attachment_selection_forward"},
 		{"missing source gallery links", "DROP TABLE post_gallery_links", "missing post_gallery_links"},
+		{"missing thread relationships", "DROP TABLE source_post_threads", "missing source_post_threads"},
+		{"missing thread sharing guard", "DROP TRIGGER post_gallery_thread_share_insert", "missing post_gallery_thread_share_insert"},
 		{"missing gallery membership history", "DROP TABLE gallery_membership_events", "missing gallery_membership_events"},
 		{"missing source gallery intent", "DROP TRIGGER source_gallery_galleries_images_delete", "missing source_gallery_galleries_images_delete"},
 		{"missing gallery membership revision", "DROP TRIGGER archive_gallery_galleries_images_delete", "missing archive_gallery_galleries_images_delete"},

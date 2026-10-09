@@ -93,7 +93,7 @@ func validateDatabaseLineage(path string) error {
 			return errors.New("native database still contains an active fork migration ledger")
 		}
 		if version >= NativeSchemaBaseline+105 {
-			for _, name := range []string{"source_post_threads", "source_post_threads_conversation", "source_post_threads_author", "source_post_threads_parent", "source_post_thread_scope", "source_post_thread_immutable", "post_gallery_thread_share_insert", "post_gallery_thread_share_update"} {
+			for _, name := range []string{"post_gallery_links", "source_post_threads", "source_post_threads_conversation", "source_post_threads_author", "source_post_threads_parent", "source_post_thread_scope", "source_post_thread_immutable", "post_gallery_thread_share_insert", "post_gallery_thread_share_update"} {
 				var exists bool
 				if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
 					return err

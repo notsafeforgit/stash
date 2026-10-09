@@ -200,6 +200,8 @@ Before downloading, the adapter queues a retained source capture and derives the
 attachment from source evidence. Reddit galleries use their media IDs; ordinary
 Reddit images and videos use direct service URLs. Linked Redgifs clips use the
 captured watch/iframe ID; direct external files use their full source URL.
+Redgifs image permalinks retain that direct URL identity while their captured
+API item ID and rendition URLs connect the actual CDN download to it.
 A retained Reddit fallback preview can resolve to that same linked attachment.
 Unrelated child downloads and Redgifs posters cannot substitute for the clip,
 and one watch URL does not establish an external gallery's membership or count.

@@ -887,7 +887,7 @@
     "home_backup_caller_and_coverage_update"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-09T02:09:00.054881+00:00",
+  "checked_at": "2026-10-09T03:31:19.510978+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -1479,7 +1479,7 @@
     "failed_comparison_retained": true,
     "imports_replayed": false
   },
-  "root_free_GiB": 116.14,
+  "root_free_GiB": 116.15150451660156,
   "pre_public_coordinated_backup": {
     "status": "running",
     "stage": "publish-backup-before-public",
@@ -1507,7 +1507,7 @@
     "checkpoint_sealed": true,
     "server_created_at": "2026-10-09T00:55:01.564750761Z",
     "latest_pack_progress": {
-      "checked_at": "2026-10-09T01:57:24.770962+00:00",
+      "checked_at": "2026-10-09T03:30:30.454618+00:00",
       "status": "running",
       "stage": "publish-backup-before-public",
       "run_id": "20261008_175444_1545955",
@@ -1515,9 +1515,9 @@
       "isolated_restore_complete": false,
       "packed_artifacts": {
         "library": 1,
-        "blob": 20645
+        "blob": 101741
       },
-      "packed_logical_bytes": 25412135606,
+      "packed_logical_bytes": 37798846600,
       "run_files": [
         "catalog.json",
         "ledger-2-video_manifest_previous.nul",
@@ -1530,7 +1530,7 @@
         "worker-inventory.json",
         "ledger-1-tar_delta_state.sqlite3"
       ],
-      "root_free_GiB": 116.13505935668945,
+      "root_free_GiB": 116.15150451660156,
       "source_artwork_inventory": {
         "checked_at": "2026-10-09T02:03:16.441058+00:00",
         "files": 240872,
@@ -1809,5 +1809,111 @@
     "isolated_download_and_native_validation_required": true,
     "interrupted_sealed_run_must_be_recovered_without_recapture": true,
     "schedules_resumed": false
+  },
+  "private_native_browser": {
+    "status": "passed",
+    "checked_at": "2026-10-09T03:30:17.953160+00:00",
+    "source_revision": "0ea2c05fbc20356929c561f2173386a14870fdb7",
+    "browser_image": "mcr.microsoft.com/playwright:v1.63.0-resolute",
+    "profiles": [
+      {
+        "name": "chromium-desktop",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "checks": 13,
+        "requests": 1926,
+        "blocked_requests": 0,
+        "application_errors": 0,
+        "http_errors": 0,
+        "browser_diagnostics": {
+          "count": 0,
+          "distinct": []
+        },
+        "album_cases": [
+          "empty",
+          "images",
+          "mixed",
+          "videos"
+        ],
+        "archive_routes": [
+          "/source-posts",
+          "/collections",
+          "/account-review",
+          "/review-queue",
+          "/archive-activity",
+          "/import-history",
+          "/media-roots",
+          "/saved-actions"
+        ],
+        "keyboard_expand_collapse": true,
+        "mobile_section_drawer_and_scrolling": false,
+        "mobile_native_navigation_links": 0
+      },
+      {
+        "name": "webkit-mobile",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "checks": 14,
+        "requests": 448,
+        "blocked_requests": 0,
+        "application_errors": 0,
+        "http_errors": 0,
+        "browser_diagnostics": {
+          "count": 13,
+          "distinct": [
+            "Viewport argument key \"interactive-widget\" not recognized and ignored."
+          ]
+        },
+        "album_cases": [
+          "empty",
+          "images",
+          "mixed",
+          "videos"
+        ],
+        "archive_routes": [
+          "/source-posts",
+          "/collections",
+          "/account-review",
+          "/review-queue",
+          "/archive-activity",
+          "/import-history",
+          "/media-roots",
+          "/saved-actions"
+        ],
+        "keyboard_expand_collapse": true,
+        "mobile_section_drawer_and_scrolling": true,
+        "mobile_native_navigation_links": 8
+      }
+    ],
+    "total_checks": 27,
+    "read_only": true,
+    "network_guard": "Same-origin GET/HEAD, parsed GraphQL queries/subscriptions, and only the audited read-only POST attachments/download-status batch endpoint. All other methods/destinations blocked.",
+    "audited_download_status_handler_sha256": "579121fed05491724a495eba34f4b03ed0fb5acb7fa7024256a40bc615fea845",
+    "database_verification": {
+      "no_commits_observed": true,
+      "same_database_and_wal_identity_size_mtime_mode_ownership": true,
+      "full_wal_sha256_unchanged": true,
+      "wal_ctime_changed": true,
+      "ctime_is_not_a_content_comparison": true
+    },
+    "harness_corrections": [
+      "Retained the first failed guard attempt; the pinned download-status handler was audited as read-only before allowing its bounded POST.",
+      "Retained the second attempt; its sole WebKit console message reports the unsupported interactive-widget viewport option. Final checks record that exact diagnostic separately."
+    ],
+    "private_artifacts": {
+      "verify.cjs": "cce58d963df8e00ab446474998985f9769521233f42364da7c243b2259e5faa8",
+      "run-verification.py": "6003d2e141fc0ab7eb4c270d668449f66e06a7da6713a8706d5eb0eda12e7a25",
+      "verification.json": "6c2ad3eb06cac15288f3e675bf7392c87f30ad89f423e5883b4e275a5b42c0c9",
+      "database-read-only-proof.json": "d3c5c0a5ec6022b7d29f2a25e011a8575e3925efcdd8f1a9d01e6b514cc0083c",
+      "chromium-desktop-album.png": "8300fe191a9c6778dfce112056ff787a454486b8f9c3abaad2e22582001fd49c",
+      "webkit-mobile-album.png": "664f69c716f7b69a39c46218688de730efccad8beb8853dc33a9b4e0d22c37ff",
+      "webkit-mobile-navigation.png": "d17f103b7665202034fd574d1dc03aaa73b354089135a00844bfbbfdf93390fc"
+    },
+    "owner_acceptance": false,
+    "scope": "Populated private rendered read paths only. No write/apply/playback actions, public handoff, worker startup or owner acceptance."
   }
 }

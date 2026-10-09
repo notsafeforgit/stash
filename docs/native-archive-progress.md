@@ -12652,3 +12652,20 @@ repeat the request. Verification checks the actual published-version table and
 completed publication outbox. Syntax, timer hashes and the full 28-barrier
 partition passed preparation checks; no unit, timer or workflow was changed.
 Starting these timers will still require observing their real execution results.
+
+The populated private application now passes 27 rendered checks in desktop
+Chromium and mobile WebKit. Four gallery samples cover unavailable, image,
+video and mixed albums. Displayed source positions and media links match their
+API responses. The mobile section picker works, album cards scroll above the
+fixed footer, and all eight native archive destinations appear in the mobile
+navigation drawer. Those destinations load without API or application errors;
+source-order sections also expand and collapse with the keyboard.
+
+The browser checks allowed only reads, including the audited batch POST that
+reads download status. The database commit counter, file identities, sizes and
+modification times remained unchanged; the complete WAL checksum also matched.
+WebKit's diagnostic about the unsupported `interactive-widget` viewport option
+is recorded separately. Earlier test-guard failures and their corrections are
+retained. These checks do not replace owner acceptance or exercise mutations.
+The original sealed backup continues packing artwork with over 116 GiB free;
+its publication and isolated restore remain prerequisites for live handoff.

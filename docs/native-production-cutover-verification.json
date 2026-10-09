@@ -1714,7 +1714,15 @@
     "new_native_timers_inactive_disabled": true,
     "schedules_changed": false,
     "pending_home_backup_audit": false,
-    "home_backup_installation_pending": true
+    "home_backup_installation_pending": true,
+    "helpers_prepared": true,
+    "old_unit_definitions_to_retain_and_mask": 9,
+    "existing_native_barriers_to_open": 15,
+    "n8n_parent_resumption": "Separate checksum-guarded REST publication of each saved version, followed by actual publication-table and outbox verification.",
+    "uncertain_workflow_requests_not_repeated": true,
+    "helper_syntax_and_current_file_hashes_checked": true,
+    "actual_runtime_execution_pending": true,
+    "required_gate": "Fresh post-controlled coordinated backup and isolated restore; no timer or workflow changes during preparation."
   },
   "home_backup_audit": {
     "status": "findings_addressed_in_tested_preparation_not_installed",
@@ -1766,5 +1774,40 @@
     "services_started": false,
     "schedule_changed": false,
     "actual_capture_and_cloud_sync_verification_pending": true
+  },
+  "translation_worker_resumption_preparation": {
+    "status": "prepared_tested_not_executed",
+    "requires": "Pre-public restore, native runtime, reconciled hold activation and controlled host/n8n/manual/enrichment completions.",
+    "configuration_change": "Only translation_worker_enabled false to true; exact parsed configuration difference checked.",
+    "database_identity_preserved_on_restart": true,
+    "verification_requires_new_provider_result_and_completed_native_job": true,
+    "verification_covers_all_frozen_targets_in_sample_job": true,
+    "fixture_cases": 6,
+    "negative_cases": [
+      "Wrong post association",
+      "Changed retry deadline",
+      "Migrated cache presented as new provider result",
+      "Wrong frozen target revision",
+      "Changed original text"
+    ],
+    "runtime_changed": false,
+    "provider_requests_during_preparation": 0,
+    "actual_worker_completion_pending": true
+  },
+  "post_controlled_backup_preparation": {
+    "status": "prepared_not_executed",
+    "installed_runtime_revision": "d863a41af893bcdc341bc3021cca02eff8ebeebd",
+    "uses_final_installed_configuration": true,
+    "requires_controlled_source_and_translation_proofs": true,
+    "quiesce_containers": [
+      "n8n-runners",
+      "n8n",
+      "redis-n8n"
+    ],
+    "cold_media_compaction": false,
+    "remote_media_cleanup": false,
+    "isolated_download_and_native_validation_required": true,
+    "interrupted_sealed_run_must_be_recovered_without_recapture": true,
+    "schedules_resumed": false
   }
 }

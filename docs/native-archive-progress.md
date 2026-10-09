@@ -6,7 +6,36 @@ that plan's scope or replace its completion criteria. Development remains on
 `v3-rewrite`; merge into `develop` requires verification and the owner's success
 review. The production cutover is in progress; the native replacement is not yet public.
 
-## Current release position — 2026-10-08 UTC
+## Current release position — 2026-10-09 UTC
+
+All 1,711 catalogs and 925,869 automation records are imported and reconciled.
+Post/media associations, source albums, disabled policies and source URL
+registration have passed their independent checks. The original compatible
+database and held source snapshot remain intact. The public native application
+and scraper schedules are still stopped.
+
+The first coordinated native backup has sealed its checkpoint and is packaging
+the 22.2 GB database, 240,872 saved artwork files and coordinated host state.
+Publication and isolated restore remain in progress. AWS access is verified;
+the original backup process is advancing. No live-root activation, producer
+credential issuance or database promotion has occurred.
+
+The missing translation executable is fixed, published and verified in the
+exact selected wrapper. Inactive n8n dependency, translation image and home-backup
+overlays are prepared; their installation requires the first restore to pass.
+The home-backup repair passed eight fixture tests and read-only copies of all
+19 worker/archive databases. Its final planned backup inventory has 202 effective
+components. None of those overlays changes the current sealed backup.
+
+Separate steps are prepared for controlled host/n8n/manual/enrichment checks,
+native translation startup and job verification, and a fresh post-write backup
+and isolated restore. Only afterward may the old catalog services be masked,
+seven existing timer cadences resume, three native worker timers start and the
+two saved n8n parent versions be published. Actual scheduled cycles, retirement
+verification, home-backup capture/upload and desktop/mobile owner acceptance
+remain. `develop` has not been merged and the frozen compatible release is unchanged.
+
+## Earlier production cutover records — 2026-10-08 UTC
 
 The production maintenance boundary is active. Compatible Stash, n8n, Redis,
 scrapers and their related schedules are stopped behind reversible admission
@@ -12597,3 +12626,29 @@ planned inventory to 62 static inputs and 202 effective components, validated
 with the installed publisher. Final inventory verification requires this
 overlay together with the n8n and translation overlays. The current sealed
 backup still uses its original configuration and is not changed by preparation.
+
+The remaining worker/schedule steps are now prepared separately. Translation
+startup changes only its enable flag and restarts the verified native image
+after controlled ingestion checks. Its read-only verifier requires a newly
+captured provider result, a succeeded native job and matching frozen target
+history, post evidence, deadlines and priorities. Six focused fixture cases
+pass, including rejection of a migrated cache masquerading as a new provider
+call. No production setting or translation target has changed.
+
+The post-controlled backup driver uses the installed publisher and final
+configuration, including all three n8n runtime dependencies in capture. It
+requires actual host/n8n/manual/enrichment/translation completion proofs, then
+publishes and restores into a new isolated directory with media compaction and
+remote cleanup deferred. Any interrupted sealed generation must be recovered
+from its original identity. The driver is prepared, not executed.
+
+Later schedule resumption preserves all seven existing timer definitions and
+adds the three native worker timers. Nine obsolete unit definitions will first
+be retained and reversibly masked so their retirement does not depend on the
+temporary cutover sentinel. The other 15 schedule/service barriers are explicitly
+accounted for. Each n8n parent uses its exact saved published version and a
+checksum-guarded REST request; an uncertain response retains intent and cannot
+repeat the request. Verification checks the actual published-version table and
+completed publication outbox. Syntax, timer hashes and the full 28-barrier
+partition passed preparation checks; no unit, timer or workflow was changed.
+Starting these timers will still require observing their real execution results.

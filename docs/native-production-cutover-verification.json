@@ -2033,7 +2033,18 @@
         "verified upload and latest-manifest publication ordering"
       ],
       "follow_up": "Reuse verified unchanged content and capture evidence; keep full audits and restore drills explicit. Do not label audit success from publication alone.",
-      "current_baseline_gate_changed": false
+      "current_baseline_gate_changed": false,
+      "unchanged_object_upload_reuse": {
+        "status": "implemented_tested_source_only",
+        "matching_prior_checksum_receipt_and_current_inventory_required": true,
+        "lifecycle_reconciliation_preserved": true,
+        "missing_changed_unknown_inputs_still_validated": true,
+        "explicit_audit_and_restore_unchanged": true,
+        "backup_tests_passed": 308,
+        "running_baseline_changed": false,
+        "daily_runtime_updated": false,
+        "full_routine_audit_split_complete": false
+      }
     }
   },
   "metadata_retention_configuration": {

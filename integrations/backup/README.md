@@ -30,8 +30,13 @@ private local SQLite index. Subsequent runs use a complete paginated LIST and
 reuse the proof only when the expected checksum/length and the object's ETag,
 modification time and storage class still match. LIST and ETag are change checks,
 not content hashes. Changed or unknown objects require a new checksum HEAD;
-missing immutable objects are uploaded and verified again. Immutable archive objects
-and per-run manifests precede the current JSON pointer. A successful pointer
+missing immutable objects are uploaded and verified again. Matching checksum
+receipts and a current LIST identity also avoid rereading the local upload copy.
+Lifecycle reconciliation still removes any retirement tag before reuse; if the
+remote object expired, its replacement is validated locally before upload. This
+only removes an upload-stage reread, not the full content verification described
+below. Immutable archive objects and per-run manifests precede the current JSON
+pointer. A successful pointer
 commit receives an immutable backup-history receipt before local release or
 cleanup is eligible. Remote obsolete tagging follows that receipt and retention
 verification; verification failures preserve the preceding generation.

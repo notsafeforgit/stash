@@ -219,6 +219,15 @@ class NativeStore:
             raise InvalidArchive("Uploaded native object is unavailable for checksum verification")
 
     def put_file(self, key, path, expected_sha256, expected_size, *, receipts=None, listed=None):
+        # The retained remote object already supplies these exact bytes. Reuse
+        # its checksum evidence before opening an unnecessary local upload copy.
+        # Unknown/changed objects still follow the complete input validation path.
+        if (receipts is not None and listed is not None
+                and receipts.matches(self.prefix + key, expected_sha256, expected_size, listed.get(self.prefix + key))):
+            if (not native_tags.MANAGED.fullmatch(key)
+                    or native_tags.reconcile(self, key, expected_sha256, expected_size, "live",
+                                             receipts=receipts, listed=listed)):
+                return
         with open_regular(path) as incoming:
             if regular(path).st_size != expected_size or hashlib.file_digest(incoming, "sha256").hexdigest() != expected_sha256:
                 raise InvalidArchive("Native publication input differs from its declared bytes")

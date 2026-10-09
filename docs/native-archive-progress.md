@@ -126,8 +126,15 @@ object identity, transfer checksums and publication ordering. A lighter routine
 path should reuse verified unchanged content and capture evidence, with explicit
 full audits and restore drills preserving deeper validation. The initial
 migration/reconciliation checks remain separate from this recurring policy.
-This follow-up is not implemented or deployed, and it does not change the running
-baseline backup's checks or the owner's confirmed-publication rollout gate.
+The broader routine/audit split remains unimplemented. A first source improvement
+now skips the upload-stage local reread when a previous full-checksum receipt and
+a fresh S3 listing identify the same remote bytes. It still clears retirement
+tags before reuse and validates the local replacement if expiration wins that
+race. Missing, changed and unverified objects retain full input validation;
+explicit audits and restores retain their independent checksum checks. All 308
+backup tests pass, including corrupt replacement files and expiration races.
+This improvement is not installed in the current runtime. It does not change the
+running baseline backup or the owner's confirmed-publication rollout gate.
 
 The Standard download was measured at 40.2 GiB across 241,410 unique content
 objects, plus three metadata objects. One HEAD and GET per object yields about

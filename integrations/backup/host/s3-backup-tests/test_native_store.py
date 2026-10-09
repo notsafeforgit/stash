@@ -25,12 +25,13 @@ from fake_s3 import FakeS3, S3Error
 from native_backup import CONFIG_FORMAT, NativeBackupSession, NativeRunJournal, OwnedWorkspace, copy_ledger
 from native_store import MEDIA_FORMAT, NativeStore, PREFIX, selection_digest, media_selection
 from native_history import record_publication, publication_key
+from object_receipts import ObjectReceipts, inventory
 from stash_archive.artwork_pins import ArtworkPins
 from stash_archive.bundle import FORMAT, export_archive, import_archive, iter_artifacts
 from stash_archive.checkpoint_abandon import FORMAT as ABANDON_FORMAT
 from stash_archive.filesystem_boundary import FORMAT as BOUNDARY_FORMAT
 from stash_archive.server_checkpoint import FORMAT as CHECKPOINT_FORMAT, COVERAGE
-from stash_archive.storage import InvalidArchive, json_bytes, store_file
+from stash_archive.storage import InvalidArchive, json_bytes, open_regular, store_file
 from stash_archive.verification import verify_archive_contents, verify_archive_proofs
 
 
@@ -152,7 +153,12 @@ class NativeStoreTests(unittest.TestCase):
         self.s3.operations.clear()
         self.s3.page_size = 2
         self.store = self.cached_store()  # A new process has no in-memory proof.
-        self.assertEqual(self.publish(), reference)
+        def publication_input(path):
+            self.assertNotEqual(Path(path).parent, self.archive / 'objects',
+                                'Unchanged verified remote bytes must not reread the local upload copy')
+            return open_regular(path)
+        with patch('native_store.open_regular', side_effect=publication_input):
+            self.assertEqual(self.publish(), reference)
         self.assertEqual(self.object_requests('head'), [])
         self.assertEqual(self.object_requests('put'), [])
         self.assertGreater(len(self.object_requests('list')), 1)
@@ -171,6 +177,40 @@ class NativeStoreTests(unittest.TestCase):
         self.publish()
         self.assertEqual(self.object_requests('put'), [('put', key)])
         self.assertEqual(self.object_requests('head'), [('head', key)])
+
+    def test_missing_remote_object_cannot_be_repaired_from_corrupt_local_bytes(self):
+        self.store = self.cached_store()
+        self.publish()
+        key = self.object_requests('put')[0][1]
+        path = self.archive / 'objects' / Path(key).name
+        expected_size = path.stat().st_size
+        path.write_bytes(b'X' * expected_size)
+        (self.cloud / key).unlink()
+        self.s3.operations.clear()
+        with closing(ObjectReceipts(self.store.receipts_path, self.store.bucket)) as receipts:
+            listed = inventory(self.s3, self.store.bucket, 'prefix/' + PREFIX + 'objects/')
+            with self.assertRaisesRegex(InvalidArchive, 'input differs'):
+                self.store.put_file(key.removeprefix('prefix/'), path, path.stem, expected_size,
+                                    receipts=receipts, listed=listed)
+        self.assertFalse((self.cloud / key).exists())
+        self.assertEqual(self.object_requests('put'), [])
+
+    def test_unverified_or_changed_remote_objects_still_validate_local_bytes(self):
+        self.store = self.cached_store()
+        self.publish()
+        key = self.object_requests('put')[0][1]
+        path = self.archive / 'objects' / Path(key).name
+        expected_size = path.stat().st_size
+        path.write_bytes(b'X' * expected_size)
+        with closing(ObjectReceipts(self.store.receipts_path, self.store.bucket)) as receipts:
+            listed = inventory(self.s3, self.store.bucket, 'prefix/' + PREFIX + 'objects/')
+            changed = copy.deepcopy(listed)
+            changed[key]['LastModified'] += timedelta(seconds=1)
+            for label, cache, current in [('no receipt', None, listed), ('no inventory', receipts, None),
+                                           ('changed object', receipts, changed)]:
+                with self.subTest(label=label), self.assertRaisesRegex(InvalidArchive, 'input differs'):
+                    self.store.put_file(key.removeprefix('prefix/'), path, path.stem, expected_size,
+                                        receipts=cache, listed=current)
 
     def test_changed_remote_identity_forces_checksum_validation_before_reuse(self):
         self.store = self.cached_store()

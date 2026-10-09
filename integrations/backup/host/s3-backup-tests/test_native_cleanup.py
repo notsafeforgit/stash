@@ -116,11 +116,37 @@ class CleanupTests(unittest.TestCase):
         with closing(ObjectReceipts(self.store.receipts_path, self.store.bucket)) as receipts:
             listed = inventory(self.s3, self.store.bucket, self.store.prefix + PREFIX + 'objects/')
             self.s3.lost_tag_reply.add(full_key)
-            self.store.put_file(key, path, sha, path.stat().st_size, receipts=receipts, listed=listed)
+            with patch('native_store.open_regular', side_effect=AssertionError('Unneeded local reread')):
+                self.store.put_file(key, path, sha, path.stat().st_size, receipts=receipts, listed=listed)
         self.assertEqual(self.s3.tags[full_key], {'owner': 'archive'})
         self.s3.lost_tag_reply.clear()
         self.cleanup.run(current)
         self.assertNotIn(full_key, self.retired_keys())
+
+    def test_cached_file_reuse_revalidates_input_if_expiration_wins(self):
+        for corrupt in (False, True):
+            with self.subTest(corrupt=corrupt):
+                body = b'encoded chunk ' + str(corrupt).encode()
+                sha = hashlib.sha256(body).hexdigest()
+                key = PREFIX + 'objects/' + sha + '.gz'
+                full_key = self.store.prefix + key
+                path = self.root / (sha + '.gz')
+                path.write_bytes(body)
+                self.s3.before_tags = lambda key: None
+                with closing(ObjectReceipts(self.store.receipts_path, self.store.bucket)) as receipts:
+                    self.store.put_file(key, path, sha, len(body), receipts=receipts)
+                    listed = inventory(self.s3, self.store.bucket, self.store.prefix + PREFIX + 'objects/')
+                    reconcile(self.store, key, sha, len(body), 'retired', receipts=receipts, listed=listed)
+                    self.s3.before_tags = lambda candidate: (self.s3.root / candidate).unlink()
+                    if corrupt:
+                        path.write_bytes(b'X' * len(body))
+                        with self.assertRaisesRegex(InvalidArchive, 'input differs'):
+                            self.store.put_file(key, path, sha, len(body), receipts=receipts, listed=listed)
+                        self.assertFalse((self.s3.root / full_key).exists())
+                    else:
+                        self.store.put_file(key, path, sha, len(body), receipts=receipts, listed=listed)
+                        self.assertEqual((self.s3.root / full_key).read_bytes(), body)
+                        self.assertNotIn(full_key, self.retired_keys())
 
     def test_expiration_winning_tag_removal_race_reuploads_original_bytes(self):
         body = b'encoded chunk'

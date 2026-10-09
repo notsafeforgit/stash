@@ -1455,6 +1455,11 @@ leaves the worker stopped. The current provider requires a Unix host; inspection
 storage and migration are independent of that executable. Website credentials
 remain in the existing scraping environments.
 
+Native container images include Translate Shell and its runtime dependencies.
+Installing the executable does not enable the worker; provider requests still
+require the explicit configuration switch above. Standalone Unix installations
+must provide `trans` themselves or configure its absolute path.
+
 Policy `translate-shell-bing-text-v1` extracts text from recognized HTML, splits
 it into 1,800-code-point chunks and disables translate-shell init files. A leading
 HTTP/file URL is passed as literal text. The provider receives no shell-expanded

@@ -31,6 +31,16 @@ ROLES = {"config", "import_rules", "file_journal", "producer_outbox",
          "download_archive", "media_manifest", "worker_profile", "operating_state", "operating_database"}
 SQLITE_ROLES = {"library", "producer_outbox", "download_archive", "operating_database"}
 VERIFICATION_CACHE_KIB = 256 * 1024
+CAPTURE_VERIFICATION = "capture-verification.json"
+
+
+def sqlite_evidence_binding(manifest, entries):
+    """Describe checked SQLite bytes; callers must perform the checks first."""
+    return {
+        "archive_uuid": manifest["uuid"], "manifest_sha256": hashlib.sha256(json_bytes(manifest)).hexdigest(),
+        "checks": ["integrity_check", "foreign_key_check", "identity"],
+        "components": [{key: entry[key] for key in ("role", "name", "sha256", "size", "sqlite")}
+                       for entry in entries if entry["role"] in SQLITE_ROLES]}
 
 
 def connect_readonly(path):
@@ -158,6 +168,7 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
         server_expected = component_stage.expected() if component_stage is not None else {}
         inventory_digest = hashlib.sha256()
         inventory_bytes, count, total = 0, 0, 0
+        databases, producer_proof = [], None
         inventory_path = destination / "artifacts.jsonl"
         inventory_fd = os.open(inventory_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         def add(path, role, name, sqlite_metadata=None, *, retained_blob=False):
@@ -177,6 +188,7 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
             entry.update(role=role, name=name)
             if sqlite_metadata is not None:
                 entry["sqlite"] = sqlite_metadata
+                databases.append({key: entry[key] for key in ("role", "name", "sha256", "size", "sqlite")})
             body = json_bytes(entry)
             if len(body) > MAX_MANIFEST:
                 raise InvalidArchive("Artifact descriptor exceeds the supported size")
@@ -215,8 +227,9 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
                 media_snapshot.open_bound(server_checkpoint.boundary_receipt).verify()
             if producer_origin is not None:
                 from .receipts import verify_snapshot_receipts
-                verify_snapshot_receipts(native, [snapshots[index][0] for index, component in enumerate(components)
-                                                   if component["role"] == "producer_outbox"], producer_origin)
+                producer_proof = verify_snapshot_receipts(native,
+                    [snapshots[index][0] for index, component in enumerate(components)
+                     if component["role"] == "producer_outbox"], producer_origin)
             add(native, "library", "library", metadata)
             pinned = artwork_pins.open_bound(server_checkpoint.boundary_receipt).verify() if artwork_pins is not None else None
             with closing(connect_readonly(native)) as connection:
@@ -252,6 +265,24 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
         if len(body) > MAX_MANIFEST:
             raise InvalidArchive("Archive manifest exceeds the supported size")
         validate_manifest(manifest)
+        if producer_proof is not None:
+            # Capture checked every SQLite copy and the producer boundary;
+            # packing hashed those exact bytes and verified the artwork. Retain
+            # that evidence before the final manifest, including across retries.
+            # Upload still checks new/unknown encoded objects against these hashes.
+            manifest_sha256 = hashlib.sha256(body).hexdigest()
+            proof = {"uuid": manifest["uuid"], "manifest_sha256": manifest_sha256,
+                     "coverage": manifest["coverage"], "contents_verified": True,
+                     "verification_method": "captured-contents",
+                     "sqlite_snapshots": sqlite_evidence_binding(manifest, databases),
+                     "ingestion_receipts": dict(producer_proof, archive_uuid=manifest["uuid"],
+                         manifest_sha256=manifest_sha256,
+                         components=[{key: entry[key] for key in ("role", "name", "sha256")}
+                                     for entry in databases if entry["role"] in ("library", "producer_outbox")])}
+            proof_body = json_bytes(proof)
+            if len(proof_body) > MAX_MANIFEST:
+                raise InvalidArchive("Capture verification exceeds its size limit")
+            publish_bytes(destination / CAPTURE_VERIFICATION, proof_body)
         publish_bytes(destination / "manifest.json", body)
         sync_directory(destination.parent)
         return manifest

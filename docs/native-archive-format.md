@@ -549,8 +549,17 @@ removes that temporary copy. `import` requires a new destination and writes
 `restore.json` only after all checks and durability steps succeed. It preserves
 pending producer work exactly. Server and worker activation are separate steps.
 
-Daily host publication uses the Python `verify_archive_contents` API instead
-of the full restore command. It validates the entire inventory before allocating
+Exports with a producer origin save `capture-verification.json` before the final
+manifest. This `captured-contents` record binds the successful SQLite/producer
+capture checks to every packed database hash, and includes the artifact/artwork
+checks completed by the exporter. Daily publication validates these bindings
+and verifies uploads against the packed hashes, using prior checksum evidence
+only for unchanged remote objects. It does not repeat the capture checks on a
+reconstructed copy. The evidence is preserved on retry; a present but invalid
+record fails. It does not change any component bytes or replace a restore drill.
+
+Historical sealed archives without capture evidence use the Python
+`verify_archive_contents` API. It validates the entire inventory before allocating
 scratch space, streams all artifacts through the same encoded/raw and complete
 artifact hash/size checks, and verifies artwork MD5 and its exact library
 inventory. It writes only SQLite snapshots for integrity, foreign-key, identity
@@ -558,8 +567,8 @@ and producer-receipt checks. These private temporary files need
 no durable restore receipt; they are discarded after validation. The space
 estimate covers their total database bytes plus the configured reserve.
 
-Proofs explicitly label this path `verification_method: "streamed-contents"`.
-They include `sqlite_snapshots`, binding the integrity/foreign-key/identity checks
+Proofs explicitly label this fallback `verification_method: "streamed-contents"`.
+Both methods include `sqlite_snapshots`, binding the integrity/foreign-key/identity checks
 to every database's role, name, SHA-256, size and SQLite identity. Routine host
 publication omits the optional native application audit and its `native_snapshot`
 proof. It does not claim that relationships, provenance and all application

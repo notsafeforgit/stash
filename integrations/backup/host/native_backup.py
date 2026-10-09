@@ -21,7 +21,7 @@ from stash_archive.host_boundary import HostFilesystemCapture
 from stash_archive.storage import (HEX, InvalidArchive, decode_json, json_bytes, load_manifest, open_regular,
                                    publish_bytes, regular, require_space, sync_directory)
 from stash_archive.server_checkpoint import ServerCheckpoint
-from stash_archive.verification import verify_archive_contents, validator_path
+from stash_archive.verification import load_capture_verification, verify_archive_contents, validator_path
 from stash_archive.zfs_media import ZFSMedia, mounts, release_published_media
 
 from native_store import (MEDIA_FORMAT, NativeStore, archive_objects, media_selection, selection_digest,
@@ -431,13 +431,16 @@ class NativeBackupSession:
         media = validate_selection_binding(self.archive, self.client.request_id, selection)
         if media != media_document:
             raise InvalidArchive("Retained archive differs from the original native/media selection")
-        workspace = OwnedWorkspace(self.root, "verify")
-        workspace.clear()
-        # Full native relationship/provenance validation belongs to an explicit
-        # application audit or restore drill. Publication still verifies every
-        # artifact, SQLite consistency/identity and the producer boundary.
-        proof = verify_archive_contents(self.archive, producer_origin=self.producer_origin,
-                                        temp_parent=workspace.path, reserve=self.reserve)
+        # New captures retain their SQLite/producer checks and packed-byte
+        # hashes. Do not reconstruct and re-audit the same snapshots before
+        # uploading them. Historical sealed attempts without that evidence
+        # still use streaming verification; they are never recaptured.
+        proof = load_capture_verification(self.archive, self.producer_origin)
+        if proof is None:
+            workspace = OwnedWorkspace(self.root, "verify")
+            workspace.clear()
+            proof = verify_archive_contents(self.archive, producer_origin=self.producer_origin,
+                                            temp_parent=workspace.path, reserve=self.reserve)
         self.publication = self.store.publish_archive(self.archive, proof, self.client.request_id, selection)
         same_or_publish(self.root / "publication.json", json_bytes(self.publication))
         return self.publication

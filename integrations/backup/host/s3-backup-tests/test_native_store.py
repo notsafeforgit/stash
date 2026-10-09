@@ -32,7 +32,7 @@ from stash_archive.checkpoint_abandon import FORMAT as ABANDON_FORMAT
 from stash_archive.filesystem_boundary import FORMAT as BOUNDARY_FORMAT
 from stash_archive.server_checkpoint import FORMAT as CHECKPOINT_FORMAT, COVERAGE
 from stash_archive.storage import InvalidArchive, json_bytes, open_regular, store_file
-from stash_archive.verification import verify_archive_contents, verify_archive_proofs
+from stash_archive.verification import load_capture_verification, verify_archive_contents, verify_archive_proofs
 
 
 class NativeStoreTests(unittest.TestCase):
@@ -85,6 +85,7 @@ class NativeStoreTests(unittest.TestCase):
                            'sha256': e['sha256'], 'bytes': e['size']} for e in self.entries if e['role'] != 'media_manifest']}
         path = self.root / 'server-checkpoint.json'
         path.write_bytes(json_bytes(checkpoint))
+        self.export_components = components + [{'role': 'operating_state', 'name': path.name, 'path': path}]
         entry = store_file(self.archive, path, reserve=0)
         entry.update(role='operating_state', name=path.name)
         self.entries.append(entry)
@@ -179,6 +180,65 @@ class NativeStoreTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(InvalidArchive):
                 self.store.publish_archive(self.archive, proof, self.checkpoint, selection_digest(self.catalog))
         self.assertEqual(self.s3.operations, [])
+
+    def captured_session(self):
+        session = NativeBackupSession.__new__(NativeBackupSession)
+        session.root = self.root / 'captured-run'
+        session.root.mkdir()
+        session.archive = session.root / 'archive'
+        export_archive(self.database, session.archive, reserve=0, components=self.export_components,
+                       producer_origin='https://stash.example')
+        session.store = self.store
+        session.view, session.check_source = Mock(), Mock()
+        session.client = SimpleNamespace(request_id=self.checkpoint, boundary_bytes=json_bytes(self.boundary))
+        session.reserve, session.producer_origin = 0, 'https://stash.example'
+        return session
+
+    def test_host_reuses_capture_evidence_and_cloud_restore_still_checks_downloaded_bytes(self):
+        session = self.captured_session()
+        with patch('native_backup.verify_archive_contents', side_effect=AssertionError('already checked at capture')):
+            reference = session.publish(self.catalog, [])
+            self.assertEqual(session.publish(self.catalog, []), reference)
+        self.assertFalse((session.root / 'scratch-verify').exists())
+        proof = json.loads((self.cloud / ('prefix/' + reference['verification']['key'])).read_bytes())
+        self.assertEqual(proof, load_capture_verification(session.archive, session.producer_origin))
+        self.assertEqual(proof['verification_method'], 'captured-contents')
+        self.assertNotIn('native_snapshot', proof)
+        destination = self.root / 'captured-download'
+        self.store.download(reference, destination, reserve=0)
+        with patch('stash_archive.verification.validator_output', return_value=json_bytes({
+                k: v for k, v in self.proof['native_snapshot'].items()
+                if k not in ('archive_uuid', 'manifest_sha256', 'component')})):
+            restored = verify_archive_proofs(destination, native_validator=sys.executable,
+                producer_origin=session.producer_origin, temp_parent=self.root, reserve=0)
+        self.assertTrue(restored['native_snapshot']['database_verified'])
+        self.assertEqual(restored['sqlite_snapshots'], proof['sqlite_snapshots'])
+        self.assertEqual(restored['verification_method'], 'isolated-restore')
+
+    def test_changed_capture_components_prevent_upload_without_repeating_audit(self):
+        session = self.captured_session()
+        path = session.archive / 'capture-verification.json'
+        original = json.loads(path.read_bytes())
+        for field in ('sqlite_snapshots', 'ingestion_receipts'):
+            proof = copy.deepcopy(original)
+            proof[field]['components'] = []
+            path.write_bytes(json_bytes(proof))
+            with patch('native_backup.verify_archive_contents', side_effect=AssertionError('do not hide invalid proof')):
+                with self.subTest(field=field), self.assertRaises(InvalidArchive):
+                    session.publish(self.catalog, [])
+        self.assertEqual(self.s3.operations, [])
+        self.assertFalse((session.root / 'publication.json').exists())
+
+    def test_capture_evidence_does_not_allow_corrupt_upload_bytes(self):
+        session = self.captured_session()
+        artifact = next(iter_artifacts(session.archive, json.loads((session.archive / 'manifest.json').read_bytes())))
+        chunk = artifact['chunks'][0]
+        (session.archive / 'objects' / (chunk['sha256'] + '.gz')).write_bytes(b'X' * chunk['encoded_size'])
+        with patch('native_backup.verify_archive_contents', side_effect=AssertionError('already checked at capture')):
+            with self.assertRaisesRegex(InvalidArchive, 'input differs'):
+                session.publish(self.catalog, [])
+        self.assertFalse((session.root / 'publication.json').exists())
+        self.assertFalse(any(op[0] == 'put' and op[1].endswith('/manifest.json') for op in self.s3.operations))
 
     def cached_store(self, *, bucket='metadata'):
         return NativeStore(self.s3, bucket, 'prefix', receipts_path=self.root / 'object-receipts.sqlite3')

@@ -13,12 +13,14 @@ import sys
 import subprocess
 import tempfile
 import unittest
+import uuid
 from unittest.mock import patch
 
 from stash_archive.bundle import FORMAT, export_archive, import_archive, iter_artifacts
 from stash_archive.cli import main
 from stash_archive.storage import InvalidArchive, json_bytes, store_file
-from stash_archive.verification import verify_archive_contents, verify_archive_proofs, validator_output
+from stash_archive.verification import (load_capture_verification, verify_archive_contents,
+                                        verify_archive_proofs, validator_output)
 
 
 def contract_validator(root, *, mode="ok", overrides=None):
@@ -236,7 +238,7 @@ class StreamedVerificationTests(NativeVerificationTests):
     verifier = staticmethod(verify_archive_contents)
     method = 'streamed-contents'
 
-    def rich_archive(self):
+    def rich_archive(self, *, producer_origin=None):
         original = b'original photo'
         self.checksum = hashlib.md5(original, usedforsecurity=False).hexdigest()
         self.blobs = self.root / 'artwork'
@@ -253,6 +255,7 @@ class StreamedVerificationTests(NativeVerificationTests):
             db.executescript('CREATE TABLE state(value TEXT); INSERT INTO state VALUES("pending");')
         self.archive = self.root / 'rich-archive'
         self.manifest = export_archive(self.database, self.archive, blob_paths=[self.blobs], reserve=0,
+            producer_origin=producer_origin,
             components=[{'role': role, 'name': 'worker.sqlite', 'path': operating}
                         for role in ('operating_database', 'download_archive')]
                        + [{'role': 'config', 'name': config.name, 'path': config}])
@@ -283,6 +286,49 @@ class StreamedVerificationTests(NativeVerificationTests):
             {key: entry[key] for key in ('role', 'name', 'sha256', 'size', 'sqlite')}
             for entry in self.entries if 'sqlite' in entry])
         self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
+
+    def test_capture_evidence_matches_independent_verification_without_rebuilding_snapshots(self):
+        self.rich_archive(producer_origin='https://stash.example')
+        with patch('stash_archive.verification._stream_archive', side_effect=AssertionError('no reconstruction')), \
+             patch('stash_archive.receipts.verify_snapshot_receipts', side_effect=AssertionError('no repeated audit')):
+            proof = load_capture_verification(self.archive, 'https://stash.example')
+        self.assertEqual(proof['verification_method'], 'captured-contents')
+        self.assertNotIn('native_snapshot', proof)
+        checked = verify_archive_contents(self.archive, producer_origin='https://stash.example',
+                                          temp_parent=self.root, reserve=0)
+        self.assertEqual(checked, proof | {'verification_method': 'streamed-contents'})
+        self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
+
+    def test_only_absent_capture_evidence_can_use_historical_fallback(self):
+        self.assertIsNone(load_capture_verification(self.archive, 'https://stash.example'))
+        self.rich_archive(producer_origin='https://stash.example')
+        path = self.archive / 'capture-verification.json'
+        original = path.read_bytes()
+        proof = json.loads(original)
+        for changed in [b'{', json_bytes(proof | {'uuid': str(uuid.uuid4())}),
+                        json_bytes(proof | {'manifest_sha256': '0' * 64}),
+                        json_bytes(proof | {'verification_method': 'isolated-restore'})]:
+            path.write_bytes(changed)
+            with self.subTest(changed=changed[:40]), self.assertRaises(InvalidArchive):
+                load_capture_verification(self.archive, 'https://stash.example')
+        path.write_bytes(original)
+        with self.assertRaisesRegex(InvalidArchive, 'producer origin'):
+            load_capture_verification(self.archive, 'https://other.example')
+        path.unlink()
+        path.symlink_to(self.archive / 'manifest.json')
+        with self.assertRaises((InvalidArchive, OSError)):
+            load_capture_verification(self.archive, 'https://stash.example')
+
+    def test_capture_evidence_must_be_durable_before_manifest_publication(self):
+        from stash_archive.storage import publish_bytes
+        def fail_capture(path, body):
+            if Path(path).name == 'capture-verification.json':
+                raise OSError('capture evidence could not be saved')
+            return publish_bytes(path, body)
+        with patch('stash_archive.bundle.publish_bytes', side_effect=fail_capture):
+            with self.assertRaisesRegex(OSError, 'could not be saved'):
+                self.rich_archive(producer_origin='https://stash.example')
+        self.assertFalse(self.archive.exists())
 
     def test_publication_rejects_foreign_key_failure_even_with_valid_transport_hashes(self):
         self.rich_archive()

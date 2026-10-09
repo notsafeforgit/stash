@@ -40,6 +40,23 @@ remain. `develop` has not been merged and the frozen compatible release is uncha
 
 ### Separate application audits from publication — 2026-10-09
 
+Capture evidence reuse now also removes the repeated reconstruction and
+SQLite/producer audit from new backups. The exporter records its successful
+checks against the exact packed hashes before publishing the archive manifest.
+Publication validates that evidence and the media/checkpoint binding, then
+verifies new or changed upload bytes and reuses verified remote objects. The
+proof says `captured-contents`, without claiming an application audit or restore.
+Older sealed archives without that evidence retain the streaming fallback; an
+invalid record fails rather than silently changing verification methods.
+
+All 144 archive tests and 313 backup tests pass. New coverage compares capture
+evidence with independent streamed verification, publishes/retries without
+creating verification snapshots, rejects altered evidence and corrupted upload
+bytes, and performs an independent download/restore. Failed evidence persistence
+cannot publish a success manifest. Initial capture and packing still read the
+selected inputs; the running baseline is unchanged. This additional source
+change is awaiting installation into the prepared future runtime.
+
 The full native validator repeats SQLite integrity and foreign-key checks, hashes
 the database twice, and scans native relationships, provenance and ingestion
 history. Requiring that audit before each upload is excessive. The host publisher

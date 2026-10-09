@@ -19,7 +19,7 @@ from object_receipts import ObjectReceipts, inventory as list_objects
 from media_objects import validate_inventory as validate_media_inventory
 import native_tags
 
-from stash_archive.bundle import SQLITE_ROLES, iter_artifacts, validate_manifest
+from stash_archive.bundle import SQLITE_ROLES, iter_artifacts, sqlite_evidence_binding, validate_manifest
 from stash_archive.filesystem_boundary import canonical_uuid
 from stash_archive.checkpoint_release import archived_boundary
 from stash_archive.server_checkpoint import ServerCheckpoint
@@ -81,21 +81,17 @@ def validate_proof(source, manifest, proof):
     manifest_hash = hashlib.sha256(json_bytes(manifest)).hexdigest()
     if (not isinstance(proof, dict) or proof.get("uuid") != manifest["uuid"]
             or proof.get("manifest_sha256") != manifest_hash or proof.get("contents_verified") is not True
-            or proof.get("verification_method", "isolated-restore") not in ("isolated-restore", "streamed-contents")
+            or proof.get("verification_method", "isolated-restore") not in ("isolated-restore", "streamed-contents", "captured-contents")
             or not isinstance(proof.get("ingestion_receipts"), dict)
             or proof["ingestion_receipts"].get("archive_uuid") != manifest["uuid"]
             or proof["ingestion_receipts"].get("manifest_sha256") != manifest_hash):
         raise InvalidArchive("Native publication requires matching content and producer validation proofs")
     databases = [entry for entry in iter_artifacts(source, manifest) if entry["role"] in SQLITE_ROLES]
     if "sqlite_snapshots" in proof:
-        expected = {
-            "archive_uuid": manifest["uuid"], "manifest_sha256": manifest_hash,
-            "checks": ["integrity_check", "foreign_key_check", "identity"],
-            "components": [{key: entry[key] for key in ("role", "name", "sha256", "size", "sqlite")}
-                           for entry in databases]}
+        expected = sqlite_evidence_binding(manifest, databases)
         if proof["sqlite_snapshots"] != expected:
             raise InvalidArchive("SQLite verification does not match every archived database")
-    elif "native_snapshot" not in proof:
+    elif proof.get("verification_method") == "captured-contents" or "native_snapshot" not in proof:
         raise InvalidArchive("Native publication requires SQLite verification")
     # Historical publications carry only the full native audit. Keep those
     # readable, and never ignore an invalid audit attached to a newer proof.

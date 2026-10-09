@@ -10,16 +10,21 @@ with producer receipt checks on one temporary restore. Both proofs identify the
 exact archive and library bytes. This does not certify the remaining shared
 media, filesystem-journal and configuration boundary.
 
-The host's daily publisher instead calls `verify_archive_contents`. It streams
-and checks every artifact, including artwork MD5 and inventory membership,
-materializing only SQLite components for integrity, foreign-key, identity and
-producer-receipt validation. Its `sqlite_snapshots` proof binds those checks to
-every archived database. It does not invoke the full native application audit
-or claim `native_snapshot.database_verified`. Passing `native_validator`
-explicitly to this API still requests that additional audit.
-Its proof says `verification_method: "streamed-contents"`; the full restore
-command says `isolated-restore`. Content verification does not replace an
-explicit restore drill, and neither path starts a server or worker.
+Exports with a producer origin retain `capture-verification.json` before the
+final manifest. It binds the SQLite/producer checks already performed during
+capture to the exact packed component hashes, with `verification_method:
+"captured-contents"`. The host publisher reuses this evidence and verifies uploads
+without reconstructing those snapshots and repeating their audits. Missing,
+changed or unknown remote objects still require checksum verification; an invalid
+capture record cannot silently fall back to a different verification method.
+
+Older sealed archives without this evidence use `verify_archive_contents`,
+streaming every artifact and materializing only SQLite files. This path reports
+`streamed-contents`. Both paths bind `sqlite_snapshots` to every archived database
+and make no native application audit claim. Passing `native_validator` explicitly
+to the streaming API adds that audit. Full restore commands report
+`isolated-restore`; neither capture evidence nor streaming replaces that drill.
+No verification path starts a server or worker.
 
 `export --server` captures the running native application's fixed database,
 configuration and deletion recovery components after declared producer journals.

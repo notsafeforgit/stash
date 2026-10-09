@@ -16,13 +16,41 @@ import subprocess
 import tempfile
 import time
 
-from .bundle import (FORMAT, SQLITE_ROLES, _blob_rows, _target, connect_readonly,
-                     database_metadata, import_archive, iter_artifacts, validate_manifest)
-from .storage import (InvalidArchive, RESERVE_BYTES, decode_json, json_bytes,
-                      load_manifest, require_space, write_artifact)
+from .bundle import (CAPTURE_VERIFICATION, FORMAT, SQLITE_ROLES, _blob_rows, _target, connect_readonly,
+                     database_metadata, import_archive, iter_artifacts, sqlite_evidence_binding, validate_manifest)
+from .storage import (MAX_MANIFEST, InvalidArchive, RESERVE_BYTES, decode_json, json_bytes,
+                      load_manifest, open_regular, require_space, write_artifact)
 
 MAX_OUTPUT = 64 << 10
 DEFAULT_TIMEOUT = 3600
+
+
+def load_capture_verification(source, producer_origin):
+    """Read the exporter-owned capture evidence, without repeating its audits.
+
+    Historical archives may lack this record. A present but invalid record must
+    fail, rather than silently falling back. The publisher also validates its
+    complete component binding and verifies remote object checksums before commit.
+    """
+    from .receipts import origin
+
+    expected_origin = origin(producer_origin)
+    try:
+        with open_regular(Path(source) / CAPTURE_VERIFICATION) as stream:
+            body = stream.read(MAX_MANIFEST + 1)
+    except FileNotFoundError:
+        return None
+    if len(body) > MAX_MANIFEST:
+        raise InvalidArchive("Capture verification exceeds its size limit")
+    proof = decode_json(body)
+    manifest = validate_manifest(load_manifest(source))
+    if (not isinstance(proof, dict) or proof.get("verification_method") != "captured-contents"
+            or proof.get("uuid") != manifest["uuid"]
+            or proof.get("manifest_sha256") != hashlib.sha256(json_bytes(manifest)).hexdigest()
+            or not isinstance(proof.get("ingestion_receipts"), dict)
+            or proof["ingestion_receipts"].get("origin") != expected_origin):
+        raise InvalidArchive("Capture verification does not match this archive and producer origin")
+    return proof
 
 
 def validator_output(executable, database, timeout, *, lock_fd=None):
@@ -202,11 +230,7 @@ def _verify_archive(source, *, restore, native_validator, producer_origin,
                   "verification_method": "isolated-restore" if restore else "streamed-contents"}
         # Both paths checked the reconstructed SQLite bytes before reaching here.
         # Keep this narrower evidence distinct from the optional native audit.
-        result["sqlite_snapshots"] = {
-            "archive_uuid": manifest["uuid"], "manifest_sha256": manifest_sha256,
-            "checks": ["integrity_check", "foreign_key_check", "identity"],
-            "components": [{key: entry[key] for key in ("role", "name", "sha256", "size", "sqlite")}
-                           for entry in databases]}
+        result["sqlite_snapshots"] = sqlite_evidence_binding(manifest, databases)
         if native_validator is not None:
             proof = verify_native_snapshot(restored, library, native_validator, timeout=timeout, lock_fd=lock_fd)
             result["native_snapshot"] = dict(proof, archive_uuid=manifest["uuid"],

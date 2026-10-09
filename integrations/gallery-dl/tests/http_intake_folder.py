@@ -21,9 +21,12 @@ value = {"format": FORMAT, "endpoint": setup["endpoint"], "root_uuid": setup["ro
          "state_dir": str(directory / "intake"), "library_lock": str(directory / "backup.lock"),
          "api_key_file": str(key), "max_pending": 1, "entries_per_run": 100,
          "settle_seconds": 0, "scan_interval_seconds": 3600}
+# Intake uses integer seconds, while freshly created fixture files have
+# fractional mtimes. Keep this network-recovery test past that file boundary.
+settled_now = int(time.time()) + 2
 if setup["phase"] == "lost":
     try:
-        run(value)
+        run(value, now=settled_now)
     except Unavailable as error:
         assert error.code == "network_unavailable", str(error)
     else:
@@ -34,12 +37,12 @@ if setup["phase"] == "lost":
 elif setup["phase"] == "recovered":
     saved = json.loads((directory / "saved-intake.json").read_text())
     for _ in range(2):
-        result = run(value)
+        result = run(value, now=settled_now)
         assert result["pending"] == 1 and result["submitted"] == 0, result
         assert result["observed"] == {}, result
         assert Journal(value["state_dir"], value).pending() == [saved]
 elif setup["phase"] == "next":
-    result = run(value)
+    result = run(value, now=settled_now)
     assert result["pending"] == 1 and result["submitted"] == 1, result
     assert result["observed"] == {"cancelled": 1}, result
     saved, = Journal(value["state_dir"], value).pending()

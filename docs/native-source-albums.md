@@ -10,6 +10,17 @@ media playback are available on source-post and gallery pages. Production
 activation remains governed by the
 [transition plan](native-archive-transition-plan.md#source-post-albums-and-galleries).
 
+Gallery detail pages show a **Gallery source** summary before the cover and
+metadata, on desktop and mobile. An evidenced post association labels the
+gallery **Source-post album** and links to its parent posts. Otherwise the
+summary distinguishes **Folder gallery**, **ZIP gallery**, and **Manual gallery**
+from their actual backing references, showing folder and archive paths. A failed
+lookup stays unresolved rather than implying a manual gallery. Merged galleries
+can retain multiple parent posts; the Source albums tab shows all of them and
+their individual attachment order. Shared media can retain titles from other
+posts. The summary and tab reuse one paginated lookup, and viewing them changes
+no metadata or membership.
+
 ## Evidence accepted by the parser
 
 | Source | Post identity | Ordered attachment evidence |

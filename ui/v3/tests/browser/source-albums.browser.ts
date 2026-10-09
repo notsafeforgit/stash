@@ -17,6 +17,7 @@ async function archive(
     disabled?: boolean;
     failed?: boolean;
     manyPosts?: boolean;
+    untitled?: boolean;
   } = {},
 ) {
   const requests: URL[] = [];
@@ -74,7 +75,12 @@ async function archive(
                   })),
                 };
               })
-            : [postSummary()],
+            : [
+                {
+                  ...postSummary(),
+                  ...(options.untitled ? { latest_capture: null } : {}),
+                },
+              ],
       };
     } else if (url.pathname.endsWith("/album-media")) {
       const response = albumPage();
@@ -287,4 +293,123 @@ test("gallery source lookups retry and page after retained merged associations",
       ?.searchParams.get("after"),
   ).toBe(albumUUID(1025));
   expect(remote.writes).toEqual([]);
+});
+
+for (const desktop of [false, true])
+  test(`gallery origin is visible before opening albums on ${desktop ? "desktop" : "mobile"}`, async ({
+    page,
+  }) => {
+    const remote = await archive(page);
+    if (desktop) await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/source-albums");
+    const summary = page.locator("[data-gallery-origin]");
+    await expect(
+      summary.getByText("Source-post album", { exact: true }),
+    ).toBeVisible();
+    const parent = summary.getByRole("link", {
+      name: postSummary().latest_capture?.title ?? "",
+      exact: true,
+    });
+    await expect(parent).toBeVisible();
+    await expect(parent).toHaveAttribute(
+      "href",
+      new RegExp(`/source-posts\\?.*post=${postIds.post}`),
+    );
+    await expect(
+      page.getByText("Library images", { exact: true }),
+    ).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      )
+      .toBe(true);
+    await page.screenshot({
+      path: test
+        .info()
+        .outputPath(`gallery-origin-${desktop ? "desktop" : "mobile"}.png`),
+    });
+    await summary
+      .getByRole("button", { name: "View source albums", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", {
+        name: postSummary().latest_capture?.title ?? "",
+        exact: true,
+      }),
+    ).toBeVisible();
+    expect(
+      remote.requests.filter((url) => url.pathname.endsWith("/album-posts")),
+    ).toHaveLength(1);
+    expect(
+      remote.requests.some((url) => url.pathname.endsWith("/album-media")),
+    ).toBe(false);
+    expect(remote.writes).toEqual([]);
+  });
+
+for (const backing of [
+  { label: "Manual gallery", query: "", path: "" },
+  {
+    label: "Folder gallery",
+    query: "folder",
+    path: "/media/performer/album-with-a-very-long-folder-name-".repeat(3),
+  },
+  {
+    label: "ZIP gallery",
+    query: "archive",
+    path: "/media/performer/purchased-album.zip",
+  },
+])
+  test(`${backing.label} identifies its backing without inventing a post`, async ({
+    page,
+  }) => {
+    const remote = await archive(page, { empty: true });
+    const query = new URLSearchParams(
+      backing.query ? { [backing.query]: backing.path } : {},
+    );
+    await page.goto(`/source-albums?${query}`);
+    const summary = page.locator("[data-gallery-origin]");
+    await expect(
+      summary.getByText(backing.label, { exact: true }),
+    ).toBeVisible();
+    if (backing.path)
+      await expect(
+        summary.getByText(backing.path, { exact: true }),
+      ).toBeVisible();
+    await expect(summary.getByRole("link")).toHaveCount(0);
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      )
+      .toBe(true);
+    expect(remote.writes).toEqual([]);
+  });
+
+test("a failed gallery source lookup stays unknown until retry succeeds", async ({
+  page,
+}) => {
+  const remote = await archive(page, { failed: true, empty: true });
+  await page.goto("/source-albums");
+  const summary = page.locator("[data-gallery-origin]");
+  await expect(
+    summary.getByText("Could not check linked posts", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    summary.getByText("Manual gallery", { exact: true }),
+  ).toHaveCount(0);
+  remote.recover();
+  await summary
+    .getByRole("button", { name: "Retry source lookup", exact: true })
+    .click();
+  await expect(
+    summary.getByText("Manual gallery", { exact: true }),
+  ).toBeVisible();
+});
+
+test("an untitled album links to its source post ID", async ({ page }) => {
+  await archive(page, { untitled: true });
+  await page.goto("/source-albums");
+  const summary = page.locator("[data-gallery-origin]");
+  await expect(
+    summary.getByRole("link", { name: "Post example", exact: true }),
+  ).toBeVisible();
 });

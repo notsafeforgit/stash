@@ -1,40 +1,20 @@
-import { useCallback, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMsg } from "@/hooks/message";
 import { cn } from "@/lib/utils";
-import { createSourceAlbumAPI } from "@/core/native-archive/source-album-api";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { PostEmpty, PostSection } from "../posts/shared";
 import { AlbumReadError, SourceAlbum } from "./ordered";
-import { useAlbumPages } from "./read";
+import type { GallerySources } from "./gallery-sources";
 
 export function GallerySourceAlbums({
-  localId,
+  sources: result,
   onPublished,
 }: {
-  localId: string;
+  sources: GallerySources;
   onPublished?: () => void | Promise<void>;
 }) {
   const msg = useMsg();
-  const api = useMemo(() => createSourceAlbumAPI(), []);
-  const load = useCallback(
-    async (after: string | undefined, signal: AbortSignal) => {
-      const identity = await api.identity(localId, signal);
-      const page = await api.posts(identity.uuid, after, signal);
-      return {
-        signature: JSON.stringify(page.gallery),
-        items: page.posts,
-        next:
-          page.posts.length === api.pageLimit
-            ? (page.posts.at(-1)?.uuid ?? null)
-            : null,
-        header: page,
-      };
-    },
-    [api, localId],
-  );
-  const result = useAlbumPages(load);
   return (
     <div className="flex min-h-0 flex-col gap-4 p-4 md:flex-1 md:overflow-y-auto">
       <p className="text-sm text-muted-foreground">
@@ -91,7 +71,7 @@ export function GallerySourceAlbums({
             </Link>
             <SourceAlbum
               post={post.uuid}
-              endpoint={api.endpoint}
+              endpoint={result.endpoint}
               onPublished={onPublished}
             />
           </div>

@@ -27,6 +27,8 @@ import { GalleryActionsMenu } from "src/components/detail/gallery-actions-menu";
 import { GalleryEditForm } from "src/components/detail/gallery-edit-form";
 import { Lightbox } from "src/components/lightbox";
 import { GallerySourceAlbums } from "@/components/archive/albums/gallery";
+import { GalleryOrigin } from "@/components/archive/albums/gallery-origin";
+import { useGallerySources } from "@/components/archive/albums/gallery-sources";
 import { GalleryImagesTab } from "src/components/detail/gallery-list-tabs";
 import { useDocumentTitle } from "src/hooks/title";
 
@@ -91,14 +93,17 @@ function GalleryDetailPage() {
   const intl = useIntl();
   const [editOpen, setEditOpen] = useState(false);
   const [coverLightboxOpen, setCoverLightboxOpen] = useState(false);
+  const sources = useGallerySources(galleryId);
+  const reloadSources = sources.reload;
 
   const { data, loading, error, refetch } = useQuery(GQL.FindGalleryDocument, {
     variables: { id: galleryId },
     fetchPolicy: "cache-first",
   });
   const refreshGallery = useCallback(async () => {
+    reloadSources();
     await refetch();
-  }, [refetch]);
+  }, [refetch, reloadSources]);
 
   const [updateGallery] = useMutation(GQL.GalleryUpdateDocument);
   function handleToggleOrganized() {
@@ -139,7 +144,7 @@ function GalleryDetailPage() {
           content: (
             <GallerySourceAlbums
               key={gallery.id}
-              localId={gallery.id}
+              sources={sources}
               onPublished={refreshGallery}
             />
           ),
@@ -182,6 +187,11 @@ function GalleryDetailPage() {
                       />
                       <div className="md:flex-1 md:min-h-0 md:overflow-y-auto">
                         <div className="flex flex-col items-stretch gap-3 p-3">
+                          <GalleryOrigin
+                            gallery={gallery}
+                            sources={sources}
+                            onViewAlbums={() => setActiveTab("source-albums")}
+                          />
                           <GalleryCover
                             gallery={gallery}
                             onImageClick={() => setCoverLightboxOpen(true)}
@@ -291,5 +301,10 @@ function GalleryDetailPage() {
 
 export const Route = createFileRoute("/galleries/$galleryId")({
   validateSearch: searchSchema,
-  component: GalleryDetailPage,
+  component: GalleryDetailRoute,
 });
+
+function GalleryDetailRoute() {
+  const { galleryId } = Route.useParams();
+  return <GalleryDetailPage key={galleryId} />;
+}

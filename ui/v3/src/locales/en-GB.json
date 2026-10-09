@@ -3427,6 +3427,21 @@
     "order": "Source order",
     "title": "Source albums"
   },
+  "gallery_origin": {
+    "title": "Gallery source",
+    "source_album": "Source-post album",
+    "folder_gallery": "Folder gallery",
+    "zip_gallery": "ZIP gallery",
+    "manual_gallery": "Manual gallery",
+    "album_help": "Linked posts explain this album's grouping. Shared images and videos can retain different titles.",
+    "loading": "Checking gallery source",
+    "failed": "Could not check linked posts",
+    "retry": "Retry source lookup",
+    "post_id": "Post {id}",
+    "view_albums": "View source albums",
+    "archive_file": "Archive file",
+    "manual_help": "Images and videos grouped without a linked source post or backing folder or archive."
+  },
   "album_review": {
     "candidate_identity": "Library item identity",
     "reason_unknown": "This candidate needs additional review before it can be linked.",

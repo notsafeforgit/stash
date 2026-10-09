@@ -1477,7 +1477,7 @@
     "failed_comparison_retained": true,
     "imports_replayed": false
   },
-  "root_free_GiB": 116.74,
+  "root_free_GiB": 116.7,
   "pre_public_coordinated_backup": {
     "status": "running",
     "stage": "publish-backup-before-public",
@@ -1525,7 +1525,28 @@
     "requires": "Successful pre-public coordinated backup/restore and separately verified public handoff",
     "website_requests": 0,
     "workflow_executions": 0,
-    "media_mutations": 0
+    "media_mutations": 0,
+    "metadata_enrichment": {
+      "status": "prepared_not_executed",
+      "source_requests": 0,
+      "native_mutations": 0,
+      "retry_deadlines_unchanged": true,
+      "installed_profile_validated_without_network": true,
+      "read_only_media_snapshot_function_checked": true,
+      "checked_existing_media": 1,
+      "checked_existing_files": 1,
+      "checked_relation_tables": 14,
+      "checked_file_bytes": 3341509,
+      "checks": [
+        "Selected existing recovered target and policy only",
+        "Separate admission and one exact metadata-only job",
+        "Native publication and producer journal agree",
+        "Original captures preserved and at least one new source capture",
+        "Scene/image fields and relationships unchanged",
+        "Existing file bytes and stat identity unchanged",
+        "No file ingestion or download source run"
+      ]
+    }
   },
   "backup_component_label_correction": {
     "status": "passed_installed_inactive",
@@ -1544,5 +1565,77 @@
     "failed_attempt_records_retained": true,
     "runtime_implementations_changed": false,
     "current_backup_retry_started": true
+  },
+  "private_gallery_api": {
+    "status": "passed",
+    "checked_at": "2026-10-09T01:10:20.704726+00:00",
+    "gallery_count": 4197,
+    "source_galleries": 2857,
+    "http_requests": 18,
+    "max_request_seconds": 0.010624208021908998,
+    "mutations": 0,
+    "scope": "Read-only populated private API check; rendered desktop/mobile owner acceptance remains required.",
+    "samples": [
+      {
+        "case": "empty",
+        "images": 0,
+        "scenes": 0,
+        "ordered_slots": 2,
+        "pages": 1,
+        "graph_and_source_routes_match_database": true
+      },
+      {
+        "case": "images",
+        "images": 2,
+        "scenes": 0,
+        "ordered_slots": 2,
+        "pages": 1,
+        "graph_and_source_routes_match_database": true
+      },
+      {
+        "case": "mixed",
+        "images": 2,
+        "scenes": 1,
+        "ordered_slots": 3,
+        "pages": 2,
+        "graph_and_source_routes_match_database": true
+      },
+      {
+        "case": "videos",
+        "images": 0,
+        "scenes": 9,
+        "ordered_slots": 9,
+        "pages": 5,
+        "graph_and_source_routes_match_database": true
+      }
+    ]
+  },
+  "n8n_runtime_dependency_preparation": {
+    "status": "prepared_not_installed",
+    "runner_image": "3b74fc39443510cd9002af462490a49edc9bd8ce239f4c3928d65b977d6c6af6",
+    "runner_image_version": "2.42.4",
+    "runner_package_version": "2.42.3",
+    "main_bundled_runner_package_version": "2.42.3",
+    "runner_package_versions_match": true,
+    "static_components_before": 49,
+    "static_components_after": 51,
+    "effective_backup_components_validated": 191,
+    "container_boundary_before": [
+      "n8n",
+      "redis-n8n"
+    ],
+    "container_boundary_after": [
+      "n8n-runners",
+      "n8n",
+      "redis-n8n"
+    ],
+    "current_sealed_backup_changed": false,
+    "services_started": false,
+    "runtime_upgrade": false,
+    "added_backup_components": [
+      "External task-runner service definition",
+      "Existing forward-auth hook"
+    ],
+    "installation_gate": "Current pre-public coordinated backup and isolated restore must pass before changing the installed configuration."
   }
 }

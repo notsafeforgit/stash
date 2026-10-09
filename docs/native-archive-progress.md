@@ -12504,3 +12504,30 @@ The final installed-file verifier now checks this
 one-file configuration overlay and validates component names, roles and
 uniqueness. Runtime implementations and public-writer barriers are unchanged;
 coordinated publication and isolated restore are still pending.
+
+Read-only checks against the populated private API also passed: 18 requests
+verified all 4,197 galleries are discoverable and sampled empty, image, video
+and mixed source albums against their SQLite memberships. The source routes
+preserve attachment order across pagination. The slowest sampled request took
+10.6 ms. This verifies the gallery data path; rendered desktop/mobile owner
+acceptance still follows the public handoff.
+
+A selected metadata-only execution check is prepared with separate snapshot,
+admission, execution and verification phases. Its read-only preservation check
+ran against one existing scene, 14 related tables and the actual file bytes.
+Later execution must produce a native capture/publication while preserving
+library fields, relationships and media bytes. A due Twitter target was chosen;
+the retained future Reddit retry deadlines remain unchanged. No source fetch or
+metadata-job admission has occurred.
+
+Runtime inspection found n8n's external Code-node runner must accompany the main
+process during controlled startup. Its installed image matches n8n 2.42.4; both
+images contain the same 2.42.3 task-runner package. A configuration overlay is
+prepared to pin that existing image, include its service definition and the
+existing forward-auth hook in coordinated backups, and pause the runner along
+with n8n/Redis during future capture. Exact publisher deduplication validates
+191 effective components from 51 static and 141 dynamic inputs. The overlay,
+updated final inventory check and three-container startup are prepared only;
+installation requires the current pre-public backup/restore to finish. The
+sealed run and its configuration remain unchanged. Scheduled native workers
+are confirmed inactive, and the public application remains off.

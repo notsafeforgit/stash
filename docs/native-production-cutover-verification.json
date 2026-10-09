@@ -1990,7 +1990,7 @@
     "resumed_controller_bound_to_same_sealed_generation": true
   },
   "routine_backup_verification": {
-    "status": "same_published_archive_finalization_running",
+    "status": "cloud_published_provider_released_local_cleanup_running",
     "source_revision": "e9cfa08a954f63abbc39250056c4422513969a86",
     "method": "reuse-published-verification",
     "checks": [
@@ -2146,14 +2146,18 @@
     },
     "published_archive_finalization": {
       "native_archive_uploaded": true,
-      "coordinated_master_pending": true,
+      "coordinated_master_pending": false,
       "saved_remote_proof_reused": true,
       "database_reconstruction_repeated": false,
       "application_audit_repeated": false,
       "missing_remote_objects_repaired_from_original_archive": true,
       "zfs_remount_requires_original_snapshot_identity": true,
       "failed_controller_preserved": true,
-      "same_run_id": "20261008_175444_1545955"
+      "same_run_id": "20261008_175444_1545955",
+      "coordinated_master_published": true,
+      "providers_released": true,
+      "local_cleanup_pending": true,
+      "post_controlled_helper_matches_captured_contents": true
     }
   },
   "metadata_retention_configuration": {

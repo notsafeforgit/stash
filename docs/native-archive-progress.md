@@ -16,10 +16,12 @@ and scraper schedules are still stopped.
 
 The first coordinated native backup has sealed and packed its checkpoint with
 the 22.2 GB database, 240,872 saved artwork files and coordinated host state.
-Its streaming verification and native archive upload completed. Final coordinated
-publication failed at the media-view guard before writing the master manifest;
-the same sealed run is retained for finalization. The held ZFS snapshot still
-passes its durable identity and read-only checks. AWS access is verified. Following
+Its streaming verification, native archive upload and final cloud manifest
+publication completed. The first attempt failed at the media-view guard; the
+fixed publisher resumed the same sealed run and completed all provider releases.
+It is cleaning up its owned temporary archive objects before recording process
+completion and starting the independent restore. Cloud publication is complete;
+local cleanup is pending. Following
 explicit owner approval, the original publisher stopped gracefully and the new
 publisher resumed the same sealed generation. No live-root activation, producer
 credential issuance or database promotion has occurred.
@@ -49,11 +51,16 @@ An expired ZFS snapshot mount is accepted only after rechecking the original
 snapshot GUID, creation transaction, checkpoint properties, hold and read-only
 topology. All 317 backup tests pass, including missing-object repair, altered
 remote proof rejection and snapshot revalidation failures. The failed controller
-and its original publication receipt remain intact. Finalization is running on
-`e9cfa08a9`, reusing that publication. The same runtime is selected for the prepared
+and its original publication receipt remain intact. Finalization on `e9cfa08a9`
+reused that publication and completed the master and provider releases. The same runtime is selected for the prepared
 daily launchers, with 13 fixture, five CLI and six schedule-guard checks passing.
 Use `install-finalization-launch-cleanup.py` after the n8n/home overlays; this
 supersedes the earlier capture-runtime preparation.
+
+The prepared post-controlled backup helper now expects `captured-contents`,
+matching the selected deployment. Its stale `streamed-contents` assertion would
+have rejected the new runtime before starting a backup. Independent restore
+still requires `isolated-restore`; no active process or archive was changed.
 
 Capture evidence reuse now also removes the repeated reconstruction and
 SQLite/producer audit from new backups. The exporter records its successful

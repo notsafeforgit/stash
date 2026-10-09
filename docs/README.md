@@ -21,6 +21,7 @@ provides the frozen fallback for users who do not migrate.
 | [Fork maintenance](../FORK.md) | Independent development, upstream imports, native migrations, and release boundaries |
 | [Native schema promotion](native-schema.md) | Implemented lineage, one-time historical imports, promoted tables, and remaining model conversions |
 | [Native source identity](native-source-identity.md) | Captured account claims, service namespaces, and reviewed performer/account registry import |
+| [Imported catalog association repair](catalog-association-repair.md) | Backfill historical publishers and unique performer links from retained account and author-folder evidence |
 | [Native source collections](native-source-collections.md) | Collections, media-root bindings, metadata rules, draft previews and durable browser saves |
 | [Native local-file intake](native-manual-intake.md) | Reviewed purchased-media admission, durable file verification, recovery and cancellation |
 | [Native file deduplication](native-file-deduplication.md) | Verified redundant locations, preserved source evidence, journaled removal and host conversion boundary |

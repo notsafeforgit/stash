@@ -269,7 +269,9 @@ for (const desktop of [false, true]) {
     await expect(
       page.getByText("One shared description", { exact: true }),
     ).toHaveCount(1);
-    await expect(page.getByText("2 observations", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("2 observations", { exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByText("Observation time unknown for 1 imported record."),
     ).toBeVisible();

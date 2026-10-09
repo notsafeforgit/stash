@@ -868,7 +868,12 @@ capture rows, linking qualified IDs or creating accounts when the core policy
 allows it. Shared observation parents are not additional captures. Preserve
 existing publisher choices and explicit unlinks; missing author IDs remain
 unavailable, while ambiguous or invalid evidence retains review context. Never
-infer the publisher from a folder, feed owner or historical catalog association.
+infer the publisher from a folder, feed owner or historical catalog association
+in this automatic capture-ID pass.
+The explicit [catalog association repair](docs/catalog-association-repair.md)
+can subsequently use unambiguous imported post-account and known author-folder
+evidence, preserving conflicting authors and explicit choices. This is an
+owner-requested historical backfill, not the automatic new-capture policy.
 Exact manifest/ordinal checkpoints commit decisions, account evidence and
 immutable receipts together. This pass selects source publishers, not depicted
 performers or media metadata. Whole-catalog status remains `imported:false`.

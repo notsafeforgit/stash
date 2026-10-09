@@ -82,6 +82,17 @@ func capturedAccountLabel(field capturedField) string {
 // A nil result means there is insufficient identity evidence. Invalid claimed
 // identifiers return an error so an importer can report them for review.
 func ExtractCapturedAccount(raw []byte) (*CapturedAccount, error) {
+	return extractCapturedAccount(raw, true)
+}
+
+// CapturedAccountReferences also reports handle-only author evidence. This is
+// useful for rejecting conflicting historical associations, but does not make a
+// handle sufficient for automatic account creation or identity consolidation.
+func CapturedAccountReferences(raw []byte) (*CapturedAccount, error) {
+	return extractCapturedAccount(raw, false)
+}
+
+func extractCapturedAccount(raw []byte, requireID bool) (*CapturedAccount, error) {
 	data, err := DecodeJSONObject(raw, MaxSourcePayloadBytes)
 	if err != nil {
 		return nil, err
@@ -192,7 +203,7 @@ func ExtractCapturedAccount(raw []byte) (*CapturedAccount, error) {
 	if err := addCapturedAccountIdentifier(result, id, idKind, basis); err != nil {
 		return nil, err
 	}
-	if len(result.Identifiers) == 0 {
+	if requireID && len(result.Identifiers) == 0 {
 		return nil, nil
 	}
 	if err := addCapturedAccountIdentifier(result, secondary, "secUid", basis); err != nil {
@@ -203,6 +214,9 @@ func ExtractCapturedAccount(raw []byte) (*CapturedAccount, error) {
 	}
 	if label := capturedAccountLabel(handle); label != "" {
 		result.Label = label
+	}
+	if len(result.Identifiers) == 0 {
+		return nil, nil
 	}
 	if category == "coomer" || category == "kemono" {
 		profile, _ := data["user_profile"].(sourceObject)

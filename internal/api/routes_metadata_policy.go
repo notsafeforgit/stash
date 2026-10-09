@@ -78,6 +78,9 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/post-merge-notifications/{job}/retry", rs.retryPostMergeNotification)
 	r.Get("/posts/{post}/identifiers", rs.sourcePostIdentifiers)
 	r.Get("/posts/{post}/publishers", rs.sourcePostPublishers)
+	r.Get("/posts/{post}/catalog-association-preview", rs.previewCatalogAssociation)
+	r.Post("/catalog-associations/backfill", rs.backfillCatalogAssociations)
+	r.Get("/catalog-associations/posts", rs.catalogAssociationPosts)
 	r.Get("/posts/{post}/media", rs.sourcePostMedia)
 	r.Get("/posts/{post}/album", rs.sourcePostAlbum)
 	r.Get("/posts/{post}/thread", rs.sourcePostThread)
@@ -333,6 +336,14 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 }
 
 func nativeArchiveError(w http.ResponseWriter, err error) {
+	if errors.Is(err, models.ErrSourcePostIdentityInvalid) {
+		ingestError(w, ingest.ErrInvalid)
+		return
+	}
+	if errors.Is(err, models.ErrSourcePostConflict) || errors.Is(err, models.ErrCapturePublisherConflict) || errors.Is(err, models.ErrCapturePublisherReplay) {
+		ingestJSON(w, http.StatusConflict, map[string]string{"error": "publisher_conflict", "message": "The post or publisher evidence changed; load a fresh preview."})
+		return
+	}
 	if errors.Is(err, models.ErrPerformerSourceLimit) {
 		ingestJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "performer_source_limit", "message": "Performer identity history exceeds the bounded review limit."})
 		return

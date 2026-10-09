@@ -84,4 +84,28 @@ type CapturePublisherReaderWriter interface {
 	Current(context.Context, string) (*CapturePublisherDecision, error)
 	History(context.Context, string, int, int) ([]CapturePublisherDecision, error)
 	PostAccounts(context.Context, string, string, int) ([]*SourceAccount, error)
+	CatalogAssociationPosts(context.Context, string, int) ([]string, error)
+	PreviewCatalogAssociation(context.Context, string) (*CatalogAssociationPreview, error)
+	BackfillCatalogAssociation(context.Context, string, bool) (*CatalogAssociationResult, error)
+}
+
+// Catalog associations are an explicitly requested repair of imported evidence,
+// not the automatic author policy for new scrapes. They never tag media.
+type CatalogAssociationPreview struct {
+	PostUUID    string   `json:"post_uuid"`
+	Action      string   `json:"action"`
+	Reason      string   `json:"reason"`
+	AccountUUID string   `json:"account_uuid,omitempty"`
+	CaptureUUID string   `json:"capture_uuid,omitempty"`
+	Evidence    []string `json:"evidence"`
+	Candidates  []string `json:"candidates"`
+	Signature   string   `json:"-"` // internal signature of the selected capture's explicit link
+}
+
+type CatalogAssociationResult struct {
+	CatalogAssociationPreview
+	DecisionUUID        string   `json:"decision_uuid,omitempty"`
+	Ownership           string   `json:"ownership,omitempty"`
+	PerformerUUID       string   `json:"performer_uuid,omitempty"`
+	PerformerCandidates []string `json:"performer_candidates,omitempty"`
 }

@@ -645,6 +645,13 @@ catalog families and final semantic reconciliation are still required.
 
 ## Selecting catalog capture publishers
 
+The subsequent explicit [catalog association repair](catalog-association-repair.md)
+also supports imported post-account claims and known gallery-dl author folders
+when captures have no author IDs. It records ordinary publisher decisions and
+optionally links a unique existing performer name/alias, preserving explicit
+unlinks and conflicting evidence. The capture-ID import described below keeps
+its original strict policy and immutable receipts.
+
 Native schema 1000034 applies the existing `captured-account-v1` policy after a
 snapshot's evidence and relationship passes have completed. It processes the
 original flat observations and detail captures; shared observation parents do

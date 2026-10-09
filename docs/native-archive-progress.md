@@ -9,9 +9,9 @@ in progress.
 
 ## Current release position — 2026-10-09 UTC
 
-Production is healthy on schema **1000103**, source
-`d1f15e9fae3d0d2573ed50f5c5f342d02a864e81`, pinned wrapper
-`localhost/stash-native-s6@sha256:49f9b2c1c9b39b38d9f7955a2fd67bc2227724e1099d646a879a3f6fd27472b8`.
+Production is healthy on schema **1000104**, source
+`2dc9bdc4157c9761e8b4d3e972c25922da66b7aa`, pinned wrapper
+`localhost/stash-native-s6@sha256:0fca92f0a79fb927bfa921099d75bcbe563c364428a839e6b0e6e5a429e212a7`.
 The matching backup validator and binary reconstruction components are installed
 for the next backup. The original published backup and its separately running
 restore still use their sealed configuration.
@@ -33,7 +33,7 @@ grouping; its six scrape targets were already active. Unrelated disabled or
 retired entries were left unchanged. Desktop and mobile checks passed.
 
 The n8n producer now runs image
-`sha256:dc7c2c1c2c6488c7484b23b0ec8bd07240043f26a75ac61edc8acd70f38800ed`.
+`sha256:dd4c39705d4df79a3b32c226af0db0860b5b86414b1a5b6bc7a166d87c960257`.
 Captured Reddit Redgifs/direct-file references can identify their downloaded
 attachments, including retained Reddit fallback previews. Unsupported external
 gallery membership is not inferred from filenames. The QSV GIF helper pads odd
@@ -45,19 +45,28 @@ Schema 1000103 adds owner-approved execution-policy upgrades for queued or
 deferred source runs. This preserves their original admission, UUID, coverage,
 progress and retry deadlines. All 38 current pending n8n runs were upgraded;
 the ten attachment-error deferrals were reopened through the existing review
-API. The 169 imported review holds remain unchanged. n8n and its download timer
-are active. Existing service cooldowns currently prevent the first repaired
-attempt; actual post-repair download/intake verification is still pending.
+API. The subsequent metadata-worker release upgraded all 42 then-pending runs
+to its matching producer, preserving their original policy, progress and retry
+deadlines. The 169 imported review holds remain unchanged.
 
-The release passed 663 producer tests and focused backend matching, policy,
-migration and API checks. The broader backend run's failures were corrected and
-rechecked: export cleanup omitted shared-capture tables, one retirement test
-expected the former permanent state, and Python API fixtures needed the pinned
-producer interpreter. Subsequent diagnosis found a separate Reddit discovery
-initialization error before network access. Its fix and actual-extractor
-regression are in source; deploying it requires preserving the policies of the
-already admitted metadata jobs and imported account listings. The retained
-metadata worker definition is installed but remains inactive.
+Schema 1000104 allows compatible metadata-worker repairs for an exact original
+profile and job kind without rewriting admissions or listing digests. Claims
+require the approved execution policy; each attempt retains the policy it ran.
+Four deployed approvals cover the existing Reddit/Twitter metadata profiles.
+All 71 metadata job records and four listing definitions were unchanged by those
+approvals. The Reddit discovery initialization repair is deployed: it attaches
+the page interceptor after the actual extractor creates its API. Both host and
+n8n installations match all 127 source modules. The unused old-runtime metadata
+worker definitions and their backup entries were removed with local preimages.
+
+The current release passed 666 producer tests, focused backend queue, migration,
+API and Python HTTP integration checks, and the pinned backend lint gate. Tests
+include retaining checkpoints across an upgrade, migrating existing attempts,
+anonymized exports, and recovering a staged page under a changed worker without
+refetching it. n8n and the main worker timer are active. The first repaired pass
+found the existing Reddit/Twitter service cooldowns; the 64 queued enrichment
+jobs also fill the admission limit until work can execute. Actual post-repair
+source completion remains pending, rather than inferred from an active timer.
 
 The remaining rollout includes metadata-worker continuity, controlled host and
 manual intake checks, translation activation, a fresh incremental post-write

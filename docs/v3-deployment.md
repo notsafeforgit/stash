@@ -1,16 +1,38 @@
 # Native preview builds and deployment
 
-Development continues on `v3-rewrite`. Production remains on the frozen
-compatible release until the [cutover gates](native-archive-transition-plan.md#production-cutover-runbook)
-and owner review pass. A native image must use a separate database and config;
-never open the live compatible library merely to test a build. The original
-compatible source and image digests are preserved in the
+Development continues on `v3-rewrite`, and the native application is now running
+in production. Routine updates replace that native application's pinned image;
+they do not repeat the original cutover or open the frozen compatible database.
+Keep build/rehearsal databases separate from the live library. The original
+compatible source and image digests remain preserved in the
 [release manifest](releases/v2.5-compatible-final.json).
 
 There are two images: `notsafeforgit/stash` publishes the binary, and
 `notsafeforgit/stash-s6` packages that binary with its runtime. Native builds
 publish separate `native-preview` tags. Verify the exact source digest in the
-wrapper before starting an isolated rehearsal or an approved cutover.
+wrapper before deploying an update or starting an isolated rehearsal.
+Production images must be built and published by GitHub Actions and pulled from
+GHCR. A local build, or uploading a locally built image to GHCR, does not satisfy
+the owner's delivery requirement. Report push, publication and deployment as
+separate outcomes, with the run URLs and actual running registry digest.
+
+### When dispatch reports Actions disabled
+
+Inspect both `GET /repos/{owner}/{repo}/actions/permissions` and the workflow's
+state. An enabled repository policy and an active workflow do not prove GitHub
+will accept a dispatch. On October 9, both readbacks were enabled/active for
+`notsafeforgit/stash`, but push created no checks and workflow dispatch returned
+HTTP 422, `Actions has been disabled for this repository.` Reapplying the enabled
+policy and enabling the workflow did not clear the error, including with REST
+API version `2026-03-10`.
+
+[GitHub documents a separate GitHub-controlled disabled state](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#managing-github-actions-permissions-for-your-repository)
+that settings changes cannot clear and advises contacting Support for review.
+Keep the HTTP status, response message, UTC timestamp and `X-GitHub-Request-Id`
+with the enabled/active readbacks. Do not diagnose billing or a disabled settings
+toggle without evidence. Publication remains blocked until a run actually
+starts and succeeds; neither a successful push nor registry access establishes
+that the publishing workflow ran. Do not substitute a local image.
 
 ## 1. Publish and verify the Stash image
 

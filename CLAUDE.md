@@ -8,6 +8,11 @@ Stash is a self-hosted media organizer written in Go (backend) + React/TypeScrip
 
 This repository is now an **independent fork** of upstream stashapp/stash. Work continues on `v3-rewrite` under the [native archive transition plan](docs/native-archive-transition-plan.md); merge into `develop` follows migration verification and the owner's success review. Read [FORK.md](FORK.md) for migration, release, and upstream-import policy. V2.5 compatibility is frozen at `v2.5-compatible-final`, not a constraint on new code. The native application is running in production; [transition progress](docs/native-archive-progress.md) records the remaining worker rollout and restore verification. The [documentation index](docs/README.md) links current guides.
 
+The owner requires GitHub Actions-built, GHCR-published production images. Do not
+deploy another local-image fallback or treat a Git push as publication. Follow
+the [deployment runbook](docs/v3-deployment.md), retain the actual run URLs and
+source/wrapper digests, and report any GitHub-side execution block explicitly.
+
 New plugins use the independent [`apiVersion: 3` contract](docs/plugin-manifests.md). Preserve its settings, UI contributions, capability checks, and after-success notifications. Only `apiVersion: 3` manifests load. Unversioned manifests and legacy UI injection are rejected and reported through `pluginLoadErrorsV3` and Settings → Plugins. Native catalog invariants belong in core services. New Twitter captures retain numeric thread/parent/publisher relationships in schema 1000105; evidenced self-replies share a source gallery while retaining each post and its attachment order. See [source albums](docs/native-source-albums.md#twitter-threads-and-replies).
 
 The build commands and storage-bridge descriptions below describe the code as

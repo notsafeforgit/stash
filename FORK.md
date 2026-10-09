@@ -19,6 +19,12 @@ retained while the worker rollout and independent restore finish.
 - Publish development Stash images to `native-preview` and revision tags. The
   wrapper explicitly selects a full source-image digest and publishes separate
   native preview variants. Never select the newest source image implicitly.
+- Production delivery must use images built and published by the repository's
+  GitHub Actions workflows, then deployed from GHCR by verified digest. The owner
+  explicitly rejected continued local-image deployments on October 9. Do not use
+  another local build or republish one as a substitute when Actions is blocked;
+  report the publication blocker and retain the running service until the
+  required registry release is available.
 - Keep live production pinned during development. Exercise migrations and
   imports against copies before opening the native database for production
   writes. Preserve the original database, configuration, catalogs, and operating

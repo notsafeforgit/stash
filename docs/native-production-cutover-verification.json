@@ -2035,7 +2035,7 @@
       "follow_up": "Reuse verified unchanged content and capture evidence; keep full audits and restore drills explicit. Do not label audit success from publication alone.",
       "current_baseline_gate_changed": false,
       "unchanged_object_upload_reuse": {
-        "status": "implemented_tested_source_only",
+        "status": "included_in_inactive_incremental_runtime",
         "matching_prior_checksum_receipt_and_current_inventory_required": true,
         "lifecycle_reconciliation_preserved": true,
         "missing_changed_unknown_inputs_still_validated": true,
@@ -2047,7 +2047,7 @@
       }
     },
     "incremental_database_uploads": {
-      "status": "implemented_tested_source_only",
+      "status": "runtime_installed_future_launch_prepared",
       "sqlite_chunk_bytes": 4194304,
       "previous_sqlite_chunk_bytes": 67108864,
       "existing_archive_format_preserved": true,
@@ -2063,7 +2063,18 @@
       "required_before_daily_schedule_activation": true,
       "current_sealed_run_changed": false,
       "google_drive_backup_retained": true,
-      "routine_full_local_reads_resolved": false
+      "routine_full_local_reads_resolved": false,
+      "source_revision": "ef031eeed64dfdb66ce89d613c027306e040ac38",
+      "installed_runtime_modules_verified": {
+        "stash_archive": 20,
+        "stash_ingest": 125,
+        "host": 17
+      },
+      "prepared_launch_fixture_checks": 13,
+      "prepared_launch_actual_checks": 5,
+      "future_launch_installer": "install-incremental-launch-cleanup.py",
+      "future_backup_components": 209,
+      "daily_commands_and_schedules_changed": false
     }
   },
   "metadata_retention_configuration": {

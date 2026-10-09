@@ -153,7 +153,15 @@ test dependencies; the complete suite passes in its intended producer environmen
 No full production database copy, cloud request or live write was needed for this
 regression measurement. These results are not measured nightly production churn.
 
-This change remains source-only and must be included in the future daily runtime.
+The tested package is now installed as a separate inactive runtime. A separate
+launch preparation routes the daily service and manual backup commands through
+it, with 13 fixture and five actual launcher checks passing. All 209 planned
+backup components and original preimages remain covered. Use the incremental
+launch installer after publication and the n8n/home overlays; it supersedes the
+earlier streaming-only preparation for future jobs. The original resume helpers
+are retained unchanged for the running baseline. No command or schedule has
+been switched yet.
+
 The current sealed baseline keeps its original bytes and runtime. Switching chunk
 sizes requires one new database baseline, then shares its unchanged chunks across
 later backups; unchanged photos/covers need no new baseline. The existing Google

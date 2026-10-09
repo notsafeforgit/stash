@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/require"
 )
@@ -40,6 +41,14 @@ func TestMain(m *testing.M) {
 			fmt.Print(strings.Repeat("x", 2*1024*1024))
 		case "malformed":
 			fmt.Print(`[{"detectedLanguage":{"language":""},"translations":[]}]`)
+		case "undetected":
+			fmt.Print(`[{"translations":[{"text":"☀️🌦️","to":"en"}],"usedLLM":true}]`)
+		case "partially_detected":
+			if os.Args[len(os.Args)-1] == "☀️" {
+				fmt.Print(`[{"translations":[{"text":"☀️","to":"en"}]}]`)
+			} else {
+				fmt.Print(`[{"detectedLanguage":{"language":"en"},"translations":[{"text":"First chunk","to":"en"}]}]`)
+			}
 		default:
 			language := os.Getenv("STASH_TEST_TRANSLATION_LANGUAGE")
 			if language == "" {
@@ -145,6 +154,31 @@ func TestBingProviderBoundsFailuresAndHonorsCancellation(t *testing.T) {
 	defer stop()
 	_, err := provider.Translate(ctx, bingRequest("Cancelled source text"))
 	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestBingProviderAllowsUndetectedLanguageWithoutInventingOne(t *testing.T) {
+	provider, _ := bingFixture(t, "undetected")
+	original := "<p>☀️🌦️</p>"
+	result, err := provider.Translate(t.Context(), bingRequest(original))
+	require.NoError(t, err)
+	require.Equal(t, "translated", result.Status, "this is a provider result, not proof of an already-English source")
+	require.Nil(t, result.SourceLanguage)
+	require.Equal(t, "☀️🌦️", *result.TranslatedText)
+	require.Equal(t, "translate-shell/bing", *result.Provider)
+	request, err := archive.PrepareTranslationRequest(bingRequest(original).TranslationRequestInput)
+	require.NoError(t, err)
+	result.RequestUUID, result.Origin, result.CapturedAt = request.UUID, "worker", "2026-10-09T12:00:00Z"
+	_, retained, err := archive.PrepareTranslationCache(request, result)
+	require.NoError(t, err)
+	require.Equal(t, original, *retained.OriginalText)
+	require.Nil(t, retained.SourceLanguage)
+
+	t.Setenv("STASH_TEST_TRANSLATION_MODE", "partially_detected")
+	result, err = provider.Translate(t.Context(), bingRequest(strings.Repeat("a", 1800)+"☀️"))
+	require.NoError(t, err)
+	require.Nil(t, result.SourceLanguage, "one detected chunk cannot identify the entire source language")
+	require.Equal(t, "translated", result.Status)
+	require.Equal(t, "First chunk\n☀️", *result.TranslatedText)
 }
 
 func TestBingProviderOutputLimitCannotBeBypassedByCopy(t *testing.T) {

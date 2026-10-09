@@ -73,6 +73,7 @@ func (b *BingTranslateShell) Translate(ctx context.Context, request models.Trans
 	bounded, stop := context.WithTimeout(ctx, b.Timeout)
 	defer stop()
 	outputs, languages := []string{}, map[string]bool{}
+	unknownLanguage := false
 	outputBytes := 0
 	unchanged := true
 	for offset := 0; offset < len(chars); offset += 1800 {
@@ -91,7 +92,11 @@ func (b *BingTranslateShell) Translate(ctx context.Context, request models.Trans
 		if err != nil {
 			return ret, err
 		}
-		languages[language] = true
+		if language == "" {
+			unknownLanguage = true
+		} else {
+			languages[language] = true
+		}
 		outputBytes += len(output) + 1
 		if outputBytes > archive.MaxTranslationTextBytes {
 			return ret, ErrProviderResponse
@@ -99,8 +104,10 @@ func (b *BingTranslateShell) Translate(ctx context.Context, request models.Trans
 		unchanged = unchanged && languageBase(language) == languageBase(request.TargetLanguage)
 		outputs = append(outputs, output)
 	}
-	language := "mul"
-	if len(languages) == 1 {
+	language := ""
+	if !unknownLanguage && len(languages) > 1 {
+		language = "mul"
+	} else if !unknownLanguage && len(languages) == 1 {
 		for value := range languages {
 			language = value
 		}
@@ -113,7 +120,10 @@ func (b *BingTranslateShell) Translate(ctx context.Context, request models.Trans
 		}
 		output, status = request.OriginalText, "unchanged"
 	}
-	ret.Status, ret.TranslatedText, ret.SourceLanguage, ret.Provider = status, &output, &language, &provider
+	ret.Status, ret.TranslatedText, ret.Provider = status, &output, &provider
+	if language != "" {
+		ret.SourceLanguage = &language
+	}
 	return ret, nil
 }
 
@@ -133,7 +143,10 @@ func decodeBingResult(raw []byte, target string) (string, string, error) {
 			Text string `json:"text"`
 		} `json:"translations"`
 	}
-	if err := json.Unmarshal(raw, &results); err != nil || len(results) != 1 || strings.TrimSpace(results[0].DetectedLanguage.Language) == "" {
+	// Bing can return a valid target-language result without detecting a source
+	// language, for example for emoji. Preserve that uncertainty instead of
+	// failing the job or claiming the source already uses the target language.
+	if err := json.Unmarshal(raw, &results); err != nil || len(results) != 1 {
 		return "", "", ErrProviderResponse
 	}
 	for _, output := range results[0].Translations {

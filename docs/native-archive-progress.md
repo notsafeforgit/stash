@@ -155,6 +155,14 @@ The 4,817 default policies now select shared native translations. Every original
 NFO-derived post metadata record matches the pre-cleanup digest, and all four
 library counts are unchanged. The temporary 23.3 GB rehearsal copy is removed.
 
+A subsequent live check confirmed all eight NFO document/bookkeeping tables and
+the NFO staging rows are empty, with all 1,711 catalog snapshots compacted. Two
+policies created after that cleanup still used the old default NFO expressions;
+their scene/image title and details mappings now use the same tested native
+translation expressions through revision-checked API updates. No current policy
+references the discarded NFO inputs. No additional document deletion or deployment
+was needed; original post text, translations and media associations remain.
+
 The final copy passed native snapshot verification and semantic reconciliation.
 Backend lint and tests passed except for a second-boundary race in the intake
 response-loss fixture; its explicit settled clock passes three reruns. Focused

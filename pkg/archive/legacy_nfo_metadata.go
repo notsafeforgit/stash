@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/stashapp/stash/pkg/models"
 )
+
+var generatedNFOEntity = regexp.MustCompile(`&(?:amp|lt|gt|quot|apos|#[0-9]+|#x[0-9a-fA-F]+);`)
 
 // LegacyNFOPostData is a transient projection used when removing imported NFO
 // documents. It contains domain values only, not document IDs, paths, XML,
@@ -53,10 +56,14 @@ func RecoverGeneratedNFOFields(raw []byte) (json.RawMessage, error) {
 			return nil, fmt.Errorf("incomplete generated NFO field")
 		}
 		value := text[:end]
-		if strings.Contains(value, "<!") || strings.Contains(value, "<?") || strings.ContainsRune(value, 0) || strings.Contains(value, opening) {
+		// Text such as "<!" and "<?" can be literal emoticons from the old
+		// writer. Field contents are plain text here, never parsed as markup.
+		if strings.ContainsRune(value, 0) || strings.Contains(value, opening) {
 			return nil, fmt.Errorf("unsupported generated NFO text")
 		}
-		fields[key] = []string{html.UnescapeString(value)}
+		// Decode complete XML character references once. HTML's permissive
+		// partial-entity rules would change literal text such as "&notable".
+		fields[key] = []string{generatedNFOEntity.ReplaceAllStringFunc(value, html.UnescapeString)}
 		text = strings.TrimSpace(text[end+len(closing):])
 	}
 	if text != "</movie>" {

@@ -18,6 +18,7 @@ import (
 
 func removeSourceServiceOriginsSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeImportedNFOSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER source_run_attempt_pacing_origin;
 DROP TRIGGER source_run_attempt_pacing_origin_immutable;
 DROP TRIGGER source_run_attempt_pacing_bind;

@@ -3,6 +3,7 @@ package sqlite_test
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -16,6 +17,15 @@ import (
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
+
+func removeImportedNFOSchema(t *testing.T, raw *sql.DB) {
+	t.Helper()
+	_, err := raw.Exec(`DROP TRIGGER catalog_nfo_compaction_guard;
+DROP VIEW catalog_document_pending_imports;
+ALTER TABLE catalog_snapshots DROP COLUMN nfo_compacted;
+DELETE FROM native_migration_history WHERE version=1000100`)
+	require.NoError(t, err)
+}
 
 func cleanupFixture(t *testing.T) (*sqlite.Database, models.Repository, string, string) {
 	t.Helper()

@@ -887,7 +887,7 @@
     "home_backup_caller_and_coverage_update"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-09T03:58:26.012945+00:00",
+  "checked_at": "2026-10-09T07:49:36.119721+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -1507,39 +1507,25 @@
     "checkpoint_sealed": true,
     "server_created_at": "2026-10-09T00:55:01.564750761Z",
     "latest_pack_progress": {
-      "checked_at": "2026-10-09T03:58:15.723413+00:00",
-      "status": "running",
-      "stage": "publish-backup-before-public",
+      "checked_at": "2026-10-09T06:22:13.728039+00:00",
       "run_id": "20261008_175444_1545955",
-      "coordinated_backup_complete": false,
-      "isolated_restore_complete": false,
+      "status": "packed_awaiting_verification_and_publication",
       "packed_artifacts": {
         "library": 1,
-        "blob": 125549
+        "blob": 240872,
+        "config": 66,
+        "download_archive": 15,
+        "operating_database": 3,
+        "operating_state": 80,
+        "producer_outbox": 2,
+        "worker_profile": 32,
+        "media_manifest": 1,
+        "file_journal": 1
       },
-      "packed_logical_bytes": 41422965089,
-      "run_files": [
-        "catalog.json",
-        "ledger-2-video_manifest_previous.nul",
-        "generated.json",
-        "identity.json",
-        "ledger-0-tarball_footprints.jsonl",
-        "scratch-pack.json",
-        "media.json",
-        "ledger-3-tombstones_ledger.txt",
-        "worker-inventory.json",
-        "ledger-1-tar_delta_state.sqlite3"
-      ],
-      "root_free_GiB": 116.13511657714844,
-      "source_artwork_inventory": {
-        "checked_at": "2026-10-09T02:03:16.441058+00:00",
-        "files": 240872,
-        "apparent_bytes_including_directory_entries": 36882763390,
-        "count_command": "rg --files --hidden",
-        "size_command": "du -sb",
-        "held_writers": true
-      }
-    }
+      "packed_logical_bytes": 61829535775,
+      "artwork_count_matches_source_inventory": true
+    },
+    "local_verification_method": "isolated-restore; original sealed publisher remains unchanged"
   },
   "fresh_backup_snapshot_probe": {
     "status": "passed",
@@ -1558,7 +1544,7 @@
     "manual": "Existing extensionless Matroska with a guarded .mkv rename and direct filename-title intake",
     "runtime": "Pinned n8n 2.42.4 authentication entry point and worker imports checked without network or live mounts",
     "completion_checks": "Source completion, producer/native event digests, completed file jobs, live file generations and media associations, and sample file bytes",
-    "requires": "Successful pre-public coordinated backup/restore and separately verified public handoff",
+    "requires": "Confirmed pre-public coordinated backup publication and separately verified public handoff.",
     "website_requests": 0,
     "workflow_executions": 0,
     "media_mutations": 0,
@@ -1672,7 +1658,7 @@
       "External task-runner service definition",
       "Existing forward-auth hook"
     ],
-    "installation_gate": "Current pre-public coordinated backup and isolated restore must pass before changing the installed configuration."
+    "installation_gate": "Confirmed pre-public backup publication and provider release before changing the installed configuration; independent cloud restore may continue."
   },
   "translation_runtime_preparation": {
     "status": "published_verified_prepared_not_installed",
@@ -1702,7 +1688,7 @@
     "installed_files_planned": 1,
     "services_started": false,
     "current_backup_changed": false,
-    "installation_gate": "Completed pre-public coordinated backup and isolated restore; single inactive image-pin replacement before guarded private/public handoff.",
+    "installation_gate": "Confirmed pre-public backup publication; single inactive image-pin replacement before guarded private/public handoff.",
     "main_publication_status": "passed"
   },
   "schedule_resumption_preparation": {
@@ -1722,7 +1708,7 @@
     "uncertain_workflow_requests_not_repeated": true,
     "helper_syntax_and_current_file_hashes_checked": true,
     "actual_runtime_execution_pending": true,
-    "required_gate": "Fresh post-controlled coordinated backup and isolated restore; no timer or workflow changes during preparation.",
+    "required_gate": "Confirmed post-controlled backup publication plus controlled runtime checks; separate cloud restore remains required before recovery-copy retirement and transition completion.",
     "effective_service_commands_required_before_timer_start": 10
   },
   "home_backup_audit": {
@@ -1736,7 +1722,7 @@
   },
   "home_backup_native_preparation": {
     "status": "prepared_tested_not_installed",
-    "installation_gate": "Completed pre-public coordinated backup and isolated restore; n8n runtime dependency overlay installed; native and home-backup locks held.",
+    "installation_gate": "Confirmed pre-public backup publication; n8n runtime dependency overlay installed; native and home-backup locks held.",
     "existing_files_to_replace": 2,
     "immutable_release_files_to_add": 5,
     "entrypoint_replaced_atomically_last": true,
@@ -1778,7 +1764,7 @@
   },
   "translation_worker_resumption_preparation": {
     "status": "prepared_tested_not_executed",
-    "requires": "Pre-public restore, native runtime, reconciled hold activation and controlled host/n8n/manual/enrichment completions.",
+    "requires": "Confirmed pre-public backup publication, native runtime, reconciled hold activation and controlled host/n8n/manual/enrichment completions.",
     "configuration_change": "Only translation_worker_enabled false to true; exact parsed configuration difference checked.",
     "database_identity_preserved_on_restart": true,
     "verification_requires_new_provider_result_and_completed_native_job": true,
@@ -1797,7 +1783,7 @@
   },
   "post_controlled_backup_preparation": {
     "status": "prepared_not_executed",
-    "installed_runtime_revision": "d863a41af893bcdc341bc3021cca02eff8ebeebd",
+    "installed_runtime_revision": "29fc61be47b64324817b447a5540393273eea7d7",
     "uses_final_installed_configuration": true,
     "requires_controlled_source_and_translation_proofs": true,
     "quiesce_containers": [
@@ -1811,7 +1797,11 @@
     "interrupted_sealed_run_must_be_recovered_without_recapture": true,
     "schedules_resumed": false,
     "requires_legacy_launch_cleanup": true,
-    "final_effective_backup_components": 209
+    "final_effective_backup_components": 209,
+    "runtime_selection_status": "installed_inactive_pending_reviewed_launch_overlay",
+    "routine_verification": "streamed-contents",
+    "independent_restore_verification": "isolated-restore",
+    "publication_unlocks_schedules_after_runtime_checks": true
   },
   "private_native_browser": {
     "status": "passed",
@@ -1921,7 +1911,7 @@
   },
   "legacy_launch_cleanup_preparation": {
     "status": "prepared_tested_not_installed",
-    "checked_at": "2026-10-09T03:58:03.380525+00:00",
+    "checked_at": "2026-10-09T07:40:54.107468+00:00",
     "reference_audit_files": 310,
     "confirmed_runtime_gap": "Existing Instagram journal.conf still replaces the native ExecStart with the catalog-backed launcher; service remains held inactive.",
     "changes": [
@@ -1930,14 +1920,15 @@
       "Remove two dormant global gallery-dl catalog processors and their two references.",
       "Route the three existing manual backup/restore commands through the isolated installed native runtime.",
       "Replace the two obsolete catalog/translation entrypoints with retirement messages, preserving repository files.",
-      "Retain original launch/config bytes and add new installed paths to coordinated backups."
+      "Retain original launch/config bytes and add new installed paths to coordinated backups.",
+      "Select the tested streaming-verification runtime in the existing daily backup service and inventoried release record; retain full restore drills."
     ],
-    "files_to_install": 10,
-    "retained_original_preimages": 8,
+    "files_to_install": 12,
+    "retained_original_preimages": 10,
     "profile_definitions_unchanged": 32,
     "private_bindings_unchanged": 79,
     "active_and_held_workflow_graphs_checked": 21,
-    "fixture_checks": 10,
+    "fixture_checks": 13,
     "actual_cli_checks": 5,
     "host_native_python_requires_catalog_package": false,
     "selected_n8n_native_python_requires_catalog_package": false,
@@ -1946,7 +1937,6 @@
     "effective_backup_components_after_overlay": 209,
     "preimages_installed_first": true,
     "backup_configuration_installed_last": true,
-    "requires_pre_public_backup_and_restore": true,
     "requires_prior_n8n_and_home_backup_overlays": true,
     "all_scheduled_writers_remain_held": true,
     "current_sealed_backup_changed": false,
@@ -1963,8 +1953,60 @@
       "runs_before_timer_barriers_open": true,
       "actual_post_reload_verification_pending": true
     },
-    "preparation_sha256": "d4e389ae5da64f43a1db371424a6a0b9f41e2a267513e0d9e9a8b1ed759aa075",
-    "installer_sha256": "3c833e422dd57caa654ecc15485ea9a0f96edab9a55272868109531a5f50bbcf",
-    "active_history_versions_verified": 19
+    "preparation_sha256": "705a64b5d852c1d4c34c20aa87ca360ec96949455424a2102ae49ff38de6ff77",
+    "installer_sha256": "6d34e9ea61605d7c745a02f35cc0ee5475c08f29a34187603cb8093f970d4199",
+    "active_history_versions_verified": 19,
+    "requires_confirmed_pre_public_publication": true,
+    "requires_prior_cloud_restore_completion": false,
+    "prepared_backup_runtime_revision": "29fc61be47b64324817b447a5540393273eea7d7"
+  },
+  "rollout_gate": {
+    "owner_approved_on": "2026-10-09",
+    "gate": "confirmed_backup_publication",
+    "requires_exact_run_checkpoint_configuration_and_manifest": true,
+    "requires_publication_and_provider_release_receipts": true,
+    "packed_archive_sufficient": false,
+    "cloud_restore_required_before_rollout": false,
+    "cloud_restore_required_before_recovery_copy_retirement": true,
+    "cloud_restore_required_before_completion": true,
+    "cloud_restore_receipt_rejects_streamed_only_proof": true,
+    "gate_tests_passed": 11,
+    "current_unfinished_publication_rejection_verified": true,
+    "current_controller_unchanged": true
+  },
+  "routine_backup_verification": {
+    "status": "tested_pushed_runtime_prepared_inactive",
+    "source_revision": "29fc61be47b64324817b447a5540393273eea7d7",
+    "method": "streamed-contents",
+    "checks": [
+      "encoded and raw chunk SHA-256",
+      "complete artifact size, hash and chunk order",
+      "original artwork MD5 and exact library inventory",
+      "all SQLite integrity, foreign keys and identity",
+      "matching native binary validation",
+      "exact library and producer receipt boundary"
+    ],
+    "only_sqlite_components_materialized": true,
+    "full_restore_drill_preserved": true,
+    "archive_tests_passed": 138,
+    "backup_tests_passed": 305,
+    "runtime_modules_verified": {
+      "stash_archive": 20,
+      "stash_ingest": 125,
+      "host": 17
+    },
+    "original_daily_timer_preserved": true,
+    "media_storage_policy_preserved": true,
+    "current_sealed_run_changed": false,
+    "live_launchers_updated": false
+  },
+  "metadata_retention_configuration": {
+    "status": "passed",
+    "completed_at": "2026-10-08T17:11:36.025954+00:00",
+    "daily_runtime_retention_verified": true,
+    "metadata_bucket_unversioned": true,
+    "media_bucket_changed": false,
+    "existing_user_policies_unchanged": true,
+    "objects_tagged_or_deleted": 0
   }
 }

@@ -4,7 +4,7 @@ import re
 from urllib.parse import urlsplit
 
 from .encoding import InvalidData
-from . import instagram, mirror, social_media, ytdl_media, web_media
+from . import instagram, mirror, social_media, ytdl_media, web_media, reddit_external
 
 
 class UnsupportedSource(InvalidData):
@@ -225,10 +225,13 @@ def attachment(source):
                 video = (data.get(key) or {}).get("reddit_video") or {}
                 values += [reddit_media(video.get(k)) for k in ("fallback_url", "dash_url", "hls_url")]
             known = {v for v in values if v is not None}
-            if len(known) > 1:
+            if len(known) > 1 or (known and reddit_external.target(data) is not None):
                 raise InvalidData("Reddit post media identifiers disagree")
             if selected is not None and known == {selected}:
                 return {"namespace": ref["namespace"], "value": selected}
+            external = reddit_external.attachment(data, source, download_url)
+            if external is not None:
+                return external
     elif category == "twitter":
         legacy = data.get("legacy") or data
         entities = (legacy.get("extended_entities") or {}).get("media")

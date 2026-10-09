@@ -9,6 +9,20 @@ from stash_ingest.retention import retain
 
 
 class SourceAdapterTests(unittest.TestCase):
+    def test_linked_reddit_attachment_contract(self):
+        path = Path(__file__).resolve().parents[3] / "pkg/archive/testdata/reddit-external-media-v1.json"
+        for case in json.loads(path.read_text())["cases"]:
+            with self.subTest(case=case["name"]):
+                original = copy.deepcopy(case["source"])
+                kept = retain(case["source"])
+                if case["attachment"] is None:
+                    with self.assertRaises(InvalidData):
+                        source.attachment(kept)
+                else:
+                    self.assertEqual(case["attachment"], source.attachment(kept))
+                    self.assertEqual({"namespace": "native:reddit", "value": "post"}, source.post(kept))
+                self.assertEqual(original, case["source"])
+
     def test_shared_server_identity_and_metadata_contract(self):
         path = Path(__file__).resolve().parents[3] / "pkg/archive/testdata/captured-post-adapters-v1.json"
         fixture = json.loads(path.read_text())

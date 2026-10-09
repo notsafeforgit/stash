@@ -19,6 +19,7 @@ from gallery_dl import extractor as gdl_extractors
 from gallery_dl.extractor.common import Extractor, Message
 from gallery_dl.extractor.twitter import TwitterExtractor
 from gallery_dl.extractor.reddit import RedditExtractor
+from gallery_dl.extractor.redgifs import RedgifsAPI, RedgifsImageExtractor
 
 from stash_ingest.encoding import InvalidData, decode
 from stash_ingest.filesystem import Root
@@ -93,6 +94,14 @@ class ParentFixture(Fixture):
             data = copy.deepcopy(item)
             yield Message.Directory, "", data
             yield Message.Queue, "https://fixture.invalid/child", {**data, "_extractor": ChildFixture}
+
+
+class LinkedRedgifsFixture(Fixture):
+    def items(self):
+        for item in self.records:
+            data = copy.deepcopy(item)
+            yield Message.Directory, "", data
+            yield Message.Queue, data["url"], {**data, "_extractor": RedgifsImageExtractor}
 
 
 class GalleryTests(unittest.TestCase):
@@ -281,6 +290,45 @@ class GalleryTests(unittest.TestCase):
         self.assertEqual(seen, [(0, 999)])
         with self.assertRaises(InvalidData):
             NativeDownloadJob(ChildFixture.from_url("https://fixture.invalid/child"), task)
+
+    def test_reddit_linked_redgifs_download_and_skip_keep_parent_and_attachment(self):
+        self.narrow_window()
+        config.set(("extractor", "reddit"), "parent-metadata", "_reddit")
+        post = reddit_data(id="redditpost", url="https://www.redgifs.com/watch/LinkedClip",
+                           date="2026-10-01T00:00:00.200Z")
+        clip = {"id": "linkedclip", "createDate": 1577836800, "gallery": None,
+                "userName": "different-host-account",
+                "urls": {"hd": "https://media.redgifs.com/LinkedClip.mp4",
+                         "poster": "https://media.redgifs.com/LinkedClip-poster.jpg"}}
+        downloaded = []
+
+        def download(child, url):
+            self.assertEqual(self.events(kinds=None)[-1]["state"], "started")
+            self.assertEqual(url, clip["urls"]["hd"])
+            downloaded.append(url)
+            child.pathfmt.part_enable()
+            with child.pathfmt.open("wb") as output:
+                output.write(b"completed fixture video")
+            return True
+
+        with patch.object(RedgifsAPI, "gif", side_effect=lambda *_: copy.deepcopy(clip)), \
+                patch.object(NativeDownloadJob, "download", download):
+            for _ in range(2):
+                task = self.task(post, fixture=LinkedRedgifsFixture)
+                self.assertEqual(task.run(), 0)
+        self.assertEqual(downloaded, [clip["urls"]["hd"]])
+        self.assertEqual(self.archive_count(), 1)
+        events = self.events()
+        self.assertEqual([event["kind"] for event in events], ["source.capture", "file.completed"] * 2)
+        for capture, completed in zip(events[::2], events[1::2]):
+            self.assertEqual(capture["post"], {"namespace": "native:reddit", "value": "redditpost"})
+            self.assertEqual(capture["source"]["_reddit"]["author"], "publisher")
+            self.assertEqual(capture["source"]["_url"], clip["urls"]["hd"])
+            self.assertEqual(completed["source"], {
+                "capture_event_uuid": capture["event_uuid"],
+                "attachment": {"namespace": "native:redgifs", "value": "linkedclip"},
+            })
+            self.assertEqual(completed["media_kind"], "scene")
 
     def test_download_and_existing_file_skip_keep_exact_capture_dependency(self):
         first = self.task()

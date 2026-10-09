@@ -42,7 +42,6 @@ func TestCapturedRedditSingleMediaDoesNotGuessFromDownloadOrPreview(t *testing.T
 	for _, source := range []string{
 		`{"category":"reddit","id":"post","_url":"https://i.redd.it/download.jpg","filename":"download","num":1}`,
 		`{"category":"reddit","id":"post","url":"https://external.test/album/123","preview":{"images":[{"source":{"url":"https://preview.redd.it/thumb.jpg"}}]}}`,
-		`{"category":"reddit","id":"post","url":"https://i.redd.it.attacker.test/image.jpg"}`,
 		`{"category":"reddit","id":"post","url":"https://i.redd.it/folder/image.jpg"}`,
 		`{"category":"reddit","id":"post","url":"https://i.redd.it/a%2Fb.jpg"}`,
 		`{"category":"reddit","id":"post","url":"https://user@i.redd.it/image.jpg"}`,

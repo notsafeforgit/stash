@@ -58,8 +58,16 @@ func redditMediaReference(value interface{}) (*models.SourcePostIdentifier, stri
 func capturedRedditSingle(result *CapturedAlbum, data sourceObject, evidencePath string) (bool, error) {
 	var selected *models.SourcePostIdentifier
 	kind := ""
+	complete := true
 	add := func(value interface{}, fieldPath string) error {
 		ref, hint := redditMediaReference(value)
+		if ref == nil {
+			var single bool
+			ref, hint, single = redditExternalReference(value)
+			if ref != nil {
+				complete = complete && single
+			}
+		}
 		if ref == nil {
 			return nil
 		}
@@ -92,10 +100,9 @@ func capturedRedditSingle(result *CapturedAlbum, data sourceObject, evidencePath
 	if selected == nil {
 		return false, nil
 	}
-	count := 1
 	result.Manifest = models.SourceAttachmentManifestInput{
-		Complete: true, ExpectedCount: &count,
-		Entries: []models.SourceAttachmentEntry{{Position: 0, Reference: *selected, MediaKind: kind}},
+		Complete: complete,
+		Entries:  []models.SourceAttachmentEntry{{Position: 0, Reference: *selected, MediaKind: kind}},
 	}
 	return true, nil
 }

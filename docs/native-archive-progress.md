@@ -14,26 +14,62 @@ registration have passed their independent checks. The original compatible
 database and held source snapshot remain intact. The public native application
 and scraper schedules are still stopped.
 
-The first coordinated native backup has sealed its checkpoint and is packaging
+The first coordinated native backup has sealed and packed its checkpoint with
 the 22.2 GB database, 240,872 saved artwork files and coordinated host state.
-Publication and isolated restore remain in progress. AWS access is verified;
-the original backup process is advancing. No live-root activation, producer
+Its local verification restore is in progress; cloud publication and the separate
+cloud restore are pending. AWS access is verified; the original backup process
+is advancing. No live-root activation, producer
 credential issuance or database promotion has occurred.
 
 The missing translation executable is fixed, published and verified in the
 exact selected wrapper. Inactive n8n dependency, translation image and home-backup
-overlays are prepared; their installation requires the first restore to pass.
+overlays are prepared; their installation requires confirmed backup publication.
 The home-backup repair passed eight fixture tests and read-only copies of all
 19 worker/archive databases. Its final planned backup inventory has 202 effective
 components. None of those overlays changes the current sealed backup.
 
 Separate steps are prepared for controlled host/n8n/manual/enrichment checks,
 native translation startup and job verification, and a fresh post-write backup
-and isolated restore. Only afterward may the old catalog services be masked,
+and isolated restore. After the controlled checks and confirmed post-write backup
+publication, the old catalog services may be reversibly masked,
 seven existing timer cadences resume, three native worker timers start and the
 two saved n8n parent versions be published. Actual scheduled cycles, retirement
 verification, home-backup capture/upload and desktop/mobile owner acceptance
 remain. `develop` has not been merged and the frozen compatible release is unchanged.
+
+### Owner-approved publication gate — 2026-10-09
+
+The owner explicitly permits rollout once the backup is confirmed, while the
+separate cloud restore continues and can be repaired during live operation.
+The new operator gate binds the publisher's completion and provider-release
+receipts to the selected run, checkpoint, configuration, master and inventory.
+The rollout helpers now consume a publication receipt, independently of restore
+success. They still require completed migration/reconciliation, their existing
+runtime checks, and the applicable completed backup before any rollout action.
+The current packed-but-unpublished backup remains ineligible.
+
+The running publisher and its controller are unchanged. The controller's old
+final held-services check can become obsolete after launch; its original result
+is retained. A separate restore receipt requires the restore child to exit
+successfully and validates its output against the downloaded archive's native
+database and producer receipts. Neither a running child nor a failed restore is
+reported as successful. Original snapshots and recovery copies remain protected
+until restore verification passes; complete restore coverage and owner acceptance
+remain transition completion requirements.
+
+Eleven publication-gate tests pass, including mismatched receipts, unfinished
+publication, independent restore failure and successful restore-child handling.
+The revised launch helpers also pass their ten fixture and five launcher checks.
+A read-only check against the actual unfinished run rejects rollout and creates
+no publication receipt. The fifteen updated rollout helpers retain their prior
+versions for recovery; no installed configuration or running service changed.
+
+The Standard download was measured at 40.2 GiB across 241,410 unique content
+objects, plus three metadata objects. One HEAD and GET per object yields about
+483,000 requests, approximately $0.19 at the current Oregon rate. Internet
+transfer depends on the remaining shared monthly free allowance; the drill
+does not thaw or download the Deep Archive media. It verifies native state and
+its media mappings, not retrieval of every cold media byte.
 
 ## Earlier production cutover records — 2026-10-08 UTC
 

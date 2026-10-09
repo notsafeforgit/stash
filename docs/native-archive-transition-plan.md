@@ -841,7 +841,10 @@ rescan every catalog; long operations expose durable progress and resumability.
    resumable catalog import against the final snapshots and preserved Stash IDs.
 5. Run integrity and semantic reconciliation. Verify selected metadata, all
    performer bindings/redirects, source references, pending work, share access,
-   and configured API clients. Resolve release-blocking discrepancies.
+   and configured API clients. Resolve release-blocking discrepancies. Publish a
+   coordinated native backup and confirm its immutable cloud manifest, checksums,
+   provider release and durable completion receipt before enabling the writer.
+   A packed local archive alone does not satisfy this gate.
 6. Enable the native writer. Disable Catalog Metadata's old hooks and any
    overlapping filename plugin, install the API adapter and effective host/n8n
    config, provision scoped Stash API tokens, and remove old catalog write authority.
@@ -850,12 +853,29 @@ rescan every catalog; long operations expose durable progress and resumability.
    distinct launch/runtime path, plus a manual-file intake and a metadata-only
    enrichment. Verify source evidence and media appear once, retries are safe,
    edits persist, and queued work is not misreported as completed.
-8. Run the native backup and an isolated restore/export check. Resume schedules
-   with overlap guards and inspect at least one scheduled recovery/backup cycle.
+8. Publish a fresh native backup after the controlled writes. Resume schedules
+   after confirmed publication and the controlled runtime checks, with overlap
+   guards, and inspect at least one scheduled recovery/backup cycle. Run the
+   separate isolated cloud restore/export checks concurrently with live operation.
+   Track and fix any restore failure independently; publication is not proof of
+   recoverability. Keep original snapshots and recovery copies until the restore
+   checks pass, and require those results before completing the transition.
 9. Publish the cutover report with artifact versions, snapshot references,
    migration outcomes, unresolved review items, tested contracts, and rollback
    instructions. Remove obsolete live mounts/services only after this evidence
    confirms no required path still depends on them.
+
+The owner approved this publication-based rollout gate on October 9, 2026.
+It supersedes the earlier requirement to wait for the separate cloud restore
+before public startup or schedule resumption. It does not bypass the backup
+publisher's own local content validation, checksum-verified cloud publication,
+or durable completion and provider-release receipts. The operator helper
+[`native_cutover_gate.py`](../scripts/native_cutover_gate.py) validates the exact
+selected run, checkpoint, configuration, master and artifact inventory without
+claiming restore success. A failed restore remains an outstanding verification
+task; it does not erase an already confirmed publication. Reversible disabling
+of obsolete writers can occur during rollout while their definitions and all
+original recovery data remain retained.
 
 Before native writes reopen, rollback restores the exact bridge database,
 configuration, catalogs, and matching operational state with the old artifacts.

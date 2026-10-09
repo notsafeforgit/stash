@@ -105,8 +105,12 @@ native migration and contract tests as their runtime paths are removed. Keep
 security and dependency checks for the remaining application.
 
 Use the [cutover runbook](docs/native-archive-transition-plan.md#production-cutover-runbook),
-full-copy migration rehearsal, semantic reconciliation, and an isolated restore
-drill before deploying the new writer. Update architecture, contributor guidance,
+full-copy migration rehearsal, semantic reconciliation, and confirmed coordinated
+backup publication before deploying the new writer. The owner's October 9 rollout
+decision permits the separate cloud restore drill to finish after launch. Keep its
+result independent of publication, retain the recovery copies until it passes,
+and require verified restore coverage before declaring the transition complete.
+Update architecture, contributor guidance,
 build/CI, packaging, and deployment instructions with their implementation
 changes. Do not describe planned work as already deployed or declare completion
 while the plan's acceptance criteria remain unmet.

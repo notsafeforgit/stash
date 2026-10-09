@@ -877,7 +877,6 @@
     "manifest_sha256": "091b55067fe1f2932450f2f8ac9274301242ffec1961c74850d9ca56dcf43c6c"
   },
   "remaining": [
-    "domain_and_policy_reconciliation",
     "pending_work_handoff",
     "scoped_credentials_and_installed_inventory",
     "current_coordinated_backup_and_restore",
@@ -886,7 +885,7 @@
     "owner_acceptance"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-09T00:38:46.892200+00:00",
+  "checked_at": "2026-10-09T00:58:09.848158+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -1002,45 +1001,78 @@
       }
     },
     "albums": {
-      "status": "running",
-      "stage": "applying_current_album_plan",
-      "started_at": "2026-10-08T23:25:56.653257+00:00",
-      "updated_at": "2026-10-09T00:38:04.437400+00:00",
+      "status": "passed",
+      "stage": "current_source_albums_verified",
+      "completed_at": "2026-10-09T00:42:07.481329+00:00",
       "posts": 5131,
       "actions": {
         "create": 2857,
         "ineligible": 2274
       },
+      "created_galleries": 2857,
+      "memberships": {
+        "members": 7669
+      },
+      "all_jobs_succeeded": true,
+      "original_galleries_and_memberships_preserved": true,
+      "plan_sha256": "7d42f69c3dc81d94f40147e96d8e15dd1c96c9419abfc7377c2eb8280af16e93",
       "public_service_activated": false
     },
-    "policies": "prepared_1718_disabled_definitions",
+    "policies": "verified_1718_disabled_definitions",
     "policy_import": {
-      "status": "running",
-      "stage": "waiting_for_current_domain_migration",
-      "started_at": "2026-10-08T23:25:56.870235+00:00",
-      "updated_at": "2026-10-08T23:25:56.870290+00:00",
-      "completed": 0,
+      "status": "passed",
+      "stage": "current_disabled_policies_verified",
+      "completed_at": "2026-10-09T00:45:48.203386+00:00",
+      "completed": 1718,
+      "total": 1718,
+      "catalog_policies": 1711,
+      "folder_policies": 7,
+      "scope_changes": 1718,
+      "all_policies_disabled": true,
       "public_service_activated": false
     },
     "local_manual_handoff": {
-      "status": "running",
-      "stage": "waiting_for_current_disabled_policies",
-      "started_at": "2026-10-08T23:25:57.269246+00:00",
+      "status": "passed",
+      "stage": "current_local_handoff_prepared",
+      "completed_at": "2026-10-09T00:45:57.531876+00:00",
+      "operations": 6,
+      "explicit_folder_defaults": 2,
+      "plan_sha256": "b5ff502b33a38d36fa7f3efe1fe7a5d11345f98b283dfc956662241040598068",
+      "application_pending": true,
       "native_changed": false
     },
     "source_registration": {
-      "status": "running",
-      "stage": "waiting_for_current_policy_import",
-      "started_at": "2026-10-08T23:25:57.083468+00:00",
-      "updated_at": "2026-10-08T23:25:57.083518+00:00",
-      "registered": 0,
+      "status": "passed",
+      "stage": "native_subscriptions_registered_workers_still_stopped",
+      "completed_at": "2026-10-09T00:47:52.194930+00:00",
+      "plan_sha256": "0bd0f8f23fcb63dd51727dc6a394d7bbbd6df82b9b0f93419194e1102c5547ba",
+      "registered": 3106,
+      "targets": 3106,
+      "source_definitions_verified": 3106,
+      "policy_definitions_verified": 3106,
+      "existing_collections_and_policies_unchanged": true,
+      "root_state": "disabled",
+      "root_revision": 1,
+      "jobs_activated": 0,
       "public_service_activated": false
     },
     "operational_recovery_preparation": {
-      "status": "running",
-      "stage": "waiting_for_current_policy_import",
-      "started_at": "2026-10-08T23:25:57.544386+00:00",
-      "native_changed": false
+      "status": "passed",
+      "stage": "current_operational_scopes_prepared",
+      "completed_at": "2026-10-09T00:46:35.536202+00:00",
+      "enrichment_targets": 213845,
+      "translation_states": {
+        "completed": 238414,
+        "held": 177320
+      },
+      "discovery_accounts": 6,
+      "discovery_targets": 569,
+      "scopes": 792,
+      "qualified_scopes": 784,
+      "review_scopes": 8,
+      "application_pending": true,
+      "native_changed": false,
+      "jobs_activated": 0
     }
   },
   "maintenance_journals": {
@@ -1228,9 +1260,11 @@
       "executed": false
     },
     "verify-final-worker-inventory.py": {
-      "sha256": "4f6753b70a54a164aa861d8d1a6093314e8995e7086ff21bb31808f693f129e5",
+      "sha256": "0b60cf3d4a7b77945b61f76aac448294675a5e2038dc0087522fa3728358a815",
       "syntax_checked": true,
-      "executed": false
+      "executed": false,
+      "component_label_overlay_added": true,
+      "effective_component_name_validation_added": true
     },
     "promote-native-database.py": {
       "sha256": "6b21dbc5629e943baa97aba359310de9e6820f40e7d870e31cc976e6897a5e45",
@@ -1443,10 +1477,10 @@
     "failed_comparison_retained": true,
     "imports_replayed": false
   },
-  "root_free_GiB": 116.89,
+  "root_free_GiB": 116.74,
   "pre_public_coordinated_backup": {
     "status": "running",
-    "stage": "waiting_for_verified_domain_migration",
+    "stage": "publish-backup-before-public",
     "public_handoff_started": false,
     "root_activated": false,
     "credentials_issued": 0,
@@ -1458,11 +1492,18 @@
       "Use existing private native API on loopback port 19499",
       "Verify producer services are held, containers absent/stopped and database files closed before capturing them without container pause hooks"
     ],
-    "installed_configuration_unchanged": true,
     "native_backup_reserve_GiB": 50,
     "media_compaction": false,
     "media_cleanup_deferred": true,
-    "publication_scope": "Current reconciled candidate before live root binding and public startup; a fresh checkpoint after controlled ingestion remains required before schedules resume."
+    "publication_scope": "Current reconciled candidate before live root binding and public startup; a fresh checkpoint after controlled ingestion remains required before schedules resume.",
+    "started_at": "2026-10-09T00:54:43.972424+00:00",
+    "installed_configuration_changes": [
+      "Two opaque component labels for the worker service/timer templates replace @. with -template.; source paths and file contents are unchanged."
+    ],
+    "config_sha256": "51216834aee37ff7681013397c495693a0ebf504b89dbdb87602ba5ba8732c65",
+    "sealed_checkpoint_uuid": "dbf8cd08-ea38-43df-9864-6f20429be640",
+    "checkpoint_sealed": true,
+    "server_created_at": "2026-10-09T00:55:01.564750761Z"
   },
   "fresh_backup_snapshot_probe": {
     "status": "passed",
@@ -1485,5 +1526,23 @@
     "website_requests": 0,
     "workflow_executions": 0,
     "media_mutations": 0
+  },
+  "backup_component_label_correction": {
+    "status": "passed_installed_inactive",
+    "checked_at": "2026-10-09T00:53:30.230636+00:00",
+    "corrected_labels": 2,
+    "static_backup_components": 49,
+    "dynamic_components": 141,
+    "effective_components": 189,
+    "all_component_names_roles_and_uniqueness_validated": true,
+    "source_paths_and_file_contents_unchanged": true,
+    "installed_config_sha256": "b44cbf4b75e52efcbdef6027c86dc595119ae7e29bfe3bc82e790b0d08ab453d",
+    "private_config_sha256": "51216834aee37ff7681013397c495693a0ebf504b89dbdb87602ba5ba8732c65",
+    "failed_checkpoint_uuid": "d59a6404-798f-4c11-ace4-9f68604c65eb",
+    "failed_run_safely_abandoned": true,
+    "failed_run_cloud_publication_started": false,
+    "failed_attempt_records_retained": true,
+    "runtime_implementations_changed": false,
+    "current_backup_retry_started": true
   }
 }

@@ -12464,7 +12464,7 @@ provisioning, database promotion or public startup has occurred. A fresh backup
 after controlled ingestion still gates resuming scraper schedules.
 
 Post/media application and independent receipt reconciliation completed on
-October 9: all 261,642 post receipts, 423,849 selected associations and 427,207
+October 9 (UTC): all 261,642 post receipts, 423,849 selected associations and 427,207
 file proofs match their saved plans. There were no review or unavailable
 outcomes in this matching scope. Gallery previews then checked all 5,131 posts
 with retained attachment selections; 2,857 qualify for new source galleries
@@ -12482,3 +12482,25 @@ live media associations and independently checked sample bytes. The n8n launch
 records intent before its request and can recover the actual execution after a
 lost response without submitting another workflow. These checks still require
 the coordinated backup/restore and verified public handoff.
+
+Gallery application and preservation checks subsequently passed: 2,857 source
+galleries contain 7,669 memberships, while every original gallery and membership
+remains intact. All 1,718 migrated policy definitions are verified and disabled.
+All 3,106 source URLs and their policy definitions are registered under the
+disabled root, with existing definitions unchanged and no source jobs activated.
+The six local-policy operations and 792 operational recovery scopes are prepared;
+the eight scopes requiring review remain identified separately. All nine
+prerequisites for the pre-public backup now pass.
+
+The first backup stopped before capturing components or publishing to S3 because
+two opaque component labels retained `@` from systemd template filenames. The
+backup format permits only portable name characters. Their labels now use
+`-template.` while preserving the original file paths and contents. Validation
+covers all 189 effective components from the 49 static and 141 dynamic inputs.
+The publisher fenced and abandoned the unsealed checkpoint, retained its
+identity and failure evidence, and cleared its active pointer. The corrected
+retry has sealed its coordinated checkpoint and is continuing the backup.
+The final installed-file verifier now checks this
+one-file configuration overlay and validates component names, roles and
+uniqueness. Runtime implementations and public-writer barriers are unchanged;
+coordinated publication and isolated restore are still pending.

@@ -12567,3 +12567,33 @@ step; it is not a completed cloud publication or restore. The original owner
 and publisher remain alive with increasing I/O, and system disk free space
 remains above the required 50 GiB reserve. Post-write backup/restore, actual
 scheduled-cycle checks, retirement and owner acceptance remain outstanding.
+
+The home-backup repair is now prepared and tested, but not installed. It reads
+the existing private native backup key file, accepts the successful null API
+response, and requires a new native snapshot before upload. The three latest
+validated native snapshots are staged with hard links on `/tank`, avoiding a
+second full database allocation on the system disk. Only native snapshot names
+are eligible for retention, after both existing syncs succeed; changed or newly
+created snapshots prevent pruning. Existing legacy backups remain untouched.
+
+The installed worker inventory supplies 15 download archives, two producer
+outboxes and two intake/dedupe databases. All 19 were snapshotted successfully
+using the SQLite backup API, with committed WAL included, standalone DELETE
+journal mode and unchanged source hashes. The 44.1 MB of temporary copies were
+removed after verification. Eight fixture tests also cover API errors and
+redirects, native schema validation, hard-link staging, retention races and
+real rclone routing with the original user filters. A full empty schema99
+database passed the native staging check. These home copies remain individually
+consistent supplementary backups; the coordinated S3 bundle supplies complete
+archive recovery. Actual scheduled capture and cloud sync still need verification.
+
+Five immutable helper/filter resources will be installed first. Only the native
+backup configuration and existing home-backup entrypoint change, with the
+entrypoint replaced atomically last. Original user filters, the older snapshot
+helper, client configuration and timer remain in use or unchanged. The installer
+requires the pre-public restore and n8n dependency overlay, takes both backup
+locks, and starts no service. Its 11 added static backup paths bring the final
+planned inventory to 62 static inputs and 202 effective components, validated
+with the installed publisher. Final inventory verification requires this
+overlay together with the n8n and translation overlays. The current sealed
+backup still uses its original configuration and is not changed by preparation.

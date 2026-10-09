@@ -1702,7 +1702,8 @@
     "installed_files_planned": 1,
     "services_started": false,
     "current_backup_changed": false,
-    "installation_gate": "Completed pre-public coordinated backup and isolated restore; single inactive image-pin replacement before guarded private/public handoff."
+    "installation_gate": "Completed pre-public coordinated backup and isolated restore; single inactive image-pin replacement before guarded private/public handoff.",
+    "main_publication_status": "passed"
   },
   "schedule_resumption_preparation": {
     "status": "prepared_not_applied",
@@ -1712,15 +1713,58 @@
     "new_native_worker_timers": 3,
     "new_native_timers_inactive_disabled": true,
     "schedules_changed": false,
-    "pending_home_backup_audit": true
+    "pending_home_backup_audit": false,
+    "home_backup_installation_pending": true
   },
   "home_backup_audit": {
-    "status": "read_only_findings_pending_correction",
+    "status": "findings_addressed_in_tested_preparation_not_installed",
     "old_stash_backup_path_used": true,
     "successful_null_graphql_result_incorrectly_rejected": true,
     "ordinary_home_sync_excludes_native_producer_state": true,
     "coordinated_s3_covers_native_producer_state": true,
     "native_backup_destination_outside_home": "/tank/stash-native-backup/server-checkpoints",
     "existing_home_timer_preserved": true
+  },
+  "home_backup_native_preparation": {
+    "status": "prepared_tested_not_installed",
+    "installation_gate": "Completed pre-public coordinated backup and isolated restore; n8n runtime dependency overlay installed; native and home-backup locks held.",
+    "existing_files_to_replace": 2,
+    "immutable_release_files_to_add": 5,
+    "entrypoint_replaced_atomically_last": true,
+    "original_filters_and_timer_preserved": true,
+    "private_api_key_file_reused": true,
+    "successful_null_graphql_response_supported": true,
+    "one_fresh_native_snapshot_required": true,
+    "snapshot_staging": "Hard links on the same /tank filesystem; no extra full database copy on the system disk.",
+    "retained_native_snapshots": 3,
+    "retained_remote_history_days": 3,
+    "retention_only_after_both_syncs_succeed": true,
+    "retention_protects_changed_or_new_snapshots": true,
+    "legacy_backup_files_untouched": true,
+    "download_archives_snapshotted": 15,
+    "producer_outboxes_snapshotted": 2,
+    "operating_databases_snapshotted": 2,
+    "sqlite_backup_includes_committed_wal": true,
+    "standalone_copy_journal_mode": "delete",
+    "secondary_home_copies_are_coordinated_archive": false,
+    "complete_recovery_owner": "Native coordinated S3 publisher",
+    "static_backup_components_after": 62,
+    "effective_backup_components_validated": 202,
+    "tests": {
+      "fixture_tests": 8,
+      "shell_syntax": "passed",
+      "actual_worker_snapshots": 19,
+      "actual_worker_snapshot_bytes": 44109824,
+      "original_worker_database_hashes_unchanged": true,
+      "actual_native_schema99_staging": "passed",
+      "original_user_filter_composition_checked_with_rclone": true,
+      "temporary_worker_copies_removed": true,
+      "cloud_requests": 0,
+      "stash_api_mutations": 0
+    },
+    "production_configuration_changed": false,
+    "services_started": false,
+    "schedule_changed": false,
+    "actual_capture_and_cloud_sync_verification_pending": true
   }
 }

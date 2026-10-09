@@ -136,6 +136,30 @@ backup tests pass, including corrupt replacement files and expiration races.
 This improvement is not installed in the current runtime. It does not change the
 running baseline backup or the owner's confirmed-publication rollout gate.
 
+The owner also clarified that nightly database uploads must be incremental.
+The initial archive's 40.2 GiB includes original photos/covers and operating state;
+the database itself is 22,244,438,016 bytes, encoded as 5,817,898,827 bytes in 332
+64 MiB chunks. Publication already shares identical objects between snapshots,
+but the earlier production-size rehearsal uploaded 188 MB after one title edit.
+The coarse database chunks therefore amplify small changes unnecessarily.
+
+The source now uses 4 MiB chunks for SQLite components, retaining larger chunks
+for other files and the existing portable format. A bounded SQLite/fake-S3
+measurement uploads 4.2 MB after one SQL edit versus 16.8 MB with the old chunks;
+an unchanged retry uploads zero database bytes. Both snapshots restore correctly
+with reused objects. All 139 archive and 308 backup tests pass. The first archive
+suite invocation used the host-only environment and could not import the producer
+test dependencies; the complete suite passes in its intended producer environment.
+No full production database copy, cloud request or live write was needed for this
+regression measurement. These results are not measured nightly production churn.
+
+This change remains source-only and must be included in the future daily runtime.
+The current sealed baseline keeps its original bytes and runtime. Switching chunk
+sizes requires one new database baseline, then shares its unchanged chunks across
+later backups; unchanged photos/covers need no new baseline. The existing Google
+Drive/rclone backup remains part of the independent backup plan. The broader
+routine-versus-audit cost split is still outstanding.
+
 The Standard download was measured at 40.2 GiB across 241,410 unique content
 objects, plus three metadata objects. One HEAD and GET per object yields about
 483,000 requests, approximately $0.19 at the current Oregon rate. Internet

@@ -2045,6 +2045,25 @@
         "daily_runtime_updated": false,
         "full_routine_audit_split_complete": false
       }
+    },
+    "incremental_database_uploads": {
+      "status": "implemented_tested_source_only",
+      "sqlite_chunk_bytes": 4194304,
+      "previous_sqlite_chunk_bytes": 67108864,
+      "existing_archive_format_preserved": true,
+      "unchanged_artwork_shared": true,
+      "switch_requires_one_database_baseline": true,
+      "current_baseline_raw_database_bytes": 22244438016,
+      "current_baseline_encoded_database_bytes": 5817898827,
+      "measurement": "docs/native-backup-incremental-measurement.json",
+      "archive_tests_passed": 139,
+      "backup_tests_passed": 308,
+      "production_daily_churn_measured": false,
+      "source_change_deployed": false,
+      "required_before_daily_schedule_activation": true,
+      "current_sealed_run_changed": false,
+      "google_drive_backup_retained": true,
+      "routine_full_local_reads_resolved": false
     }
   },
   "metadata_retention_configuration": {

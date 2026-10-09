@@ -725,6 +725,17 @@ costs. Routine inventory request costs should be cents per month at this scale.
 The design must not require bucket versioning solely to compensate for reusing
 mutable media filename keys; use immutable media identities and restore mappings.
 
+The owner's October 9 clarification requires incremental database uploads as
+well as inexpensive verification. A full logical snapshot must reference reused
+immutable chunks, not upload another full database every night. SQLite components
+now use 4 MiB chunks to reduce small-edit amplification from the previous 64 MiB
+units. Validate new/reused byte counts and restoration across consecutive backups
+before enabling the daily runtime. The first backup after a chunk-size change
+needs a new database baseline; unchanged original artwork remains shared. Keep
+the existing Google Drive/rclone backup as an independent copy. If observed S3
+database churn remains excessive, revisit the destination rather than silently
+accepting a full nightly database upload.
+
 Native Standard reclamation must protect the complete union of retained/pinned
 snapshot references, resume interrupted retirement, and cancel an expiration tag
 before reusing shared content. Keep small permanent publication/retirement

@@ -1,0 +1,54 @@
+{
+  "measured_at": "2026-10-09T09:12:47.035998+00:00",
+  "scope": "Synthetic 32-row SQLite fixture with 16 MiB of high-entropy payload; not measured daily production churn",
+  "cloud_requests": 0,
+  "live_database_read_or_changed": false,
+  "sqlite_chunk_bytes": 4194304,
+  "restore_before_and_after_edit_passed": true,
+  "scenarios": [
+    {
+      "scenario": "baseline",
+      "database_bytes": 20709376,
+      "database_chunks": 5,
+      "database_encoded_bytes": 16822592,
+      "new_database_objects": 5,
+      "new_database_encoded_bytes": 16822592,
+      "database_head_requests": 5,
+      "inventory_requests": 1
+    },
+    {
+      "scenario": "one_sql_edit",
+      "database_bytes": 20709376,
+      "database_chunks": 5,
+      "database_encoded_bytes": 16822601,
+      "new_database_objects": 1,
+      "new_database_encoded_bytes": 4195247,
+      "database_head_requests": 1,
+      "inventory_requests": 1
+    },
+    {
+      "scenario": "unchanged_retry",
+      "database_bytes": 20709376,
+      "database_chunks": 5,
+      "database_encoded_bytes": 16822601,
+      "new_database_objects": 0,
+      "new_database_encoded_bytes": 0,
+      "database_head_requests": 0,
+      "inventory_requests": 1
+    }
+  ],
+  "same_fixture_with_previous_64_mib_chunks": [
+    {
+      "scenario": "original",
+      "new_database_objects": 1,
+      "new_database_encoded_bytes": 16822515
+    },
+    {
+      "scenario": "modified",
+      "new_database_objects": 1,
+      "new_database_encoded_bytes": 16822524
+    }
+  ],
+  "scope_note": "Request counts exercise the real object publisher against FakeS3; this fixture is not a cloud bill or production-day forecast.",
+  "scratch_removed": true
+}

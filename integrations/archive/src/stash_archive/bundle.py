@@ -18,7 +18,7 @@ import time
 import uuid
 from urllib.parse import urlsplit
 
-from .storage import (CHUNK_SIZE, LEGACY_CHUNK_SIZE, HEX, MAX_MANIFEST, RESERVE_BYTES, InvalidArchive,
+from .storage import (CHUNK_SIZE, LEGACY_CHUNK_SIZE, SQLITE_CHUNK_SIZE, HEX, MAX_MANIFEST, RESERVE_BYTES, InvalidArchive,
                       json_bytes, load_manifest, open_regular, publish_bytes,
                       regular, require_space, store_file, sync_directory,
                       check_descriptor, decode_json, write_artifact)
@@ -166,6 +166,11 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
                 raise InvalidArchive("Invalid or duplicate component name")
             names.add((role, name))
             options = {"expected_md5": name} if retained_blob else {}
+            # Small SQL edits can dirty pages throughout a large database.
+            # Keep their replacement units smaller than bulk file chunks.
+            # The manifest declares a maximum; existing readers accept both.
+            if sqlite_metadata is not None:
+                options["chunk_size"] = SQLITE_CHUNK_SIZE
             entry = store_file(destination, path, reserve=reserve, **options)
             if (role, name) in server_expected and (entry["sha256"], entry["size"]) != server_expected[(role, name)]:
                 raise InvalidArchive("Packed checkpoint component differs from its captured digest")

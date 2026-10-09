@@ -260,16 +260,30 @@ not prove that storage bytes have expired.
 
 The database, original record photos/logos/covers and small restore manifests
 remain in Standard; bulk media stays in Deep Archive. Unchanged encoded chunks
-share immutable keys across runs. New archives use a maximum 64 MiB raw chunk
-instead of 1 MiB, reducing requests for changing database snapshots. Readers
-continue to accept earlier 1 MiB archives and enforce each manifest's limit.
-The larger chunk is a storage/request tradeoff: an edit replaces its whole
-chunk, while reducing the number of upload requests. Standard reclamation now
-has retry/reuse and request-count tests; cloud-policy activation and real daily
-change volume still need validation.
+share immutable keys across runs. SQLite components now use 4 MiB raw chunks;
+other files retain the 64 MiB maximum. Smaller database chunks limit how much
+unchanged data accompanies a SQL edit, while avoiding an object per SQLite page.
+Each snapshot's manifest describes a complete restore using shared immutable
+objects; no earlier restore or SQL-log replay is required. Readers continue to
+accept earlier 1 MiB and 64 MiB archives and enforce each manifest's limit.
+Changing the database chunk size requires one new set of database objects;
+unchanged artwork keeps its existing objects. Retention protects older snapshots
+until they expire. This is incremental remote storage and transfer; capture and
+verification still read full snapshots locally, as described above.
+
+The [2026-10-09 bounded regression measurement](../../docs/native-backup-incremental-measurement.json)
+uses a 20.7 MB SQLite fixture with 16 MiB of high-entropy payload. A single SQL
+edit publishes one new 4.2 MB object, compared with 16.8 MB using the previous
+64 MiB chunks. Reopening the upload receipt cache and publishing the unchanged
+snapshot sends zero database objects and makes zero database HEAD requests.
+Both snapshots restore with their respective edits, and the newer restore
+reuses objects from the first snapshot. This is a synthetic fixture with a local
+fake S3 transport, not a production-day or billing forecast. The nightly amount
+depends on actual changed chunks, and needs observation after ingestion resumes.
 
 The [2026-10-05 encoder measurement](../../docs/native-backup-cost-measurement.json)
-used a disposable copy of the verified schema-1000077 rehearsal database. It
+used the previous 64 MiB database chunks on a disposable copy of the verified
+schema-1000077 rehearsal database. It
 made no cloud requests and left the source unchanged. The 20,265,979,904-byte
 database compressed to 5,242,807,047 bytes in 302 objects. Controlled SQL image-title
 updates produced these additional objects relative to earlier scenarios:

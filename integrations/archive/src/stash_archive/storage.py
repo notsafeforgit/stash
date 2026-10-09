@@ -13,6 +13,7 @@ import tempfile
 import zlib
 
 LEGACY_CHUNK_SIZE = 1 << 20
+SQLITE_CHUNK_SIZE = 4 << 20
 CHUNK_SIZE = 64 << 20
 MAX_MANIFEST = 128 << 20
 RESERVE_BYTES = 50 << 30
@@ -88,7 +89,7 @@ def object_path(root, checksum):
 
 
 def store_file(root, source, *, reserve=RESERVE_BYTES, expected_md5=None, chunk_size=CHUNK_SIZE):
-    if type(chunk_size) is not int or chunk_size not in (LEGACY_CHUNK_SIZE, CHUNK_SIZE):
+    if type(chunk_size) is not int or chunk_size not in (LEGACY_CHUNK_SIZE, SQLITE_CHUNK_SIZE, CHUNK_SIZE):
         raise InvalidArchive("Unsupported archive chunk size")
     if expected_md5 is not None and (not isinstance(expected_md5, str) or not re.fullmatch(r"[0-9a-f]{32}", expected_md5)):
         raise InvalidArchive("Invalid retained artwork checksum")

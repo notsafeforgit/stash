@@ -11,7 +11,7 @@ from unittest.mock import patch
 from stash_archive.bundle import (FORMAT, export_archive, import_archive, summary,
                                   iter_artifacts, validate_manifest, verify_archive)
 from stash_archive.cli import list_records, main
-from stash_archive.storage import (CHUNK_SIZE, LEGACY_CHUNK_SIZE, InvalidArchive, json_bytes,
+from stash_archive.storage import (CHUNK_SIZE, LEGACY_CHUNK_SIZE, SQLITE_CHUNK_SIZE, InvalidArchive, json_bytes,
                                    read_chunk, store_file, write_artifact)
 
 
@@ -72,7 +72,7 @@ class ArchiveTests(unittest.TestCase):
             if legacy:
                 stack.enter_context(patch('stash_archive.bundle.CHUNK_SIZE', LEGACY_CHUNK_SIZE))
                 stack.enter_context(patch('stash_archive.bundle.store_file',
-                                          side_effect=lambda *a, **k: store_file(*a, **k, chunk_size=LEGACY_CHUNK_SIZE)))
+                                          side_effect=lambda *a, **k: store_file(*a, **(k | {'chunk_size': LEGACY_CHUNK_SIZE}))))
             return export_archive(self.database, output or self.output, blob_paths=[self.blobs], reserve=0,
                                   components=[{"role": "producer_outbox", "name": "worker.sqlite", "path": self.outbox},
                                               {"role": "config", "name": "config.yml", "path": self.config}])
@@ -119,6 +119,38 @@ class ArchiveTests(unittest.TestCase):
         self.assertGreater(a['size'], LEGACY_CHUNK_SIZE)
         self.assertEqual(len(a["chunks"]), 1)
         self.assertLess(summary(self.output)["compressed_bytes"], summary(self.output)["uncompressed_bytes"])
+
+    def test_sql_edit_reuses_database_chunks_and_both_snapshots_restore(self):
+        self.db.execute('CREATE TABLE backup_churn(id INTEGER PRIMARY KEY,label TEXT,body BLOB)')
+        self.db.executemany('INSERT INTO backup_churn VALUES(?,?,?)', [
+            (i, 'original', hashlib.shake_256(str(i).encode()).digest(512 << 10)) for i in range(32)])
+        self.db.commit()
+        first = self.export()
+        a = next(e for e in iter_artifacts(self.output, first) if e['role'] == 'library')
+        self.db.execute("UPDATE backup_churn SET label='modified' WHERE id=16")
+        self.db.commit()
+        second_path = self.root / 'second'
+        second = self.export(second_path)
+        b = next(e for e in iter_artifacts(second_path, second) if e['role'] == 'library')
+        previous = {c['sha256'] for c in a['chunks']}
+        changed = [c for c in b['chunks'] if c['sha256'] not in previous]
+        self.assertTrue(changed)
+        self.assertGreater(len(b['chunks']) - len(changed), 0)
+        self.assertLess(sum(c['encoded_size'] for c in changed), sum(c['encoded_size'] for c in b['chunks']) / 2)
+        self.assertLessEqual(sum(c['size'] for c in changed), 2 * SQLITE_CHUNK_SIZE)
+        # Reassemble the newer snapshot from the union of reused and new
+        # objects, with no dependency on replaying a prior restore or SQL log.
+        for chunk in b['chunks']:
+            if chunk['sha256'] in previous:
+                target = second_path / 'objects' / (chunk['sha256'] + '.gz')
+                target.unlink()
+                target.hardlink_to(self.output / 'objects' / target.name)
+        for source, label in ((self.output, 'original'), (second_path, 'modified')):
+            restored = self.root / ('restored-' + label)
+            import_archive(source, restored, reserve=0)
+            with contextlib.closing(sqlite3.connect(restored / 'library.sqlite')) as db:
+                self.assertEqual(db.execute('SELECT label FROM backup_churn WHERE id=16').fetchone(), (label,))
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM backup_churn').fetchone(), (32,))
 
     def test_operating_database_restores_wal_rows_and_execution_sequence(self):
         source = self.root / "workflow.sqlite"

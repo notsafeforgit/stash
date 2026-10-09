@@ -887,7 +887,7 @@
     "home_backup_caller_and_coverage_update"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-09T03:31:19.510978+00:00",
+  "checked_at": "2026-10-09T03:58:26.012945+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -1479,7 +1479,7 @@
     "failed_comparison_retained": true,
     "imports_replayed": false
   },
-  "root_free_GiB": 116.15150451660156,
+  "root_free_GiB": 116.13511657714844,
   "pre_public_coordinated_backup": {
     "status": "running",
     "stage": "publish-backup-before-public",
@@ -1507,7 +1507,7 @@
     "checkpoint_sealed": true,
     "server_created_at": "2026-10-09T00:55:01.564750761Z",
     "latest_pack_progress": {
-      "checked_at": "2026-10-09T03:30:30.454618+00:00",
+      "checked_at": "2026-10-09T03:58:15.723413+00:00",
       "status": "running",
       "stage": "publish-backup-before-public",
       "run_id": "20261008_175444_1545955",
@@ -1515,9 +1515,9 @@
       "isolated_restore_complete": false,
       "packed_artifacts": {
         "library": 1,
-        "blob": 101741
+        "blob": 125549
       },
-      "packed_logical_bytes": 37798846600,
+      "packed_logical_bytes": 41422965089,
       "run_files": [
         "catalog.json",
         "ledger-2-video_manifest_previous.nul",
@@ -1530,7 +1530,7 @@
         "worker-inventory.json",
         "ledger-1-tar_delta_state.sqlite3"
       ],
-      "root_free_GiB": 116.15150451660156,
+      "root_free_GiB": 116.13511657714844,
       "source_artwork_inventory": {
         "checked_at": "2026-10-09T02:03:16.441058+00:00",
         "files": 240872,
@@ -1722,7 +1722,8 @@
     "uncertain_workflow_requests_not_repeated": true,
     "helper_syntax_and_current_file_hashes_checked": true,
     "actual_runtime_execution_pending": true,
-    "required_gate": "Fresh post-controlled coordinated backup and isolated restore; no timer or workflow changes during preparation."
+    "required_gate": "Fresh post-controlled coordinated backup and isolated restore; no timer or workflow changes during preparation.",
+    "effective_service_commands_required_before_timer_start": 10
   },
   "home_backup_audit": {
     "status": "findings_addressed_in_tested_preparation_not_installed",
@@ -1808,7 +1809,9 @@
     "remote_media_cleanup": false,
     "isolated_download_and_native_validation_required": true,
     "interrupted_sealed_run_must_be_recovered_without_recapture": true,
-    "schedules_resumed": false
+    "schedules_resumed": false,
+    "requires_legacy_launch_cleanup": true,
+    "final_effective_backup_components": 209
   },
   "private_native_browser": {
     "status": "passed",
@@ -1915,5 +1918,53 @@
     },
     "owner_acceptance": false,
     "scope": "Populated private rendered read paths only. No write/apply/playback actions, public handoff, worker startup or owner acceptance."
+  },
+  "legacy_launch_cleanup_preparation": {
+    "status": "prepared_tested_not_installed",
+    "checked_at": "2026-10-09T03:58:03.380525+00:00",
+    "reference_audit_files": 310,
+    "confirmed_runtime_gap": "Existing Instagram journal.conf still replaces the native ExecStart with the catalog-backed launcher; service remains held inactive.",
+    "changes": [
+      "Neutralize the obsolete Instagram ExecStart override while preserving the native service and timer.",
+      "Remove the unused old translation-hook mount from n8n.",
+      "Remove two dormant global gallery-dl catalog processors and their two references.",
+      "Route the three existing manual backup/restore commands through the isolated installed native runtime.",
+      "Replace the two obsolete catalog/translation entrypoints with retirement messages, preserving repository files.",
+      "Retain original launch/config bytes and add new installed paths to coordinated backups."
+    ],
+    "files_to_install": 10,
+    "retained_original_preimages": 8,
+    "profile_definitions_unchanged": 32,
+    "private_bindings_unchanged": 79,
+    "active_and_held_workflow_graphs_checked": 21,
+    "fixture_checks": 10,
+    "actual_cli_checks": 5,
+    "host_native_python_requires_catalog_package": false,
+    "selected_n8n_native_python_requires_catalog_package": false,
+    "static_backup_components_after_overlay": 69,
+    "dynamic_backup_components": 141,
+    "effective_backup_components_after_overlay": 209,
+    "preimages_installed_first": true,
+    "backup_configuration_installed_last": true,
+    "requires_pre_public_backup_and_restore": true,
+    "requires_prior_n8n_and_home_backup_overlays": true,
+    "all_scheduled_writers_remain_held": true,
+    "current_sealed_backup_changed": false,
+    "services_started": false,
+    "systemd_reloaded": false,
+    "source_repository_changed": false,
+    "effective_service_command_verifier": {
+      "commands": 10,
+      "checks": [
+        "No pending daemon reload",
+        "Effective ExecStart equals the reviewed native fragment",
+        "No retired catalog command"
+      ],
+      "runs_before_timer_barriers_open": true,
+      "actual_post_reload_verification_pending": true
+    },
+    "preparation_sha256": "d4e389ae5da64f43a1db371424a6a0b9f41e2a267513e0d9e9a8b1ed759aa075",
+    "installer_sha256": "3c833e422dd57caa654ecc15485ea9a0f96edab9a55272868109531a5f50bbcf",
+    "active_history_versions_verified": 19
   }
 }

@@ -12669,3 +12669,27 @@ is recorded separately. Earlier test-guard failures and their corrections are
 retained. These checks do not replace owner acceptance or exercise mutations.
 The original sealed backup continues packing artwork with over 116 GiB free;
 its publication and isolated restore remain prerequisites for live handoff.
+
+A further host dependency audit found an important launch-path omission:
+Instagram's existing `journal.conf` drop-in still replaces the newly installed
+native service command with the old catalog scraper. The service is inactive
+behind its cutover barrier. n8n also retains an unused mount of the old NFO
+translation hook. Neither issue is resolved merely by checking the main unit
+file, so the prepared schedule step now checks ten effective systemd commands
+after reload and before opening any timer barriers.
+
+A separate cleanup is prepared for after the first restore and the n8n/home
+backup overlays. It neutralizes that Instagram override, removes the unused
+mount and dormant global catalog processors, routes three existing manual
+backup/restore commands through the installed native runtime, and retires two
+old catalog/translation commands. Original bytes are retained before replacement;
+replacing the command symlink leaves its repository target intact. All 32 native
+profiles and 79 private configuration references remain unchanged. Active and
+held workflow graphs do not reference the retired commands.
+
+Ten filesystem/command checks and five actual CLI checks passed. Host and selected
+n8n producer environments also pass without the external catalog package. The
+prepared final backup inventory now contains 69 static inputs and 209 effective
+components, including the original launch/config bytes. Final inventory, n8n
+startup, runtime verification and post-controlled backup require this cleanup.
+No installed file, service, schedule or current sealed backup has changed.

@@ -4,15 +4,16 @@ This is the implementation record for the
 [full transition plan](native-archive-transition-plan.md). It does not narrow
 that plan's scope or replace its completion criteria. Development remains on
 `v3-rewrite`; merge into `develop` requires verification and the owner's success
-review. The production cutover is in progress; the native replacement is not yet public.
+review. The native replacement is running; the controlled worker rollout remains
+in progress.
 
 ## Current release position — 2026-10-09 UTC
 
 All 1,711 catalogs and 925,869 automation records are imported and reconciled.
 Post/media associations, source albums, disabled policies and source URL
 registration have passed their independent checks. The original compatible
-database and held source snapshot remain intact. The public native application
-is starting; scraper schedules remain paused.
+database and held source snapshot remain intact. The production application is
+healthy on the existing Stash port; scraper schedules remain paused.
 
 The first coordinated native backup has sealed and packed its checkpoint with
 the 22.2 GB database, 240,872 saved artwork files and coordinated host state.
@@ -38,7 +39,12 @@ Queue handoff activated 202,561 enrichment targets, 177,320 translation targets,
 and retained progress remain preserved; no scrape or background job has executed.
 The private application completed startup. Database promotion passed in 96 seconds,
 including the closed WAL checkpoint and an inode-preserving move into the final
-configuration directory. Public startup is waiting for application health.
+configuration directory. Production startup passed at 11:27 UTC in 129 seconds.
+The API reports schema 1000099 and the expected 273,546 scenes, 503,711 images,
+4,197 galleries and 1,440 performers. The application uses the promoted database
+and live media directory, with no old catalog mount. "Public startup" in the
+cutover records means the normal production Stash service, in contrast to the
+temporary localhost-only migration instance.
 Ordinary startup was also
 found to repeat the full domain audit; a source change to separate it from
 identity checks is in progress and has not been tested or deployed.

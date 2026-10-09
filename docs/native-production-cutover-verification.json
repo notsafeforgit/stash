@@ -2,7 +2,7 @@
   "status": "cutover_in_progress",
   "boundary_uuid": "8c462d7a-ee41-4508-a4c8-b4ab55c7ca13",
   "native_schema": 1000099,
-  "public_native_activated": false,
+  "public_native_activated": true,
   "legacy_writers_paused": true,
   "original_database_unchanged": true,
   "source_revision": "0ea2c05fbc20356929c561f2173386a14870fdb7",
@@ -877,7 +877,6 @@
     "manifest_sha256": "091b55067fe1f2932450f2f8ac9274301242ffec1961c74850d9ca56dcf43c6c"
   },
   "remaining": [
-    "public_start_health",
     "controlled_native_ingestion_checks",
     "isolated_cloud_restores_and_post_write_publication",
     "scheduled_cycles_and_legacy_retirement",
@@ -887,7 +886,7 @@
     "routine_startup_audit_separation"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-09T11:25:33.677293+00:00",
+  "checked_at": "2026-10-09T11:27:53.916789+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -2277,15 +2276,28 @@
     "translation-runtime-deployment.json": "passed_installed_inactive"
   },
   "public_application_start": {
-    "status": "running",
-    "stage": "waiting_for_native_application_health",
+    "status": "passed",
+    "stage": "native_application_ready_schedules_held",
     "started_at": "2026-10-09T11:24:50.902571+00:00",
-    "updated_at": "2026-10-09T11:24:51.231111+00:00",
+    "completed_at": "2026-10-09T11:27:00.379912+00:00",
+    "seconds": 129.4773575880099,
     "service": "stash-native-cutover-public-start-01a0ed5e.service",
-    "owner": {
-      "pid": 3656420,
-      "start_ticks": "55506903"
+    "scheduled_writers_resumed": false,
+    "database": "/home/andrew/services/stash-native/config/stash-native.sqlite",
+    "image": "ghcr.io/notsafeforgit/stash-s6@sha256:21c7242e3c93dad609e7c03d1990585185dc95d0a017ad6c67a55d02affcf89f",
+    "database_inode_verified": true,
+    "former_catalog_mounts_absent": true,
+    "public_native_endpoint": "http://127.0.0.1:8009",
+    "system_status": {
+      "status": "OK",
+      "databaseSchema": 1000099,
+      "appSchema": 1000099
     },
-    "scheduled_writers_resumed": false
+    "api_counts": {
+      "scenes": 273546,
+      "images": 503711,
+      "galleries": 4197,
+      "performers": 1440
+    }
   }
 }

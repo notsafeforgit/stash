@@ -219,6 +219,11 @@ func TestCatalogEnrichmentMigrationPreservesExistingState(t *testing.T) {
 	for _, table := range []string{"catalog_snapshots", "catalog_snapshot_records", "source_posts", "source_captures", "source_collections", "source_service_turns"} {
 		before[table] = albumJobRows(t, raw, table)
 	}
+	// A historical snapshot acquires an unset cleanup flag. The migration
+	// itself must not discard any of its inputs or change the receipt values.
+	for i := range before["catalog_snapshots"] {
+		before["catalog_snapshots"][i] = append(before["catalog_snapshots"][i], int64(0))
+	}
 	var needed *sqlite.MigrationNeededError
 	require.True(t, errors.As(f.db.Open(path), &needed))
 	require.NoError(t, f.db.RunAllMigrations())

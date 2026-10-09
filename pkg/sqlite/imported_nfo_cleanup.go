@@ -79,7 +79,14 @@ func (db *Database) CompactImportedNFO(ctx context.Context, progress func(string
 		if err := compactNFOStaging(ctx, r, progress); err != nil {
 			return err
 		}
-		for _, query := range []string{
+		// Historical enrichment receipts reference alias rows in this same
+		// staging table. Without this lookup SQLite scans every enrichment row
+		// for each discarded document row while checking its foreign keys.
+		// Keep the maintenance index only for the duration of this transaction.
+		if _, err := dbWrapper.Exec(ctx, `CREATE INDEX nfo_cleanup_enrichment_alias ON automation_enrichment_records(catalog_snapshot_uuid,alias_ordinal)`); err != nil {
+			return err
+		}
+		for step, query := range []string{
 			`DELETE FROM metadata_policy_import_documents`,
 			`DELETE FROM metadata_policy_imports WHERE uuid IN (SELECT import_uuid FROM nfo_policy_imports)`,
 			`DELETE FROM catalog_document_records`,
@@ -94,9 +101,15 @@ func (db *Database) CompactImportedNFO(ctx context.Context, progress func(string
 			`DELETE FROM source_post_revisions WHERE uuid IN (SELECT uuid FROM nfo_old_revisions) AND NOT EXISTS(SELECT 1 FROM source_captures c WHERE c.revision_uuid=source_post_revisions.uuid)`,
 			`DELETE FROM source_payloads WHERE digest IN (SELECT digest FROM nfo_old_payloads) AND NOT EXISTS(SELECT 1 FROM source_captures c WHERE c.patch_digest=source_payloads.digest) AND NOT EXISTS(SELECT 1 FROM source_post_revisions r WHERE r.body_digest=source_payloads.digest) AND NOT EXISTS(SELECT 1 FROM source_profile_bodies p WHERE p.payload_digest=source_payloads.digest)`,
 		} {
+			if progress != nil {
+				progress("discarding", step)
+			}
 			if _, err := dbWrapper.Exec(ctx, query); err != nil {
 				return err
 			}
+		}
+		if _, err := dbWrapper.Exec(ctx, `DROP INDEX nfo_cleanup_enrichment_alias`); err != nil {
+			return err
 		}
 		result, err := dbWrapper.Exec(ctx, `UPDATE catalog_snapshots SET nfo_compacted=1 WHERE nfo_compacted=0`)
 		if err != nil {

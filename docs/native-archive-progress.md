@@ -10,8 +10,8 @@ in progress.
 ## Current release position — 2026-10-09 UTC
 
 Production is healthy on schema **1000104**, source
-`2dc9bdc4157c9761e8b4d3e972c25922da66b7aa`, pinned wrapper
-`localhost/stash-native-s6@sha256:0fca92f0a79fb927bfa921099d75bcbe563c364428a839e6b0e6e5a429e212a7`.
+`c8c9e498cae1b29953a9dc857316c76bcdf3cfde`, pinned wrapper
+`localhost/stash-native-s6@sha256:73a993e7d43f14b0fd69e52a2a484c9edb438827c321a1f50e9f063932d77189`.
 The matching backup validator and binary reconstruction components are installed
 for the next backup. The original published backup and its separately running
 restore still use their sealed configuration.
@@ -63,13 +63,26 @@ The current release passed 666 producer tests, focused backend queue, migration,
 API and Python HTTP integration checks, and the pinned backend lint gate. Tests
 include retaining checkpoints across an upgrade, migrating existing attempts,
 anonymized exports, and recovering a staged page under a changed worker without
-refetching it. n8n and the main worker timer are active. The first repaired pass
-found the existing Reddit/Twitter service cooldowns; the 64 queued enrichment
-jobs also fill the admission limit until work can execute. Actual post-repair
-source completion remains pending, rather than inferred from an active timer.
+refetching it. n8n and the main worker timer are active. The first repaired
+Twitter listing attempt used its approved policy but retried with
+`extraction_failed`; its new cooldown is retained. The first repaired Reddit
+listing attempt reached a terminal `not_found` result. These are actual attempts,
+not proof of successful source completion. The 64 queued enrichment jobs also
+fill the admission limit until work can execute.
+
+Manual folder discovery now filters root-wide scrape targets by direct folder
+ownership before applying the scope limit. Previously, 3,138 unrelated targets
+could block a local folder with HTTP 503. The changed lookup passed regression
+tests with 300 unrelated sources, source-folder protection and the existing
+manual intake/API tests, plus backend lint. The deployed lookup allowed the
+reviewed extensionless Matroska file to be renamed with `.mkv` and ingested as
+scene 373319. Its bytes are unchanged, its title comes from the filename, it
+remains unorganized, and it has no fabricated source-post association. Replaying
+the same admission returned the same completed job. This backend-only release
+retains schema 1000104 and the deployed producer image.
 
 The remaining rollout includes metadata-worker continuity, controlled host and
-manual intake checks, translation activation, a fresh incremental post-write
+remaining folder-default checks, translation activation, a fresh incremental post-write
 backup, and resumption/observation of the held schedules. The independent
 baseline restore is still running. No merge into `develop` or change to the
 frozen compatible release has occurred.

@@ -226,7 +226,7 @@ def verify_snapshot_receipts(database, outboxes, expected_origin):
 
 
 def verify_restored_receipts(source, restored, manifest, expected_origin):
-    """Check an isolated, fully restored archive before its owner discards it."""
+    """Check verified library/outbox files before their owner discards them."""
     entries = [entry for entry in iter_artifacts(source, manifest)
                if entry["role"] in ("library", "producer_outbox")]
     report = verify_snapshot_receipts(Path(restored) / "library.sqlite",

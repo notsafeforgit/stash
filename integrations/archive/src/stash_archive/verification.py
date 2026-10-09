@@ -1,10 +1,11 @@
-"""Bind optional native and producer checks to one isolated verified restore.
+"""Bind native and producer checks to streamed contents or an isolated restore.
 
 The executable is an explicit, trusted local input, never selected by an archive.
 No server, migration, worker or filesystem recovery is started by this protocol.
 This still does not establish a coordinated live backup/media boundary.
 """
 
+from contextlib import closing
 import hashlib
 import math
 import os
@@ -15,8 +16,10 @@ import subprocess
 import tempfile
 import time
 
-from .bundle import FORMAT, import_archive, iter_artifacts
-from .storage import InvalidArchive, RESERVE_BYTES, decode_json, json_bytes
+from .bundle import (FORMAT, SQLITE_ROLES, _blob_rows, _target, connect_readonly,
+                     database_metadata, import_archive, iter_artifacts, validate_manifest)
+from .storage import (InvalidArchive, RESERVE_BYTES, decode_json, json_bytes,
+                      load_manifest, require_space, write_artifact)
 
 MAX_OUTPUT = 64 << 10
 DEFAULT_TIMEOUT = 3600
@@ -105,9 +108,77 @@ def verify_native_snapshot(restored, entry, executable, *, timeout=DEFAULT_TIMEO
     return report
 
 
+class _ArtworkDigest:
+    """A write_artifact sink that checks artwork without creating a file."""
+
+    def __init__(self):
+        self.digest = hashlib.md5(usedforsecurity=False)
+
+    def write(self, data):
+        self.digest.update(data)
+
+
+def _stream_archive(source, destination, reserve):
+    manifest = validate_manifest(load_manifest(source))
+    # Exhaust the inventory before allocating scratch files or trusting sizes.
+    # Only SQLite components need a filesystem representation for their checks.
+    database_bytes = sum(entry["size"] for entry in iter_artifacts(source, manifest)
+                         if entry["role"] in SQLITE_ROLES)
+    require_space(destination.parent, database_bytes, reserve)
+    destination.mkdir(mode=0o700)
+    blobs = set()
+    for entry in iter_artifacts(source, manifest):
+        role = entry["role"]
+        if role in SQLITE_ROLES:
+            path = _target(destination, entry)
+            path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "wb") as output:
+                write_artifact(source, entry, output,
+                               check_space=lambda size: require_space(destination, size, reserve))
+            # These private files exist only for validation and are discarded
+            # before publication. There is deliberately no durable restore
+            # receipt or per-file/directory fsync for this disposable workspace.
+            with closing(connect_readonly(path)) as connection:
+                if database_metadata(connection, role) != entry["sqlite"]:
+                    raise InvalidArchive("Verified database identity differs from the manifest")
+        elif role == "blob":
+            sink = _ArtworkDigest()
+            write_artifact(source, entry, sink)
+            if sink.digest.hexdigest() != entry["name"]:
+                raise InvalidArchive("Original artwork checksum mismatch")
+            blobs.add(entry["name"])
+        else:
+            write_artifact(source, entry)
+    with closing(connect_readonly(destination / "library.sqlite")) as connection:
+        required = set(_blob_rows(connection))
+    if required != blobs:
+        raise InvalidArchive("Original artwork inventory does not match the library snapshot")
+    return manifest
+
+
+def verify_archive_contents(source, *, native_validator=None, producer_origin=None,
+                            timeout=DEFAULT_TIMEOUT, temp_parent=None, reserve=RESERVE_BYTES, lock_fd=None):
+    """Check every byte and database, materializing only temporary SQLite files.
+
+    This is the routine pre-publication check. It does not claim that a complete
+    installation has been restored; use verify_archive_proofs for that drill.
+    """
+    return _verify_archive(source, restore=False, native_validator=native_validator,
+                           producer_origin=producer_origin, timeout=timeout,
+                           temp_parent=temp_parent, reserve=reserve, lock_fd=lock_fd)
+
+
 def verify_archive_proofs(source, *, native_validator=None, producer_origin=None,
                          timeout=DEFAULT_TIMEOUT, temp_parent=None, reserve=RESERVE_BYTES, lock_fd=None):
     """Return success only after every requested check passes on the same restore."""
+    return _verify_archive(source, restore=True, native_validator=native_validator,
+                           producer_origin=producer_origin, timeout=timeout,
+                           temp_parent=temp_parent, reserve=reserve, lock_fd=lock_fd)
+
+
+def _verify_archive(source, *, restore, native_validator, producer_origin,
+                    timeout, temp_parent, reserve, lock_fd):
     from .receipts import origin, verify_restored_receipts
 
     if producer_origin is not None:
@@ -116,13 +187,17 @@ def verify_archive_proofs(source, *, native_validator=None, producer_origin=None
         native_validator = validator_path(native_validator, timeout)
     with tempfile.TemporaryDirectory(prefix="stash-archive-verify-", dir=temp_parent) as temp:
         restored = Path(temp) / "restored"
-        manifest = import_archive(source, restored, reserve=reserve)
+        if restore:
+            manifest = import_archive(source, restored, reserve=reserve)
+        else:
+            manifest = _stream_archive(source, restored, reserve)
         # Consume the complete iterator, so the inventory digest and unique
         # library requirement are checked before any additional proof is used.
         library, = [entry for entry in iter_artifacts(source, manifest) if entry["role"] == "library"]
         manifest_sha256 = hashlib.sha256(json_bytes(manifest)).hexdigest()
         result = {"uuid": manifest["uuid"], "manifest_sha256": manifest_sha256,
-                  "coverage": manifest["coverage"], "contents_verified": True}
+                  "coverage": manifest["coverage"], "contents_verified": True,
+                  "verification_method": "isolated-restore" if restore else "streamed-contents"}
         if native_validator is not None:
             proof = verify_native_snapshot(restored, library, native_validator, timeout=timeout, lock_fd=lock_fd)
             result["native_snapshot"] = dict(proof, archive_uuid=manifest["uuid"],

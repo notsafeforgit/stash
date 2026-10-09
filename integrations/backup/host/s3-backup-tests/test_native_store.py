@@ -31,7 +31,7 @@ from stash_archive.checkpoint_abandon import FORMAT as ABANDON_FORMAT
 from stash_archive.filesystem_boundary import FORMAT as BOUNDARY_FORMAT
 from stash_archive.server_checkpoint import FORMAT as CHECKPOINT_FORMAT, COVERAGE
 from stash_archive.storage import InvalidArchive, json_bytes, store_file
-from stash_archive.verification import verify_archive_proofs
+from stash_archive.verification import verify_archive_contents, verify_archive_proofs
 
 
 class NativeStoreTests(unittest.TestCase):
@@ -99,7 +99,7 @@ class NativeStoreTests(unittest.TestCase):
                   'schema_version': 1000077, 'sha256': library['sha256'], 'bytes': library['size'],
                   'database_verified': True, 'pending_file_deletions': 0, 'filesystem_recovery_verified': False}
         with patch('stash_archive.verification.validator_output', return_value=json_bytes(report)):
-            self.proof = verify_archive_proofs(self.archive, native_validator=sys.executable,
+            self.proof = verify_archive_contents(self.archive, native_validator=sys.executable,
                                                 producer_origin='https://stash.example', reserve=0, temp_parent=self.root)
 
     def publish(self):
@@ -119,6 +119,25 @@ class NativeStoreTests(unittest.TestCase):
         import_archive(downloaded, restored, reserve=0)
         self.assertEqual((restored / 'components/config/config.yml').read_bytes(), b'database: library.sqlite\n')
         self.assertEqual((restored / 'components/media_manifest/s3-media.json').read_bytes(), json_bytes(self.media))
+        self.assertEqual(self.proof['verification_method'], 'streamed-contents')
+        with patch('stash_archive.verification.validator_output', return_value=json_bytes({
+                k: v for k, v in self.proof['native_snapshot'].items()
+                if k not in ('archive_uuid', 'manifest_sha256', 'component')})):
+            drill = verify_archive_proofs(downloaded, native_validator=sys.executable,
+                                          producer_origin='https://stash.example', reserve=0, temp_parent=self.root)
+        self.assertEqual(drill, self.proof | {'verification_method': 'isolated-restore'})
+
+    def test_historical_proofs_remain_readable_and_unknown_methods_are_rejected(self):
+        proof = copy.deepcopy(self.proof)
+        proof['verification_method'] = 'unchecked'
+        with self.assertRaises(InvalidArchive):
+            self.store.publish_archive(self.archive, proof, self.checkpoint, selection_digest(self.catalog))
+        self.assertEqual(self.s3.operations, [])
+        # Archives predating the split used the full restore path and omitted
+        # this label. Keep those immutable publication records readable.
+        del self.proof['verification_method']
+        reference = self.publish()
+        self.store.download(reference, self.root / 'historical-proof', reserve=0)
 
     def cached_store(self, *, bucket='metadata'):
         return NativeStore(self.s3, bucket, 'prefix', receipts_path=self.root / 'object-receipts.sqlite3')
@@ -361,12 +380,12 @@ class NativeStoreTests(unittest.TestCase):
         session.client = SimpleNamespace(request_id=self.checkpoint, boundary_bytes=json_bytes(self.boundary))
         session.reserve, session.validator_timeout = 0, 10
         session.validator, session.producer_origin = sys.executable, 'https://stash.example'
-        with patch('native_backup.verify_archive_proofs', side_effect=InvalidArchive('native schema refused')):
+        with patch('native_backup.verify_archive_contents', side_effect=InvalidArchive('native schema refused')):
             with self.assertRaisesRegex(InvalidArchive, 'native schema refused'):
                 session.publish(self.catalog, [])
         self.assertEqual(self.s3.operations, [])
         self.assertFalse((self.root / 'publication.json').exists())
-        with patch('native_backup.verify_archive_proofs', return_value=self.proof):
+        with patch('native_backup.verify_archive_contents', return_value=self.proof):
             reference = session.publish(self.catalog, [])
         self.assertEqual(reference['selection_sha256'], selection_digest(self.catalog))
         changed = copy.deepcopy(self.catalog)
@@ -637,7 +656,7 @@ class NativeStoreTests(unittest.TestCase):
         session.reserve, session.validator_timeout = 0, 10
         session.validator, session.producer_origin = sys.executable, 'https://stash.example'
         with patch('native_backup.export_archive', side_effect=AssertionError('already sealed')), \
-             patch('native_backup.verify_archive_proofs', return_value=self.proof):
+             patch('native_backup.verify_archive_contents', return_value=self.proof):
             reference = session.publish(self.catalog, [])
         self.assertEqual(reference['archive_uuid'], self.manifest['uuid'])
         self.assertEqual(list(work.path.iterdir()), [])

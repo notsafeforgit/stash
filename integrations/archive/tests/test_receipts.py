@@ -267,6 +267,12 @@ class ReceiptBoundaryTests(ReceiptFixture):
                          next(e["sha256"] for e in proof["components"] if e["role"] == "library"))
         self.assertEqual(list(self.root.glob('stash-archive-receipts-*')), [])
         self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
+        from stash_archive.verification import verify_archive_contents
+        streamed = verify_archive_contents(archive, native_validator=contract_validator(self.root),
+                                           producer_origin=ORIGIN, temp_parent=self.root, reserve=0)
+        self.assertEqual(value['verification_method'], 'isolated-restore')
+        self.assertEqual(streamed, value | {'verification_method': 'streamed-contents'})
+        self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
 
 
 if __name__ == "__main__":

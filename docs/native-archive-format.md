@@ -549,6 +549,23 @@ removes that temporary copy. `import` requires a new destination and writes
 `restore.json` only after all checks and durability steps succeed. It preserves
 pending producer work exactly. Server and worker activation are separate steps.
 
+Daily host publication uses the Python `verify_archive_contents` API instead
+of the full restore command. It validates the entire inventory before allocating
+scratch space, streams all artifacts through the same encoded/raw and complete
+artifact hash/size checks, and verifies artwork MD5 and its exact library
+inventory. It writes only SQLite snapshots for integrity, foreign-key, identity,
+native binary and producer-receipt checks. These private temporary files need
+no durable restore receipt; they are discarded after validation. The space
+estimate covers their total database bytes plus the configured reserve.
+
+Proofs explicitly label this path `verification_method: "streamed-contents"`.
+`verify_archive_proofs`, `stash-archive verify` with native/producer checks and
+the downloaded-cloud restore drill retain the full reconstruction path and
+label it `isolated-restore`. Preexisting proofs without that field were produced
+by the full restore path and remain readable. Neither the archive format nor
+the bytes selected for backup change. A content check still reads all archive
+bytes and performs the full database checks; it is not an empty-install drill.
+
 The restored directory contains `library.sqlite`, `blobs/`, and `components/`.
 Select the restored database and corresponding artwork in the native server's
 configuration. Use a binary that supports the recorded native schema. Existing

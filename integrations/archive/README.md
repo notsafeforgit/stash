@@ -10,6 +10,13 @@ with producer receipt checks on one temporary restore. Both proofs identify the
 exact archive and library bytes. This does not certify the remaining shared
 media, filesystem-journal and configuration boundary.
 
+The host's daily publisher instead calls `verify_archive_contents`. It streams
+and checks every artifact, including artwork MD5 and inventory membership,
+materializing only SQLite components for database/native/producer validation.
+Its proof says `verification_method: "streamed-contents"`; the full restore
+command says `isolated-restore`. Content verification does not replace an
+explicit restore drill, and neither path starts a server or worker.
+
 `export --server` captures the running native application's fixed database,
 configuration and deletion recovery components after declared producer journals.
 Export never releases the server's retryable temporary files. An authorized

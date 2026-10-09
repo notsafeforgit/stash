@@ -64,6 +64,33 @@ A read-only check against the actual unfinished run rejects rollout and creates
 no publication receipt. The fifteen updated rollout helpers retain their prior
 versions for recovery; no installed configuration or running service changed.
 
+### Routine backup verification cost — 2026-10-09
+
+The first publisher is doing a full local restore before upload: it reconstructs
+240,872 artwork files, syncs every file and parent directory, then rereads the
+artwork. That path was also selected for every scheduled native backup, making
+routine verification unnecessarily expensive. The current sealed publisher and
+its runtime remain unchanged while it completes that original check.
+
+The daily publisher now selects streamed content verification. It checks every
+compressed/raw chunk, complete artifact hash/size, artwork MD5 and exact artwork
+inventory, while materializing only SQLite components for full integrity,
+foreign-key, identity, native binary and producer-receipt checks. Its proof
+explicitly records `streamed-contents`. Explicit local/cloud restore commands
+retain full reconstruction and durability checks and report `isolated-restore`.
+Historical publication proofs remain readable. This changes neither the daily
+host S3 schedule nor media storage classes and adds no routine cloud download.
+
+All 138 archive tests and 305 backup tests pass. The backup suite used temporary
+directories on the workspace disk because this host's 31 GiB `/tmp` cannot meet
+an existing restore fixture's 50 GiB reserve. The original failure is retained;
+production reserves were not reduced. Coverage includes corruption in streamed
+artwork/configuration, missing artwork, database identity/integrity failures,
+exact producer proofs, no artwork materialization, historical proof reads and a
+stream-verified publication followed by an independent full restore. The new
+backup runtime must be installed and selected before daily jobs resume; no
+production runtime or current sealed generation has been changed by these tests.
+
 The Standard download was measured at 40.2 GiB across 241,410 unique content
 objects, plus three metadata objects. One HEAD and GET per object yields about
 483,000 requests, approximately $0.19 at the current Oregon rate. Internet

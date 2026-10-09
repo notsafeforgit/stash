@@ -22,8 +22,8 @@ source. Dry runs create no native checkpoint, artwork pins or ZFS snapshot.
 `current_manifest.json` version 4 binds the media selection to one native archive
 and checkpoint UUID. A selection digest excludes timestamps and publication
 references, avoiding a circular hash. The same selection is packed inside the
-archive with the sealed filesystem-boundary digest. Content restore, native
-binary validation and producer receipt verification precede publication. Every
+archive with the sealed filesystem-boundary digest. Full content verification,
+native binary validation and producer receipt verification precede publication. Every
 new or previously unverified S3 metadata object requires full-object SHA-256,
 exact length and Standard storage class. Publication records that proof in a
 private local SQLite index. Subsequent runs use a complete paginated LIST and
@@ -35,6 +35,23 @@ and per-run manifests precede the current JSON pointer. A successful pointer
 commit receives an immutable backup-history receipt before local release or
 cleanup is eligible. Remote obsolete tagging follows that receipt and retention
 verification; verification failures preserve the preceding generation.
+
+Routine publication uses `verify_archive_contents`: it streams every compressed
+object, checks encoded/raw SHA-256, artifact size/order/hash and original artwork
+MD5, and compares the complete artwork inventory with the library. Only SQLite
+components are written to disposable private files for integrity, foreign-key,
+identity, native-schema and producer-receipt validation. It does not recreate
+hundreds of thousands of artwork files or fsync a disposable restore tree.
+The proof records `verification_method: "streamed-contents"`. Every archive byte
+is still read, and database validation can remain substantial on a large library.
+
+Full restore drills are separate, explicit operations. `stash-archive verify`
+and `stash-s3-restore-native --download-to` still reconstruct and validate every
+file, complete the restore durability checks, and report `isolated-restore`.
+Older immutable proofs without a method label retain their original full-restore
+meaning. The daily host S3 publisher and timer remain responsible for backups;
+this does not add a Stash-owned S3 service or a daily cloud restore. Media storage
+classes and the existing remote checksum-reuse policy are unchanged.
 
 After publication and the last use of the retained view, the host releases the
 server checkpoint, artwork pins, ZFS snapshot and external component copies.
@@ -70,7 +87,11 @@ locking and recovery of the retained checkpoint; the recovery service requires
 no catalog package or catalog directory. Its [timer](systemd/s3-backup-recovery.timer)
 preserves the five-minute boot delay and fifteen-minute retry cadence. Include
 both unit files in the host backup's configuration components. Keep them held
-during cutover until the native backup and isolated restore have passed.
+during cutover until confirmed native publication and the applicable controlled
+runtime checks have passed, as specified in the
+[transition plan](../../docs/native-archive-transition-plan.md). The separate
+cloud restore may finish after rollout; recovery copies remain protected until
+that drill passes.
 
 Interrupted packing and verification use private scratch directories with
 durable inode ownership records. A fully sealed bundle is promoted without

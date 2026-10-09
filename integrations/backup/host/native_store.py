@@ -81,6 +81,7 @@ def validate_proof(source, manifest, proof):
     manifest_hash = hashlib.sha256(json_bytes(manifest)).hexdigest()
     if (not isinstance(proof, dict) or proof.get("uuid") != manifest["uuid"]
             or proof.get("manifest_sha256") != manifest_hash or proof.get("contents_verified") is not True
+            or proof.get("verification_method", "isolated-restore") not in ("isolated-restore", "streamed-contents")
             or not isinstance(proof.get("native_snapshot"), dict) or not isinstance(proof.get("ingestion_receipts"), dict)
             or proof["native_snapshot"].get("database_verified") is not True
             or any(proof[k].get("archive_uuid") != manifest["uuid"] or proof[k].get("manifest_sha256") != manifest_hash
@@ -330,7 +331,7 @@ class NativeStore:
         return manifest
 
     def publish_archive(self, source, proof, checkpoint_uuid, selection_sha256):
-        """The host must obtain proof from verify_archive_proofs on this bundle."""
+        """Require content, native and producer proofs bound to this bundle."""
         source = Path(source)
         manifest = validate_manifest(load_manifest(source))
         manifest_body = (source / "manifest.json").read_bytes()

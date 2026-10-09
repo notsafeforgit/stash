@@ -2,6 +2,7 @@
 
 from contextlib import closing, redirect_stderr, redirect_stdout
 import hashlib
+import copy
 import io
 import json
 import fcntl
@@ -16,8 +17,8 @@ from unittest.mock import patch
 
 from stash_archive.bundle import FORMAT, export_archive, import_archive, iter_artifacts
 from stash_archive.cli import main
-from stash_archive.storage import InvalidArchive, json_bytes
-from stash_archive.verification import verify_archive_proofs, validator_output
+from stash_archive.storage import InvalidArchive, json_bytes, store_file
+from stash_archive.verification import verify_archive_contents, verify_archive_proofs, validator_output
 
 
 def contract_validator(root, *, mode="ok", overrides=None):
@@ -65,6 +66,9 @@ if mode == 'failed':
 
 
 class NativeVerificationTests(unittest.TestCase):
+    verifier = staticmethod(verify_archive_proofs)
+    method = 'isolated-restore'
+
     def test_validator_keeps_host_lock_after_parent_descriptor_closes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -123,15 +127,16 @@ class NativeVerificationTests(unittest.TestCase):
         self.library, = iter_artifacts(self.archive, self.manifest)
 
     def verify(self, executable, **kwargs):
-        return verify_archive_proofs(self.archive, native_validator=executable,
-                                     temp_parent=self.root, reserve=0, **kwargs)
+        return self.verifier(self.archive, native_validator=executable,
+                             temp_parent=self.root, reserve=0, **kwargs)
 
-    def test_combined_proof_uses_one_restore_and_binds_exact_library(self):
+    def test_combined_proof_binds_exact_library_and_reports_method(self):
         executable = contract_validator(self.root)
         before = hashlib.sha256(self.database.read_bytes()).hexdigest()
         with patch('stash_archive.verification.import_archive', wraps=import_archive) as restore:
             result = self.verify(executable, producer_origin="https://stash.example")
-        self.assertEqual(restore.call_count, 1)
+        self.assertEqual(restore.call_count, int(self.method == 'isolated-restore'))
+        self.assertEqual(result['verification_method'], self.method)
         proof = result['native_snapshot']
         self.assertEqual(proof['archive_uuid'], self.manifest['uuid'])
         self.assertEqual(proof['manifest_sha256'], hashlib.sha256(json_bytes(self.manifest)).hexdigest())
@@ -222,6 +227,130 @@ class NativeVerificationTests(unittest.TestCase):
         self.assertEqual(exited.exception.code, 1)
         self.assertEqual(output.getvalue(), '')
         self.assertIn('no matching outbox', errors.getvalue())
+        self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
+
+
+class StreamedVerificationTests(NativeVerificationTests):
+    # Run the same validator rejection, timeout and receipt-binding contracts
+    # against the daily path, as well as the explicit restore path above.
+    verifier = staticmethod(verify_archive_contents)
+    method = 'streamed-contents'
+
+    def rich_archive(self):
+        original = b'original photo'
+        self.checksum = hashlib.md5(original, usedforsecurity=False).hexdigest()
+        self.blobs = self.root / 'artwork'
+        path = self.blobs / self.checksum[:2] / self.checksum[2:4] / self.checksum
+        path.parent.mkdir(parents=True)
+        path.write_bytes(original)
+        with closing(sqlite3.connect(self.database)) as db:
+            db.execute('INSERT INTO blobs VALUES(?,NULL)', (self.checksum,))
+            db.commit()
+        config = self.root / 'config.yml'
+        config.write_bytes(b'exact config bytes')
+        operating = self.root / 'operating.sqlite'
+        with closing(sqlite3.connect(operating)) as db:
+            db.executescript('CREATE TABLE state(value TEXT); INSERT INTO state VALUES("pending");')
+        self.archive = self.root / 'rich-archive'
+        self.manifest = export_archive(self.database, self.archive, blob_paths=[self.blobs], reserve=0,
+            components=[{'role': role, 'name': 'worker.sqlite', 'path': operating}
+                        for role in ('operating_database', 'download_archive')]
+                       + [{'role': 'config', 'name': config.name, 'path': config}])
+        self.entries = list(iter_artifacts(self.archive, self.manifest))
+        self.library = next(entry for entry in self.entries if entry['role'] == 'library')
+
+    def rewrite_inventory(self, entries):
+        body = b''.join(json_bytes(entry) for entry in entries)
+        self.manifest['inventory'] = {'sha256': hashlib.sha256(body).hexdigest(), 'size': len(body),
+                                     'count': len(entries), 'total_bytes': sum(e['size'] for e in entries)}
+        (self.archive / 'artifacts.jsonl').write_bytes(body)
+        (self.archive / 'manifest.json').write_bytes(json_bytes(self.manifest))
+
+    def test_only_database_files_are_materialized_and_no_restore_is_claimed(self):
+        self.rich_archive()
+        from stash_archive.verification import verify_native_snapshot
+        def check_scratch(restored, *args, **kwargs):
+            paths = {p.relative_to(restored).as_posix() for p in restored.rglob('*') if p.is_file()}
+            self.assertEqual(paths, {'library.sqlite', 'components/operating_database/worker.sqlite',
+                                     'components/download_archive/worker.sqlite'})
+            return verify_native_snapshot(restored, *args, **kwargs)
+        with patch('stash_archive.verification.verify_native_snapshot', side_effect=check_scratch), \
+             patch('stash_archive.verification.os.fsync', side_effect=AssertionError('disposable files')):
+            result = self.verify(contract_validator(self.root), producer_origin='https://stash.example')
+        self.assertTrue(result['contents_verified'])
+        self.assertEqual(result['verification_method'], 'streamed-contents')
+        self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
+
+    def test_space_budget_covers_only_databases(self):
+        self.rich_archive()
+        from stash_archive.storage import require_space
+        with patch('stash_archive.verification.require_space', wraps=require_space) as space:
+            self.verify(contract_validator(self.root))
+        expected = sum(e['size'] for e in self.entries if 'sqlite' in e)
+        self.assertEqual(space.call_args_list[0].args[1:], (expected, 0))
+        self.assertLess(expected, self.manifest['inventory']['total_bytes'])
+
+    def test_corrupt_non_database_objects_and_digests_fail_closed(self):
+        self.rich_archive()
+        for role in ('blob', 'config'):
+            entry = next(e for e in self.entries if e['role'] == role)
+            path = self.archive / 'objects' / (entry['chunks'][0]['sha256'] + '.gz')
+            original = path.read_bytes()
+            try:
+                path.write_bytes(original[:-1])
+                with self.subTest(role=role, corruption='object'), self.assertRaises(InvalidArchive):
+                    self.verify(contract_validator(self.root))
+            finally:
+                path.write_bytes(original)
+            for field in ('sha256', 'raw_sha256'):
+                changed = copy.deepcopy(self.entries)
+                target = next(e for e in changed if e['role'] == role)
+                (target if field == 'sha256' else target['chunks'][0])[field] = '0' * 64
+                self.rewrite_inventory(changed)
+                with self.subTest(role=role, corruption=field), self.assertRaises(InvalidArchive):
+                    self.verify(contract_validator(self.root))
+                self.rewrite_inventory(self.entries)
+        self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
+
+    def test_artwork_md5_and_complete_inventory_remain_required(self):
+        self.rich_archive()
+        for name in ('0' * 32, None):
+            changed = copy.deepcopy(self.entries)
+            if name is None:
+                changed = [e for e in changed if e['role'] != 'blob']
+            else:
+                next(e for e in changed if e['role'] == 'blob')['name'] = name
+            self.rewrite_inventory(changed)
+            with self.subTest(name=name), self.assertRaisesRegex(InvalidArchive, 'artwork'):
+                self.verify(contract_validator(self.root))
+        self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
+
+    def test_invalid_inventory_is_rejected_before_reading_any_artifact(self):
+        self.manifest['inventory']['sha256'] = '0' * 64
+        (self.archive / 'manifest.json').write_bytes(json_bytes(self.manifest))
+        with patch('stash_archive.verification.write_artifact', side_effect=AssertionError('untrusted inventory')):
+            with self.assertRaisesRegex(InvalidArchive, 'Inventory'):
+                self.verify(contract_validator(self.root))
+        self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
+
+    def test_every_database_role_keeps_identity_and_integrity_checks(self):
+        self.rich_archive()
+        for role in ('library', 'operating_database', 'download_archive'):
+            changed = copy.deepcopy(self.entries)
+            target = next(e for e in changed if e['role'] == role)
+            target['sqlite']['user_version'] += 1
+            self.rewrite_inventory(changed)
+            with self.subTest(role=role), self.assertRaisesRegex(InvalidArchive, 'database identity'):
+                self.verify(contract_validator(self.root))
+        self.rewrite_inventory(self.entries)
+        # Transport hashes can all be valid while a database is not SQLite.
+        path = self.root / 'invalid-database'
+        path.write_bytes(b'not a sqlite database')
+        changed = copy.deepcopy(self.entries)
+        next(e for e in changed if e['role'] == 'operating_database').update(store_file(self.archive, path, reserve=0))
+        self.rewrite_inventory(changed)
+        with self.assertRaises(sqlite3.DatabaseError):
+            self.verify(contract_validator(self.root))
         self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
 
 

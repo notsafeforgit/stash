@@ -21,7 +21,7 @@ from stash_archive.host_boundary import HostFilesystemCapture
 from stash_archive.storage import (HEX, InvalidArchive, decode_json, json_bytes, load_manifest, open_regular,
                                    publish_bytes, regular, require_space, sync_directory)
 from stash_archive.server_checkpoint import ServerCheckpoint
-from stash_archive.verification import verify_archive_proofs, validator_path
+from stash_archive.verification import verify_archive_contents, validator_path
 from stash_archive.zfs_media import ZFSMedia, mounts, release_published_media
 
 from native_store import (MEDIA_FORMAT, NativeStore, archive_objects, media_selection, selection_digest,
@@ -433,7 +433,7 @@ class NativeBackupSession:
             raise InvalidArchive("Retained archive differs from the original native/media selection")
         workspace = OwnedWorkspace(self.root, "verify")
         workspace.clear()
-        proof = verify_archive_proofs(self.archive, native_validator=self.validator, producer_origin=self.producer_origin,
+        proof = verify_archive_contents(self.archive, native_validator=self.validator, producer_origin=self.producer_origin,
                                       timeout=self.validator_timeout, temp_parent=workspace.path, reserve=self.reserve,
                                       lock_fd=getattr(self, "lock_fd", None))
         self.publication = self.store.publish_archive(self.archive, proof, self.client.request_id, selection)

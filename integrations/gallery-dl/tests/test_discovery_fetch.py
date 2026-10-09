@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from gallery_dl import config
 from gallery_dl.extractor.common import Extractor, Message
+from gallery_dl.extractor.reddit import RedditAPI
 
 from stash_ingest.discovery_fetch import MAX_RECORDS, collect, fetch, profile_platform, validate_page
 from stash_ingest.encoding import InvalidData, encode
@@ -46,7 +47,6 @@ class RedditListing(Extractor):
 
     def _init(self):
         self.calls = 0
-        self.api = SimpleNamespace(_call=self.call)
 
     def call(self, endpoint, params=None):
         self.calls += 1
@@ -55,6 +55,10 @@ class RedditListing(Extractor):
         return {"data": {"after": self.following}}
 
     def items(self):
+        self.api = SimpleNamespace(_call=self.call)
+        yield from self.submissions()
+
+    def submissions(self):
         self.api._call("/user/juniper/submitted/.json")
         yield from copy.deepcopy(self.messages)
         if self.following:
@@ -125,6 +129,37 @@ class DiscoveryFetchTests(unittest.TestCase):
         self.assertFalse(result["complete"])
         self.assertEqual(result["next_cursor"], {"after": "t3_next"})
         self.assertEqual(reconstruct(result).metadata(0)["source_extractor_url"], REDDIT)
+
+    def test_pinned_reddit_extractor_installs_page_boundary_when_api_is_created(self):
+        submission = {"id": "abc123", "name": "t3_abc123", "title": "One source post",
+                      "author": "juniper", "author_fullname": "t2_fixture", "created_utc": 1780000000,
+                      "url": "https://i.redd.it/fixture.jpg", "is_video": False, "is_self": False, "num_comments": 0,
+                      "permalink": "/r/fixture/comments/abc123/one_source_post/"}
+        for after in ("t3_next", None):
+            with self.subTest(after=after):
+                calls = []
+
+                def response(api, endpoint, params):
+                    calls.append((endpoint, copy.deepcopy(params)))
+                    if endpoint == "/user/juniper/about.json":
+                        return {"data": {"name": "juniper", "id": "fixture"}}
+                    self.assertEqual(endpoint, "/user/juniper/submitted/.json")
+                    self.assertEqual(sum(e == endpoint for e, _ in calls), 1)
+                    return {"data": {"after": after, "children": [{"kind": "t3", "data": copy.deepcopy(submission)}]}}
+
+                with patch.object(RedditAPI, "_call", response), \
+                        patch("requests.sessions.Session.send", side_effect=AssertionError("network access")), \
+                        patch("gallery_dl.downloader.find", side_effect=AssertionError("media download")):
+                    page = collect(REDDIT, {}, {"after": "t3_saved"})
+                self.assertNotIn("error", page)
+                self.assertEqual([e for e, _ in calls], ["/user/juniper/about.json", "/user/juniper/submitted/.json"])
+                self.assertEqual(calls[1][1]["after"], "t3_saved")
+                self.assertEqual(page["complete"], after is None)
+                self.assertEqual(page["next_cursor"], {"after": after} if after else None)
+                bundle = reconstruct(page)
+                self.assertEqual([r["kind"] for r in page["records"]], ["post", "media"])
+                self.assertEqual(bundle.metadata(0)["title"], "One source post")
+                self.assertEqual(bundle.metadata(1)["_url"], submission["url"])
 
     def test_listing_pages_keep_the_historical_record_bound_without_widening_post_fetches(self):
         messages = [(Message.Directory, "", {"tweet_id": str(9000000000000000000 + i)}) for i in range(1100)]

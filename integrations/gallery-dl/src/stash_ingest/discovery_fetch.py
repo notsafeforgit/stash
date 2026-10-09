@@ -148,21 +148,30 @@ def collect(url, settings, cursor=None, *, factory=None, check=lambda: None, res
 
             target._update_cursor = update
         else:
-            original_call, seen = target.api._call, False
+            # Reddit creates its API inside items(), immediately before calling
+            # submissions(). Initialization alone has not created it yet. Bind
+            # the page boundary there, before either profile or listing access.
+            original_submissions = target.submissions
 
-            def call(endpoint, params=None, *args, **kwargs):
-                nonlocal seen
-                listing = endpoint.startswith("/user/") and endpoint.endswith("/.json")
-                if listing and seen:
-                    raise _PageComplete()
-                payload = original_call(endpoint, params, *args, **kwargs)
-                if listing:
-                    seen = True
-                    after = payload["data"]["after"]
-                    result["next_cursor"] = {"after": after} if after else None
-                return payload
+            def submissions():
+                original_call, seen = target.api._call, False
 
-            target.api._call = call
+                def call(endpoint, params=None, *args, **kwargs):
+                    nonlocal seen
+                    listing = endpoint.startswith("/user/") and endpoint.endswith("/.json")
+                    if listing and seen:
+                        raise _PageComplete()
+                    payload = original_call(endpoint, params, *args, **kwargs)
+                    if listing:
+                        seen = True
+                        after = payload["data"]["after"]
+                        result["next_cursor"] = {"after": after} if after else None
+                    return payload
+
+                target.api._call = call
+                return original_submissions()
+
+            target.submissions = submissions
         base = None
         try:
             for kind, media_url, original in target:

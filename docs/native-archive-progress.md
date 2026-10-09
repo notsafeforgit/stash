@@ -10,11 +10,23 @@ in progress.
 ## Current release position — 2026-10-09 UTC
 
 Production is healthy on schema **1000104**, source
-`1f55872502eea274173659c2f361e5a74cd75dca`, pinned wrapper
-`localhost/stash-native-s6@sha256:9cbf7de64cc386c245ca1d9bddbbc6bad2b1a67a460fce6a448361a56938de36`.
-The matching backup validator and binary reconstruction components are installed
-for the next backup. The original published backup and its separately running
-restore still use their sealed configuration.
+`2f81070dc3d4bbd1f2ecab7bd52ab90bb0989b83`, pinned wrapper
+`localhost/stash-native-s6@sha256:374a5ade4b402912d3509e3dc53cce85089b61ae04cf6ce91a9cdc9482f32258`.
+This release changes the gallery UI; the backend and producer source remain at
+the verified `1f55872502ee` behavior. Its matching static recovery binary and
+reconstruction files are retained. A one-time service will select those files
+for future backups after the running post-write backup publishes, under the
+existing backup lock. That active backup and the original published backup's
+separate restore retain their original configurations.
+
+Gallery detail pages now distinguish Source-post album, Folder gallery, ZIP
+gallery and Manual gallery, with parent-post links or backing paths above the
+cover. The summary shares its bounded lookup with the Source albums tab; failed
+lookups do not imply a manual gallery. All 28 Chromium/WebKit source-album browser
+checks and 800 UI unit tests passed, along with UI validation and embedded-asset
+checks. Live desktop/mobile verification of gallery 6274 confirmed its Reddit
+parent link, working Source albums action and no horizontal overflow. The native
+n8n worker timer resumed after deployment. No membership or metadata was changed.
 
 Schema 1000101 consolidated 37,434 redundant post versions while preserving
 source text, media links, first/last sightings and repeat counts. Schema 1000102

@@ -12,7 +12,11 @@ media, filesystem-journal and configuration boundary.
 
 The host's daily publisher instead calls `verify_archive_contents`. It streams
 and checks every artifact, including artwork MD5 and inventory membership,
-materializing only SQLite components for database/native/producer validation.
+materializing only SQLite components for integrity, foreign-key, identity and
+producer-receipt validation. Its `sqlite_snapshots` proof binds those checks to
+every archived database. It does not invoke the full native application audit
+or claim `native_snapshot.database_verified`. Passing `native_validator`
+explicitly to this API still requests that additional audit.
 Its proof says `verification_method: "streamed-contents"`; the full restore
 command says `isolated-restore`. Content verification does not replace an
 explicit restore drill, and neither path starts a server or worker.

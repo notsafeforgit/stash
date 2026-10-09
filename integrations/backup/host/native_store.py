@@ -19,7 +19,7 @@ from object_receipts import ObjectReceipts, inventory as list_objects
 from media_objects import validate_inventory as validate_media_inventory
 import native_tags
 
-from stash_archive.bundle import iter_artifacts, validate_manifest
+from stash_archive.bundle import SQLITE_ROLES, iter_artifacts, validate_manifest
 from stash_archive.filesystem_boundary import canonical_uuid
 from stash_archive.checkpoint_release import archived_boundary
 from stash_archive.server_checkpoint import ServerCheckpoint
@@ -82,19 +82,36 @@ def validate_proof(source, manifest, proof):
     if (not isinstance(proof, dict) or proof.get("uuid") != manifest["uuid"]
             or proof.get("manifest_sha256") != manifest_hash or proof.get("contents_verified") is not True
             or proof.get("verification_method", "isolated-restore") not in ("isolated-restore", "streamed-contents")
-            or not isinstance(proof.get("native_snapshot"), dict) or not isinstance(proof.get("ingestion_receipts"), dict)
-            or proof["native_snapshot"].get("database_verified") is not True
-            or any(proof[k].get("archive_uuid") != manifest["uuid"] or proof[k].get("manifest_sha256") != manifest_hash
-                   for k in ("native_snapshot", "ingestion_receipts"))):
-        raise InvalidArchive("Native publication requires matching native and producer validation proofs")
-    entries = [entry for entry in iter_artifacts(source, manifest) if entry["role"] in ("library", "producer_outbox")]
+            or not isinstance(proof.get("ingestion_receipts"), dict)
+            or proof["ingestion_receipts"].get("archive_uuid") != manifest["uuid"]
+            or proof["ingestion_receipts"].get("manifest_sha256") != manifest_hash):
+        raise InvalidArchive("Native publication requires matching content and producer validation proofs")
+    databases = [entry for entry in iter_artifacts(source, manifest) if entry["role"] in SQLITE_ROLES]
+    if "sqlite_snapshots" in proof:
+        expected = {
+            "archive_uuid": manifest["uuid"], "manifest_sha256": manifest_hash,
+            "checks": ["integrity_check", "foreign_key_check", "identity"],
+            "components": [{key: entry[key] for key in ("role", "name", "sha256", "size", "sqlite")}
+                           for entry in databases]}
+        if proof["sqlite_snapshots"] != expected:
+            raise InvalidArchive("SQLite verification does not match every archived database")
+    elif "native_snapshot" not in proof:
+        raise InvalidArchive("Native publication requires SQLite verification")
+    # Historical publications carry only the full native audit. Keep those
+    # readable, and never ignore an invalid audit attached to a newer proof.
+    entries = [entry for entry in databases if entry["role"] in ("library", "producer_outbox")]
     library, = [entry for entry in entries if entry["role"] == "library"]
-    native, receipts = proof["native_snapshot"], proof["ingestion_receipts"]
+    if "native_snapshot" in proof:
+        native = proof["native_snapshot"]
+        if (not isinstance(native, dict) or native.get("database_verified") is not True
+                or native.get("archive_uuid") != manifest["uuid"] or native.get("manifest_sha256") != manifest_hash
+                or native.get("component") != {"role": "library", "name": "library"}
+                or native.get("sha256") != library["sha256"] or native.get("bytes") != library["size"]
+                or native.get("schema_version") != library["sqlite"]["schema"]):
+            raise InvalidArchive("Native audit does not verify the exact archived library")
+    receipts = proof["ingestion_receipts"]
     expected = [{"role": entry["role"], "name": entry["name"], "sha256": entry["sha256"]} for entry in entries]
-    if (native.get("component") != {"role": "library", "name": "library"}
-            or native.get("sha256") != library["sha256"] or native.get("bytes") != library["size"]
-            or native.get("schema_version") != library["sqlite"]["schema"]
-            or receipts.get("registered_producers_complete") is not True
+    if (receipts.get("registered_producers_complete") is not True
             or receipts.get("components") != expected):
         raise InvalidArchive("Publication proofs do not verify the exact archived library and producer components")
 
@@ -340,7 +357,7 @@ class NativeStore:
         return manifest
 
     def publish_archive(self, source, proof, checkpoint_uuid, selection_sha256):
-        """Require content, native and producer proofs bound to this bundle."""
+        """Require content, SQLite and producer proofs bound to this bundle."""
         source = Path(source)
         manifest = validate_manifest(load_manifest(source))
         manifest_body = (source / "manifest.json").read_bytes()

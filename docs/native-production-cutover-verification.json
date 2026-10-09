@@ -2034,6 +2034,20 @@
       ],
       "follow_up": "Reuse verified unchanged content and capture evidence; keep full audits and restore drills explicit. Do not label audit success from publication alone.",
       "current_baseline_gate_changed": false,
+      "application_audit_separation": {
+        "status": "implemented_tested_not_deployed",
+        "routine_publisher_invokes_native_validator": false,
+        "sqlite_snapshot_proofs_bind_all_database_components": true,
+        "contents_and_producer_checks_preserved": true,
+        "explicit_native_audit_and_cloud_restore_preserved": true,
+        "publication_does_not_claim_native_audit_success": true,
+        "historical_full_audit_proofs_readable": true,
+        "archive_tests_passed": 141,
+        "backup_tests_passed": 310,
+        "running_baseline_changed": false,
+        "daily_runtime_updated": false,
+        "full_routine_audit_split_complete": false
+      },
       "unchanged_object_upload_reuse": {
         "status": "included_in_inactive_incremental_runtime",
         "matching_prior_checksum_receipt_and_current_inventory_required": true,

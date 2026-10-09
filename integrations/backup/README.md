@@ -45,14 +45,21 @@ Routine publication uses `verify_archive_contents`: it streams every compressed
 object, checks encoded/raw SHA-256, artifact size/order/hash and original artwork
 MD5, and compares the complete artwork inventory with the library. Only SQLite
 components are written to disposable private files for integrity, foreign-key,
-identity, native-schema and producer-receipt validation. It does not recreate
+identity and producer-receipt validation. It does not recreate
 hundreds of thousands of artwork files or fsync a disposable restore tree.
 The proof records `verification_method: "streamed-contents"`. Every archive byte
 is still read, and database validation can remain substantial on a large library.
+The `sqlite_snapshots` evidence names every checked database and its exact bytes
+and identity. The publisher no longer invokes the full native application audit,
+which repeats SQLite checks and scans application relationships and provenance.
+A publication proof without `native_snapshot` makes no claim that this audit
+passed. Historical publications containing the full native proof remain readable.
 
 Full restore drills are separate, explicit operations. `stash-archive verify`
 and `stash-s3-restore-native --download-to` still reconstruct and validate every
 file, complete the restore durability checks, and report `isolated-restore`.
+The cloud restore command still requires the trusted native validator and its
+successful application audit; a publication proof cannot substitute for it.
 Older immutable proofs without a method label retain their original full-restore
 meaning. The daily host S3 publisher and timer remain responsible for backups;
 this does not add a Stash-owned S3 service or a daily cloud restore. Media storage

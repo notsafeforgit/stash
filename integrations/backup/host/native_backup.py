@@ -433,9 +433,11 @@ class NativeBackupSession:
             raise InvalidArchive("Retained archive differs from the original native/media selection")
         workspace = OwnedWorkspace(self.root, "verify")
         workspace.clear()
-        proof = verify_archive_contents(self.archive, native_validator=self.validator, producer_origin=self.producer_origin,
-                                      timeout=self.validator_timeout, temp_parent=workspace.path, reserve=self.reserve,
-                                      lock_fd=getattr(self, "lock_fd", None))
+        # Full native relationship/provenance validation belongs to an explicit
+        # application audit or restore drill. Publication still verifies every
+        # artifact, SQLite consistency/identity and the producer boundary.
+        proof = verify_archive_contents(self.archive, producer_origin=self.producer_origin,
+                                        temp_parent=workspace.path, reserve=self.reserve)
         self.publication = self.store.publish_archive(self.archive, proof, self.client.request_id, selection)
         same_or_publish(self.root / "publication.json", json_bytes(self.publication))
         return self.publication

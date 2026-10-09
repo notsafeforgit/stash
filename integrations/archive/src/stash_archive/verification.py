@@ -161,8 +161,9 @@ def verify_archive_contents(source, *, native_validator=None, producer_origin=No
                             timeout=DEFAULT_TIMEOUT, temp_parent=None, reserve=RESERVE_BYTES, lock_fd=None):
     """Check every byte and database, materializing only temporary SQLite files.
 
-    This is the routine pre-publication check. It does not claim that a complete
-    installation has been restored; use verify_archive_proofs for that drill.
+    The host publisher uses this without native_validator. An explicitly supplied
+    validator adds the full application audit, which is not needed to publish a
+    backup. Use verify_archive_proofs for a complete isolated restore drill.
     """
     return _verify_archive(source, restore=False, native_validator=native_validator,
                            producer_origin=producer_origin, timeout=timeout,
@@ -193,11 +194,19 @@ def _verify_archive(source, *, restore, native_validator, producer_origin,
             manifest = _stream_archive(source, restored, reserve)
         # Consume the complete iterator, so the inventory digest and unique
         # library requirement are checked before any additional proof is used.
-        library, = [entry for entry in iter_artifacts(source, manifest) if entry["role"] == "library"]
+        databases = [entry for entry in iter_artifacts(source, manifest) if entry["role"] in SQLITE_ROLES]
+        library, = [entry for entry in databases if entry["role"] == "library"]
         manifest_sha256 = hashlib.sha256(json_bytes(manifest)).hexdigest()
         result = {"uuid": manifest["uuid"], "manifest_sha256": manifest_sha256,
                   "coverage": manifest["coverage"], "contents_verified": True,
                   "verification_method": "isolated-restore" if restore else "streamed-contents"}
+        # Both paths checked the reconstructed SQLite bytes before reaching here.
+        # Keep this narrower evidence distinct from the optional native audit.
+        result["sqlite_snapshots"] = {
+            "archive_uuid": manifest["uuid"], "manifest_sha256": manifest_sha256,
+            "checks": ["integrity_check", "foreign_key_check", "identity"],
+            "components": [{key: entry[key] for key in ("role", "name", "sha256", "size", "sqlite")}
+                           for entry in databases]}
         if native_validator is not None:
             proof = verify_native_snapshot(restored, library, native_validator, timeout=timeout, lock_fd=lock_fd)
             result["native_snapshot"] = dict(proof, archive_uuid=manifest["uuid"],

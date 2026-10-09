@@ -137,8 +137,48 @@ class NativeStoreTests(unittest.TestCase):
         # Archives predating the split used the full restore path and omitted
         # this label. Keep those immutable publication records readable.
         del self.proof['verification_method']
+        del self.proof['sqlite_snapshots']
         reference = self.publish()
         self.store.download(reference, self.root / 'historical-proof', reserve=0)
+
+    def test_publication_without_native_audit_still_downloads_and_requires_explicit_restore_audit(self):
+        native = self.proof['native_snapshot']
+        self.proof = verify_archive_contents(self.archive, producer_origin='https://stash.example',
+                                            temp_parent=self.root, reserve=0)
+        self.assertNotIn('native_snapshot', self.proof)
+        reference = self.publish()
+        self.store.audit(reference, reserve=0)
+        destination = self.root / 'publication-only'
+        self.store.download(reference, destination, reserve=0)
+        with patch('stash_archive.verification.validator_output', side_effect=InvalidArchive('native audit failed')):
+            with self.assertRaisesRegex(InvalidArchive, 'native audit failed'):
+                verify_archive_proofs(destination, native_validator=sys.executable,
+                                      producer_origin='https://stash.example', temp_parent=self.root, reserve=0)
+        with patch('stash_archive.verification.validator_output', return_value=json_bytes({
+                k: v for k, v in native.items() if k not in ('archive_uuid', 'manifest_sha256', 'component')})):
+            drill = verify_archive_proofs(destination, native_validator=sys.executable,
+                                          producer_origin='https://stash.example', temp_parent=self.root, reserve=0)
+        self.assertEqual(drill['verification_method'], 'isolated-restore')
+        self.assertTrue(drill['native_snapshot']['database_verified'])
+        self.assertEqual(drill['sqlite_snapshots'], self.proof['sqlite_snapshots'])
+
+    def test_missing_or_mismatched_sqlite_publication_proof_cannot_upload(self):
+        del self.proof['native_snapshot']
+        for change in ({'archive_uuid': str(uuid.uuid4())}, {'manifest_sha256': '0' * 64},
+                       {'checks': ['identity']}, {'components': []}, None):
+            proof = copy.deepcopy(self.proof)
+            if change is None:
+                del proof['sqlite_snapshots']
+            else:
+                proof['sqlite_snapshots'].update(change)
+            with self.subTest(change=change), self.assertRaises(InvalidArchive):
+                self.store.publish_archive(self.archive, proof, self.checkpoint, selection_digest(self.catalog))
+        for field, value in [('sha256', '0' * 64), ('size', 0), ('sqlite', {'schema': 1000000})]:
+            proof = copy.deepcopy(self.proof)
+            proof['sqlite_snapshots']['components'][0][field] = value
+            with self.subTest(field=field), self.assertRaises(InvalidArchive):
+                self.store.publish_archive(self.archive, proof, self.checkpoint, selection_digest(self.catalog))
+        self.assertEqual(self.s3.operations, [])
 
     def cached_store(self, *, bucket='metadata'):
         return NativeStore(self.s3, bucket, 'prefix', receipts_path=self.root / 'object-receipts.sqlite3')
@@ -286,7 +326,7 @@ class NativeStoreTests(unittest.TestCase):
         self.assertFalse(any(op[0] == 'put' for op in self.s3.operations))
 
     def test_mismatched_proof_or_selection_prevents_all_uploads(self):
-        for field in ('native_snapshot', 'ingestion_receipts'):
+        for field in ('native_snapshot', 'sqlite_snapshots', 'ingestion_receipts'):
             proof = copy.deepcopy(self.proof)
             proof[field]['archive_uuid'] = str(uuid.uuid4())
             with self.assertRaises(InvalidArchive):
@@ -420,14 +460,17 @@ class NativeStoreTests(unittest.TestCase):
         session.client = SimpleNamespace(request_id=self.checkpoint, boundary_bytes=json_bytes(self.boundary))
         session.reserve, session.validator_timeout = 0, 10
         session.validator, session.producer_origin = sys.executable, 'https://stash.example'
-        with patch('native_backup.verify_archive_contents', side_effect=InvalidArchive('native schema refused')):
-            with self.assertRaisesRegex(InvalidArchive, 'native schema refused'):
+        with patch('native_backup.verify_archive_contents', side_effect=InvalidArchive('SQLite integrity refused')):
+            with self.assertRaisesRegex(InvalidArchive, 'SQLite integrity refused'):
                 session.publish(self.catalog, [])
         self.assertEqual(self.s3.operations, [])
         self.assertFalse((self.root / 'publication.json').exists())
-        with patch('native_backup.verify_archive_contents', return_value=self.proof):
+        with patch('stash_archive.verification.validator_output', side_effect=AssertionError('unrequested audit')):
             reference = session.publish(self.catalog, [])
         self.assertEqual(reference['selection_sha256'], selection_digest(self.catalog))
+        published_proof = json.loads((self.cloud / ('prefix/' + reference['verification']['key'])).read_bytes())
+        self.assertNotIn('native_snapshot', published_proof)
+        self.assertIn('sqlite_snapshots', published_proof)
         changed = copy.deepcopy(self.catalog)
         changed['videos'][0]['size'] += 1
         count = len(self.s3.operations)

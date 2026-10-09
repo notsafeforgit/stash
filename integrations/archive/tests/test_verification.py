@@ -232,7 +232,7 @@ class NativeVerificationTests(unittest.TestCase):
 
 class StreamedVerificationTests(NativeVerificationTests):
     # Run the same validator rejection, timeout and receipt-binding contracts
-    # against the daily path, as well as the explicit restore path above.
+    # when a streamed audit is explicitly requested, as well as on restore.
     verifier = staticmethod(verify_archive_contents)
     method = 'streamed-contents'
 
@@ -265,6 +265,39 @@ class StreamedVerificationTests(NativeVerificationTests):
                                      'count': len(entries), 'total_bytes': sum(e['size'] for e in entries)}
         (self.archive / 'artifacts.jsonl').write_bytes(body)
         (self.archive / 'manifest.json').write_bytes(json_bytes(self.manifest))
+
+    def test_publication_proof_checks_all_databases_without_claiming_native_audit(self):
+        self.rich_archive()
+        with patch('stash_archive.verification.validator_output', side_effect=AssertionError('unrequested audit')):
+            result = verify_archive_contents(self.archive, producer_origin='https://stash.example',
+                                             temp_parent=self.root, reserve=0)
+        self.assertNotIn('native_snapshot', result)
+        self.assertTrue(result['contents_verified'])
+        self.assertTrue(result['ingestion_receipts']['registered_producers_complete'])
+        self.assertEqual(result['verification_method'], 'streamed-contents')
+        proof = result['sqlite_snapshots']
+        self.assertEqual(proof['archive_uuid'], self.manifest['uuid'])
+        self.assertEqual(proof['manifest_sha256'], hashlib.sha256(json_bytes(self.manifest)).hexdigest())
+        self.assertEqual(proof['checks'], ['integrity_check', 'foreign_key_check', 'identity'])
+        self.assertEqual(proof['components'], [
+            {key: entry[key] for key in ('role', 'name', 'sha256', 'size', 'sqlite')}
+            for entry in self.entries if 'sqlite' in entry])
+        self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
+
+    def test_publication_rejects_foreign_key_failure_even_with_valid_transport_hashes(self):
+        self.rich_archive()
+        database = self.root / 'operating.sqlite'
+        with closing(sqlite3.connect(database)) as db:
+            db.executescript('CREATE TABLE parent(id INTEGER PRIMARY KEY);'
+                             'CREATE TABLE child(parent_id REFERENCES parent(id));'
+                             'INSERT INTO child VALUES(99);')
+        changed = copy.deepcopy(self.entries)
+        next(e for e in changed if e['role'] == 'operating_database').update(
+            store_file(self.archive, database, reserve=0))
+        self.rewrite_inventory(changed)
+        with self.assertRaisesRegex(InvalidArchive, 'foreign key'):
+            verify_archive_contents(self.archive, temp_parent=self.root, reserve=0)
+        self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
 
     def test_only_database_files_are_materialized_and_no_restore_is_claimed(self):
         self.rich_archive()
@@ -341,7 +374,7 @@ class StreamedVerificationTests(NativeVerificationTests):
             target['sqlite']['user_version'] += 1
             self.rewrite_inventory(changed)
             with self.subTest(role=role), self.assertRaisesRegex(InvalidArchive, 'database identity'):
-                self.verify(contract_validator(self.root))
+                verify_archive_contents(self.archive, temp_parent=self.root, reserve=0)
         self.rewrite_inventory(self.entries)
         # Transport hashes can all be valid while a database is not SQLite.
         path = self.root / 'invalid-database'
@@ -350,7 +383,7 @@ class StreamedVerificationTests(NativeVerificationTests):
         next(e for e in changed if e['role'] == 'operating_database').update(store_file(self.archive, path, reserve=0))
         self.rewrite_inventory(changed)
         with self.assertRaises(sqlite3.DatabaseError):
-            self.verify(contract_validator(self.root))
+            verify_archive_contents(self.archive, temp_parent=self.root, reserve=0)
         self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
 
 

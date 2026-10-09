@@ -38,6 +38,30 @@ two saved n8n parent versions be published. Actual scheduled cycles, retirement
 verification, home-backup capture/upload and desktop/mobile owner acceptance
 remain. `develop` has not been merged and the frozen compatible release is unchanged.
 
+### Separate application audits from publication — 2026-10-09
+
+The full native validator repeats SQLite integrity and foreign-key checks, hashes
+the database twice, and scans native relationships, provenance and ingestion
+history. Requiring that audit before each upload is excessive. The host publisher
+now verifies archive contents, all SQLite components and the producer boundary
+without invoking that additional application audit. Its scoped `sqlite_snapshots`
+evidence identifies the exact checked components and does not claim native audit
+success. Explicit audits and cloud restore drills still require a successful
+native validator report. Existing immutable full-audit publications remain readable.
+
+All 141 archive tests and 310 backup tests pass. They cover publication without
+an audit, corruption with otherwise valid transport checksums, missing or changed
+SQLite evidence, historical proof reads, and a subsequent restore whose native
+audit can fail independently of the successful publication. Full archive reads,
+SQLite checks and historical producer scans remain; this change does not finish
+the broader recurring-cost work.
+
+The running baseline uses its original installed runtime. Its native validator
+has exited and the publisher remains active, with no publication receipt as of
+09:41 UTC. This source change has not restarted or modified that run. The future
+daily/manual launch preparation still needs the newly tested runtime before
+schedule activation.
+
 ### Owner-approved publication gate — 2026-10-09
 
 The owner explicitly permits rollout once the backup is confirmed, while the

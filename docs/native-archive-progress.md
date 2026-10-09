@@ -9,23 +9,38 @@ in progress.
 
 ## Current release position — 2026-10-09 UTC
 
-Schema 1000105 is implemented for incoming Twitter thread relationships and
-shared self-reply galleries. Parent/root links and paged thread navigation work
-on desktop and mobile. Each post retains its own metadata and attachment order;
-manual exclusions and deleted galleries remain protected. The migration leaves
-existing albums unchanged and performs no historical capture scan. Focused
-SQLite/ingestion/API tests and all 50 affected Chromium/WebKit browser checks
-pass; production deployment is pending the remaining release checks.
+Production is healthy on schema **1000105**, source
+`7ba77242ebbd21d1fc6fcde8329745f3b0c89f21`, pinned wrapper
+`localhost/stash-native-s6@sha256:ed8b20e5b42657653f78658ab76ca26fecdd735ec31002dc5f4d8a1212191a45`.
+New Twitter captures retain exact conversation, parent-post and publisher IDs.
+The **Thread and replies** section provides local links or source-site links for
+missing ancestors. Same-account self-replies share one gallery while retaining
+each post's metadata and attachment order. Manual exclusions, disabled/deleted
+galleries and conflicting identities remain protected. No historical thread
+reconstruction ran; the migration preserved all 2,928 existing post-gallery
+links. Existing database-opening checks accounted for most deployment downtime.
 
-Production is healthy on schema **1000104**, source
-`2f81070dc3d4bbd1f2ecab7bd52ab90bb0989b83`, pinned wrapper
-`localhost/stash-native-s6@sha256:374a5ade4b402912d3509e3dc53cce85089b61ae04cf6ce91a9cdc9482f32258`.
-This release changes the gallery UI; the backend and producer source remain at
-the verified `1f55872502ee` behavior. Its matching static recovery binary and
-reconstruction files are retained. A one-time service will select those files
-for future backups after the running post-write backup publishes, under the
-existing backup lock. That active backup and the original published backup's
-separate restore retain their original configurations.
+The host and n8n producer adapters preserve the numeric reply-target account ID
+before gallery-dl transformation. The new installed producer matches all 127
+source modules and the staged fingerprints of 22 host and 10 n8n profiles.
+Compatible execution-policy approvals preserved progress and retry times for
+42 queued runs and six metadata policies. The n8n worker timer resumed after
+server and producer verification; other previously held schedules remain held.
+
+UI validation passed 801 tests, with 50 Chromium/WebKit source-post/album browser
+checks. Producer, library, archive and backup suites passed (668, 12, 144 and 317
+tests). The full Go run exposed only a missing-table diagnostic ordering
+regression; that was corrected and the affected lineage/thread tests passed.
+A populated shared gallery also survived reopening without duplicate membership.
+Live desktop/mobile checks verified the new endpoint and section, no horizontal
+overflow, and no fabricated relationship on an old imported post.
+
+The matching static recovery binary, producer wheel and exact worker image are
+retained. A replacement one-time backup-config updater selects this release for
+future backups after the current post-write publication completes, under the
+existing backup lock. The running publisher and original independent restore
+retain their original configurations. Other schedule-resume checks now also
+require that matching future backup configuration to be selected.
 
 Gallery detail pages now distinguish Source-post album, Folder gallery, ZIP
 gallery and Manual gallery, with parent-post links or backing paths above the
@@ -53,7 +68,7 @@ grouping; its six scrape targets were already active. Unrelated disabled or
 retired entries were left unchanged. Desktop and mobile checks passed.
 
 The n8n producer now runs immutable image ID
-`fe95174b0ef4b658bd4495b73a67de6fee58ce7d64a2ba32f4aa08df46d8bcec`.
+`c2e1344642a3432031adf74ec2fbfa62aa6aeee94bac84f934bd8e5dddf477b2`.
 Captured Reddit Redgifs/direct-file references can identify their downloaded
 attachments, including retained Reddit fallback previews, image permalinks and
 legacy `v3.redgifs.com/ifr/` links. Image permalinks retain their original URL

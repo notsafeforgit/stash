@@ -162,6 +162,13 @@ earlier streaming-only preparation for future jobs. The original resume helpers
 are retained unchanged for the running baseline. No command or schedule has
 been switched yet.
 
+The schedule-resumption helper now requires that exact incremental runtime,
+its reviewed module hashes, deployment/release records and effective daily
+service definition before opening any timer barrier. Six fixture checks pass,
+including rejection of the previous runtime, a mismatched preparation, missing
+module coverage, an old release selection and a changed daily service. The helper
+has not run against live schedules; the baseline publication is still pending.
+
 The current sealed baseline keeps its original bytes and runtime. Switching chunk
 sizes requires one new database baseline, then shares its unchanged chunks across
 later backups; unchanged photos/covers need no new baseline. The existing Google

@@ -2074,7 +2074,14 @@
       "prepared_launch_actual_checks": 5,
       "future_launch_installer": "install-incremental-launch-cleanup.py",
       "future_backup_components": 209,
-      "daily_commands_and_schedules_changed": false
+      "daily_commands_and_schedules_changed": false,
+      "schedule_activation_guard": {
+        "status": "prepared_tested_not_executed_live",
+        "checks_passed": 6,
+        "requires_matching_installed_runtime_and_effective_daily_service": true,
+        "rejects_previous_runtime_and_changed_service": true,
+        "timers_started": false
+      }
     }
   },
   "metadata_retention_configuration": {

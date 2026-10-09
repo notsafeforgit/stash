@@ -101,7 +101,14 @@ func TestNativeMediaRootReviewAndHistory(t *testing.T) {
 	input["expected_revision"], input["state"] = 3, "retired"
 	require.Equal(t, http.StatusOK, request(http.MethodPut, "/media-roots/"+id, input).Code)
 	input["expected_revision"], input["state"] = 4, "active"
-	require.Equal(t, http.StatusConflict, request(http.MethodPut, "/media-roots/"+id, input).Code)
+	w = request(http.MethodPut, "/media-roots/"+id, input)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var restored models.MediaRoot
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &restored))
+	require.Equal(t, id, restored.UUID)
+	require.Equal(t, 5, restored.Revision)
+	require.Equal(t, "active", restored.State)
+	require.Equal(t, rebound, *restored.Binding)
 	for _, target := range []string{
 		"/media-roots/" + id + "/history?after=-1", "/media-roots/" + id + "/history?limit=101", "/media-roots/bad/history",
 	} {

@@ -57,24 +57,25 @@ type ArchiveActivityReference struct {
 }
 
 type SourceRunActivity struct {
-	Sequence           int64      `json:"sequence"`
-	UUID               string     `json:"uuid"`
-	CollectionUUID     string     `json:"collection_uuid"`
-	CollectionRevision int        `json:"collection_revision"`
-	CollectionLabel    string     `json:"collection_label"`
-	TargetURL          string     `json:"target_url"`
-	Operation          string     `json:"operation"`
-	State              string     `json:"state"`
-	Revision           int64      `json:"revision"`
-	AttemptCount       int64      `json:"attempt_count"`
-	Failures           int        `json:"failures"`
-	PendingWindows     int        `json:"pending_windows"`
-	CompletedWindows   int        `json:"completed_windows"`
-	AvailableAt        time.Time  `json:"available_at"`
-	LeaseUntil         *time.Time `json:"lease_until"`
-	ErrorCode          string     `json:"error_code"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	CanonicalCollectionUUID string     `json:"canonical_collection_uuid,omitempty"`
+	Sequence                int64      `json:"sequence"`
+	UUID                    string     `json:"uuid"`
+	CollectionUUID          string     `json:"collection_uuid"`
+	CollectionRevision      int        `json:"collection_revision"`
+	CollectionLabel         string     `json:"collection_label"`
+	TargetURL               string     `json:"target_url"`
+	Operation               string     `json:"operation"`
+	State                   string     `json:"state"`
+	Revision                int64      `json:"revision"`
+	AttemptCount            int64      `json:"attempt_count"`
+	Failures                int        `json:"failures"`
+	PendingWindows          int        `json:"pending_windows"`
+	CompletedWindows        int        `json:"completed_windows"`
+	AvailableAt             time.Time  `json:"available_at"`
+	LeaseUntil              *time.Time `json:"lease_until"`
+	ErrorCode               string     `json:"error_code"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at"`
 }
 
 var ErrArchiveActivityInvalid = errors.New("invalid archive activity request")

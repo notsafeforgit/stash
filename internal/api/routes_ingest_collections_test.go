@@ -23,8 +23,8 @@ func TestProducerCollectionLookupPreservesTargetAndScope(t *testing.T) {
 	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "collections.sqlite")))
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	service := ingest.New(db.Repository())
-	const target = "https://www.reddit.com/user/example/submitted/?sort=new"
-	const topTarget = "https://www.reddit.com/user/example/submitted/?sort=top&t=all"
+	const target = "https://www.reddit.com/r/example/?sort=new"
+	const topTarget = "https://www.reddit.com/r/example/?sort=top&t=all"
 	var root, otherRoot *models.MediaRoot
 	var producer *models.IngestProducer
 	var top, unbound, moved, retired *models.SourceCollection
@@ -101,10 +101,10 @@ func TestProducerCollectionLookupPreservesTargetAndScope(t *testing.T) {
 	}
 	result := lookup(&root.UUID, target, topTarget, target+"&missing=1", retired.TargetURL)
 	require.Len(t, result[0].Candidates, 55)
-	require.Equal(t, []ingestCollectionBinding{{top.UUID, 1, "active"}}, result[1].Candidates)
+	require.Equal(t, []ingestCollectionBinding{{CollectionUUID: top.UUID, CollectionRevision: 1, State: "active"}}, result[1].Candidates)
 	require.Empty(t, result[2].Candidates)
-	require.Equal(t, []ingestCollectionBinding{{retired.UUID, 2, "retired"}}, result[3].Candidates)
-	require.Equal(t, []ingestCollectionBinding{{unbound.UUID, 2, "disabled"}}, lookup(nil, target)[0].Candidates)
+	require.Equal(t, []ingestCollectionBinding{{CollectionUUID: retired.UUID, CollectionRevision: 2, State: "retired"}}, result[3].Candidates)
+	require.Equal(t, []ingestCollectionBinding{{CollectionUUID: unbound.UUID, CollectionRevision: 2, State: "disabled"}}, lookup(nil, target)[0].Candidates)
 	require.Equal(t, http.StatusUnauthorized, request("", &root.UUID, []string{target}).Code)
 	require.Equal(t, http.StatusForbidden, request(token, &otherRoot.UUID, []string{target}).Code)
 	for _, targets := range [][]string{nil, {target, target}, {"not a URL"}, {"https://user:password@example.invalid/"}, {target + "\n"}, strings.Fields(strings.Repeat(target+" ", 51))} {
@@ -121,7 +121,7 @@ func TestProducerCollectionLookupPreservesTargetAndScope(t *testing.T) {
 		return err
 	}))
 	require.Empty(t, lookup(&root.UUID, topTarget)[0].Candidates, "do not substitute historical URLs")
-	require.Equal(t, []ingestCollectionBinding{{top.UUID, 2, "active"}}, lookup(&root.UUID, topTarget+"&changed=1")[0].Candidates)
+	require.Equal(t, []ingestCollectionBinding{{CollectionUUID: top.UUID, CollectionRevision: 2, State: "active"}}, lookup(&root.UUID, topTarget+"&changed=1")[0].Candidates)
 	require.Empty(t, lookup(&root.UUID, moved.TargetURL)[0].Candidates, "a prior root grant cannot see a moved definition")
 	rootCredential, rootToken, err := service.IssueCredential(t.Context(), producer.UUID, nil, nil, root.UUID)
 	require.NoError(t, err)

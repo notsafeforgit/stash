@@ -7,6 +7,21 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement is running; the controlled worker rollout remains
 in progress.
 
+## One source per Reddit profile — implementation, 2026-10-09
+
+Schema 1000106 replaces the six editable new/top/search definitions with one
+canonical profile source. Equivalent account, state, root, destination and policy
+bindings consolidate; historical aliases retain original receipts and runs.
+New n8n subscriptions create one source, producer calls keep internal per-pass
+coverage, and profile state gates historical pending work. Old links open the
+profile, and its activity includes previous retrievals using bounded queries.
+See [profile retrievals](native-source-collections.md#reddit-profile-retrievals).
+
+The production audit found 425 six-definition profiles and two partial groups,
+with no conflicting state, account or policy settings. Subreddits and saved feeds
+are separate sources. Rehearsal and release evidence is being retained in
+`.local/reddit-profile-sources-20261009/`; this section does not yet claim deployment.
+
 ## Historical Twitter filename recovery — 2026-10-09 UTC
 
 The `legacy-twitter-filename-v1` album policy now implements recovery of missing

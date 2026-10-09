@@ -104,10 +104,10 @@ func TestSourceCollectionsKeepTargetsIndependentFromAttribution(t *testing.T) {
 	account := createSourceAccount(t, repo, "native:reddit")
 	input := models.SourceCollectionInput{UUID: uuid.NewString(), Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
 		Label: "Aggregator submissions", Kind: "account", State: "active", Namespace: account.Namespace, AccountUUID: &account.UUID,
-		TargetURL: "https://www.reddit.com/user/aggregator/submitted/?sort=new", RootUUID: &root.UUID, PathPrefix: "Aggregator, reddit"}}
+		TargetURL: "https://www.reddit.com/user/aggregator/saved/", RootUUID: &root.UUID, PathPrefix: "Aggregator, reddit"}}
 	first := putSourceCollection(t, repo, input)
 	input.ExpectedRevision = first.Revision
-	input.TargetURL = "https://www.reddit.com/user/aggregator/submitted/?sort=top"
+	input.TargetURL = "https://www.reddit.com/user/aggregator/upvoted/"
 	second := putSourceCollection(t, repo, input)
 	duplicate := input
 	duplicate.UUID, duplicate.ExpectedRevision, duplicate.Label = uuid.NewString(), 0, "Separate scrape policy"

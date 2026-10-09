@@ -70,8 +70,13 @@ func (s *SourceRunStore) Claim(ctx context.Context, id, producer, owner, policy 
 		rootIdentity = root.Binding.DirectoryIdentity
 	}
 	var busy bool
-	if err := dbWrapper.Get(ctx, &busy, `SELECT EXISTS(SELECT 1 FROM source_runs WHERE state='running' AND (collection_uuid=? OR target_key=?))
-OR EXISTS(SELECT 1 FROM source_run_cooldowns WHERE target_key=? AND available_at_ms>?)`, collection.UUID, row.TargetKey, row.TargetKey, now.UnixMilli()); err != nil {
+	profile := collection.UUID
+	if collection.CanonicalUUID != "" {
+		profile = collection.CanonicalUUID
+	}
+	if err := dbWrapper.Get(ctx, &busy, `SELECT EXISTS(SELECT 1 FROM source_runs WHERE state='running' AND (collection_uuid IN (
+SELECT ? UNION ALL SELECT alias_uuid FROM source_collection_aliases WHERE source_uuid=?) OR target_key=?))
+OR EXISTS(SELECT 1 FROM source_run_cooldowns WHERE target_key=? AND available_at_ms>?)`, profile, profile, row.TargetKey, row.TargetKey, now.UnixMilli()); err != nil {
 		return nil, err
 	}
 	if busy {

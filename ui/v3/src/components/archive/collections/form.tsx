@@ -93,7 +93,7 @@ export function CollectionForm({
       label: msg("collections.target", "Source URL"),
       help: msg(
         "collections.target_help",
-        "The account page, feed, search or other source this collection tracks. Leave blank for direct file imports.",
+        "Use one profile URL per Reddit account; its retrieval passes are handled automatically. Other feeds and searches remain separate. Leave blank for direct file imports.",
       ),
       max: 8192,
     },

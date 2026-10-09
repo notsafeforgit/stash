@@ -64,7 +64,11 @@ def snapshot(value):
     if not isinstance(targets, list) or not 1 <= len(targets) <= 10000:
         raise InvalidData("A caller snapshot requires 1–10000 targets")
     targets = [target_url(target) for target in targets]
-    if len(set(targets)) != len(targets) or sum(len(target.encode()) for target in targets) > 8 << 20:
+    if len(set(targets)) != len(targets):
+        raise InvalidData("Caller targets must be unique and bounded")
+    from .profile_sources import expand_profiles
+    targets = expand_profiles(targets)
+    if len(targets) > 10000 or len(set(targets)) != len(targets) or sum(len(target.encode()) for target in targets) > 8 << 20:
         raise InvalidData("Caller targets must be unique and bounded")
     spec = definition({key: item for key, item in value.items() if key != "targets"})
     return spec, targets
@@ -219,6 +223,8 @@ class SourceCalls:
             ticket = str(uuid.uuid5(uuid.UUID(delivery.call_uuid), "source/" + str(item["position"])))
             spec = {key: value for key, value in delivery.definition.items() if key != "root_uuid"}
             spec.update(collection_uuid=candidate["collection_uuid"], collection_revision=candidate["collection_revision"])
+            if "retrieval_url" in candidate:
+                spec["retrieval_url"] = candidate["retrieval_url"]
             intent = RunQueue(self.box).enqueue_in_transaction(spec, ticket_uuid=ticket)
             self.db.execute("""UPDATE source_call_targets SET state='queued',owner=NULL,lease_until=NULL,
                 collection_uuid=?,collection_revision=?,ticket_uuid=?,intent_uuid=?,error_code=NULL WHERE seq=?""",

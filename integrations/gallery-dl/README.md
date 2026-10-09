@@ -898,7 +898,7 @@ is no command-line token argument.
 | `drain` | Attempts one ready batch of at most eight events; exits 2 while local event work remains |
 | `retry EVENT_UUID` | Requeues one explicitly reviewed event with its original contents |
 | `receipt-status EVENT_UUID` | Reads actual server ingestion/worker status |
-| `queue-run --collection UUID --revision N --profile FILE --until TIME` | Records/coalesces a download request using the profile digest; low-level callers may use `--policy SHA256` instead |
+| `queue-run --collection UUID --revision N --profile FILE --until TIME [--retrieval-url URL]` | Records/coalesces a download request using the profile digest; low-level callers may use `--policy SHA256` instead |
 | `submit-runs` | Submits one ready request; exits 2 while requests remain pending, in flight or in review |
 | `dispatch --profile FILE` | Resolves/delivers/submits queued work and discovers at most one source attempt; retains pagination and backoff |
 | `dispatch-all --profiles FILE` | Delivers saved work and rotates across local download, enrichment and account-listing profiles and permitted collections |
@@ -914,6 +914,13 @@ file processor leaves new file events pending while previously committed
 receipts remain recoverable. `queue-run` succeeding means the request was recorded
 locally; `submit-runs` succeeding means requests were admitted by Stash. Neither
 command claims a completed scrape or starts a downloader.
+
+Reddit subscriptions use one canonical profile URL, not one collection per
+new/top/search pass. The n8n source-management flow registers this profile once.
+Profile caller inputs expand into internal retrievals; lookup binds each one to
+the same collection and returns `retrieval_url`. The producer retains that URL in
+the run ticket and completion proof, so completion of one pass cannot complete
+another. This is advertised as `profile_source_protocol: 1`.
 
 Collection lookup uses the native API's `collection_lookup` capability and
 `POST /collections/lookup`. A request contains up to 50 distinct exact source

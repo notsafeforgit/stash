@@ -7,6 +7,17 @@ import (
 )
 
 func validateSourceRunSchema(conn *sqlx.DB, version uint) error {
+	if version >= NativeSchemaBaseline+106 {
+		for _, name := range []string{"source_collection_aliases", "source_collection_alias_source", "source_collection_alias_immutable", "source_collection_alias_retained", "source_collection_alias_frozen", "source_run_retrievals", "source_run_retrieval_immutable", "source_run_retrieval_retained"} {
+			var exists bool
+			if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+				return err
+			}
+			if !exists {
+				return fmt.Errorf("native database schema is incomplete: missing %s", name)
+			}
+		}
+	}
 	if version >= NativeSchemaBaseline+103 {
 		if err := validateSourceRunPolicySchema(conn); err != nil {
 			return err

@@ -300,6 +300,7 @@ export function Collections({
             create={create}
             onBack={() => onSelect()}
             onChanged={changed}
+            onCanonicalSource={onSelect}
           />
         )}
         <div className={cn("flex flex-col gap-6", selected && "hidden")}>

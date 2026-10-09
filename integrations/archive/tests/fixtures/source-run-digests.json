@@ -128,5 +128,22 @@
       "cooldown_seconds": 30
     },
     "native_sha256": "30d5b056309ed758cb0b02e51f31899f7c57856a6e64f0cd9dfdc7e25a69924a"
+  },
+  {
+    "name": "reddit_profile_retrieval",
+    "input": {
+      "request_uuid": "33333333-3333-4333-8333-333333333333",
+      "collection_uuid": "22222222-2222-4222-8222-222222222222",
+      "collection_revision": 7,
+      "operation": "download",
+      "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "window": {
+        "since": null,
+        "until": "2026-10-01T00:00:00Z"
+      },
+      "cooldown_seconds": 30,
+      "retrieval_url": "https://www.reddit.com/search?q=author:example+nsfw:yes&include_over_18=on&sort=top&t=year"
+    },
+    "native_sha256": "72fe52be75678c4dd0a6665575d3e583ec8b009ddfc81393a0db7a97d584af0b"
   }
 ]

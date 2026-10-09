@@ -15,6 +15,9 @@ func sourceDefinitionSearch(filter models.SourceDefinitionFilter, collection boo
 		return "", nil, models.ErrSourceDefinitionInvalid
 	}
 	where := " WHERE b.uuid>? AND r.revision=b.revision"
+	if collection {
+		where += " AND NOT EXISTS(SELECT 1 FROM source_collection_aliases a WHERE a.alias_uuid=b.uuid)"
+	}
 	args := []interface{}{after}
 	if filter.State != "" {
 		where += " AND r.state=?"

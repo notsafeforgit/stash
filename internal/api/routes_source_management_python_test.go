@@ -33,7 +33,7 @@ func TestPythonSourceManagementPreservesOwnershipAndRecoversLostReplies(t *testi
 	var root *models.MediaRoot
 	var producer *models.IngestProducer
 	var existing *models.SourceCollection
-	targets := []string{"https://www.reddit.com/user/example/submitted/?sort=new", "https://www.reddit.com/user/example/submitted/?sort=top&t=all"}
+	targets := []string{"https://www.reddit.com/user/example/", "https://www.reddit.com/user/another/"}
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		var err error
 		root, err = repo.MediaRoot.Put(ctx, models.MediaRootInput{Origin: "review", MediaRootDefinition: models.MediaRootDefinition{Label: "Fixture root", State: "active"}})

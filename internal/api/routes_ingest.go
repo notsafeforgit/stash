@@ -14,6 +14,7 @@ import (
 	"github.com/stashapp/stash/internal/ingest"
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/scrape"
 )
 
 const ingestPath = "/api/v3/ingest"
@@ -183,6 +184,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"metadata_worker_policy_upgrade_protocol": 1,
 		"enrichment_collections_protocol":         1,
 		"source_backfill_protocol":                1,
+		"profile_source_protocol":                 1,
 		"collection_lookup":                       true,
 		"enrichment_protocol":                     2,
 		"enrichment_dispatch_protocol":            1,
@@ -203,6 +205,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 }
 
 type ingestCollectionBinding struct {
+	RetrievalURL       string `json:"retrieval_url,omitempty"`
 	CollectionUUID     string `json:"collection_uuid"`
 	CollectionRevision int    `json:"collection_revision"`
 	State              string `json:"state"`
@@ -231,13 +234,18 @@ func (rs *ingestRoutes) lookupCollections(w http.ResponseWriter, r *http.Request
 	matches := make([]ingestCollectionMatches, 0, len(input.Targets))
 	for _, target := range input.Targets {
 		entry := ingestCollectionMatches{TargetURL: target, Candidates: make([]ingestCollectionBinding, 0)}
+		profile := scrape.RedditProfileURL(target)
 		for _, collection := range result {
-			if collection.TargetURL == target {
+			if collection.TargetURL == target || (collection.Namespace == "native:reddit" && profile != "" && profile == collection.TargetURL) {
 				if len(entry.Candidates) == 128 {
 					entry.HasMore = true
 					continue
 				}
-				entry.Candidates = append(entry.Candidates, ingestCollectionBinding{collection.UUID, collection.Revision, collection.State})
+				binding := ingestCollectionBinding{CollectionUUID: collection.UUID, CollectionRevision: collection.Revision, State: collection.State}
+				if collection.TargetURL != target {
+					binding.RetrievalURL = target
+				}
+				entry.Candidates = append(entry.Candidates, binding)
 			}
 		}
 		matches = append(matches, entry)

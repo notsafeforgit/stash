@@ -1088,7 +1088,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 		// Only this isolated export discards policy history. Restore the guard
 		// in the same transaction; failure rolls back both schema and deletes.
 		retainedGuards := []string{}
-		for _, name := range []string{"source_run_policy_upgrade_retained", "metadata_worker_policy_retained", "metadata_worker_attempt_policy_retained"} {
+		for _, name := range []string{"source_collection_alias_retained", "source_run_retrieval_retained", "source_run_policy_upgrade_retained", "metadata_worker_policy_retained", "metadata_worker_attempt_policy_retained"} {
 			var definition string
 			if err := dbWrapper.Get(ctx, &definition, "SELECT sql FROM sqlite_schema WHERE type='trigger' AND name=?", name); err != nil {
 				return err
@@ -1151,7 +1151,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"source_backfill_requests", "source_backfill_decisions",
 			"source_enrichment_waiter_scopes", "source_enrichment_waiters", "source_service_turns",
 			"source_run_attempt_failures", "source_run_attempt_pacing", "enrichment_attempt_pacing", "source_run_pacing", "enrichment_job_pacing", "source_pacing",
-			"source_run_policy_upgrades", "source_run_requests", "source_run_attempts", "source_run_reviews", "source_runs", "source_run_cooldowns",
+			"source_run_retrievals", "source_run_policy_upgrades", "source_run_requests", "source_run_attempts", "source_run_reviews", "source_runs", "source_run_cooldowns",
 			"enrichment_checkpoint_releases", "enrichment_published_records", "enrichment_publications",
 			"enrichment_checkpoints", "enrichment_checkpoint_records", "enrichment_checkpoint_receipts", "enrichment_job_attempts", "enrichment_job_targets",
 			"metadata_worker_attempt_policies", "metadata_worker_policy_upgrades",
@@ -1173,7 +1173,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"post_attachment_selections", "post_attachment_decision_manifests", "post_attachment_decisions",
 			"attachment_media_links", "attachment_media_decisions", "source_media_evidence", "source_capture_attachment_manifests", "source_attachment_entries", "source_attachment_manifests", "source_attachments",
 			"capture_publisher_write_context", "capture_publisher_claims", "capture_publisher_heads", "capture_publisher_decisions",
-			"source_collection_post_evidence", "source_collection_captures", "source_collection_media_intake", "source_collection_revisions", "source_collections", "media_root_revisions", "media_roots",
+			"source_collection_aliases", "source_collection_post_evidence", "source_collection_captures", "source_collection_media_intake", "source_collection_revisions", "source_collections", "media_root_revisions", "media_roots",
 			"source_post_account_claims", "source_post_identifier_evidence", "source_post_url_evidence", "source_post_urls",
 			"source_post_threads", "source_capture_sightings", "source_capture_content", "source_capture_profiles", "source_captures", "source_post_revisions", "source_post_identifiers",
 			"source_post_consolidation_context", "source_post_consolidations", "source_post_identities", "source_posts", "source_profile_bodies", "source_payloads",

@@ -131,6 +131,8 @@ def completion_proof(box, backfill_uuid, source_uuid, spec):
         requested, pending, assignments = ticket_snapshot(box, item["ticket_uuid"])
         wanted = {key: value for key, value in summary["definition"].items() if key != "root_uuid"}
         wanted.update(collection_uuid=item["collection_uuid"], collection_revision=item["collection_revision"])
+        if "retrieval_url" in requested:
+            wanted["retrieval_url"] = item["target_url"]
         if pending or requested != wanted:
             raise InvalidData("Backfill ticket differs from its original binding")
         for assignment in assignments:

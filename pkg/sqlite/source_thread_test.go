@@ -17,6 +17,7 @@ import (
 
 func removeSourceThreadSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeProfileSourceSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER post_gallery_thread_share_insert;
 DROP TRIGGER post_gallery_thread_share_update;
 DROP TABLE source_post_threads;

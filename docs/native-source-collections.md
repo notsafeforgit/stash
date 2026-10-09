@@ -26,9 +26,13 @@ appends a definition revision, preserving the UUID, media associations and
 history. Stale revisions still conflict. This does not resurrect deleted media.
 
 An imported catalog collection groups previously collected posts and files. Its
-state is independent of the account's live scrape target collections: one account
-can have several targets, such as new submissions and top posts. Changing one
-collection does not change the other targets or the gallery-dl subscription list.
+state is independent of the account's live profile subscription. Each Reddit
+profile has one source URL, such as `https://www.reddit.com/user/example/`.
+New/top submissions and author-search passes are execution details of that source;
+they are not separate editable subscriptions. Pausing or retiring the profile
+blocks all its passes. The n8n add/remove flow registers or disables this one
+source and updates the gallery-dl subscription list. Editing a collection directly
+does not rewrite the saved list.
 Merely creating or activating a collection does not schedule downloads or assign
 performer metadata.
 Worker activation and metadata policy remain separate operations. Existing
@@ -209,3 +213,26 @@ identities and fails explicitly if exceeded. Draft validation checks constants
 and expressions in both scene and image rules, including the kind not currently
 selected as a sample. Producer tokens cannot edit policies or use administrative
 sample/reference routes.
+
+## Reddit profile retrievals
+
+Schema 1000106 consolidates equivalent existing Reddit retrieval definitions into
+one profile source per root and destination. Account, enabled state and metadata
+and translation policies must agree. Arbitrary searches, subreddit sources and
+saved feeds remain independent. Ambiguous or conflicting groups are retained for
+review. Canonical profile URLs use lowercase usernames.
+
+Old definitions remain as immutable aliases for execution receipts and captured
+provenance; source lists exclude them, and old collection links open the canonical
+profile. The profile activity view includes its historical retrieval runs. Pending
+runs keep their original URLs, requests, progress, completed windows and retry
+state, and must also pass the current profile's enabled-state and destination
+checks. The migration does not claim that a scrape completed.
+
+New producer calls expand a profile into the configured standard six Reddit
+passes. `/collections/lookup` resolves each pass to the one current source and
+returns its exact `retrieval_url`. Run requests retain that optional field and
+validate it against the subscribed profile. Each pass has separate coalescing and
+completion coverage, while the profile permits only one running pass at a time.
+Backfill completion still requires all relevant passes. Current-source edits
+continue to use normal revision checks; they do not rewrite immutable receipts.

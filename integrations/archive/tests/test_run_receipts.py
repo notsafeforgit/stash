@@ -26,6 +26,7 @@ class RunReceiptTests(ReceiptFixture):
         for name in ('source_runs', 'source_run_requests'):
             body = migration.split(f'CREATE TABLE {name} (', 1)[1].split('\n);', 1)[0]
             self.db.executescript(f'CREATE TABLE {name} (' + body + '\n);')
+        self.db.execute('CREATE TABLE source_run_retrievals(run_uuid TEXT PRIMARY KEY, url TEXT NOT NULL)')
         value = self.cases[0]['input']
         self.db.execute("INSERT INTO source_collection_revisions VALUES(?,?)",
                         (value['collection_uuid'], value['collection_revision']))
@@ -57,6 +58,8 @@ class RunReceiptTests(ReceiptFixture):
              request['policy_sha256'],request['cooldown_seconds'],'a'*64,'b'*64,json.dumps([request['window']])))
         self.db.execute("INSERT INTO source_run_requests VALUES(?,?,?,?,1)",
                         (PRODUCER,request['request_uuid'],native_hash,run))
+        if 'retrieval_url' in request:
+            self.db.execute('INSERT OR IGNORE INTO source_run_retrievals VALUES(?,?)', (run, request['retrieval_url']))
         self.db.commit()
         receipt = dict(request,uuid=run,root_uuid=MEDIA_ROOT,root_revision=1,state='queued')
         if acknowledge:
@@ -100,6 +103,25 @@ class RunReceiptTests(ReceiptFixture):
         self.db.commit()
         with self.assertRaisesRegex(InvalidArchive,'does not match the original request'):
             self.admissions()
+
+    def test_profile_retrieval_is_preserved_and_verified_separately(self):
+        target = 'https://www.reddit.com/user/example/submitted/?sort=top&t=year'
+        receipt = self.admit(self.submit(self.request(retrieval_url=target)))
+        self.assertEqual(self.admissions()['counts']['admitted'], 1)
+        self.box.db.execute('UPDATE run_requests SET receipt=?', (encode(dict(receipt, retrieval_url=target + 'x')),))
+        with self.assertRaisesRegex(InvalidArchive, 'another request or run'):
+            self.admissions()
+        self.box.db.execute('UPDATE run_requests SET receipt=?', (encode(receipt),))
+        self.db.execute('UPDATE source_run_retrievals SET url=?', (target + 'x',))
+        self.db.commit()
+        with self.assertRaisesRegex(InvalidArchive, 'does not match the original request'):
+            self.admissions()
+
+    def test_old_snapshot_without_profile_retrievals_remains_readable(self):
+        self.admit(self.submit())
+        self.db.execute('DROP TABLE source_run_retrievals')
+        self.db.commit()
+        self.assertEqual(self.admissions()['counts']['admitted'], 1)
 
     def test_lost_response_preserves_unadmitted_original_and_later_run_state(self):
         delivery = self.submit()

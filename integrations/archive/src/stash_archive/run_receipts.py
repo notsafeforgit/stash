@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import re
+from urllib.parse import urlsplit
 
 from .receipts import checked_json, identifier, objects
 from .storage import HEX, InvalidArchive, decode_json, json_bytes
@@ -15,8 +16,7 @@ STAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.(\d{1,9}))?(?:Z|[+-
 
 
 def producer_bytes(value):
-    # Source requests contain only UUID/hash/enum strings, integer revisions and
-    # normalized millisecond timestamps, unlike arbitrary captured source JSON.
+    # This is the producer's canonical encoding, including optional retrieval URLs.
     return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode()
 
 
@@ -44,8 +44,19 @@ def window(value):
 
 
 def template(value):
-    if not isinstance(value, dict) or set(value) != set(FIELDS):
+    if not isinstance(value, dict) or set(value) - {"retrieval_url"} != set(FIELDS):
         raise InvalidArchive("Invalid retained source request template")
+    if "retrieval_url" in value:
+        raw = value["retrieval_url"]
+        try:
+            if (not isinstance(raw, str) or not raw or raw.strip() != raw
+                    or len(raw.encode()) > 8192 or any(ord(c) < 32 or 127 <= ord(c) < 160 for c in raw)):
+                raise ValueError
+            parsed = urlsplit(raw)
+            if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username is not None:
+                raise ValueError
+        except ValueError:
+            raise InvalidArchive("Invalid retained retrieval URL") from None
     identifier(value["collection_uuid"])
     if (type(value["collection_revision"]) is not int or not 1 <= value["collection_revision"] <= 2147483647
             or value["operation"] not in ("download", "enrich")
@@ -61,10 +72,10 @@ def native_request_digest(value):
     SQLite source_run_requests stores this normalized typed representation, not
     the raw HTTP digest. Keep its field order and UTC RFC3339Nano timestamps.
     """
-    if not isinstance(value, dict) or set(value) != set(FIELDS) | {"request_uuid", "window"}:
+    if not isinstance(value, dict) or set(value) - {"retrieval_url"} != set(FIELDS) | {"request_uuid", "window"}:
         raise InvalidArchive("Invalid source admission request")
     identifier(value["request_uuid"])
-    definition = template({key: value[key] for key in FIELDS})
+    definition = template({key: item for key, item in value.items() if key not in ('request_uuid', 'window')})
     normalized = window(value["window"])
     if normalized.get('basis') and definition['operation'] != 'download':
         raise InvalidArchive('Retained traversal is not a download request')
@@ -81,8 +92,13 @@ def native_request_digest(value):
                "cooldown_seconds": definition["cooldown_seconds"]}
     if normalized.get('basis'):
         ordered['window']['basis'] = normalized['basis']
-    raw = json.dumps(ordered, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode()
-    return hashlib.sha256(raw).hexdigest()
+    if 'retrieval_url' in definition:
+        ordered = {'retrieval_url': definition['retrieval_url'], **ordered}
+    raw = json.dumps(ordered, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    # Go's default JSON encoder escapes HTML characters, including URL '&'.
+    for character in ('&', '<', '>', '\u2028', '\u2029'):
+        raw = raw.replace(character, '\\u%04x' % ord(character))
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 
 def retained_template(row):
@@ -102,6 +118,9 @@ def verify_run_admissions(library, queue, producer, version):
     counters = {key: 0 for key in ("admitted", "pending", "sending", "review", "accepted_unacknowledged")}
     report = {"intents": 0, "pending_windows": 0, "requests": 0, "maximum_sequence": 0, "counts": counters}
     intent_digest, request_digest = hashlib.sha256(), hashlib.sha256()
+    retrieval = ('(SELECT url FROM source_run_retrievals WHERE run_uuid=j.uuid)'
+                 if library.execute("SELECT 1 FROM sqlite_schema WHERE name='source_run_retrievals'").fetchone()
+                 else 'NULL')
     if version == 1:
         if queue.execute("SELECT 1 FROM sqlite_schema WHERE name IN ('run_intents','run_requests') LIMIT 1").fetchone():
             raise InvalidArchive("Producer schema version would omit retained source admission state")
@@ -155,8 +174,9 @@ def verify_run_admissions(library, queue, producer, version):
         if hashlib.sha256(raw).hexdigest() != row["sha256"]:
             raise InvalidArchive("Source request cannot be reconstructed from its retained template and window")
         native_hash = native_request_digest(request)
-        native = list(objects(library, """SELECT r.digest,r.run_uuid,j.uuid AS native_run_uuid,
-            j.collection_uuid,j.collection_revision,j.operation,j.policy_sha256,j.cooldown_seconds,j.root_uuid,j.root_revision
+        native = list(objects(library, f"""SELECT r.digest,r.run_uuid,j.uuid AS native_run_uuid,
+            j.collection_uuid,j.collection_revision,j.operation,j.policy_sha256,j.cooldown_seconds,j.root_uuid,j.root_revision,
+            {retrieval} AS retrieval_url
             FROM source_run_requests r LEFT JOIN source_runs j ON j.uuid=r.run_uuid
             WHERE r.producer_uuid=? AND r.request_uuid=?""", (producer, row["request_uuid"])))
         if len(native) > 1:
@@ -164,6 +184,7 @@ def verify_run_admissions(library, queue, producer, version):
         server = native[0] if native else None
         if server is not None:
             if (server["digest"] != native_hash or server["run_uuid"] != server["native_run_uuid"]
+                    or server['retrieval_url'] != request.get('retrieval_url')
                     or json_bytes({key:server[key] for key in FIELDS}) != json_bytes({key:request[key] for key in FIELDS})):
                 raise InvalidArchive("Native source admission does not match the original request")
             identifier(server["run_uuid"])
@@ -172,7 +193,7 @@ def verify_run_admissions(library, queue, producer, version):
                 raise InvalidArchive("Admitted producer request is missing from the native snapshot")
             receipt = checked_json(row["receipt"], 65536)
             expected = {key: server[key] for key in FIELDS + ("root_uuid", "root_revision")}
-            expected.update(request_uuid=row["request_uuid"], uuid=server["run_uuid"])
+            expected.update(request_uuid=row["request_uuid"], uuid=server["run_uuid"], retrieval_url=server['retrieval_url'])
             if (row["body"] is not None or row["run_uuid"] != server["run_uuid"]
                     or json_bytes({key:receipt.get(key) for key in expected}) != json_bytes(expected)
                     or receipt.get("state") not in ("queued", "running", "succeeded", "deferred", "cancelled")):

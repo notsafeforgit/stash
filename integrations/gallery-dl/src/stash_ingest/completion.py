@@ -55,6 +55,8 @@ def validate_run(value, assignment, requested, expected=None):
         if any(type(record.get(field)) is not type(requested[field]) or record[field] != requested[field]
                for record in (receipt, value)):
             raise InvalidData("Source status does not match this caller's definition")
+    if any(record.get("retrieval_url") != requested.get("retrieval_url") for record in (receipt, value)):
+        raise InvalidData("Source status changed the requested retrieval")
     root = receipt.get("root_uuid")
     if expected is not None and root != expected["root_uuid"]:
         raise InvalidData("Caller admission changed its original root")
@@ -101,12 +103,16 @@ class _RunStatuses:
         return current
 
 
-def inspect_ticket(box, client, ticket_uuid, *, _statuses=None, _expected=None):
+def inspect_ticket(box, client, ticket_uuid, *, _statuses=None, _expected=None, _expected_target=None):
     if (box.endpoint, box.producer) != (client.endpoint, client.producer):
         raise Conflict("Caller ticket and client identify different Stash producers")
     requested, unassigned, assignments = ticket_snapshot(box, ticket_uuid)
-    if _expected is not None and requested != {key: value for key, value in _expected.items() if key != "root_uuid"}:
-        raise InvalidData("Caller ticket differs from its frozen source binding")
+    if _expected is not None:
+        wanted = {key: value for key, value in _expected.items() if key != "root_uuid"}
+        if "retrieval_url" in requested:
+            wanted["retrieval_url"] = _expected_target
+        if requested != wanted:
+            raise InvalidData("Caller ticket differs from its frozen source binding")
     statuses = _statuses or _RunStatuses(client)
     if statuses.client is not client:
         raise Conflict("Source status reader identifies a different Stash client")
@@ -163,7 +169,7 @@ def inspect_call(calls, client, call_uuid):
                         raise InvalidData("Caller target has a different ticket identity")
                     expected = {**summary["definition"], "collection_uuid": item["collection_uuid"],
                                 "collection_revision": item["collection_revision"]}
-                    result = inspect_ticket(calls.box, client, item["ticket_uuid"], _statuses=statuses, _expected=expected)
+                    result = inspect_ticket(calls.box, client, item["ticket_uuid"], _statuses=statuses, _expected=expected, _expected_target=item["target_url"])
                     state = result["state"]
                     code = next((part["error_code"] for part in result["submissions"] if part.get("error_code")), None)
                 except InvalidData:

@@ -91,7 +91,7 @@ class RunLease:
         if deadline <= self.clock():
             raise SourcePaused("Source lease expired before its response arrived")
         if self.run is not None:
-            for field in ("policy_sha256", "execution_policy_sha256", "collection_uuid", "collection_revision", "target_url", "path_prefix",
+            for field in ("policy_sha256", "execution_policy_sha256", "collection_uuid", "collection_revision", "target_url", "retrieval_url", "path_prefix",
                           "root_uuid", "root_revision", "window", "operation", "recovery", "turn_until"):
                 if run.get(field) != self.run.get(field):
                     raise SourcePaused("Source lease definition changed")
@@ -181,7 +181,7 @@ class RunLease:
                         or result.get("fence") != self.run["fence"] or result.get("state") not in expected
                         or any(result.get(field) != self.run.get(field) for field in (
                             "policy_sha256", "execution_policy_sha256", "collection_uuid", "collection_revision", "root_uuid", "root_revision",
-                            "target_url", "path_prefix", "operation"))):
+                            "target_url", "retrieval_url", "path_prefix", "operation"))):
                     raise SourcePaused("Run completion was not acknowledged")
                 return result
             finally:

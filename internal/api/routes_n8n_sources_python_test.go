@@ -95,13 +95,13 @@ func TestPythonNativeSourceWorkflowsRecoverPoliciesAndUseLinkedAccounts(t *testi
 	}
 	run("lost_policy_reply")
 	require.True(t, dropped.Load())
-	require.EqualValues(t, 7, writes.Load(), "six collections and the first policy were saved")
+	require.EqualValues(t, 2, writes.Load(), "one profile and its policy were saved")
 	run("resume")
-	require.EqualValues(t, 12, writes.Load(), "retry creates only the five missing policies")
+	require.EqualValues(t, 2, writes.Load(), "retry reuses the committed profile and policy")
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		collections, err := repo.SourceCollection.List(ctx, "", 20)
 		require.NoError(t, err)
-		require.Len(t, collections, 6)
+		require.Len(t, collections, 1)
 		for _, collection := range collections {
 			require.Nil(t, collection.AccountUUID, "registration cannot invent account ownership")
 			policy, err := repo.MetadataPolicy.Find(ctx, collection.UUID)
@@ -134,7 +134,7 @@ INSERT INTO performer_names(performer_id,name,position) VALUES(1,'A different di
 		return err
 	}))
 	run("linked_removal")
-	require.EqualValues(t, 18, writes.Load(), "six sources disabled; completed request replay makes no writes")
+	require.EqualValues(t, 3, writes.Load(), "one profile disabled; completed request replay makes no writes")
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		collections, err := repo.SourceCollection.List(ctx, "", 20)
 		require.NoError(t, err)

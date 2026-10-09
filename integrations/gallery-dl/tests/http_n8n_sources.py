@@ -39,7 +39,7 @@ if setup["phase"] == "lost_policy_reply":
     assert reddit.read_bytes() == original
 elif setup["phase"] == "resume":
     result = run("add", "example", "100")
-    assert result["complete"] and result["added"] and result["source_targets"] == 6
+    assert result["complete"] and result["added"] and result["source_targets"] == 1
     assert result["scrape_completion"] == "not_checked"
     assert reddit.read_bytes() == original + b"https://reddit.com/user/example/submitted/\r\n"
 elif setup["phase"] == "linked_removal":

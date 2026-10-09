@@ -65,6 +65,7 @@ export const jobActivitySchema = common
 export const runActivitySchema = common
   .extend({
     collection_uuid: uuid,
+    canonical_collection_uuid: uuid.optional(),
     collection_revision: positive,
     collection_label: collectionSchema.shape.label,
     target_url: collectionSchema.shape.target_url,

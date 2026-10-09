@@ -54,15 +54,20 @@ type sourceRunRow struct {
 func (row sourceRunRow) resolve(ctx context.Context) (*models.SourceRun, error) {
 	var definition struct {
 		TargetURL       string `db:"target_url"`
+		RetrievalURL    string `db:"retrieval_url"`
 		PathPrefix      string `db:"path_prefix"`
 		ExecutionPolicy string `db:"execution_policy"`
 	}
 	if err := dbWrapper.Get(ctx, &definition, `SELECT target_url,path_prefix,
+coalesce((SELECT url FROM source_run_retrievals WHERE run_uuid=?),'') AS retrieval_url,
 coalesce((SELECT policy_sha256 FROM source_run_policy_upgrades WHERE run_uuid=? ORDER BY expected_revision DESC LIMIT 1),?) AS execution_policy
-FROM source_collection_revisions WHERE collection_uuid=? AND revision=?`, row.UUID, row.Policy, row.Collection, row.CollectionRevision); err != nil {
+FROM source_collection_revisions WHERE collection_uuid=? AND revision=?`, row.UUID, row.UUID, row.Policy, row.Collection, row.CollectionRevision); err != nil {
 		return nil, err
 	}
-	r := &models.SourceRun{Sequence: row.Sequence, UUID: row.UUID, CollectionUUID: row.Collection, CollectionRevision: row.CollectionRevision,
+	if definition.RetrievalURL != "" {
+		definition.TargetURL = definition.RetrievalURL
+	}
+	r := &models.SourceRun{RetrievalURL: definition.RetrievalURL, Sequence: row.Sequence, UUID: row.UUID, CollectionUUID: row.Collection, CollectionRevision: row.CollectionRevision,
 		TargetURL: definition.TargetURL, PathPrefix: definition.PathPrefix,
 		RootUUID: row.Root, RootRevision: int(row.RootRevision.Int64), Operation: row.Operation, PolicySHA256: row.Policy, CooldownSeconds: row.Cooldown,
 		ExecutionPolicySHA256: definition.ExecutionPolicy,
@@ -151,6 +156,9 @@ func sourceRunDefinition(ctx context.Context, r *models.SourceRun) (*models.Sour
 		(c.RootUUID == nil) != (r.RootUUID == nil) || (c.RootUUID != nil && *c.RootUUID != *r.RootUUID) {
 		return nil, nil, models.ErrSourceDefinitionConflict
 	}
+	if err := profileAliasActive(ctx, c); err != nil {
+		return nil, nil, err
+	}
 	var root *models.MediaRoot
 	if c.RootUUID != nil {
 		root, err = (&MediaRootStore{}).Find(ctx, *c.RootUUID)
@@ -222,6 +230,12 @@ func (s *SourceRunStore) enqueue(ctx context.Context, input models.SourceRunRequ
 		(input.Operation == "download" && c.RootUUID == nil) {
 		return nil, false, models.ErrSourceDefinitionConflict
 	}
+	if err := profileAliasActive(ctx, c); err != nil {
+		return nil, false, err
+	}
+	if (input.RetrievalURL != "" && c.Namespace != "native:reddit") || !scrape.RetrievalURL(c.TargetURL, input.RetrievalURL) {
+		return nil, false, models.ErrSourceRunInvalid
+	}
 	var rootRevision any
 	if c.RootUUID != nil {
 		root, err := (&MediaRootStore{}).Find(ctx, *c.RootUUID)
@@ -234,6 +248,9 @@ func (s *SourceRunStore) enqueue(ctx context.Context, input models.SourceRunRequ
 		rootRevision = root.Revision
 	}
 	workDefinition := []any{c.UUID, c.Revision, rootRevision, input.Operation, input.PolicySHA256, input.CooldownSeconds}
+	if input.RetrievalURL != "" {
+		workDefinition = append(workDefinition, input.RetrievalURL)
+	}
 	if input.Window.Basis != "" {
 		workDefinition = append(workDefinition, input.Window.Basis)
 	}
@@ -300,6 +317,11 @@ VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, c.UUID, c.Revision, c.RootUUID, rootRe
 			return nil, false, err
 		}
 	}
+	if created && input.RetrievalURL != "" {
+		if _, err := dbWrapper.Exec(ctx, "INSERT INTO source_run_retrievals(run_uuid,url) VALUES(?,?)", id, input.RetrievalURL); err != nil {
+			return nil, false, err
+		}
+	}
 	run, err := s.Find(ctx, id)
 	return run, created, err
 }
@@ -312,7 +334,7 @@ func (s *SourceRunStore) List(ctx context.Context, collection string, roots []*s
 	if err != nil {
 		return nil, models.ErrSourceRunInvalid
 	}
-	args := []any{collection, after}
+	args := []any{collection, collection, after}
 	for _, root := range roots {
 		if root != nil && !validSourceRunUUID(*root) {
 			return nil, models.ErrSourceRunInvalid
@@ -320,7 +342,7 @@ func (s *SourceRunStore) List(ctx context.Context, collection string, roots []*s
 		args = append(args, root)
 	}
 	args = append(args, limit)
-	query := "SELECT * FROM source_runs WHERE collection_uuid=? AND id>? AND (" +
+	query := "SELECT * FROM source_runs WHERE collection_uuid IN (SELECT ? UNION ALL SELECT alias_uuid FROM source_collection_aliases WHERE source_uuid=?) AND id>? AND (" +
 		strings.TrimSuffix(strings.Repeat("root_uuid IS ? OR ", len(roots)), " OR ") + ") ORDER BY id LIMIT ?"
 	var rows []sourceRunRow
 	if err := dbWrapper.Select(ctx, &rows, query, args...); err != nil {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/scrape"
 )
 
 type SourceCollectionStore struct{}
@@ -103,6 +104,9 @@ func (s *SourceCollectionStore) Put(ctx context.Context, input models.SourceColl
 	if err := normalizeCollectionDefinition(&input); err != nil {
 		return nil, fmt.Errorf("%w: %s", models.ErrSourceDefinitionInvalid, err)
 	}
+	if err := normalizeProfileSource(ctx, &input, id); err != nil {
+		return nil, err
+	}
 	current, err := s.Find(ctx, id)
 	if err != nil {
 		return nil, err
@@ -149,7 +153,27 @@ func (s *SourceCollectionStore) Find(ctx context.Context, value string) (*models
 		}
 		return nil, err
 	}
-	return row.resolve(), nil
+	ret := row.resolve()
+	var aliases []struct {
+		UUID   string  `db:"uuid"`
+		State  string  `db:"state"`
+		Target string  `db:"target_url"`
+		Root   *string `db:"root_uuid"`
+		Prefix string  `db:"path_prefix"`
+	}
+	if err := dbWrapper.Select(ctx, &aliases, `SELECT s.uuid,r.state,r.target_url,r.root_uuid,r.path_prefix FROM source_collection_aliases a
+ JOIN source_collections s ON s.uuid=a.source_uuid JOIN source_collection_revisions r ON r.collection_uuid=s.uuid AND r.revision=s.revision
+ WHERE a.alias_uuid=?`, id); err != nil {
+		return nil, err
+	}
+	if len(aliases) > 0 {
+		canonical := aliases[0]
+		ret.CanonicalUUID, ret.State = canonical.UUID, canonical.State
+		if canonical.Target != scrape.RedditProfileURL(ret.TargetURL) || !reflect.DeepEqual(canonical.Root, ret.RootUUID) || canonical.Prefix != ret.PathPrefix {
+			ret.State = "disabled"
+		}
+	}
+	return ret, nil
 }
 
 func resolveCollections(rows []sourceCollectionRow) []*models.SourceCollection {
@@ -166,7 +190,7 @@ func (s *SourceCollectionStore) List(ctx context.Context, after string, limit in
 		return nil, err
 	}
 	var rows []sourceCollectionRow
-	if err := dbWrapper.Select(ctx, &rows, sourceCollectionSelect+" WHERE b.uuid>? AND r.revision=b.revision ORDER BY b.uuid LIMIT ?", after, limit); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, sourceCollectionSelect+" WHERE b.uuid>? AND r.revision=b.revision AND NOT EXISTS(SELECT 1 FROM source_collection_aliases a WHERE a.alias_uuid=b.uuid) ORDER BY b.uuid LIMIT ?", after, limit); err != nil {
 		return nil, err
 	}
 	return resolveCollections(rows), nil
@@ -218,9 +242,11 @@ func (s *SourceCollectionStore) LookupCurrentTargets(ctx context.Context, target
 		return nil, err
 	}
 	ret := make([]*models.SourceCollection, 0)
+	seen := map[string]bool{}
 	for _, target := range targets {
-		query := sourceCollectionSelect + " WHERE r.revision=b.revision AND r.target_url!='' AND r.target_url=? AND r.root_uuid IS ?"
-		args := []any{target, root}
+		profile := scrape.RedditProfileURL(target)
+		query := sourceCollectionSelect + " WHERE r.revision=b.revision AND r.target_url!='' AND (r.target_url=? OR (r.namespace='native:reddit' AND r.target_url=?)) AND r.root_uuid IS ? AND NOT EXISTS(SELECT 1 FROM source_collection_aliases a WHERE a.alias_uuid=b.uuid)"
+		args := []any{target, profile, root}
 		if !allCollections {
 			query += " AND b.uuid IN (SELECT value FROM json_each(?))"
 			args = append(args, collectionJSON)
@@ -232,7 +258,12 @@ func (s *SourceCollectionStore) LookupCurrentTargets(ctx context.Context, target
 		if err := dbWrapper.Select(ctx, &rows, query, args...); err != nil {
 			return nil, err
 		}
-		ret = append(ret, resolveCollections(rows)...)
+		for _, row := range rows {
+			if !seen[row.UUID] {
+				ret = append(ret, row.resolve())
+				seen[row.UUID] = true
+			}
+		}
 	}
 	return ret, nil
 }

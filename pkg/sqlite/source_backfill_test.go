@@ -139,15 +139,16 @@ func TestSourceBackfillNativeProofRequiresEveryOriginalRequestWindow(t *testing.
 	require.NoError(t, err)
 	middle := f.now.Add(-24 * time.Hour)
 	var last *models.SourceRun
+	collection := putSourceCollection(t, f.repo, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
+		Label: "Backfill profile", Kind: "account", Namespace: "native:reddit", State: "active", TargetURL: scrape.RedditProfileURL(targets[0]), RootUUID: &f.root.UUID, PathPrefix: "Example"}})
 	for i, target := range targets {
-		collection := putSourceCollection(t, f.repo, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
-			Label: "Backfill component", Kind: "feed", Namespace: "native:reddit", State: "active", TargetURL: target, RootUUID: &f.root.UUID, PathPrefix: "Example"}})
 		windows := []models.SourceWindow{{Until: f.now}}
 		if i == 0 {
 			windows = []models.SourceWindow{{Until: middle}, {Since: &middle, Until: f.now}}
 		}
 		for _, window := range windows {
 			request := f.request()
+			request.RetrievalURL = target
 			request.CollectionUUID, request.CollectionRevision, request.Window, request.CooldownSeconds = collection.UUID, collection.Revision, window, 0
 			input.Requests = append(input.Requests, request)
 			last = f.submit(t, request)

@@ -29,9 +29,9 @@ func (s *SourceCollectionStore) DirectoryScopes(ctx context.Context, root, direc
 	// ownership of every folder. Filter it before the per-directory bound so a
 	// large source list cannot prevent unrelated manual intake. The uncorrelated
 	// subquery reads the selected directory's file evidence once through its index.
-	query += ` AND (r.path_prefix!='.' OR r.kind IN ('directory','manual_batch')`
+	query += ` AND NOT EXISTS(SELECT 1 FROM source_collection_aliases a WHERE a.alias_uuid=b.uuid) AND (r.path_prefix!='.' OR r.kind IN ('directory','manual_batch')`
 	if directory != "." {
-		query += ` OR b.uuid IN (SELECT DISTINCT collection_uuid FROM source_file_observations INDEXED BY source_file_observation_location
+		query += ` OR b.uuid IN (SELECT DISTINCT coalesce((SELECT source_uuid FROM source_collection_aliases WHERE alias_uuid=o.collection_uuid),o.collection_uuid) FROM source_file_observations o INDEXED BY source_file_observation_location
 WHERE root_uuid=? AND archive_path IS NULL AND relative_path>=? AND relative_path<?
 AND instr(substr(relative_path,?),'/')=0)`
 		args = append(args, root, directory+"/", directory+"0", len([]rune(directory))+2)

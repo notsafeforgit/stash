@@ -3,6 +3,7 @@ import { withReviewRecord } from "./review-storage";
 import { NativeArchiveError } from "./client";
 import {
   collectionInputSchema,
+  normalizeProfileSource,
   type CollectionAPI,
   type CollectionInput,
 } from "./collection-api";
@@ -38,7 +39,7 @@ export function createCollectionOutbox(api: CollectionAPI) {
   }
   const read = (id: string) => transaction(id, "readonly", (value) => value);
   async function prepare(input: CollectionInput) {
-    const checked = collectionInputSchema.parse(input);
+    const checked = normalizeProfileSource(collectionInputSchema.parse(input));
     const body = JSON.stringify(checked);
     if (new TextEncoder().encode(body).length > 24576)
       throw new NativeArchiveError(0, "request_too_large");

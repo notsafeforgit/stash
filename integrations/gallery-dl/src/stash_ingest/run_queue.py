@@ -13,8 +13,11 @@ from . import tickets
 
 def specification(value):
     fields = {"collection_uuid", "collection_revision", "operation", "policy_sha256", "cooldown_seconds", "window"}
-    if not isinstance(value, dict) or set(value) != fields:
+    if not isinstance(value, dict) or set(value) - {"retrieval_url"} != fields:
         raise InvalidData("Source requests accept only the typed collection, policy and window fields")
+    if "retrieval_url" in value:
+        from .collections import target_url
+        target_url(value["retrieval_url"])
     identifier(value["collection_uuid"])
     if (type(value["collection_revision"]) is not int or not 1 <= value["collection_revision"] <= 2147483647
             or value["operation"] not in ("download", "enrich") or not sha256(value["policy_sha256"])
@@ -159,6 +162,8 @@ class RunQueue:
                     or any(receipt.get(k) != request[k] for k in (
                         "collection_uuid", "collection_revision", "operation", "policy_sha256", "cooldown_seconds"))):
                 raise Conflict("Run admission does not acknowledge this source request")
+            if receipt.get("retrieval_url") != request.get("retrieval_url"):
+                raise Conflict("Run admission changed the requested retrieval")
             run_id = identifier(receipt.get("uuid"))
             if request["operation"] == "download":
                 identifier(receipt.get("root_uuid"))

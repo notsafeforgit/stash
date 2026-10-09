@@ -67,8 +67,10 @@ def collection(value, expected_uuid=None, *, history=False):
     keys = DEFINITION | {"uuid", "revision", "created_at"}
     if history:
         keys |= {"origin", "reason", "recorded_at"}
-    if not isinstance(value, dict) or set(value) != keys:
+    if not isinstance(value, dict) or set(value) - {"canonical_uuid"} != keys:
         raise InvalidData("Invalid source collection response")
+    if "canonical_uuid" in value:
+        identifier(value["canonical_uuid"])
     definition({key: value[key] for key in DEFINITION})
     identifier(value["uuid"])
     integer(value["revision"], 1, 2147483647)

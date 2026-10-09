@@ -53,7 +53,8 @@ type SourceCollectionDefinition struct {
 }
 
 type SourceCollection struct {
-	UUID string `json:"uuid"`
+	CanonicalUUID string `json:"canonical_uuid,omitempty"`
+	UUID          string `json:"uuid"`
 	SourceCollectionDefinition
 	Revision  int       `json:"revision"`
 	CreatedAt time.Time `json:"created_at"`

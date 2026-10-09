@@ -39,12 +39,14 @@ export function CollectionEditor({
   create,
   onBack,
   onChanged,
+  onCanonicalSource,
 }: {
   api: CollectionAPI;
   id: string;
   create: boolean;
   onBack: () => void;
   onChanged: (collection: Collection) => void;
+  onCanonicalSource?: (id: string) => void;
 }) {
   const msg = useMsg();
   const [outbox] = useState(() => createCollectionOutbox(api));
@@ -75,6 +77,11 @@ export function CollectionEditor({
         let current: Collection | undefined;
         try {
           current = await api.collection(id, controller.signal);
+          if (current.canonical_uuid && onCanonicalSource) {
+            if (pending) throw new NativeArchiveError(409, "preview_changed");
+            onCanonicalSource(current.canonical_uuid);
+            return;
+          }
         } catch (error) {
           if (
             !(
@@ -133,7 +140,16 @@ export function CollectionEditor({
     }
     void load();
     return () => controller.abort();
-  }, [api, accounts, outbox, id, create, onChanged, refresh]);
+  }, [
+    api,
+    accounts,
+    outbox,
+    id,
+    create,
+    onChanged,
+    onCanonicalSource,
+    refresh,
+  ]);
   async function deliver(input?: CollectionInput) {
     setBusy(true);
     setError(undefined);

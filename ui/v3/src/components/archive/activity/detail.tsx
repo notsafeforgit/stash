@@ -261,7 +261,9 @@ export function ActivityDetail({
                       q: "",
                       state: "",
                       kind: "",
-                      collection: run.summary.collection_uuid,
+                      collection:
+                        run.summary.canonical_collection_uuid ??
+                        run.summary.collection_uuid,
                     }}
                   >
                     {msg("archive_activity.open_collection", "Open collection")}

@@ -19,6 +19,7 @@ type SourceWindow struct {
 // PolicySHA256 identifies the effective, secret-free worker configuration and
 // adapter version. It never contains executable commands or website logins.
 type SourceRunRequest struct {
+	RetrievalURL       string       `json:"retrieval_url,omitempty"`
 	RequestUUID        string       `json:"request_uuid"`
 	CollectionUUID     string       `json:"collection_uuid"`
 	CollectionRevision int          `json:"collection_revision"`
@@ -29,6 +30,7 @@ type SourceRunRequest struct {
 }
 
 type SourceRun struct {
+	RetrievalURL          string             `json:"retrieval_url,omitempty"`
 	Sequence              int64              `json:"sequence"`
 	UUID                  string             `json:"uuid"`
 	CollectionUUID        string             `json:"collection_uuid"`

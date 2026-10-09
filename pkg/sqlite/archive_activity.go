@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -115,28 +116,29 @@ func (s *ArchiveActivityStore) Job(ctx context.Context, id string) (*models.Arch
 }
 
 type runActivityRow struct {
-	Sequence           int64         `db:"id"`
-	UUID               string        `db:"uuid"`
-	CollectionUUID     string        `db:"collection_uuid"`
-	CollectionRevision int           `db:"collection_revision"`
-	CollectionLabel    string        `db:"label"`
-	TargetURL          string        `db:"target_url"`
-	Operation          string        `db:"operation"`
-	State              string        `db:"state"`
-	Revision           int64         `db:"revision"`
-	AttemptCount       int64         `db:"fence"`
-	Failures           int           `db:"failures"`
-	PendingWindows     int           `db:"pending_windows"`
-	CompletedWindows   int           `db:"completed_windows"`
-	AvailableAt        int64         `db:"available_at_ms"`
-	LeaseUntil         sql.NullInt64 `db:"lease_until_ms"`
-	ErrorCode          string        `db:"error_code"`
-	CreatedAt          int64         `db:"created_at_ms"`
-	UpdatedAt          int64         `db:"updated_at_ms"`
+	CanonicalCollectionUUID string        `db:"canonical_collection_uuid"`
+	Sequence                int64         `db:"id"`
+	UUID                    string        `db:"uuid"`
+	CollectionUUID          string        `db:"collection_uuid"`
+	CollectionRevision      int           `db:"collection_revision"`
+	CollectionLabel         string        `db:"label"`
+	TargetURL               string        `db:"target_url"`
+	Operation               string        `db:"operation"`
+	State                   string        `db:"state"`
+	Revision                int64         `db:"revision"`
+	AttemptCount            int64         `db:"fence"`
+	Failures                int           `db:"failures"`
+	PendingWindows          int           `db:"pending_windows"`
+	CompletedWindows        int           `db:"completed_windows"`
+	AvailableAt             int64         `db:"available_at_ms"`
+	LeaseUntil              sql.NullInt64 `db:"lease_until_ms"`
+	ErrorCode               string        `db:"error_code"`
+	CreatedAt               int64         `db:"created_at_ms"`
+	UpdatedAt               int64         `db:"updated_at_ms"`
 }
 
 func (row runActivityRow) resolve() models.SourceRunActivity {
-	return models.SourceRunActivity{Sequence: row.Sequence, UUID: row.UUID, CollectionUUID: row.CollectionUUID,
+	return models.SourceRunActivity{CanonicalCollectionUUID: row.CanonicalCollectionUUID, Sequence: row.Sequence, UUID: row.UUID, CollectionUUID: row.CollectionUUID,
 		CollectionRevision: row.CollectionRevision, CollectionLabel: row.CollectionLabel, TargetURL: row.TargetURL,
 		Operation: row.Operation, State: row.State, Revision: row.Revision, AttemptCount: row.AttemptCount, Failures: row.Failures,
 		PendingWindows: row.PendingWindows, CompletedWindows: row.CompletedWindows,
@@ -146,7 +148,8 @@ func (row runActivityRow) resolve() models.SourceRunActivity {
 
 // Keep the captured collection revision, even if the current collection changes
 // its name, target URL or root. CROSS JOIN retains the bounded run scan first.
-const runActivitySelect = `SELECT r.id,r.uuid,r.collection_uuid,r.collection_revision,c.label,c.target_url,
+const runActivitySelect = `SELECT r.id,r.uuid,r.collection_uuid,r.collection_revision,c.label,coalesce((SELECT url FROM source_run_retrievals WHERE run_uuid=r.uuid),c.target_url) AS target_url,
+coalesce((SELECT source_uuid FROM source_collection_aliases WHERE alias_uuid=r.collection_uuid),'') AS canonical_collection_uuid,
 r.operation,r.state,r.revision,r.fence,r.failures,json_array_length(r.pending) AS pending_windows,
 json_array_length(r.completed) AS completed_windows,r.available_at_ms,r.lease_until_ms,r.error_code,r.created_at_ms,r.updated_at_ms
 FROM source_runs r CROSS JOIN source_collection_revisions c ON c.collection_uuid=r.collection_uuid AND c.revision=r.collection_revision`
@@ -173,17 +176,41 @@ func runActivityQuery(filter models.SourceRunActivityFilter) (string, []any, err
 }
 
 func (s *ArchiveActivityStore) Runs(ctx context.Context, filter models.SourceRunActivityFilter) ([]models.SourceRunActivity, error) {
-	query, args, err := runActivityQuery(filter)
-	if err != nil {
+	if _, _, err := runActivityQuery(filter); err != nil {
 		return nil, err
 	}
-	var rows []runActivityRow
-	if err := dbWrapper.Select(ctx, &rows, query, args...); err != nil {
-		return nil, err
+	members := []string{filter.CollectionUUID}
+	if filter.CollectionUUID != "" {
+		var aliases []string
+		if err := dbWrapper.Select(ctx, &aliases, "SELECT alias_uuid FROM source_collection_aliases WHERE source_uuid=? ORDER BY alias_uuid LIMIT 129", filter.CollectionUUID); err != nil {
+			return nil, err
+		}
+		if len(aliases) > 128 {
+			return nil, models.ErrArchiveActivityInvalid
+		}
+		members = append(members, aliases...)
 	}
-	ret := make([]models.SourceRunActivity, 0, len(rows))
-	for _, row := range rows {
-		ret = append(ret, row.resolve())
+	// Read a bounded, indexed page per historical member. Never sort a profile's
+	// complete execution history just to return its newest activity page.
+	ret := []models.SourceRunActivity{}
+	for _, id := range members {
+		selected := filter
+		selected.CollectionUUID = id
+		query, args, err := runActivityQuery(selected)
+		if err != nil {
+			return nil, err
+		}
+		var rows []runActivityRow
+		if err := dbWrapper.Select(ctx, &rows, query, args...); err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			ret = append(ret, row.resolve())
+		}
+	}
+	sort.Slice(ret, func(i, j int) bool { return ret[i].Sequence > ret[j].Sequence })
+	if len(ret) > filter.Limit {
+		ret = ret[:filter.Limit]
 	}
 	return ret, nil
 }

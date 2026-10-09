@@ -54,7 +54,7 @@ func (s *ScanJournalStore) PreviewActivation(ctx context.Context, input models.S
 	if err != nil {
 		return nil, err
 	}
-	if c == nil || c.State != "active" || c.Revision != input.CollectionRevision || c.RootUUID == nil || *c.RootUUID != journal.RootUUID || c.TargetURL != anchor.TargetURL {
+	if c == nil || c.State != "active" || c.Revision != input.CollectionRevision || c.RootUUID == nil || *c.RootUUID != journal.RootUUID || (c.TargetURL != anchor.TargetURL && !scrape.RetrievalURL(c.TargetURL, anchor.TargetURL)) {
 		return nil, models.ErrSourceDefinitionConflict
 	}
 	root, err := (&MediaRootStore{}).Find(ctx, journal.RootUUID)
@@ -166,8 +166,19 @@ func (s *ScanJournalStore) Activate(ctx context.Context, input models.ScanJourna
 	if plan.PlanSHA256 != expected {
 		return nil, models.ErrScanJournalConflict
 	}
+	collection, err := (&SourceCollectionStore{}).Find(ctx, input.CollectionUUID)
+	if err != nil {
+		return nil, err
+	}
+	if collection == nil {
+		return nil, models.ErrSourceDefinitionConflict
+	}
+	retrieval := ""
+	if collection.TargetURL != plan.TargetURL {
+		retrieval = plan.TargetURL
+	}
 	run, created, err := (&SourceRunStore{}).enqueue(ctx, models.SourceRunRequest{
-		CollectionUUID: input.CollectionUUID, CollectionRevision: input.CollectionRevision, Operation: "download",
+		CollectionUUID: input.CollectionUUID, CollectionRevision: input.CollectionRevision, Operation: "download", RetrievalURL: retrieval,
 		PolicySHA256: input.PolicySHA256, Window: plan.Window, CooldownSeconds: input.CooldownSeconds,
 	}, now, 100000)
 	if err != nil {

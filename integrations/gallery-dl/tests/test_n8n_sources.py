@@ -90,8 +90,8 @@ class NativeSourceWorkflowsTests(unittest.TestCase):
         result = self.run_request(*self.request())
         self.assertTrue(result["complete"])
         self.assertEqual(result["scrape_completion"], "not_checked")
-        self.assertEqual(len(self.remote.histories), 6)
-        self.assertEqual(len(self.remote.policy_puts), 6)
+        self.assertEqual(len(self.remote.histories), 1)
+        self.assertEqual(len(self.remote.policy_puts), 1)
         self.assertEqual(self.reddit.read_bytes(), b"# Keep this comment\r\nhttps://reddit.com/r/example/\r\nhttps://reddit.com/user/Example/submitted/\r\n")
         self.assertTrue(all(row[-1]["account_uuid"] is None for row in self.remote.histories.values()))
         self.assertTrue(all(not row["definition"]["apply_to_scans"] for row in self.remote.policy_puts))
@@ -110,8 +110,8 @@ class NativeSourceWorkflowsTests(unittest.TestCase):
         self.runtime = n8n_sources.Runtime(self.config)
         self.assertTrue(self.run_request(call, value)["complete"])
         self.assertEqual((self.runtime.state / call / "plan.json").read_bytes(), planned)
-        self.assertEqual(len(self.remote.histories), 6)
-        self.assertEqual(len(self.remote.policy_puts), 6)
+        self.assertEqual(len(self.remote.histories), 1)
+        self.assertEqual(len(self.remote.policy_puts), 1)
         self.assertEqual(self.remote.policy_puts[-1]["definition"], policy_definition())
 
     def test_completed_replay_preserves_later_list_and_source_edits(self):
@@ -160,7 +160,7 @@ class NativeSourceWorkflowsTests(unittest.TestCase):
         result = self.run_request(*self.request(execution="101"))
         self.assertFalse(result["added"])
         self.assertEqual(self.remote.policy_history, policies)
-        self.assertEqual(len(self.remote.puts), 6)
+        self.assertEqual(len(self.remote.puts), 1)
 
     def test_remove_only_exact_account_preserves_comments_and_other_sources(self):
         self.run_request(*self.request(platform="twitter", identity="123"))
@@ -201,8 +201,8 @@ class NativeSourceWorkflowsTests(unittest.TestCase):
         after = self.reddit.read_bytes()
         self.assertTrue(self.run_request(call, value)["complete"])
         self.assertEqual(self.reddit.read_bytes(), after)
-        self.assertEqual(len(self.remote.puts), 6)
-        self.assertEqual(len(self.remote.policy_puts), 6)
+        self.assertEqual(len(self.remote.puts), 1)
+        self.assertEqual(len(self.remote.policy_puts), 1)
 
     def test_unknown_performer_links_stop_without_using_names(self):
         identity = str(uuid.uuid4())

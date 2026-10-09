@@ -62,6 +62,28 @@ class SourceCallTests(unittest.TestCase):
     def record(self, count=1, call_uuid=None):
         return self.calls.record(call_uuid or self.call_uuid, "b" * 64, lambda: snapshot(count))
 
+    def test_profile_subscription_uses_one_collection_and_separate_retrieval_tickets(self):
+        from stash_ingest.n8n_sources import target_urls
+        from stash_ingest.profile_sources import expand_profiles
+        profile = target_urls("reddit", [("handle", "Example"), ("handle", "example")])
+        self.assertEqual(profile, ["https://www.reddit.com/user/example/"])
+        urls = expand_profiles(profile)
+        self.assertEqual(len(urls), 6)
+        binding = candidate(profile[0])
+        self.matches = {url: [{**binding, "retrieval_url": url}] for url in urls}
+        value = {**snapshot(), "targets": profile}
+        self.assertEqual(self.calls.record(self.call_uuid, "b" * 64, lambda: value)["target_count"], 6)
+        self.assertEqual(resolve_once(self.calls, self.client)["counts"], {"queued": 6, "review": 0})
+        rows = self.calls.page(self.call_uuid)
+        self.assertEqual({row["collection_uuid"] for row in rows}, {binding["collection_uuid"]})
+        templates = [decode(row[0]) for row in self.box.db.execute("SELECT template FROM run_intents")]
+        self.assertEqual({row["retrieval_url"] for row in templates}, set(urls))
+        self.assertEqual(len(templates), 6, "coverage for one pass must not complete another")
+        second = str(uuid.uuid4())
+        self.calls.record(second, "b" * 64, lambda: value)
+        resolve_once(self.calls, self.client)
+        self.assertEqual(RunQueue(self.box).status()["configurations"], 6, "repeated schedules coalesce")
+
     def test_large_offline_list_resolves_in_bounded_pages_and_overlapping_calls_coalesce(self):
         self.assertEqual(self.record(500)["target_count"], 500)
         self.client.capabilities.side_effect = Unavailable("network_unavailable")

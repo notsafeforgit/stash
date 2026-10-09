@@ -83,8 +83,7 @@ def target_urls(platform, references):
             urls.append("https://x.com/i/user/" + value if kind == "id" else "https://x.com/" + value)
         elif kind == "handle":
             backfills.subject("00000000-0000-4000-8000-000000000001", platform, value)
-            urls.extend(backfills.targets(platform, value, "reddit-new"))
-            urls.extend(backfills.targets(platform, value, "reddit-top"))
+            urls.append("https://www.reddit.com/user/" + value.lower() + "/")
         else:
             raise InvalidData("A Reddit subscription requires a handle")
     return list(dict.fromkeys(urls))
@@ -108,8 +107,7 @@ def prepare(app, policies, producer, runtime, value, directory, call):
         references = [("id" if platform == "twitter" else "handle", value["identity"])]
     after, matched, removed = source_lists.change(before, platform, references,
                                                   add=value["identity"] if action == "add" else None)
-    # Include the exact incoming spelling for backfills and retained list
-    # spellings for scheduled runs. Do not silently rebind old URL definitions.
+    # Preserve saved list spellings while subscribing once per canonical profile.
     source_refs = list(dict.fromkeys(references + matched)) if action == "add" else list(dict.fromkeys(matched))
     targets, bindings = [], {}
     for ref in source_refs:

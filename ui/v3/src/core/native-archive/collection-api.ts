@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { redditProfileURL } from "./profile-source";
 import {
   accountSearchSchema,
   accountUUIDSchema as uuid,
@@ -68,6 +69,7 @@ const definitionSchema = z.object({
   path_prefix: text(4096),
 });
 export const collectionSchema = definitionSchema.extend({
+  canonical_uuid: uuid.optional(),
   uuid,
   revision: revision.positive(),
   created_at: z.string(),
@@ -127,13 +129,23 @@ export type CollectionFilter = z.infer<typeof collectionFilterSchema>;
 export type MediaRoot = z.infer<typeof mediaRootSchema>;
 export type CollectionRevision = z.infer<typeof historySchema>;
 
+export function normalizeProfileSource(
+  input: CollectionInput,
+): CollectionInput {
+  if (input.namespace === "native:reddit") {
+    const profile = redditProfileURL(input.target_url);
+    if (profile) return { ...input, target_url: profile, kind: "account" };
+  }
+  return input;
+}
+
 export function sameCollectionDefinition(
   input: CollectionInput,
   found: Collection,
 ) {
-  return Object.entries(definitionSchema.parse(input)).every(
-    ([key, value]) => Reflect.get(found, key) === value,
-  );
+  return Object.entries(
+    definitionSchema.parse(normalizeProfileSource(input)),
+  ).every(([key, value]) => Reflect.get(found, key) === value);
 }
 
 export function createCollectionAPI(

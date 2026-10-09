@@ -21,7 +21,7 @@ def target_url(value):
 
 
 def lookup_collections(client, targets, root_uuid):
-    """No implicit alias substitution, creation, or selection among candidates."""
+    """Resolve explicit subscriptions and server-validated profile retrievals."""
     if root_uuid is not None:
         identifier(root_uuid)
     if (not isinstance(targets, list) or not 1 <= len(targets) <= 50
@@ -36,13 +36,13 @@ def lookup_collections(client, targets, root_uuid):
         if (not isinstance(result, dict) or "root_uuid" not in result or result["root_uuid"] != root_uuid
                 or not isinstance(result.get("targets"), list) or len(result["targets"]) != len(targets)):
             raise InvalidData("Mismatched collection lookup")
-        found, seen = [], set()
+        found, bindings = [], {}
         for target, item in zip(targets, result["targets"], strict=True):
             if (not isinstance(item, dict) or item.get("target_url") != target
                     or not isinstance(item.get("candidates"), list) or len(item["candidates"]) > 128
                     or type(item.get("has_more")) is not bool or (item["has_more"] and len(item["candidates"]) != 128)):
                 raise InvalidData("Mismatched collection candidates")
-            candidates = []
+            candidates, seen = [], set()
             for candidate in item["candidates"]:
                 if not isinstance(candidate, dict):
                     raise InvalidData("Invalid collection candidate")
@@ -52,7 +52,16 @@ def lookup_collections(client, targets, root_uuid):
                         or state not in ("active", "disabled", "retired")):
                     raise InvalidData("Invalid collection candidate")
                 seen.add(collection)
-                candidates.append({"collection_uuid": collection, "collection_revision": revision, "state": state})
+                binding = {"collection_uuid": collection, "collection_revision": revision, "state": state}
+                if "retrieval_url" in candidate:
+                    if candidate["retrieval_url"] != target:
+                        raise InvalidData("Collection lookup changed the requested retrieval")
+                    binding["retrieval_url"] = target
+                previous = bindings.get(collection)
+                if previous is not None and "retrieval_url" not in previous and "retrieval_url" not in binding:
+                    raise InvalidData("Collection returned for different exact targets")
+                bindings[collection] = binding
+                candidates.append(binding)
             state = "unresolved" if not candidates else "ambiguous"
             if len(candidates) == 1 and not item["has_more"]:
                 state = "resolved" if candidates[0]["state"] == "active" else candidates[0]["state"]

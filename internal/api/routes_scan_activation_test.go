@@ -65,7 +65,7 @@ func TestPythonScanActivationKeepsDeferralAfterLostResponse(t *testing.T) {
 			if row.Table == "scan_jobs" {
 				binding.ScanRecordUUID = row.UUID
 			}
-			if row.Table == "extractor_jobs" && row.TargetURL == collection.TargetURL {
+			if row.Table == "extractor_jobs" && row.TargetURL == "https://www.reddit.com/user/Example/submitted/?sort=new" {
 				binding.CheckpointRecordUUID = row.UUID
 			}
 		}

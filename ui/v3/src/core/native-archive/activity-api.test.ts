@@ -185,3 +185,16 @@ it("rejects invalid page inputs before transport and strips unrelated response d
   const result = await client(response).api.job(activityIds.job);
   expect(result).toEqual(activityJobDetail());
 });
+
+it("includes historical retrievals in their canonical profile activity", async () => {
+  const row = {
+    ...activityRun(),
+    canonical_collection_uuid: activityIds.other,
+  };
+  expect(
+    await client([row]).api.runs({
+      state: "queued",
+      collection: activityIds.other,
+    }),
+  ).toEqual([row]);
+});

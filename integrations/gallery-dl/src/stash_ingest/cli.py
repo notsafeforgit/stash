@@ -78,6 +78,7 @@ def main(argv=None):
     request = commands.add_parser("queue-run", help="Durably coalesce a source request without starting a scrape")
     request.add_argument("--collection", required=True)
     request.add_argument("--revision", required=True, type=int)
+    request.add_argument("--retrieval-url", help="One standard retrieval pass belonging to a subscribed profile")
     policy_source = request.add_mutually_exclusive_group(required=True)
     policy_source.add_argument("--policy", help="Reviewed policy SHA-256; low-level caller option")
     policy_source.add_argument("--profile", help="Native worker JSON; computes the effective configuration digest")
@@ -192,7 +193,7 @@ def main(argv=None):
                 if args.source_mode is not None and mode != profile.source_mode:
                     raise InvalidData('Caller mode differs from the reviewed worker profile')
                 policy, mode = profile.policy_sha256, profile.source_mode
-            intent = requests.enqueue({"collection_uuid": args.collection, "collection_revision": args.revision,
+            intent = requests.enqueue({**({"retrieval_url": args.retrieval_url} if args.retrieval_url else {}), "collection_uuid": args.collection, "collection_revision": args.revision,
                 "policy_sha256": policy, "operation": args.operation, "cooldown_seconds": args.cooldown,
                 "window": {"since": args.since, "until": args.until,
                            **({'basis': 'traversal'} if mode == 'traversal' else {})}}, ticket_uuid=args.ticket)

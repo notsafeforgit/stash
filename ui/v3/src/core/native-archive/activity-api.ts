@@ -96,7 +96,9 @@ export function createArchiveActivityAPI(
       new Set(rows.map((row) => row.uuid)).size !== rows.length ||
       rows.some(
         (row) =>
-          (checked.collection && row.collection_uuid !== checked.collection) ||
+          (checked.collection &&
+            row.collection_uuid !== checked.collection &&
+            row.canonical_collection_uuid !== checked.collection) ||
           (checked.state && row.state !== checked.state),
       )
     )

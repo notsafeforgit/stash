@@ -488,6 +488,14 @@ profiles, outboxes, download archives and media are deployment mounts, never
 image build inputs. Select the new image only at the verified cutover after
 converting workflow/host entry points and their receipts.
 
+A local image ID pins the running container but cannot be downloaded on a new
+host. Retain an OCI image export as an explicit backup component when an image
+has no published registry digest. Include the task-runner image if it is also
+local-only. Keep exports immutable by image ID so incremental backups reuse
+their contents. Restore with `podman load --input <image.oci.tar>` and verify the
+loaded ID before starting its Quadlet. A Containerfile referring to an
+unretained intermediate local image is insufficient recovery coverage.
+
 Use the `stash-ingest` console command for download workers. Its bootstrap
 initializes gallery-dl logging once, including the lowercase levels used by
 configured actions such as `error:network security`. Logs go to stderr while

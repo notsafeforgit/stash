@@ -10,8 +10,8 @@ in progress.
 ## Current release position — 2026-10-09 UTC
 
 Production is healthy on schema **1000104**, source
-`c8c9e498cae1b29953a9dc857316c76bcdf3cfde`, pinned wrapper
-`localhost/stash-native-s6@sha256:73a993e7d43f14b0fd69e52a2a484c9edb438827c321a1f50e9f063932d77189`.
+`1f55872502eea274173659c2f361e5a74cd75dca`, pinned wrapper
+`localhost/stash-native-s6@sha256:9cbf7de64cc386c245ca1d9bddbbc6bad2b1a67a460fce6a448361a56938de36`.
 The matching backup validator and binary reconstruction components are installed
 for the next backup. The original published backup and its separately running
 restore still use their sealed configuration.
@@ -32,10 +32,13 @@ target for the same account and directory. This includes the `lila-gw, reddit`
 grouping; its six scrape targets were already active. Unrelated disabled or
 retired entries were left unchanged. Desktop and mobile checks passed.
 
-The n8n producer now runs image
-`sha256:dd4c39705d4df79a3b32c226af0db0860b5b86414b1a5b6bc7a166d87c960257`.
+The n8n producer now runs immutable image ID
+`fe95174b0ef4b658bd4495b73a67de6fee58ce7d64a2ba32f4aa08df46d8bcec`.
 Captured Reddit Redgifs/direct-file references can identify their downloaded
-attachments, including retained Reddit fallback previews. Unsupported external
+attachments, including retained Reddit fallback previews, image permalinks and
+legacy `v3.redgifs.com/ifr/` links. Image permalinks retain their original URL
+identity; only matching captured API item IDs and observed rendition URLs can
+resolve the download. Unsupported external
 gallery membership is not inferred from filenames. The QSV GIF helper pads odd
 dimensions before encoding; temporary copies of both failing library GIFs
 converted successfully and the originals were unchanged. The host producer
@@ -58,8 +61,11 @@ approvals. The Reddit discovery initialization repair is deployed: it attaches
 the page interceptor after the actual extractor creates its API. Both host and
 n8n installations match all 127 source modules. The unused old-runtime metadata
 worker definitions and their backup entries were removed with local preimages.
+The final hostname repair approved 46 pending source runs and five metadata
+profiles for its matching runtime. All 72 metadata job records and four listing
+definitions were unchanged by these approvals; the 169 imported holds remain.
 
-The current release passed 666 producer tests, focused backend queue, migration,
+The current release passed 668 producer tests, focused backend queue, migration,
 API and Python HTTP integration checks, and the pinned backend lint gate. Tests
 include retaining checkpoints across an upgrade, migrating existing attempts,
 anonymized exports, and recovering a staged page under a changed worker without
@@ -67,8 +73,11 @@ refetching it. n8n and the main worker timer are active. The first repaired
 Twitter listing attempt used its approved policy but retried with
 `extraction_failed`; its new cooldown is retained. The first repaired Reddit
 listing attempt reached a terminal `not_found` result. These are actual attempts,
-not proof of successful source completion. The 64 queued enrichment jobs also
-fill the admission limit until work can execute.
+not proof of successful source completion. A later real metadata-only job
+completed with one captured record and four existing linked media items. Its
+priority and retry deadline were preserved, and it created no file-completion
+events. The queued enrichment jobs still fill their admission limit between
+executions.
 
 Manual folder discovery now filters root-wide scrape targets by direct folder
 ownership before applying the scope limit. Previously, 3,138 unrelated targets
@@ -81,11 +90,43 @@ remains unorganized, and it has no fabricated source-post association. Replaying
 the same admission returned the same completed job. This backend-only release
 retains schema 1000104 and the deployed producer image.
 
-The remaining rollout includes metadata-worker continuity, controlled host and
-remaining folder-default checks, translation activation, a fresh incremental post-write
-backup, and resumption/observation of the held schedules. The independent
-baseline restore is still running. No merge into `develop` or change to the
-frozen compatible release has occurred.
+The two existing performer-folder defaults also passed read-only scene/image
+draft previews against their protected performer assignments. Twelve actual
+host launchers/environment files were found still selecting the frozen producer
+directory; they now select the verified current runtime. Their arguments,
+source lists and schedule definitions are unchanged, and all twelve files are
+included in the existing backup inventory.
+
+Controlled source ingestion passed through both launch paths. n8n completed a
+saved scan window with 47 media files, 224 acknowledged events and 73 captures.
+The first host window was legitimately empty. A second already-queued account
+exposed the legacy Redgifs hostname bug; after repair, that same window completed
+with four media files, 24 acknowledged events and seven captures. Read-only
+checks verified receipt digests, native file/media links and sampled live bytes.
+These are completed sample windows, not a claim that the remaining scrape queue
+has finished. n8n and its worker timer are active.
+
+The translation worker is enabled and has completed real provider-backed jobs.
+Bing sometimes returns valid translated text without detecting a source
+language; the parser now accepts that result while retaining an unknown language
+and the exact original text/hash. Generic input reproduces the provider behavior,
+and two actual completed results passed read-only preservation checks. Provider
+failures retain their normal retry deadlines.
+
+The final dependency inventory resolves 32 worker profiles and 258 explicit or
+discovered components, plus the publisher's generated records. The local-only
+n8n and task-runner images now have verified OCI exports included in future
+backups, totaling 718,808,576 bytes. Unchanged exports are reused; recovery can
+load the exact image IDs without relying on intermediate local build images.
+The installed publisher uses 4 MiB SQLite chunks and a 50 GiB free-space reserve.
+The post-write incremental backup has started with its normal coordinated
+capture and publication locks. It has not yet produced a completion receipt.
+No second full restore was started.
+
+The remaining rollout includes confirming that backup publication, reversibly
+masking obsolete catalog units, and resuming/observing the held schedules. The
+independent baseline restore is still running. No merge into `develop` or change
+to the frozen compatible release has occurred.
 
 ## Earlier cutover and NFO cleanup — schema 1000100
 

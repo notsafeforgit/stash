@@ -52,7 +52,11 @@ func (s *EnrichmentJobStore) Ready(ctx context.Context, collection, policy, extr
 		if err != nil {
 			return nil, err
 		}
-		if work.CollectionUUID != collection || work.PolicySHA256 != policy || work.ExtractorVersion != extractor {
+		executionPolicy, _, err := metadataWorkerPolicy(ctx, job.Kind, work.PolicySHA256)
+		if err != nil {
+			return nil, err
+		}
+		if work.CollectionUUID != collection || executionPolicy != policy || work.ExtractorVersion != extractor {
 			continue
 		}
 		if _, err := enrichmentJobEligible(ctx, work, now); err != nil {

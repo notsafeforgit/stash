@@ -7,6 +7,7 @@ from .enrichment_journal import EnrichmentJournal
 from .enrichment_worker import execute
 from .events import sha256
 from .outbox import Capacity, Conflict
+from .worker_policy import execution_policy
 
 PAGE_SIZE = 20
 DELIVERY_POLICY = "0" * 64
@@ -120,7 +121,8 @@ class EnrichmentDispatcher:
             selected = None if deliveries else self.configuration
             result = self._execute(state, value.job_uuid, selected)
             if result["state"] == "ownership_required" and self.configuration is not None:
-                if (value.definition["arguments"]["policy_sha256"] == self.configuration.policy_sha256
+                current = self.client.describe(value.job_uuid)
+                if (execution_policy(current["job"], value.definition["arguments"]["policy_sha256"]) == self.configuration.policy_sha256
                         and value.definition["arguments"]["extractor_version"] == self.configuration.extractor_version):
                     result = self._execute(state, value.job_uuid, self.configuration)
                 else:

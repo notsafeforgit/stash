@@ -43,6 +43,7 @@ type Repository struct {
 	ArchiveReview               ArchiveReviewReader
 	ArchiveImport               ArchiveImportReader
 	SourceRun                   SourceRunReaderWriter
+	WorkerPolicy                WorkerPolicyReaderWriter
 	SourceBackfill              SourceBackfillReaderWriter
 	ScanJournal                 ScanJournalReaderWriter
 	CatalogIdentityImport       CatalogIdentityImportReaderWriter

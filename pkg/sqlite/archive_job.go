@@ -129,7 +129,11 @@ func findArchiveJob(ctx context.Context, query string, args ...interface{}) (*mo
 		}
 		return nil, err
 	}
-	return row.resolve(), nil
+	job := row.resolve()
+	if err := resolveMetadataJobPolicy(ctx, job); err != nil {
+		return nil, err
+	}
+	return job, nil
 }
 
 func (s *ArchiveJobStore) Submit(ctx context.Context, input models.ArchiveJobSubmission, now time.Time, maxActive int) (*models.ArchiveJob, error) {
@@ -327,8 +331,25 @@ func (s *ArchiveJobStore) Attempts(ctx context.Context, id string, after int64, 
 		return nil, err
 	}
 	ret := make([]models.ArchiveJobAttempt, 0, len(rows))
+	job, err := s.Find(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	original := ""
+	if job != nil && metadataJobKind(job.Kind) {
+		original, err = metadataJobOriginalPolicy(ctx, job)
+		if err != nil {
+			return nil, err
+		}
+	}
 	for _, row := range rows {
 		attempt := models.ArchiveJobAttempt{JobUUID: row.JobUUID, Fence: row.Fence, OwnerUUID: row.Owner, StartedAt: time.UnixMilli(row.Started).UTC(), Outcome: row.Outcome, Result: json.RawMessage(row.Result), ErrorCode: row.Error}
+		if original != "" {
+			attempt.PolicySHA256, err = metadataAttemptPolicy(ctx, job, row.Fence, original)
+			if err != nil {
+				return nil, err
+			}
+		}
 		if row.Ended.Valid {
 			ended := time.UnixMilli(row.Ended.Int64).UTC()
 			attempt.EndedAt = &ended
@@ -443,6 +464,9 @@ func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, own
 		return nil, err
 	}
 	if _, err := dbWrapper.Exec(ctx, "INSERT INTO archive_job_attempts(job_uuid,fence,owner_uuid,started_at_ms) VALUES(?,?,?,?)", job.UUID, job.Fence+1, owner, now.UnixMilli()); err != nil {
+		return nil, err
+	}
+	if err := bindMetadataAttemptPolicy(ctx, job, job.Fence+1); err != nil {
 		return nil, err
 	}
 	if pacingScope != "" {

@@ -179,6 +179,7 @@ func (db *Database) Repository() models.Repository {
 		ArchiveReview:               &ArchiveReviewStore{},
 		ArchiveImport:               &ArchiveImportStore{},
 		SourceRun:                   &SourceRunStore{},
+		WorkerPolicy:                &WorkerPolicyStore{},
 		SourceBackfill:              &SourceBackfillStore{},
 		ScanJournal:                 &ScanJournalStore{},
 		CatalogIdentityImport:       &CatalogIdentityImportStore{},

@@ -4,6 +4,7 @@ from datetime import datetime
 import hashlib
 
 from .client import Unavailable
+from .worker_policy import execution_policy
 from .discovery_fetch import ERRORS, MAX_RECORDS, page_cursor, profile_platform, validate_page
 from .encoding import InvalidData, encode, identifier, native_json
 from .events import sha256
@@ -302,7 +303,10 @@ class DiscoveryClient:
 
     def _running(self, value, expected, owner, fence):
         work = self._job(value, expected["uuid"])
+        if "execution_policy_sha256" in value:
+            execution_policy(value, None)
         if (work != expected["arguments"] or value["state"] != "running" or value.get("owner_uuid") != owner
+                or value.get("execution_policy_sha256") != expected.get("execution_policy_sha256")
                 or value["fence"] != fence or value["revision"] < expected["revision"]):
             raise Unavailable("invalid_response")
 
@@ -312,7 +316,7 @@ class DiscoveryClient:
         self._seconds(seconds)
         response = self.client._request("POST", self.path(job["uuid"], "/claim"), encode({
             "expected_revision": job["revision"], "owner_uuid": identifier(owner),
-            "policy_sha256": listing["policy_sha256"], "extractor_version": listing["extractor_version"],
+            "policy_sha256": execution_policy(job, listing["policy_sha256"]), "extractor_version": listing["extractor_version"],
             "lease_seconds": seconds}), timed=True, allow_empty=True)
         if response[0] is not None:
             expected = job["fence"] if job["state"] == "running" else job["fence"] + 1

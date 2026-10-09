@@ -1414,6 +1414,20 @@ repairs with compatible coverage and cursor semantics; changed targets, roots,
 source filters or traversal meaning require new work. Schema 1000103 creates
 the immutable upgrade history without changing any existing job or admission.
 
+Schema 1000104 provides the same separation for metadata workers. The owner-only
+`POST /api/v3/ingest-admin/metadata-policy-upgrades` takes `request_uuid`, `kind`
+(`post.enrich`, `account.list_page`, or `post.verify_candidate`),
+`original_policy_sha256`, `expected_policy_sha256`, `policy_sha256`, and `reason`.
+The approval covers exactly that kind and original profile, including future
+pages of an existing listing. It does not rewrite job arguments or listing
+digests. A currently running job under that profile prevents approval; saved
+checkpoints, cursors, review decisions, grants and retry deadlines stay intact.
+Claims require the approved `execution_policy_sha256`; each attempt retains the
+policy it actually used. Completed attempts are never relabeled by later
+approvals. Exact request replay and `GET` with the request UUID recover the
+original receipt. Further upgrades must name the currently approved policy;
+approvals for another original profile do not create an implicit alias chain.
+
 The producer SDK implements durable local request coalescing during outages,
 outbox delivery, shared filesystem locking, lease renewal and pausing before the
 next source request after expiry. It applies the claimed Reddit/Twitter post

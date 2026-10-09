@@ -180,6 +180,22 @@ class DiscoveryClientTests(unittest.TestCase):
         with self.assertRaises(Unavailable):
             self.client.renew(running)
 
+    def test_approved_repair_preserves_listing_digest_and_pins_claim_policy(self):
+        self.job["execution_policy_sha256"] = "b" * 64
+        original = deepcopy(self.listing)
+        running = {**self.job, **self.lease, "state": "running", "revision": 2, "lease_until": "2026-10-04T14:03:00Z"}
+        response = (running, "Sun, 04 Oct 2026 14:00:00 GMT", 100.0)
+        self.transport._request.return_value = response
+        self.assertEqual(self.client.claim(self.description, self.owner), response)
+        request = decode(self.transport._request.call_args.args[2])
+        self.assertEqual(request["policy_sha256"], "b" * 64)
+        self.assertEqual(self.listing, original)
+        self.assertEqual(self.digest(self.listing), original["sha256"])
+        for policy in ("a" * 64, None, "not-a-digest"):
+            self.transport._request.return_value = (dict(running, execution_policy_sha256=policy), response[1], response[2])
+            with self.assertRaises(Unavailable):
+                self.client.renew(running)
+
     def test_page_acknowledgement_binds_exact_bytes_identity_and_original_fence(self):
         self.transport._request.return_value = self.receipt
         self.assertEqual(self.client.append_page(self.description, self.lease, self.page), self.receipt)

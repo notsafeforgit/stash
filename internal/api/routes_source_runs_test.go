@@ -149,6 +149,24 @@ func TestSourceRunHTTPScopedOwnershipAndLateEvidence(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &run))
 	require.Equal(t, upgrade.PolicySHA256, run.ExecutionPolicySHA256)
 	require.Equal(t, input.PolicySHA256, run.PolicySHA256)
+	metadataUpgrade := models.WorkerPolicyUpgradeInput{RequestUUID: uuid.NewString(), Kind: models.ArchiveJobEnrichPost,
+		OriginalPolicySHA256: strings.Repeat("a", 64), ExpectedPolicySHA256: strings.Repeat("a", 64),
+		PolicySHA256: strings.Repeat("b", 64), Reason: "Compatible metadata adapter repair"}
+	require.Equal(t, http.StatusNotFound, request(handler, http.MethodPost, ingestPath+"/metadata-policy-upgrades", token, metadataUpgrade).Code)
+	metadataPath := "/api/v3/ingest-admin/metadata-policy-upgrades"
+	w = request(admin, http.MethodPost, metadataPath, "", metadataUpgrade)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	ack = w.Body.String()
+	w = request(admin, http.MethodPost, metadataPath, "", metadataUpgrade)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.JSONEq(t, ack, w.Body.String())
+	w = request(admin, http.MethodGet, metadataPath+"/"+metadataUpgrade.RequestUUID, "", nil)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.JSONEq(t, ack, w.Body.String())
+	metadataUpgrade.PolicySHA256 = strings.Repeat("c", 64)
+	require.Equal(t, http.StatusConflict, request(admin, http.MethodPost, metadataPath, "", metadataUpgrade).Code)
+	metadataUpgrade.Kind = "media.verify"
+	require.Equal(t, http.StatusBadRequest, request(admin, http.MethodPost, metadataPath, "", metadataUpgrade).Code)
 	w = request(admin, http.MethodPost, "/api/v3/ingest-admin/runs/"+run.UUID+"/review", "", map[string]any{"action": "cancel", "expected_revision": run.Revision})
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.Contains(t, w.Body.String(), `"state":"cancelled"`)

@@ -210,6 +210,22 @@ class EnrichmentClientTests(unittest.TestCase):
             with self.assertRaises(InvalidData):
                 self.client.claim(self.job, self.owner, seconds)
 
+    def test_approved_repair_claims_new_policy_and_rejects_renewal_policy_changes(self):
+        self.job["execution_policy_sha256"] = "b" * 64
+        original = deepcopy(self.job["arguments"])
+        self.transport._request.return_value = self.job
+        self.assertEqual(self.client.admit(original["target_uuid"], 1, "b" * 64, "1.32.15-dev"), self.job)
+        running = dict(self.job, state="running", owner_uuid=self.owner, revision=2, fence=1)
+        self.transport._request.return_value = (running, "date", 100)
+        self.assertEqual(self.client.claim(self.job, self.owner)[0], running)
+        request = decode(self.transport._request.call_args.args[2])
+        self.assertEqual(request["policy_sha256"], "b" * 64)
+        self.assertEqual(running["arguments"], original)
+        for policy in ("a" * 64, None, "not-a-digest"):
+            self.transport._request.return_value = (dict(running, execution_policy_sha256=policy), "date", 100)
+            with self.assertRaises(Unavailable):
+                self.client.renew(running)
+
     def test_source_reservation_requires_exact_attempt_and_boolean_reply(self):
         running = dict(self.job, state="running", owner_uuid=self.owner, revision=2, fence=1)
         good = {"job_uuid": running["uuid"], "fence": 1, "ready": True}

@@ -58,7 +58,11 @@ func (s *DiscoveryDetailStore) Collections(ctx context.Context, q models.Enrichm
 		if err != nil {
 			return nil, err
 		}
-		if seen[work.CollectionUUID] || work.CollectionUUID <= q.After || work.PolicySHA256 != q.PolicySHA256 || work.ExtractorVersion != q.ExtractorVersion {
+		executionPolicy, _, err := metadataWorkerPolicy(ctx, job.Kind, work.PolicySHA256)
+		if err != nil {
+			return nil, err
+		}
+		if seen[work.CollectionUUID] || work.CollectionUUID <= q.After || executionPolicy != q.PolicySHA256 || work.ExtractorVersion != q.ExtractorVersion {
 			continue
 		}
 		allowed := false
@@ -121,7 +125,11 @@ func (s *DiscoveryDetailStore) Ready(ctx context.Context, collection, policy, ex
 		if err != nil {
 			return nil, err
 		}
-		if work.CollectionUUID != collection || work.PolicySHA256 != policy || work.ExtractorVersion != extractor {
+		executionPolicy, _, err := metadataWorkerPolicy(ctx, job.Kind, work.PolicySHA256)
+		if err != nil {
+			return nil, err
+		}
+		if work.CollectionUUID != collection || executionPolicy != policy || work.ExtractorVersion != extractor {
 			continue
 		}
 		if err := discoveryDetailEligible(ctx, work, now); err != nil {

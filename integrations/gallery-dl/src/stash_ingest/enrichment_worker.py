@@ -9,6 +9,7 @@ from .metadata_bundle import ERRORS, MAX_BYTES
 from .metadata_fetch import fetch
 from .outbox import Capacity, Conflict
 from .runs import SourcePaused
+from .worker_policy import execution_policy
 
 
 def _deliver(journal, client, value):
@@ -185,7 +186,7 @@ def execute_metadata(box, transport, configuration, job_uuid, journal_type, clie
 
 def _configuration(configuration, job, url):
     configuration.check()
-    if (job["arguments"]["policy_sha256"] != configuration.policy_sha256
+    if (execution_policy(job, job["arguments"]["policy_sha256"]) != configuration.policy_sha256
             or job["arguments"]["extractor_version"] != configuration.extractor_version
             or not configuration.accepts(url)):
         raise Conflict("Enrichment job does not match this reviewed metadata profile")

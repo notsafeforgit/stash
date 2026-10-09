@@ -1087,12 +1087,16 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 	return txn.WithTxn(ctx, db, func(ctx context.Context) error {
 		// Only this isolated export discards policy history. Restore the guard
 		// in the same transaction; failure rolls back both schema and deletes.
-		var retainPolicyHistory string
-		if err := dbWrapper.Get(ctx, &retainPolicyHistory, "SELECT sql FROM sqlite_schema WHERE type='trigger' AND name='source_run_policy_upgrade_retained'"); err != nil {
-			return err
-		}
-		if _, err := dbWrapper.Exec(ctx, "DROP TRIGGER source_run_policy_upgrade_retained"); err != nil {
-			return err
+		retainedGuards := []string{}
+		for _, name := range []string{"source_run_policy_upgrade_retained", "metadata_worker_policy_retained", "metadata_worker_attempt_policy_retained"} {
+			var definition string
+			if err := dbWrapper.Get(ctx, &definition, "SELECT sql FROM sqlite_schema WHERE type='trigger' AND name=?", name); err != nil {
+				return err
+			}
+			if _, err := dbWrapper.Exec(ctx, "DROP TRIGGER "+name); err != nil {
+				return err
+			}
+			retainedGuards = append(retainedGuards, definition)
 		}
 		for _, table := range []string{
 			"account_profile_urls", "performer_profile_url_suppressions",
@@ -1150,6 +1154,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"source_run_policy_upgrades", "source_run_requests", "source_run_attempts", "source_run_reviews", "source_runs", "source_run_cooldowns",
 			"enrichment_checkpoint_releases", "enrichment_published_records", "enrichment_publications",
 			"enrichment_checkpoints", "enrichment_checkpoint_records", "enrichment_checkpoint_receipts", "enrichment_job_attempts", "enrichment_job_targets",
+			"metadata_worker_attempt_policies", "metadata_worker_policy_upgrades",
 			"translation_job_targets", "archive_job_submissions", "archive_job_attempts", "archive_jobs",
 			"file_content_versions", "media_contents",
 			"post_media_decision_evidence", "post_media_backfill_decisions", "post_media_backfills",
@@ -1179,8 +1184,12 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 				return err
 			}
 		}
-		_, err := dbWrapper.Exec(ctx, retainPolicyHistory)
-		return err
+		for _, definition := range retainedGuards {
+			if _, err := dbWrapper.Exec(ctx, definition); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 

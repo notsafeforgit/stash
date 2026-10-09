@@ -32,6 +32,7 @@ class EnrichmentDispatchTests(unittest.TestCase):
         self.native_ready = patch.object(EnrichmentClient, "ready_jobs", return_value=[]).start()
         self.targets = patch.object(EnrichmentClient, "ready", return_value=[]).start()
         self.admit = patch.object(EnrichmentClient, "admit", return_value={"uuid": str(uuid.uuid4())}).start()
+        self.describe = patch.object(EnrichmentClient, "describe", return_value={"job": {}}).start()
         self.capabilities = patch.object(EnrichmentClient, "capabilities", return_value={"enrichment_dispatch_protocol": 1}).start()
 
     def open(self):
@@ -99,6 +100,13 @@ class EnrichmentDispatchTests(unittest.TestCase):
             self.assertEqual(result["state"], "delivery_pending")
             self.assertEqual(result["dispatch"]["state"], "unavailable")
             self.executor.assert_called_once_with(box, self.transport, None, value.job_uuid)
+
+            self.executor.reset_mock(side_effect=True)
+            self.describe.return_value = {"job": {"execution_policy_sha256": self.profile.policy_sha256}}
+            self.executor.side_effect = [{"state": "ownership_required"}, {"state": "completed"}]
+            self.now = result["dispatch"]["next_attempt_at"]
+            self.assertEqual(self.worker(box).once()["state"], "completed")
+            self.assertIs(self.executor.call_args_list[1].args[2], self.profile)
             self.assertEqual(EnrichmentJournal(box).find(value.job_uuid).body, value.body)
         self.native_ready.assert_not_called()
         self.targets.assert_not_called()

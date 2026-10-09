@@ -9,6 +9,7 @@ from .job_lease import JobLease
 from .metadata_bundle import MAX_BYTES
 from .outbox import Capacity, Conflict
 from .runs import SourcePaused
+from .worker_policy import execution_policy
 
 
 def _deliver(journal, client, value):
@@ -30,7 +31,7 @@ def _result(journal, job, state, receipt=None):
 def _configuration(configuration, description):
     configuration.check()
     listing = description["listing"]
-    if (configuration.operation != "account.list_page" or listing["policy_sha256"] != configuration.policy_sha256
+    if (configuration.operation != "account.list_page" or execution_policy(description["job"], listing["policy_sha256"]) != configuration.policy_sha256
             or listing["extractor_version"] != configuration.extractor_version
             or not configuration.accepts(listing["profile_url"])):
         raise Conflict("Discovery job does not match this reviewed listing profile")

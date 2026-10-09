@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/internal/ingest"
 	"github.com/stashapp/stash/pkg/archive"
+	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,9 +50,14 @@ func TestPythonDiscoveryExecutionRecoversOwnedPagesWithoutRefetch(t *testing.T) 
 	}
 	require.NoError(t, json.Unmarshal(invoke(t, map[string]any{"directory": t.TempDir(), "policy_only": true}, "", true), &policy))
 	require.True(t, archive.ValidSHA256(policy.Digest))
+	var repairedPolicy struct {
+		Digest string `json:"policy_sha256"`
+	}
+	require.NoError(t, json.Unmarshal(invoke(t, map[string]any{"directory": t.TempDir(), "policy_only": true, "upgraded": true}, "", true), &repairedPolicy))
+	require.NotEqual(t, policy.Digest, repairedPolicy.Digest)
 	fixture, err := filepath.Abs("../../pkg/archive/testdata/discovery-pages-v1.json")
 	require.NoError(t, err)
-	for _, scenario := range []string{"lost_page", "lost_claim", "source_failure", "expired_page", "paused_after_fetch", "capacity", "rejected_page", "other_completion", "empty_final", "profile_mismatch"} {
+	for _, scenario := range []string{"lost_page", "lost_claim", "source_failure", "expired_page", "upgraded_expired_page", "paused_after_fetch", "capacity", "rejected_page", "other_completion", "empty_final", "profile_mismatch"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newDiscoveryHTTPFixtureForPolicy(t, time.Date(2026, 10, 4, 14, 0, 0, 0, time.UTC), policy.Digest)
 			worker := ingest.NewDiscoveryCoordinator(f.service)
@@ -71,7 +77,7 @@ func TestPythonDiscoveryExecutionRecoversOwnedPagesWithoutRefetch(t *testing.T) 
 					_, _ = io.WriteString(w, `{"error":"invalid_discovery_work"}`)
 					return
 				}
-				loseBefore := page && (scenario == "expired_page" || scenario == "other_completion")
+				loseBefore := page && (scenario == "expired_page" || scenario == "upgraded_expired_page" || scenario == "other_completion")
 				loseAfter := (scenario == "lost_page" && page) || (scenario == "lost_claim" && strings.HasSuffix(r.URL.Path, "/claim")) ||
 					(scenario == "source_failure" && strings.HasSuffix(r.URL.Path, "/failure"))
 				mu.Lock()
@@ -95,6 +101,7 @@ func TestPythonDiscoveryExecutionRecoversOwnedPagesWithoutRefetch(t *testing.T) 
 			}))
 			t.Cleanup(server.Close)
 			directory := t.TempDir()
+			upgraded := false
 			type executionResult struct {
 				State   string `json:"state"`
 				Fetches int    `json:"fetches"`
@@ -108,7 +115,7 @@ func TestPythonDiscoveryExecutionRecoversOwnedPagesWithoutRefetch(t *testing.T) 
 				t.Helper()
 				body := invoke(t, map[string]any{"endpoint": server.URL, "producer": f.producer.UUID, "directory": directory,
 					"fixture": fixture, "job_uuid": job.UUID, "fetch": fetch, "deliver_only": deliver, "expected": expected,
-					"max_bytes": maxBytes, "pause_after_fetch": scenario == "paused_after_fetch", "mismatch": scenario == "profile_mismatch"}, f.token, !deliver)
+					"max_bytes": maxBytes, "pause_after_fetch": scenario == "paused_after_fetch", "mismatch": scenario == "profile_mismatch", "upgraded": upgraded}, f.token, !deliver)
 				var result executionResult
 				require.NoError(t, json.Unmarshal(body, &result))
 				verifyNativeArchiveJournals(t, f.database, directory, server.URL)
@@ -166,7 +173,7 @@ func TestPythonDiscoveryExecutionRecoversOwnedPagesWithoutRefetch(t *testing.T) 
 				now.Store(current.Job.AvailableAt.UnixMilli())
 				run("page", false, "page_delivered", 512<<20)
 				expectedAttempts = 2
-			case "expired_page", "other_completion":
+			case "expired_page", "upgraded_expired_page", "other_completion":
 				require.Greater(t, first.Journal.StagedBytes, 0)
 				now.Store(current.Job.LeaseUntil.Add(time.Second).UnixMilli())
 				require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
@@ -177,6 +184,15 @@ func TestPythonDiscoveryExecutionRecoversOwnedPagesWithoutRefetch(t *testing.T) 
 				current, err = worker.Describe(t.Context(), f.token, job.UUID)
 				require.NoError(t, err)
 				now.Store(current.Job.AvailableAt.UnixMilli())
+				if scenario == "upgraded_expired_page" {
+					require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+						_, err := f.repo.WorkerPolicy.Upgrade(ctx, models.WorkerPolicyUpgradeInput{RequestUUID: uuid.NewString(),
+							Kind: models.ArchiveJobListAccount, OriginalPolicySHA256: policy.Digest, ExpectedPolicySHA256: policy.Digest,
+							PolicySHA256: repairedPolicy.Digest, Reason: "Repair the worker while retaining its original staged page"}, worker.Now())
+						return err
+					}))
+					upgraded = true
+				}
 				if scenario == "other_completion" {
 					peer, err := worker.Claim(t.Context(), f.token, job.UUID, current.Job.Revision, uuid.NewString(), policy.Digest, f.listing.ExtractorVersion, time.Minute)
 					require.NoError(t, err)
@@ -199,6 +215,10 @@ func TestPythonDiscoveryExecutionRecoversOwnedPagesWithoutRefetch(t *testing.T) 
 				attempts, err := f.repo.ArchiveJob.Attempts(ctx, job.UUID, 0, 10)
 				require.NoError(t, err)
 				require.Len(t, attempts, expectedAttempts)
+				if upgraded {
+					require.Equal(t, policy.Digest, attempts[0].PolicySHA256)
+					require.Equal(t, repairedPolicy.Digest, attempts[1].PolicySHA256)
+				}
 				page, err := f.repo.DiscoveryJob.Page(ctx, f.listing.UUID, 1)
 				require.NoError(t, err)
 				require.NotNil(t, page)

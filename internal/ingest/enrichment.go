@@ -83,7 +83,7 @@ func (c *EnrichmentCoordinator) Admit(ctx context.Context, token, targetID strin
 			if err != nil {
 				return err
 			}
-			if work.PolicySHA256 != policy || work.ExtractorVersion != extractor {
+			if result.ExecutionPolicySHA256 != policy && work.PolicySHA256 != policy || work.ExtractorVersion != extractor {
 				return models.ErrEnrichmentConflict
 			}
 			c.guard(ctx, token, result, nil)
@@ -152,7 +152,7 @@ func (c *EnrichmentCoordinator) Claim(ctx context.Context, token, id string, exp
 		if err != nil {
 			return err
 		}
-		if work.PolicySHA256 != policy || work.ExtractorVersion != extractor {
+		if current.ExecutionPolicySHA256 != policy || work.ExtractorVersion != extractor {
 			return models.ErrEnrichmentConflict
 		}
 		if current.State == "running" && current.OwnerUUID == owner && current.LeaseUntil != nil && c.Now().Before(*current.LeaseUntil) {

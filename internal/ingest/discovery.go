@@ -102,7 +102,11 @@ func (c *DiscoveryCoordinator) Admit(ctx context.Context, token, id, digest, pol
 		if err != nil {
 			return err
 		}
-		if listing.Digest != digest || listing.PolicySHA256 != policy || listing.ExtractorVersion != extractor {
+		executionPolicy, err := c.Service.Repo.WorkerPolicy.Resolve(ctx, models.ArchiveJobListAccount, listing.PolicySHA256)
+		if err != nil {
+			return err
+		}
+		if listing.Digest != digest || executionPolicy != policy && listing.PolicySHA256 != policy || listing.ExtractorVersion != extractor {
 			return models.ErrDiscoveryConflict
 		}
 		result, err = c.Service.Repo.DiscoveryJob.Admit(ctx, id, c.Now())
@@ -128,7 +132,7 @@ func (c *DiscoveryCoordinator) Claim(ctx context.Context, token, id string, expe
 		if err != nil {
 			return err
 		}
-		if listing.PolicySHA256 != policy || listing.ExtractorVersion != extractor {
+		if current.ExecutionPolicySHA256 != policy || listing.ExtractorVersion != extractor {
 			return models.ErrDiscoveryConflict
 		}
 		if current.State == "running" && current.OwnerUUID == owner && current.LeaseUntil != nil && c.Now().Before(*current.LeaseUntil) {

@@ -25,7 +25,7 @@ profile = None
 if not setup.get("deliver_only", False):
     profile = DiscoveryConfiguration.from_document({"schema": SCHEMA, "source_category": "reddit", "bindings": {
         "login": {"kind": "private", "env": "DISCOVERY_FIXTURE_LOGIN"}}, "gallery": {"extractor": {
-        "sleep-request": 1 if setup.get("mismatch") else 0, "sleep-extractor": 0,
+        "sleep-request": 1 if setup.get("mismatch") or setup.get("upgraded") else 0, "sleep-extractor": 0,
         "reddit": {"cookies": "${stash:login}"}}}}, directory)
 if setup.get("policy_only"):
     print(json.dumps({"policy_sha256": profile.policy_sha256, "extractor_version": profile.extractor_version}))

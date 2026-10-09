@@ -90,7 +90,7 @@ func (c *DiscoveryDetailCoordinator) Claim(ctx context.Context, token, id string
 		if err != nil {
 			return err
 		}
-		if work.PolicySHA256 != policy || work.ExtractorVersion != extractor {
+		if current.ExecutionPolicySHA256 != policy || work.ExtractorVersion != extractor {
 			return models.ErrDiscoveryConflict
 		}
 		if current.State == "running" && current.OwnerUUID == owner && current.LeaseUntil != nil && c.Now().Before(*current.LeaseUntil) {

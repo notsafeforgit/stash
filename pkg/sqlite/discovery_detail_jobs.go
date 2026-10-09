@@ -142,7 +142,11 @@ func (s *DiscoveryDetailStore) Admit(ctx context.Context, input models.Discovery
 		if err != nil {
 			return nil, err
 		}
-		if work.PolicySHA256 != input.PolicySHA256 || work.ExtractorVersion != input.ExtractorVersion {
+		executionPolicy, _, err := metadataWorkerPolicy(ctx, models.ArchiveJobVerifyCandidate, work.PolicySHA256)
+		if err != nil {
+			return nil, err
+		}
+		if executionPolicy != input.PolicySHA256 && work.PolicySHA256 != input.PolicySHA256 || work.ExtractorVersion != input.ExtractorVersion {
 			return nil, models.ErrDiscoveryConflict
 		}
 		return prior, nil

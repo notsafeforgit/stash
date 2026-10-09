@@ -58,7 +58,11 @@ func (s *DiscoveryJobStore) Ready(ctx context.Context, collection, policy, extra
 			}
 			return nil, err
 		}
-		if listing.CollectionUUID != collection || listing.PolicySHA256 != policy || listing.ExtractorVersion != extractor {
+		executionPolicy, _, err := metadataWorkerPolicy(ctx, models.ArchiveJobListAccount, listing.PolicySHA256)
+		if err != nil {
+			return nil, err
+		}
+		if listing.CollectionUUID != collection || executionPolicy != policy || listing.ExtractorVersion != extractor {
 			continue
 		}
 		ret = append(ret, models.DiscoveryJobCandidate{Sequence: job.Sequence, UUID: job.UUID})
@@ -95,7 +99,11 @@ func (s *DiscoveryJobStore) ReadyListings(ctx context.Context, collection, polic
 		if err != nil {
 			return nil, err
 		}
-		if listing.PolicySHA256 != policy || listing.ExtractorVersion != extractor {
+		executionPolicy, _, err := metadataWorkerPolicy(ctx, models.ArchiveJobListAccount, listing.PolicySHA256)
+		if err != nil {
+			return nil, err
+		}
+		if executionPolicy != policy || listing.ExtractorVersion != extractor {
 			continue
 		}
 		if err := discoveryFetchEligible(ctx, listing.DiscoveryListingInput, now); err != nil {

@@ -33,6 +33,7 @@ class DiscoveryDispatchTests(unittest.TestCase):
         self.ready = patch.object(DiscoveryClient, "ready_jobs", return_value=[]).start()
         self.listings = patch.object(DiscoveryClient, "ready_listings", return_value={"listings": [], "after": "", "has_more": False}).start()
         self.admit = patch.object(DiscoveryClient, "admit", return_value={"uuid": str(uuid.uuid4())}).start()
+        self.describe = patch.object(DiscoveryClient, "describe", return_value={"job": {}}).start()
         self.caps = patch.object(DiscoveryClient, "capabilities", return_value={"discovery_readiness_protocol": 1, "discovery_dispatch_protocol": 1}).start()
         self.addCleanup(patch.stopall)
 
@@ -98,6 +99,13 @@ class DiscoveryDispatchTests(unittest.TestCase):
             self.assertEqual(result["state"], "delivery_pending")
             self.assertEqual(result["dispatch"]["state"], "unavailable")
             self.execute.assert_called_once_with(box, self.transport, None, value.job_uuid)
+
+            self.execute.reset_mock(side_effect=True)
+            self.describe.return_value = {"job": {"execution_policy_sha256": self.profile.policy_sha256}}
+            self.execute.side_effect = [{"state": "ownership_required"}, {"state": "page_delivered"}]
+            self.now = result["dispatch"]["next_attempt_at"]
+            self.assertEqual(self.worker(box).once()["state"], "page_delivered")
+            self.assertIs(self.execute.call_args_list[1].args[2], self.profile)
             self.assertEqual(DiscoveryJournal(box).find(value.job_uuid).body, value.body)
         self.ready.assert_not_called()
         self.listings.assert_not_called()

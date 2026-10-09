@@ -20,25 +20,26 @@ const (
 )
 
 type ArchiveJob struct {
-	Sequence    int64           `json:"sequence"`
-	UUID        string          `json:"uuid"`
-	Kind        string          `json:"kind"`
-	WorkKey     string          `json:"work_key"`
-	ResourceKey string          `json:"resource_key"`
-	Arguments   json.RawMessage `json:"arguments"`
-	State       string          `json:"state"`
-	Revision    int64           `json:"revision"`
-	Priority    int             `json:"priority"`
-	Fence       int64           `json:"fence"`
-	MaxAttempts int             `json:"max_attempts"`
-	AvailableAt time.Time       `json:"available_at"`
-	OwnerUUID   string          `json:"owner_uuid,omitempty"`
-	LeaseUntil  *time.Time      `json:"lease_until,omitempty"`
-	Progress    json.RawMessage `json:"progress"`
-	Result      json.RawMessage `json:"result"`
-	ErrorCode   string          `json:"error_code"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
+	Sequence              int64           `json:"sequence"`
+	UUID                  string          `json:"uuid"`
+	Kind                  string          `json:"kind"`
+	WorkKey               string          `json:"work_key"`
+	ResourceKey           string          `json:"resource_key"`
+	Arguments             json.RawMessage `json:"arguments"`
+	ExecutionPolicySHA256 string          `json:"execution_policy_sha256,omitempty"`
+	State                 string          `json:"state"`
+	Revision              int64           `json:"revision"`
+	Priority              int             `json:"priority"`
+	Fence                 int64           `json:"fence"`
+	MaxAttempts           int             `json:"max_attempts"`
+	AvailableAt           time.Time       `json:"available_at"`
+	OwnerUUID             string          `json:"owner_uuid,omitempty"`
+	LeaseUntil            *time.Time      `json:"lease_until,omitempty"`
+	Progress              json.RawMessage `json:"progress"`
+	Result                json.RawMessage `json:"result"`
+	ErrorCode             string          `json:"error_code"`
+	CreatedAt             time.Time       `json:"created_at"`
+	UpdatedAt             time.Time       `json:"updated_at"`
 }
 
 type ArchiveJobSubmission struct {
@@ -63,14 +64,15 @@ func (j ArchiveJob) Lease() ArchiveJobLease {
 }
 
 type ArchiveJobAttempt struct {
-	JobUUID   string          `json:"job_uuid"`
-	Fence     int64           `json:"fence"`
-	OwnerUUID string          `json:"owner_uuid"`
-	StartedAt time.Time       `json:"started_at"`
-	EndedAt   *time.Time      `json:"ended_at,omitempty"`
-	Outcome   string          `json:"outcome"`
-	Result    json.RawMessage `json:"result"`
-	ErrorCode string          `json:"error_code"`
+	PolicySHA256 string          `json:"policy_sha256,omitempty"`
+	JobUUID      string          `json:"job_uuid"`
+	Fence        int64           `json:"fence"`
+	OwnerUUID    string          `json:"owner_uuid"`
+	StartedAt    time.Time       `json:"started_at"`
+	EndedAt      *time.Time      `json:"ended_at,omitempty"`
+	Outcome      string          `json:"outcome"`
+	Result       json.RawMessage `json:"result"`
+	ErrorCode    string          `json:"error_code"`
 }
 
 type ArchiveJobOutcome struct {

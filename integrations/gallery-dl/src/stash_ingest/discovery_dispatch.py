@@ -7,6 +7,7 @@ from .discovery_worker import execute
 from .encoding import InvalidData, identifier
 from .events import sha256
 from .outbox import Capacity, Conflict
+from .worker_policy import execution_policy
 
 PAGE_SIZE = 20
 DELIVERY_POLICY = "0" * 64
@@ -99,7 +100,8 @@ class DiscoveryDispatcher:
             result = self._execute(state, value.job_uuid, selected)
             if result["state"] == "ownership_required" and self.configuration is not None:
                 listing = value.definition["listing"]
-                if (listing["policy_sha256"] == self.configuration.policy_sha256
+                current = self.client.describe(value.job_uuid)
+                if (execution_policy(current["job"], listing["policy_sha256"]) == self.configuration.policy_sha256
                         and listing["extractor_version"] == self.configuration.extractor_version):
                     result = self._execute(state, value.job_uuid, self.configuration)
                 else:

@@ -5,6 +5,7 @@ from datetime import datetime
 import re
 
 from .client import Unavailable
+from .worker_policy import execution_policy
 from .encoding import InvalidData, encode, identifier, native_json
 from .events import sha256
 from .metadata_bundle import Bundle, ERRORS, MAX_BYTES, MAX_RECORDS, MAX_REFERENCES, SCHEMA, RETAINED_SCHEMA, public_url
@@ -183,7 +184,7 @@ class EnrichmentClient:
             "expected_revision": revision, "policy_sha256": policy, "extractor_version": extractor}))
         work = self._job(value)
         if (work.get("target_uuid") != target or work.get("target_revision") != revision
-                or work.get("policy_sha256") != policy or work.get("extractor_version") != extractor):
+                or execution_policy(value, work.get("policy_sha256")) != policy or work.get("extractor_version") != extractor):
             raise Unavailable("invalid_response")
         return value
 
@@ -245,7 +246,7 @@ class EnrichmentClient:
         self._seconds(seconds)
         response = self.client._request("POST", self.path(job["uuid"], "/claim"), encode({
             "expected_revision": job["revision"], "owner_uuid": identifier(owner),
-            "policy_sha256": work["policy_sha256"], "extractor_version": work["extractor_version"],
+            "policy_sha256": execution_policy(job, work["policy_sha256"]), "extractor_version": work["extractor_version"],
             "lease_seconds": seconds}), timed=True, allow_empty=True)
         if response[0] is not None:
             self._running(response[0], job, owner)
@@ -277,6 +278,7 @@ class EnrichmentClient:
     def _running(self, value, expected, owner):
         work = self._job(value, expected["uuid"])
         if (work != expected["arguments"] or value["state"] != "running"
+                or execution_policy(value, work["policy_sha256"]) != execution_policy(expected, work["policy_sha256"])
                 or value.get("owner_uuid") != owner or value["fence"] < 1
                 or value["revision"] < expected["revision"]):
             raise Unavailable("invalid_response")

@@ -26,6 +26,8 @@ func (rs *ingestRoutes) adminRouter() http.Handler {
 	r.Post("/runs/{run}/review", rs.reviewRun)
 	r.Post("/run-policy-upgrades", rs.upgradeSourceRunPolicy)
 	r.Get("/run-policy-upgrades/{upgrade}", rs.sourceRunPolicyUpgrade)
+	r.Post("/metadata-policy-upgrades", rs.upgradeMetadataWorkerPolicy)
+	r.Get("/metadata-policy-upgrades/{upgrade}", rs.metadataWorkerPolicyUpgrade)
 	return r
 }
 

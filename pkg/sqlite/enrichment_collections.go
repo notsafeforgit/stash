@@ -53,7 +53,11 @@ func (s *EnrichmentJobStore) Collections(ctx context.Context, q models.Enrichmen
 		if err != nil {
 			return nil, err
 		}
-		if seen[work.CollectionUUID] || work.PolicySHA256 != q.PolicySHA256 || work.ExtractorVersion != q.ExtractorVersion {
+		executionPolicy, _, err := metadataWorkerPolicy(ctx, job.Kind, work.PolicySHA256)
+		if err != nil {
+			return nil, err
+		}
+		if seen[work.CollectionUUID] || executionPolicy != q.PolicySHA256 || work.ExtractorVersion != q.ExtractorVersion {
 			continue
 		}
 		if _, err := enrichmentJobEligible(ctx, work, now); err != nil {

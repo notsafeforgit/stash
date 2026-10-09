@@ -92,6 +92,11 @@ func validateDatabaseLineage(path string) error {
 		if present[forkSchemaMigrationsTable] {
 			return errors.New("native database still contains an active fork migration ledger")
 		}
+		if version >= NativeSchemaBaseline+104 {
+			if err := validateWorkerPolicySchema(conn); err != nil {
+				return err
+			}
+		}
 		if version >= NativeSchemaBaseline+101 {
 			for _, name := range []string{"source_capture_sightings", "source_capture_content", "source_capture_content_post"} {
 				var exists bool

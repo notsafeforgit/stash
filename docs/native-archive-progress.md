@@ -12,26 +12,36 @@ All 1,711 catalogs and 925,869 automation records are imported and reconciled.
 Post/media associations, source albums, disabled policies and source URL
 registration have passed their independent checks. The original compatible
 database and held source snapshot remain intact. The public native application
-and scraper schedules are still stopped.
+is starting; scraper schedules remain paused.
 
 The first coordinated native backup has sealed and packed its checkpoint with
 the 22.2 GB database, 240,872 saved artwork files and coordinated host state.
-Its streaming verification, native archive upload and final cloud manifest
-publication completed. The first attempt failed at the media-view guard; the
-fixed publisher resumed the same sealed run and completed all provider releases.
-It is cleaning up its owned temporary archive objects before recording process
-completion and starting the independent restore. Cloud publication is complete;
-local cleanup is pending. Following
-explicit owner approval, the original publisher stopped gracefully and the new
-publisher resumed the same sealed generation. No live-root activation, producer
-credential issuance or database promotion has occurred.
+Its streaming verification, native archive upload, final cloud manifest,
+provider releases and local cleanup are complete. The publication gate passed
+at 10:47 UTC. The independent restore is running separately and does not block
+rollout. The first attempt failed at the media-view guard; the fixed publisher
+resumed and completed the same sealed generation without repeating its audit or
+upload. The failed attempt and its evidence remain intact.
 
 The missing translation executable is fixed, published and verified in the
-exact selected wrapper. Inactive n8n dependency, translation image and home-backup
-overlays are prepared; their installation requires confirmed backup publication.
+exact selected wrapper. The n8n dependency, translation image, home-backup and
+daily-backup launcher overlays are installed, with their workers still inactive.
 The home-backup repair passed eight fixture tests and read-only copies of all
-19 worker/archive databases. Its final planned backup inventory has 202 effective
-components. None of those overlays changes the current sealed backup.
+19 worker/archive databases. Final inventory confirms all 32 worker profiles,
+95 installed files and 209 effective backup components after the launch cleanup
+and native credential provisioning. The sealed baseline backup is unchanged.
+
+The live media root is bound, two ingest workers have native credentials, and
+the six local intake changes preserve the two existing folder performer defaults.
+Queue handoff activated 202,561 enrichment targets, 177,320 translation targets,
+544 discovery targets and 207 saved scan plans. Review holds, retry deadlines
+and retained progress remain preserved; no scrape or background job has executed.
+The private application completed startup. Database promotion passed in 96 seconds,
+including the closed WAL checkpoint and an inode-preserving move into the final
+configuration directory. Public startup is waiting for application health.
+Ordinary startup was also
+found to repeat the full domain audit; a source change to separate it from
+identity checks is in progress and has not been tested or deployed.
 
 Separate steps are prepared for controlled host/n8n/manual/enrichment checks,
 native translation startup and job verification, and a fresh post-write backup

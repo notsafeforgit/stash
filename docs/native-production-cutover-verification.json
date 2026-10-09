@@ -877,17 +877,17 @@
     "manifest_sha256": "091b55067fe1f2932450f2f8ac9274301242ffec1961c74850d9ca56dcf43c6c"
   },
   "remaining": [
-    "pending_work_handoff",
-    "scoped_credentials_and_installed_inventory",
-    "current_coordinated_backup_and_restore",
-    "controlled_native_activation",
+    "public_start_health",
+    "controlled_native_ingestion_checks",
+    "isolated_cloud_restores_and_post_write_publication",
     "scheduled_cycles_and_legacy_retirement",
     "owner_acceptance",
-    "native_translation_runtime_install_and_enable",
-    "home_backup_caller_and_coverage_update"
+    "native_translation_worker_enable",
+    "home_backup_capture_and_upload",
+    "routine_startup_audit_separation"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-09T07:49:36.119721+00:00",
+  "checked_at": "2026-10-09T11:25:33.677293+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -1481,14 +1481,14 @@
   },
   "root_free_GiB": 116.13511657714844,
   "pre_public_coordinated_backup": {
-    "status": "running",
-    "stage": "publish-backup-before-public-streamed",
-    "public_handoff_started": false,
-    "root_activated": false,
-    "credentials_issued": 0,
-    "source_runs_activated": 0,
+    "status": "published_restore_running",
+    "stage": "restore-backup-before-public-streamed",
+    "public_handoff_started": true,
+    "root_activated": true,
+    "credentials_issued": 2,
+    "source_runs_activated": 207,
     "scraper_schedules_resumed": false,
-    "coordinated_backup_complete": false,
+    "coordinated_backup_complete": true,
     "isolated_restore_complete": false,
     "configuration_changes": [
       "Use existing private native API on loopback port 19499",
@@ -1538,7 +1538,10 @@
       "runtime_revision": "29fc61be47b64324817b447a5540393273eea7d7",
       "service": "stash-native-cutover-backup-streamed-01a0ed5e.service"
     },
-    "resumed_at": "2026-10-09T08:24:47.557150+00:00"
+    "resumed_at": "2026-10-09T08:24:47.557150+00:00",
+    "publication_gate_passed_at": "2026-10-09T10:47:48.223962+00:00",
+    "local_cleanup_complete": true,
+    "master_sha256": "392dfb241997ec1e98a42f86ca4435bd86983c86bec7d87b2af38cd0df0babc4"
   },
   "fresh_backup_snapshot_probe": {
     "status": "passed",
@@ -1987,7 +1990,9 @@
     "current_unfinished_publication_rejection_verified": true,
     "current_controller_unchanged": false,
     "original_controller_result_preserved": true,
-    "resumed_controller_bound_to_same_sealed_generation": true
+    "resumed_controller_bound_to_same_sealed_generation": true,
+    "publication_gate_passed": true,
+    "publication_gate_recorded_at": "2026-10-09T10:47:48.223962+00:00"
   },
   "routine_backup_verification": {
     "status": "cloud_published_provider_released_local_cleanup_running",
@@ -2168,5 +2173,119 @@
     "media_bucket_changed": false,
     "existing_user_policies_unchanged": true,
     "objects_tagged_or_deleted": 0
+  },
+  "operational_handoff": {
+    "root-binding-state.json": {
+      "status": "passed",
+      "completed_at": "2026-10-09T11:19:55.237791+00:00",
+      "root_revision": 2
+    },
+    "producer-provisioning-state.json": {
+      "status": "passed",
+      "completed_at": "2026-10-09T11:20:20.418686+00:00",
+      "credentials_issued": 2
+    },
+    "local-handoff-state.json": {
+      "status": "passed",
+      "completed_at": "2026-10-09T11:20:29.546211+00:00",
+      "explicit_folder_defaults": 2,
+      "filename_only_manual_base": true,
+      "operations": [
+        {
+          "path": "/api/v3/archive/collections/7e4aee4b-d7ba-5083-a4bd-4c613fd21f51",
+          "revision": 2
+        },
+        {
+          "path": "/api/v3/archive/collections/7e4aee4b-d7ba-5083-a4bd-4c613fd21f51/metadata-policy",
+          "revision": 2
+        },
+        {
+          "path": "/api/v3/archive/collections/407152a6-8ee1-5318-89ed-f10ed4eb5192",
+          "revision": 2
+        },
+        {
+          "path": "/api/v3/archive/collections/407152a6-8ee1-5318-89ed-f10ed4eb5192/metadata-policy",
+          "revision": 2
+        },
+        {
+          "path": "/api/v3/archive/collections/360ea576-0511-565d-abf1-c483f7345a95",
+          "revision": 1
+        },
+        {
+          "path": "/api/v3/archive/collections/360ea576-0511-565d-abf1-c483f7345a95/metadata-policy",
+          "revision": 1
+        }
+      ]
+    },
+    "discovery-recovery-state.json": {
+      "status": "passed",
+      "completed_at": "2026-10-09T11:21:12.969417+00:00",
+      "operations": 4,
+      "listings": 4,
+      "bound_targets": 544,
+      "retained_review_targets": 25
+    },
+    "scan-recovery-activation-state.json": {
+      "status": "passed",
+      "completed_at": "2026-10-09T11:21:55.928533+00:00",
+      "jobs_activated": 207,
+      "states": {
+        "queued": 38,
+        "deferred": 169
+      }
+    },
+    "final-worker-inventory-state.json": {
+      "status": "passed",
+      "checked_at": "2026-10-09T11:21:34.051270+00:00",
+      "profiles": 32,
+      "components": 141,
+      "installed_release_files_verified": 95,
+      "effective_backup_components_validated": 209
+    }
+  },
+  "database_promotion": {
+    "status": "passed",
+    "stage": "native_database_and_current_configuration_promoted",
+    "started_at": "2026-10-09T11:22:15.029246+00:00",
+    "completed_at": "2026-10-09T11:23:51.306499+00:00",
+    "seconds": 96.27726970799267,
+    "service": "stash-native-cutover-promote-database-01a0ed5e.service",
+    "database_copied": false,
+    "final_database": "/home/andrew/services/stash-native/config/stash-native.sqlite",
+    "same_filesystem_same_inodes_verified": true,
+    "counters": {
+      "scenes": 273546,
+      "images": 503711,
+      "galleries": 4197,
+      "performers": 1440,
+      "catalog_snapshots": 1711,
+      "automation_snapshots": 1,
+      "source_collections": 5774,
+      "metadata_policies": 4825,
+      "source_runs": 207,
+      "scan_journal_activations": 207,
+      "enrichment_activations": 2031,
+      "translation_activations": 1774,
+      "discovery_activations": 4,
+      "ingest_credentials": 2
+    }
+  },
+  "installed_rollout_overlays": {
+    "n8n-runtime-dependency-deployment.json": "passed_installed_inactive",
+    "home-backup-native-deployment.json": "passed_installed_inactive",
+    "legacy-launch-cleanup-deployment.json": "passed_installed_inactive",
+    "translation-runtime-deployment.json": "passed_installed_inactive"
+  },
+  "public_application_start": {
+    "status": "running",
+    "stage": "waiting_for_native_application_health",
+    "started_at": "2026-10-09T11:24:50.902571+00:00",
+    "updated_at": "2026-10-09T11:24:51.231111+00:00",
+    "service": "stash-native-cutover-public-start-01a0ed5e.service",
+    "owner": {
+      "pid": 3656420,
+      "start_ticks": "55506903"
+    },
+    "scheduled_writers_resumed": false
   }
 }

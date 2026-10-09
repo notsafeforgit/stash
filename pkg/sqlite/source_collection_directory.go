@@ -24,8 +24,20 @@ func (s *SourceCollectionStore) DirectoryScopes(ctx context.Context, root, direc
 			break
 		}
 	}
+	query := sourceCollectionSelect + ` WHERE r.revision=b.revision AND r.root_uuid=? AND r.path_prefix IN ` + getInBinding(len(args)-1)
+	// Root-wide access permits account folder renames; it does not establish
+	// ownership of every folder. Filter it before the per-directory bound so a
+	// large source list cannot prevent unrelated manual intake. The uncorrelated
+	// subquery reads the selected directory's file evidence once through its index.
+	query += ` AND (r.path_prefix!='.' OR r.kind IN ('directory','manual_batch')`
+	if directory != "." {
+		query += ` OR b.uuid IN (SELECT DISTINCT collection_uuid FROM source_file_observations INDEXED BY source_file_observation_location
+WHERE root_uuid=? AND archive_path IS NULL AND relative_path>=? AND relative_path<?
+AND instr(substr(relative_path,?),'/')=0)`
+		args = append(args, root, directory+"/", directory+"0", len([]rune(directory))+2)
+	}
+	query += `) ORDER BY length(r.path_prefix) DESC,b.uuid LIMIT 257`
 	var rows []sourceCollectionRow
-	query := sourceCollectionSelect + ` WHERE r.revision=b.revision AND r.root_uuid=? AND r.path_prefix IN ` + getInBinding(len(args)-1) + ` ORDER BY length(r.path_prefix) DESC,b.uuid LIMIT 257`
 	if err := dbWrapper.Select(ctx, &rows, query, args...); err != nil {
 		return nil, err
 	}
@@ -34,24 +46,6 @@ func (s *SourceCollectionStore) DirectoryScopes(ctx context.Context, root, direc
 	}
 	ret := make([]*models.SourceCollection, 0, len(rows))
 	for _, row := range rows {
-		// Whole-root access is used by sources spanning renamed account folders.
-		// It is not ownership of every directory. Exclude only folders with
-		// direct source-file evidence; do not prune a parent containing separate
-		// source and manual subfolders. The location index bounds this lookup.
-		if row.PathPrefix == "." && row.Kind != "directory" && row.Kind != "manual_batch" {
-			if directory == "." {
-				continue
-			}
-			var observed bool
-			if err := dbWrapper.Get(ctx, &observed, `SELECT EXISTS(SELECT 1 FROM source_file_observations INDEXED BY source_file_observation_location
-WHERE root_uuid=? AND archive_path IS NULL AND relative_path>=? AND relative_path<? AND collection_uuid=?
-AND instr(substr(relative_path,?),'/')=0)`, root, directory+"/", directory+"0", row.UUID, len([]rune(directory))+2); err != nil {
-				return nil, err
-			}
-			if !observed {
-				continue
-			}
-		}
 		ret = append(ret, row.resolve())
 	}
 	return ret, nil

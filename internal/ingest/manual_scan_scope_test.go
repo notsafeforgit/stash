@@ -145,6 +145,18 @@ func TestManualScanRejectsSourceRegistrationAfterPreviewOrAdmission(t *testing.T
 
 func TestManualScanWholeRootAccessUsesObservedFoldersAndProtectsExactProducerFiles(t *testing.T) {
 	f := newManualFileFixture(t, models.ArchiveImage)
+	// Production has thousands of account targets allowed to write beneath the
+	// media root. They must be excluded before applying the folder-scope limit.
+	require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		for range 300 {
+			_, err := f.service.Repo.SourceCollection.Put(ctx, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
+				Label: "Unrelated source", Kind: "account", State: "active", RootUUID: &f.root.UUID, PathPrefix: "."}})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
 	source := f.scanCollection(t, ".", "legacy_catalog", "active")
 	observe := func(relative string) {
 		require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {

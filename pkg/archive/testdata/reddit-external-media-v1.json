@@ -419,6 +419,195 @@
       "complete": false,
       "kind": "unknown",
       "manifest_error": false
+    },
+    {
+      "name": "Redgifs image permalink resolves its original CDN rendition",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal-large.jpg",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-medium.jpg"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://i.redgifs.com/i/GentleExampleAnimal.jpg",
+          "url_overridden_by_dest": "https://i.redgifs.com/i/GentleExampleAnimal.jpg"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal-large.jpg"
+      },
+      "attachment": {
+        "namespace": "native:reddit",
+        "value": "url:69906c64d992ee8977f225f939c32f625b94998662777db5121a20d8002a4a1c"
+      },
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "url:69906c64d992ee8977f225f939c32f625b94998662777db5121a20d8002a4a1c"
+      },
+      "complete": true,
+      "kind": "image",
+      "manifest_error": false
+    },
+    {
+      "name": "Redgifs image permalink resolves its fallback rendition",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal-large.jpg",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-medium.jpg"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://i.redgifs.com/i/GentleExampleAnimal.jpg",
+          "url_overridden_by_dest": "https://i.redgifs.com/i/GentleExampleAnimal.jpg"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal-medium.jpg"
+      },
+      "attachment": {
+        "namespace": "native:reddit",
+        "value": "url:69906c64d992ee8977f225f939c32f625b94998662777db5121a20d8002a4a1c"
+      },
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "url:69906c64d992ee8977f225f939c32f625b94998662777db5121a20d8002a4a1c"
+      },
+      "complete": true,
+      "kind": "image",
+      "manifest_error": false
+    },
+    {
+      "name": "Redgifs image cannot use a different API item",
+      "source": {
+        "category": "redgifs",
+        "id": "differentitem",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal-large.jpg",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-medium.jpg"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://i.redgifs.com/i/GentleExampleAnimal.jpg",
+          "url_overridden_by_dest": "https://i.redgifs.com/i/GentleExampleAnimal.jpg"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal-large.jpg"
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "url:69906c64d992ee8977f225f939c32f625b94998662777db5121a20d8002a4a1c"
+      },
+      "complete": true,
+      "kind": "image",
+      "manifest_error": false
+    },
+    {
+      "name": "Redgifs image requires an observed rendition",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal-large.jpg",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-medium.jpg"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://i.redgifs.com/i/GentleExampleAnimal.jpg",
+          "url_overridden_by_dest": "https://i.redgifs.com/i/GentleExampleAnimal.jpg"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal-unobserved.jpg"
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "url:69906c64d992ee8977f225f939c32f625b94998662777db5121a20d8002a4a1c"
+      },
+      "complete": true,
+      "kind": "image",
+      "manifest_error": false
+    },
+    {
+      "name": "Lookalike image host does not prove a Redgifs API item",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal-large.jpg",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-medium.jpg"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://example.invalid/i/GentleExampleAnimal.jpg",
+          "url_overridden_by_dest": "https://example.invalid/i/GentleExampleAnimal.jpg"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal-large.jpg"
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "url:5a35fe4560aa542a332847bd6c8c54039077aef77ab1d919f5639d720caa93ea"
+      },
+      "complete": true,
+      "kind": "image",
+      "manifest_error": false
+    },
+    {
+      "name": "A direct image download keeps the original permalink identity",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://i.redgifs.com/i/GentleExampleAnimal.jpg",
+        "url_overridden_by_dest": "https://i.redgifs.com/i/GentleExampleAnimal.jpg",
+        "_url": "https://i.redgifs.com/i/GentleExampleAnimal.jpg"
+      },
+      "attachment": {
+        "namespace": "native:reddit",
+        "value": "url:69906c64d992ee8977f225f939c32f625b94998662777db5121a20d8002a4a1c"
+      },
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "url:69906c64d992ee8977f225f939c32f625b94998662777db5121a20d8002a4a1c"
+      },
+      "complete": true,
+      "kind": "image",
+      "manifest_error": false
+    },
+    {
+      "name": "Invalid permalink cannot lend its item ID to a different direct link",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal-large.jpg",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-medium.jpg"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://i.redgifs.com:443/i/GentleExampleAnimal.jpg",
+          "url_overridden_by_dest": "https://example.invalid/different.jpg"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal-large.jpg"
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "url:27b5984935d109713f2d38deb717b45490b99ac0b2d65dfa2b7a962c11de1e69"
+      },
+      "complete": true,
+      "kind": "image",
+      "manifest_error": false
     }
   ]
 }

@@ -330,6 +330,40 @@ class GalleryTests(unittest.TestCase):
             })
             self.assertEqual(completed["media_kind"], "scene")
 
+    def test_reddit_redgifs_image_permalink_download_and_replay(self):
+        self.narrow_window()
+        config.set(("extractor", "reddit"), "parent-metadata", "_reddit")
+        post = reddit_data(id="imagepost", url="https://i.redgifs.com/i/LinkedPicture.jpg",
+                           date="2026-10-01T00:00:00.200Z")
+        picture = {"id": "linkedpicture", "createDate": 1577836800, "gallery": None,
+                   "urls": {"hd": "https://media.redgifs.com/LinkedPicture-large.jpg",
+                            "sd": "https://media.redgifs.com/LinkedPicture-medium.jpg"}}
+        downloads = []
+
+        def download(child, url):
+            self.assertEqual(self.events(kinds=None)[-1]["state"], "started")
+            self.assertEqual(url, picture["urls"]["hd"])
+            downloads.append(url)
+            child.pathfmt.part_enable()
+            with child.pathfmt.open("wb") as output:
+                output.write(b"completed fixture image")
+            return True
+
+        with patch.object(RedgifsAPI, "gif", side_effect=lambda *_: copy.deepcopy(picture)), \
+                patch.object(NativeDownloadJob, "download", download):
+            for _ in range(2):
+                self.assertEqual(self.task(post, fixture=LinkedRedgifsFixture).run(), 0)
+        self.assertEqual(downloads, [picture["urls"]["hd"]])
+        self.assertEqual(self.archive_count(), 1)
+        events = self.events()
+        self.assertEqual([event["kind"] for event in events], ["source.capture", "file.completed"] * 2)
+        expected = {"namespace": "native:reddit", "value": "url:" + hashlib.sha256(post["url"].encode()).hexdigest()}
+        for capture, completed in zip(events[::2], events[1::2]):
+            self.assertEqual(capture["post"], {"namespace": "native:reddit", "value": "imagepost"})
+            self.assertEqual(capture["source"]["_reddit"]["url"], post["url"])
+            self.assertEqual(completed["source"], {"capture_event_uuid": capture["event_uuid"], "attachment": expected})
+            self.assertEqual(completed["media_kind"], "image")
+
     def test_download_and_existing_file_skip_keep_exact_capture_dependency(self):
         first = self.task()
         self.assertEqual(first.run(), 0)

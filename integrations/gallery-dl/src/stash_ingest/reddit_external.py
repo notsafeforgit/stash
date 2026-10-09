@@ -57,6 +57,20 @@ def same_url(left, right):
         return False
 
 
+def redgifs_image_id(value):
+    """The image permalink identifies the API item behind its CDN renditions."""
+    if linked(value) is None:
+        return None
+    try:
+        parsed = urlsplit(html.unescape(value))
+    except ValueError:
+        return None
+    if parsed.hostname != 'i.redgifs.com':
+        return None
+    match = re.fullmatch(r'/i/([A-Za-z0-9]{1,256})\.(?:jpg|jpeg|png|webp|avif|jxl|bmp)', parsed.path, re.IGNORECASE)
+    return match[1].lower() if match else None
+
+
 def preview_matches(data, download):
     from .source import reddit_media
     preview = data.get('preview')
@@ -93,15 +107,21 @@ def attachment(data, source, download):
     ref = target(data)
     if ref is None or data.get('comment'):
         return None
-    if ref['namespace'] == 'native:redgifs':
-        if source.get('category') == 'redgifs' and str(source.get('id', '')).lower() == ref['value']:
+    # Keep the direct image URL's existing attachment identity, including its
+    # query. Only the exact Redgifs API item and one of its observed renditions
+    # may resolve that permalink; output filenames are not source evidence.
+    image_id = next((identity for key in ('url', 'url_overridden_by_dest')
+                     if (identity := redgifs_image_id(data.get(key))) is not None), None)
+    redgifs_id = ref['value'] if ref['namespace'] == 'native:redgifs' else image_id
+    if redgifs_id is not None:
+        if source.get('category') == 'redgifs' and str(source.get('id', '')).lower() == redgifs_id:
             urls = source.get('urls')
             if isinstance(urls, dict):
                 for key in ('hd', 'sd', 'gif', 'silent'):
                     value = urls.get(key)
                     if isinstance(value, str) and same_url(value.replace('//thumbs2.', '//thumbs3.', 1), download):
                         return ref
-    elif any(same_url(data.get(key), download) for key in ('url', 'url_overridden_by_dest')):
+    if ref['namespace'] != 'native:redgifs' and any(same_url(data.get(key), download) for key in ('url', 'url_overridden_by_dest')):
         return ref
     if preview_matches(data, download):
         return ref

@@ -100,6 +100,15 @@ runtime. The cloud-restore receipt gate explicitly rejects streamed-only proof.
 Installation of these launch changes still waits for the current publication;
 no active service, current runtime or sealed generation has changed.
 
+A same-generation resume is prepared for the current publisher. Read-only checks
+confirmed the retained server checkpoint, exact packed manifest/inventory and
+unchanged configuration; the installed journal resumed copied identity records
+without creating a new generation. Five stop/resume guard tests pass. Automatic
+approval review rejected sending the graceful stop signal without explicit owner
+authorization to interrupt the running job. No signal executed, the original
+publisher remains active, and the switch awaits that answer. This does not block
+the original backup from completing normally.
+
 The Standard download was measured at 40.2 GiB across 241,410 unique content
 objects, plus three metadata objects. One HEAD and GET per object yields about
 483,000 requests, approximately $0.19 at the current Oregon rate. Internet

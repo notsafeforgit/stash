@@ -86,6 +86,21 @@ func TestImportedNFOCleanupRollsBackOnUnaccountedDocument(t *testing.T) {
 	require.NoError(t, db.Open(db.DatabasePath()))
 }
 
+func TestImportedNFOCleanupPreservesAbsentEmptyScalars(t *testing.T) {
+	db, repo, post, _ := cleanupFixture(t)
+	payload, err := archive.PrepareRetainedCapture("legacy-nfo", "reddit", json.RawMessage(`{"nfo_fields":{"title":[""],"plot":[""],"premiered":[""]},"nfo_path":"empty.nfo"}`))
+	require.NoError(t, err)
+	capture := recordSourceTestCapture(t, repo, models.SourceCaptureInput{UUID: uuid.NewString(), PostUUID: post, Origin: "legacy-nfo", Platform: "reddit", CapturedAt: time.Now().UTC(), RetentionPolicy: "legacy-retained-v1", Payload: *payload})
+	_, err = db.CompactImportedNFO(t.Context(), nil)
+	require.NoError(t, err)
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		kept, err := repo.SourceEvidence.FindCapture(ctx, capture.UUID)
+		require.NoError(t, err)
+		require.Equal(t, models.SourcePostMetadata{}, kept.Metadata)
+		return nil
+	}))
+}
+
 func TestImportedNFOCleanupCompletedSnapshotCanReopen(t *testing.T) {
 	empty := sha256.Sum256(nil)
 	hash := hex.EncodeToString(empty[:])

@@ -220,6 +220,22 @@ func (db *Database) compactNFOCaptures(ctx context.Context, r *NFOCleanupResult,
 			// Source language can be independent of a translation's target language.
 			metadata := data.Metadata
 			metadata.Language = capture.Metadata.Language
+			// The old catalog normalizer represented empty scalar strings as
+			// absent metadata. They carry the same value; keep that representation.
+			for _, field := range []struct {
+				projected **string
+				retained  *string
+			}{
+				{&metadata.Title, capture.Metadata.Title}, {&metadata.OriginalText, capture.Metadata.OriginalText},
+				{&metadata.PublishedAt, capture.Metadata.PublishedAt},
+			} {
+				if *field.projected != nil && **field.projected == "" && field.retained == nil {
+					*field.projected = nil
+				}
+			}
+			if metadata.PublishedAt == nil {
+				metadata.DateBasis = capture.Metadata.DateBasis
+			}
 			if !reflect.DeepEqual(metadata, capture.Metadata) {
 				return fmt.Errorf("NFO capture %s differs from its projected metadata", id)
 			}

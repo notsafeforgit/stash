@@ -43,6 +43,12 @@ the first implementation phase updates that policy for independent development.
 - Preserve the current retention policy during migration. Do not revive deleted
   content, restart intentionally abandoned original downloads, regenerate NFOs,
   or perform online identity resolution as a side effect of import.
+- The owner clarified NFO retention on October 9: the NFO-to-catalog import is
+  already complete. After its useful values are represented as native post
+  metadata, translations, media associations and folder defaults, remove the
+  original XML, obsolete NFO paths and redundant per-NFO migration records.
+  Do not add per-NFO retirement records or retain original hashes as a substitute
+  for the discarded files. This is cleanup of imported data, not another import.
 - Preserve standalone access through a documented export format and offline
   inspection/import tools. A second browser application is outside this change.
 
@@ -119,7 +125,7 @@ foreign keys, uniqueness, indexes, and lifecycle rules before implementation.
 | Media appearance | Attachment-to-scene/image association, content identity, and provenance; many posts may reference one item |
 | Source album | Explicit post-to-gallery association with ordered attachments, download completeness, and preserved membership decisions |
 | Translation | Original revision/text identity, translated text, language, provider, and provenance; originals remain intact |
-| Retained document | Deduplicated original NFO bytes and parser results, with all original path/post references and selected heads |
+| Imported NFO metadata | Ordinary post fields, translations and media associations; remove original XML, NFO paths and redundant document records after conversion |
 | Import policy | Typed source/folder defaults, mappings, title policy, entity-creation policy, and organized behavior |
 | Metadata decision | Field-level selection or explicit override with origin, revision, and user/import provenance |
 | Ingestion | Producers, runs, event receipts, job state, checkpoints, leases, and durable retry state |
@@ -560,7 +566,7 @@ still reconcile.
 | assets, files, appearances | Content/location/media associations, attachment order, pending/missing/deduplicated states, and surviving-path references |
 | memberships | Collection membership independent of ownership/depicted performers |
 | translations | Originals, translations, language/provider/provenance, and input identity |
-| sidecar_documents, sidecar_sources, sidecar_heads, older sidecars table/view | Exact original bytes, hashes, parser results/warnings, paths, selected versions, and folder defaults |
+| sidecar_documents, sidecar_sources, sidecar_heads, older sidecars table/view | Collate useful values into post metadata, translations, media associations and native folder defaults; then discard original XML, obsolete NFO references and per-NFO migration records |
 | metadata_edits | Append-only field choices, timestamps, original path scope, and selected/inherited precedence |
 | dedupe_events and file_events | Existing relationship and filesystem history; do not execute historical actions again |
 | metadata_prune_queue | Pending cleanup intent, disabled until migrated references and retention checks validate |

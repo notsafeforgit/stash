@@ -16,9 +16,10 @@ and scraper schedules are still stopped.
 
 The first coordinated native backup has sealed and packed its checkpoint with
 the 22.2 GB database, 240,872 saved artwork files and coordinated host state.
-Its local verification restore is in progress; cloud publication and the separate
-cloud restore are pending. AWS access is verified; the original backup process
-is advancing. No live-root activation, producer
+Its streaming verification and publication are in progress; cloud publication
+and the separate cloud restore are pending. AWS access is verified. Following
+explicit owner approval, the original publisher stopped gracefully and the new
+publisher resumed the same sealed generation. No live-root activation, producer
 credential issuance or database promotion has occurred.
 
 The missing translation executable is fixed, published and verified in the
@@ -48,9 +49,10 @@ success. They still require completed migration/reconciliation, their existing
 runtime checks, and the applicable completed backup before any rollout action.
 The current packed-but-unpublished backup remains ineligible.
 
-The running publisher and its controller are unchanged. The controller's old
-final held-services check can become obsolete after launch; its original result
-is retained. A separate restore receipt requires the restore child to exit
+The original publisher was stopped with the owner's approval, and its controller's
+actual interrupted result is retained. A new controller resumes the same sealed
+run using streaming verification, with the original configuration and archive.
+A separate restore receipt requires the restore child to exit
 successfully and validates its output against the downloaded archive's native
 database and producer receipts. Neither a running child nor a failed restore is
 reported as successful. Original snapshots and recovery copies remain protected
@@ -69,8 +71,8 @@ versions for recovery; no installed configuration or running service changed.
 The first publisher is doing a full local restore before upload: it reconstructs
 240,872 artwork files, syncs every file and parent directory, then rereads the
 artwork. That path was also selected for every scheduled native backup, making
-routine verification unnecessarily expensive. The current sealed publisher and
-its runtime remain unchanged while it completes that original check.
+routine verification unnecessarily expensive. The owner authorized stopping that
+publisher and continuing the same sealed archive with streaming verification.
 
 The daily publisher now selects streamed content verification. It checks every
 compressed/raw chunk, complete artifact hash/size, artwork MD5 and exact artwork
@@ -97,17 +99,21 @@ effective components. Thirteen fixture checks and five actual launcher checks
 pass; the installed daily module uses streaming and the explicit restore module
 uses full reconstruction. The future controlled backup selects that same reviewed
 runtime. The cloud-restore receipt gate explicitly rejects streamed-only proof.
-Installation of these launch changes still waits for the current publication;
-no active service, current runtime or sealed generation has changed.
+Installation of these daily/manual launch changes still waits for the current
+publication. The current one-time publisher already uses the new runtime and
+the sealed generation is unchanged.
 
-A same-generation resume is prepared for the current publisher. Read-only checks
+A same-generation resume is running for the current publisher. Read-only checks
 confirmed the retained server checkpoint, exact packed manifest/inventory and
 unchanged configuration; the installed journal resumed copied identity records
 without creating a new generation. Five stop/resume guard tests pass. Automatic
-approval review rejected sending the graceful stop signal without explicit owner
-authorization to interrupt the running job. No signal executed, the original
-publisher remains active, and the switch awaits that answer. This does not block
-the original backup from completing normally.
+approval review initially rejected sending the graceful stop signal without
+explicit owner authorization. The owner then approved it. Both original processes
+exited, the backup lock was released, and the streaming publisher started at
+08:24:47 UTC. Its log confirms the original run and checkpoint; the packed
+manifest/inventory and active journal are unchanged. The original controller's
+exit-code-1 result remains intact. Publication is still pending, and rollout
+continues to require confirmed publication and provider release.
 
 The Standard download was measured at 40.2 GiB across 241,410 unique content
 objects, plus three metadata objects. One HEAD and GET per object yields about

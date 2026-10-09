@@ -1482,7 +1482,7 @@
   "root_free_GiB": 116.13511657714844,
   "pre_public_coordinated_backup": {
     "status": "running",
-    "stage": "publish-backup-before-public",
+    "stage": "publish-backup-before-public-streamed",
     "public_handoff_started": false,
     "root_activated": false,
     "credentials_issued": 0,
@@ -1525,7 +1525,20 @@
       "packed_logical_bytes": 61829535775,
       "artwork_count_matches_source_inventory": true
     },
-    "local_verification_method": "isolated-restore; original sealed publisher remains unchanged"
+    "local_verification_method": "streamed-contents; owner-authorized resume of the same sealed generation",
+    "streaming_resume": {
+      "status": "resumed_same_sealed_generation",
+      "recorded_at": "2026-10-09T08:26:23.848233+00:00",
+      "run_id": "20261008_175444_1545955",
+      "checkpoint_uuid": "dbf8cd08-ea38-43df-9864-6f20429be640",
+      "routine_verification": "streamed-contents",
+      "original_controller_preserved": true,
+      "original_archive_manifest_and_inventory_unchanged": true,
+      "original_publisher_exit_code": 1,
+      "runtime_revision": "29fc61be47b64324817b447a5540393273eea7d7",
+      "service": "stash-native-cutover-backup-streamed-01a0ed5e.service"
+    },
+    "resumed_at": "2026-10-09T08:24:47.557150+00:00"
   },
   "fresh_backup_snapshot_probe": {
     "status": "passed",
@@ -1972,10 +1985,12 @@
     "cloud_restore_receipt_rejects_streamed_only_proof": true,
     "gate_tests_passed": 11,
     "current_unfinished_publication_rejection_verified": true,
-    "current_controller_unchanged": true
+    "current_controller_unchanged": false,
+    "original_controller_result_preserved": true,
+    "resumed_controller_bound_to_same_sealed_generation": true
   },
   "routine_backup_verification": {
-    "status": "tested_pushed_runtime_prepared_inactive",
+    "status": "active_for_same_generation_resume_daily_launchers_prepared",
     "source_revision": "29fc61be47b64324817b447a5540393273eea7d7",
     "method": "streamed-contents",
     "checks": [
@@ -1998,7 +2013,10 @@
     "original_daily_timer_preserved": true,
     "media_storage_policy_preserved": true,
     "current_sealed_run_changed": false,
-    "live_launchers_updated": false
+    "live_launchers_updated": false,
+    "stop_resume_guard_tests_passed": 5,
+    "same_sealed_generation_resume_verified": true,
+    "owner_authorized_live_switch": true
   },
   "metadata_retention_configuration": {
     "status": "passed",

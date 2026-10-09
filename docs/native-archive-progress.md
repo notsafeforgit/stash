@@ -9,6 +9,16 @@ in progress.
 
 ## Current release position — 2026-10-09 UTC
 
+The NFO-to-catalog import and subsequent catalog-to-native import are already
+complete. The requested NFO work removes redundant storage from that completed
+import. A transient field conversion now preserves original text, translations,
+dates, URLs and performer/studio defaults without retaining XML, document paths, hashes or
+per-document retirement records. Its four focused tests pass, and a read-only
+run accepts all 272,035 valid/repaired parsed documents with no unmapped fields.
+The 520 malformed documents and one empty document remain separate exceptions.
+The converter is not yet connected to database cleanup: production records,
+payloads and sidecar files have not been deleted.
+
 All 1,711 catalogs and 925,869 automation records are imported and reconciled.
 Post/media associations, source albums, disabled policies and source URL
 registration have passed their independent checks. The original compatible

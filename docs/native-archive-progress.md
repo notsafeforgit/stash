@@ -25,14 +25,31 @@ text needs only a null reference. Known default title/details mappings receive
 new native policy revisions; their history and all other settings stay intact.
 Custom expressions that still depend on discarded NFO inputs stop cleanup.
 
-The complete backend gate and a full production-copy cleanup passed. Focused
-tests also cover capture-specific saved translations, original-text choices,
-policy history and custom-expression rollback. The copy is being refreshed for
-the final display-selection change. Production cleanup and deployment remain
-pending. GitHub reports Actions enabled and the workflow active, but workflow
-dispatch returns HTTP 422 claiming Actions is disabled. A local digest-pinned
-build is prepared; this API failure is not evidence that the repository setting
-is disabled.
+Production cleanup and deployment are complete on schema 1000100. It removed
+272,556 NFO documents and their per-file bookkeeping, normalized 414,561 captures,
+scrubbed 686,599 redundant staging payloads and compacted all 1,711 catalogs.
+Recovery retained 520 malformed documents as ordinary post metadata and linked
+1,334 existing media associations; 11 old file references had no current match.
+The 4,817 default policies now select shared native translations. Every original
+NFO-derived post metadata record matches the pre-cleanup digest, and all four
+library counts are unchanged. The temporary 23.3 GB rehearsal copy is removed.
+
+The final copy passed native snapshot verification and semantic reconciliation.
+Backend lint and tests passed except for a second-boundary race in the intake
+response-loss fixture; its explicit settled clock passes three reruns. Focused
+tests cover capture-specific saved translations, original-text choices, policy
+history, rollback and database reopening. Source `2337eef9e` is running from
+`localhost/stash-native-s6@sha256:ea42c1891b270f25b17d6a8d9da98e991b62f32509e263c458e19c55209f247b`,
+with a healthy container and API. The subsequent `c34f25177` changes only that
+test fixture. The matching backup validator and runtime/reconstruction components
+are installed for future backups; the sealed baseline and its validator remain
+unchanged. This deployment has not yet received its post-write cloud backup.
+
+GitHub reports Actions enabled and the publishing workflow active, but dispatch
+returns HTTP 422 claiming Actions is disabled. This API failure does not prove
+the repository setting is disabled. Image publication is pending; the live
+deployment uses the tested local image, and its binary and pinned runtime-base
+reconstruction files are included in the next configured backup.
 
 All 1,711 catalogs and 925,869 automation records are imported and reconciled.
 Post/media associations, source albums, disabled policies and source URL
@@ -65,14 +82,14 @@ and retained progress remain preserved; no scrape or background job has executed
 The private application completed startup. Database promotion passed in 96 seconds,
 including the closed WAL checkpoint and an inode-preserving move into the final
 configuration directory. Production startup passed at 11:27 UTC in 129 seconds.
-The API reports schema 1000099 and the expected 273,546 scenes, 503,711 images,
-4,197 galleries and 1,440 performers. The application uses the promoted database
+The initial cutover reported schema 1000099; the NFO cleanup release now reports
+1000100 with the same 273,546 scenes, 503,711 images, 4,197 galleries and 1,440
+performers. The application uses the promoted database
 and live media directory, with no old catalog mount. "Public startup" in the
 cutover records means the normal production Stash service, in contrast to the
 temporary localhost-only migration instance.
-Ordinary startup was also
-found to repeat the full domain audit; a source change to separate it from
-identity checks is in progress and has not been tested or deployed.
+Ordinary startup still performs the full domain audit. The separately saved
+optimization patch has not been tested or deployed.
 
 Separate steps are prepared for controlled host/n8n/manual/enrichment checks,
 native translation startup and job verification, and a fresh post-write backup

@@ -12462,3 +12462,23 @@ ZFS probe verified read-only capture, retained original bytes, replay and releas
 only its disposable dataset was removed. No live-root activation, credential
 provisioning, database promotion or public startup has occurred. A fresh backup
 after controlled ingestion still gates resuming scraper schedules.
+
+Post/media application and independent receipt reconciliation completed on
+October 9: all 261,642 post receipts, 423,849 selected associations and 427,207
+file proofs match their saved plans. There were no review or unavailable
+outcomes in this matching scope. Gallery previews then checked all 5,131 posts
+with retained attachment selections; 2,857 qualify for new source galleries
+and 2,274 are ineligible. Applying that plan is in progress, with all 1,340
+original galleries and 505,653 image memberships included in preservation
+checks. Policies, source registration and the pre-public backup/restore remain
+gated on those checks.
+
+Controlled host, n8n and direct-file intake checks are prepared without starting
+scrapes. The selected host scan retains its original publication window; the
+n8n check uses an existing interrupted backfill and the stored workflow, with
+accepted completion and skip decisions preserved. Verification requires actual
+source completion, matching producer/native event digests, completed file jobs,
+live media associations and independently checked sample bytes. The n8n launch
+records intent before its request and can recover the actual execution after a
+lost response without submitting another workflow. These checks still require
+the coordinated backup/restore and verified public handoff.

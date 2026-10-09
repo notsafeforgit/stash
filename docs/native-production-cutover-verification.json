@@ -886,7 +886,7 @@
     "owner_acceptance"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-08T23:54:48.442462+00:00",
+  "checked_at": "2026-10-09T00:38:46.892200+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -955,8 +955,8 @@
   },
   "domain_services": {
     "post_media": {
-      "status": "running",
-      "stage": "apply",
+      "status": "passed",
+      "stage": "current_post_media_links_verified",
       "started_at": "2026-10-08T23:25:56.423869+00:00",
       "preview_progress": {
         "posts": 261642,
@@ -976,44 +976,71 @@
         }
       },
       "apply_progress": {
-        "posts": 79000,
-        "batches": 79,
+        "posts": 261642,
+        "batches": 262,
         "outcomes": {
-          "selected": 128903,
+          "selected": 423849,
           "preserved": 0,
           "review": 0,
           "unavailable": 0
         },
         "statuses": {
-          "committed": 79000
+          "committed": 261642
         }
+      },
+      "completed_at": "2026-10-09T00:35:25.096874+00:00",
+      "independent_receipt_comparison": {
+        "status": "passed",
+        "totals": {
+          "proofs": 427207,
+          "decisions": 423849,
+          "receipts": 261642
+        },
+        "seconds": 27.080514500965364,
+        "public_service_activated": false,
+        "method": "Every new receipt, immutable decision, selected link and proof reference equals its independently verified saved API plan; request hashes and deterministic decision UUIDs recomputed independently."
       }
     },
     "albums": {
       "status": "running",
-      "stage": "waiting_for_current_post_media_links",
-      "started_at": "2026-10-08T23:25:56.653257+00:00"
+      "stage": "applying_current_album_plan",
+      "started_at": "2026-10-08T23:25:56.653257+00:00",
+      "updated_at": "2026-10-09T00:38:04.437400+00:00",
+      "posts": 5131,
+      "actions": {
+        "create": 2857,
+        "ineligible": 2274
+      },
+      "public_service_activated": false
     },
     "policies": "prepared_1718_disabled_definitions",
     "policy_import": {
       "status": "running",
       "stage": "waiting_for_current_domain_migration",
-      "started_at": "2026-10-08T23:25:56.870235+00:00"
+      "started_at": "2026-10-08T23:25:56.870235+00:00",
+      "updated_at": "2026-10-08T23:25:56.870290+00:00",
+      "completed": 0,
+      "public_service_activated": false
     },
     "local_manual_handoff": {
       "status": "running",
       "stage": "waiting_for_current_disabled_policies",
-      "started_at": "2026-10-08T23:25:57.269246+00:00"
+      "started_at": "2026-10-08T23:25:57.269246+00:00",
+      "native_changed": false
     },
     "source_registration": {
       "status": "running",
       "stage": "waiting_for_current_policy_import",
-      "started_at": "2026-10-08T23:25:57.083468+00:00"
+      "started_at": "2026-10-08T23:25:57.083468+00:00",
+      "updated_at": "2026-10-08T23:25:57.083518+00:00",
+      "registered": 0,
+      "public_service_activated": false
     },
     "operational_recovery_preparation": {
       "status": "running",
       "stage": "waiting_for_current_policy_import",
-      "started_at": "2026-10-08T23:25:57.544386+00:00"
+      "started_at": "2026-10-08T23:25:57.544386+00:00",
+      "native_changed": false
     }
   },
   "maintenance_journals": {
@@ -1220,6 +1247,21 @@
       "sha256": "cdf604e44e0cd203a93263c720241d8ae292b0da450e7e39e4ce98732b3c74a9",
       "syntax_checked": true,
       "executed": false
+    },
+    "verify-extensionless-intake.py": {
+      "status": "prepared_not_executed",
+      "sha256": "22f96e8e830831ac2d96a28de34850638fbcba60fcfee653470ded14bf4a7eeb",
+      "syntax_checked": true
+    },
+    "start-controlled-n8n.py": {
+      "status": "prepared_not_executed",
+      "sha256": "53892664842e6aaeb2b47b8d0fcff5552338b6802f33a07b086a66752bf601d6",
+      "syntax_checked": true
+    },
+    "verify-controlled-source.py": {
+      "status": "prepared_not_executed",
+      "sha256": "ef1277b03d206a69aacc587eb1b285ef0729cf957366f2694f9b922447b584af",
+      "syntax_checked": true
     }
   },
   "retired_rehearsal_databases": {
@@ -1401,7 +1443,7 @@
     "failed_comparison_retained": true,
     "imports_replayed": false
   },
-  "root_free_GiB": 117.58,
+  "root_free_GiB": 116.89,
   "pre_public_coordinated_backup": {
     "status": "running",
     "stage": "waiting_for_verified_domain_migration",
@@ -1431,5 +1473,17 @@
     "release_and_retry_passed": true,
     "disposable_dataset_removed": true,
     "production_media_unchanged": true
+  },
+  "controlled_ingestion_preparation": {
+    "status": "prepared_not_executed",
+    "host": "One existing queued Reddit profile scan with its original publication window and no historical failures",
+    "n8n": "One existing interrupted Reddit backfill using the stored workflow, two recovered source targets, and no accepted completion/skip decision",
+    "manual": "Existing extensionless Matroska with a guarded .mkv rename and direct filename-title intake",
+    "runtime": "Pinned n8n 2.42.4 authentication entry point and worker imports checked without network or live mounts",
+    "completion_checks": "Source completion, producer/native event digests, completed file jobs, live file generations and media associations, and sample file bytes",
+    "requires": "Successful pre-public coordinated backup/restore and separately verified public handoff",
+    "website_requests": 0,
+    "workflow_executions": 0,
+    "media_mutations": 0
   }
 }

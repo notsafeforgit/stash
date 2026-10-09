@@ -10,8 +10,8 @@ in progress.
 ## Current release position — 2026-10-09 UTC
 
 Production is healthy on schema **1000105**, source
-`8d9979b6f42969ab2a53cea5448114b199810e7b`, pinned wrapper
-`localhost/stash-native-s6@sha256:db7a76fa53d09062a0aa2ede193e8d89aa03a3a0bed0dea07ec7fd89f2fc17cd`.
+`81b81cf6313c634b28caea007df9f893222ad9a9`, pinned wrapper
+`localhost/stash-native-s6@sha256:fa8367a5ca3330c27088e3a8f722233b95b46e70b5018c2b6a9a63556c7ac154`.
 The explicit [catalog association repair](catalog-association-repair.md) now
 promotes unambiguous imported post-account claims and known author directories
 to ordinary publisher decisions. Accounts without an ownership choice can link
@@ -20,14 +20,31 @@ performers, saved/subreddit directories and existing choices remain protected.
 Publisher ownership does not add depicted-performer tags to media. The example
 post `0000e604-6fd6-5f99-8512-ad9409be43f6` now exposes its Reddit account and
 the existing CuteLilAsya performer link; live desktop/mobile checks passed.
-The full imported-post repair is running in resumable batches of 25 through the
-admin API. Its receipts and unresolved matches are recorded under
-`.local/catalog-association-20261009/`.
+The repair completed all **266,597** imported posts in batches of 25 through the
+admin API, creating **208,188 publisher decisions** and **869 account-to-performer
+ownership decisions**. Existing choices were preserved. A follow-up recognized
+retained mirror-account usernames when their display labels were numeric IDs:
+those 25,252 posts already had publisher links, and resolving the aliases enabled
+26 additional ownership links, included in the total above. The targeted retry
+also checked one representative post per previously unmatched owner account.
+The live example `000a6a0b-dc74-577d-9a0c-0d3ae391ea9e` resolves the retained
+`innocentbeautypremium` identity to the existing Kayla Kapoor performer (#401).
 
-All fork-gate components passed for this release. The backup fixture suite used
+The final report leaves 8,278 posts without usable imported author evidence,
+207 with conflicting folder/account identities, 80 from a saved-feed directory,
+five with oversized capture scopes and seven with conflicting captured authors.
+There are 92 considered accounts without a uniquely matching existing performer.
+These outcomes do not remove existing source links or prevent later manual
+review. Receipts and unresolved matches are recorded under
+`.local/catalog-association-20261009/` and `.local/catalog-alias-20261009/`;
+the authoritative links and ownership history live in the normal Stash database.
+
+All fork-gate components passed for the initial association change. The backup fixture suite used
 disk-backed scratch for its free-space requirements; Go integration tests were
 rerun in `/tmp` after the disk-backed test phase was interrupted for excessive
-filesystem latency. The complete Go run passed there. No database migration was
+filesystem latency. The complete Go run passed there. The mirror-alias follow-up
+passed the publisher/ownership SQLite and API suites and Go lint; its regression
+failed before the fix. No database migration was
 needed for this application update. The worker timer resumed after readiness,
 and the pending future-backup runtime selector now targets this release while
 the running backup retains its original sealed configuration.

@@ -126,7 +126,8 @@ class PublicationGateTest(unittest.TestCase):
         historical = copy.deepcopy(proof)
         del historical["verification_method"]
         gate.check_restore_audit(historical)
-        for change in ({"verification_method": "streamed-contents"}, {"contents_verified": False},
+        for change in ({"verification_method": "streamed-contents"}, {"verification_method": "captured-contents"},
+                       {"contents_verified": False},
                        {"native_snapshot": None}, {"native_snapshot": {}},
                        {"native_snapshot": {"database_verified": False}},
                        {"native_snapshot": {"database_verified": 1}}):

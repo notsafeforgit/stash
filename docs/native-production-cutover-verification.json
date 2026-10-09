@@ -2048,18 +2048,19 @@
         "daily_runtime_updated": false,
         "full_routine_audit_split_complete": false,
         "source_revision": "37331d454b367f1ca73434c332d45e7c26db1542",
-        "runtime": "/home/andrew/.local/share/stash-native-backup/releases/37331d454b36/venv",
+        "runtime": "/home/andrew/.local/share/stash-native-backup/releases/87638e5b0f6a/venv",
         "installed_runtime_modules_verified": {
           "stash_archive": 20,
           "stash_ingest": 125,
           "host": 17
         },
-        "future_launch_installer": "install-publication-launch-cleanup.py",
+        "future_launch_installer": "install-capture-launch-cleanup.py",
         "launch_fixture_checks_passed": 13,
         "actual_launcher_checks_passed": 5,
         "schedule_guard_checks_passed": 6,
         "explicit_restore_gate_tests_passed": 12,
-        "routine_native_application_audit": false
+        "routine_native_application_audit": false,
+        "selected_runtime_revision": "87638e5b0f6a723d8ebed1205c240661167d0947"
       },
       "unchanged_object_upload_reuse": {
         "status": "included_in_inactive_incremental_runtime",
@@ -2073,7 +2074,7 @@
         "full_routine_audit_split_complete": false
       },
       "capture_evidence_reuse": {
-        "status": "implemented_tested_not_deployed",
+        "status": "runtime_installed_future_launch_prepared",
         "method": "captured-contents",
         "checks_retained_before_manifest": true,
         "sqlite_integrity_identity_and_producer_boundary_checked_during_capture": true,
@@ -2086,7 +2087,20 @@
         "archive_tests_passed": 144,
         "backup_tests_passed": 313,
         "current_publisher_changed": false,
-        "initial_capture_and_packing_cost_remains": true
+        "initial_capture_and_packing_cost_remains": true,
+        "source_revision": "87638e5b0f6a723d8ebed1205c240661167d0947",
+        "runtime": "/home/andrew/.local/share/stash-native-backup/releases/87638e5b0f6a/venv",
+        "future_launch_installer": "install-capture-launch-cleanup.py",
+        "installed_runtime_modules_verified": {
+          "stash_archive": 20,
+          "stash_ingest": 125,
+          "host": 17
+        },
+        "launch_fixture_checks_passed": 13,
+        "actual_launcher_checks_passed": 5,
+        "schedule_guard_checks_passed": 6,
+        "restore_scope_gate_tests_passed": 12,
+        "daily_commands_changed": false
       }
     },
     "incremental_database_uploads": {
@@ -2099,15 +2113,15 @@
       "current_baseline_raw_database_bytes": 22244438016,
       "current_baseline_encoded_database_bytes": 5817898827,
       "measurement": "docs/native-backup-incremental-measurement.json",
-      "archive_tests_passed": 141,
-      "backup_tests_passed": 310,
+      "archive_tests_passed": 144,
+      "backup_tests_passed": 313,
       "production_daily_churn_measured": false,
       "source_change_deployed": false,
       "required_before_daily_schedule_activation": true,
       "current_sealed_run_changed": false,
       "google_drive_backup_retained": true,
       "routine_full_local_reads_resolved": false,
-      "source_revision": "37331d454b367f1ca73434c332d45e7c26db1542",
+      "source_revision": "87638e5b0f6a723d8ebed1205c240661167d0947",
       "installed_runtime_modules_verified": {
         "stash_archive": 20,
         "stash_ingest": 125,
@@ -2115,7 +2129,7 @@
       },
       "prepared_launch_fixture_checks": 13,
       "prepared_launch_actual_checks": 5,
-      "future_launch_installer": "install-publication-launch-cleanup.py",
+      "future_launch_installer": "install-capture-launch-cleanup.py",
       "future_backup_components": 209,
       "daily_commands_and_schedules_changed": false,
       "schedule_activation_guard": {

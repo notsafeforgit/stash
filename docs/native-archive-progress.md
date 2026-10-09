@@ -54,8 +54,11 @@ evidence with independent streamed verification, publishes/retries without
 creating verification snapshots, rejects altered evidence and corrupted upload
 bytes, and performs an independent download/restore. Failed evidence persistence
 cannot publish a success manifest. Initial capture and packing still read the
-selected inputs; the running baseline is unchanged. This additional source
-change is awaiting installation into the prepared future runtime.
+selected inputs; the running baseline is unchanged. The `87638e5b0` runtime is
+installed and verified inactive, with 13 launch fixture checks, five actual CLI
+checks and six schedule-guard checks passing. Use `install-capture-launch-cleanup.py`
+after publication and the n8n/home overlays. It supersedes the earlier launch
+preparations, preserving all 209 backup components and worker/profile bindings.
 
 The full native validator repeats SQLite integrity and foreign-key checks, hashes
 the database twice, and scans native relationships, provenance and ingestion
@@ -79,8 +82,7 @@ native validator while the explicit restore command still invokes it. The new
 launch preparation passes 13 fixture and five actual launcher checks, retaining
 the same 209-component configuration and all 32 worker profiles/79 private
 bindings. Six schedule-guard checks select this runtime for future backups.
-Use `install-publication-launch-cleanup.py` after confirmed publication and the
-n8n/home overlays; it supersedes the earlier incremental/streamed preparations.
+That preparation is superseded by the capture-evidence runtime described above.
 
 The independent restore gate now explicitly requires the native audit as well
 as `isolated-restore`, with 12 gate tests passing. It still rejects the real

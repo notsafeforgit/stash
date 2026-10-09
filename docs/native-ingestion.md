@@ -1396,6 +1396,24 @@ ownership; it does not undo source evidence or completed-file jobs. Review
 actions and attempt outcomes remain in the database. Producer tokens cannot
 access this administrative route.
 
+Worker updates change the adapter fingerprint. To approve a compatible repair
+for an existing queued or deferred run, the application-authenticated
+`POST /api/v3/ingest-admin/run-policy-upgrades` accepts `request_uuid`, `run_uuid`,
+`expected_revision`, `expected_policy_sha256`, the new `policy_sha256`, and a
+nonempty `reason`. Save the exact request before sending. Replay returns the
+original acknowledgement; `GET /api/v3/ingest-admin/run-policy-upgrades/{request}`
+recovers it after a lost response. Producer tokens cannot approve upgrades.
+
+The run keeps its original `policy_sha256`, UUID, caller tickets, windows,
+checkpoint and retry deadline. `execution_policy_sha256` identifies the approved
+worker for discovery and claims. Attempt history reports the policy that actually
+ran. An upgrade neither completes work nor retries a deferral; use the existing
+review action when the underlying failure has been fixed. Running, cancelled,
+completed or stale-definition runs cannot be upgraded. This is for reviewed
+repairs with compatible coverage and cursor semantics; changed targets, roots,
+source filters or traversal meaning require new work. Schema 1000103 creates
+the immutable upgrade history without changing any existing job or admission.
+
 The producer SDK implements durable local request coalescing during outages,
 outbox delivery, shared filesystem locking, lease renewal and pausing before the
 next source request after expiry. It applies the claimed Reddit/Twitter post

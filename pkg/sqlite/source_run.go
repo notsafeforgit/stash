@@ -53,16 +53,20 @@ type sourceRunRow struct {
 
 func (row sourceRunRow) resolve(ctx context.Context) (*models.SourceRun, error) {
 	var definition struct {
-		TargetURL  string `db:"target_url"`
-		PathPrefix string `db:"path_prefix"`
+		TargetURL       string `db:"target_url"`
+		PathPrefix      string `db:"path_prefix"`
+		ExecutionPolicy string `db:"execution_policy"`
 	}
-	if err := dbWrapper.Get(ctx, &definition, "SELECT target_url,path_prefix FROM source_collection_revisions WHERE collection_uuid=? AND revision=?", row.Collection, row.CollectionRevision); err != nil {
+	if err := dbWrapper.Get(ctx, &definition, `SELECT target_url,path_prefix,
+coalesce((SELECT policy_sha256 FROM source_run_policy_upgrades WHERE run_uuid=? ORDER BY expected_revision DESC LIMIT 1),?) AS execution_policy
+FROM source_collection_revisions WHERE collection_uuid=? AND revision=?`, row.UUID, row.Policy, row.Collection, row.CollectionRevision); err != nil {
 		return nil, err
 	}
 	r := &models.SourceRun{Sequence: row.Sequence, UUID: row.UUID, CollectionUUID: row.Collection, CollectionRevision: row.CollectionRevision,
 		TargetURL: definition.TargetURL, PathPrefix: definition.PathPrefix,
 		RootUUID: row.Root, RootRevision: int(row.RootRevision.Int64), Operation: row.Operation, PolicySHA256: row.Policy, CooldownSeconds: row.Cooldown,
-		State: row.State, Revision: row.Revision, Fence: row.Fence, Failures: row.Failures, ProducerUUID: row.Producer.String, OwnerUUID: row.Owner.String,
+		ExecutionPolicySHA256: definition.ExecutionPolicy,
+		State:                 row.State, Revision: row.Revision, Fence: row.Fence, Failures: row.Failures, ProducerUUID: row.Producer.String, OwnerUUID: row.Owner.String,
 		AvailableAt: time.UnixMilli(row.Available).UTC(), ErrorCode: row.ErrorCode, CreatedAt: time.UnixMilli(row.Created).UTC(), UpdatedAt: time.UnixMilli(row.Updated).UTC()}
 	for _, item := range []struct {
 		body string
@@ -356,7 +360,9 @@ func (s *SourceRunStore) Ready(ctx context.Context, collections []string, allCol
 	// its write transaction before considering ownership. Deferred work stays
 	// behind the explicit review boundary.
 	query := `SELECT id,uuid FROM source_runs INDEXED BY source_runs_active
-WHERE state IN ('queued','running','deferred') AND root_uuid=? AND policy_sha256=? AND id>? AND operation='download'
+WHERE state IN ('queued','running','deferred') AND root_uuid=?
+AND coalesce((SELECT policy_sha256 FROM source_run_policy_upgrades WHERE run_uuid=source_runs.uuid ORDER BY expected_revision DESC LIMIT 1),policy_sha256)=?
+AND id>? AND operation='download'
 AND ((state='queued' AND available_at_ms<=?) OR (state='running' AND lease_until_ms<=?))`
 	if !allCollections {
 		query += " AND collection_uuid IN (" + strings.TrimSuffix(strings.Repeat("?,", len(collections)), ",") + ")"
@@ -389,8 +395,12 @@ func (s *SourceRunStore) Attempts(ctx context.Context, id string, after int64, l
 		Outcome    string        `db:"outcome"`
 		Error      string        `db:"error_code"`
 		ErrorScope string        `db:"error_scope"`
+		Policy     string        `db:"execution_policy"`
 	}
-	if err := dbWrapper.Select(ctx, &rows, `SELECT a.*,coalesce(f.scope,'') AS error_scope FROM source_run_attempts a
+	if err := dbWrapper.Select(ctx, &rows, `SELECT a.*,coalesce(f.scope,'') AS error_scope,
+coalesce((SELECT p.policy_sha256 FROM source_run_policy_upgrades p WHERE p.run_uuid=a.run_uuid AND p.effective_after_fence<a.fence
+ORDER BY p.expected_revision DESC LIMIT 1),(SELECT policy_sha256 FROM source_runs WHERE uuid=a.run_uuid)) AS execution_policy
+FROM source_run_attempts a
 LEFT JOIN source_run_attempt_failures f ON f.run_uuid=a.run_uuid AND f.fence=a.fence
 WHERE a.run_uuid=? AND a.fence>? ORDER BY a.fence LIMIT ?`, id, after, limit); err != nil {
 		return nil, err
@@ -398,6 +408,7 @@ WHERE a.run_uuid=? AND a.fence>? ORDER BY a.fence LIMIT ?`, id, after, limit); e
 	ret := make([]models.SourceRunAttempt, 0, len(rows))
 	for _, row := range rows {
 		a := models.SourceRunAttempt{SourceRunLease: models.SourceRunLease{RunUUID: row.Run, Fence: row.Fence, ProducerUUID: row.Producer, OwnerUUID: row.Owner}, StartedAt: time.UnixMilli(row.Started).UTC(), Outcome: row.Outcome, ErrorCode: row.Error, ErrorScope: row.ErrorScope}
+		a.PolicySHA256 = row.Policy
 		if row.Ended.Valid {
 			value := time.UnixMilli(row.Ended.Int64).UTC()
 			a.EndedAt = &value

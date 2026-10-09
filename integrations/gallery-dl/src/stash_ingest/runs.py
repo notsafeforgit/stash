@@ -70,7 +70,7 @@ class RunLease:
         if (not isinstance(run, dict) or run.get("uuid") != self.run_uuid
                 or run.get("producer_uuid") != self.client.producer
                 or run.get("owner_uuid") != self.owner or run.get("state") != "running"
-                or run.get("policy_sha256") != self.policy
+                or run.get("execution_policy_sha256", run.get("policy_sha256")) != self.policy
                 or type(run.get("fence")) is not int or run["fence"] < 1
                 or (self.run is not None and run["fence"] != self.run["fence"])):
             raise SourcePaused("Source lease response does not identify the claimed work")
@@ -91,7 +91,7 @@ class RunLease:
         if deadline <= self.clock():
             raise SourcePaused("Source lease expired before its response arrived")
         if self.run is not None:
-            for field in ("collection_uuid", "collection_revision", "target_url", "path_prefix",
+            for field in ("policy_sha256", "execution_policy_sha256", "collection_uuid", "collection_revision", "target_url", "path_prefix",
                           "root_uuid", "root_revision", "window", "operation", "recovery", "turn_until"):
                 if run.get(field) != self.run.get(field):
                     raise SourcePaused("Source lease definition changed")
@@ -180,7 +180,7 @@ class RunLease:
                 if (not isinstance(result, dict) or result.get("uuid") != self.run_uuid
                         or result.get("fence") != self.run["fence"] or result.get("state") not in expected
                         or any(result.get(field) != self.run.get(field) for field in (
-                            "policy_sha256", "collection_uuid", "collection_revision", "root_uuid", "root_revision",
+                            "policy_sha256", "execution_policy_sha256", "collection_uuid", "collection_revision", "root_uuid", "root_revision",
                             "target_url", "path_prefix", "operation"))):
                     raise SourcePaused("Run completion was not acknowledged")
                 return result

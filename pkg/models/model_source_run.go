@@ -29,34 +29,35 @@ type SourceRunRequest struct {
 }
 
 type SourceRun struct {
-	Sequence           int64              `json:"sequence"`
-	UUID               string             `json:"uuid"`
-	CollectionUUID     string             `json:"collection_uuid"`
-	CollectionRevision int                `json:"collection_revision"`
-	TargetURL          string             `json:"target_url"`
-	PathPrefix         string             `json:"path_prefix"`
-	RootUUID           *string            `json:"root_uuid"`
-	RootRevision       int                `json:"root_revision"`
-	Operation          string             `json:"operation"`
-	PolicySHA256       string             `json:"policy_sha256"`
-	CooldownSeconds    int                `json:"cooldown_seconds"`
-	State              string             `json:"state"`
-	Revision           int64              `json:"revision"`
-	Fence              int64              `json:"fence"`
-	Failures           int                `json:"failures"`
-	Pending            []SourceWindow     `json:"pending"`
-	Completed          []SourceWindow     `json:"completed"`
-	Window             *SourceWindow      `json:"window"`
-	ProducerUUID       string             `json:"producer_uuid,omitempty"`
-	OwnerUUID          string             `json:"owner_uuid,omitempty"`
-	LeaseUntil         *time.Time         `json:"lease_until,omitempty"`
-	TurnUntil          *time.Time         `json:"turn_until,omitempty"`
-	AvailableAt        time.Time          `json:"available_at"`
-	Progress           SourceRunProgress  `json:"progress"`
-	Recovery           *SourceRunRecovery `json:"recovery,omitempty"`
-	ErrorCode          string             `json:"error_code"`
-	CreatedAt          time.Time          `json:"created_at"`
-	UpdatedAt          time.Time          `json:"updated_at"`
+	Sequence              int64              `json:"sequence"`
+	UUID                  string             `json:"uuid"`
+	CollectionUUID        string             `json:"collection_uuid"`
+	CollectionRevision    int                `json:"collection_revision"`
+	TargetURL             string             `json:"target_url"`
+	PathPrefix            string             `json:"path_prefix"`
+	RootUUID              *string            `json:"root_uuid"`
+	RootRevision          int                `json:"root_revision"`
+	Operation             string             `json:"operation"`
+	PolicySHA256          string             `json:"policy_sha256"`
+	ExecutionPolicySHA256 string             `json:"execution_policy_sha256"`
+	CooldownSeconds       int                `json:"cooldown_seconds"`
+	State                 string             `json:"state"`
+	Revision              int64              `json:"revision"`
+	Fence                 int64              `json:"fence"`
+	Failures              int                `json:"failures"`
+	Pending               []SourceWindow     `json:"pending"`
+	Completed             []SourceWindow     `json:"completed"`
+	Window                *SourceWindow      `json:"window"`
+	ProducerUUID          string             `json:"producer_uuid,omitempty"`
+	OwnerUUID             string             `json:"owner_uuid,omitempty"`
+	LeaseUntil            *time.Time         `json:"lease_until,omitempty"`
+	TurnUntil             *time.Time         `json:"turn_until,omitempty"`
+	AvailableAt           time.Time          `json:"available_at"`
+	Progress              SourceRunProgress  `json:"progress"`
+	Recovery              *SourceRunRecovery `json:"recovery,omitempty"`
+	ErrorCode             string             `json:"error_code"`
+	CreatedAt             time.Time          `json:"created_at"`
+	UpdatedAt             time.Time          `json:"updated_at"`
 }
 
 // Recovery comes from a reviewed journal activation, never from a worker's
@@ -92,13 +93,31 @@ func (r SourceRun) Lease() SourceRunLease {
 
 type SourceRunAttempt struct {
 	SourceRunLease
-	Window     SourceWindow      `json:"window"`
-	Progress   SourceRunProgress `json:"progress"`
-	StartedAt  time.Time         `json:"started_at"`
-	EndedAt    *time.Time        `json:"ended_at"`
-	Outcome    string            `json:"outcome"`
-	ErrorCode  string            `json:"error_code"`
-	ErrorScope string            `json:"error_scope,omitempty"`
+	PolicySHA256 string            `json:"policy_sha256"`
+	Window       SourceWindow      `json:"window"`
+	Progress     SourceRunProgress `json:"progress"`
+	StartedAt    time.Time         `json:"started_at"`
+	EndedAt      *time.Time        `json:"ended_at"`
+	Outcome      string            `json:"outcome"`
+	ErrorCode    string            `json:"error_code"`
+	ErrorScope   string            `json:"error_scope,omitempty"`
+}
+
+// An owner can explicitly approve a compatible worker repair for remaining
+// work. The original admission, windows and completed attempts remain intact.
+type SourceRunPolicyUpgradeInput struct {
+	RequestUUID          string `json:"request_uuid"`
+	RunUUID              string `json:"run_uuid"`
+	ExpectedRevision     int64  `json:"expected_revision"`
+	ExpectedPolicySHA256 string `json:"expected_policy_sha256"`
+	PolicySHA256         string `json:"policy_sha256"`
+	Reason               string `json:"reason"`
+}
+
+type SourceRunPolicyUpgrade struct {
+	SourceRunPolicyUpgradeInput
+	EffectiveAfterFence int64     `json:"effective_after_fence"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 type SourceRunOutcome struct {
@@ -130,5 +149,7 @@ type SourceRunReaderWriter interface {
 	Progress(context.Context, SourceRunLease, SourceRunProgress, time.Time) (*SourceRun, error)
 	Finish(context.Context, SourceRunLease, SourceRunOutcome, time.Time) (*SourceRun, error)
 	Review(context.Context, string, int64, string, time.Time) (*SourceRun, error) // retry or cancel
+	UpgradePolicy(context.Context, SourceRunPolicyUpgradeInput, time.Time) (*SourceRunPolicyUpgrade, error)
+	PolicyUpgrade(context.Context, string) (*SourceRunPolicyUpgrade, error)
 	Recover(context.Context, time.Time, int) (int, error)
 }

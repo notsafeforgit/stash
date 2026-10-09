@@ -87,7 +87,7 @@ def execute(box, client, configuration, run_uuid):
         raise Unavailable('native_source_traversal_unavailable')
     current = client._request("GET", "/runs/" + run_uuid)
     if (not isinstance(current, dict) or current.get("uuid") != run_uuid
-            or current.get("policy_sha256") != configuration.policy_sha256
+            or current.get("execution_policy_sha256", current.get("policy_sha256")) != configuration.policy_sha256
             or current.get("root_uuid") != configuration.root_uuid or current.get("operation") != "download"):
         raise Conflict("Run does not match this worker's reviewed configuration and root")
     with configuration.activate():

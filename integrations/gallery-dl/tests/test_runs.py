@@ -40,6 +40,15 @@ class RunLeaseTests(unittest.TestCase):
         with self.assertRaises(SourcePaused):
             self.lease.check()
 
+    def test_reviewed_execution_policy_keeps_original_admission_and_guards_renewal(self):
+        self.run.update(policy_sha256="b" * 64, execution_policy_sha256="a" * 64)
+        self.lease._accept(self.response())
+        self.assertEqual(self.lease.run["policy_sha256"], "b" * 64)
+        self.lease.check()
+        self.client._request.return_value = self.response(execution_policy_sha256="c" * 64)
+        with self.assertRaises(SourcePaused):
+            self.lease.renew()
+
     def test_renewal_progress_and_terminal_finish(self):
         self.lease._accept(self.response())
         self.now[0] += 50

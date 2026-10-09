@@ -24,6 +24,8 @@ func (rs *ingestRoutes) adminRouter() http.Handler {
 	r.Get("/producers/{producer}/credentials", rs.credentials)
 	r.Delete("/credentials/{credential}", rs.revokeCredential)
 	r.Post("/runs/{run}/review", rs.reviewRun)
+	r.Post("/run-policy-upgrades", rs.upgradeSourceRunPolicy)
+	r.Get("/run-policy-upgrades/{upgrade}", rs.sourceRunPolicyUpgrade)
 	return r
 }
 

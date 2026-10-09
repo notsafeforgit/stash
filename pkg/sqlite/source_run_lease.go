@@ -29,7 +29,11 @@ func (s *SourceRunStore) Claim(ctx context.Context, id, producer, owner, policy 
 	if err != nil || row == nil {
 		return nil, err
 	}
-	if row.Policy != policy {
+	executionPolicy, err := sourceRunExecutionPolicy(ctx, id, row.Policy)
+	if err != nil {
+		return nil, err
+	}
+	if executionPolicy != policy {
 		return nil, models.ErrSourceRunConflict
 	}
 	if row.State == "running" && row.Producer.String == producer && row.Owner.String == owner && row.LeaseUntil.Int64 > now.UnixMilli() {

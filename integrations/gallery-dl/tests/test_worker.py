@@ -148,6 +148,14 @@ class WorkerTests(unittest.TestCase):
         self.delivery.close.assert_called_once()
         self.lease.close.assert_called_once()
 
+    def test_reviewed_upgrade_claims_current_adapter_without_rewriting_admission(self):
+        self.lease.run.update(policy_sha256="a" * 64, execution_policy_sha256=self.profile.policy_sha256)
+        self.client._request.return_value = dict(self.lease.run)
+        result = self.run_worker()
+        self.assertEqual(result["state"], "source_succeeded")
+        self.claim.assert_called_once_with(self.client, RUN, self.profile.policy_sha256)
+        self.assertEqual(self.lease.run["policy_sha256"], "a" * 64)
+
     def test_claimed_basis_must_match_the_reviewed_profile_before_work_starts(self):
         self.lease.run['window']['basis'] = 'traversal'
         self.assertEqual(self.run_worker()['state'], 'deferred')

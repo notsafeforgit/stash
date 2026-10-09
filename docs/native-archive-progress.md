@@ -11,13 +11,20 @@ in progress.
 
 The NFO-to-catalog import and subsequent catalog-to-native import are already
 complete. The requested NFO work removes redundant storage from that completed
-import. A transient field conversion now preserves original text, translations,
-dates, URLs and performer/studio defaults without retaining XML, document paths, hashes or
-per-document retirement records. Its four focused tests pass, and a read-only
-run accepts all 272,035 valid/repaired parsed documents with no unmapped fields.
-The 520 malformed documents and one empty document remain separate exceptions.
-The converter is not yet connected to database cleanup: production records,
-payloads and sidecar files have not been deleted.
+import. Schema 1000100 and the explicit offline `cmd/nfo-cleanup` command now
+collate original text, translations, dates, URLs and performer/studio defaults,
+then discard XML, document paths, duplicate parsed payloads and per-document
+import bookkeeping in one transaction. The completion marker is per catalog
+snapshot. Existing capture/post/media identities and native policies survive;
+no per-NFO retirement ledger is created. A strict recovery path handles the old
+writer's unescaped text without treating it as arbitrary XML. Recovered posts
+are matched to existing media only through unambiguous current file matches.
+
+Focused recovery, rollback, repeat-run and database-reopen tests pass, as do
+the affected snapshot/document/evidence import tests. A production-data copy is
+being exercised before deployment. Production cleanup and the new deployment
+remain pending; the previously checked 520 malformed documents and one empty
+document have not yet been removed from production.
 
 All 1,711 catalogs and 925,869 automation records are imported and reconciled.
 Post/media associations, source albums, disabled policies and source URL

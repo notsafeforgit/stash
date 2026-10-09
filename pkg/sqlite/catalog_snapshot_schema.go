@@ -3,6 +3,7 @@ package sqlite
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -17,8 +18,7 @@ func validateCatalogSnapshotSchema(conn *sqlx.DB) error {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
 	}
-	var invalid bool
-	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM catalog_snapshots s WHERE
+	query := `SELECT EXISTS(SELECT 1 FROM catalog_snapshots s WHERE
  s.uuid IS NOT json_extract(CAST(s.manifest AS TEXT),'$.snapshot_uuid')
  OR s.source_uuid IS NOT json_extract(CAST(s.manifest AS TEXT),'$.registry_source_uuid')
  OR s.catalog_id IS NOT json_extract(CAST(s.manifest AS TEXT),'$.catalog_id')
@@ -45,7 +45,25 @@ func validateCatalogSnapshotSchema(conn *sqlx.DB) error {
  OR t.received_bytes>json_extract(CAST(s.manifest AS TEXT),'$.tables.'||t.source_table||'.bytes')
  OR (s.state='received' AND (t.received_records!=json_extract(CAST(s.manifest AS TEXT),'$.tables.'||t.source_table||'.rows')
  OR t.received_bytes!=json_extract(CAST(s.manifest AS TEXT),'$.tables.'||t.source_table||'.bytes')
- OR t.received_sha256!=json_extract(CAST(s.manifest AS TEXT),'$.tables.'||t.source_table||'.sha256'))))`); err != nil {
+ OR t.received_sha256!=json_extract(CAST(s.manifest AS TEXT),'$.tables.'||t.source_table||'.sha256'))))`
+	var compactable bool
+	if err := conn.Get(&compactable, `SELECT EXISTS(SELECT 1 FROM pragma_table_info('catalog_snapshots') WHERE name='nfo_compacted')`); err != nil {
+		return err
+	}
+	if compactable {
+		// Receipt totals still describe the original import. Only the four NFO
+		// tables may be absent; every other table must retain its row count.
+		query = strings.ReplaceAll(query, "s.received_records!=(SELECT count(*) FROM catalog_snapshot_records r WHERE r.snapshot_uuid=s.uuid)",
+			"s.received_records!=(SELECT count(*) FROM catalog_snapshot_records r WHERE r.snapshot_uuid=s.uuid)+CASE WHEN s.nfo_compacted=1 THEN (SELECT coalesce(sum(t.received_records),0) FROM catalog_snapshot_tables t WHERE t.snapshot_uuid=s.uuid AND t.source_table IN "+nfoSourceTables+") ELSE 0 END")
+		query = strings.ReplaceAll(query, "OR s.received_records!=(SELECT coalesce(max(r.ordinal),0) FROM catalog_snapshot_records r WHERE r.snapshot_uuid=s.uuid)",
+			"OR (s.nfo_compacted=0 AND s.received_records!=(SELECT coalesce(max(r.ordinal),0) FROM catalog_snapshot_records r WHERE r.snapshot_uuid=s.uuid)) OR EXISTS(SELECT 1 FROM catalog_snapshot_records r WHERE r.snapshot_uuid=s.uuid AND r.ordinal>s.received_records)")
+		query = strings.ReplaceAll(query, "OR c.record_count!=(SELECT count(*) FROM catalog_snapshot_records r WHERE r.snapshot_uuid=c.snapshot_uuid AND r.chunk_index=c.chunk_index)",
+			"OR (s.nfo_compacted=0 AND c.record_count!=(SELECT count(*) FROM catalog_snapshot_records r WHERE r.snapshot_uuid=c.snapshot_uuid AND r.chunk_index=c.chunk_index))")
+		query = strings.ReplaceAll(query, "t.received_records!=(SELECT count(*) FROM catalog_snapshot_records r WHERE r.snapshot_uuid=t.snapshot_uuid AND r.source_table=t.source_table)",
+			"CASE WHEN s.nfo_compacted=1 AND t.source_table IN "+nfoSourceTables+" THEN 0 ELSE t.received_records END!=(SELECT count(*) FROM catalog_snapshot_records r WHERE r.snapshot_uuid=t.snapshot_uuid AND r.source_table=t.source_table)")
+	}
+	var invalid bool
+	if err := conn.Get(&invalid, query); err != nil {
 		return err
 	}
 	if invalid {

@@ -86,7 +86,26 @@ func validateCatalogDocumentSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
-	err := conn.Get(&invalid, catalogDocumentValidationQuery)
+	imports := "catalog_document_imports"
+	var compactable bool
+	if err := conn.Get(&compactable, `SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='catalog_document_pending_imports')`); err != nil {
+		return err
+	}
+	if compactable {
+		imports = "catalog_document_pending_imports"
+		if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM catalog_snapshots s
+ WHERE s.nfo_compacted=1 AND (NOT EXISTS(SELECT 1 FROM catalog_document_imports i WHERE i.snapshot_uuid=s.uuid AND i.state='mapped' AND i.phase='complete')
+ OR EXISTS(SELECT 1 FROM catalog_document_records r WHERE r.snapshot_uuid=s.uuid)))`); err != nil {
+			return err
+		}
+		if invalid {
+			return errors.New("compacted NFO import still has document records or unfinished work")
+		}
+	}
+	// The remaining document rows keep their ordinary checks. Only the aggregate
+	// progress check skips imports whose original NFO inputs were discarded.
+	query := strings.Replace(catalogDocumentValidationQuery, "FROM catalog_document_imports i", "FROM "+imports+" i", 1)
+	err := conn.Get(&invalid, query)
 	if err != nil {
 		return err
 	}
@@ -96,7 +115,7 @@ func validateCatalogDocumentSchema(conn *sqlx.DB) error {
 	for n, phase := range catalogDocumentPhases[:4] {
 		later := "('" + strings.Join(catalogDocumentPhases[n+1:], "','") + "')"
 		earlier := "('" + strings.Join(catalogDocumentPhases[:n], "','") + "')"
-		err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM catalog_document_imports i WHERE
+		err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM `+imports+` i WHERE
  (i.phase IN `+later+` AND (SELECT count(*) FROM catalog_document_records r JOIN catalog_snapshot_records e ON e.snapshot_uuid=r.snapshot_uuid AND e.ordinal=r.ordinal
   WHERE r.snapshot_uuid=i.snapshot_uuid AND e.source_table=?)!=(SELECT count(*) FROM catalog_snapshot_records e WHERE e.snapshot_uuid=i.snapshot_uuid AND e.source_table=?))
  OR (i.phase IN `+earlier+` AND EXISTS(SELECT 1 FROM catalog_document_records r JOIN catalog_snapshot_records e ON e.snapshot_uuid=r.snapshot_uuid AND e.ordinal=r.ordinal

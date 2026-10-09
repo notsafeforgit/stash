@@ -3,6 +3,9 @@ package archive
 import (
 	"encoding/json"
 	"fmt"
+	"html"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/stashapp/stash/pkg/models"
 )
@@ -17,6 +20,49 @@ type LegacyNFOPostData struct {
 	Performers   []string
 	Studio       *string
 	Translations []models.SourceTranslationInput
+}
+
+// RecoverGeneratedNFOFields handles the old writer's unescaped text bug. The
+// wrapper and field order must match that writer exactly; this is not a lenient
+// XML parser and never resolves external entities or guesses missing fields.
+func RecoverGeneratedNFOFields(raw []byte) (json.RawMessage, error) {
+	if len(raw) > MaxDocumentBytes || !utf8.Valid(raw) {
+		return nil, fmt.Errorf("invalid generated NFO text")
+	}
+	text := strings.TrimSpace(string(raw))
+	if strings.HasPrefix(text, "<?xml") {
+		end := strings.Index(text, "?>")
+		if end < 0 {
+			return nil, fmt.Errorf("invalid NFO declaration")
+		}
+		text = strings.TrimSpace(text[end+2:])
+	}
+	if !strings.HasPrefix(text, "<movie>") {
+		return nil, fmt.Errorf("unrecognized generated NFO wrapper")
+	}
+	text = strings.TrimSpace(strings.TrimPrefix(text, "<movie>"))
+	fields := map[string][]string{}
+	for _, key := range []string{"url", "premiered", "title", "plot"} {
+		opening, closing := "<"+key+">", "</"+key+">"
+		if !strings.HasPrefix(text, opening) {
+			return nil, fmt.Errorf("unrecognized generated NFO field order")
+		}
+		text = strings.TrimPrefix(text, opening)
+		end := strings.Index(text, closing)
+		if end < 0 {
+			return nil, fmt.Errorf("incomplete generated NFO field")
+		}
+		value := text[:end]
+		if strings.Contains(value, "<!") || strings.Contains(value, "<?") || strings.ContainsRune(value, 0) || strings.Contains(value, opening) {
+			return nil, fmt.Errorf("unsupported generated NFO text")
+		}
+		fields[key] = []string{html.UnescapeString(value)}
+		text = strings.TrimSpace(text[end+len(closing):])
+	}
+	if text != "</movie>" {
+		return nil, fmt.Errorf("unexpected generated NFO contents")
+	}
+	return json.Marshal(fields)
 }
 
 // CollateLegacyNFOFields reads the already-parsed fields in a completed catalog

@@ -24,6 +24,9 @@ type SourceEvidenceStore struct{ gallery *GalleryStore }
 
 const legacyRetentionPolicy = "legacy-retained-v1"
 
+// Native domain data retained when completed imports discard their documents.
+const importedMetadataPolicy = "imported-metadata-v1"
+
 type sourcePostRow struct {
 	UUID      string    `db:"uuid"`
 	State     string    `db:"state"`
@@ -329,6 +332,16 @@ func canonicalCaptureInput(input *models.SourceCaptureInput) (string, string, er
 	case legacyRetentionPolicy:
 		// This policy belongs to the trusted catalog import boundary. Network
 		// producers must negotiate the current source retention policy instead.
+	case importedMetadataPolicy:
+		object, err := archive.DecodeJSONObject(retained, archive.MaxSourcePayloadBytes)
+		if err != nil {
+			return "", "", err
+		}
+		for key := range object {
+			if key != "performers" && key != "studio" {
+				return "", "", errors.New("invalid imported metadata payload")
+			}
+		}
 	default:
 		return "", "", errors.New("unsupported source retention policy")
 	}

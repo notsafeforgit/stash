@@ -93,6 +93,17 @@ func validateDatabaseLineage(path string) error {
 			return errors.New("native database still contains an active fork migration ledger")
 		}
 		if version >= NativeSchemaBaseline+1 {
+			if version >= NativeSchemaBaseline+100 {
+				for _, name := range []string{"catalog_document_pending_imports", "catalog_nfo_compaction_guard"} {
+					var exists bool
+					if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+						return err
+					}
+					if !exists {
+						return fmt.Errorf("native database schema is incomplete: missing %s", name)
+					}
+				}
+			}
 			for _, name := range []string{"native_migration_history", "saved_filter_import_conflicts"} {
 				if !present[name] {
 					return fmt.Errorf("native database schema is incomplete: missing %s", name)

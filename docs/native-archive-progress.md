@@ -115,6 +115,20 @@ manifest/inventory and active journal are unchanged. The original controller's
 exit-code-1 result remains intact. Publication is still pending, and rollout
 continues to require confirmed publication and provider release.
 
+The owner's follow-up identified a remaining recurring-cost problem. Streaming
+removes artwork reconstruction, but the current daily path still repeats full
+SQLite/application validation, historical producer-receipt checks and complete
+archive reads. Packing already checks the input and encoded content, and upload
+hashes encoded objects again. The streaming change alone therefore does not
+complete the backup-runtime performance work. Routine capture must keep a
+consistent database/producer boundary, expected-component coverage, immutable
+object identity, transfer checksums and publication ordering. A lighter routine
+path should reuse verified unchanged content and capture evidence, with explicit
+full audits and restore drills preserving deeper validation. The initial
+migration/reconciliation checks remain separate from this recurring policy.
+This follow-up is not implemented or deployed, and it does not change the running
+baseline backup's checks or the owner's confirmed-publication rollout gate.
+
 The Standard download was measured at 40.2 GiB across 241,410 unique content
 objects, plus three metadata objects. One HEAD and GET per object yields about
 483,000 requests, approximately $0.19 at the current Oregon rate. Internet

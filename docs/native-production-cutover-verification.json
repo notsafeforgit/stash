@@ -2016,7 +2016,25 @@
     "live_launchers_updated": false,
     "stop_resume_guard_tests_passed": 5,
     "same_sealed_generation_resume_verified": true,
-    "owner_authorized_live_switch": true
+    "owner_authorized_live_switch": true,
+    "recurring_cost_policy": {
+      "status": "outstanding",
+      "streaming_does_not_complete_performance_work": true,
+      "current_daily_full_audits": [
+        "SQLite integrity and foreign keys",
+        "native application validation",
+        "historical producer receipt boundary",
+        "complete archive content readback"
+      ],
+      "required_routine_guarantees": [
+        "consistent database and producer snapshots",
+        "expected component and schema coverage",
+        "immutable object identity and new-data checksums",
+        "verified upload and latest-manifest publication ordering"
+      ],
+      "follow_up": "Reuse verified unchanged content and capture evidence; keep full audits and restore drills explicit. Do not label audit success from publication alone.",
+      "current_baseline_gate_changed": false
+    }
   },
   "metadata_retention_configuration": {
     "status": "passed",

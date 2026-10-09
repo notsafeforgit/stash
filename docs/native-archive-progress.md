@@ -12531,3 +12531,39 @@ updated final inventory check and three-container startup are prepared only;
 installation requires the current pre-public backup/restore to finish. The
 sealed run and its configuration remain unchanged. Scheduled native workers
 are confirmed inactive, and the public application remains off.
+
+The native translation worker had another deployment dependency: the selected
+container lacked the `trans` executable. The application image and all three
+native wrapper variants now install Translate Shell and exercise its interpreter
+dependencies during the build. Both repository changes are pushed. Wrapper
+build 37871713513 published the variants against the existing verified Stash
+source digest; the selected Debian wrapper contains the exact same application
+binary as the current snapshot validator. A real sample translation passed
+using the backend's exact arguments. Fresh startup, restart and native snapshot
+validation also passed with translation enabled in an isolated container with
+no external network or production mounts.
+
+The new wrapper is prepared as a one-file change to the inactive Stash service
+definition. Its installer requires the current backup and isolated restore to
+pass, starts no services and leaves production translation disabled. The
+private handoff, public startup and installed-file verifier now require this
+overlay while retaining the original release evidence. No running application,
+database, producer credential or sealed backup has changed.
+
+The schedule audit accounts for all ten previously active timers: seven retain
+their original cadence, and the three catalog timers are replaced by native
+workers. The three new native worker timers remain inactive and disabled.
+The home-directory backup still needs a bounded caller update: it references
+the old Stash backup directory, incorrectly rejects the normal null result from
+`backupDatabase(download: false)`, and its ordinary filters exclude native
+producer state. Coordinated S3 capture already covers that state. The existing
+home-backup timer and unrelated backup behavior remain unchanged while this
+additional path is corrected.
+
+The first coordinated backup continues packaging its sealed checkpoint. The
+saved artwork source contains 240,872 files and approximately 36.9 GB, in addition
+to the 22.2 GB native database. This is a substantial initial local packaging
+step; it is not a completed cloud publication or restore. The original owner
+and publisher remain alive with increasing I/O, and system disk free space
+remains above the required 50 GiB reserve. Post-write backup/restore, actual
+scheduled-cycle checks, retirement and owner acceptance remain outstanding.

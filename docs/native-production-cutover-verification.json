@@ -882,10 +882,12 @@
     "current_coordinated_backup_and_restore",
     "controlled_native_activation",
     "scheduled_cycles_and_legacy_retirement",
-    "owner_acceptance"
+    "owner_acceptance",
+    "native_translation_runtime_install_and_enable",
+    "home_backup_caller_and_coverage_update"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-09T00:58:09.848158+00:00",
+  "checked_at": "2026-10-09T02:09:00.054881+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -1477,7 +1479,7 @@
     "failed_comparison_retained": true,
     "imports_replayed": false
   },
-  "root_free_GiB": 116.7,
+  "root_free_GiB": 116.14,
   "pre_public_coordinated_backup": {
     "status": "running",
     "stage": "publish-backup-before-public",
@@ -1503,7 +1505,41 @@
     "config_sha256": "51216834aee37ff7681013397c495693a0ebf504b89dbdb87602ba5ba8732c65",
     "sealed_checkpoint_uuid": "dbf8cd08-ea38-43df-9864-6f20429be640",
     "checkpoint_sealed": true,
-    "server_created_at": "2026-10-09T00:55:01.564750761Z"
+    "server_created_at": "2026-10-09T00:55:01.564750761Z",
+    "latest_pack_progress": {
+      "checked_at": "2026-10-09T01:57:24.770962+00:00",
+      "status": "running",
+      "stage": "publish-backup-before-public",
+      "run_id": "20261008_175444_1545955",
+      "coordinated_backup_complete": false,
+      "isolated_restore_complete": false,
+      "packed_artifacts": {
+        "library": 1,
+        "blob": 20645
+      },
+      "packed_logical_bytes": 25412135606,
+      "run_files": [
+        "catalog.json",
+        "ledger-2-video_manifest_previous.nul",
+        "generated.json",
+        "identity.json",
+        "ledger-0-tarball_footprints.jsonl",
+        "scratch-pack.json",
+        "media.json",
+        "ledger-3-tombstones_ledger.txt",
+        "worker-inventory.json",
+        "ledger-1-tar_delta_state.sqlite3"
+      ],
+      "root_free_GiB": 116.13505935668945,
+      "source_artwork_inventory": {
+        "checked_at": "2026-10-09T02:03:16.441058+00:00",
+        "files": 240872,
+        "apparent_bytes_including_directory_entries": 36882763390,
+        "count_command": "rg --files --hidden",
+        "size_command": "du -sb",
+        "held_writers": true
+      }
+    }
   },
   "fresh_backup_snapshot_probe": {
     "status": "passed",
@@ -1637,5 +1673,54 @@
       "Existing forward-auth hook"
     ],
     "installation_gate": "Current pre-public coordinated backup and isolated restore must pass before changing the installed configuration."
+  },
+  "translation_runtime_preparation": {
+    "status": "published_verified_prepared_not_installed",
+    "main_revision": "af98bb7a640e00dee9c856d5bc5c6281de4381df",
+    "main_publication_run": 37871587821,
+    "wrapper_revision": "4f0f0594e95e000a75e4819f2494c3a44ce7f04d",
+    "wrapper_build_run": 37871713513,
+    "source_revision": "0ea2c05fbc20356929c561f2173386a14870fdb7",
+    "source_image": "ghcr.io/notsafeforgit/stash@sha256:bb201d70080b5cdd4c1c7f933e81fa2c75398cb44ee0255049ef360fd2719379",
+    "prepared_wrapper_image": "ghcr.io/notsafeforgit/stash-s6@sha256:21c7242e3c93dad609e7c03d1990585185dc95d0a017ad6c67a55d02affcf89f",
+    "application_binary_sha256": "d73643e192057d3d7bb97c44d001130380a9fe3ab716dd0a541af90e6d211720",
+    "application_binary_unchanged": true,
+    "native_variants_published": [
+      "alpine",
+      "hwaccel-alpine",
+      "hwaccel"
+    ],
+    "translation_shell_version": "0.9.7.1",
+    "actual_provider_sample_passed": true,
+    "exact_backend_arguments": true,
+    "fresh_start_seconds": 3.818750901031308,
+    "restart_seconds": 1.429823826008942,
+    "network_for_startup": "none",
+    "startup_translation_worker_enabled": true,
+    "provider_dependency_warning_absent": true,
+    "production_translation_worker_enabled": false,
+    "installed_files_planned": 1,
+    "services_started": false,
+    "current_backup_changed": false,
+    "installation_gate": "Completed pre-public coordinated backup and isolated restore; single inactive image-pin replacement before guarded private/public handoff."
+  },
+  "schedule_resumption_preparation": {
+    "status": "prepared_not_applied",
+    "original_active_timers": 10,
+    "preserve_original_cadence": 7,
+    "legacy_catalog_timers_to_retire": 3,
+    "new_native_worker_timers": 3,
+    "new_native_timers_inactive_disabled": true,
+    "schedules_changed": false,
+    "pending_home_backup_audit": true
+  },
+  "home_backup_audit": {
+    "status": "read_only_findings_pending_correction",
+    "old_stash_backup_path_used": true,
+    "successful_null_graphql_result_incorrectly_rejected": true,
+    "ordinary_home_sync_excludes_native_producer_state": true,
+    "coordinated_s3_covers_native_producer_state": true,
+    "native_backup_destination_outside_home": "/tank/stash-native-backup/server-checkpoints",
+    "existing_home_timer_preserved": true
   }
 }

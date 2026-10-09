@@ -10,12 +10,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/internal/ingest"
+	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTranslationJobsMigrationPreservesWorkAndRollsBackCollision(t *testing.T) {
+	config.InitializeEmpty()
 	for _, collision := range []bool{false, true} {
 		name := "upgrade"
 		if collision {

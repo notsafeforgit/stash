@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/scrape"
@@ -364,6 +365,7 @@ func TestTranslationWorkBoundedLookupsUseIndexes(t *testing.T) {
 }
 
 func TestTranslationWorkMigrationPreservesLibraryAndRollsBackCollision(t *testing.T) {
+	config.InitializeEmpty()
 	for _, collision := range []bool{false, true} {
 		name := "upgrade"
 		if collision {

@@ -1990,9 +1990,9 @@
     "resumed_controller_bound_to_same_sealed_generation": true
   },
   "routine_backup_verification": {
-    "status": "active_for_same_generation_resume_daily_launchers_prepared",
-    "source_revision": "29fc61be47b64324817b447a5540393273eea7d7",
-    "method": "streamed-contents",
+    "status": "same_published_archive_finalization_running",
+    "source_revision": "e9cfa08a954f63abbc39250056c4422513969a86",
+    "method": "reuse-published-verification",
     "checks": [
       "encoded and raw chunk SHA-256",
       "complete artifact size, hash and chunk order",
@@ -2004,7 +2004,7 @@
     "only_sqlite_components_materialized": true,
     "full_restore_drill_preserved": true,
     "archive_tests_passed": 138,
-    "backup_tests_passed": 305,
+    "backup_tests_passed": 317,
     "runtime_modules_verified": {
       "stash_archive": 20,
       "stash_ingest": 125,
@@ -2032,7 +2032,7 @@
         "immutable object identity and new-data checksums",
         "verified upload and latest-manifest publication ordering"
       ],
-      "follow_up": "Reuse verified unchanged content and capture evidence; keep full audits and restore drills explicit. Do not label audit success from publication alone.",
+      "follow_up": "Capture and packing still read selected inputs; publication reuses capture evidence and already published remote proof. Measure real daily churn after rollout; keep full audits and restore drills explicit.",
       "current_baseline_gate_changed": false,
       "application_audit_separation": {
         "status": "runtime_installed_future_launch_prepared",
@@ -2048,19 +2048,19 @@
         "daily_runtime_updated": false,
         "full_routine_audit_split_complete": false,
         "source_revision": "37331d454b367f1ca73434c332d45e7c26db1542",
-        "runtime": "/home/andrew/.local/share/stash-native-backup/releases/87638e5b0f6a/venv",
+        "runtime": "/home/andrew/.local/share/stash-native-backup/releases/e9cfa08a954f/venv",
         "installed_runtime_modules_verified": {
           "stash_archive": 20,
           "stash_ingest": 125,
           "host": 17
         },
-        "future_launch_installer": "install-capture-launch-cleanup.py",
+        "future_launch_installer": "install-finalization-launch-cleanup.py",
         "launch_fixture_checks_passed": 13,
         "actual_launcher_checks_passed": 5,
         "schedule_guard_checks_passed": 6,
         "explicit_restore_gate_tests_passed": 12,
         "routine_native_application_audit": false,
-        "selected_runtime_revision": "87638e5b0f6a723d8ebed1205c240661167d0947"
+        "selected_runtime_revision": "e9cfa08a954f63abbc39250056c4422513969a86"
       },
       "unchanged_object_upload_reuse": {
         "status": "included_in_inactive_incremental_runtime",
@@ -2089,8 +2089,8 @@
         "current_publisher_changed": false,
         "initial_capture_and_packing_cost_remains": true,
         "source_revision": "87638e5b0f6a723d8ebed1205c240661167d0947",
-        "runtime": "/home/andrew/.local/share/stash-native-backup/releases/87638e5b0f6a/venv",
-        "future_launch_installer": "install-capture-launch-cleanup.py",
+        "runtime": "/home/andrew/.local/share/stash-native-backup/releases/e9cfa08a954f/venv",
+        "future_launch_installer": "install-finalization-launch-cleanup.py",
         "installed_runtime_modules_verified": {
           "stash_archive": 20,
           "stash_ingest": 125,
@@ -2100,7 +2100,8 @@
         "actual_launcher_checks_passed": 5,
         "schedule_guard_checks_passed": 6,
         "restore_scope_gate_tests_passed": 12,
-        "daily_commands_changed": false
+        "daily_commands_changed": false,
+        "selected_runtime_revision": "e9cfa08a954f63abbc39250056c4422513969a86"
       }
     },
     "incremental_database_uploads": {
@@ -2129,7 +2130,7 @@
       },
       "prepared_launch_fixture_checks": 13,
       "prepared_launch_actual_checks": 5,
-      "future_launch_installer": "install-capture-launch-cleanup.py",
+      "future_launch_installer": "install-finalization-launch-cleanup.py",
       "future_backup_components": 209,
       "daily_commands_and_schedules_changed": false,
       "schedule_activation_guard": {
@@ -2139,7 +2140,20 @@
         "rejects_previous_runtime_and_changed_service": true,
         "timers_started": false
       },
-      "sqlite_chunk_source_revision": "ef031eeed64dfdb66ce89d613c027306e040ac38"
+      "sqlite_chunk_source_revision": "ef031eeed64dfdb66ce89d613c027306e040ac38",
+      "selected_runtime_revision": "e9cfa08a954f63abbc39250056c4422513969a86",
+      "runtime": "/home/andrew/.local/share/stash-native-backup/releases/e9cfa08a954f/venv"
+    },
+    "published_archive_finalization": {
+      "native_archive_uploaded": true,
+      "coordinated_master_pending": true,
+      "saved_remote_proof_reused": true,
+      "database_reconstruction_repeated": false,
+      "application_audit_repeated": false,
+      "missing_remote_objects_repaired_from_original_archive": true,
+      "zfs_remount_requires_original_snapshot_identity": true,
+      "failed_controller_preserved": true,
+      "same_run_id": "20261008_175444_1545955"
     }
   },
   "metadata_retention_configuration": {

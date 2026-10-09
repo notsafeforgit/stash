@@ -49,7 +49,11 @@ An expired ZFS snapshot mount is accepted only after rechecking the original
 snapshot GUID, creation transaction, checkpoint properties, hold and read-only
 topology. All 317 backup tests pass, including missing-object repair, altered
 remote proof rejection and snapshot revalidation failures. The failed controller
-and its original publication receipt remain intact; finalization is pending.
+and its original publication receipt remain intact. Finalization is running on
+`e9cfa08a9`, reusing that publication. The same runtime is selected for the prepared
+daily launchers, with 13 fixture, five CLI and six schedule-guard checks passing.
+Use `install-finalization-launch-cleanup.py` after the n8n/home overlays; this
+supersedes the earlier capture-runtime preparation.
 
 Capture evidence reuse now also removes the repeated reconstruction and
 SQLite/producer audit from new backups. The exporter records its successful

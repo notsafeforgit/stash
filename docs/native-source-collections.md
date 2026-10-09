@@ -19,8 +19,18 @@ leave both source fields empty. A folder uses a canonical relative path under
 the selected root, or `.` for that whole root. The root is a deployment binding;
 the collection retains the portable root UUID and relative path.
 
-Retiring a collection is permanent and preserves its definition history. Merely
-creating a collection does not schedule downloads or assign performer metadata.
+Active permits configured ingestion; Disabled pauses it; Retired marks a
+collection as no longer used. Both Disabled and Retired can be restored: select
+Active (or Disabled to restore without allowing ingestion) and save. Restoration
+appends a definition revision, preserving the UUID, media associations and
+history. Stale revisions still conflict. This does not resurrect deleted media.
+
+An imported catalog collection groups previously collected posts and files. Its
+state is independent of the account's live scrape target collections: one account
+can have several targets, such as new submissions and top posts. Changing one
+collection does not change the other targets or the gallery-dl subscription list.
+Merely creating or activating a collection does not schedule downloads or assign
+performer metadata.
 Worker activation and metadata policy remain separate operations. Existing
 collections now expose **Edit metadata rules**, including fixed performer
 selection for folder scans. **Media roots** provides folder registration and
@@ -47,7 +57,8 @@ rewrites existing scene/image file paths or grants a worker access.
 An unbound root preserves its identity and collection paths but cannot accept
 file ingestion. Disabling a root preserves its binding; reactivation verifies
 the directory again. Labels can be changed and roots disabled while their
-unchanged folder is offline. Retirement is permanent and preserves history.
+unchanged folder is offline. Retired roots can also be restored to Disabled or
+Active with the same UUID; activating a bound root rechecks the directory.
 Neither disabling nor retiring deletes media or collections. Restoring a root's
 binding is only one part of deployment relocation; file-path reconciliation and
 worker configuration still need to agree with the restored filesystem.
@@ -102,7 +113,9 @@ they never unmark an already organized item. Previews explain missing fields.
 For scans, the most specific matching folder wins. A disabled policy with scan
 selection enabled masks parent-folder policies. Equal folder matches require
 review. Rules bind to a collection revision: after changing its folder or source,
-review and save its rules again. Retired collections are read-only.
+review and save its rules again. Retired collections keep their rules read-only
+until restored. Restoring a collection does not revive old queued work or remove
+revision checks; workers and policies must use its current definition.
 
 ## Testing a draft
 

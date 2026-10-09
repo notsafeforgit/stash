@@ -114,7 +114,7 @@ type CollectionMediaIntake struct {
 var (
 	ErrMediaRootBindingInvalid  = errors.New("invalid media root binding")
 	ErrSourceDefinitionInvalid  = errors.New("invalid source definition")
-	ErrSourceDefinitionConflict = errors.New("source definition changed or is retired")
+	ErrSourceDefinitionConflict = errors.New("source definition changed")
 	ErrCollectionIntakeReplay   = errors.New("collection intake UUID has different contents")
 )
 

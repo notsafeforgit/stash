@@ -98,6 +98,17 @@ func TestNativeCollectionManagement(t *testing.T) {
 	var history []models.SourceCollectionRevision
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &history))
 	require.Len(t, history, 1)
+	for revision, state := range []string{"retired", "disabled", "active", "retired", "active"} {
+		input.ExpectedRevision, input.State = revision+2, state
+		w = request(http.MethodPut, "/collections/"+before.UUID, input)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var restored models.SourceCollection
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &restored))
+		require.Equal(t, before.UUID, restored.UUID)
+		require.Equal(t, input.ExpectedRevision+1, restored.Revision)
+		require.Equal(t, state, restored.State)
+		require.Equal(t, http.StatusConflict, request(http.MethodPut, "/collections/"+before.UUID, input).Code)
+	}
 	require.Equal(t, 2, history[0].Revision)
 	require.Equal(t, "Rename", history[0].Reason)
 	require.Equal(t, "review", history[0].Origin)

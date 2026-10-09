@@ -202,10 +202,7 @@ export function createCollectionAPI(
         throw new NativeArchiveError(409, "preview_changed");
       }
       const current = await collection(input.uuid);
-      if (
-        current.revision !== input.expected_revision ||
-        current.state === "retired"
-      )
+      if (current.revision !== input.expected_revision)
         throw new NativeArchiveError(409, "preview_changed");
       return sameCollectionDefinition(input, current) ? current : null;
     } catch (error) {

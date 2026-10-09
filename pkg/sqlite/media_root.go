@@ -79,7 +79,7 @@ func (s *MediaRootStore) Put(ctx context.Context, input models.MediaRootInput) (
 	if err != nil {
 		return nil, err
 	}
-	if (current == nil && input.ExpectedRevision != 0) || (current != nil && (current.Revision != input.ExpectedRevision || current.State == "retired")) {
+	if (current == nil && input.ExpectedRevision != 0) || (current != nil && current.Revision != input.ExpectedRevision) {
 		return nil, models.ErrSourceDefinitionConflict
 	}
 	// Labels and disabling an offline mount do not need that mount online.

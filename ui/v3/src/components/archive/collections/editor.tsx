@@ -278,7 +278,7 @@ export function CollectionEditor({
               <p>
                 {msg(
                   "collections.retired_help",
-                  "This collection is retired. Its definition and history remain available for reference.",
+                  "This collection is retired. Choose Active or Disabled and save to restore it with the same identity and history.",
                 )}
               </p>
             )}
@@ -288,9 +288,7 @@ export function CollectionEditor({
               input={data.input}
               root={data.root}
               account={data.account}
-              disabled={
-                !ready || busy || !!saved || data.current?.state === "retired"
-              }
+              disabled={!ready || busy || !!saved}
               onSave={deliver}
             />
             {data.current && (

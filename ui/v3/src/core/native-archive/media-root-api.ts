@@ -112,10 +112,7 @@ export function createMediaRootAPI(
         throw new NativeArchiveError(409, "preview_changed");
       }
       const current = await root(input.uuid);
-      if (
-        current.revision !== input.expected_revision ||
-        current.state === "retired"
-      )
+      if (current.revision !== input.expected_revision)
         throw new NativeArchiveError(409, "preview_changed");
       return sameRootDefinition(input, current) ? current : null;
     } catch (error) {

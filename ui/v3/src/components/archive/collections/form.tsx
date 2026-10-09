@@ -167,6 +167,14 @@ export function CollectionForm({
                   </SelectGroup>
                 </SelectContent>
               </Select>
+              {field.state.value === "legacy_catalog" && (
+                <FieldDescription>
+                  {msg(
+                    "collections.imported_catalog_help",
+                    "Groups posts and files imported from an old catalog. Its status applies only to this collection. The same account can have separate active scrape targets.",
+                  )}
+                </FieldDescription>
+              )}
             </Field>
           )}
         </form.Field>
@@ -335,7 +343,13 @@ export function CollectionForm({
               <FieldDescription>
                 {msg(
                   "collections.state_help",
-                  "Retirement is permanent. Retired collections keep their history and cannot be edited or reactivated.",
+                  "Active allows configured ingestion. Disabled pauses it. Retired marks this collection as no longer in use. Choose Active and save to restore either. All states retain existing media and history.",
+                )}
+              </FieldDescription>
+              <FieldDescription>
+                {msg(
+                  "collections.state_scope_help",
+                  "This status does not change other collections for the same account or edit gallery-dl target lists. Activating a collection does not start a scrape; scheduling and metadata rules are configured separately.",
                 )}
               </FieldDescription>
             </Field>

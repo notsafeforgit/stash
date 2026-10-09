@@ -127,7 +127,7 @@ class SourceManagementClient(ActivationClient):
                     raise conflict()
                 return found
             found = self.collection(identity)
-            if found["revision"] != revision or found["state"] == "retired":
+            if found["revision"] != revision:
                 raise conflict()
             return found if same_definition(value, found) else None
         except Unavailable as error:

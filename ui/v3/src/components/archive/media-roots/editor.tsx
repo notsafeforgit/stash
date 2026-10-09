@@ -237,7 +237,7 @@ export function MediaRootEditor({
               <p>
                 {msg(
                   "media_roots.retired_help",
-                  "This root is retired. Its definition and binding history remain available for reference.",
+                  "This root is retired. Choose Active or Disabled and save to restore it with the same identity and history. Activating it verifies its folder again.",
                 )}
               </p>
             )}
@@ -245,9 +245,7 @@ export function MediaRootEditor({
               key={`${refresh}:${data.current?.revision ?? 0}`}
               api={api}
               input={data.input}
-              disabled={
-                !ready || busy || !!saved || data.current?.state === "retired"
-              }
+              disabled={!ready || busy || !!saved}
               onSave={deliver}
             />
             {data.current && (

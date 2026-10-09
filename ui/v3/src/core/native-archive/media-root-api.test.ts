@@ -99,6 +99,25 @@ function server() {
   };
 }
 
+it("restores a retired root after a lost request with its reviewed binding", async () => {
+  const remote = server();
+  remote.commit({ ...input(), state: "retired" });
+  const outbox = createMediaRootOutbox(remote.api);
+  await outbox.prepare({ ...input(), expected_revision: 1 });
+  remote.lose("before");
+  await expect(outbox.deliver(rootID)).rejects.toThrow("lost before save");
+  expect(await createMediaRootOutbox(remote.api).deliver(rootID)).toMatchObject(
+    {
+      uuid: rootID,
+      revision: 2,
+      state: "active",
+      binding: input().binding,
+    },
+  );
+  expect(remote.bodies).toHaveLength(2);
+  expect(remote.bodies[0]).toBe(remote.bodies[1]);
+});
+
 it("recovers the committed binding after a lost response, later relocation and mount loss without reprobe", async () => {
   const remote = server();
   const outbox = createMediaRootOutbox(remote.api);

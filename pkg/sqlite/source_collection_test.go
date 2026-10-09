@@ -66,14 +66,23 @@ func TestMediaRootRevisionAndMountReview(t *testing.T) {
 	input.ExpectedRevision, input.State = 3, "retired"
 	retired := putMediaRoot(t, repo, input)
 	input.ExpectedRevision, input.State = 4, "active"
+	require.NoError(t, os.Rename(mount, mount+"-retired"))
+	require.NoError(t, os.Mkdir(mount, 0700))
 	err = repo.WithTxn(context.Background(), func(ctx context.Context) error { _, err := repo.MediaRoot.Put(ctx, input); return err })
-	require.ErrorIs(t, err, models.ErrSourceDefinitionConflict)
+	require.ErrorContains(t, err, "directory changed", "restoring a retired root must recheck its binding")
+	input.Binding, err = archive.ProbeMediaRoot(mount)
+	require.NoError(t, err)
+	restored := putMediaRoot(t, repo, input)
+	require.Equal(t, retired.UUID, restored.UUID)
+	require.Equal(t, 5, restored.Revision)
+	err = repo.WithTxn(context.Background(), func(ctx context.Context) error { _, err := repo.MediaRoot.Put(ctx, input); return err })
+	require.ErrorIs(t, err, models.ErrSourceDefinitionConflict, "restoration does not bypass revision checks")
 	require.NoError(t, db.Close())
 	require.NoError(t, db.Open(db.DatabasePath()))
 	require.NoError(t, repo.WithReadTxn(context.Background(), func(ctx context.Context) error {
 		current, err := repo.MediaRoot.Find(ctx, id)
 		require.NoError(t, err)
-		require.Equal(t, retired, current)
+		require.Equal(t, restored, current)
 		history, err := repo.MediaRoot.History(ctx, id, 0, 2)
 		require.NoError(t, err)
 		require.Len(t, history, 2)
@@ -84,6 +93,7 @@ func TestMediaRootRevisionAndMountReview(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, next, 2)
 		require.Equal(t, *rebound, next[0].MediaRoot)
+		require.Equal(t, *retired, next[1].MediaRoot)
 		return nil
 	}))
 }
@@ -233,14 +243,30 @@ func TestCollectionCaptureAndManualIntakeReplay(t *testing.T) {
 	}))
 	input.ExpectedRevision, input.State = second.Revision, "retired"
 	retired := putSourceCollection(t, repo, input)
-	input.ExpectedRevision, input.State = retired.Revision, "active"
-	err := repo.WithTxn(context.Background(), func(ctx context.Context) error { _, err := repo.SourceCollection.Put(ctx, input); return err })
-	require.ErrorIs(t, err, models.ErrSourceDefinitionConflict)
 	// Retired definitions can still receive previously unimported provenance.
 	intake.UUID = uuid.NewString()
 	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error {
 		_, err := repo.SourceCollection.RecordMediaIntake(ctx, intake)
 		return err
+	}))
+	for _, state := range []string{"disabled", "active", "retired", "active"} {
+		input.ExpectedRevision, input.State = retired.Revision, state
+		retired = putSourceCollection(t, repo, input)
+		require.Equal(t, first.UUID, retired.UUID)
+		require.Equal(t, state, retired.State)
+	}
+	err := repo.WithTxn(context.Background(), func(ctx context.Context) error { _, err := repo.SourceCollection.Put(ctx, input); return err })
+	require.ErrorIs(t, err, models.ErrSourceDefinitionConflict)
+	require.NoError(t, repo.WithReadTxn(context.Background(), func(ctx context.Context) error {
+		items, err := repo.SourceCollection.MediaIntake(ctx, first.UUID, "", 100)
+		require.NoError(t, err)
+		require.Len(t, items, 2, "restoration preserves previously recorded intake")
+		history, err := repo.SourceCollection.History(ctx, first.UUID, 0, 100)
+		require.NoError(t, err)
+		require.Len(t, history, 7)
+		require.Equal(t, "retired", history[2].State)
+		require.Equal(t, "active", history[6].State)
+		return nil
 	}))
 	performer := archiveFind(t, repo, models.ArchivePerformer, 71)
 	intake.UUID, intake.MediaUUID = uuid.NewString(), performer.UUID
@@ -338,7 +364,7 @@ func TestSourceDefinitionValidationAndSQLPublicationGuards(t *testing.T) {
 	_, err = raw.Exec("UPDATE media_roots SET revision=2")
 	require.ErrorContains(t, err, "recorded revision")
 	_, err = raw.Exec(`INSERT INTO media_root_revisions(root_uuid,revision,label,state,origin,reason) VALUES(?,3,'Skipped','active','review','')`, root.UUID)
-	require.ErrorContains(t, err, "stale or retired")
+	require.ErrorContains(t, err, "stale")
 	require.NoError(t, repo.WithReadTxn(ctx, func(ctx context.Context) error {
 		_, err := repo.MediaRoot.List(ctx, "", 101)
 		require.Error(t, err)

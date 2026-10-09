@@ -84,6 +84,18 @@ class Remote:
 
 
 class SourceManagementTests(unittest.TestCase):
+    def test_explicit_retired_restoration_recovers_lost_response_with_same_identity(self):
+        remote = Remote()
+        before = remote.add({**spec()["targets"][0], "state": "retired"})
+        value = {**{key: before[key] for key in DEFINITION}, "state": "active",
+                 "uuid": before["uuid"], "expected_revision": before["revision"], "reason": "Restore collection"}
+        remote.drop_next = True
+        with self.assertRaisesRegex(Unavailable, "network_unavailable"):
+            remote.app.apply(value)
+        restored = remote.app.apply(value)
+        self.assertEqual((restored["uuid"], restored["revision"], restored["state"]), (before["uuid"], 2, "active"))
+        self.assertEqual(len(remote.puts), 1)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

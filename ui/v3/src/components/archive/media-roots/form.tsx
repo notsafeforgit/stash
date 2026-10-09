@@ -307,7 +307,7 @@ export function MediaRootForm({
               <FieldDescription>
                 {msg(
                   "media_roots.state_help",
-                  "Disabled roots retain their binding and can be reactivated after verification. Retirement is permanent. Neither action deletes media or collections.",
+                  "Disabled pauses use of this root. Retired marks it as no longer in use. Both retain their folder binding and can be restored by choosing Active and saving, which verifies the folder again. Neither deletes media or collections.",
                 )}
               </FieldDescription>
             </Field>

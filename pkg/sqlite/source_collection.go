@@ -107,7 +107,7 @@ func (s *SourceCollectionStore) Put(ctx context.Context, input models.SourceColl
 	if err != nil {
 		return nil, err
 	}
-	if (current == nil && input.ExpectedRevision != 0) || (current != nil && (current.Revision != input.ExpectedRevision || current.State == "retired")) {
+	if (current == nil && input.ExpectedRevision != 0) || (current != nil && current.Revision != input.ExpectedRevision) {
 		return nil, models.ErrSourceDefinitionConflict
 	}
 	if current != nil && reflect.DeepEqual(current.SourceCollectionDefinition, input.SourceCollectionDefinition) {

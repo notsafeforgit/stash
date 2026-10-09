@@ -82,6 +82,31 @@ function server() {
   };
 }
 
+it("restores a retired collection after a lost request without changing its identity", async () => {
+  const remote = server();
+  remote.commit({ ...collectionInput(), state: "retired" });
+  const outbox = createCollectionOutbox(remote.api);
+  const restored = {
+    ...collectionInput(),
+    expected_revision: 1,
+    state: "active" as const,
+  };
+  await outbox.prepare(restored);
+  remote.loseBefore();
+  await expect(outbox.deliver(collectionID)).rejects.toThrow(
+    "Connection lost before commit",
+  );
+  expect(
+    await createCollectionOutbox(remote.api).deliver(collectionID),
+  ).toMatchObject({
+    uuid: collectionID,
+    revision: 2,
+    state: "active",
+  });
+  expect(remote.bodies).toHaveLength(2);
+  expect(remote.bodies[0]).toBe(remote.bodies[1]);
+});
+
 it("uses bounded scoped searches, cancellation and PUT with the caller's stable identity", async () => {
   const transport = vi.fn<typeof fetch>(async (target, options) => {
     const url = new URL(String(target));

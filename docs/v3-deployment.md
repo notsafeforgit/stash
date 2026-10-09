@@ -30,9 +30,17 @@ API version `2026-03-10`.
 that settings changes cannot clear and advises contacting Support for review.
 Keep the HTTP status, response message, UTC timestamp and `X-GitHub-Request-Id`
 with the enabled/active readbacks. Do not diagnose billing or a disabled settings
-toggle without evidence. Publication remains blocked until a run actually
+toggle without evidence. Publication must remain blocked until a run actually
 starts and succeeds; neither a successful push nor registry access establishes
 that the publishing workflow ran. Do not substitute a local image.
+
+The restriction cleared later on October 9: source revision `48cdadac2a`
+[published successfully](https://github.com/notsafeforgit/stash/actions/runs/37994520342),
+and the [wrapper build](https://github.com/notsafeforgit/stash-s6/actions/runs/37997504208)
+consumed that exact source digest. The production unit now uses its verified
+GHCR digest; [the progress record](native-archive-progress.md#current-release-position--2026-10-09-utc)
+retains the current identities. The earlier restriction does not describe the
+current Actions state.
 
 ## 1. Publish and verify the Stash image
 

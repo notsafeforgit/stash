@@ -26,11 +26,30 @@ file/ownership and ambiguity checks. The example
 276637 and 276638. The private scope is saved under
 `.local/twitter-album-recovery-20261009/`.
 
-**Production backfill remains unapplied.** The running server rejects the new
-policy; the previously recorded GitHub Actions publication restriction must be
-resolved before the approved registry release and queued application can run.
-No local-image deployment or direct production SQL repair substitutes for that
-release. The existing runtime, scrapers and backup jobs remain in place.
+The GitHub publication restriction cleared for this push. Both the
+[source build](https://github.com/notsafeforgit/stash/actions/runs/37994520342) and
+[wrapper build](https://github.com/notsafeforgit/stash-s6/actions/runs/37997504208)
+succeeded. Production now runs the verified GHCR wrapper below; the scraper
+timer resumed after API readiness. The retrospective application completed all
+**11,892** candidates in batches of 25 through durable album jobs, creating
+**11,891 galleries** with **29,967 attachment/media links**. All submitted jobs
+finished their after-success notifications; none failed or required conflict
+review. One candidate retained only its first registered image, with its later
+recorded files missing, so it remained unchanged.
+
+**344 recovered lists** retain numbering gaps among registered attachments.
+Every recovered list remains partial with an unknown total. The manifest readback
+found no synthetic capture links. A live deduplication example verified that the
+original filename supplies the position while the selected surviving file has a
+different path. The original example is now gallery **6388**, with images 276637
+and 276638 in positions 1 and 2. Existing selected source lists were preserved.
+
+The separate 31 posts without registered media remain ungrouped: 12 have no
+surviving local files, while 19 have 48 local files not registered in Stash (also
+absent under the same basenames elsewhere in its file index). These exclusions
+and the one unchanged candidate are recorded with the private recovery results.
+The in-flight backups retain their original sealed configuration. Their pending
+successor configuration selects the actual registry binary for future backups.
 
 Validation passed: binding generation and UI build, Go lint and the full Go
 integration suite, UI validation (802 tests), producer/library/archive tests,
@@ -44,8 +63,15 @@ also passed.
 ## Current release position — 2026-10-09 UTC
 
 Production is healthy on schema **1000105**, source
-`81b81cf6313c634b28caea007df9f893222ad9a9`, pinned wrapper
-`localhost/stash-native-s6@sha256:fa8367a5ca3330c27088e3a8f722233b95b46e70b5018c2b6a9a63556c7ac154`.
+`48cdadac2aaba7834e3984494700e7b04a90ecf2`, pinned wrapper
+`ghcr.io/notsafeforgit/stash-s6@sha256:f3f0b748098c691eaab87af8bf3b46d02d6f5dc10f3fe35a7819d36ca0d15869`.
+The verified source image is
+`ghcr.io/notsafeforgit/stash@sha256:ebfdef660c9b3411ed74325df2d723dd6516d9c313e2079687d8e8bf7d3dc009`,
+with wrapper source `4f0f0594e95e000a75e4819f2494c3a44ce7f04d`.
+The deployment required no schema migration. After the completed backfill,
+the root filesystem has 55.2 GiB free. Release receipts and the binary retained
+for future backup validation are recorded under
+`.local/twitter-album-recovery-20261009/`.
 The explicit [catalog association repair](catalog-association-repair.md) now
 promotes unambiguous imported post-account claims and known author directories
 to ordinary publisher decisions. Accounts without an ownership choice can link

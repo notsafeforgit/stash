@@ -56,10 +56,14 @@ export const jobActivitySchema = common
     kind: jobKindSchema,
     state: jobStateSchema,
     max_attempts: positive,
+    failures: integer,
   })
   .refine(
     (row) =>
-      row.attempt_count <= row.max_attempts &&
+      row.failures <= row.attempt_count &&
+      row.failures <= row.max_attempts &&
+      (!["queued", "running"].includes(row.state) ||
+        row.failures < row.max_attempts) &&
       (row.state === "running") === (row.lease_until !== null),
   );
 export const runActivitySchema = common

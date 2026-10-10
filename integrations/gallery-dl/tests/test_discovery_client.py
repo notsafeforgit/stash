@@ -44,6 +44,15 @@ class DiscoveryClientTests(unittest.TestCase):
     def digest(listing):
         return hashlib.sha256(native_json({k: listing[k] for k in LISTING_KEYS}, 32768)).hexdigest()
 
+    def test_restarted_jobs_do_not_exhaust_the_failure_budget(self):
+        execution, _ = execution_fixture()
+        job = execution["job"]
+        job.update(fence=12, failures=1)
+        DiscoveryClient._job(job)
+        for failures in (-1, 8, True, 13):
+            with self.assertRaises(Unavailable):
+                DiscoveryClient._job(dict(job, failures=failures))
+
     def test_capabilities_require_the_exact_protocol_and_full_page_capacity(self):
         good = {"discovery_protocol": 1, "discovery_source_pacing_protocol": 1, "max_discovery_page_bytes": MAX_BYTES}
         self.transport.capabilities.return_value = good
@@ -239,7 +248,7 @@ class DiscoveryClientTests(unittest.TestCase):
         self.transport._request.return_value = failure
         self.assertEqual(self.client.fail(self.job["uuid"], self.lease, "rate_limited"), failure)
         for change in ({"producer_uuid": str(uuid.uuid4())}, {"owner_uuid": str(uuid.uuid4())},
-                       {"fence": 2}, {"outcome": "failed"}, {"ended_at": None}, {"error_code": "timeout"}):
+                       {"fence": 2}, {"outcome": "succeeded"}, {"ended_at": None}, {"error_code": "timeout"}):
             self.transport._request.return_value = {**failure, **change}
             with self.assertRaises(Unavailable):
                 self.client.fail(self.job["uuid"], self.lease, "rate_limited")

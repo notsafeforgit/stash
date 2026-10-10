@@ -3,6 +3,7 @@
 import hashlib
 import re
 
+from .job_recovery import valid_job_retries
 from .client import Unavailable
 from .discovery_client import _integer, _runtime, _time
 from .encoding import InvalidData, encode, identifier, native_json
@@ -90,8 +91,7 @@ class DiscoveryDetailClient(EnrichmentClient):
                                                        "candidate_sequence", "collection_revision"))
                 or not _integer(work["page_ordinal"], 1, 10000)
                 or any(not sha256(work[k]) for k in ("source_sha256", "page_sha256", "definition_sha256", "policy_sha256"))
-                or not _integer(value.get("revision"), 1) or not _integer(value.get("fence"), 0, 8)
-                or not _integer(value.get("max_attempts"), 8, 8)
+                or not _integer(value.get("revision"), 1) or not valid_job_retries(value)
                 or value.get("state") not in ("queued", "running", "succeeded", "failed", "cancelled")):
             raise Unavailable("invalid_response")
         try:
@@ -112,8 +112,6 @@ class DiscoveryDetailClient(EnrichmentClient):
                     raise InvalidData("Running detail requires ownership")
             elif value.get("owner_uuid") is not None or value.get("lease_until") is not None:
                 raise InvalidData("Inactive detail cannot retain ownership")
-            if value["state"] == "queued" and value["fence"] == 8:
-                raise InvalidData("Exhausted detail cannot remain queued")
             if (value.get("work_key") != hashlib.sha256(native_json(work, 16384)).hexdigest()
                     or value.get("resource_key") != hashlib.sha256(
                         ("enrichment-collection\x00" + work["collection_uuid"]).encode()).hexdigest()):
@@ -158,7 +156,7 @@ class DiscoveryDetailClient(EnrichmentClient):
     @classmethod
     def _receipt(cls, value, job):
         super()._receipt(value, job)
-        if not _integer(value["revision"], 1, 128) or not _integer(value["fence"], 1, 8):
+        if not _integer(value["revision"], 1, 128) or not _integer(value["fence"], 1):
             raise Unavailable("invalid_response")
         try:
             _time(value.get("created_at"))
@@ -183,7 +181,7 @@ class DiscoveryDetailClient(EnrichmentClient):
                 "record_ordinals", "pending_count", "unresolved_count"}
         if (not isinstance(value, dict) or set(value) != {"job_uuid", "checkpoint_revision", "fence", "evidence", "created_at"}
                 or value["job_uuid"] != job or not _integer(value["checkpoint_revision"], 1, 128)
-                or not _integer(value["fence"], 1, 8) or not isinstance(evidence, dict)
+                or not _integer(value["fence"], 1) or not isinstance(evidence, dict)
                 or not keys <= set(evidence) or set(evidence) - keys - {"basis", "witness_ordinal"}
                 or evidence["policy"] != MATCH_POLICY or evidence["status"] not in ("corroborated", "uncorroborated")
                 or not isinstance(evidence["post"], dict) or set(evidence["post"]) != {"Namespace", "Value"}

@@ -162,6 +162,21 @@ shares and offline assets without a UI flag. Verify native schema lineage,
 import/reconciliation receipts and worker health separately; an HTTP health
 response alone does not establish archive completeness.
 
+Routine Stash restarts do not require draining a scrape pass, stopping n8n, or
+pausing the worker timer. The external worker retains completed files and its
+SQLite outbox during API downtime. It pauses new source work when ownership
+cannot be renewed; after Stash returns, the dispatcher reclaims expired work and
+resumes from the saved cursor/checkpoint. Existing download archives avoid
+fetching completed files again. Receipt replay makes uncertain delivery safe.
+Recovery may wait for the remaining lease, poll backoff and source cooldowns;
+it is automatic, rather than necessarily immediate. Schema 1000107 makes lease
+expiry independent of failure limits for both source runs and metadata jobs.
+
+Producer-code updates still need a verified runtime and explicit policy upgrades
+for retained work when the execution fingerprint changes. Coordinate that short
+runtime handoff separately; never wait for a whole profile traversal to complete.
+Keep the worker's durable outbox, download archives and pending requests intact.
+
 When an update requires a schema migration, wait for the migration job's
 `FINISHED` status as well as the expected schema and `systemStatus: OK` before
 updating scraper policies or resuming workers. Schema readiness can become

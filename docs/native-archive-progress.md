@@ -7,6 +7,27 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement is running; the controlled worker rollout remains
 in progress.
 
+## Scrape restart recovery — implementation, 2026-10-10
+
+Schema 1000107 separates archive-job failure counts from ownership generations.
+Expired leases keep checkpoints and return to the queue without exhausting the
+failure allowance. Download runs similarly retain their window/cursor and treat
+lease expiry or worker interruption separately from source failures. Existing
+terminal states and receipt histories are preserved. Genuine errors retain
+bounded retries and source cooldowns; stale workers cannot publish.
+
+The producer validates retries using the new failure count, including pending
+local failure acknowledgements after many restarts. Job displays show failures
+separately from attempts. Routine deployment no longer needs to drain a full
+scrape pass or stop n8n. A runtime fingerprint change still requires a bounded
+policy handoff for pending work.
+
+Tests cover repeated database reopen/lease expiry, progress retention, stale
+worker rejection, real failure exhaustion, migration preservation and the real
+Python worker resuming through an HTTP outage without downloading a completed
+file again. Release validation and the production update remain in progress.
+Private evidence: `.local/scrape-restart-20261010/`.
+
 ## Mixed gallery browsing — deployed, 2026-10-10
 
 Gallery pages now open a unified Media view with images and scenes in selected

@@ -108,6 +108,7 @@ export function albumJob(overrides: Partial<AlbumJob> = {}): AlbumJob {
     state: "queued",
     revision: 1,
     attempts: 0,
+    failures: 0,
     max_attempts: 10,
     available_at: "2026-10-06T12:00:00Z",
     publication_committed: false,

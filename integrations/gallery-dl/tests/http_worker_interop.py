@@ -12,6 +12,7 @@ import time
 from unittest.mock import patch
 from types import SimpleNamespace
 import uuid
+from urllib.request import Request, urlopen
 
 from gallery_dl import ytdl
 from gallery_dl.extractor.ytdl import YoutubeDLExtractor
@@ -83,7 +84,7 @@ def main():
                    "--identity", "Native_Fixture", "--profile", str(path), "--until", now.isoformat(timespec="milliseconds")]
 
     def record():
-        if setup["adapter"] not in ('caller-cli', 'ytdl', 'ytdl-traversal', 'tumblr', 'jpgfish', 'leakgallery'):
+        if setup["adapter"] not in ('caller-cli', 'restart', 'ytdl', 'ytdl-traversal', 'tumblr', 'jpgfish', 'leakgallery'):
             result = subprocess.run(command, capture_output=True, text=True, timeout=30)
             assert result.returncode == 0, result.stderr
             value = json.loads(result.stdout)
@@ -131,6 +132,8 @@ def main():
             client.urlopen = lambda request: SimpleNamespace(status=200)
             return client
 
+        downloads = []
+
         def job(target, *, producer, lock_directory):
             class CallerFixture(Fixture):
                 pattern = re.escape(setup["target"])
@@ -158,6 +161,7 @@ def main():
             task = NativeDownloadJob(extractor, producer=producer, lock_directory=lock_directory)
 
             def download(url):
+                downloads.append(url)
                 # The independent drainer must deliver while the downloader is
                 # still running, through its own SQLite connection.
                 row = box.db.execute("SELECT event_uuid FROM events ORDER BY seq LIMIT 1").fetchone()
@@ -184,6 +188,29 @@ def main():
             with redirect_stdout(output):
                 status = producer_cli(["--outbox", str(database), "--endpoint", setup["endpoint"],
                                        "--producer", setup["producer"], "dispatch", "--profile", str(path)])
+            first_result = json.loads(output.getvalue())
+            if setup["adapter"] == "restart":
+                assert first_result["state"] in ("paused", "completion_unconfirmed"), first_result
+                assert len(downloads) == 1
+                # The worker process and its outbox stay alive while Stash
+                # closes/reopens its database. Advance only the fixture clock.
+                with urlopen(Request(setup["endpoint"] + "/test/restart", method="POST")) as response:
+                    assert response.status == 204
+                from stash_ingest.dispatch import dispatch_once
+                for attempt in range(6):
+                    box.clock = lambda attempt=attempt: time.time() + 600 * (attempt + 1)
+                    with redirect_stdout(io.StringIO()):
+                        resumed = dispatch_once(box, client, profile)
+                    if resumed["state"] == "source_succeeded":
+                        break
+                    with urlopen(Request(setup["endpoint"] + "/test/advance", method="POST")) as response:
+                        assert response.status == 204
+                assert resumed["state"] == "source_succeeded", resumed
+                assert resumed["run_uuid"] == first_result["run_uuid"]
+                assert len(downloads) == 1, "completed file was downloaded again"
+                # Keep original admission evidence alongside the resumed result.
+                output = io.StringIO(json.dumps({**first_result, **resumed,
+                    "submission": first_result["submission"], "resolution": first_result["resolution"]}))
         result = json.loads(output.getvalue())
         assert status in (0, 2), (status, result)
         assert result["resolution"] == {"state": "queued", "call_uuid": call_uuid, "counts": {"queued": 1, "review": 0}}, result
@@ -193,8 +220,11 @@ def main():
         assert result["state"] == "source_succeeded", result
         assert result["finish_recovered"] is True, result
         rows = list(box.db.execute("SELECT event_uuid,kind FROM events ORDER BY seq"))
-        assert [row[1] for row in rows] == ["source.capture", "attachment.download", "file.completed", "attachment.download"], rows
-        capture_id, start_id, file_id, end_id = [row[0] for row in rows]
+        assert [row[1] for row in rows[:4]] == ["source.capture", "attachment.download", "file.completed", "attachment.download"], [tuple(r) for r in rows]
+        if setup["adapter"] != "restart":
+            assert len(rows) == 4
+        expected_events = len(rows)
+        capture_id, start_id, file_id, end_id = [row[0] for row in rows[:4]]
     # File admission must survive closing/reopening the producer, independently
     # of source completion. Source and file receipts stay separate.
     with closing(Outbox(database, setup["endpoint"], setup["producer"])) as box:
@@ -202,11 +232,11 @@ def main():
             # Advance only local delivery backoff. Recover the server's exact
             # receipt after its deliberately lost report response, then allow
             # the file-dependent terminal report through the same real API.
-            box.clock = lambda attempt=attempt: time.time() + 120 * (attempt + 1)
+            box.clock = lambda attempt=attempt: time.time() + (6000 if setup["adapter"] == "restart" else 0) + 120 * (attempt + 1)
             drain_once(box, client)
-            if box.status()["counts"]["acknowledged"] == 4:
+            if box.status()["counts"]["acknowledged"] == expected_events:
                 break
-        assert box.status()["counts"] == {"pending": 0, "sending": 0, "review": 0, "acknowledged": 4}, box.status()
+        assert box.status()["counts"] == {"pending": 0, "sending": 0, "review": 0, "acknowledged": expected_events}, box.status()
         for event_id, state in ((start_id, "started"), (end_id, "downloaded")):
             report = box.receipt(event_id)
             assert report["capture_uuid"] == box.receipt(capture_id)["capture_uuid"]

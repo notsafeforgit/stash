@@ -198,7 +198,7 @@ class DiscoveryJournalTests(unittest.TestCase):
             self.assertEqual(value.reserved_bytes, 0)
             receipt = self.failure_receipt(value)
             for change in ({"owner_uuid": str(uuid.uuid4())}, {"producer_uuid": str(uuid.uuid4())},
-                           {"outcome": "failed"}, {"error_code": "worker_failed"}, {"ended_at": None}):
+                           {"outcome": "succeeded"}, {"error_code": "worker_failed"}, {"ended_at": None}):
                 with self.assertRaises(Conflict):
                     self.journal.acknowledged(value, {**receipt, **change})
             with self.assertRaises(Conflict):

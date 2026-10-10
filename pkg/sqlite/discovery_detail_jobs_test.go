@@ -110,8 +110,6 @@ func TestDiscoveryDetailJobsResumeOriginalProvenanceAndKeepReview(t *testing.T) 
 		require.Equal(t, 1, ret.Recovered)
 		return err
 	}))
-	require.Nil(t, f.claim(t, job, 1))
-	f.now = f.now.Add(5 * time.Minute)
 	second := f.claim(t, job, 1)
 	require.NotNil(t, second)
 	checkpoint2, err := f.worker.Checkpoint(t.Context(), f.tokens[1], second.Lease(), checkpoint.Revision, f.body)

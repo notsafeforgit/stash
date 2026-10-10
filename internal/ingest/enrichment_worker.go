@@ -177,17 +177,20 @@ func (c *EnrichmentCoordinator) Fail(ctx context.Context, token string, lease mo
 		if len(attempts) != 1 || attempts[0].Fence != lease.Fence || attempts[0].OwnerUUID != lease.OwnerUUID {
 			return models.ErrArchiveJobLease
 		}
-		expected := state
-		if lease.Fence >= int64(current.MaxAttempts) {
-			expected = "failed"
-		}
 		if attempts[0].EndedAt != nil {
-			if attempts[0].ErrorCode != code || attempts[0].Outcome != expected {
+			// Replay the committed outcome even after later attempts have used
+			// more of the job's failure budget.
+			validOutcome := attempts[0].Outcome == state || (state == "retry" && attempts[0].Outcome == "failed")
+			if attempts[0].ErrorCode != code || !validOutcome {
 				return models.ErrEnrichmentConflict
 			}
 			ret = &EnrichmentFailureReceipt{ArchiveJobAttempt: attempts[0], ProducerUUID: credential.ProducerUUID}
 			c.guard(ctx, token, current, nil)
 			return nil
+		}
+		expected := state
+		if current.Failures+1 >= current.MaxAttempts {
+			expected = "failed"
 		}
 		before, err := c.Service.Repo.EnrichmentJob.CheckLease(ctx, models.EnrichmentJobLease{ArchiveJobLease: lease, ProducerUUID: credential.ProducerUUID}, c.Now())
 		if err != nil {
@@ -195,7 +198,7 @@ func (c *EnrichmentCoordinator) Fail(ctx context.Context, token string, lease mo
 		}
 		outcome := models.ArchiveJobOutcome{State: state, ErrorCode: code, Result: []byte(`{}`)}
 		if state == "retry" {
-			// The repository applies the attempt-based minimum backoff.
+			// The repository applies the failure-based minimum backoff.
 			outcome.RetryAt = c.Now().Add(5 * time.Minute)
 		}
 		after, err := c.Service.Repo.ArchiveJob.Finish(ctx, lease, c.Now(), outcome)

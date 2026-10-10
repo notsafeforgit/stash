@@ -75,7 +75,7 @@ func sourceEnrichmentTurn(ctx context.Context, scope, collection string, now tim
 	var rows []archiveJobRow
 	err := dbWrapper.Select(ctx, &rows, `SELECT j.* FROM source_enrichment_waiters w JOIN archive_jobs j ON j.uuid=w.job_uuid
  WHERE w.expires_at_ms>? AND w.refreshed_at_ms<=? AND j.state='queued' AND j.fence=w.fence
- AND j.available_at_ms<=? AND j.fence<j.max_attempts
+ AND j.available_at_ms<=? AND j.failures<j.max_attempts
  AND (json_extract(j.arguments,'$.collection_uuid')=? OR EXISTS(
   SELECT 1 FROM source_enrichment_waiter_scopes p WHERE p.job_uuid=w.job_uuid AND p.scope=?))
  AND NOT EXISTS(SELECT 1 FROM source_enrichment_waiter_scopes p JOIN source_pacing s ON s.scope=p.scope

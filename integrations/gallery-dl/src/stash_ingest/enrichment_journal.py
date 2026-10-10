@@ -253,10 +253,10 @@ class EnrichmentJournal:
                                          receipt=pending["receipt"], lease=pending["lease"])
             state[self.completion_field], phase = receipt, "completed"
         else:
-            expected = "retry" if pending["error_code"] in RETRYABLE and pending["lease"]["fence"] < 8 else "failed"
+            outcomes = {"retry", "failed"} if pending["error_code"] in RETRYABLE else {"failed"}
             if (receipt.get("job_uuid") != value.job_uuid or receipt.get("producer_uuid") != self.box.producer
                     or any(receipt.get(k) != pending["lease"][k] for k in ("owner_uuid", "fence"))
-                    or receipt.get("error_code") != pending["error_code"] or receipt.get("outcome") != expected
+                    or receipt.get("error_code") != pending["error_code"] or receipt.get("outcome") not in outcomes
                     or not receipt.get("ended_at")):
                 raise Conflict("Enrichment failure acknowledgement identifies another attempt")
             state["failure"] = receipt

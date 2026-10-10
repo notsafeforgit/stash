@@ -4,6 +4,7 @@ import hashlib
 from datetime import datetime
 import re
 
+from .job_recovery import valid_job_retries
 from .client import Unavailable
 from .worker_policy import execution_policy
 from .encoding import InvalidData, encode, identifier, native_json
@@ -151,8 +152,7 @@ class EnrichmentClient:
                 or not isinstance(work.get("extractor_version"), str) or not work["extractor_version"]
                 or any(type(work.get(k)) is not int or work[k] < 1 for k in ("target_revision", "collection_revision"))
                 or type(value.get("revision")) is not int or value["revision"] < 1
-                or type(value.get("fence")) is not int or not 0 <= value["fence"] <= 8
-                or type(value.get("max_attempts")) is not int or value["max_attempts"] != 8
+                or not valid_job_retries(value)
                 or value.get("state") not in ("queued", "running", "succeeded", "failed", "cancelled")):
             raise Unavailable("invalid_response")
         try:
@@ -387,11 +387,11 @@ class EnrichmentClient:
         if not isinstance(code, str) or code not in ERRORS | {"post_identity_conflict"}:
             raise InvalidData("Invalid enrichment failure code")
         value = self.client._request("POST", self.path(job, "/failure"), encode({**self.lease(lease), "error_code": code}))
-        outcome = "retry" if code in RETRYABLE and lease["fence"] < 8 else "failed"
+        outcomes = {"retry", "failed"} if code in RETRYABLE else {"failed"}
         if (not isinstance(value, dict) or value.get("job_uuid") != job or value.get("producer_uuid") != self.client.producer
                 or value.get("owner_uuid") != lease["owner_uuid"] or type(value.get("fence")) is not int
                 or value["fence"] != lease["fence"]
-                or value.get("error_code") != code or value.get("outcome") != outcome or not value.get("ended_at")):
+                or value.get("error_code") != code or value.get("outcome") not in outcomes or not value.get("ended_at")):
             raise Unavailable("invalid_response")
         try:
             if datetime.fromisoformat(value["ended_at"]).tzinfo is None:

@@ -29,6 +29,7 @@ export function activityJob(): JobActivity {
     uuid: activityIds.job,
     kind: "media.verify",
     state: "queued",
+    failures: 0,
     max_attempts: 3,
   };
 }

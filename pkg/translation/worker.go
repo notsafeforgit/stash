@@ -200,9 +200,9 @@ func (w *Worker) fail(ctx context.Context, claimed *models.ArchiveJob, cause err
 	durable := w.Service.Durable
 	_, err := durable.Publish(ctx, claimed.Lease(), func(ctx context.Context, current *models.ArchiveJob) (models.ArchiveJobOutcome, error) {
 		outcome := models.ArchiveJobOutcome{State: "failed", ErrorCode: code, Result: json.RawMessage(`{}`)}
-		if !permanent && current.Fence < int64(current.MaxAttempts) {
+		if !permanent && current.Failures+1 < current.MaxAttempts {
 			outcome.State = "retry"
-			delay := min(24*time.Hour, 5*time.Minute*(1<<min(current.Fence-1, 9)))
+			delay := min(24*time.Hour, 5*time.Minute*(1<<min(current.Failures, 9)))
 			outcome.RetryAt = durable.Now().Add(delay)
 		} else if work, err := archive.DecodeTranslationJob(current); err == nil {
 			if err := w.Service.hold(ctx, work, durable.Now()); err != nil {

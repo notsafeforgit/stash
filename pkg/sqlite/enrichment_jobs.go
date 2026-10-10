@@ -15,7 +15,7 @@ import (
 type EnrichmentJobStore struct{}
 
 func enrichmentRetryAt(job *models.ArchiveJob, now time.Time) time.Time {
-	shift := job.Fence - 1
+	shift := job.Failures
 	if shift < 0 {
 		shift = 0
 	}

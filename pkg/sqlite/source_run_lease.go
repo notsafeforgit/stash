@@ -256,7 +256,7 @@ func (s *SourceRunStore) Finish(ctx context.Context, lease models.SourceRunLease
 	}
 	if (outcome.State != "succeeded" && outcome.State != "retry" && outcome.State != "deferred") || !jobErrorCode(outcome.ErrorCode) || outcome.RetryAfterSeconds < 0 || outcome.RetryAfterSeconds > 604800 ||
 		(outcome.State == "succeeded" && (outcome.ErrorCode != "" || outcome.ErrorScope != "" || outcome.RetryAfterSeconds != 0)) || (outcome.State != "succeeded" && outcome.ErrorCode == "") ||
-		(outcome.ErrorCode == "source_turn_complete" && (outcome.State != "retry" || outcome.ErrorScope != "" || outcome.RetryAfterSeconds != 0)) {
+		((outcome.ErrorCode == "source_turn_complete" || outcome.ErrorCode == "worker_interrupted") && (outcome.State != "retry" || outcome.ErrorScope != "" || outcome.RetryAfterSeconds != 0)) {
 		return nil, models.ErrSourceRunInvalid
 	}
 	r, err := s.CheckLease(ctx, lease, now)
@@ -287,7 +287,10 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 		}
 	} else {
 		r.Pending = scrape.Union(r.Pending, []models.SourceWindow{*r.Window})
-		if outcome.ErrorCode != "source_turn_complete" {
+		if outcome.State == "expired" || outcome.ErrorCode == "worker_interrupted" {
+			// Restart recovery preserves progress and does not exhaust source retries.
+			delay = max(delay, 30*time.Second)
+		} else if outcome.ErrorCode != "source_turn_complete" {
 			r.Failures++
 			if outcome.State == "deferred" || r.Failures >= 8 {
 				state = "deferred"

@@ -11,6 +11,9 @@ import (
 )
 
 func (rs *ingestRoutes) runCoordinator() *ingest.RunCoordinator {
+	if rs.runs != nil {
+		return rs.runs
+	}
 	return ingest.NewRunCoordinator(rs.service)
 }
 

@@ -292,7 +292,7 @@ func TestSourceRunRestartRecoveryCheckpointsAndTokenRotation(t *testing.T) {
 	require.Nil(t, f.claim(t, r), "recovery preserves retry backoff")
 	recovered := f.find(t, r.UUID)
 	require.Equal(t, "queued", recovered.State)
-	require.Equal(t, 1, recovered.Failures)
+	require.Zero(t, recovered.Failures)
 	f.now = recovered.AvailableAt
 	second := f.claim(t, r)
 	require.EqualValues(t, 2, second.Fence)

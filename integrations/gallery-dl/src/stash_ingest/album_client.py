@@ -98,7 +98,11 @@ def validate_status(value, record):
         for key in ("sequence", "revision"):
             integer(value.get(key), 1, (1 << 63) - 1)
         maximum = integer(value.get("max_attempts"), 1, 100)
-        integer(value.get("attempts"), 0, maximum)
+        attempts = integer(value.get("attempts"), 0, (1 << 63) - 1)
+        # Old saved responses counted every lease against max_attempts.
+        failures = integer(value.get("failures", attempts), 0, min(attempts, maximum))
+        if value["state"] in ("queued", "running") and "failures" in value and failures == maximum:
+            raise InvalidData("Active album job exhausted its failure budget")
         for key in ("publication_committed", "hooks_finished"):
             if type(value.get(key)) is not bool:
                 raise InvalidData("Album progress must be explicit")

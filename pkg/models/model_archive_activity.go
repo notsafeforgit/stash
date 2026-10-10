@@ -33,6 +33,7 @@ type ArchiveJobActivity struct {
 	Revision     int64      `json:"revision"`
 	AttemptCount int64      `json:"attempt_count"`
 	MaxAttempts  int        `json:"max_attempts"`
+	Failures     int        `json:"failures"`
 	AvailableAt  time.Time  `json:"available_at"`
 	LeaseUntil   *time.Time `json:"lease_until"`
 	ErrorCode    string     `json:"error_code"`

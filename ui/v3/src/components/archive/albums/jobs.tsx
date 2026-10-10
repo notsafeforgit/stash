@@ -220,9 +220,13 @@ export function AlbumJobStatus({
             {
               id: "album_review.attempt_count",
               defaultMessage:
-                "{count, number} worker attempts; limit {limit, number}.",
+                "{count, number} worker attempts; {failures, number} failures out of {limit, number} allowed.",
             },
-            { count: job.attempts, limit: job.max_attempts },
+            {
+              count: job.attempts,
+              failures: job.failures,
+              limit: job.max_attempts,
+            },
           )}
         </p>
         <div className="flex flex-wrap gap-2">

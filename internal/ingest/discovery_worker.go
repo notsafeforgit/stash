@@ -101,17 +101,20 @@ func (c *DiscoveryCoordinator) Fail(ctx context.Context, token string, lease mod
 		if len(attempts) != 1 || attempts[0].Fence != lease.Fence || attempts[0].OwnerUUID != lease.OwnerUUID {
 			return models.ErrArchiveJobLease
 		}
-		expected := state
-		if lease.Fence >= int64(current.MaxAttempts) {
-			expected = "failed"
-		}
 		if attempts[0].EndedAt != nil {
-			if attempts[0].ErrorCode != code || attempts[0].Outcome != expected {
+			// Replay the committed outcome even after later attempts have used
+			// more of the job's failure budget.
+			validOutcome := attempts[0].Outcome == state || (state == "retry" && attempts[0].Outcome == "failed")
+			if attempts[0].ErrorCode != code || !validOutcome {
 				return models.ErrDiscoveryConflict
 			}
 			result = &DiscoveryFailureReceipt{ArchiveJobAttempt: attempts[0], ProducerUUID: credential.ProducerUUID}
 			c.guard(ctx, token, current, nil)
 			return nil
+		}
+		expected := state
+		if current.Failures+1 >= current.MaxAttempts {
+			expected = "failed"
 		}
 		before, err := c.Service.Repo.DiscoveryJob.CheckLease(ctx, models.DiscoveryJobLease{ArchiveJobLease: lease, ProducerUUID: credential.ProducerUUID}, c.Now())
 		if err != nil {

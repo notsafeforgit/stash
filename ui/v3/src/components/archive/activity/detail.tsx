@@ -313,9 +313,14 @@ export function ActivityDetail({
                 {job && (
                   <>
                     <dt>
-                      {msg("archive_activity.attempt_limit", "Attempt limit")}
+                      {msg(
+                        "archive_activity.failure_budget",
+                        "Failures / limit",
+                      )}
                     </dt>
-                    <dd>{job.summary.max_attempts}</dd>
+                    <dd>
+                      {job.summary.failures} / {job.summary.max_attempts}
+                    </dd>
                   </>
                 )}
                 {run?.path_prefix && (

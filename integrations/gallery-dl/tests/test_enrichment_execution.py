@@ -59,6 +59,23 @@ class EnrichmentJournalTests(unittest.TestCase):
             "pending_count": len(body["pending"]), "unresolved_count": len(body["unresolved"])}
         return value
 
+    def test_failure_receipt_after_many_restarts_retains_retry(self):
+        with self.journal.execution():
+            self.execution["job"].update(fence=12, failures=1)
+            value = self.journal.prepare(self.execution)
+            value = self.journal.claim(value, self.execution["job"])
+            lease = {**self.execution["job"], "state": "running", "revision": 2, "fence": 13,
+                     "owner_uuid": value.state["claim"]["owner_uuid"]}
+            value = self.journal.claimed(value, lease)
+            value = self.journal.intent(value, lease, "failure", {"error_code": "timeout"})
+            receipt = {"job_uuid": value.job_uuid, "producer_uuid": PRODUCER,
+                       "owner_uuid": lease["owner_uuid"], "fence": 13, "error_code": "timeout",
+                       "outcome": "retry", "ended_at": "2026-10-10T00:00:00Z"}
+            value = self.journal.acknowledged(value, receipt)
+            self.assertEqual(value.phase, "active")
+            self.assertIsNone(value.state["claim"])
+            self.assertEqual(value.state["failure"], receipt)
+
     def test_stable_claim_fenced_local_updates_and_restart_keep_original_request(self):
         with self.journal.execution() as owned:
             self.assertTrue(owned)

@@ -32,6 +32,7 @@ type ArchiveJob struct {
 	Priority              int             `json:"priority"`
 	Fence                 int64           `json:"fence"`
 	MaxAttempts           int             `json:"max_attempts"`
+	Failures              int             `json:"failures"`
 	AvailableAt           time.Time       `json:"available_at"`
 	OwnerUUID             string          `json:"owner_uuid,omitempty"`
 	LeaseUntil            *time.Time      `json:"lease_until,omitempty"`

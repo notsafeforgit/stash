@@ -136,8 +136,6 @@ func TestDiscoveryListingsResumePagesAndLostAcknowledgements(t *testing.T) {
 	_, err = f.append(t, models.DiscoveryJobLease{ArchiveJobLease: expiring.Lease(), ProducerUUID: f.producers[0].UUID}, 2, final)
 	require.ErrorIs(t, err, models.ErrArchiveJobLease)
 	require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error { _, err := f.repo.ArchiveJob.Recover(ctx, f.now, 100); return err }))
-	require.Nil(t, f.claim(t, 1), "expiry retains retry delay")
-	f.now = f.now.Add(5 * time.Minute)
 	second := f.claim(t, 1)
 	require.NotNil(t, second)
 	two := models.DiscoveryJobLease{ArchiveJobLease: second.Lease(), ProducerUUID: f.producers[1].UUID}

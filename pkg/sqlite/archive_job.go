@@ -30,6 +30,7 @@ type archiveJobRow struct {
 	Priority    int            `db:"priority"`
 	Fence       int64          `db:"fence"`
 	MaxAttempts int            `db:"max_attempts"`
+	Failures    int            `db:"failures"`
 	AvailableAt int64          `db:"available_at_ms"`
 	Owner       sql.NullString `db:"owner_uuid"`
 	LeaseUntil  sql.NullInt64  `db:"lease_until_ms"`
@@ -43,7 +44,7 @@ type archiveJobRow struct {
 func (r archiveJobRow) resolve() *models.ArchiveJob {
 	j := &models.ArchiveJob{Sequence: r.Sequence, UUID: r.UUID, Kind: r.Kind, WorkKey: r.WorkKey, ResourceKey: r.ResourceKey,
 		Arguments: json.RawMessage(r.Arguments), State: r.State, Revision: r.Revision, Priority: r.Priority, Fence: r.Fence,
-		MaxAttempts: r.MaxAttempts, AvailableAt: time.UnixMilli(r.AvailableAt).UTC(), OwnerUUID: r.Owner.String,
+		MaxAttempts: r.MaxAttempts, Failures: r.Failures, AvailableAt: time.UnixMilli(r.AvailableAt).UTC(), OwnerUUID: r.Owner.String,
 		Progress: json.RawMessage(r.Progress), Result: json.RawMessage(r.Result), ErrorCode: r.ErrorCode,
 		CreatedAt: time.UnixMilli(r.CreatedAt).UTC(), UpdatedAt: time.UnixMilli(r.UpdatedAt).UTC()}
 	if r.LeaseUntil.Valid {
@@ -375,7 +376,7 @@ func (s *ArchiveJobStore) Claim(ctx context.Context, kind, owner string, now tim
 		return nil, err
 	}
 	job, err := findArchiveJob(ctx, `SELECT j.* FROM archive_jobs j INDEXED BY archive_jobs_ready
-WHERE j.kind=? AND j.state='queued' AND j.available_at_ms<=? AND j.fence<j.max_attempts
+WHERE j.kind=? AND j.state='queued' AND j.available_at_ms<=? AND j.failures<j.max_attempts
  AND NOT EXISTS(SELECT 1 FROM archive_jobs r WHERE r.state='running' AND r.resource_key=j.resource_key)
 ORDER BY j.priority DESC,j.available_at_ms,j.id LIMIT 1`, kind, now.UnixMilli())
 	if err != nil || job == nil {
@@ -404,7 +405,7 @@ func (s *ArchiveJobStore) ClaimByID(ctx context.Context, id string, revision int
 		return nil, models.ErrArchiveJobConflict
 	}
 	job, err := findArchiveJob(ctx, `SELECT j.* FROM archive_jobs j
-WHERE j.uuid=? AND j.state='queued' AND j.available_at_ms<=? AND j.fence<j.max_attempts
+WHERE j.uuid=? AND j.state='queued' AND j.available_at_ms<=? AND j.failures<j.max_attempts
  AND NOT EXISTS(SELECT 1 FROM archive_jobs r WHERE r.state='running' AND r.resource_key=j.resource_key)`, id, now.UnixMilli())
 	if err != nil || job == nil {
 		return job, err
@@ -580,7 +581,7 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 		if metadataJobKind(job.Kind) {
 			available = max(available, enrichmentRetryAt(job, now).UnixMilli())
 		}
-		if job.Fence >= int64(job.MaxAttempts) {
+		if job.Failures+1 >= job.MaxAttempts {
 			state, attempt = "failed", "failed"
 		}
 	}
@@ -594,7 +595,10 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 	if err := finishJobAttempt(ctx, job, now, attempt, string(result), outcome.ErrorCode); err != nil {
 		return nil, err
 	}
-	_, err = dbWrapper.Exec(ctx, `UPDATE archive_jobs SET state=?,available_at_ms=?,result=?,error_code=?,owner_uuid=NULL,lease_until_ms=NULL,revision=revision+1,updated_at_ms=? WHERE uuid=?`, state, available, string(result), outcome.ErrorCode, now.UnixMilli(), job.UUID)
+	if attempt == "retry" || attempt == "failed" {
+		job.Failures++
+	}
+	_, err = dbWrapper.Exec(ctx, `UPDATE archive_jobs SET state=?,available_at_ms=?,result=?,error_code=?,failures=?,owner_uuid=NULL,lease_until_ms=NULL,revision=revision+1,updated_at_ms=? WHERE uuid=?`, state, available, string(result), outcome.ErrorCode, job.Failures, now.UnixMilli(), job.UUID)
 	if err != nil {
 		return nil, err
 	}
@@ -661,14 +665,9 @@ func recoverArchiveJob(ctx context.Context, job *models.ArchiveJob, now time.Tim
 	if err := finishJobAttempt(ctx, job, now, "expired", "{}", "lease_expired"); err != nil {
 		return err
 	}
-	state := "queued"
-	if job.Fence >= int64(job.MaxAttempts) {
-		state = "failed"
-	}
-	available := now.UnixMilli()
-	if metadataJobKind(job.Kind) {
-		available = max(job.AvailableAt.UnixMilli(), enrichmentRetryAt(job, now).UnixMilli())
-	}
-	_, err := dbWrapper.Exec(ctx, `UPDATE archive_jobs SET state=?,available_at_ms=?,owner_uuid=NULL,lease_until_ms=NULL,error_code='lease_expired',revision=revision+1,updated_at_ms=? WHERE uuid=?`, state, available, now.UnixMilli(), job.UUID)
+	// Keep the checkpoint. Lease expiry already waits for the old owner;
+	// recovery does not consume a failure or add another delay.
+	available := max(job.AvailableAt.UnixMilli(), now.UnixMilli())
+	_, err := dbWrapper.Exec(ctx, `UPDATE archive_jobs SET state='queued',available_at_ms=?,owner_uuid=NULL,lease_until_ms=NULL,error_code='lease_expired',revision=revision+1,updated_at_ms=? WHERE uuid=?`, available, now.UnixMilli(), job.UUID)
 	return err
 }

@@ -112,6 +112,7 @@ func TestArchiveJobsCoalesceBoundedWorkAndRetainSubmissionReceipts(t *testing.T)
 func TestArchiveJobsRestartRecoveryFencesOldWorkersAndBoundsRetries(t *testing.T) {
 	f := newDurableJobFixture(t)
 	input := jobSubmission("work", "destination")
+	input.MaxAttempts = 2
 	f.submit(t, input)
 	first := f.claim(t, uuid.NewString())
 	require.NotNil(t, first)
@@ -175,7 +176,7 @@ func TestArchiveJobsRestartRecoveryFencesOldWorkersAndBoundsRetries(t *testing.T
 	}))
 }
 
-func TestArchiveJobsRecoveryIsBoundedAndExhaustedLeasesFail(t *testing.T) {
+func TestArchiveJobsRecoveryIsBoundedAndInterruptedJobsRemainQueued(t *testing.T) {
 	f := newDurableJobFixture(t)
 	for _, key := range []string{"first", "second", "third"} {
 		input := jobSubmission(key, key)
@@ -191,12 +192,12 @@ func TestArchiveJobsRecoveryIsBoundedAndExhaustedLeasesFail(t *testing.T) {
 		running, err := f.repo.ArchiveJob.List(ctx, models.ArchiveJobVerifyMedia, "running", 0, 10)
 		require.NoError(t, err)
 		require.Len(t, running, 1)
-		failed, err := f.repo.ArchiveJob.List(ctx, models.ArchiveJobVerifyMedia, "failed", 0, 10)
+		queued, err := f.repo.ArchiveJob.List(ctx, models.ArchiveJobVerifyMedia, "queued", 0, 10)
 		require.NoError(t, err)
-		require.Len(t, failed, 2)
+		require.Len(t, queued, 2)
 		return nil
 	}))
-	require.Nil(t, f.claim(t, uuid.NewString()), "claim recovers the remaining expired lease without exceeding its attempt limit")
+	require.NotNil(t, f.claim(t, uuid.NewString()), "claim recovers the remaining expired lease without consuming a failure")
 	count, err = f.service.Recover(t.Context(), 2)
 	require.NoError(t, err)
 	require.Zero(t, count)
@@ -596,7 +597,7 @@ func TestArchiveJobsValidationIndexesAndAnonymisation(t *testing.T) {
 		"SELECT * FROM archive_jobs WHERE kind='media.verify' AND state='queued' AND id>0 ORDER BY id LIMIT 10":       "archive_jobs_list",
 		"SELECT * FROM archive_jobs WHERE state='running' AND lease_until_ms<=10 ORDER BY lease_until_ms,id LIMIT 10": "archive_jobs_expired",
 		"SELECT * FROM archive_jobs WHERE state='running' AND resource_key='fixture'":                                 "archive_jobs_running_resource",
-		`SELECT j.* FROM archive_jobs j WHERE j.uuid='fixture' AND j.state='queued' AND j.available_at_ms<=10 AND j.fence<j.max_attempts
+		`SELECT j.* FROM archive_jobs j WHERE j.uuid='fixture' AND j.state='queued' AND j.available_at_ms<=10 AND j.failures<j.max_attempts
  AND NOT EXISTS(SELECT 1 FROM archive_jobs r WHERE r.state='running' AND r.resource_key=j.resource_key)`: "SEARCH j USING INDEX sqlite_autoindex_archive_jobs_",
 	} {
 		rows, err := raw.Query("EXPLAIN QUERY PLAN " + query)

@@ -2686,7 +2686,7 @@ Native publication receipts continue to prove individual job completion.
 The application runs trusted enrichment maintenance every 30 seconds while its
 HTTP server is active. It uses the partial active-job index, bounded to the 64
 permitted active enrichment jobs. It cancels work whose source/target changed
-and recovers expired ownership with native retry delay/attempt limits. It leaves
+and recovers expired ownership with native source pacing/failure limits. It leaves
 checkpoints, publication receipts and source evidence intact, never performs
 website requests, and stops with the server before database shutdown. Producer
 discovery itself is read-only and does not recover jobs or confer a lease.
@@ -3175,3 +3175,22 @@ establish depicted performers. Audio and other unsupported files retain an
 excluded outcome without a download. Missing dates and the extractor's year-one
 placeholder are not promoted to publication dates. Historical payloads without
 the new marker keep their original capture partitioning.
+
+### Stash restart recovery
+
+Stash can restart during a scrape. The worker keeps downloaded files and its
+local SQLite outbox, stops starting source work if its lease becomes unavailable,
+and resumes the same native run after service recovery. Listing replay may be
+necessary to find the saved cursor; download archives skip completed files.
+Saved metadata/checkpoint bodies are replayed with their original receipts.
+
+Native schema 1000107 counts actual job failures separately from lease ownership
+generations. Repeated Stash/worker restarts therefore do not exhaust the eight
+failure allowance. Expired metadata jobs are eligible once their old lease and
+existing source pacing permit; source runs retain their configured cooldown
+with a 30-second minimum recovery delay. Transport polling also retains its
+normal backoff. Genuine source errors still consume the failure budget.
+
+An ordinary Stash restart needs no worker drain or n8n shutdown. A producer code
+upgrade can change its policy fingerprint and requires the normal reviewed
+policy handoff while retaining all queued data.

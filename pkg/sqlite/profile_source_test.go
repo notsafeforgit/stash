@@ -16,6 +16,7 @@ import (
 
 func removeProfileSourceSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeInterruptedWorkSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER source_collection_alias_frozen;
 DROP TABLE source_collection_aliases;
 DROP TABLE source_run_retrievals;

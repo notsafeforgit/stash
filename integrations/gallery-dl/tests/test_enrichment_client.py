@@ -34,6 +34,19 @@ class EnrichmentClientTests(unittest.TestCase):
             "sha256": hashlib.sha256(checkpoint_bytes(self.body)).hexdigest(),
             "record_count": 3, "pending_count": 1, "unresolved_count": 1}
 
+    def test_repeated_restarts_keep_jobs_and_failure_receipts_readable(self):
+        self.job.update(fence=12, failures=1)
+        self.client._job(self.job)
+        for failures in (-1, 8, True, 13):
+            with self.assertRaises(Unavailable):
+                self.client._job(dict(self.job, failures=failures))
+        self.lease["fence"] = 13
+        receipt = {"job_uuid": self.job["uuid"], "producer_uuid": self.transport.producer,
+                   **self.lease, "error_code": "timeout", "outcome": "retry",
+                   "ended_at": "2026-10-10T00:00:00Z"}
+        self.transport._request.return_value = receipt
+        self.assertEqual(self.client.fail(self.job["uuid"], self.lease, "timeout"), receipt)
+
     def test_capability_and_response_byte_limits(self):
         good = {"enrichment_protocol": 2, "max_enrichment_checkpoint_bytes": MAX_BYTES,
                 "enrichment_source_pacing_protocol": 1}

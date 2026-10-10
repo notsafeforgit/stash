@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -26,7 +27,7 @@ import (
 )
 
 func TestPythonDownloadWorkerRecoversFinishAndDeliversFiles(t *testing.T) {
-	for _, adapter := range []string{"caller-cli", "host-launcher", "n8n-backfill", "ytdl", "ytdl-traversal", "tumblr", "jpgfish", "leakgallery"} {
+	for _, adapter := range []string{"caller-cli", "restart", "host-launcher", "n8n-backfill", "ytdl", "ytdl-traversal", "tumblr", "jpgfish", "leakgallery"} {
 		t.Run(adapter, func(t *testing.T) { runPythonDownloadWorker(t, adapter) })
 	}
 }
@@ -86,12 +87,37 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 	}))
 	_, token, err := service.IssueCredential(t.Context(), producer.UUID, nil, nil, root.UUID)
 	require.NoError(t, err)
-	router := (&ingestRoutes{service: service, fileIngestion: true}).router()
+	coordinator := ingest.NewRunCoordinator(service)
+	var offset time.Duration
+	coordinator.Now = func() time.Time { return time.Now().UTC().Add(offset) }
+	router := (&ingestRoutes{service: service, fileIngestion: true, runs: coordinator}).router()
+	var serverMu sync.Mutex
+	outage, interrupted := false, false
 	var finishes, finishStatus atomic.Int32
 	var reportResponses atomic.Int32
 	var backfillFinishes atomic.Int32
 	var firstProof atomic.Value
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverMu.Lock()
+		defer serverMu.Unlock()
+		if adapter == "restart" && r.URL.Path == "/test/restart" {
+			require.True(t, outage)
+			require.NoError(t, db.Open(db.DatabasePath()))
+			outage = false
+			offset += 4 * time.Minute
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if adapter == "restart" && r.URL.Path == "/test/advance" {
+			offset += time.Minute
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.Header().Set("Date", coordinator.Now().Format(http.TimeFormat))
+		if outage {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
 		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/batches") {
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
@@ -131,6 +157,13 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 				return
 			}
 			r.Body = io.NopCloser(bytes.NewReader(body))
+			if adapter == "restart" && !interrupted && bytes.Contains(body, []byte(`"progress"`)) {
+				// Commit the first file's cursor, then take the database offline.
+				router.ServeHTTP(w, r)
+				require.NoError(t, db.Close())
+				outage, interrupted = true, true
+				return
+			}
 			if bytes.Contains(body, []byte(`"outcome"`)) && finishes.Add(1) == 1 {
 				committed := httptest.NewRecorder()
 				router.ServeHTTP(committed, r)
@@ -186,6 +219,11 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 		require.NoError(t, err)
 		require.Equal(t, "succeeded", run.State)
 		require.EqualValues(t, 1, run.Progress.FilesCompleted)
+		if adapter == "restart" {
+			require.EqualValues(t, 2, run.Fence)
+			require.Zero(t, run.Failures)
+			require.True(t, interrupted)
+		}
 		capture, err := service.Repo.Ingest.FindReceipt(ctx, producer.UUID, result.Capture)
 		require.NoError(t, err)
 		require.NotNil(t, capture)
@@ -207,7 +245,11 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 		attachmentID = attachment.UUID
 		history, err := service.Repo.SourceAttachment.DownloadHistory(ctx, attachment.UUID, 0, 10, time.Now())
 		require.NoError(t, err)
-		require.Len(t, history, 2)
+		if adapter == "restart" {
+			require.GreaterOrEqual(t, len(history), 2)
+		} else {
+			require.Len(t, history, 2)
+		}
 		for _, report := range history {
 			require.Equal(t, "downloaded", report.TransferState)
 			require.Equal(t, "queued", report.VerificationState)
@@ -237,8 +279,11 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 	require.NoError(t, err)
 	require.Equal(t, "queued", status.State)
 	require.FileExists(t, filepath.Join(mediaPath, result.Path))
-	verifyAttachmentDownloadTransferHTTP(t, service.Repo, attachmentID, result.Started, result.Downloaded, result.File)
 	require.Positive(t, reportResponses.Load(), "a committed report response was deliberately lost")
+	if adapter == "restart" {
+		return // Replay adds observations; the other adapters cover the two-report view and restore.
+	}
+	verifyAttachmentDownloadTransferHTTP(t, service.Repo, attachmentID, result.Started, result.Downloaded, result.File)
 	require.NoError(t, db.Close())
 	archivePath := filepath.Join(filepath.Dir(packagePath), "archive", "src")
 	command = exec.CommandContext(ctx, python, "-c", pythonDownloadReceiptRestore, db.DatabasePath(), filepath.Join(directory, "producer.sqlite"), t.TempDir(), server.URL)

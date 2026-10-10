@@ -299,7 +299,7 @@ func TestTranslationJobsForgottenPostsAvoidProviderAndRetainReview(t *testing.T)
 	require.NoError(t, db.Open(db.DatabasePath()))
 }
 
-func TestTranslationJobsExhaustedLeasesRequireExplicitRetry(t *testing.T) {
+func TestTranslationJobsExpiredLeasesResumeWithoutExplicitRetry(t *testing.T) {
 	_, repo := archiveTestDatabase(t)
 	s, clock := translationService(t, repo)
 	request := retainTranslationRequest(t, repo, "Expired work")
@@ -323,20 +323,14 @@ func TestTranslationJobsExhaustedLeasesRequireExplicitRetry(t *testing.T) {
 	count, err := s.Durable.Recover(t.Context(), 10)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
-	require.Equal(t, "failed", translationStatus(t, s, current.UUID).State)
-	admitted, err := s.Admit(t.Context())
+	require.Equal(t, "queued", translationStatus(t, s, current.UUID).State)
+	resumed, err := s.Durable.Claim(t.Context(), models.ArchiveJobTranslateText, uuid.NewString(), 5*time.Second)
 	require.NoError(t, err)
-	require.Nil(t, admitted)
-	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
-		retried, err := repo.TranslationWork.RetryTarget(ctx, target.UUID, target.Revision, s.Durable.Now())
-		require.NoError(t, err)
-		require.Equal(t, target.NotBefore, retried.NotBefore)
-		require.Equal(t, target.Revision+1, retried.Revision)
-		return nil
-	}))
-	admitted, err = s.Admit(t.Context())
-	require.NoError(t, err)
-	require.NotEqual(t, current.UUID, admitted.UUID)
+	require.NotNil(t, resumed)
+	require.Equal(t, current.UUID, resumed.UUID)
+	require.EqualValues(t, 2, resumed.Fence)
+	require.Zero(t, resumed.Failures)
+	require.Equal(t, target.Revision, translationTarget(t, repo, target.UUID).Revision)
 }
 
 func TestTranslationJobsAdmissionRollsBackMissingOrInvalidBindings(t *testing.T) {

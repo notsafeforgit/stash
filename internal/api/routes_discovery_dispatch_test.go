@@ -128,7 +128,8 @@ func TestDiscoveryMaintenanceRuntimeRecoversWithoutProducer(t *testing.T) {
 	require.NoError(t, f.repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		current, err := f.repo.ArchiveJob.Find(ctx, job.UUID)
 		require.NoError(t, err)
-		require.Equal(t, f.now.Add(5*time.Minute), current.AvailableAt)
+		require.Equal(t, f.now, current.AvailableAt)
+		require.Zero(t, current.Failures)
 		attempts, err := f.repo.ArchiveJob.Attempts(ctx, job.UUID, 0, 10)
 		require.NoError(t, err)
 		require.Len(t, attempts, 1)

@@ -22,6 +22,7 @@ const ingestPath = "/api/v3/ingest"
 type ingestRoutes struct {
 	service       *ingest.Service
 	fileIngestion bool
+	runs          *ingest.RunCoordinator
 	enrichment    *ingest.EnrichmentCoordinator
 	discovery     *ingest.DiscoveryCoordinator
 	detail        *ingest.DiscoveryDetailCoordinator

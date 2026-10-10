@@ -48,7 +48,13 @@ func albumJobRows(t *testing.T, db *sql.DB, table string) [][]any {
 		require.NotEmpty(t, columns)
 		order = strings.Join(columns, ",")
 	}
-	rows, err := tx.Query("SELECT * FROM " + table + " ORDER BY " + order)
+	projection := "*"
+	if table == "archive_jobs" {
+		// Compare the retained pre-107 columns. The interruption migration
+		// separately verifies the newly derived failure counter.
+		projection = "id,uuid,kind,work_key,resource_key,arguments,state,revision,priority,fence,max_attempts,available_at_ms,owner_uuid,lease_until_ms,progress,result,error_code,created_at_ms,updated_at_ms"
+	}
+	rows, err := tx.Query("SELECT " + projection + " FROM " + table + " ORDER BY " + order)
 	require.NoError(t, err)
 	defer rows.Close()
 	columns, err := rows.Columns()

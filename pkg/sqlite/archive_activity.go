@@ -35,6 +35,7 @@ type jobActivityRow struct {
 	Revision     int64         `db:"revision"`
 	AttemptCount int64         `db:"fence"`
 	MaxAttempts  int           `db:"max_attempts"`
+	Failures     int           `db:"failures"`
 	AvailableAt  int64         `db:"available_at_ms"`
 	LeaseUntil   sql.NullInt64 `db:"lease_until_ms"`
 	ErrorCode    string        `db:"error_code"`
@@ -44,12 +45,12 @@ type jobActivityRow struct {
 
 func (row jobActivityRow) resolve() models.ArchiveJobActivity {
 	return models.ArchiveJobActivity{Sequence: row.Sequence, UUID: row.UUID, Kind: row.Kind, State: row.State,
-		Revision: row.Revision, AttemptCount: row.AttemptCount, MaxAttempts: row.MaxAttempts,
+		Revision: row.Revision, AttemptCount: row.AttemptCount, MaxAttempts: row.MaxAttempts, Failures: row.Failures,
 		AvailableAt: time.UnixMilli(row.AvailableAt).UTC(), LeaseUntil: activityTime(row.LeaseUntil), ErrorCode: row.ErrorCode,
 		CreatedAt: time.UnixMilli(row.CreatedAt).UTC(), UpdatedAt: time.UnixMilli(row.UpdatedAt).UTC()}
 }
 
-const jobActivitySelect = `SELECT id,uuid,kind,state,revision,fence,max_attempts,available_at_ms,lease_until_ms,error_code,created_at_ms,updated_at_ms FROM archive_jobs`
+const jobActivitySelect = `SELECT id,uuid,kind,state,revision,fence,max_attempts,failures,available_at_ms,lease_until_ms,error_code,created_at_ms,updated_at_ms FROM archive_jobs`
 
 // Fixed SQL fragments are chosen by validated filters. Each combination can
 // traverse its index in sequence order without sorting or reading worker bodies.

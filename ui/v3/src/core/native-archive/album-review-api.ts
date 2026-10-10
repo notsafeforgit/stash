@@ -222,6 +222,7 @@ export const albumJobSchema = z
     revision,
     attempts: count,
     max_attempts: revision,
+    failures: count,
     available_at: timestamp,
     publication_committed: z.boolean(),
     publication: albumPublicationSchema.optional(),

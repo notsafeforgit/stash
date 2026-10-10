@@ -228,12 +228,12 @@ cancellation, bounded recovery, and atomic publication. Supported kinds are
 the file worker when FFmpeg/FFprobe are configured, plus an independent
 metadata-only album worker. Both start after plugin routing is initialized and
 are cancelled and joined during shutdown before the manager closes SQLite. Transient loop
-failures are retried; jobs retain their own bounded attempts and retry delay.
+failures are retried; jobs retain their own bounded failure budgets and retry delay.
 
 Each server-created submission has a stable request UUID. Replaying it returns
 the original job even after completion. Distinct submissions with the same kind
 and work key share queued/running work, provided their arguments, resource key,
-and attempt limit agree. A new submission after completion can create a new job.
+and failure limit agree. A new submission after completion can create a new job.
 These internal submission digests use canonical arguments; the public capture
 protocol retains its separate exact-request-byte digest contract.
 
@@ -245,14 +245,16 @@ key. Shared filesystem locks remain necessary for external downloaders.
 
 Claims increment a persistent fence and record an owner and deadline. Renewal,
 progress, and publication require that exact unexpired lease. Recovery examines
-at most 100 expired attempts per transaction and either requeues them or marks
-them failed at their attempt limit. Retry times survive repeat submissions;
+at most 100 expired attempts per transaction and requeues them with their saved
+progress. Schema 1000107 separates the monotonically increasing `fence` from
+`failures`: only committed `retry` or `failed` outcomes consume `max_attempts`.
+Expired leases never exhaust that budget. Existing terminal jobs stay terminal. Retry times survive repeat submissions;
 duplicates cannot bypass backoff. The default service capacity is 10,000 active
 jobs, checked before new work is created; coalescing and receipt lookup still
 work at capacity. Queue/history reads use bounded indexed pagination.
 
 `ArchiveJob.ClaimByID` claims one explicitly selected job revision using indexed
-lookups. It preserves readiness, attempt limits and shared-resource exclusion;
+lookups. It preserves readiness, failure limits and shared-resource exclusion;
 it cannot fall through to unrelated work or recover other expired jobs. Trusted
 queue maintenance performs recovery separately. A changed or missing selection
 returns a conflict; an unchanged but unavailable selection returns no claim.
@@ -329,7 +331,7 @@ can complete as no-ops. Only created or changed galleries notify plugins.
 Every status includes the original preview `signature`, allowing a resumed
 client to verify its post, policy and reviewed plan together.
 
-Automatic retry uses at most ten attempts with a 30-second delay and renewed
+Automatic retry allows at most ten failures with a 30-second delay and renewed
 worker leases. Notification delivery is at least once; plugins can deduplicate
 the stable `hookContext.eventId`. Explicit retry retains terminal history in the
 old job and creates a new submission. If publication already committed, it resumes
@@ -647,8 +649,9 @@ and executable under their frozen identity/proof contract. See
 [reviewed execution](native-schema.md#executing-a-reviewed-checkpoint-handoff).
 
 Retryable failure codes are `rate_limited`, `extraction_failed`, `timeout`,
-`worker_failed` and `source_busy`. Server backoff starts at five minutes and increases by attempt;
-the eighth attempt becomes terminal. Authentication, access, challenge,
+`worker_failed` and `source_busy`. Server backoff starts at five minutes and increases by actual failure;
+the eighth failure becomes terminal. Lease expiry preserves checkpoints and
+requeues the job without consuming that budget or adding a failure backoff. Authentication, access, challenge,
 not-found, unsupported-extractor, malformed-checkpoint, size, runtime and
 post-identity failures require review. Clients cannot report success through
 the failure route or supply their own retry deadline. Failed attempts retain
@@ -710,7 +713,7 @@ work nor changes leases or scheduling state.
 
 The native server runs enrichment maintenance every 30 seconds independently of
 media and translation workers. It cancels stale source/target work, recovers
-expired attempts with backoff and preserves checkpoint/receipt evidence. Claims
+expired attempts without consuming failures and preserves checkpoint/receipt evidence. Claims
 and source reservations also recover conflicting expired work; discovery remains
 read-only. Stash never contacts websites for these operations. Legacy queue import
 and host/n8n activation remain required before switching production schedules.
@@ -1376,8 +1379,11 @@ or retry delay and certifies traversal of the claimed window under that policy.
 It does not certify that every queued file event has finished ingestion.
 Remaining windows keep the run queued; otherwise it succeeds. A failure restores
 the claimed window, retains its checkpoint, and uses exponential retry delay
-starting at five minutes. Eight consecutive failed/expired attempts cause a
-durable deferral. Timers and manual submissions cannot clear it or shorten an
+starting at five minutes. Eight consecutive failures cause a durable deferral.
+Expired leases and `worker_interrupted` restore the pending window and saved
+progress without incrementing failures; recovery waits at least 30 seconds and
+respects any configured target cooldown. Repeated Stash restarts cannot exhaust
+the scrape's failure budget. Timers and manual submissions cannot clear it or shorten an
 existing delay. Target cooldown also survives changes of scan policy.
 
 Lease renewal, progress and completion require producer UUID, worker UUID,

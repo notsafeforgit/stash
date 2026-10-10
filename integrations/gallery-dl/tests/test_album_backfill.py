@@ -247,7 +247,8 @@ class AlbumBackfillTests(unittest.TestCase):
             inspect_plan(client, plan, apply=True)
             client.finish(record["operation"]["request_uuid"])
             good = client.status(record)
-            for change in ({"post_uuid": str(uuid.uuid4())}, {"policy": POLICIES[1]}, {"signature": "b" * 64},
+            validate_status({**good, "attempts": 12, "failures": 1}, record)
+            for change in ({"failures": -1}, {"attempts": 12, "failures": 11}, {"post_uuid": str(uuid.uuid4())}, {"policy": POLICIES[1]}, {"signature": "b" * 64},
                            {"state": "queued"}, {"hooks_finished": False}, {"publication_committed": False},
                            {"attempts": True}, {"revision": 0}, {"resume_from_job_uuid": str(uuid.uuid4())},
                            {"available_at": "tomorrow"}, {"error_code": "private secret\n"},

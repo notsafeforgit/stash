@@ -3,6 +3,7 @@
 from datetime import datetime
 import hashlib
 
+from .job_recovery import valid_job_retries
 from .client import Unavailable
 from .worker_policy import execution_policy
 from .discovery_fetch import ERRORS, MAX_RECORDS, page_cursor, profile_platform, validate_page
@@ -194,8 +195,7 @@ class DiscoveryClient:
                 or not _integer(work.get("version"), 1, 1)
                 or not _integer(work.get("generation"), 1) or not _integer(work.get("page_ordinal"), 1, 10000)
                 or not sha256(work.get("definition_sha256"))
-                or not _integer(value.get("revision"), 1) or not _integer(value.get("fence"), 0, 8)
-                or not _integer(value.get("max_attempts"), 8, 8)
+                or not _integer(value.get("revision"), 1) or not valid_job_retries(value)
                 or value.get("state") not in ("queued", "running", "succeeded", "failed", "cancelled")):
             raise Unavailable("invalid_response")
         try:
@@ -211,8 +211,6 @@ class DiscoveryClient:
                     raise InvalidData("A running job requires an attempt")
             elif value.get("owner_uuid") is not None or value.get("lease_until") is not None:
                 raise InvalidData("A terminal or queued job cannot hold ownership")
-            if value["state"] == "queued" and value["fence"] == 8:
-                raise InvalidData("Exhausted discovery work cannot be queued")
         except InvalidData:
             raise Unavailable("invalid_response") from None
         return work
@@ -238,7 +236,7 @@ class DiscoveryClient:
         if (not isinstance(value, dict) or value.get("job_uuid") != job["uuid"]
                 or value.get("listing_uuid") != work["listing_uuid"]
                 or not _integer(value.get("ordinal"), 1, 10000) or value["ordinal"] != work["page_ordinal"]
-                or not _integer(value.get("fence"), 1, 8) or not sha256(value.get("sha256"))
+                or not _integer(value.get("fence"), 1) or not sha256(value.get("sha256"))
                 or not _integer(value.get("record_count"), 0, MAX_RECORDS) or type(value.get("complete")) is not bool):
             raise Unavailable("invalid_response")
         try:
@@ -297,7 +295,7 @@ class DiscoveryClient:
 
     @staticmethod
     def lease(value):
-        if not isinstance(value, dict) or not _integer(value.get("fence"), 1, 8):
+        if not isinstance(value, dict) or not _integer(value.get("fence"), 1):
             raise InvalidData("Invalid discovery attempt fence")
         return {"owner_uuid": identifier(value.get("owner_uuid")), "fence": value["fence"]}
 
@@ -336,7 +334,7 @@ class DiscoveryClient:
         profile_platform(url)
         value = self.client._request("POST", self.path(job["uuid"], "/source"), encode({**self.lease(job), "url": url}))
         if (not isinstance(value, dict) or set(value) != {"job_uuid", "fence", "ready"}
-                or value["job_uuid"] != job["uuid"] or not _integer(value["fence"], 1, 8)
+                or value["job_uuid"] != job["uuid"] or not _integer(value["fence"], 1)
                 or value["fence"] != job["fence"] or type(value["ready"]) is not bool):
             raise Unavailable("invalid_response")
         return value["ready"]
@@ -366,11 +364,11 @@ class DiscoveryClient:
 
     @staticmethod
     def _failure(value, job, owned, producer, code):
-        outcome = "retry" if code in RETRYABLE and owned["fence"] < 8 else "failed"
+        outcomes = {"retry", "failed"} if code in RETRYABLE else {"failed"}
         if (not isinstance(value, dict) or value.get("job_uuid") != job
                 or value.get("producer_uuid") != producer or value.get("owner_uuid") != owned["owner_uuid"]
-                or not _integer(value.get("fence"), 1, 8) or value["fence"] != owned["fence"]
-                or value.get("error_code") != code or value.get("outcome") != outcome):
+                or not _integer(value.get("fence"), 1) or value["fence"] != owned["fence"]
+                or value.get("error_code") != code or value.get("outcome") not in outcomes):
             raise Unavailable("invalid_response")
         try:
             _time(value.get("started_at"), milliseconds=True)

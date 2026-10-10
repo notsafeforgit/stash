@@ -100,7 +100,7 @@ func TestEnrichmentMaintenanceRecoveryRetainsEvidenceAndBackoff(t *testing.T) {
 	recovered, err := f.worker.Find(t.Context(), f.tokens[0], job.UUID)
 	require.NoError(t, err)
 	require.Equal(t, "queued", recovered.State)
-	require.Equal(t, f.now.Add(5*time.Minute), recovered.AvailableAt)
+	require.Equal(t, f.now, recovered.AvailableAt)
 	retained, err := f.worker.CheckpointHead(t.Context(), f.tokens[0], job.UUID)
 	require.NoError(t, err)
 	require.Equal(t, *head, retained.EnrichmentCheckpointReceipt)

@@ -2,9 +2,10 @@
 
 Status: implementation in progress on `v3-rewrite`, following the plan requested
 on 2026-09-30. The [progress record](native-archive-progress.md) distinguishes
-validated checkpoints from outstanding work. Production remains on the frozen
-compatible release until the release and data migration described here are
-complete.
+validated checkpoints from outstanding work. The native application is now
+live, source queues have resumed, and independent cloud restore verification
+passed. Final acceptance remains pending; the original
+compatible release and recovery copies remain preserved.
 
 The target is one independently maintained Stash application that owns media,
 performers, source accounts, posts, provenance, import rules, and metadata edits.
@@ -15,8 +16,8 @@ record and preservation of existing UUIDs, links, merges, and manual choices.
 
 This is the full transition plan. It supersedes the narrower planning scope of
 [Retiring v2.5 compatibility](v3-schema-promotion.md), whose migration invariants
-remain useful. [FORK.md](../FORK.md) describes the currently implemented bridge;
-the first implementation phase updates that policy for independent development.
+remain useful. [FORK.md](../FORK.md) defines the independent development and
+release policy implemented during this transition.
 
 ## Decisions and boundaries
 
@@ -52,14 +53,15 @@ the first implementation phase updates that policy for independent development.
 - Preserve standalone access through a documented export format and offline
   inspection/import tools. A second browser application is outside this change.
 
-## Current implementation inventory
+## Pre-transition inventory (2026-09-30)
 
-The following inventory comes from the checked-out Stash, scrape-catalog, and
-Catalog Metadata code and the local configuration inspected for this plan.
-Exact row counts, database sizes, running jobs, workflow versions, and image
-digests must be captured again for rehearsal and production cutover.
+The following historical inventory comes from the Stash, scrape-catalog, and
+Catalog Metadata code and local configuration inspected when writing this plan.
+It describes the starting point, not the current deployment. The
+[cutover record](native-production-cutover-verification.json) records the actual
+migration boundary, outcomes and running artifact identities.
 
-| Surface | Current implementation | Transition responsibility |
+| Surface | Pre-transition implementation | Transition responsibility |
 | --- | --- | --- |
 | Application | Go backend, shared GraphQL schema, SQLite, v3 UI plus embedded v2.5 | Own schema/API lifecycle and build only v3 |
 | Schema bridge | Primary schema 86 and separate fork migrations through 9 in this checkout | Promote all durable fork data and establish independent lineage |

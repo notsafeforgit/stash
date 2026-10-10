@@ -7,7 +7,7 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running. Independent
 restore verification passed; scheduled-work observation remains in progress.
 
-## Translation request length — implemented, publication pending, 2026-10-10
+## Translation request length — deployed, 2026-10-10
 
 The final worker check found 64 translation jobs repeatedly returning
 `translation_provider_response`. Every retained input exceeds 1,000 UTF-16 units.
@@ -24,6 +24,45 @@ arguments, exact Unicode boundaries and oversized-input rejection before any
 subprocess. The installed queue's retry deadlines remain unchanged. A successful
 generic probe does not establish completion of those private jobs.
 Evidence is under `.local/native-transition-acceptance-20261010/`.
+
+The complete [source validation and publication](https://github.com/notsafeforgit/stash/actions/runs/38069101302)
+and [wrapper publication](https://github.com/notsafeforgit/stash-s6/actions/runs/38070319195)
+passed. Source `b0e481c8694d6d4fbedaeb133d3fab4b72cdf1c2` is running from
+wrapper digest `sha256:18fdc686082f2b6a5987b6657a1ab98ef7d5dbbe606633f331e4c7995d2551df`.
+The 17:10:23 UTC restart was healthy in 1.053 seconds on unchanged schema
+1000110. n8n was not restarted, no worker timers were paused, and all fourteen
+timers remain active. All 32 profile files are unchanged. Gallery #3664 retains
+converted MKV scene #373593, and its cover returns HTTP 200. Future backups select
+the matching registry-extracted validator. Deployment evidence is under
+`.local/translation-length-20261010/`.
+
+## Completion evidence review — 2026-10-10
+
+The [cutover record](native-production-cutover-verification.json) now reconciles
+the current release, completed cloud restore, daily publication/cleanup and
+queue rollout instead of reporting those finished steps as pending. The final
+review reuses the preserved typed-row comparisons and domain outcomes; it did
+not repeat the multi-million-row reconciliation or reconstruct artwork again.
+
+Read-only runtime checks found no external catalog package in either producer
+environment, no old catalog database mounts, and no retired catalog commands in
+the 21 active n8n workflow versions. Retired services remain masked. The sampled
+same-user process descriptors had no old catalog databases open. Operational
+download-lock mounts remain intentional. The criterion-by-criterion review
+records the earlier tests' scopes and retains unresolved ownership choices.
+
+Eight successful incremental Reddit attempts in a bounded recent sample
+overlapped initial work. The earlier stalled initial run completed with 684
+items and 509 files processed, and the run interrupted by the prior restart
+subsequently completed with 671 items and 491 files processed. This does not
+claim that every historical pass or queued profile has finished.
+
+The supplementary home backup is still in its original invocation's general
+home-sync stage; native snapshot upload follows it. Ordinary scrape and
+translation retry queues remain operational follow-ups, not a requirement to
+empty the library's queues before acceptance. Owner review is still required
+before merging `v3-rewrite` into `develop`. The frozen compatible release and
+recovery copies remain retained.
 
 ## Routine startup and full data audits — deployed, 2026-10-10
 
@@ -66,8 +105,8 @@ restarting its controller or starting another cloud download. It verified the
 declared file contents, 21 SQLite components, native library domain/history
 checks and ingestion receipt boundaries for both registered producers. The
 restored library is 22,244,438,016 bytes at its captured schema 1000099, with no
-pending file deletions. This is the original pre-cutover boundary, not a claim
-that today's still-running scheduled backup has finished. It does not retrieve
+pending file deletions. This verifies the original pre-cutover boundary; the
+later scheduled publication is recorded separately below. It does not retrieve
 Deep Archive media.
 
 The result is retained in

@@ -6,7 +6,9 @@ defines the full migration scope and acceptance criteria.
 [Implementation progress](docs/native-archive-progress.md) records completed
 work, verification, and deployment status. The native application is running in
 production. The original compatible database and recovery artifacts remain
-retained while the worker rollout and independent restore finish.
+retained for final acceptance. Worker rollout and the independent cloud restore
+are verified; the progress record tracks the supplementary home backup and
+remaining observations before the owner's merge review.
 
 ## Branch and release policy
 

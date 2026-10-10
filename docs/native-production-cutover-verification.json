@@ -1,11 +1,11 @@
 {
-  "status": "native_live_final_observation_and_restore_pending",
+  "status": "native_live_home_backup_and_owner_acceptance_pending",
   "boundary_uuid": "8c462d7a-ee41-4508-a4c8-b4ab55c7ca13",
   "native_schema": 1000110,
   "public_native_activated": true,
   "legacy_writers_paused": true,
   "original_database_unchanged": true,
-  "source_revision": "8d2e8cc15b0a15b05b5c49e9ca006a6c5f9da222",
+  "source_revision": "b0e481c8694d6d4fbedaeb133d3fab4b72cdf1c2",
   "producer_backup_revision": "d863a41af893bcdc341bc3021cca02eff8ebeebd",
   "library_reconciliation": {
     "status": "passed",
@@ -877,15 +877,11 @@
     "manifest_sha256": "091b55067fe1f2932450f2f8ac9274301242ffec1961c74850d9ca56dcf43c6c"
   },
   "remaining": [
-    "independent_cloud_restore",
-    "scheduled_backup_and_home_sync_observation",
-    "latest_runtime_backup_configuration_handoff",
-    "scheduled_worker_recovery_observation",
-    "routine_startup_audit_separation",
+    "supplementary_home_backup_completion",
     "owner_acceptance_before_develop_merge"
   ],
-  "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
-  "checked_at": "2026-10-09T11:27:53.916789+00:00",
+  "scope": "Running native production with dated migration and recovery evidence. Supplementary home backup and owner acceptance remain pending. Ordinary scrape/translation queues continue on their schedules; clearing every backlog is not a migration acceptance gate. No new migration reconciliation or cold-media restore was run for this review.",
+  "checked_at": "2026-10-10T17:14:59.130212+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -2302,46 +2298,50 @@
   "promotion_native_schema": 1000099,
   "promotion_source_revision": "0ea2c05fbc20356929c561f2173386a14870fdb7",
   "latest_rollout": {
-    "checked_at": "2026-10-10T13:31:53.360780+00:00",
-    "scope": "Current rollout observations; earlier preparation and reconciliation records retain their original scope and date.",
+    "checked_at": "2026-10-10T17:14:59.130212+00:00",
+    "scope": "Current deployment and bounded live checks; earlier migration and historical failure records retain their original dates.",
     "application": {
-      "evidence": ".local/source-site-concurrency-20261010/registry-deployment.json",
-      "sha256": "47ddb6f0ba9c54fc0297af3ed644ab7823b5640810d070e66e2bca9333b988e6",
-      "source_revision": "8d2e8cc15b0a15b05b5c49e9ca006a6c5f9da222",
+      "evidence": ".local/translation-length-20261010/registry-deployment.json",
+      "sha256": "d1cf1c206e22fd5556cbb5815210e861b0112ae2964b4fcb172cd9651c79ef81",
+      "source_revision": "b0e481c8694d6d4fbedaeb133d3fab4b72cdf1c2",
       "source_run": {
         "conclusion": "success",
-        "headSha": "8d2e8cc15b0a15b05b5c49e9ca006a6c5f9da222",
+        "headSha": "b0e481c8694d6d4fbedaeb133d3fab4b72cdf1c2",
         "status": "completed",
-        "url": "https://github.com/notsafeforgit/stash/actions/runs/38053689663"
+        "url": "https://github.com/notsafeforgit/stash/actions/runs/38069101302"
       },
       "wrapper_run": {
         "conclusion": "success",
         "headSha": "4f0f0594e95e000a75e4819f2494c3a44ce7f04d",
         "status": "completed",
-        "url": "https://github.com/notsafeforgit/stash-s6/actions/runs/38054899782"
+        "url": "https://github.com/notsafeforgit/stash-s6/actions/runs/38070319195"
       },
-      "source_image": "ghcr.io/notsafeforgit/stash@sha256:4aeccdd635c53fed5f457f02090ff2da90383115ff94aa875dd0edc0b2e3fd34",
-      "wrapper_image": "ghcr.io/notsafeforgit/stash-s6@sha256:824ee3e856184057624b5d54ae7f1e2499be7e616065ec424e52f759fc4c4143",
+      "source_image": "ghcr.io/notsafeforgit/stash@sha256:b5b2ee26ba3dc400f7bc1941ac01902000206725f310e4e3d4f2bbfcdc0aede5",
+      "wrapper_image": "ghcr.io/notsafeforgit/stash-s6@sha256:18fdc686082f2b6a5987b6657a1ab98ef7d5dbbe606633f331e4c7995d2551df",
       "native_schema": 1000110
     },
     "deployment": {
-      "evidence": ".local/source-site-concurrency-20261010/deployment-result.json",
-      "sha256": "d90bba341083e9f1f6c0194e4022fb528336f05301308dbe3b14c156c3350181",
+      "evidence": ".local/translation-length-20261010/deployment-result.json",
+      "sha256": "24b7edee37b8125e39f4c6d1c06b6906f19efa6efd134ba6c2dcae7501d6ff62",
       "status": "deployed",
-      "schema_changed": true,
-      "deployed_at": "2026-10-10T13:27:18.560226+00:00"
+      "deployed_at": "2026-10-10T17:10:25.148017+00:00",
+      "startup_to_healthy_seconds": 1.053,
+      "schema_changed": false,
+      "n8n_restarted": false,
+      "worker_timer_paused": false,
+      "scrapes_drained": false
     },
     "producer": {
-      "evidence": ".local/source-site-concurrency-20261010/producer-live-check.json",
-      "sha256": "ef03cadadb0fbd5d10bc860656284368a26e2a0958001ee98c6684d8e0f9bd31",
+      "evidence": ".local/resumed-work-budget-20261010/producer-live-check.json",
+      "sha256": "9f263a9fe9fa2a20a114e1cae68e45c660afeecb3081aa7369f3212d17206e38",
       "status": "verified",
-      "checked_at": "2026-10-10T13:29:31.549159+00:00",
+      "checked_at": "2026-10-10T15:32:00.280472+00:00",
       "host": {
         "profiles": 22,
         "runtime": {
           "gallery_dl": "c40eb2a42fbaa1d26a2bb7c96804b7f47d1f73f8",
           "yt_dlp": "2026.9.27.232945.dev0",
-          "adapter_sha256": "13ca6588d4f4f094fdabdbbac87ea75b54ef61cf00441c93e3ac796873c9540a"
+          "adapter_sha256": "93ee4d470e9cf6b5068b3f6a271b2c54cac96f001a4b1816a7283dd39b8a3ad9"
         }
       },
       "n8n": {
@@ -2349,34 +2349,28 @@
         "runtime": {
           "gallery_dl": "c40eb2a42fbaa1d26a2bb7c96804b7f47d1f73f8",
           "yt_dlp": "2026.9.27.232945.dev0",
-          "adapter_sha256": "13ca6588d4f4f094fdabdbbac87ea75b54ef61cf00441c93e3ac796873c9540a"
+          "adapter_sha256": "93ee4d470e9cf6b5068b3f6a271b2c54cac96f001a4b1816a7283dd39b8a3ad9"
         }
       },
-      "timers": {
-        "stash-native-intake.timer": "active",
-        "gallery-dl-instagram.timer": "active",
-        "gallery-dl-twitter.timer": "active",
-        "gallery-dl-reddit-last-week.timer": "active",
-        "stash-ingest-worker@host-bluesky.timer": "active",
-        "stash-ingest-worker@host-coomer.timer": "active",
-        "stash-ingest-worker@host-instagram.timer": "active",
-        "stash-ingest-worker@host-kemono.timer": "active",
-        "stash-ingest-worker@host-manual.timer": "active",
-        "stash-ingest-worker@host-reddit.timer": "active",
-        "stash-ingest-worker@host-tiktok.timer": "active",
-        "stash-ingest-worker@host-twitter.timer": "active",
-        "stash-native-n8n-reddit-worker.timer": "active",
-        "stash-native-n8n-twitter-worker.timer": "active"
-      },
-      "pending_work": {
-        "metadata_profiles": 10,
-        "pending_runs": 1359,
-        "untouched_legacy_holds": 169,
-        "run_approvals_created": 1359,
-        "metadata_job_state_groups_preserved": 6,
-        "listing_definitions_preserved": 4
-      },
-      "source_revision": "8d2e8cc15b0a15b05b5c49e9ca006a6c5f9da222"
+      "host_sqlite": "3.53.4",
+      "overlay_mount_read_only": true,
+      "source_revision": "7de9d60c3e8dd35564f94b584f0f9477219193a1",
+      "current_runtime_check": {
+        "evidence": ".local/native-transition-acceptance-20261010/current-runtime.json",
+        "sha256": "2af647d5170a8d076cf2b17c55482611006641ded1bc4d5a80a1d7c93c692788",
+        "checked_at": "2026-10-10T17:12:00.844064+00:00",
+        "host_runtime": {
+          "sqlite": "3.53.4",
+          "native_adapter_present": true,
+          "external_catalog_present": false
+        },
+        "n8n_runtime": {
+          "sqlite": "3.53.4",
+          "native_adapter_present": true,
+          "external_catalog_present": false
+        },
+        "unchanged_profiles": 32
+      }
     },
     "completed_checks": {
       "controlled_host": {
@@ -2446,20 +2440,20 @@
       "cadences_changed": false
     },
     "timers": {
-      "evidence": ".local/source-site-concurrency-20261010/site-services.json",
-      "sha256": "93ba0cf4d0cfe111842c0e008e6f92627652d5186c483adfcac2ea596f02da65",
-      "status": "active_verified",
-      "site_worker_timers_active": 10,
-      "retired_global_timers_disabled": [
-        "stash-ingest-worker@host.timer",
-        "stash-native-n8n-worker.timer"
-      ],
-      "other_checked_active_timers": [
-        "stash-native-intake.timer",
-        "gallery-dl-instagram.timer",
-        "gallery-dl-twitter.timer",
-        "gallery-dl-reddit-last-week.timer"
-      ]
+      "stash-ingest-worker@host-bluesky.timer": "active",
+      "stash-ingest-worker@host-coomer.timer": "active",
+      "stash-ingest-worker@host-instagram.timer": "active",
+      "stash-ingest-worker@host-kemono.timer": "active",
+      "stash-ingest-worker@host-manual.timer": "active",
+      "stash-ingest-worker@host-reddit.timer": "active",
+      "stash-ingest-worker@host-tiktok.timer": "active",
+      "stash-ingest-worker@host-twitter.timer": "active",
+      "stash-native-n8n-reddit-worker.timer": "active",
+      "stash-native-n8n-twitter-worker.timer": "active",
+      "stash-native-intake.timer": "active",
+      "gallery-dl-instagram.timer": "active",
+      "gallery-dl-twitter.timer": "active",
+      "gallery-dl-reddit-last-week.timer": "active"
     },
     "account_url_repair": {
       "linked": 186,
@@ -2511,19 +2505,26 @@
     },
     "independent_restore": {
       "evidence": ".local/native-production-cutover-20261008/backup-before-public-finalization-state.json",
-      "sha256": "fe3a540d7abbf9d10e9cb7a9de8a72af4ec062171c0aac895a117e77d7fca809",
-      "status": "running",
-      "stage": "restore-backup-before-public-streamed",
+      "sha256": "64380a6e03f60c7e51903d804fbf4e3403ffcac55448987bf04213c960f797ec",
+      "status": "passed",
+      "stage": "pre_public_coordinated_backup_and_restore_verified",
+      "completed_at": "2026-10-10T15:46:11.790502+00:00",
       "run_id": "20261008_175444_1545955",
       "checkpoint_uuid": "dbf8cd08-ea38-43df-9864-6f20429be640",
       "coordinated_backup_complete": true,
-      "isolated_restore_complete": false
+      "isolated_restore_complete": true,
+      "contents_verified": true,
+      "coverage": "declared-components",
+      "cold_media_retrieved": false,
+      "scope": "Original pre-cutover native/configuration/artwork/operating-state archive. Interrupted deletion and nonempty producer replay are covered by the separate populated local recovery rehearsal."
     },
     "future_backup_configuration": {
-      "evidence": ".local/source-site-concurrency-20261010/backup-config-activation.json",
-      "sha256": "b43adb2f9108c3c3b0512b616be8779ca6a0cab35a712c5f1017220010ecfeef",
-      "status": "waiting_for_backup",
-      "source_revision": "8d2e8cc15b0a15b05b5c49e9ca006a6c5f9da222"
+      "evidence": ".local/translation-length-20261010/backup-config-activation.json",
+      "sha256": "13ff8fda394e299d5fae99ce63a5b66d7cfaf309658c4fd8eabf2aff6b66ea4b",
+      "status": "passed",
+      "source_revision": "b0e481c8694d6d4fbedaeb133d3fab4b72cdf1c2",
+      "producer_source_revision": "7de9d60c3e8dd35564f94b584f0f9477219193a1",
+      "completed_at": "2026-10-10T17:12:30.679817+00:00"
     },
     "home_backup": {
       "last_failed_at": "2026-10-10T10:00:01Z",
@@ -2532,18 +2533,26 @@
       "retry_started_at": "2026-10-10T11:51:24Z",
       "service": "rclone-backup-homedir.service",
       "pid": 1513750,
-      "status": "retry_running",
-      "checked_at": "2026-10-10T12:30:25.923824+00:00",
+      "status": "running_general_home_sync",
+      "checked_at": "2026-10-10T17:12:00.844064+00:00",
       "service_state": {
         "ActiveState": "activating",
         "SubState": "start",
+        "UnitFileState": "disabled",
+        "NeedDaemonReload": "no",
         "MainPID": "1513750",
-        "Result": "success",
-        "ExecMainStartTimestamp": "Sat 2026-10-10 04:51:24 PDT",
-        "ExecMainExitTimestamp": ""
-      }
+        "ControlPID": "0",
+        "Result": "success"
+      },
+      "native_snapshot_remote_completion_observed": false,
+      "note": "The existing invocation is moving retired development files to its remote backup directory. Its native snapshot sync follows the ordinary home sync. It has not been restarted or duplicated."
     },
     "source_runs": [
+      {
+        "state": "deferred",
+        "error_code": "access_denied",
+        "count": 5
+      },
       {
         "state": "deferred",
         "error_code": "legacy_scan_deferred",
@@ -2552,7 +2561,7 @@
       {
         "state": "deferred",
         "error_code": "not_found",
-        "count": 6
+        "count": 15
       },
       {
         "state": "deferred",
@@ -2567,7 +2576,7 @@
       {
         "state": "queued",
         "error_code": "",
-        "count": 1327
+        "count": 1232
       },
       {
         "state": "queued",
@@ -2577,12 +2586,17 @@
       {
         "state": "queued",
         "error_code": "lease_expired",
-        "count": 2
+        "count": 3
+      },
+      {
+        "state": "queued",
+        "error_code": "source_busy",
+        "count": 1
       },
       {
         "state": "queued",
         "error_code": "source_turn_complete",
-        "count": 15
+        "count": 7
       },
       {
         "state": "running",
@@ -2592,7 +2606,7 @@
       {
         "state": "succeeded",
         "error_code": "",
-        "count": 73
+        "count": 171
       }
     ],
     "native_jobs": [
@@ -2624,22 +2638,22 @@
       {
         "kind": "media.verify",
         "state": "succeeded",
-        "count": 58743
+        "count": 73538
       },
       {
         "kind": "post.enrich",
         "state": "failed",
-        "count": 2
+        "count": 13
       },
       {
         "kind": "post.enrich",
         "state": "queued",
-        "count": 64
+        "count": 16
       },
       {
         "kind": "post.enrich",
         "state": "succeeded",
-        "count": 13
+        "count": 54
       },
       {
         "kind": "text.translate",
@@ -2653,9 +2667,53 @@
       }
     ],
     "scheduled_backup": {
-      "status": "original_attempt_running",
+      "status": "published_native_cleanup_recovered",
       "run_id": "20261010_015141_781770",
-      "checkpoint_uuid": "4fb711ad-5bfc-4b66-8023-ff1515fdfcd4"
+      "checkpoint_uuid": "4fb711ad-5bfc-4b66-8023-ff1515fdfcd4",
+      "archive_uuid": "05878059-92ec-4207-bcfe-b13ea36e1f7e",
+      "native_cleanup": {
+        "evidence": ".local/startup-audit-separation-20261010/native-cleanup-result.json",
+        "sha256": "3ea43300fb794a02c2c55ee8c55e7599a0fdc02e97c119fef0bb5de6e2a75162",
+        "status": "passed",
+        "finished_at": "2026-10-10T16:08:19.632710+00:00",
+        "result": {
+          "retired_snapshots": 0,
+          "protected_objects": 251139,
+          "newly_processed_chunks": 0,
+          "local_bytes_reclaimed": 0
+        },
+        "requests": {
+          "GetBucketLifecycleConfiguration": 1,
+          "GetBucketVersioning": 1,
+          "ListObjectsV2": 256,
+          "HeadObject": 34,
+          "GetObject": 9,
+          "GetObjectTagging": 12
+        },
+        "new_backup_created": false,
+        "cold_media_retrieved": false
+      },
+      "redundant_preflight_cancelled": {
+        "evidence": ".local/native-transition-acceptance-20261010/cancel-redundant-backup-preflight.json",
+        "sha256": "46c786df18a1a41f3e7dc90db51267be98c72164bcafb9329b92b25d139e6693",
+        "at": "2026-10-10T16:29:09.844035+00:00",
+        "cancelled_stage": "fclones read-only grouping",
+        "new_backup_created": false,
+        "interruption_marker_present": false,
+        "daily_timer": "active"
+      },
+      "active_attempt": false,
+      "interruption_marker": false,
+      "current_service": {
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "UnitFileState": "static",
+        "NeedDaemonReload": "no",
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success"
+      },
+      "note": "The original service exited after publication during native cleanup. Only that failed cleanup was replayed successfully; other routine media maintenance is left to the next daily cycle."
     },
     "producer_changed": true,
     "backup_reader_fix": {
@@ -2741,101 +2799,330 @@
       ]
     },
     "site_concurrency": {
-      "evidence": ".local/source-site-concurrency-20261010/live-worker-observation.json",
-      "sha256": "e11f7c6f9612a95b3a4191c3a01fce5a2b35a414b06974f9adae04af5fe3d2d0",
-      "checked_at": "2026-10-10T13:31:53.360780+00:00",
-      "schema": {
-        "version": 1000110,
-        "dirty": 0
+      "current_assignments": {
+        "incremental_sites": [
+          "bluesky",
+          "coomer",
+          "instagram",
+          "kemono",
+          "manual",
+          "reddit",
+          "tiktok",
+          "twitter"
+        ],
+        "initial_sites": [
+          "reddit",
+          "twitter"
+        ],
+        "one_worker_per_site_per_queue": true
       },
-      "destination_index_unique": 0,
-      "host_sites": [
-        "bluesky",
-        "coomer",
-        "instagram",
-        "kemono",
-        "manual",
-        "reddit",
-        "tiktok",
-        "twitter"
-      ],
-      "n8n_sites": [
-        "reddit",
-        "twitter"
-      ],
-      "completed_poll_workers": 9,
-      "download_in_progress_workers": 1,
-      "run_counts": [
-        {
-          "namespace": "native:reddit",
-          "state": "queued",
-          "total": 845,
-          "min_fence": 0,
-          "max_fence": 9
-        },
-        {
-          "namespace": "native:reddit",
-          "state": "running",
-          "total": 1,
-          "min_fence": 44,
-          "max_fence": 44
-        },
-        {
-          "namespace": "native:twitter",
-          "state": "queued",
-          "total": 500,
-          "min_fence": 0,
-          "max_fence": 0
-        }
-      ],
-      "retained_cooldowns": [
-        {
-          "scope": "service:twitter",
-          "available_at_ms": 1791647287095,
-          "last_started_at_ms": 1791608792417,
-          "reason": "extraction_failed"
-        }
-      ],
-      "cross_site_simultaneous_claims_fixture": "TestSourceRunIndependentServicesShareRootConcurrently",
-      "twitter_download_concurrency_live_observation": "pending_existing_source_cooldown",
-      "obsolete_cursor_cleanup": {
-        "applied": true,
-        "at": "2026-10-10T13:28:59.583125+00:00",
-        "outboxes": {
-          "host": {
-            "before": 10000,
-            "obsolete_cursor_hints": 10000,
-            "after": 0,
-            "other_tables_unchanged": 21
-          },
-          "n8n": {
-            "before": 3582,
-            "obsolete_cursor_hints": 3582,
-            "after": 0,
-            "other_tables_unchanged": 21
-          }
-        }
+      "initial_vs_incremental": {
+        "evidence": ".local/initial-scrape-concurrency-20261010/verified-attempt-overlap.json",
+        "sha256": "d1d1ce46c3a272f151dda634b8dfe95f01b1ef88e239db73e8bfad77e685415a",
+        "at": "2026-10-10T15:13:52.690329+00:00"
       },
-      "future_backup_component_check": {
-        "backup_components": 104,
-        "new_site_configuration_components": 23,
-        "matching_validator": true,
-        "original_restore_process_alive": true,
-        "services": {
-          "s3-backup.service": {
-            "ActiveState": "activating",
-            "MainPID": "781770"
-          },
-          "rclone-backup-homedir.service": {
-            "ActiveState": "activating",
-            "MainPID": "1513750"
-          },
-          "stash.service": {
-            "ActiveState": "active",
-            "MainPID": "1825698"
+      "recent_overlap": {
+        "evidence": ".local/native-transition-acceptance-20261010/recent-overlap.json",
+        "sha256": "ba22800d50f94a5a9dc280d0f1d42be610799346c0d6dff11265b92f6a17ba8a",
+        "overlapping_attempt_pairs": 10,
+        "successful_incremental_attempts": 8
+      },
+      "previously_stalled_initial": {
+        "uuid": "b4f52ff3-1397-4858-8031-b8c2dfc70706",
+        "state": "succeeded",
+        "fence": 54,
+        "progress": {
+          "items_seen": 684,
+          "files_completed": 509,
+          "cursor": "e9913c8cd6ffddf0e7fea42b4538c4803bb17872ce82ca916c3c136053c99882"
+        },
+        "failures": 0
+      },
+      "restart_recovery": {
+        "evidence": ".local/startup-audit-separation-20261010/post-restart-scrapes.json",
+        "sha256": "b5ae0b863dbe1b77f760c0bf382d7fad3fd22a9e2092722b1616cf1fba125704",
+        "at": "2026-10-10T16:27:06.620254+00:00",
+        "all_original_runs_retained": true,
+        "windows_unchanged": true,
+        "runs": [
+          {
+            "uuid": "1a87c5da-b9e8-4e37-bdda-a4ad036880a0",
+            "before_state": "running",
+            "state": "running",
+            "before_fence": 4,
+            "fence": 5,
+            "before_progress": {
+              "items_seen": 652,
+              "files_completed": 478,
+              "cursor": "f21ff7a3febc034f4204013634ac19e5dba9cc3c2748051d11761a8d14958b64"
+            },
+            "progress": {
+              "items_seen": 652,
+              "files_completed": 478,
+              "cursor": "f21ff7a3febc034f4204013634ac19e5dba9cc3c2748051d11761a8d14958b64"
+            },
+            "updated_at_ms": 1791649603639,
+            "original_attempt_outcome": "expired"
           }
+        ]
+      },
+      "all_queued_profiles_completed": false,
+      "same_profile_fence_and_site_cooldowns_preserved": true
+    },
+    "gif_conversion": {
+      "evidence": ".local/translation-length-20261010/gif-live-check.json",
+      "sha256": "9ef9d1c24035c03263e99c42cec33648ebb85045c754d5f461b032f34e242421",
+      "at": "2026-10-10T17:11:58.405216+00:00",
+      "converted_scene": "373593",
+      "files": [
+        {
+          "suffix": ".mkv",
+          "size": 173338,
+          "original_gif_absent": true
         }
+      ],
+      "cover": {
+        "status": 200,
+        "type": "image/jpeg",
+        "bytes": 86734
+      },
+      "converter_sha256": "07eeb6da7fd314875977062770441a032fbfa351ea6b7d50b09530300f27d123"
+    },
+    "routine_startup": {
+      "evidence": ".local/startup-audit-separation-20261010/deployment-result.json",
+      "sha256": "5aaca5ffa846524db09838c14421d7c1d9c53290e21eda07c4f66e8a1e193681",
+      "source_revision": "3e710df7486dac8ed552cb9fd684426db82fc46d",
+      "startup_to_healthy_seconds": 1.076,
+      "schema_changed": false,
+      "deployed_at": "2026-10-10T16:23:14.219062+00:00"
+    },
+    "runtime_dependency_audit": {
+      "evidence": ".local/native-transition-acceptance-20261010/current-runtime.json",
+      "sha256": "2af647d5170a8d076cf2b17c55482611006641ded1bc4d5a80a1d7c93c692788",
+      "checked_at": "2026-10-10T17:12:00.844064+00:00",
+      "status": "passed_for_stated_scope",
+      "gallery_dl_legacy_markers": [],
+      "legacy_catalog_descriptors": {
+        "same_user_processes": 385,
+        "inaccessible_or_exited": 2,
+        "open": [],
+        "scope": "Snapshot of same-user process file descriptors; does not inspect other users or imply files were deleted."
+      },
+      "retired_units_masked": 9,
+      "n8n_graphs": {
+        "graphs_checked": 21,
+        "active_versions": 21,
+        "active_matches_saved": true,
+        "retired_command_references": 0
       }
+    },
+    "translation_length": {
+      "status": "deployed_existing_retry_deadlines_preserved",
+      "source_revision": "b0e481c8694d6d4fbedaeb133d3fab4b72cdf1c2",
+      "provider_boundary": {
+        "evidence": ".local/native-transition-acceptance-20261010/translation-length-probe.json",
+        "sha256": "f444583c78b48fa1324850eefeac34d9b4a10daa20925f58725de5fb4e1c0e52",
+        "checked_at": "2026-10-10T16:46:16.800492+00:00",
+        "synthetic_inputs_only": true,
+        "samples": [
+          {
+            "sample": "ascii_1000",
+            "runes": 1000,
+            "utf16_units": 1000,
+            "exit_code": 0,
+            "result_type": "list",
+            "translation_present": true
+          },
+          {
+            "sample": "ascii_1001",
+            "runes": 1001,
+            "utf16_units": 1001,
+            "exit_code": 0,
+            "result_type": "dict",
+            "status_code": 400
+          },
+          {
+            "sample": "emoji_500",
+            "runes": 500,
+            "utf16_units": 1000,
+            "exit_code": 0,
+            "result_type": "list",
+            "translation_present": true
+          },
+          {
+            "sample": "emoji_501",
+            "runes": 501,
+            "utf16_units": 1002,
+            "exit_code": 0,
+            "result_type": "dict",
+            "status_code": 400
+          }
+        ]
+      },
+      "input_shape": {
+        "evidence": ".local/native-transition-acceptance-20261010/translation-input-shapes.json",
+        "sha256": "ba3e166d4b186c1df3886b994e8ebdda06c717432b45c52029f8df30b29c30c8",
+        "request_count": 64,
+        "shapes": [
+          {
+            "multiline": true,
+            "over_chunk_limit": false,
+            "contains_markup_delimiters": true,
+            "target": "en",
+            "count": 1
+          },
+          {
+            "multiline": true,
+            "over_chunk_limit": false,
+            "contains_markup_delimiters": false,
+            "target": "en",
+            "count": 33
+          },
+          {
+            "multiline": true,
+            "over_chunk_limit": true,
+            "contains_markup_delimiters": false,
+            "target": "en",
+            "count": 28
+          },
+          {
+            "multiline": false,
+            "over_chunk_limit": false,
+            "contains_markup_delimiters": true,
+            "target": "en",
+            "count": 1
+          },
+          {
+            "multiline": false,
+            "over_chunk_limit": false,
+            "contains_markup_delimiters": false,
+            "target": "en",
+            "count": 1
+          }
+        ]
+      },
+      "private_requests_sent_by_diagnostics": 0,
+      "queued_private_completions_verified": false,
+      "reason": "All 64 waiting originals exceed the observed 1000 UTF-16-unit provider limit. The previous worker sent up to 1800 code points per request."
     }
+  },
+  "completion_review": {
+    "checked_at": "2026-10-10T17:14:59.130212+00:00",
+    "status": "implementation_verified_for_recorded_scopes_acceptance_pending",
+    "method": "Review existing reconciliation algorithms and results, passing release gates and bounded current-runtime checks. Do not repeat multi-million-row comparisons, artwork reconstruction or cloud restore solely for a final status report.",
+    "criteria": [
+      {
+        "criterion": "V3 sole application and independent schema",
+        "evidence": [
+          "FORK.md",
+          "latest_rollout.application",
+          "docs/native-schema99-release-verification.json"
+        ],
+        "result": "Sole native UI/API runtime at schema 1000110; compatible source and eight immutable image tags retained separately."
+      },
+      {
+        "criterion": "Every retained catalog record has a native outcome",
+        "evidence": [
+          "post_import_reconciliation",
+          "catalog_bodies",
+          "registry",
+          "journal_reconciliation"
+        ],
+        "result": "1711 catalogs and 5011403 source records covered; 8290833 typed Stash rows reconciled. Later NFO cleanup follows the explicit owner instruction to retain useful post data and discard redundant raw XML/path records."
+      },
+      {
+        "criterion": "Native account/post/collection/provenance editing",
+        "evidence": [
+          "private_native_browser",
+          "domain_services",
+          "docs/native-provider-review-verification.json"
+        ],
+        "result": "Core APIs and desktop/mobile workflows verified for their recorded scopes; owner acceptance remains separate."
+      },
+      {
+        "criterion": "Host/n8n native API delivery and obsolete writers retired",
+        "evidence": [
+          "latest_rollout.completed_checks.controlled_host",
+          "latest_rollout.completed_checks.controlled_n8n",
+          "latest_rollout.runtime_dependency_audit"
+        ],
+        "result": "Both live launch paths completed controlled ingestion; current workflows, runtimes and mounts no longer require external catalog writers."
+      },
+      {
+        "criterion": "Manual purchased/scanned media",
+        "evidence": [
+          "operational_handoff.local-handoff-state.json",
+          "latest_rollout.completed_checks.manual_media",
+          "docs/native-manual-intake.md"
+        ],
+        "result": "Filename base metadata and explicit folder performer defaults installed; controlled manual intake verified without a synthetic post/account."
+      },
+      {
+        "criterion": "Publisher provenance separate from depicted performers",
+        "evidence": [
+          "docs/native-schema.md",
+          "docs/native-provider-metadata-verification.json",
+          "docs/native-provider-import-paths-verification.json"
+        ],
+        "result": "Account ownership, captured publisher and depicted performers have separate domain decisions; source associations do not silently assert every depicted performer."
+      },
+      {
+        "criterion": "Idempotent ordered mixed-media albums",
+        "evidence": [
+          "domain_services.albums",
+          "docs/native-source-albums.md",
+          "latest_rollout.gif_conversion"
+        ],
+        "result": "Original memberships preserved; source/thread albums, attachment gaps, mixed scenes/images and GIF-to-MKV identity transition covered by release tests and live samples."
+      },
+      {
+        "criterion": "Preserved IDs, UUIDs, merges, edits and recovery",
+        "evidence": [
+          "library_reconciliation",
+          "registry",
+          "post_import_reconciliation",
+          "docs/native-archive-progress.md#performer-source-accounts-and-identity-history--2026-10-06"
+        ],
+        "result": "Original typed values and merge/identity maps reconciled, including imelizabethtran; later repairs retain explicit choices and durable receipts."
+      },
+      {
+        "criterion": "Stash-box, v3 plugins, shares and offline contracts",
+        "evidence": [
+          "docs/native-stash-box-verification.json",
+          "docs/native-provider-review-verification.json",
+          "latest_rollout.application.source_run",
+          "docs/plugin-manifests.md"
+        ],
+        "result": "Recorded protocol fixtures/live read probes and current release checks pass. No live stash-box writes were used as verification."
+      },
+      {
+        "criterion": "Backup/restore and standalone archive including pending events",
+        "evidence": [
+          "latest_rollout.independent_restore",
+          "latest_rollout.scheduled_backup",
+          "docs/native-archive-progress.md#complete-populated-local-restore-proof--2026-10-08",
+          "docs/native-archive-format.md"
+        ],
+        "result": "Cloud native restore passed. Separate populated local recovery replayed both producer outboxes and an interrupted file deletion. Daily publication and native cleanup verified; supplementary Google Drive copy still running."
+      },
+      {
+        "criterion": "Clean runtime dependency boundary",
+        "evidence": [
+          "latest_rollout.runtime_dependency_audit",
+          "latest_rollout.producer.current_runtime_check",
+          "latest_rollout.application"
+        ],
+        "result": "Host/n8n native Python environments have no scrape_catalog package. No catalog database mounts remain; operational download locks remain intentional. Retired writers are masked, and the sampled same-user process descriptors show no old catalog database open."
+      }
+    ],
+    "review_items": {
+      "account_link_choices": "The prior targeted repair left 91 tracked undecided accounts. Name-only/ambiguous candidates remain review work, not permission to invent ownership.",
+      "source_backlog": "Scheduled profiles and historical retrieval passes are still draining; completed sample runs do not certify every profile.",
+      "supplementary_home_backup": "Observe the existing native snapshot sync after general home sync.",
+      "translation_retries": "Operational follow-up: observe the 64 existing retries after the tested length correction. Their deadlines were not reset, and waiting for all completions is not a separate merge gate.",
+      "owner_acceptance": "Required by the original goal before merging v3-rewrite directly into develop."
+    },
+    "rollback": "Native writes are active. Prefer a forward fix; take a native snapshot/export before recovery. Never run the frozen compatible binary against the promoted database. Returning to that runtime requires separately validated conversion and preservation of post-cutover changes.",
+    "develop_merged": false
   }
 }

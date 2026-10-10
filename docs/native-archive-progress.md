@@ -7,7 +7,7 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement is running; the controlled worker rollout remains
 in progress.
 
-## Mixed gallery browsing — implementation, 2026-10-10
+## Mixed gallery browsing — deployed, 2026-10-10
 
 Gallery pages now open a unified Media view with images and scenes in selected
 source order, including shared Twitter replies. Manually added items remain
@@ -23,9 +23,19 @@ Focused SQLite tests cover ordering, gaps, repeated media, manual additions,
 exclusions, video-only galleries, out-of-order thread arrivals and indexed
 queries. Six Chromium regressions cover desktop/mobile mixed playback,
 pagination, changed membership, failed-page recovery, video-only and empty
-galleries. Full release validation and registry publication are pending; this
-entry does not claim
-deployment. Private evidence: `.local/mixed-gallery-20261010/`.
+galleries. All fork-gate checks passed, including 805 UI tests and full Go
+integration tests. The combined gallery/source-album Chromium suite passed
+20 tests. Live API checks verified galleries #3664 (one image/one scene),
+#4340 (eleven images/one scene), and #3594 (nine scenes), including paginated
+counts and unique membership. Desktop/mobile checks verified the default
+Media view and video-only contents without writing library data.
+
+The [source build](https://github.com/notsafeforgit/stash/actions/runs/38015430425) and
+[wrapper build](https://github.com/notsafeforgit/stash-s6/actions/runs/38016734820) published successfully. Production
+runs their verified GHCR digest, recorded below, and scraper services resumed.
+Checks used the direct production service; the hostname was already unreachable
+from this host. No migration, reimport or new backup run was required.
+Private evidence: `.local/mixed-gallery-20261010/`.
 
 ## Incidental post authors outside account review — deployed, 2026-10-10
 
@@ -145,13 +155,13 @@ also passed.
 ## Current release position — 2026-10-10 UTC
 
 Production is healthy on schema **1000106**, source
-`4b8ca713e9e8f6d3124462a8c4f2c9d6833fc66a`, pinned wrapper
-`ghcr.io/notsafeforgit/stash-s6@sha256:104e43df53e96c17b6650dab2a07fe07ee99459339ba9af481e34452b2dd565b`.
+`0306c6da599940e3de0b6c14afe0b25c0b40e282`, pinned wrapper
+`ghcr.io/notsafeforgit/stash-s6@sha256:b12e6795e215a4fa1ee5f9cf63b2c3a39c5f35a12be7d50532c2b6dd9eb54c14`.
 The verified source image is
-`ghcr.io/notsafeforgit/stash@sha256:a5428bed8a07250372c34259530be05d1b39b39f8ade60aef485838228edec7d`,
+`ghcr.io/notsafeforgit/stash@sha256:36fd005514b978422b546806fad5de210f8aa555d19637fb76fc069906198197`,
 with wrapper source `4f0f0594e95e000a75e4819f2494c3a44ce7f04d`.
-The account-review release is recorded under
-`.local/incidental-account-review-20261010/`. The source consolidation and existing
+The mixed-gallery release is recorded under
+`.local/mixed-gallery-20261010/`. The source consolidation and existing
 producer/backup runtime are recorded under `.local/reddit-profile-sources-20261009/`;
 the current worker timer is active.
 The current backup publisher retains its sealed configuration until publication;

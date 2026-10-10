@@ -7,6 +7,27 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement is running; the controlled worker rollout remains
 in progress.
 
+## Internal account migration identifiers — deployed, 2026-10-10
+
+Account review now shows handles, service IDs and profile URLs without listing
+imported `legacy_key` references as ordinary identifiers. The same projection
+serves cards, expanded identifier lists, consolidation previews and pickers.
+Filtering happens before pagination, so migration keys neither crowd out real
+identifiers nor create a misleading additional-identifiers indication. Internal
+lookup, import replay, consolidation and retained evidence keep those keys.
+
+The full fork gate passed. HTTP regressions cover summary bounds, paginated
+identifier discovery and retained internal lookups. Live desktop/mobile checks
+confirmed the example Twitter account displays its handle and service ID while
+its original migration reference remains in the database. No schema migration,
+reimport, production data cleanup or new cloud backup was required. The update
+restarted Stash without draining scrapes, restarting n8n or pausing its timer.
+
+The [source build](https://github.com/notsafeforgit/stash/actions/runs/38024954204) and
+[wrapper build](https://github.com/notsafeforgit/stash-s6/actions/runs/38026549490) published successfully.
+Production uses their verified GHCR digests. Deployment and live evidence:
+`.local/account-identifiers-20261010/`.
+
 ## Scrape restart recovery — deployed, 2026-10-10
 
 Schema 1000107 separates archive-job failure counts from ownership generations.
@@ -195,13 +216,14 @@ also passed.
 ## Current release position — 2026-10-10 UTC
 
 Production is healthy on schema **1000107**, source
-`deef5ce4a364a93a2801e4d00636cbf00c21515a`, pinned wrapper
-`ghcr.io/notsafeforgit/stash-s6@sha256:845679c819624f4c99e8afbf40f41ebb4c77e958186777b53a91c877f72c6460`.
+`4e1c7c8ce3e6a764b425ab7926182abc7690d3c4`, pinned wrapper
+`ghcr.io/notsafeforgit/stash-s6@sha256:c1633d72e6b4dadfab373bb2976503331dde52548d8a2349d650db38ced77c47`.
 The verified source image is
-`ghcr.io/notsafeforgit/stash@sha256:2255e028c3d12ab525246e9ed7f4eaf3ccb49ea84760aa8b152013d145b9511c`,
+`ghcr.io/notsafeforgit/stash@sha256:8be4c8b0aeca77b4997248ac3a8391efb29568763edf025f9d4ce6f2d5be0a1e`,
 with wrapper source `4f0f0594e95e000a75e4819f2494c3a44ce7f04d`.
-The current application and worker release is recorded under
-`.local/scrape-restart-20261010/`; the worker timer is active. The earlier
+The current application release is recorded under
+`.local/account-identifiers-20261010/`. The worker remains on the release recorded
+under `.local/scrape-restart-20261010/`, and its timer is active. The earlier
 mixed-gallery release is recorded under `.local/mixed-gallery-20261010/`, and
 source consolidation under `.local/reddit-profile-sources-20261009/`.
 The coordinated post-write backup has published successfully. Future backups

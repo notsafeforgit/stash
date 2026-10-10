@@ -225,6 +225,20 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(len(self.downloaded), 2)
         self.lease.finish.assert_called_once_with("succeeded", error_code="")
 
+    def test_contended_output_retries_without_losing_capture_or_failing_source(self):
+        self.lease.finish.return_value = {"state": "queued"}
+        with patch("stash_ingest.gallery.destination_lock", side_effect=PublicationBusy("output busy")):
+            result = self.run_worker()
+        self.assertEqual(result["state"], "retry")
+        self.lease.finish.assert_called_once_with("retry", error_code="worker_publication_busy")
+        self.assertEqual(self.downloaded, [])
+        self.assertFalse(any(decode(row[0])["kind"] == "file.completed"
+                             for row in self.box.db.execute("SELECT body FROM events")))
+        self.lease.finish.reset_mock()
+        self.lease.finish.return_value = {"state": "succeeded"}
+        self.assertEqual(self.run_worker()["state"], "source_succeeded")
+        self.assertEqual(len(self.downloaded), 2)
+
     def test_finalizer_lock_timeout_keeps_completed_files_and_retries(self):
         def factory(*args, **kwargs):
             task = self.job(*args, **kwargs)

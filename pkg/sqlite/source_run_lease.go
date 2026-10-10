@@ -90,24 +90,27 @@ OR EXISTS(SELECT 1 FROM source_run_cooldowns WHERE target_key=? AND available_at
 			return nil, nil
 		}
 	}
+	scope, err := sourcePacingScope(ctx, id, false)
+	if err != nil {
+		return nil, err
+	}
 	if destination != "" {
-		// Boundary-aware comparisons keep Foo separate from Foobar. Root
-		// identity also handles aliases of the same host/container mount.
-		if err := dbWrapper.Get(ctx, &busy, `SELECT EXISTS(SELECT 1 FROM source_runs WHERE state='running' AND destination!='' AND
+		// A shared media root must not serialize unrelated websites. Within
+		// each service, retain boundary-aware destination and mount-alias
+		// exclusion. Workers fence actual output stems across all services.
+		if err := dbWrapper.Get(ctx, &busy, `SELECT EXISTS(SELECT 1 FROM source_runs r
+ JOIN source_run_pacing p ON p.run_uuid=r.uuid
+ WHERE r.state='running' AND p.scope=? AND destination!='' AND
  (destination=? OR substr(destination,1,length(?))=? OR substr(?,1,length(rtrim(destination,'/')||'/'))=rtrim(destination,'/')||'/'
  OR (root_identity=? AND (destination_prefix=? OR destination_prefix='.' OR ?='.'
  OR substr(destination_prefix,1,length(?))=? OR substr(?,1,length(destination_prefix||'/'))=destination_prefix||'/'))))`,
-			destination, strings.TrimRight(destination, "/")+"/", strings.TrimRight(destination, "/")+"/", destination,
+			scope, destination, strings.TrimRight(destination, "/")+"/", strings.TrimRight(destination, "/")+"/", destination,
 			rootIdentity, prefix, prefix, prefix+"/", prefix+"/", prefix); err != nil {
 			return nil, err
 		}
 		if busy {
 			return nil, nil
 		}
-	}
-	scope, err := sourcePacingScope(ctx, id, false)
-	if err != nil {
-		return nil, err
 	}
 	ready, err := sourcePacingReady(ctx, scope, collection.UUID, r.Operation == "enrich", now)
 	if err != nil || !ready {

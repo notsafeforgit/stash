@@ -1408,12 +1408,18 @@ There are at most 64 pending/completed/claimed intervals per active run and
 10,000 active or deferred runs. Capacity errors do not acknowledge lost work.
 
 Claims prefer the newest uncovered range. Pending download work takes precedence
-over enrichment for the same collection. A collection, the same normalized
-target URL, and overlapping destination paths cannot have concurrent owners.
+over enrichment for the same collection. A collection and the same normalized
+target URL cannot have concurrent owners. Since schema 1000110, overlapping
+destination paths serialize only within the same source service. Reddit and
+Twitter can therefore download concurrently into the same media root; the root
+is not an individual output file. Service cooldowns remain independent.
 Server mount identities and resolved paths handle host/container mappings and
 existing symlinks; a missing destination may be created by the worker afterwards.
 The worker must still acquire the existing shared filesystem download lock
-before source work or filesystem writes. The coordinator does not make a
+for the actual output stem before filesystem writes. Contention retries without
+consuming the source failure budget, including harmless collisions in the bounded
+lock buckets. Backup barriers still cover all workers sharing the media root.
+The coordinator does not make a
 distributed filesystem operation atomic or physically stop an expired process.
 
 Each claim increments its fence and records an immutable traversal window in an

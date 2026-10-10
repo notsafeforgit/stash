@@ -17,7 +17,9 @@ jobs:
         with:
           fetch-depth: 0
       - name: Test check selection and publication gate
-        run: python3 -m unittest discover -s scripts -p 'test_ci_*.py'
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_ci_*.py'
+          python3 -m unittest discover -s scripts -p 'test_split_worker_profiles.py'
       - name: Find successfully published baselines
         uses: actions/github-script@v8
         with:

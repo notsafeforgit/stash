@@ -458,3 +458,58 @@ func TestSourceRunDestinationExclusionAndDefinitionChanges(t *testing.T) {
 	// Historical request receipt remains readable after disabling its root.
 	require.Equal(t, "deferred", f.find(t, first.UUID).State)
 }
+
+func TestSourceRunIndependentServicesShareRootConcurrently(t *testing.T) {
+	f := newSourceRunFixture(t)
+	definition := f.collection.SourceCollectionDefinition
+	definition.PathPrefix = "."
+	f.collection = putSourceCollection(t, f.repo, models.SourceCollectionInput{UUID: f.collection.UUID,
+		ExpectedRevision: f.collection.Revision, Origin: "review", SourceCollectionDefinition: definition})
+	reddit := f.submit(t, f.request())
+	makeRun := func(namespace, target string) *models.SourceRun {
+		collection := putSourceCollection(t, f.repo, models.SourceCollectionInput{Origin: "review",
+			SourceCollectionDefinition: models.SourceCollectionDefinition{Label: "Shared root", Kind: "feed", State: "active",
+				Namespace: namespace, TargetURL: target, RootUUID: &f.root.UUID, PathPrefix: "."}})
+		_, token, err := f.service.IssueCredential(t.Context(), f.producer.UUID,
+			[]models.IngestScope{{CollectionUUID: collection.UUID, RootUUID: &f.root.UUID}}, nil)
+		require.NoError(t, err)
+		input := f.request()
+		input.CollectionUUID, input.CollectionRevision = collection.UUID, collection.Revision
+		run, err := f.coordinator.Submit(t.Context(), token, input)
+		require.NoError(t, err)
+		return run
+	}
+	twitter := makeRun("native:twitter", "https://x.com/example")
+	otherTwitter := makeRun("native:twitter", "https://x.com/other")
+	_, token, err := f.service.IssueCredential(t.Context(), f.producer.UUID, []models.IngestScope{
+		{CollectionUUID: reddit.CollectionUUID, RootUUID: &f.root.UUID},
+		{CollectionUUID: twitter.CollectionUUID, RootUUID: &f.root.UUID},
+		{CollectionUUID: otherTwitter.CollectionUUID, RootUUID: &f.root.UUID},
+	}, nil)
+	require.NoError(t, err)
+	f.token = token
+
+	// Exercise the real transactional claim path with the same physical root,
+	// not just two unrelated temporary directories or metadata-only jobs.
+	start := make(chan struct{})
+	var group sync.WaitGroup
+	running := make([]*models.SourceRun, 2)
+	errs := make([]error, 2)
+	for i, run := range []*models.SourceRun{reddit, twitter} {
+		group.Go(func() {
+			<-start
+			running[i], errs[i] = f.coordinator.Claim(t.Context(), token, run.UUID, uuid.NewString(), run.PolicySHA256, time.Minute)
+		})
+	}
+	close(start)
+	group.Wait()
+	for i := range running {
+		require.NoError(t, errs[i])
+		require.NotNil(t, running[i], "independent services must both own their traversal")
+	}
+	require.Nil(t, f.claim(t, reddit), "the same traversal still has one owner")
+	require.Nil(t, f.claim(t, otherTwitter), "one site's shared destination remains serialized")
+	f.finish(t, running[1], "succeeded")
+	require.NotNil(t, f.claim(t, otherTwitter), "Reddit must not prevent the next Twitter account")
+	require.Equal(t, "running", f.find(t, reddit.UUID).State)
+}

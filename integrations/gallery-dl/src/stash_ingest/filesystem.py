@@ -8,6 +8,7 @@ from pathlib import Path
 import stat
 
 from .encoding import InvalidData
+from .publication_lock import PublicationBusy
 
 
 class Root:
@@ -92,7 +93,10 @@ def destination_lock(directory, root_uuid, relative, check):
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise InvalidData("Destination is held by another download worker") from None
+            # Different websites can legitimately converge on one output, or
+            # merely share a bounded lock bucket. Preserve the source run for
+            # retry instead of treating contention as invalid configuration.
+            raise PublicationBusy("Destination is held by another download worker") from None
         check()
         yield
     finally:

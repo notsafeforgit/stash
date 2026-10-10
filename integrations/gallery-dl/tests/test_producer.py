@@ -8,6 +8,7 @@ from stash_ingest.encoding import InvalidData, decode
 from stash_ingest.filesystem import Root, destination_lock
 from stash_ingest.outbox import Outbox
 from stash_ingest.producer import Producer
+from stash_ingest.publication_lock import PublicationBusy
 from stash_ingest.runs import SourcePaused, SourceTurnComplete
 from stash_ingest import source
 from helpers import PRODUCER, COLLECTION, ROOT, RUN
@@ -134,9 +135,11 @@ class ProducerTests(unittest.TestCase):
 
     def test_shared_destination_lock_fences_concurrent_workers(self):
         with destination_lock(self.locks, ROOT, "same-stem", self.producer.check):
-            with self.assertRaises(InvalidData):
+            with self.assertRaises(PublicationBusy):
                 with destination_lock(self.locks, ROOT, "same-stem", self.producer.check):
                     self.fail("Second writer acquired the destination")
+            with destination_lock(self.locks, ROOT, "different-stem", self.producer.check):
+                pass
         with destination_lock(self.locks, ROOT, "same-stem", self.producer.check):
             pass
 

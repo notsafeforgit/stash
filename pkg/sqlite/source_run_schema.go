@@ -7,6 +7,15 @@ import (
 )
 
 func validateSourceRunSchema(conn *sqlx.DB, version uint) error {
+	if version >= NativeSchemaBaseline+110 {
+		var unique bool
+		if err := conn.Get(&unique, `SELECT "unique" FROM pragma_index_list('source_runs') WHERE name='source_runs_running_destination'`); err != nil {
+			return err
+		}
+		if unique {
+			return errors.New("native database still serializes independent source destinations")
+		}
+	}
 	if version >= NativeSchemaBaseline+106 {
 		for _, name := range []string{"source_collection_aliases", "source_collection_alias_source", "source_collection_alias_immutable", "source_collection_alias_retained", "source_collection_alias_frozen", "source_run_retrievals", "source_run_retrieval_immutable", "source_run_retrieval_retained"} {
 			var exists bool

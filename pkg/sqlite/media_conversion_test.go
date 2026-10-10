@@ -21,6 +21,7 @@ import (
 
 func removeMediaConversionSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSourceSiteConcurrencySchema(t, raw)
 	if queryUint(t, raw, "SELECT count(*) FROM sqlite_schema WHERE name='media_conversions'") == 0 {
 		return
 	}

@@ -422,8 +422,9 @@ launchers.
 
 ### Host worker service and timer
 
-The templates in [`systemd/`](systemd/) provide one user service instance per
-producer runtime. The `host` instance reads
+The templates in [`systemd/`](systemd/) provide independent user service instances.
+Use one per source site so a long traversal does not occupy every site's worker.
+The `host` instance reads
 `~/.config/stash-ingest/host.env`; its profile list uses the
 [`stash-gallery-dispatch-v1` format](#dispatch-across-local-profiles). Configure
 the installed executable, durable outbox, Stash origin, registered producer
@@ -2770,6 +2771,31 @@ profiles have been checked. Saved
 metadata can therefore finish delivery even if its original website profile was
 removed or its access binding is unavailable. Native historical scope and
 ownership checks still apply; conflicting evidence remains retained for review.
+
+Each process executes one profile at a time because gallery-dl's configuration is
+process-global. To run different websites concurrently, generate separate dispatch
+lists with independent rotation identities:
+
+```sh
+python3 scripts/split_worker_profiles.py /private/worker-profiles.json
+```
+
+Run separate service instances with the generated `worker-dispatch-reddit.json`,
+`worker-dispatch-twitter.json`, etc. Each list includes that site's download,
+full-history and metadata profiles. They share the original producer UUID, outbox,
+reviewed profile files and physical filesystem lock directory. Do not copy or
+replace the outbox. Generic download profiles use the `manual` list. Host units
+can use `stash-ingest-worker@host-reddit.timer` with `host-reddit.env`, and an
+equivalent instance for each other site. Container workers likewise need separate
+processes and distinct container names selecting their site's dispatch list.
+Include the generated lists, unit definitions and environment files in backups.
+
+Schema 1000110 permits different services to share a media root concurrently.
+The same source/target remains fenced, overlapping destinations within one
+service stay serialized, and per-output locks protect shared filenames across
+sites. A busy file lock produces a retry without exhausting source failures.
+Backup barriers still wait for all active filesystem mutations. A website's
+cooldown can pause that site's workers independently of the other sites.
 
 Download entries use existing scoped run discovery. Enrichment entries require
 `enrichment_collections_protocol: 1`: Stash lists permitted active collections

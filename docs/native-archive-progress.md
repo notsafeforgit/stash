@@ -7,20 +7,34 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement is running; the controlled worker rollout remains
 in progress.
 
-## One source per Reddit profile — implementation, 2026-10-09
+## One source per Reddit profile — deployed, 2026-10-09
 
-Schema 1000106 replaces the six editable new/top/search definitions with one
-canonical profile source. Equivalent account, state, root, destination and policy
-bindings consolidate; historical aliases retain original receipts and runs.
-New n8n subscriptions create one source, producer calls keep internal per-pass
-coverage, and profile state gates historical pending work. Old links open the
-profile, and its activity includes previous retrievals using bounded queries.
+Schema **1000106** consolidates **2,553** standard Reddit retrieval
+definitions into **427 profile sources**, each with one canonical profile URL.
+New/top/search passes retain independent coverage internally. New n8n subscriptions
+create one source, and pausing a profile also gates its pending historical passes.
+Old source links open the profile; its activity includes previous retrievals.
+Subreddits, saved feeds and arbitrary searches remain separate sources.
+
+The full-copy rehearsal and production comparison preserved original run,
+request, attempt and source-definition records, metadata/translation policies,
+and media associations, with no conflicting groups. The deployment used the
+[GitHub source build](https://github.com/notsafeforgit/stash/actions/runs/38004612763) and
+[wrapper build](https://github.com/notsafeforgit/stash-s6/actions/runs/38006980918) pinned by verified GHCR digests.
+The published application's migration API saved its pre-migration database on
+the media volume. Host/n8n scraper runtimes were updated and queued work retained
+its original windows, progress and retry deadlines. The n8n service and its worker
+timer resumed. Live API lookup resolves all six passes to lila-gw's one profile;
+desktop/mobile checks verify old links open that profile's editor.
+
+Validation passed: Go lint/integration gate, UI build and 805 UI tests,
+670 producer tests, 146 archive tests, 12 library tests and 317 backup tests.
+Backup tools support the new retrieval receipts. The current backup publisher
+retains its sealed configuration until publication; its pending successor selects
+this release and its matching backup tools.
+Private release and migration evidence is under
+`.local/reddit-profile-sources-20261009/`.
 See [profile retrievals](native-source-collections.md#reddit-profile-retrievals).
-
-The production audit found 425 six-definition profiles and two partial groups,
-with no conflicting state, account or policy settings. Subreddits and saved feeds
-are separate sources. Rehearsal and release evidence is being retained in
-`.local/reddit-profile-sources-20261009/`; this section does not yet claim deployment.
 
 ## Historical Twitter filename recovery — 2026-10-09 UTC
 
@@ -77,16 +91,16 @@ also passed.
 
 ## Current release position — 2026-10-09 UTC
 
-Production is healthy on schema **1000105**, source
-`48cdadac2aaba7834e3984494700e7b04a90ecf2`, pinned wrapper
-`ghcr.io/notsafeforgit/stash-s6@sha256:f3f0b748098c691eaab87af8bf3b46d02d6f5dc10f3fe35a7819d36ca0d15869`.
+Production is healthy on schema **1000106**, source
+`89bf128a1a98aa2a686bf3946d1973e299929659`, pinned wrapper
+`ghcr.io/notsafeforgit/stash-s6@sha256:31a87131499b742aac60a6cc5c58875f2cda898f7191e111ae3488c389a0437e`.
 The verified source image is
-`ghcr.io/notsafeforgit/stash@sha256:ebfdef660c9b3411ed74325df2d723dd6516d9c313e2079687d8e8bf7d3dc009`,
+`ghcr.io/notsafeforgit/stash@sha256:bb7a6bb63e19d542f97cb3af47ec195b6081415c7ed3ec7ce84fba5139c95531`,
 with wrapper source `4f0f0594e95e000a75e4819f2494c3a44ce7f04d`.
-The deployment required no schema migration. After the completed backfill,
-the root filesystem has 55.2 GiB free. Release receipts and the binary retained
-for future backup validation are recorded under
-`.local/twitter-album-recovery-20261009/`.
+The source consolidation and matching producer deployment are recorded under
+`.local/reddit-profile-sources-20261009/`; the current worker timer is active.
+The current backup publisher retains its sealed configuration until publication;
+its pending successor selects this release and its matching backup tools.
 The explicit [catalog association repair](catalog-association-repair.md) now
 promotes unambiguous imported post-account claims and known author directories
 to ordinary publisher decisions. Accounts without an ownership choice can link
@@ -176,8 +190,10 @@ The confusing disabled entries were imported catalog groupings, distinct from
 the URL-bearing scrape targets. A reviewed repair activated 138 such groupings
 with exact migration-generated state, an active root and an active listed
 target for the same account and directory. This includes the `lila-gw, reddit`
-grouping; its six scrape targets were already active. Unrelated disabled or
-retired entries were left unchanged. Desktop and mobile checks passed.
+grouping. Before schema 1000106, its six retrieval definitions were enabled;
+there were no native run records attached to those definitions, so this did not
+establish scrape execution. They now appear as one profile source. Unrelated
+disabled or retired entries were left unchanged. Desktop and mobile checks passed.
 
 The n8n producer now runs immutable image ID
 `c2e1344642a3432031adf74ec2fbfa62aa6aeee94bac84f934bd8e5dddf477b2`.

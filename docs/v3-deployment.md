@@ -162,6 +162,14 @@ shares and offline assets without a UI flag. Verify native schema lineage,
 import/reconciliation receipts and worker health separately; an HTTP health
 response alone does not establish archive completeness.
 
+When an update requires a schema migration, wait for the migration job's
+`FINISHED` status as well as the expected schema and `systemStatus: OK` before
+updating scraper policies or resuming workers. Schema readiness can become
+visible while post-migration optimization still holds the write guard; native
+administrative writes return `temporarily_unavailable` during that interval.
+Retry an interrupted policy update with its retained request UUID and body after
+the migration job finishes.
+
 If startup fails, inspect that unit's journal and container logs before retrying.
 Never run the frozen binary against a database after native writes begin.
 Rollback follows the coordinated restore/export boundary in

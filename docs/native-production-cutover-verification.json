@@ -2533,19 +2533,26 @@
       "retry_started_at": "2026-10-10T11:51:24Z",
       "service": "rclone-backup-homedir.service",
       "pid": 1513750,
-      "status": "running_general_home_sync",
-      "checked_at": "2026-10-10T17:12:00.844064+00:00",
+      "status": "uploading_original_captured_snapshots_first",
+      "checked_at": "2026-10-10T17:31:11.570897+00:00",
       "service_state": {
-        "ActiveState": "activating",
-        "SubState": "start",
-        "UnitFileState": "disabled",
-        "NeedDaemonReload": "no",
-        "MainPID": "1513750",
-        "ControlPID": "0",
-        "Result": "success"
+        "service": "rclone-backup-homedir-resume-20261010.service",
+        "ActiveState": "active",
+        "SubState": "running",
+        "MainPID": 2793561
       },
       "native_snapshot_remote_completion_observed": false,
-      "note": "The existing invocation is moving retired development files to its remote backup directory. Its native snapshot sync follows the ordinary home sync. It has not been restarted or duplicated."
+      "note": "General home cleanup delayed the captured native/producer copies. At 17:29:03 UTC the original stage was retained by directory rename, preserving every file identity, and upload resumed snapshots-first under the same lock and remote backup directory. No recapture or integrity rescan; future normal invocations use the same new order. Stash and scrapers were not restarted.",
+      "priority_deployment": {
+        "evidence": ".local/home-backup-priority-20261010/deployment.json",
+        "sha256": "927da49d178ee9589bd4ee4b81681f61f4c03b18614132ec08f694dd3f6f8ec8",
+        "retained_at": "2026-10-10T17:29:03.427767+00:00",
+        "retained_stage": "/tank/stash-native-backup/home-staging/resume-20261010-1513750",
+        "original_pid": 1513750,
+        "started_at": "2026-10-10T17:29:03.504847+00:00",
+        "installed_sha256": "28b0341b28734aa363f8f39411d103413aff4366a43c98e61f7c3de91f1da3a1",
+        "resume_unit": "rclone-backup-homedir-resume-20261010.service"
+      }
     },
     "source_runs": [
       {
@@ -3118,7 +3125,7 @@
     "review_items": {
       "account_link_choices": "The prior targeted repair left 91 tracked undecided accounts. Name-only/ambiguous candidates remain review work, not permission to invent ownership.",
       "source_backlog": "Scheduled profiles and historical retrieval passes are still draining; completed sample runs do not certify every profile.",
-      "supplementary_home_backup": "Observe the existing native snapshot sync after general home sync.",
+      "supplementary_home_backup": "Observe the original captured snapshot upload, now prioritized ahead of general home cleanup; retained staged files and durable phase completion allow retry without recapture.",
       "translation_retries": "Operational follow-up: observe the 64 existing retries after the tested length correction. Their deadlines were not reset, and waiting for all completions is not a separate merge gate.",
       "owner_acceptance": "Required by the original goal before merging v3-rewrite directly into develop."
     },

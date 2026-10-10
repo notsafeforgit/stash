@@ -7,6 +7,30 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running. Independent
 restore verification passed; scheduled-work observation remains in progress.
 
+## Supplementary home backup upload order — 2026-10-10
+
+The general home sync was moving retired development files into Drive's dated
+backup directory before uploading the captured native database and producer
+snapshots. Future runs now upload those stable snapshots first, using the same
+two disjoint filter sets, daily timer and retention policy.
+
+The existing run's staging directory was renamed before its process stopped,
+preserving all 913 file identities and its original native snapshot receipt.
+Its replacement resumes the captured files under the same home-backup lock and
+remote backup directory; it does not request another database backup or repeat
+the native integrity scan. Successful upload phases are recorded so retries
+retain their progress. The failure/retry fixture and shell syntax checks pass.
+Stash and scraper processes were not restarted.
+
+The resumed upload started at 17:29:03 UTC. Completion remains pending;
+`rclone-backup-homedir-resume-20261010.service` retains the stage on failure.
+The installed home script hash is
+`28b0341b28734aa363f8f39411d103413aff4366a43c98e61f7c3de91f1da3a1`.
+Evidence and the exact before/after script are under
+`.local/home-backup-priority-20261010/`. These supplementary database/worker
+copies remain independently captured; the verified S3 archive is the complete
+coordinated recovery bundle.
+
 ## Translation request length — deployed, 2026-10-10
 
 The final worker check found 64 translation jobs repeatedly returning

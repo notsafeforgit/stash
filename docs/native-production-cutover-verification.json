@@ -5,7 +5,7 @@
   "public_native_activated": true,
   "legacy_writers_paused": true,
   "original_database_unchanged": true,
-  "source_revision": "7d666a6f5ffa5f620904b0f2bb7f4c8ff07d970c",
+  "source_revision": "e92f0849e69e68b06a015052ab01b8f4bd9ac3d1",
   "producer_backup_revision": "d863a41af893bcdc341bc3021cca02eff8ebeebd",
   "library_reconciliation": {
     "status": "passed",
@@ -2302,34 +2302,34 @@
   "promotion_native_schema": 1000099,
   "promotion_source_revision": "0ea2c05fbc20356929c561f2173386a14870fdb7",
   "latest_rollout": {
-    "checked_at": "2026-10-10T11:51:24.429644+00:00",
+    "checked_at": "2026-10-10T12:30:25.923824+00:00",
     "scope": "Current rollout observations; earlier preparation and reconciliation records retain their original scope and date.",
     "application": {
-      "evidence": ".local/publication-retry-20261010/registry-deployment.json",
-      "sha256": "aaf775045228dd82610261b8b43e48c1f977d81ea6d9f922d52225812b270429",
-      "source_revision": "7d666a6f5ffa5f620904b0f2bb7f4c8ff07d970c",
+      "evidence": ".local/n8n-worker-errors-20261010/registry-deployment.json",
+      "sha256": "97df2fa4a8407215506e2e76e190694005f031ec3f9d9738a76a9c5f0527e6b5",
+      "source_revision": "e92f0849e69e68b06a015052ab01b8f4bd9ac3d1",
       "source_run": {
         "conclusion": "success",
-        "headSha": "7d666a6f5ffa5f620904b0f2bb7f4c8ff07d970c",
+        "headSha": "e92f0849e69e68b06a015052ab01b8f4bd9ac3d1",
         "status": "completed",
-        "url": "https://github.com/notsafeforgit/stash/actions/runs/38048153906"
+        "url": "https://github.com/notsafeforgit/stash/actions/runs/38050563300"
       },
       "wrapper_run": {
         "conclusion": "success",
         "headSha": "4f0f0594e95e000a75e4819f2494c3a44ce7f04d",
         "status": "completed",
-        "url": "https://github.com/notsafeforgit/stash-s6/actions/runs/38049194101"
+        "url": "https://github.com/notsafeforgit/stash-s6/actions/runs/38051628305"
       },
-      "source_image": "ghcr.io/notsafeforgit/stash@sha256:325e9972f5e9201199ef6af598174d6a6dfd8e63a3c26919ec03444ee96239c1",
-      "wrapper_image": "ghcr.io/notsafeforgit/stash-s6@sha256:048937d02a323149090a069ad32393667d070f0aa696a619808ba977e91d39ea",
+      "source_image": "ghcr.io/notsafeforgit/stash@sha256:1142ad93de040495dd21b2fd18ce8170f699d27a7c8bb4ee70ba81b9a64caf4b",
+      "wrapper_image": "ghcr.io/notsafeforgit/stash-s6@sha256:773be803d327f8b72a31b86905d80c3a6e501617040609736bde7dc4fc39e2d8",
       "native_schema": 1000109
     },
     "deployment": {
-      "evidence": ".local/publication-retry-20261010/deployment-result.json",
-      "sha256": "29e283358440a4c78a81cb1cad4e52d5052c2953950257a842592c104a972c73",
+      "evidence": ".local/n8n-worker-errors-20261010/deployment-result.json",
+      "sha256": "d2181fb620774bd42d890e26328a333227a3ab522da28848c7ef53a123c9d6aa",
       "status": "deployed",
       "schema_changed": false,
-      "deployed_at": "2026-10-10T11:45:02.719524+00:00"
+      "deployed_at": "2026-10-10T12:28:53.645273+00:00"
     },
     "producer": {
       "evidence": ".local/publication-retry-20261010/producer-live-check.json",
@@ -2501,10 +2501,10 @@
       "isolated_restore_complete": false
     },
     "future_backup_configuration": {
-      "evidence": ".local/publication-retry-20261010/backup-config-activation.json",
-      "sha256": "202dc88bc94f243530186a752ebe1d4b48f748262185f017a2b15faeec271e9f",
+      "evidence": ".local/n8n-worker-errors-20261010/backup-config-activation.json",
+      "sha256": "ea892e74da80c02c33db034c7f2b965c6a2bf000ac4641383cb4630fc897e3de",
       "status": "waiting_for_backup",
-      "source_revision": "7d666a6f5ffa5f620904b0f2bb7f4c8ff07d970c"
+      "source_revision": "e92f0849e69e68b06a015052ab01b8f4bd9ac3d1"
     },
     "home_backup": {
       "last_failed_at": "2026-10-10T10:00:01Z",
@@ -2513,7 +2513,16 @@
       "retry_started_at": "2026-10-10T11:51:24Z",
       "service": "rclone-backup-homedir.service",
       "pid": 1513750,
-      "status": "retry_running"
+      "status": "retry_running",
+      "checked_at": "2026-10-10T12:30:25.923824+00:00",
+      "service_state": {
+        "ActiveState": "activating",
+        "SubState": "start",
+        "MainPID": "1513750",
+        "Result": "success",
+        "ExecMainStartTimestamp": "Sat 2026-10-10 04:51:24 PDT",
+        "ExecMainExitTimestamp": ""
+      }
     },
     "source_runs": [
       {
@@ -2524,7 +2533,7 @@
       {
         "state": "deferred",
         "error_code": "not_found",
-        "count": 4
+        "count": 5
       },
       {
         "state": "deferred",
@@ -2534,7 +2543,7 @@
       {
         "state": "queued",
         "error_code": "",
-        "count": 1337
+        "count": 1334
       },
       {
         "state": "queued",
@@ -2544,7 +2553,7 @@
       {
         "state": "queued",
         "error_code": "lease_expired",
-        "count": 2
+        "count": 3
       },
       {
         "state": "queued",
@@ -2564,7 +2573,7 @@
       {
         "state": "succeeded",
         "error_code": "",
-        "count": 62
+        "count": 67
       }
     ],
     "native_jobs": [
@@ -2596,7 +2605,7 @@
       {
         "kind": "media.verify",
         "state": "succeeded",
-        "count": 56982
+        "count": 58743
       },
       {
         "kind": "post.enrich",
@@ -2628,6 +2637,89 @@
       "status": "original_attempt_running",
       "run_id": "20261010_015141_781770",
       "checkpoint_uuid": "4fb711ad-5bfc-4b66-8023-ff1515fdfcd4"
+    },
+    "producer_changed": false,
+    "backup_reader_fix": {
+      "diagnosis": {
+        "evidence": ".local/n8n-worker-errors-20261010/diagnosis.json",
+        "sha256": "f35da1d691435e19d5ecd02afaea7e484982bc2ad6cf5303278b66cb6a0d5ab1",
+        "cause": "Database.Backup occupies sole writeDB connection during VACUUM INTO",
+        "backup_started_utc": "2026-10-10T11:51:24Z",
+        "copy_ended_utc": "2026-10-10T11:52:35Z",
+        "request_admitted_utc": "2026-10-10T11:53:41Z"
+      },
+      "local_validation": {
+        "evidence": ".local/n8n-worker-errors-20261010/local-validation.json",
+        "sha256": "5021d3ae0a675e6e7c0ef582c7e69b1517be8a6aba3d5aabcb887e3d6dbf13e1",
+        "status": "passed",
+        "old_implementation_regression": "failed as expected waiting for application writer",
+        "schema_changed": false,
+        "producer_changed": false
+      }
+    },
+    "worker_error_recovery": {
+      "evidence": ".local/n8n-worker-errors-20261010/live-verification.json",
+      "sha256": "ae82b7061bcac92203071e8632e0ac38dea9aef392aebaa0fa1c28ccca2e0d6d",
+      "status": "deployed",
+      "checked_at": "2026-10-10T12:30:25.923824+00:00",
+      "services": {
+        "stash.service": {
+          "ActiveState": "active",
+          "SubState": "running",
+          "MainPID": "1635673",
+          "Result": "success",
+          "ExecMainStartTimestamp": "Sat 2026-10-10 05:24:39 PDT",
+          "ExecMainExitTimestamp": ""
+        },
+        "n8n.service": {
+          "ActiveState": "active",
+          "SubState": "running",
+          "MainPID": "1510142",
+          "Result": "success",
+          "ExecMainStartTimestamp": "Sat 2026-10-10 04:50:25 PDT",
+          "ExecMainExitTimestamp": ""
+        },
+        "stash-native-n8n-worker.timer": {
+          "ActiveState": "active",
+          "SubState": "running",
+          "Result": "success"
+        },
+        "stash-ingest-worker@host.timer": {
+          "ActiveState": "active",
+          "SubState": "waiting",
+          "Result": "success"
+        },
+        "rclone-backup-homedir.service": {
+          "ActiveState": "activating",
+          "SubState": "start",
+          "MainPID": "1513750",
+          "Result": "success",
+          "ExecMainStartTimestamp": "Sat 2026-10-10 04:51:24 PDT",
+          "ExecMainExitTimestamp": ""
+        }
+      },
+      "affected_runs": [
+        {
+          "uuid": "352966a5-ce96-44e6-9262-abde35aea330",
+          "state": "queued",
+          "fence": 9,
+          "progress": "{\"items_seen\":5,\"files_completed\":1,\"cursor\":\"6cb234fba97043b8e20910c964f87c9cedb01d0baa3fa92c1fa2cc0b697ba759\"}",
+          "window": null,
+          "pending": "[{\"since\":\"2026-09-28T00:00:00Z\",\"until\":\"2026-10-08T18:06:56.619Z\"}]",
+          "completed": "[]",
+          "error_code": "lease_expired"
+        },
+        {
+          "uuid": "b4f52ff3-1397-4858-8031-b8c2dfc70706",
+          "state": "running",
+          "fence": 37,
+          "progress": "{\"items_seen\":603,\"files_completed\":449,\"cursor\":\"4124d9d8d4532477a9773650a3d7e1d7c426e7d9398703157f8db92f71c1b319\"}",
+          "window": "{\"since\":null,\"until\":\"2026-10-09T14:18:26.985Z\"}",
+          "pending": "[]",
+          "completed": "[]",
+          "error_code": ""
+        }
+      ]
     }
   }
 }

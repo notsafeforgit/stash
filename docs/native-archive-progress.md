@@ -7,7 +7,7 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
-## Backup interference with native workers — fixed, publication pending, 2026-10-10
+## Backup interference with native workers — deployed, 2026-10-10
 
 The supplementary Google Drive backup started its database copy at 11:51:24 UTC.
 The ordinary `backupDatabase` path held Stash's sole write connection through
@@ -26,7 +26,16 @@ open, includes only committed data, and remains a valid standalone database.
 Closed-database/literal-path backup and existing source metadata, translation
 and checkpoint backup regressions pass. The schema and producer runtime are
 unchanged. No extra production backup or cloud restore was started for this
-check. GitHub/GHCR publication and deployment remain pending; evidence is under
+check. The full GitHub validation gate and both the
+[source publisher](https://github.com/notsafeforgit/stash/actions/runs/38050563300)
+and [wrapper publisher](https://github.com/notsafeforgit/stash-s6/actions/runs/38051628305)
+passed. Production runs their verified GHCR digest from source
+`e92f0849e69e68b06a015052ab01b8f4bd9ac3d1`; health passed at 12:28:53 UTC at
+unchanged schema 1000109. n8n was not restarted and worker timers were not paused.
+The next n8n cycle reached Stash with no pending or review delivery events. The
+continuing full-history run now retains 603 items / 449 completed files.
+The original backup and restore remain intact; selecting this release for future
+backups waits for the existing backup's publication lock. Evidence is under
 `.local/n8n-worker-errors-20261010/`.
 
 ## Existing performer profile URL associations — applied, 2026-10-10
@@ -62,7 +71,7 @@ the affected SQLite suites and the complete GitHub validation gate passed.
 
 The [source publisher](https://github.com/notsafeforgit/stash/actions/runs/38048153906)
 and [wrapper publisher](https://github.com/notsafeforgit/stash-s6/actions/runs/38049194101)
-passed, and production now runs source `7d666a6f5ffa5f620904b0f2bb7f4c8ff07d970c`
+passed, and that rollout selected source `7d666a6f5ffa5f620904b0f2bb7f4c8ff07d970c`
 at unchanged schema 1000109. The server was updated before its producers. The
 verified wheel matches all 129 source modules; all 22 host and ten n8n profiles
 retain their definitions. Existing APIs approved the runtime for 1,365 pending
@@ -573,13 +582,14 @@ also passed.
 ## Current release position — 2026-10-10 UTC
 
 Production is healthy on schema **1000109**, source
-`7d666a6f5ffa5f620904b0f2bb7f4c8ff07d970c`, pinned wrapper
-`ghcr.io/notsafeforgit/stash-s6@sha256:048937d02a323149090a069ad32393667d070f0aa696a619808ba977e91d39ea`.
+`e92f0849e69e68b06a015052ab01b8f4bd9ac3d1`, pinned wrapper
+`ghcr.io/notsafeforgit/stash-s6@sha256:773be803d327f8b72a31b86905d80c3a6e501617040609736bde7dc4fc39e2d8`.
 The verified source image is
-`ghcr.io/notsafeforgit/stash@sha256:325e9972f5e9201199ef6af598174d6a6dfd8e63a3c26919ec03444ee96239c1`,
+`ghcr.io/notsafeforgit/stash@sha256:1142ad93de040495dd21b2fd18ce8170f699d27a7c8bb4ee70ba81b9a64caf4b`,
 with wrapper source `4f0f0594e95e000a75e4819f2494c3a44ce7f04d`.
-The application and producer rollout is recorded under
-`.local/publication-retry-20261010/`; the six paused timers have resumed. The
+The application backup fix is recorded under
+`.local/n8n-worker-errors-20261010/`. The unchanged producer rollout is recorded
+under `.local/publication-retry-20261010/`; its six original timers are active. The
 coordinated post-write backup has published successfully. The current scheduled
 backup retains its original sealed view, configuration and validator. A deferred
 configuration handoff will select this application and producer release for

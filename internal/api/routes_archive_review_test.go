@@ -21,7 +21,12 @@ import (
 func TestArchiveReviewQueueHTTPPopulatedContracts(t *testing.T) {
 	_, repo, input := nativeMetadataReviewFixture(t)
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
-		if _, err := repo.SourceAccount.Create(ctx, "native:reddit", "Review account"); err != nil {
+		account, err := repo.SourceAccount.Create(ctx, "native:reddit", "Review account")
+		if err != nil {
+			return err
+		}
+		if _, err := repo.SourceCollection.Put(ctx, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
+			Label: "Subscribed account", Kind: "account", Namespace: account.Namespace, State: "active", AccountUUID: &account.UUID}}); err != nil {
 			return err
 		}
 		post, err := repo.SourceEvidence.EnsurePost(ctx, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "review-queue"}, "")

@@ -243,11 +243,27 @@ export function AccountEditor({
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
+            {!account.tracked && !account.redirect_to && (
+              <Alert>
+                <AlertTitle>
+                  {msg("account_review.incidental", "Incidental post author")}
+                </AlertTitle>
+                <AlertDescription>
+                  {msg(
+                    "account_review.incidental_help",
+                    "Kept for post attribution, outside your account review queue. Adding a source for this account or making an ownership choice includes it in tracked accounts.",
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
             <div>
               <p className="text-sm text-muted-foreground">
                 {msg("account_review.current_owner", "Current owner")}
               </p>
-              <AccountOwner ownership={account.ownership} />
+              <AccountOwner
+                ownership={account.ownership}
+                tracked={account.tracked}
+              />
             </div>
             {account.redirect_to ? (
               <Alert>

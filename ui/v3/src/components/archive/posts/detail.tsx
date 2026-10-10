@@ -169,7 +169,10 @@ function PostPublishers({ id, api }: { id: string; api: SourcePostAPI }) {
               <span className="text-sm text-muted-foreground">
                 {msg("source_posts.owner", "Account owner")}
               </span>
-              <AccountOwner ownership={account.ownership} />
+              <AccountOwner
+                ownership={account.ownership}
+                tracked={account.tracked}
+              />
             </CardContent>
             <CardFooter>
               <Link

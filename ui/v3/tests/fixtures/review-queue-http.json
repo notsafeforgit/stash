@@ -3,16 +3,17 @@
     "kind": "accounts",
     "items": [
       {
-        "uuid": "b9b47a0d-2589-4347-8eab-6466eae77248",
+        "uuid": "e7ef8340-fbf1-4a2a-bb07-7c64037f7e5a",
         "reasons": ["account_owner_undecided"],
         "account": {
-          "uuid": "b9b47a0d-2589-4347-8eab-6466eae77248",
+          "uuid": "e7ef8340-fbf1-4a2a-bb07-7c64037f7e5a",
           "namespace": "native:reddit",
           "label": "Review account",
           "revision": 1,
-          "canonical_uuid": "b9b47a0d-2589-4347-8eab-6466eae77248",
+          "canonical_uuid": "e7ef8340-fbf1-4a2a-bb07-7c64037f7e5a",
           "identifiers": [],
-          "more_identifiers": false
+          "more_identifiers": false,
+          "tracked": true
         }
       }
     ],
@@ -22,14 +23,14 @@
     "kind": "media",
     "items": [
       {
-        "uuid": "50765ed7-5081-433e-8f66-e07ba1d49a47",
+        "uuid": "708ec65c-ce20-491d-9c4c-f77581c4f532",
         "reasons": ["media_unselected"],
         "post": {
-          "requested_uuid": "50765ed7-5081-433e-8f66-e07ba1d49a47",
-          "uuid": "50765ed7-5081-433e-8f66-e07ba1d49a47",
+          "requested_uuid": "708ec65c-ce20-491d-9c4c-f77581c4f532",
+          "uuid": "708ec65c-ce20-491d-9c4c-f77581c4f532",
           "state": "active",
           "revision": 3,
-          "created_at": "2026-10-07T08:58:47Z",
+          "created_at": "2026-10-10T00:33:26Z",
           "identifiers": [
             {
               "namespace": "native:reddit",
@@ -40,12 +41,12 @@
           "urls": [],
           "more_urls": false,
           "latest_capture": {
-            "uuid": "71cf926b-0015-4c6c-8e78-5064910db56f",
-            "post_uuid": "50765ed7-5081-433e-8f66-e07ba1d49a47",
-            "revision_uuid": "6fdd1d6a-a9a6-4313-9f27-fb1c3283cd24",
+            "uuid": "a734129a-cd8e-4611-8461-8befeaffe279",
+            "post_uuid": "708ec65c-ce20-491d-9c4c-f77581c4f532",
+            "revision_uuid": "1118d205-f691-4112-a7dd-19079c0e3d34",
             "origin": "gallery-dl",
             "platform": "reddit",
-            "captured_at": "2026-10-07T08:58:47.143373036Z",
+            "captured_at": "2026-10-10T00:33:26.448179788Z",
             "recorded_at": null,
             "title": "Retained post",
             "title_truncated": false,
@@ -61,10 +62,10 @@
     "kind": "metadata",
     "items": [
       {
-        "uuid": "50086c5a-47e9-430f-bbfb-6b08ec63f039",
+        "uuid": "888aefbd-17d8-4210-acae-70ee9e5328a9",
         "reasons": ["retained_metadata"],
         "media": {
-          "uuid": "50086c5a-47e9-430f-bbfb-6b08ec63f039",
+          "uuid": "888aefbd-17d8-4210-acae-70ee9e5328a9",
           "kind": "scene",
           "state": "active",
           "revision": 1,

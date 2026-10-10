@@ -41,6 +41,24 @@ selection for folder scans. **Media roots** provides folder registration and
 binding review. Historical policy import and live worker activation remain
 unfinished.
 
+## Account review and incidental authors
+
+Account review defaults to **Tracked accounts**: accounts directly associated
+with a current source collection, including an imported account folder, or with
+an explicit ownership choice. Pausing a source retains that association. Old
+source revisions and superseded Reddit retrieval definitions do not independently
+add accounts to review. Consolidated account identities resolve to one entry.
+
+An author encountered in a subreddit, saved-post feed, repost or other account's
+scrape remains available for post attribution. Downloaded media and captured
+profile metadata alone do not add that author to the account review queue or
+the general review inbox. **All known accounts** exposes these incidental authors
+when needed; their details explain why they are outside the default queue.
+Adding a direct source association or making an ownership choice brings the
+account into the tracked scope. Source account pickers and identity lookups still
+search all known accounts. No captured attribution, media, or account evidence
+is deleted by this filtering.
+
 ## Media roots and server folders
 
 Open **Media roots** from the desktop utility menu or mobile navigation drawer.

@@ -80,7 +80,7 @@ function ReviewedAccount({
       <p data-selectable-text className="text-xs wrap-anywhere">
         {account.uuid}
       </p>
-      <AccountOwner ownership={account.ownership} />
+      <AccountOwner ownership={account.ownership} tracked={account.tracked} />
       {account.identifiers.map((item) => (
         <p
           key={item.uuid}

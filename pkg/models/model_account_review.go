@@ -12,6 +12,7 @@ type AccountReviewFilter struct {
 	Query     string
 	Namespace string
 	Ownership AccountOwnershipState
+	Scope     string // tracked (default) or all, including incidental post authors
 	Limit     int
 }
 
@@ -51,6 +52,7 @@ type AccountReviewState struct {
 	Ownership       *AccountReviewOwnership   `json:"ownership,omitempty"`
 	Identifiers     []AccountReviewIdentifier `json:"identifiers"`
 	MoreIdentifiers bool                      `json:"more_identifiers"`
+	Tracked         bool                      `json:"tracked"`
 }
 
 type AccountOwnershipReviewInput struct {

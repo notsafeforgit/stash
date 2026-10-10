@@ -32,6 +32,7 @@ async function archive(
     firstPageFails?: boolean;
     accountFailsAfterCommit?: boolean;
     many?: boolean;
+    incidental?: boolean;
   } = {},
 ) {
   let current = options.linked
@@ -41,6 +42,7 @@ async function archive(
         request_uuid: ids.request,
       })
     : account();
+  if (options.incidental) current = { ...current, tracked: false };
   let committed: OwnershipReceipt | null = null;
   let stale = options.stale;
   let stalePreview = options.stalePreview;
@@ -75,6 +77,7 @@ async function archive(
       else
         result =
           (!status || status === (current.ownership?.state ?? "undecided")) &&
+          (current.tracked || url.searchParams.get("scope") === "all") &&
           (!q || current.label.includes(q))
             ? [current]
             : [];
@@ -192,6 +195,59 @@ async function choosePerformer(page: Page, other = false) {
     .getByRole("button", { name: "Preview ownership", exact: true })
     .click();
 }
+
+test("keeps incidental post authors outside the default queue and allows deliberate review", async ({
+  page,
+}) => {
+  const remote = await archive(page, { incidental: true });
+  await page.goto("/account-review");
+  await expect(
+    page.getByText("No accounts on this page", { exact: true }),
+  ).toBeVisible();
+  expect(remote.lists.at(-1)?.searchParams.get("scope")).toBe("tracked");
+  await page
+    .getByRole("button", { name: "All known accounts", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Find accounts", exact: true })
+    .click();
+  await expect(page).toHaveURL(/scope=all/);
+  await expect(
+    page.getByText("Incidental post author", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Review account", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "Kept for post attribution, outside your account review queue.",
+      { exact: false },
+    ),
+  ).toBeVisible();
+  await expect(page.getByText("Needs review", { exact: true })).toBeHidden();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    )
+    .toBe(true);
+  expect(remote.writes).toHaveLength(0);
+  await choosePerformer(page);
+  await page
+    .getByRole("button", { name: "Apply ownership change", exact: true })
+    .click();
+  await expect(
+    page.getByText("Ownership choice saved", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Kept for post attribution, outside your account review queue.",
+      { exact: false },
+    ),
+  ).toBeHidden();
+  expect(remote.writes).toHaveLength(1);
+});
 
 test("previews an explicit performer choice and refreshes only the affected account", async ({
   page,

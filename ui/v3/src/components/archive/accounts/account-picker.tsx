@@ -56,7 +56,12 @@ export function AccountPicker({
         const rows = accountUUIDSchema.safeParse(query).success
           ? [await api.account(query, controller.signal)]
           : await api.accounts(
-              { q: query, namespace: source.namespace, ownership: "all" },
+              {
+                q: query,
+                namespace: source.namespace,
+                ownership: "all",
+                scope: "all",
+              },
               "",
               controller.signal,
             );

@@ -27,6 +27,8 @@ func TestArchiveReviewQueueAccountsPreserveUnlinksAndDistinctAmbiguousAccounts(t
 	one, two := createSourceAccount(t, repo, "native:reddit"), createSourceAccount(t, repo, "native:reddit")
 	for _, account := range []*models.SourceAccount{one, two} {
 		observeAccount(t, repo, account.UUID, models.AccountReference{Namespace: account.Namespace, Kind: "handle", Value: "ambiguous"}, accountEvidence())
+		putSourceCollection(t, repo, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
+			Label: "Subscribed account", Kind: "account", Namespace: account.Namespace, State: "active", AccountUUID: &account.UUID}})
 	}
 	first := archiveQueue(t, repo, "accounts", "", 1)
 	require.Len(t, first.Items, 1)

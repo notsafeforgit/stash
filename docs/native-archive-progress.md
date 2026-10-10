@@ -7,6 +7,25 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement is running; the controlled worker rollout remains
 in progress.
 
+## Incidental post authors outside account review — implementation, 2026-10-10
+
+Account review and the general review inbox now default to accounts with a direct
+current source association or an ownership choice. Merely capturing an author
+through a subreddit, saved feed, repost or another profile creates attribution,
+not account review work. All known accounts remains searchable, with an explicit
+incidental-author label. Adding a source or reviewing ownership automatically
+includes that account. Source pickers and exact identity lookups still see all
+accounts, including consolidation candidates.
+
+This changes no schema or captured data. The production audit identified 100
+incidental authors; the reported Herb-Anderson example came from the
+ZeldaHentaiAI subreddit. Three additional accounts had real imported OnlyFans
+folders with missing account associations. Those associations were repaired
+through the native API, preserving their existing disabled metadata rules, so
+they remain in tracked-account review. Validation and publication are pending;
+this section does not yet claim deployment.
+See [account review scope](native-source-collections.md#account-review-and-incidental-authors).
+
 ## One source per Reddit profile — deployed, 2026-10-09
 
 Schema **1000106** consolidates **2,553** standard Reddit retrieval

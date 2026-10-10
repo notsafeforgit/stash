@@ -47,6 +47,7 @@ it("uses bounded, scoped account and evidence lookups with session requests and 
     limit: "25",
     q: "river%_",
     namespace: "native:reddit",
+    scope: "tracked",
     ownership: "linked",
     after: ids.otherAccount,
   });
@@ -63,6 +64,11 @@ it("uses bounded, scoped account and evidence lookups with session requests and 
   expect(urls[2]?.searchParams.get("after")).toBe("capture:first");
   expect(urls[3]?.searchParams.get("after")).toBe("7");
   expect(urls[4]?.searchParams.has("ownership")).toBe(false);
+  expect(urls[4]?.searchParams.get("scope")).toBe("tracked");
+  await api.accounts({ ...filter, scope: "all" });
+  expect(
+    new URL(String(transport.mock.calls[5]?.[0])).searchParams.get("scope"),
+  ).toBe("all");
   expect(transport.mock.calls[0]?.[1]).toMatchObject({
     method: "GET",
     credentials: "same-origin",

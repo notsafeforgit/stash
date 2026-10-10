@@ -38,7 +38,8 @@ func (rs *nativeArchiveRoutes) reviewAccounts(w http.ResponseWriter, r *http.Req
 	err = rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
 		var err error
 		result, err = rs.repo.SourceAccount.ReviewAccounts(ctx, models.AccountReviewFilter{After: after, Limit: limit,
-			Query: r.URL.Query().Get("q"), Namespace: r.URL.Query().Get("namespace"), Ownership: models.AccountOwnershipState(r.URL.Query().Get("ownership"))})
+			Query: r.URL.Query().Get("q"), Namespace: r.URL.Query().Get("namespace"), Ownership: models.AccountOwnershipState(r.URL.Query().Get("ownership")),
+			Scope: r.URL.Query().Get("scope")})
 		return err
 	})
 	if err != nil {

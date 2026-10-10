@@ -85,6 +85,18 @@ func TestNativeAccountReviewHTTPExplicitSelectionRecoveryAndDiscovery(t *testing
 	}
 	account := getAccount()
 	require.Nil(t, account.Ownership)
+	require.False(t, account.Tracked)
+	for _, scope := range []string{"", "tracked", "all"} {
+		w := request(http.MethodGet, "/source-accounts?scope="+scope, nil)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var page []models.AccountReviewState
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &page))
+		if scope == "all" {
+			require.Len(t, page, 2)
+		} else {
+			require.Empty(t, page, "observed identifiers alone do not create review work")
+		}
+	}
 	require.True(t, account.MoreIdentifiers)
 	require.Len(t, account.Identifiers, 8)
 	w := request(http.MethodGet, "/source-accounts/lookup?namespace=native%3Areddit&kind=handle&value=Shared&limit=1", nil)
@@ -138,6 +150,7 @@ func TestNativeAccountReviewHTTPExplicitSelectionRecoveryAndDiscovery(t *testing
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &saved))
 	require.Equal(t, receipt, saved)
 	require.Equal(t, 2, *getAccount().Ownership.Performer.LocalID)
+	require.True(t, getAccount().Tracked)
 	w = request(http.MethodGet, "/source-accounts?ownership=linked&q=shared&namespace=native%3Areddit", nil)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &candidates))
@@ -177,7 +190,7 @@ func TestNativeAccountReviewHTTPExplicitSelectionRecoveryAndDiscovery(t *testing
 	require.Equal(t, models.AccountOwnershipUnlinked, history[0].State)
 
 	for _, path := range []string{
-		"/source-accounts?limit=101", "/source-accounts?limit=0", "/source-accounts?after=broken", "/source-accounts?ownership=auto",
+		"/source-accounts?limit=101", "/source-accounts?limit=0", "/source-accounts?after=broken", "/source-accounts?ownership=auto", "/source-accounts?scope=unknown",
 		"/source-accounts?namespace=unqualified", "/source-accounts?" + url.Values{"q": {"bad\x00query"}}.Encode(),
 		"/source-accounts/lookup?namespace=native%3Areddit&kind=handle", "/source-accounts/not-a-uuid",
 		"/source-accounts/" + input.AccountUUID + "/identifiers?after=bad", "/source-accounts/" + input.AccountUUID + "/ownership-history?after=-1",

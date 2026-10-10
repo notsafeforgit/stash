@@ -56,6 +56,7 @@ export function account(): Account {
       },
     ],
     more_identifiers: false,
+    tracked: true,
   };
 }
 

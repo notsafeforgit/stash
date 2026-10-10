@@ -260,7 +260,10 @@ export function OwnershipForm({
             <div className="flex flex-col gap-3">
               <div>
                 <p>{msg("account_review.current_owner", "Current owner")}</p>
-                <AccountOwner ownership={preview.account.ownership} />
+                <AccountOwner
+                  ownership={preview.account.ownership}
+                  tracked={preview.account.tracked}
+                />
               </div>
               <div>
                 <p>{msg("account_review.proposed_owner", "Proposed owner")}</p>

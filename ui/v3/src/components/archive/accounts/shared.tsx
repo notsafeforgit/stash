@@ -72,10 +72,20 @@ export function PerformerName({ performer }: { performer: AccountPerformer }) {
     </Link>
   );
 }
-export function AccountOwner({ ownership }: { ownership?: AccountOwnership }) {
+export function AccountOwner({
+  ownership,
+  tracked,
+}: {
+  ownership?: AccountOwnership;
+  tracked: boolean;
+}) {
   const msg = useMsg();
   if (ownership?.state === "linked" && ownership.performer)
     return <PerformerName performer={ownership.performer} />;
+  if (!tracked)
+    return (
+      <span>{msg("account_review.incidental", "Incidental post author")}</span>
+    );
   return (
     <span>
       {ownership?.state === "unlinked"

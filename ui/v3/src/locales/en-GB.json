@@ -3003,6 +3003,12 @@
     "counts": "{accounts} account records and {identifiers} identifier claims will belong to the resulting account."
   },
   "account_review": {
+    "scope": "Accounts to show",
+    "tracked": "Tracked accounts",
+    "all_known": "All known accounts",
+    "scope_help": "Tracked accounts have a direct source association or an ownership choice. Other post authors stay out of the review queue.",
+    "incidental": "Incidental post author",
+    "incidental_help": "Kept for post attribution, outside your account review queue. Adding a source for this account or making an ownership choice includes it in tracked accounts.",
     "search": "Search accounts or identifiers",
     "search_invalid": "Use a shorter search without control characters.",
     "status": "Ownership status",

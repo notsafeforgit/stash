@@ -65,7 +65,7 @@ export function CollectionForm({
     async (query: string, signal: AbortSignal) =>
       (
         await accounts.accounts(
-          { q: query, namespace: "", ownership: "all" },
+          { q: query, namespace: "", ownership: "all", scope: "all" },
           "",
           signal,
         )

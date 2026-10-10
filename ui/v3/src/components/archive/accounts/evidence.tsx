@@ -235,7 +235,7 @@ export function AccountHistory({
         {rows.map((row) => (
           <div key={row.decision_uuid} className="flex flex-col gap-1">
             <Separator />
-            <AccountOwner ownership={row} />
+            <AccountOwner ownership={row} tracked />
             <p className="text-sm text-muted-foreground">
               {intl.formatDate(row.created_at)} ·{" "}
               <AccountOrigin origin={row.origin} />

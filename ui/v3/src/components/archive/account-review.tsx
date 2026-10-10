@@ -16,6 +16,7 @@ import {
   Field,
   FieldGroup,
   FieldLabel,
+  FieldDescription,
   FieldError,
 } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -61,6 +62,36 @@ function AccountSearch({
       }}
     >
       <FieldGroup>
+        <form.Field name="scope">
+          {(field) => (
+            <Field>
+              <FieldLabel id={`${id}-scope`}>
+                {msg("account_review.scope", "Accounts to show")}
+              </FieldLabel>
+              <ToggleGroup
+                aria-labelledby={`${id}-scope`}
+                variant="outline"
+                value={[field.state.value]}
+                onValueChange={(values) => {
+                  if (values[0]) field.handleChange(values[0]);
+                }}
+              >
+                <ToggleGroupItem value="tracked">
+                  {msg("account_review.tracked", "Tracked accounts")}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="all">
+                  {msg("account_review.all_known", "All known accounts")}
+                </ToggleGroupItem>
+              </ToggleGroup>
+              <FieldDescription>
+                {msg(
+                  "account_review.scope_help",
+                  "Tracked accounts have a direct source association or an ownership choice. Other post authors stay out of the review queue.",
+                )}
+              </FieldDescription>
+            </Field>
+          )}
+        </form.Field>
         <form.Field name="q">
           {(field) => (
             <Field data-invalid={!field.state.meta.isValid}>
@@ -155,15 +186,15 @@ export function AccountReview({
   const [error, setError] = useState<unknown>();
   const [refresh, setRefresh] = useState(0);
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
-  const { q, namespace, ownership } = filter;
-  const queryKey = JSON.stringify([q, namespace, ownership, cursor]);
+  const { q, namespace, ownership, scope } = filter;
+  const queryKey = JSON.stringify([q, namespace, ownership, scope, cursor]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: Retry explicitly refreshes this page. Individual ownership edits update its existing card.
   useEffect(() => {
     const controller = new AbortController();
     setBusy(true);
     setError(undefined);
     api
-      .accounts({ q, namespace, ownership }, cursor, controller.signal)
+      .accounts({ q, namespace, ownership, scope }, cursor, controller.signal)
       .then((rows) => {
         if (!controller.signal.aborted)
           setPage({
@@ -180,7 +211,7 @@ export function AccountReview({
         if (!controller.signal.aborted) setBusy(false);
       });
     return () => controller.abort();
-  }, [api, q, namespace, ownership, cursor, queryKey, refresh]);
+  }, [api, q, namespace, ownership, scope, cursor, queryKey, refresh]);
   const current = page?.key === queryKey ? page : undefined;
   useListScrollRestoration(
     "account-review",
@@ -196,7 +227,8 @@ export function AccountReview({
             rows: page.rows.flatMap((row) =>
               row.uuid !== account.uuid
                 ? [row]
-                : account.redirect_to
+                : account.redirect_to ||
+                    (scope === "tracked" && !account.tracked)
                   ? []
                   : ownership === "all" ||
                       (account.ownership?.state ?? "undecided") === ownership
@@ -269,7 +301,10 @@ export function AccountReview({
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-col gap-2">
-                    <AccountOwner ownership={account.ownership} />
+                    <AccountOwner
+                      ownership={account.ownership}
+                      tracked={account.tracked}
+                    />
                     {account.identifiers.slice(0, 2).map((item) => (
                       <p
                         key={item.uuid}

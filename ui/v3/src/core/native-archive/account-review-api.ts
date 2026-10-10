@@ -33,11 +33,13 @@ export const accountSearchSchema = z.object({
       /^(?:(?:native|ytdl):[a-z0-9][a-z0-9_.-]*|(?:mirror|legacy):[a-z0-9][a-z0-9_.-]*:[a-z0-9][a-z0-9_.-]*|)$/,
     ),
   ownership: z.enum(["all", "linked", "unlinked", "undecided"]),
+  scope: z.enum(["tracked", "all"]),
 });
 export const accountFilterSchema = accountSearchSchema.extend({
   q: accountSearchSchema.shape.q.default(""),
   namespace: accountSearchSchema.shape.namespace.default(""),
   ownership: accountSearchSchema.shape.ownership.default("undecided"),
+  scope: accountSearchSchema.shape.scope.default("tracked"),
 });
 export const accountPerformerSchema = z.object({
   uuid,
@@ -76,6 +78,7 @@ export const accountSchema = z.object({
   ownership: accountOwnershipSchema.optional(),
   identifiers: z.array(accountIdentifierSchema).max(8),
   more_identifiers: z.boolean(),
+  tracked: z.boolean(),
 });
 export const accountEvidenceSchema = z.object({
   key: z.string(),
@@ -171,6 +174,7 @@ export function createAccountReviewAPI(
         limit: String(pageLimit),
         q: valid.q,
         namespace: valid.namespace,
+        scope: valid.scope,
       });
       if (valid.ownership !== "all") query.set("ownership", valid.ownership);
       if (after) query.set("after", uuid.parse(after));

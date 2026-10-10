@@ -8,6 +8,17 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
+// Knowing who published a post does not subscribe to that account or create
+// ownership review work. Only current, direct source associations and ownership
+// choices enter the tracked scope. Resolve consolidated accounts, but ignore
+// historical source aliases so a replaced association cannot re-enrol an author.
+const accountReviewTracked = `(EXISTS(SELECT 1 FROM account_performer_links o WHERE o.account_uuid=a.uuid)
+ OR EXISTS(SELECT 1 FROM source_accounts x
+ JOIN source_collection_revisions r ON r.account_uuid=x.uuid
+ JOIN source_collections c ON c.uuid=r.collection_uuid AND c.revision=r.revision
+ WHERE x.canonical_uuid=a.uuid
+ AND NOT EXISTS(SELECT 1 FROM source_collection_aliases z WHERE z.alias_uuid=c.uuid)))`
+
 func (s *SourceAccountStore) ReviewAccounts(ctx context.Context, input models.AccountReviewFilter) ([]models.AccountReviewState, error) {
 	if input.Limit == 0 {
 		input.Limit = 25
@@ -24,6 +35,13 @@ func (s *SourceAccountStore) ReviewAccounts(ctx context.Context, input models.Ac
 	}
 	query := `SELECT a.uuid FROM source_accounts a WHERE a.canonical_uuid=a.uuid AND a.uuid>?`
 	args := []any{input.After}
+	switch input.Scope {
+	case "", "tracked":
+		query += " AND " + accountReviewTracked
+	case "all":
+	default:
+		return nil, models.ErrAccountReviewInvalid
+	}
 	if input.Namespace != "" {
 		query += " AND a.namespace=?"
 		args = append(args, input.Namespace)
@@ -75,6 +93,9 @@ func (s *SourceAccountStore) ReviewAccount(ctx context.Context, id string) (*mod
 	ret := &models.AccountReviewState{UUID: account.UUID, Namespace: account.Namespace, Label: account.Label,
 		Revision: account.Revision, CanonicalUUID: account.CanonicalUUID, RedirectTo: account.RedirectTo,
 		Identifiers: []models.AccountReviewIdentifier{}}
+	if err := dbWrapper.Get(ctx, &ret.Tracked, "SELECT "+accountReviewTracked+" FROM source_accounts a WHERE a.uuid=?", account.CanonicalUUID); err != nil {
+		return nil, err
+	}
 	decision, err := s.Ownership(ctx, id)
 	if err != nil {
 		return nil, err

@@ -1,11 +1,11 @@
 {
-  "status": "cutover_in_progress",
+  "status": "native_live_final_observation_and_restore_pending",
   "boundary_uuid": "8c462d7a-ee41-4508-a4c8-b4ab55c7ca13",
-  "native_schema": 1000099,
+  "native_schema": 1000109,
   "public_native_activated": true,
   "legacy_writers_paused": true,
   "original_database_unchanged": true,
-  "source_revision": "0ea2c05fbc20356929c561f2173386a14870fdb7",
+  "source_revision": "7d666a6f5ffa5f620904b0f2bb7f4c8ff07d970c",
   "producer_backup_revision": "d863a41af893bcdc341bc3021cca02eff8ebeebd",
   "library_reconciliation": {
     "status": "passed",
@@ -877,13 +877,12 @@
     "manifest_sha256": "091b55067fe1f2932450f2f8ac9274301242ffec1961c74850d9ca56dcf43c6c"
   },
   "remaining": [
-    "controlled_native_ingestion_checks",
-    "isolated_cloud_restores_and_post_write_publication",
-    "scheduled_cycles_and_legacy_retirement",
-    "owner_acceptance",
-    "native_translation_worker_enable",
-    "home_backup_capture_and_upload",
-    "routine_startup_audit_separation"
+    "independent_cloud_restore",
+    "scheduled_backup_and_home_sync_observation",
+    "latest_runtime_backup_configuration_handoff",
+    "scheduled_worker_recovery_observation",
+    "routine_startup_audit_separation",
+    "owner_acceptance_before_develop_merge"
   ],
   "scope": "Current migration checkpoint; not a completed production cutover or full backup.",
   "checked_at": "2026-10-09T11:27:53.916789+00:00",
@@ -2298,6 +2297,337 @@
       "images": 503711,
       "galleries": 4197,
       "performers": 1440
+    }
+  },
+  "promotion_native_schema": 1000099,
+  "promotion_source_revision": "0ea2c05fbc20356929c561f2173386a14870fdb7",
+  "latest_rollout": {
+    "checked_at": "2026-10-10T11:51:24.429644+00:00",
+    "scope": "Current rollout observations; earlier preparation and reconciliation records retain their original scope and date.",
+    "application": {
+      "evidence": ".local/publication-retry-20261010/registry-deployment.json",
+      "sha256": "aaf775045228dd82610261b8b43e48c1f977d81ea6d9f922d52225812b270429",
+      "source_revision": "7d666a6f5ffa5f620904b0f2bb7f4c8ff07d970c",
+      "source_run": {
+        "conclusion": "success",
+        "headSha": "7d666a6f5ffa5f620904b0f2bb7f4c8ff07d970c",
+        "status": "completed",
+        "url": "https://github.com/notsafeforgit/stash/actions/runs/38048153906"
+      },
+      "wrapper_run": {
+        "conclusion": "success",
+        "headSha": "4f0f0594e95e000a75e4819f2494c3a44ce7f04d",
+        "status": "completed",
+        "url": "https://github.com/notsafeforgit/stash-s6/actions/runs/38049194101"
+      },
+      "source_image": "ghcr.io/notsafeforgit/stash@sha256:325e9972f5e9201199ef6af598174d6a6dfd8e63a3c26919ec03444ee96239c1",
+      "wrapper_image": "ghcr.io/notsafeforgit/stash-s6@sha256:048937d02a323149090a069ad32393667d070f0aa696a619808ba977e91d39ea",
+      "native_schema": 1000109
+    },
+    "deployment": {
+      "evidence": ".local/publication-retry-20261010/deployment-result.json",
+      "sha256": "29e283358440a4c78a81cb1cad4e52d5052c2953950257a842592c104a972c73",
+      "status": "deployed",
+      "schema_changed": false,
+      "deployed_at": "2026-10-10T11:45:02.719524+00:00"
+    },
+    "producer": {
+      "evidence": ".local/publication-retry-20261010/producer-live-check.json",
+      "sha256": "eee4b8632fd031a0598c8df49174c80f6f7485c9a8de1a39e35432c5a061a02c",
+      "status": "verified",
+      "checked_at": "2026-10-10T11:50:56.615503+00:00",
+      "host": {
+        "profiles": 22,
+        "runtime": {
+          "gallery_dl": "c40eb2a42fbaa1d26a2bb7c96804b7f47d1f73f8",
+          "yt_dlp": "2026.9.27.232945.dev0",
+          "adapter_sha256": "634415c1d528f086233474848ae552f96f0b4c6b89922dfde8b3f96e457d7248"
+        }
+      },
+      "n8n": {
+        "profiles": 10,
+        "runtime": {
+          "gallery_dl": "c40eb2a42fbaa1d26a2bb7c96804b7f47d1f73f8",
+          "yt_dlp": "2026.9.27.232945.dev0",
+          "adapter_sha256": "634415c1d528f086233474848ae552f96f0b4c6b89922dfde8b3f96e457d7248"
+        }
+      },
+      "timers": {
+        "stash-native-n8n-worker.timer": "active",
+        "stash-ingest-worker@host.timer": "active",
+        "stash-native-intake.timer": "active",
+        "gallery-dl-instagram.timer": "active",
+        "gallery-dl-twitter.timer": "active",
+        "gallery-dl-reddit-last-week.timer": "active"
+      },
+      "pending_work": {
+        "metadata_profiles": 10,
+        "pending_runs": 1365,
+        "untouched_legacy_holds": 169,
+        "run_approvals_created": 1365,
+        "metadata_job_state_groups_preserved": 6,
+        "listing_definitions_preserved": 4
+      }
+    },
+    "completed_checks": {
+      "controlled_host": {
+        "evidence": ".local/native-redgifs-legacy-host-20261009/controlled-host-bc94821d-c537-4ddf-83b2-213ae3a68e84-verification.json",
+        "sha256": "938aa1091eb139673b4843c46bff2602b020ab7c2c40973410a8afd7fab46dc9",
+        "status": "passed",
+        "checked_at": "2026-10-09T18:26:45.187030+00:00",
+        "run_uuid": "bc94821d-c537-4ddf-83b2-213ae3a68e84"
+      },
+      "controlled_n8n": {
+        "evidence": ".local/native-redgifs-image-20261009/controlled-n8n-ff82ba44-c65f-496f-a392-0817ca29f6e9-verification.json",
+        "sha256": "5de634f5850ba92b9607182215c1dc29f7803f86ac22b9e1ee95ef22ffd1e867",
+        "status": "passed",
+        "checked_at": "2026-10-09T18:07:20.318872+00:00",
+        "run_uuid": "ff82ba44-c65f-496f-a392-0817ca29f6e9"
+      },
+      "metadata_enrichment": {
+        "evidence": ".local/native-redgifs-image-20261009/metadata-enrichment-verification.json",
+        "sha256": "e821cc393e0ad3987732a75364a78422569bb4e11ff4e8eedb7c95b849f7ff6f",
+        "status": "passed",
+        "checked_at": "2026-10-09T18:06:12.202505+00:00",
+        "job_uuid": "4d6b736e-3738-4248-8b57-8fd9968bb16f"
+      },
+      "manual_media": {
+        "evidence": ".local/native-production-cutover-20261008/extensionless-video-intake-state.json",
+        "sha256": "364d0459c6e29cd58aacce3a44355770cc7318a89f10dd8231a7f7d30ec98101",
+        "status": "passed",
+        "completed_at": "2026-10-09T17:33:12.552785+00:00",
+        "job_uuid": "1c53ca07-5bc7-461b-81c8-95affe9c727b"
+      },
+      "translation": {
+        "evidence": ".local/native-production-cutover-20261008/native-translation-verification.json",
+        "sha256": "f8dd18fb8aeb63208493f40fcbf74875159f042fe4054e1e79cfbabecb92e376",
+        "status": "passed",
+        "checked_at": "2026-10-09T17:40:19.551325+00:00"
+      },
+      "post_write_backup_publication": {
+        "evidence": ".local/native-production-cutover-20261008/post-controlled-backup-publication.json",
+        "sha256": "e8c7d3af13cf763349aff6b5a3df4da2701df6d9fb7f582e7513619aa0b77b34",
+        "status": "passed",
+        "run_id": "20261009_112741_1204952",
+        "checkpoint_uuid": "aae18ddc-98b2-4fd3-bc46-3a0003df1010"
+      },
+      "native_service_commands": {
+        "evidence": ".local/native-production-cutover-20261008/native-service-command-verification.json",
+        "sha256": "63b035025eecec9e497540dd18211f9ccc0113b9732ecdac8a9ea0bf110f624f",
+        "status": "passed",
+        "checked_at": "2026-10-10T07:51:00.250973+00:00"
+      }
+    },
+    "schedule_resumption": {
+      "evidence": ".local/native-schedule-rollout-20261010/state.json",
+      "sha256": "ef2da31a622eb89ad061f9798b55d80c6d2f43f1e456094b5736a300da599f5b",
+      "status": "resumed",
+      "completed_at": "2026-10-10T07:51:04.139511+00:00",
+      "masked": [
+        "scrape-catalog-enrichment.timer",
+        "scrape-catalog-recovery.timer",
+        "scrape-catalog-translations.timer",
+        "scrape-catalog-enrichment.service",
+        "scrape-catalog-recovery.service",
+        "scrape-catalog-translations.service",
+        "scrape-catalog-inventory.service",
+        "scrape-catalog-legacy-catchup.service",
+        "stash-recents-scan-autotag.service"
+      ],
+      "cadences_changed": false
+    },
+    "timers": {
+      "evidence": ".local/native-schedule-rollout-20261010/timer-verification.json",
+      "sha256": "eb23af3c97973305d99ccc74261c0ec5eeb0b41ce87d60477d728afb52443a7a",
+      "timers_active": 10,
+      "legacy_masked": 9
+    },
+    "account_url_repair": {
+      "linked": 186,
+      "remaining_tracked_undecided": 91,
+      "remaining_by_namespace": {
+        "mirror:coomer:onlyfans": 3,
+        "mirror:kemono:patreon": 3,
+        "native:twitter": 43,
+        "native:instagram": 1,
+        "native:reddit": 41
+      },
+      "remaining_name_candidates": {
+        "no_exact_name": 27,
+        "name_only_unique": 63,
+        "name_ambiguous": 1
+      },
+      "example": {
+        "label": "lilsoftykitty",
+        "state": "linked",
+        "performer_id": 463,
+        "name": "lilsoftykitty",
+        "origin": "review"
+      }
+    },
+    "temporary_lock_retry": {
+      "status": "requeued_original_runs",
+      "runs": [
+        {
+          "uuid": "d1900a10-f36b-418a-a43b-26e17ac4248a",
+          "revision": 124,
+          "available_at_ms": 1791639300350,
+          "progress": {
+            "items_seen": 39,
+            "files_completed": 16,
+            "cursor": "9277c279452951bd6d61d7a9810470ba7215e8a9d622105f3381b02eb8844805"
+          }
+        },
+        {
+          "uuid": "a091f9e0-ba14-4cf8-b4f2-aed8e039bd49",
+          "revision": 11,
+          "available_at_ms": 1791620730245,
+          "progress": {
+            "items_seen": 0,
+            "files_completed": 0,
+            "cursor": ""
+          }
+        }
+      ]
+    },
+    "independent_restore": {
+      "evidence": ".local/native-production-cutover-20261008/backup-before-public-finalization-state.json",
+      "sha256": "fe3a540d7abbf9d10e9cb7a9de8a72af4ec062171c0aac895a117e77d7fca809",
+      "status": "running",
+      "stage": "restore-backup-before-public-streamed",
+      "run_id": "20261008_175444_1545955",
+      "checkpoint_uuid": "dbf8cd08-ea38-43df-9864-6f20429be640",
+      "coordinated_backup_complete": true,
+      "isolated_restore_complete": false
+    },
+    "future_backup_configuration": {
+      "evidence": ".local/publication-retry-20261010/backup-config-activation.json",
+      "sha256": "202dc88bc94f243530186a752ebe1d4b48f748262185f017a2b15faeec271e9f",
+      "status": "waiting_for_backup",
+      "source_revision": "7d666a6f5ffa5f620904b0f2bb7f4c8ff07d970c"
+    },
+    "home_backup": {
+      "last_failed_at": "2026-10-10T10:00:01Z",
+      "failure": "Connection reset by peer during native snapshot request",
+      "completion_observed": false,
+      "retry_started_at": "2026-10-10T11:51:24Z",
+      "service": "rclone-backup-homedir.service",
+      "pid": 1513750,
+      "status": "retry_running"
+    },
+    "source_runs": [
+      {
+        "state": "deferred",
+        "error_code": "legacy_scan_deferred",
+        "count": 169
+      },
+      {
+        "state": "deferred",
+        "error_code": "not_found",
+        "count": 4
+      },
+      {
+        "state": "deferred",
+        "error_code": "source_download_failed",
+        "count": 4
+      },
+      {
+        "state": "queued",
+        "error_code": "",
+        "count": 1337
+      },
+      {
+        "state": "queued",
+        "error_code": "extraction_failed",
+        "count": 1
+      },
+      {
+        "state": "queued",
+        "error_code": "lease_expired",
+        "count": 2
+      },
+      {
+        "state": "queued",
+        "error_code": "source_lease_lost",
+        "count": 1
+      },
+      {
+        "state": "queued",
+        "error_code": "source_turn_complete",
+        "count": 15
+      },
+      {
+        "state": "running",
+        "error_code": "",
+        "count": 1
+      },
+      {
+        "state": "succeeded",
+        "error_code": "",
+        "count": 62
+      }
+    ],
+    "native_jobs": [
+      {
+        "kind": "account.list_page",
+        "state": "failed",
+        "count": 2
+      },
+      {
+        "kind": "account.list_page",
+        "state": "queued",
+        "count": 1
+      },
+      {
+        "kind": "account.list_page",
+        "state": "succeeded",
+        "count": 4
+      },
+      {
+        "kind": "album.backfill",
+        "state": "succeeded",
+        "count": 17023
+      },
+      {
+        "kind": "media.verify",
+        "state": "failed",
+        "count": 3
+      },
+      {
+        "kind": "media.verify",
+        "state": "succeeded",
+        "count": 56982
+      },
+      {
+        "kind": "post.enrich",
+        "state": "failed",
+        "count": 2
+      },
+      {
+        "kind": "post.enrich",
+        "state": "queued",
+        "count": 64
+      },
+      {
+        "kind": "post.enrich",
+        "state": "succeeded",
+        "count": 13
+      },
+      {
+        "kind": "text.translate",
+        "state": "queued",
+        "count": 64
+      },
+      {
+        "kind": "text.translate",
+        "state": "succeeded",
+        "count": 75
+      }
+    ],
+    "scheduled_backup": {
+      "status": "original_attempt_running",
+      "run_id": "20261010_015141_781770",
+      "checkpoint_uuid": "4fb711ad-5bfc-4b66-8023-ff1515fdfcd4"
     }
   }
 }

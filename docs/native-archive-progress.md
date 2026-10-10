@@ -21,7 +21,7 @@ The supplied lilsoftykitty account is linked to performer #463. There are 91
 tracked undecided accounts remaining: 63 unique name-only candidates, one
 ambiguous name and 27 without an exact name match.
 
-## Temporary filesystem-boundary contention — implemented, not yet deployed
+## Temporary filesystem-boundary contention — deployed, 2026-10-10
 
 Two source runs were incorrectly deferred with `worker_configuration_or_source`
 after their worker timed out behind a backup/dedupe publication lock. Contention
@@ -35,9 +35,28 @@ Focused regressions exercise a real held lock, successful continuation after
 release, a finalizer timeout after completed files, and more than eight retries
 without exhausting the source failure budget. SQLite reopen preserves the
 original window and checkpoint. Genuine configuration errors and real source
-failure accounting remain unchanged. Deploy server handling before the producer
-package; then retry only the two diagnosed deferred runs through the normal
-review API. This is not a schema change or a new migration.
+failure accounting remain unchanged. All 682 producer tests, 317 backup tests,
+the affected SQLite suites and the complete GitHub validation gate passed.
+
+The [source publisher](https://github.com/notsafeforgit/stash/actions/runs/38048153906)
+and [wrapper publisher](https://github.com/notsafeforgit/stash-s6/actions/runs/38049194101)
+passed, and production now runs source `7d666a6f5ffa5f620904b0f2bb7f4c8ff07d970c`
+at unchanged schema 1000109. The server was updated before its producers. The
+verified wheel matches all 129 source modules; all 22 host and ten n8n profiles
+retain their definitions. Existing APIs approved the runtime for 1,365 pending
+runs and ten metadata policies without changing their original admissions,
+windows, checkpoints, failure counts or retry deadlines. The 169 legacy holds
+remain untouched. No source requests were awaiting delivery at the handoff.
+
+One expired lease was recovered normally, retaining 599 items and 447 completed
+files. All six original timers resumed. Only the two diagnosed timeout deferrals
+were reopened through the review API, retaining their UUIDs, saved windows and
+retry deadlines; this records resumption eligibility, not completed downloads.
+The original S3 backup and independent restore retain their original processes
+and configuration. Future backup configuration selection waits for that sealed
+backup to finish. The supplementary Google Drive job was restarted after its
+03:00 connection-reset failure; its upload remains unverified. Evidence is under
+`.local/publication-retry-20261010/`.
 
 ## Verified GIF image-to-scene transition — deployed, 2026-10-10
 
@@ -74,7 +93,7 @@ a disposable n8n container.
 
 The [source publisher](https://github.com/notsafeforgit/stash/actions/runs/38044516746)
 and [wrapper publisher](https://github.com/notsafeforgit/stash-s6/actions/runs/38045578360)
-passed. Production runs source `f9bd4801a45029f01466430ee129158e711754d6`,
+passed. That rollout selected source `f9bd4801a45029f01466430ee129158e711754d6`,
 wrapper digest `sha256:5ee22c3c8a82468b2e36a7d4937526aa29e59ae551b550145285216df8dbcc8c`,
 and schema 1000109. Its matching backup validator was extracted from the registry
 image. The pre-migration snapshot remains retained. Gallery #3664's scene cover
@@ -531,20 +550,22 @@ also passed.
 
 ## Current release position — 2026-10-10 UTC
 
-Production is healthy on schema **1000107**, source
-`4e1c7c8ce3e6a764b425ab7926182abc7690d3c4`, pinned wrapper
-`ghcr.io/notsafeforgit/stash-s6@sha256:c1633d72e6b4dadfab373bb2976503331dde52548d8a2349d650db38ced77c47`.
+Production is healthy on schema **1000109**, source
+`7d666a6f5ffa5f620904b0f2bb7f4c8ff07d970c`, pinned wrapper
+`ghcr.io/notsafeforgit/stash-s6@sha256:048937d02a323149090a069ad32393667d070f0aa696a619808ba977e91d39ea`.
 The verified source image is
-`ghcr.io/notsafeforgit/stash@sha256:8be4c8b0aeca77b4997248ac3a8391efb29568763edf025f9d4ce6f2d5be0a1e`,
+`ghcr.io/notsafeforgit/stash@sha256:325e9972f5e9201199ef6af598174d6a6dfd8e63a3c26919ec03444ee96239c1`,
 with wrapper source `4f0f0594e95e000a75e4819f2494c3a44ce7f04d`.
-The current application release is recorded under
-`.local/account-identifiers-20261010/`. The worker remains on the release recorded
-under `.local/scrape-restart-20261010/`, and its timer is active. The earlier
-mixed-gallery release is recorded under `.local/mixed-gallery-20261010/`, and
-source consolidation under `.local/reddit-profile-sources-20261009/`.
-The coordinated post-write backup has published successfully. Future backups
-now select this application and worker release, preserving the original sealed
-publication evidence and the unchanged backup serializer runtime.
+The application and producer rollout is recorded under
+`.local/publication-retry-20261010/`; the six paused timers have resumed. The
+coordinated post-write backup has published successfully. The current scheduled
+backup retains its original sealed view, configuration and validator. A deferred
+configuration handoff will select this application and producer release for
+future backups. Independent restore, the current scheduled backup, supplementary
+home sync, startup audit separation and final owner review remain outstanding.
+
+### Historical catalog association repair
+
 The explicit [catalog association repair](catalog-association-repair.md) now
 promotes unambiguous imported post-account claims and known author directories
 to ordinary publisher decisions. Accounts without an ownership choice can link

@@ -13,9 +13,6 @@ RUN sh /build-libavif.sh
 
 FROM alpine:3.24
 
-# Copy the statically compiled amd64 binary from the dist folder into the alpine image
-COPY dist/stash-linux /usr/bin/stash
-
 RUN apk upgrade --no-cache && apk add --no-cache ca-certificates curl translate-shell python3 py3-requests py3-requests-toolbelt py3-lxml py3-pip ffmpeg libavif-apps libxml2 libyuv tzdata aom-libs libdav1d libde265 x265-libs libjpeg-turbo libpng vips vips-tools vips-heif vips-jxl vips-magick vips-poppler \
     && python3 -m pip install --break-system-packages --upgrade "pip>=26.2" \
     && python3 -m pip install --break-system-packages mechanicalsoup cloudscraper stashapp-tools
@@ -29,6 +26,9 @@ COPY --from=avif /out/ /
 RUN heif-info --version | grep -F '1.23.4' \
     && vips --version | grep -F '8.18.6' \
     && avifenc --version | grep -F '1.4.2'
+
+# A new application binary must not invalidate unchanged runtime libraries.
+COPY dist/stash-linux /usr/bin/stash
 ENV STASH_CONFIG_FILE=/root/.stash/config.yml
 
 # Basic build-time metadata as defined at https://github.com/opencontainers/image-spec/blob/main/annotations.md#pre-defined-annotation-keys

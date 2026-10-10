@@ -108,22 +108,28 @@ Keep these editor settings scoped to the UI workspace.
 The full fork gate, after installing dependencies, is:
 
 ```bash
-make generate
-make ui
 make validate-fork
 ```
 
-Build the UI **before** `make validate-fork` or full Go tests. In particular,
+`make validate-fork` now generates bindings, validates/builds the UI once and
+runs independent suites with two local workers (`VALIDATION_JOBS=1` makes it
+serial; increase the value only when the machine has spare CPU and memory).
+Build the UI **before standalone full Go tests**. In particular,
 [ui/ui_v3_test.go](../../../ui/ui_v3_test.go) checks that the binary embeds
 compressed underscore-prefixed route chunks. An empty/stale build directory
 can fail this check even when frontend lint and type checks pass. The
-[container publisher](../../../.github/workflows/ghcr-publish.yml) uses the same
-generate → build UI → validate → compile order.
+[container publisher](../../../.github/workflows/ghcr-publish.yml) shares generated
+assets between parallel test, lint and compilation jobs. Its conservative
+[change selection](../../../docs/v3-deployment.md#1-publish-and-verify-the-stash-image)
+can skip unchanged backend suites for frontend-only changes after a successful
+publish. The local full gate always runs all suites.
 
 | Command | Checks |
 | --- | --- |
 | `make validate-ui-v3` | Biome lint (including accessibility), React purity/type-contract lint, generation, TypeScript, formatting, locales, Vitest, and native contracts |
-| `make validate-fork` | Backend generation, v3 validation, producer tests, Go lint, and Go unit/integration tests |
+| `make validate-fork` | Generation, UI validation/build, all Python suites, Go lint/integration tests, and CI checks; independent work overlaps |
+| `make ui-ci` | Validate and build embedded UI with a single generation/type-check pass |
+| `make validate-ci` | Check-selection/publication-gate regressions and pinned actionlint workflow lint |
 | `make lint` | CI-pinned golangci-lint via `go run` |
 | `make it` | Go tests with `sqlite_stat4 sqlite_math_functions sqlite_fts5 integration` build tags |
 | `pnpm --dir ui/v3 test --run` | Generate v3 GraphQL types and run Vitest once |

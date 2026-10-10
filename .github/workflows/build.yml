@@ -3,8 +3,7 @@ name: Build
 on:
   push:
     branches:
-      - develop
-      - v3-rewrite
+      # Native branch pushes are validated and built once by ghcr-publish.yml.
       - master
       - 'releases/**'
   pull_request:
@@ -16,10 +15,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native:
+    if: ${{ github.event_name == 'pull_request' && contains(fromJSON('["develop", "v3-rewrite"]'), github.base_ref) }}
+    uses: ./.github/workflows/native-ci.yml
+    permissions:
+      contents: read
+      actions: read
+
   # Job 1: Generate code and build UI
   # Runs natively (no Docker) — go generate/gqlgen and node don't need cross-compilers.
   # Produces artifacts (generated Go files + UI build) consumed by test and build jobs.
   generate:
+    if: ${{ github.event_name != 'pull_request' || !contains(fromJSON('["develop", "v3-rewrite"]'), github.base_ref) }}
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v6
@@ -249,8 +256,8 @@ jobs:
       run: |
         git describe --tags --exclude latest_develop | tee CHECKSUMS_SHA1
         sha1sum dist/stash-* dist/stash-ui.zip | sed 's/dist\///g' | tee -a CHECKSUMS_SHA1
-        echo "STASH_VERSION=$(git describe --tags --exclude latest_develop)" >> $GITHUB_ENV
-        echo "RELEASE_DATE=$(date +'%Y-%m-%d %H:%M:%S %Z')" >> $GITHUB_ENV
+        echo "STASH_VERSION=$(git describe --tags --exclude latest_develop)" >> "$GITHUB_ENV"
+        echo "RELEASE_DATE=$(date +'%Y-%m-%d %H:%M:%S %Z')" >> "$GITHUB_ENV"
 
     # - name: Upload Windows binary
     #   # only upload binaries for pull requests

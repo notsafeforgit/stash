@@ -7,6 +7,36 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement is running; the controlled worker rollout remains
 in progress.
 
+## Parallel native validation — implemented, 2026-10-10
+
+The publisher and native PRs share one validation/build workflow. Go tests,
+lint, Python suites and compilation run in separate jobs after their actual
+prerequisites; the UI is generated, checked and built once. Native branch
+pushes no longer repeat backend work in the older Build and Lint workflows.
+Publication requires all selected jobs, with explicit rejection of failed,
+cancelled and unexpectedly skipped jobs.
+
+Frontend-only changes can skip backend/Python suites relative to a successful
+ancestor publish. The comparison includes intervening failed/cancelled pushes;
+unknown paths, tooling/schema changes and unavailable baselines run everything.
+Embedded-entry tests and compilation always run. Twelve real-Git and gate
+regressions cover selection, deleted/renamed paths and publication failures.
+
+pnpm now installs into its cached store. Go compilation caches advance per
+revision and suite; Python dependency caches distinguish their installers.
+BuildKit retains container-library layers independently of the application
+binary. Manual publication can explicitly refresh those dependency layers.
+The local full gate also runs independent suites concurrently and builds its
+own validated UI before Go checks. A tiny backup fixture now models available
+space instead of requiring 50 GiB in the test temporary directory; the actual
+restore reserve remains unchanged.
+
+The complete local gate passed in 399.64 seconds: 805 UI tests, 678 producer,
+12 library, 146 archive and 317 backup tests, all Go integration tests/lint, and
+workflow lint with ShellCheck. Final cache edits passed the CI checks again.
+Evidence: `.local/ci-speed-20261010/`. GitHub publication verification follows
+the push; this build-tooling change does not require a production restart.
+
 ## GIF conversion provenance and restart recovery — implemented, not deployed, 2026-10-10
 
 The producer now retains the configured GIF-to-MKV transformation with its

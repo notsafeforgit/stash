@@ -1,0 +1,181 @@
+name: Native validation and Linux build
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      backend: ${{ steps.changes.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Test check selection and publication gate
+        run: python3 -m unittest discover -s scripts -p test_ci_changes.py
+      - name: Find successfully published baselines
+        uses: actions/github-script@v8
+        with:
+          script: |
+            let runs = [];
+            try {
+              const response = await github.rest.actions.listWorkflowRuns({
+                ...context.repo,
+                workflow_id: 'ghcr-publish.yml',
+                branch: context.payload.pull_request?.base.ref ?? context.ref.replace('refs/heads/', ''),
+                event: 'push', status: 'success', per_page: 20,
+              });
+              runs = response.data.workflow_runs;
+            } catch (error) {
+              core.warning(`No verified baseline is available; running all checks: ${error.message}`);
+            }
+            require('fs').writeFileSync(`${process.env.RUNNER_TEMP}/native-ci-runs.json`, JSON.stringify(runs));
+      - name: Select required checks
+        id: changes
+        run: python3 scripts/ci_changes.py --runs "$RUNNER_TEMP/native-ci-runs.json"
+
+  assets:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-native-go
+        with:
+          suite: assets
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: ui/v3/package.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: ui/v3/pnpm-lock.yaml
+      - run: make pre-ui
+      - name: Validate CI definitions
+        run: make validate-ci
+      - name: Generate backend bindings
+        run: make generate-backend
+      - name: Validate and build UI once
+        run: make ui-ci
+      - uses: actions/upload-artifact@v7
+        with:
+          name: native-generated
+          retention-days: 1
+          if-no-files-found: error
+          path: |
+            internal/api/generated_exec.go
+            internal/api/generated_models.go
+            ui/v3/build/
+            ui/login/locales/
+
+  backend-tests:
+    needs: [changes, assets]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-native-go
+        with:
+          suite: tests
+      - uses: actions/download-artifact@v8
+        with:
+          name: native-generated
+      - name: Install media test runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ffmpeg libavif-bin
+      - name: Go unit and integration tests
+        run: make it
+
+  backend-lint:
+    needs: [changes, assets]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-native-go
+        with:
+          suite: lint
+      - uses: actions/download-artifact@v8
+        with:
+          name: native-generated
+      - run: make lint
+
+  python:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [producer, library, archive, backup]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: ${{ matrix.suite != 'library' && 'pip' || '' }}
+          # Producer/archive share their installed dependencies. Backup has a
+          # separate cache so the first installer cannot freeze a partial one.
+          cache-dependency-path: |
+            integrations/gallery-dl/pyproject.toml
+            integrations/archive/pyproject.toml
+            ${{ matrix.suite == 'backup' && 'integrations/backup/pyproject.toml' || 'integrations/gallery-dl/pyproject.toml' }}
+      - name: Install media test runtime
+        if: matrix.suite == 'producer'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ffmpeg libavif-bin
+      - name: Install producer test dependencies
+        if: matrix.suite == 'producer' || matrix.suite == 'archive'
+        run: make pre-producer
+      - name: Install backup test dependencies
+        if: matrix.suite == 'backup'
+        run: make pre-backup
+      - run: make validate-${{ matrix.suite }}
+
+  binary:
+    needs: assets
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-native-go
+        with:
+          suite: binary
+      - uses: actions/download-artifact@v8
+        with:
+          name: native-generated
+      # Frontend-only runs still prove that all three entry points and their
+      # compressed route chunks are embedded in the new binary.
+      - name: Test embedded UI
+        run: go test ./ui
+      - name: Compile Linux amd64
+        env:
+          OFFICIAL_BUILD: 'false'
+          UPDATE_REPO: ${{ github.repository }}
+        run: make build-cc-linux
+      - uses: actions/upload-artifact@v7
+        with:
+          name: native-linux-amd64
+          path: dist/stash-linux
+          retention-days: 1
+          if-no-files-found: error
+
+  gate:
+    needs: [changes, assets, backend-tests, backend-lint, python, binary]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Require every selected check before publication
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: python3 scripts/ci_changes.py --gate

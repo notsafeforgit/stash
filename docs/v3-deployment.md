@@ -56,9 +56,35 @@ gh run list --repo notsafeforgit/stash --workflow ghcr-publish.yml \
   --json databaseId,headSha,status,conclusion,url
 ```
 
-The [publisher](../.github/workflows/ghcr-publish.yml) installs only v3
-frontend dependencies, regenerates Go/v3 bindings, builds the app/share/offline
-entries and login locales, runs `make validate-fork`, and compiles Linux amd64.
+The [publisher](../.github/workflows/ghcr-publish.yml) calls the shared
+[native validation workflow](../.github/workflows/native-ci.yml). It generates
+bindings and validates/builds the UI once, shares those exact generated files
+and app/share/offline assets with the Go jobs, and compiles Linux amd64 in
+parallel with backend validation. Go tests, Go lint, and the four Python suites
+run as separate jobs. Publication requires every selected check to succeed;
+failed, cancelled, or unexpectedly skipped jobs cannot publish.
+
+Frontend-only changes may skip Go lint, the full Go suite and Python suites
+when **every changed path since a successful ancestor publish** is an allowed
+frontend path. Failed/cancelled intervening pushes do not reset that baseline.
+Schema, Go embed code, CI/tooling, mixed or unknown paths, missing history/API
+access, and manual dispatches run the full suite. UI validation, embedded-entry
+tests and Linux compilation always run. The check-selection job records the
+baseline and reason in its summary.
+
+Pushes to native branches no longer repeat this work in the older Build and
+Lint workflows. Native PRs use the same validation workflow; `develop` retains
+its downloadable development release using the publisher's validated artifacts.
+Browser regressions retain their separate workflow.
+
+Dependency caches cover pnpm's actual configured store, pip downloads, Go
+modules, and per-suite incremental Go compilation. BuildKit caches container
+libraries independently of the application binary; base images are still
+pulled. Dispatch with `refresh_container_dependencies=true` to rebuild those
+layers, including their package installations, without the cache. Generated
+bindings and embedded UI are fresh artifacts for each run, not reused builds
+with stale revision metadata.
+
 It publishes `ghcr.io/notsafeforgit/stash:native-preview` and the seven-character
 revision tag above. The moving tag alone is not a deployment identity.
 Both container and downloadable-binary builds set `UPDATE_REPO` to the current

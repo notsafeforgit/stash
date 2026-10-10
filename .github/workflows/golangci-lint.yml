@@ -5,13 +5,13 @@ on:
       - v*
     branches:
       - master
-      - develop
-      - v3-rewrite
       - 'releases/**'
   pull_request:
 
 jobs:
   golangci:
+    # The native reusable workflow owns lint on these PRs and branch pushes.
+    if: ${{ github.event_name != 'pull_request' || !contains(fromJSON('["develop", "v3-rewrite"]'), github.base_ref) }}
     name: lint
     runs-on: ubuntu-latest
     steps:

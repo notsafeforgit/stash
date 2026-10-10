@@ -53,7 +53,7 @@ for image publication and Quadlet restarts.
 ## Testing and linting
 
 ```bash
-make validate-fork     # Fork gate: backend generation, v3 validation, Go lint/tests
+make validate-fork     # Parallel full gate; includes generation and validated UI build
 make it                # Go unit + integration tests only
 make validate-producer # Python delivery, lease and gallery-dl lifecycle tests
 make validate-library  # Native manual tag/performer helper contracts
@@ -67,8 +67,11 @@ make validate          # Alias for validate-fork, including producer tests
 make validate-ui       # Native UI validation; validate-ui-v3 is an alias
 ```
 
-Build the native UI before full Go tests or `make validate-fork`; embedded-asset tests
-require real v3 route chunks. Use the [validation sequence](ui/v3/docs/development.md#validation).
+Build the native UI before standalone full Go tests; embedded-asset tests
+require real v3 route chunks. `make validate-fork` builds and validates those
+assets itself, then runs Go checks while independent suites overlap, using two
+workers by default (`VALIDATION_JOBS` controls local concurrency). Use the
+[validation sequence](ui/v3/docs/development.md#validation).
 To run a single Go test: `go test ./pkg/models/... -run TestFilterAST`.
 The shared `make test`/`make it` package timeout is twenty minutes for the growing
 migration suite; override `GO_TEST_TIMEOUT` when needed. Individual operation,

@@ -358,21 +358,15 @@ endif
 server-clean:
 	$(RMDIR) .local
 
-# installs UI dependencies. Run when first cloning repository, or if UI
-# dependencies have changed
-# If CI is set, configures pnpm to use a local store to avoid
-# putting .pnpm-store in /stash
+# installs UI dependencies. Use pnpm's configured store so setup-node caches
+# the same directory that installation populates, including in CI.
 # NOTE: to run in the docker build container, using the existing
 # node_modules folder, rename the .modules.yaml to .modules.yaml.bak
 # and a new one will be generated. This will need to be reversed after
 # building.
 .PHONY: pre-ui
 pre-ui:
-ifdef CI
-	cd ui/v3 && pnpm install --frozen-lockfile --store-dir ~/.pnpm-store
-else
 	cd ui/v3 && pnpm install --frozen-lockfile
-endif
 
 .PHONY: ui-env
 ui-env: build-info
@@ -389,6 +383,13 @@ ui: ui-only generate-login-locale
 .PHONY: ui-only
 ui-only: ui-env
 	cd ui/v3 && pnpm run build
+
+# The publish pipeline needs validation and assets from the same checkout.
+# Generate/type-check once instead of running both `build` and `validate`.
+.PHONY: ui-ci
+ui-ci: ui-env
+	cd ui/v3 && pnpm run validate:build
+	$(MAKE) generate-login-locale
 
 .PHONY: zip-ui
 zip-ui:
@@ -436,9 +437,21 @@ validate-backend: lint it
 .PHONY: validate
 validate: validate-fork
 
-# Full pre-push gate for the fork backend plus the active v3 UI.
-.PHONY: validate-fork
-validate-fork: generate-backend validate-ui validate-producer validate-library validate-archive validate-backup validate-backend
+# Full pre-push gate, including fresh embedded assets. Dependencies keep Go
+# checks behind code generation and the UI build, while other suites overlap.
+VALIDATION_JOBS ?= 2
+.PHONY: validate-fork validate-fork-backend
+validate-fork:
+	$(MAKE) -j$(VALIDATION_JOBS) validate-fork-backend validate-producer validate-library validate-archive validate-backup validate-ci
+
+validate-fork-backend: generate-backend ui-ci
+	$(MAKE) validate-backend
+
+ACTIONLINT_VERSION ?= v1.7.12
+.PHONY: validate-ci
+validate-ci:
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p test_ci_changes.py
+	go run github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 
 export BACKUP_PYTHON ?= $(abspath .local/native-backup/bin/python)
 

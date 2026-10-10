@@ -267,7 +267,11 @@ class MediaTests(unittest.TestCase):
             self.assertEqual(self.client.operations, [(op, self.client.prefix + key)
                                                        for key in (self.base_key, self.key) for op in ('head', 'thaw')])
             self.client.operations.clear()
-            restore.main(args + ['--download', '--destination', str(self.root / 'downloaded')])
+            # This tiny local fixture checks request identity/deduplication, not
+            # the host's available space. A memory-backed test directory need
+            # not have the production restore's 50 GiB reserve available.
+            with patch('stash_archive.storage.shutil.disk_usage', return_value=SimpleNamespace(free=100 << 30)):
+                restore.main(args + ['--download', '--destination', str(self.root / 'downloaded')])
             self.assertEqual(self.client.operations, [('get', self.client.prefix + key) for key in (self.base_key, self.key)])
             self.assertEqual((self.root / 'downloaded/creator/first.mp4').read_bytes(), self.body)
 

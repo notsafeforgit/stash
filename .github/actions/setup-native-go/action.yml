@@ -1,0 +1,39 @@
+name: Set up cached native Go toolchain
+description: Keep dependency and incremental build caches separate for each CI suite
+inputs:
+  suite:
+    description: Cache scope for this suite (assets, tests, lint, or binary)
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v6
+      with:
+        go-version-file: go.mod
+        cache: false
+    - id: go
+      shell: bash
+      run: |
+        echo "modules=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "version=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
+    - name: Cache Go modules
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.go.outputs.modules }}
+        # Lint also installs golangci-lint's own dependency graph. Give it its
+        # own module cache; the other suites share application/tool modules.
+        key: native-modules-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}-${{ inputs.suite == 'lint' && 'lint' || 'app' }}-${{ hashFiles('go.mod', 'go.sum', 'Makefile') }}
+    - name: Cache incremental Go compilation
+      uses: actions/cache@v5
+      with:
+        path: |
+          ${{ steps.go.outputs.build }}
+          ~/.cache/golangci-lint
+        # A fresh key saves work from this revision; a go.sum-only key stays
+        # frozen at whichever job populated it first. Separate suites cannot
+        # overwrite one another with an incomplete compilation cache.
+        key: native-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}-${{ inputs.suite }}-${{ hashFiles('go.mod', 'go.sum', 'Makefile') }}-${{ github.sha }}
+        restore-keys: |
+          native-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}-${{ inputs.suite }}-${{ hashFiles('go.mod', 'go.sum', 'Makefile') }}-
+          native-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}-${{ inputs.suite }}-

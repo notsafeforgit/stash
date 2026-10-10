@@ -1,0 +1,4 @@
+# The pinned actionlint runner list predates this existing WebKit runner.
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04

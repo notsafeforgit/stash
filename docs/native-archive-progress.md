@@ -7,6 +7,24 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running. Independent
 restore verification passed; scheduled-work observation remains in progress.
 
+## Translation request length — implemented, publication pending, 2026-10-10
+
+The final worker check found 64 translation jobs repeatedly returning
+`translation_provider_response`. Every retained input exceeds 1,000 UTF-16 units.
+Generic live probes reproduced the provider boundary: 1,000 ASCII characters or
+500 emoji succeed; 1,001 ASCII characters or 501 emoji return HTTP-style error
+400 in the command's JSON output. No private archive text was sent by these
+diagnostic probes. The prior 1,800-code-point chunk size exceeded this limit.
+
+The provider now counts UTF-16 units, preserves whole supplementary characters,
+includes the protective URL prefix in the limit and checks the complete
+128-request bound before sending anything. Original source text remains retained
+unchanged. Focused translation/worker/job tests pass, including actual process
+arguments, exact Unicode boundaries and oversized-input rejection before any
+subprocess. The installed queue's retry deadlines remain unchanged. A successful
+generic probe does not establish completion of those private jobs.
+Evidence is under `.local/native-transition-acceptance-20261010/`.
+
 ## Routine startup and full data audits — deployed, 2026-10-10
 
 Routine opens now validate lineage, clean supported versions, schema objects and

@@ -49,6 +49,40 @@ func languageBase(value string) string {
 	return strings.Split(strings.ReplaceAll(strings.ToLower(strings.TrimSpace(value)), "_", "-"), "-")[0]
 }
 
+func bingTextChunks(source string) ([]string, error) {
+	// The Bing web endpoint used by translate-shell limits each request to
+	// 1,000 UTF-16 units. Count supplementary characters (including emoji) twice,
+	// and include the space that prevents translate-shell from fetching a URL.
+	const maxUnits, maxChunks = 1000, 128
+	chars := []rune(source)
+	chunks := []string{}
+	for offset := 0; offset < len(chars); {
+		if len(chunks) == maxChunks {
+			return nil, ErrProviderInput
+		}
+		prefix := ""
+		start := string(chars[offset:min(offset+8, len(chars))])
+		if strings.HasPrefix(start, "http://") || strings.HasPrefix(start, "https://") || strings.HasPrefix(start, "file://") {
+			prefix = " "
+		}
+		units, end := len(prefix), offset
+		for end < len(chars) {
+			width := 1
+			if chars[end] > 0xffff {
+				width = 2
+			}
+			if units+width > maxUnits {
+				break
+			}
+			units += width
+			end++
+		}
+		chunks = append(chunks, prefix+string(chars[offset:end]))
+		offset = end
+	}
+	return chunks, nil
+}
+
 func (b *BingTranslateShell) Translate(ctx context.Context, request models.TranslationRequest) (models.TranslationCacheInput, error) {
 	ret := models.TranslationCacheInput{}
 	if _, err := archive.PrepareTranslationRequest(request.TranslationRequestInput); err != nil || b.ChunkTimeout <= 0 || b.Timeout <= 0 {
@@ -65,10 +99,11 @@ func (b *BingTranslateShell) Translate(ctx context.Context, request models.Trans
 	if strings.ContainsRune(source, 0) || b.Executable == "" {
 		return ret, ErrProviderInput
 	}
-	chars := []rune(source)
-	// Bounds total requests and memory without silently truncating long text.
-	if len(chars) > 1800*128 {
-		return ret, ErrProviderInput
+	// Bound the complete request count before calling the provider, without
+	// silently truncating long text or partially translating unsupported input.
+	chunks, err := bingTextChunks(source)
+	if err != nil {
+		return ret, err
 	}
 	bounded, stop := context.WithTimeout(ctx, b.Timeout)
 	defer stop()
@@ -76,11 +111,7 @@ func (b *BingTranslateShell) Translate(ctx context.Context, request models.Trans
 	unknownLanguage := false
 	outputBytes := 0
 	unchanged := true
-	for offset := 0; offset < len(chars); offset += 1800 {
-		chunk := string(chars[offset:min(offset+1800, len(chars))])
-		if strings.HasPrefix(chunk, "http://") || strings.HasPrefix(chunk, "https://") || strings.HasPrefix(chunk, "file://") {
-			chunk = " " + chunk
-		}
+	for _, chunk := range chunks {
 		body, err := b.runChunk(bounded, request.TargetLanguage, chunk)
 		if err != nil {
 			if ctx.Err() != nil {

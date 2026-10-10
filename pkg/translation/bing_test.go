@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf16"
 
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
@@ -50,6 +51,10 @@ func TestMain(m *testing.M) {
 				fmt.Print(`[{"detectedLanguage":{"language":"en"},"translations":[{"text":"First chunk","to":"en"}]}]`)
 			}
 		default:
+			if len(utf16.Encode([]rune(os.Args[len(os.Args)-1]))) > 1000 {
+				fmt.Print(`{"statusCode":400,"errorMessage":""}`)
+				os.Exit(0)
+			}
 			language := os.Getenv("STASH_TEST_TRANSLATION_LANGUAGE")
 			if language == "" {
 				language = "ja"
@@ -87,7 +92,7 @@ func bingRequest(text string) models.TranslationRequest {
 
 func TestBingProviderLiteralUnicodeChunksAndURLProtection(t *testing.T) {
 	provider, path := bingFixture(t, "translated")
-	original := strings.Repeat("界", 1800) + "https://example.invalid/?literal=$(secret)`command`\n"
+	original := strings.Repeat("界", 1000) + "https://example.invalid/?literal=$(secret)`command`\n"
 	result, err := provider.Translate(t.Context(), bingRequest(original))
 	require.NoError(t, err)
 	require.Equal(t, "translated", result.Status)
@@ -101,7 +106,7 @@ func TestBingProviderLiteralUnicodeChunksAndURLProtection(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(rows[0]), &first))
 	require.NoError(t, json.Unmarshal([]byte(rows[1]), &second))
 	require.Equal(t, []string{"-no-init", "-engine", "bing", "-dump", "-no-ansi", ":en", "--"}, first[:7])
-	require.Equal(t, strings.Repeat("界", 1800), first[7])
+	require.Equal(t, strings.Repeat("界", 1000), first[7])
 	require.Equal(t, " https://example.invalid/?literal=$(secret)`command`\n", second[7])
 }
 
@@ -128,8 +133,10 @@ func TestBingProviderUnchangedKeepsExactOriginalAndNoTextSkipsProcess(t *testing
 	require.True(t, os.IsNotExist(err))
 	_, err = provider.Translate(t.Context(), bingRequest("Cannot pass\x00in argv"))
 	require.ErrorIs(t, err, ErrProviderInput)
-	_, err = provider.Translate(t.Context(), bingRequest(strings.Repeat("x", 1800*128+1)))
+	_, err = provider.Translate(t.Context(), bingRequest(strings.Repeat("x", 1000*128+1)))
 	require.ErrorIs(t, err, ErrProviderInput, "oversized work is rejected, never truncated")
+	_, err = os.Stat(path)
+	require.True(t, os.IsNotExist(err), "reject the full request before calling the provider")
 }
 
 func TestBingProviderBoundsFailuresAndHonorsCancellation(t *testing.T) {
@@ -174,11 +181,46 @@ func TestBingProviderAllowsUndetectedLanguageWithoutInventingOne(t *testing.T) {
 	require.Nil(t, retained.SourceLanguage)
 
 	t.Setenv("STASH_TEST_TRANSLATION_MODE", "partially_detected")
-	result, err = provider.Translate(t.Context(), bingRequest(strings.Repeat("a", 1800)+"☀️"))
+	result, err = provider.Translate(t.Context(), bingRequest(strings.Repeat("a", 1000)+"☀️"))
 	require.NoError(t, err)
 	require.Nil(t, result.SourceLanguage, "one detected chunk cannot identify the entire source language")
 	require.Equal(t, "translated", result.Status)
 	require.Equal(t, "First chunk\n☀️", *result.TranslatedText)
+}
+
+func TestBingProviderUTF16LimitPreservesCompleteInput(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		text   string
+		chunks []string
+	}{
+		{"ascii_limit", strings.Repeat("a", 1000), []string{strings.Repeat("a", 1000)}},
+		{"ascii_over_limit", strings.Repeat("a", 1001), []string{strings.Repeat("a", 1000), "a"}},
+		{"emoji_limit", strings.Repeat("😀", 500), []string{strings.Repeat("😀", 500)}},
+		{"emoji_over_limit", strings.Repeat("😀", 501), []string{strings.Repeat("😀", 500), "😀"}},
+		{"whole_emoji", strings.Repeat("a", 999) + "😀", []string{strings.Repeat("a", 999), "😀"}},
+		{"url_prefix_counts", "https://example.invalid/" + strings.Repeat("a", 1000), []string{
+			" https://example.invalid/" + strings.Repeat("a", 975), strings.Repeat("a", 25),
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			provider, path := bingFixture(t, "translated")
+			result, err := provider.Translate(t.Context(), bingRequest(test.text))
+			require.NoError(t, err)
+			require.Equal(t, "translated", result.Status)
+			body, err := os.ReadFile(path)
+			require.NoError(t, err)
+			var chunks []string
+			for _, row := range strings.Split(strings.TrimSpace(string(body)), "\n") {
+				var args []string
+				require.NoError(t, json.Unmarshal([]byte(row), &args))
+				chunk := args[len(args)-1]
+				require.LessOrEqual(t, len(utf16.Encode([]rune(chunk))), 1000)
+				chunks = append(chunks, chunk)
+			}
+			require.Equal(t, test.chunks, chunks)
+		})
+	}
 }
 
 func TestBingProviderOutputLimitCannotBeBypassedByCopy(t *testing.T) {

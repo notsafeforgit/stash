@@ -1489,8 +1489,10 @@ require the explicit configuration switch above. Standalone Unix installations
 must provide `trans` themselves or configure its absolute path.
 
 Policy `translate-shell-bing-text-v1` extracts text from recognized HTML, splits
-it into 1,800-code-point chunks and disables translate-shell init files. A leading
-HTTP/file URL is passed as literal text. The provider receives no shell-expanded
+it into chunks of at most 1,000 UTF-16 units and disables translate-shell init
+files. Emoji outside the basic multilingual plane count twice; a leading
+HTTP/file URL's protective space also counts toward the limit. The URL is passed
+as literal text. The provider receives no shell-expanded
 command. Each subprocess has a 30-second deadline and 1 MiB output ceiling; the
 whole request has a five-minute deadline, at most 128 chunks and the existing
 4 MiB result limit. Unsupported inputs are retained for review instead of being

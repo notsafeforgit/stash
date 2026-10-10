@@ -2540,7 +2540,8 @@ Reservations end with their fenced attempt, including cancellation or expiry.
 Website access values stay in the worker and never enter scheduling records.
 
 Only publication certifies success. Failure calls accept controlled codes;
-temporary errors receive server backoff and the eighth attempt becomes terminal.
+temporary errors receive server backoff and the eighth actual failure becomes terminal.
+Expired leases retain progress without consuming that failure allowance.
 Exact failure replay cannot affect a newer attempt. Checkpoint/publication
 acknowledgements remain recoverable after staging release. Transport tests lose
 committed responses, exercise large Unicode checkpoints, and preserve original
@@ -2836,7 +2837,7 @@ Readiness is read-only; admission and claim validate eligibility again.
 
 The native server maintains stale/expired ownership every 30 seconds without a
 producer connection. It cancels changed sources and recovers expired claims
-with existing backoff and attempt limits. Account merges and disabled roots
+with source pacing and failure limits. Account merges and disabled roots
 cannot redirect a previously authorized listing. Prior pages and original
 receipts survive; failed/cancelled jobs still require explicit reviewed retry.
 

@@ -7,7 +7,7 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement is running; the controlled worker rollout remains
 in progress.
 
-## Scrape restart recovery — implementation, 2026-10-10
+## Scrape restart recovery — deployed, 2026-10-10
 
 Schema 1000107 separates archive-job failure counts from ownership generations.
 Expired leases keep checkpoints and return to the queue without exhausting the
@@ -19,14 +19,33 @@ bounded retries and source cooldowns; stale workers cannot publish.
 The producer validates retries using the new failure count, including pending
 local failure acknowledgements after many restarts. Job displays show failures
 separately from attempts. Routine deployment no longer needs to drain a full
-scrape pass or stop n8n. A runtime fingerprint change still requires a bounded
-policy handoff for pending work.
+scrape pass or stop n8n. Recovery can wait for lease expiry, polling and existing
+source cooldowns. A runtime fingerprint change still requires a bounded policy
+handoff for pending work.
 
-Tests cover repeated database reopen/lease expiry, progress retention, stale
-worker rejection, real failure exhaustion, migration preservation and the real
-Python worker resuming through an HTTP outage without downloading a completed
-file again. Release validation and the production update remain in progress.
-Private evidence: `.local/scrape-restart-20261010/`.
+The full fork gate passed, including 805 UI tests, 673 producer tests and the
+complete Go suite. Tests cover repeated database reopen/lease expiry, progress
+retention, stale-worker rejection, real failure exhaustion and the real Python
+worker resuming through an HTTP outage without downloading a completed file
+again. A full database migration rehearsal retained 42,626 jobs, their attempts
+and receipts, and source-run progress; the temporary rehearsal copy was removed.
+
+Production was restarted with a scrape active, without draining the pass,
+restarting n8n or pausing its worker timer. The interrupted run automatically
+returned to the queue with its window, checkpoint and failure count intact.
+The existing timer also resumed another queued profile. Verification did not
+hold the runtime update for that profile pass to finish; same-run completion
+without redownloading is covered by the real HTTP worker test.
+The separate producer-runtime handoff then preserved queued run identities and
+progress, installed the matching worker and resumed scheduling. Future backups
+select the deployed application and worker recovery files; the previously
+published backup proof remains unchanged. This update triggered no new cloud
+backup or restore download.
+
+The [source build](https://github.com/notsafeforgit/stash/actions/runs/38019838758) and
+[wrapper build](https://github.com/notsafeforgit/stash-s6/actions/runs/38021342750) published successfully.
+Production runs their verified GHCR digest. Private migration, deployment and
+live recovery evidence: `.local/scrape-restart-20261010/`.
 
 ## Mixed gallery browsing — deployed, 2026-10-10
 
@@ -175,18 +194,19 @@ also passed.
 
 ## Current release position — 2026-10-10 UTC
 
-Production is healthy on schema **1000106**, source
-`0306c6da599940e3de0b6c14afe0b25c0b40e282`, pinned wrapper
-`ghcr.io/notsafeforgit/stash-s6@sha256:b12e6795e215a4fa1ee5f9cf63b2c3a39c5f35a12be7d50532c2b6dd9eb54c14`.
+Production is healthy on schema **1000107**, source
+`deef5ce4a364a93a2801e4d00636cbf00c21515a`, pinned wrapper
+`ghcr.io/notsafeforgit/stash-s6@sha256:845679c819624f4c99e8afbf40f41ebb4c77e958186777b53a91c877f72c6460`.
 The verified source image is
-`ghcr.io/notsafeforgit/stash@sha256:36fd005514b978422b546806fad5de210f8aa555d19637fb76fc069906198197`,
+`ghcr.io/notsafeforgit/stash@sha256:2255e028c3d12ab525246e9ed7f4eaf3ccb49ea84760aa8b152013d145b9511c`,
 with wrapper source `4f0f0594e95e000a75e4819f2494c3a44ce7f04d`.
-The mixed-gallery release is recorded under
-`.local/mixed-gallery-20261010/`. The source consolidation and existing
-producer/backup runtime are recorded under `.local/reddit-profile-sources-20261009/`;
-the current worker timer is active.
-The current backup publisher retains its sealed configuration until publication;
-its pending successor selects this release and its matching backup tools.
+The current application and worker release is recorded under
+`.local/scrape-restart-20261010/`; the worker timer is active. The earlier
+mixed-gallery release is recorded under `.local/mixed-gallery-20261010/`, and
+source consolidation under `.local/reddit-profile-sources-20261009/`.
+The coordinated post-write backup has published successfully. Future backups
+now select this application and worker release, preserving the original sealed
+publication evidence and the unchanged backup serializer runtime.
 The explicit [catalog association repair](catalog-association-repair.md) now
 promotes unambiguous imported post-account claims and known author directories
 to ordinary publisher decisions. Accounts without an ownership choice can link

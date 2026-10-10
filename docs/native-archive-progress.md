@@ -8,6 +8,43 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Legacy GIF backlog — repaired and deployed, 2026-10-10
+
+A complete filename inventory of the media root and Stash's file records found
+six unconverted GIFs and one missing GIF whose MKV had already become a separate
+scene. The earlier gallery #3664 repair had not established that this historical
+backlog was empty. The six GIFs were converted with the installed QSV helper;
+all seven MKVs passed full decoding, and new conversions retained duration and
+dimensions with the existing one-pixel padding rule.
+
+Reviewed local intake now accepts a same-stem GIF conversion for an imported
+image without inventing a scrape capture or requiring an attachment manifest.
+It pins the original image and file lifetime. An already registered MKV may
+reuse its scene when metadata agrees; conflicting edits and existing gallery or
+activity history reject the repair. The normal conversion transaction and
+durable worker retain metadata, source links, gallery memberships and covers.
+Focused conversion, restart, legacy post-link and conflict regressions pass;
+Go lint and the complete GitHub release checks pass.
+
+The [source release](https://github.com/notsafeforgit/stash/actions/runs/38093335043)
+and [wrapper release](https://github.com/notsafeforgit/stash-s6/actions/runs/38094508233)
+published source `cd866eacb4d30068105c04b69ef59763560e9f55`. Production uses
+wrapper digest `sha256:4f3acc9fa85df867764b161f5089eaf0a6e1e181f79f3bcd0a7baab8403ae243`.
+The unchanged-schema restart was healthy in 1.077 seconds. n8n was not restarted,
+worker timers were not paused and scrapes were not drained. Future backups now
+select this release's matching registry-built validator.
+
+All seven API repair jobs succeeded. Six new scenes are #373901–#373906; the
+existing #373398 retained its ID. Metadata, performers, tags, source-post links
+and the five affected galleries' memberships were verified. Scene thumbnails,
+video range requests and gallery covers return successfully. At 23:22:01 UTC,
+a final traversal of all 3,498 media directories found no remaining GIFs or
+temporary repair originals, and Stash contained no GIF file records. The six
+new MKVs total 3,162,193 bytes, replacing 181,323,529 bytes of GIFs.
+Private operation receipts and verification are under
+`.local/gif-backlog-20261010/`. The owner's success review before merging into
+`develop` remains outstanding.
+
 ## Supplementary home backup upload order — 2026-10-10
 
 The general home sync was moving retired development files into Drive's dated

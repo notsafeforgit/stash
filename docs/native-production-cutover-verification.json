@@ -5,7 +5,7 @@
   "public_native_activated": true,
   "legacy_writers_paused": true,
   "original_database_unchanged": true,
-  "source_revision": "b0e481c8694d6d4fbedaeb133d3fab4b72cdf1c2",
+  "source_revision": "cd866eacb4d30068105c04b69ef59763560e9f55",
   "producer_backup_revision": "d863a41af893bcdc341bc3021cca02eff8ebeebd",
   "library_reconciliation": {
     "status": "passed",
@@ -880,7 +880,7 @@
     "owner_acceptance_before_develop_merge"
   ],
   "scope": "Native migration, rollout and recovery checks are complete for their recorded scopes. The supplementary native database, producer snapshots and current service/backup configuration are verified on Drive. Ordinary home retention for other applications continues separately, as do scheduled scrape and translation queues. Owner success review remains required before merging develop. No additional migration reconciliation or cold-media restore was run for this review.",
-  "checked_at": "2026-10-10T17:52:28.608996+00:00",
+  "checked_at": "2026-10-10T23:22:01.656591+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -2297,34 +2297,34 @@
   "promotion_native_schema": 1000099,
   "promotion_source_revision": "0ea2c05fbc20356929c561f2173386a14870fdb7",
   "latest_rollout": {
-    "checked_at": "2026-10-10T17:14:59.130212+00:00",
+    "checked_at": "2026-10-10T23:22:01.656591+00:00",
     "scope": "Current deployment and bounded live checks; earlier migration and historical failure records retain their original dates.",
     "application": {
-      "evidence": ".local/translation-length-20261010/registry-deployment.json",
-      "sha256": "d1cf1c206e22fd5556cbb5815210e861b0112ae2964b4fcb172cd9651c79ef81",
-      "source_revision": "b0e481c8694d6d4fbedaeb133d3fab4b72cdf1c2",
+      "evidence": ".local/gif-backlog-20261010/registry-deployment.json",
+      "sha256": "52dab640dc6af6761da5bdb06db7a486ccf8d1bbe1d0d10f191e87ce1745d89d",
+      "source_revision": "cd866eacb4d30068105c04b69ef59763560e9f55",
       "source_run": {
         "conclusion": "success",
-        "headSha": "b0e481c8694d6d4fbedaeb133d3fab4b72cdf1c2",
+        "headSha": "cd866eacb4d30068105c04b69ef59763560e9f55",
         "status": "completed",
-        "url": "https://github.com/notsafeforgit/stash/actions/runs/38069101302"
+        "url": "https://github.com/notsafeforgit/stash/actions/runs/38093335043"
       },
       "wrapper_run": {
         "conclusion": "success",
         "headSha": "4f0f0594e95e000a75e4819f2494c3a44ce7f04d",
         "status": "completed",
-        "url": "https://github.com/notsafeforgit/stash-s6/actions/runs/38070319195"
+        "url": "https://github.com/notsafeforgit/stash-s6/actions/runs/38094508233"
       },
-      "source_image": "ghcr.io/notsafeforgit/stash@sha256:b5b2ee26ba3dc400f7bc1941ac01902000206725f310e4e3d4f2bbfcdc0aede5",
-      "wrapper_image": "ghcr.io/notsafeforgit/stash-s6@sha256:18fdc686082f2b6a5987b6657a1ab98ef7d5dbbe606633f331e4c7995d2551df",
+      "source_image": "ghcr.io/notsafeforgit/stash@sha256:3be21b75ca09144ef9090fc280ffde8e72c26433d6d89a1b2e406cfb75c0eee8",
+      "wrapper_image": "ghcr.io/notsafeforgit/stash-s6@sha256:4f3acc9fa85df867764b161f5089eaf0a6e1e181f79f3bcd0a7baab8403ae243",
       "native_schema": 1000110
     },
     "deployment": {
-      "evidence": ".local/translation-length-20261010/deployment-result.json",
-      "sha256": "24b7edee37b8125e39f4c6d1c06b6906f19efa6efd134ba6c2dcae7501d6ff62",
+      "evidence": ".local/gif-backlog-20261010/deployment-result.json",
+      "sha256": "85276711b27af30bc4b955c9f2f9c1ffb12e6d07a0a98c074a8a55e070a5d0a0",
       "status": "deployed",
-      "deployed_at": "2026-10-10T17:10:25.148017+00:00",
-      "startup_to_healthy_seconds": 1.053,
+      "deployed_at": "2026-10-10T23:21:24.738931+00:00",
+      "startup_to_healthy_seconds": 1.077,
       "schema_changed": false,
       "n8n_restarted": false,
       "worker_timer_paused": false,
@@ -2518,12 +2518,12 @@
       "scope": "Original pre-cutover native/configuration/artwork/operating-state archive. Interrupted deletion and nonempty producer replay are covered by the separate populated local recovery rehearsal."
     },
     "future_backup_configuration": {
-      "evidence": ".local/translation-length-20261010/backup-config-activation.json",
-      "sha256": "13ff8fda394e299d5fae99ce63a5b66d7cfaf309658c4fd8eabf2aff6b66ea4b",
+      "evidence": ".local/gif-backlog-20261010/backup-config-activation.json",
+      "sha256": "ed21d866bee9155e2b0ee777dc4983db509c1db6107dc0b4c42df36f313de630",
       "status": "passed",
-      "source_revision": "b0e481c8694d6d4fbedaeb133d3fab4b72cdf1c2",
+      "source_revision": "cd866eacb4d30068105c04b69ef59763560e9f55",
       "producer_source_revision": "7de9d60c3e8dd35564f94b584f0f9477219193a1",
-      "completed_at": "2026-10-10T17:12:30.679817+00:00"
+      "completed_at": "2026-10-10T23:21:36.599504+00:00"
     },
     "home_backup": {
       "last_failed_at": "2026-10-10T10:00:01Z",
@@ -2975,7 +2975,185 @@
         "type": "image/jpeg",
         "bytes": 86734
       },
-      "converter_sha256": "07eeb6da7fd314875977062770441a032fbfa351ea6b7d50b09530300f27d123"
+      "converter_sha256": "07eeb6da7fd314875977062770441a032fbfa351ea6b7d50b09530300f27d123",
+      "historical_backlog": {
+        "evidence": ".local/gif-backlog-20261010/verification.json",
+        "sha256": "8e60dbd9edce464cc857d70f04407426e73abe3ef75cc04a27e18c1c4d6c624e",
+        "at": "2026-10-10T23:22:01.656591+00:00",
+        "converted_gifs": 6,
+        "repaired_existing_mkv": 1,
+        "conversions": 7,
+        "remaining_gif_files": 0,
+        "remaining_stash_gif_records": 0,
+        "directories_checked": 3498,
+        "scenes": [
+          {
+            "old_image_id": "571254",
+            "scene_id": 373901,
+            "screenshot": {
+              "status": 200,
+              "content_type": "image/jpeg",
+              "bytes_read": 40668
+            },
+            "playback": {
+              "status": 206,
+              "content_type": "video/x-matroska",
+              "bytes_read": 1024
+            },
+            "post_links_verified": true,
+            "gallery_links_verified": true
+          },
+          {
+            "old_image_id": "571265",
+            "scene_id": 373902,
+            "screenshot": {
+              "status": 200,
+              "content_type": "image/jpeg",
+              "bytes_read": 42046
+            },
+            "playback": {
+              "status": 206,
+              "content_type": "video/x-matroska",
+              "bytes_read": 1024
+            },
+            "post_links_verified": true,
+            "gallery_links_verified": true
+          },
+          {
+            "old_image_id": "593621",
+            "scene_id": 373903,
+            "screenshot": {
+              "status": 200,
+              "content_type": "image/jpeg",
+              "bytes_read": 73695
+            },
+            "playback": {
+              "status": 206,
+              "content_type": "video/x-matroska",
+              "bytes_read": 1024
+            },
+            "post_links_verified": true,
+            "gallery_links_verified": true
+          },
+          {
+            "old_image_id": "603132",
+            "scene_id": 373398,
+            "screenshot": {
+              "status": 200,
+              "content_type": "image/jpeg",
+              "bytes_read": 63644
+            },
+            "playback": {
+              "status": 206,
+              "content_type": "video/x-matroska",
+              "bytes_read": 1024
+            },
+            "post_links_verified": true,
+            "gallery_links_verified": true
+          },
+          {
+            "old_image_id": "570180",
+            "scene_id": 373904,
+            "screenshot": {
+              "status": 200,
+              "content_type": "image/jpeg",
+              "bytes_read": 80416
+            },
+            "playback": {
+              "status": 206,
+              "content_type": "video/x-matroska",
+              "bytes_read": 1024
+            },
+            "post_links_verified": true,
+            "gallery_links_verified": true
+          },
+          {
+            "old_image_id": "547375",
+            "scene_id": 373905,
+            "screenshot": {
+              "status": 200,
+              "content_type": "image/jpeg",
+              "bytes_read": 45967
+            },
+            "playback": {
+              "status": 206,
+              "content_type": "video/x-matroska",
+              "bytes_read": 1024
+            },
+            "post_links_verified": true,
+            "gallery_links_verified": true
+          },
+          {
+            "old_image_id": "547392",
+            "scene_id": 373906,
+            "screenshot": {
+              "status": 200,
+              "content_type": "image/jpeg",
+              "bytes_read": 70010
+            },
+            "playback": {
+              "status": 206,
+              "content_type": "video/x-matroska",
+              "bytes_read": 1024
+            },
+            "post_links_verified": true,
+            "gallery_links_verified": true
+          }
+        ],
+        "galleries": [
+          {
+            "id": "3258",
+            "total_members": 261,
+            "replaced_images": 2,
+            "cover": {
+              "status": 200,
+              "content_type": "image/jpeg",
+              "bytes_read": 42433
+            }
+          },
+          {
+            "id": "3315",
+            "total_members": 2027,
+            "replaced_images": 1,
+            "cover": {
+              "status": 200,
+              "content_type": "image/jpeg",
+              "bytes_read": 52114
+            }
+          },
+          {
+            "id": "3326",
+            "total_members": 970,
+            "replaced_images": 2,
+            "cover": {
+              "status": 200,
+              "content_type": "image/jpeg",
+              "bytes_read": 67341
+            }
+          },
+          {
+            "id": "3396",
+            "total_members": 8,
+            "replaced_images": 1,
+            "cover": {
+              "status": 200,
+              "content_type": "image/jpeg",
+              "bytes_read": 29312
+            }
+          },
+          {
+            "id": "3417",
+            "total_members": 2,
+            "replaced_images": 1,
+            "cover": {
+              "status": 200,
+              "content_type": "image/jpeg",
+              "bytes_read": 63644
+            }
+          }
+        ],
+        "source_revision": "cd866eacb4d30068105c04b69ef59763560e9f55"
+      }
     },
     "routine_startup": {
       "evidence": ".local/startup-audit-separation-20261010/deployment-result.json",

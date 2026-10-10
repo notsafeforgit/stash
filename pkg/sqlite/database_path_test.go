@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
@@ -11,7 +12,7 @@ import (
 
 func TestDatabaseLiteralPathsSurviveReopenAndClosedBackup(t *testing.T) {
 	directory := t.TempDir()
-	for _, name := range []string{"library #first.sqlite", "library #second.sqlite", "library %2F.sqlite", "library & café.sqlite"} {
+	for _, name := range []string{"library #first.sqlite", "library #second.sqlite", "library %2F.sqlite", "library & café.sqlite", `library "quoted".sqlite`} {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(directory, name)
 			writeEmptyNativeFixture(t, path)
@@ -46,4 +47,57 @@ func TestDatabaseLiteralPathsSurviveReopenAndClosedBackup(t *testing.T) {
 		})
 	}
 	require.NoFileExists(t, filepath.Join(directory, "library "), "opening a literal hash must not create a truncated database")
+}
+
+func TestDatabaseBackupDoesNotWaitForApplicationWriter(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "library.sqlite")
+	writeEmptyNativeFixture(t, path)
+	db := sqlite.NewDatabase()
+	require.NoError(t, db.Open(path))
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	attachmentSQL(t, db, "INSERT INTO scenes(id,title,created_at,updated_at) VALUES(31,'committed',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)")
+
+	// Keep the application's writer occupied, including an uncommitted change.
+	// A WAL reader can still copy the previously committed view. Using writeDB
+	// for the backup would deadlock here until the writer is released.
+	backup := filepath.Join(t.TempDir(), "backup.sqlite")
+	done := make(chan error, 1)
+	started := false
+	repo := db.Repository()
+	err := repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		scene, err := repo.Scene.Find(ctx, 31)
+		if err != nil {
+			return err
+		}
+		scene.Title = "committed after backup"
+		if err := repo.Scene.Update(ctx, scene); err != nil {
+			return err
+		}
+		started = true
+		go func() { done <- db.Backup(backup) }()
+		select {
+		case err := <-done:
+			done <- err
+			return err
+		case <-time.After(5 * time.Second):
+			t.Error("backup waited for the application's write connection")
+			return nil // release the writer so the backup goroutine can finish
+		}
+	})
+	if started {
+		require.NoError(t, <-done)
+	}
+	require.NoError(t, err)
+
+	for _, snapshot := range []struct {
+		path, title string
+	}{{backup, "committed"}, {path, "committed after backup"}} {
+		raw := openRawDB(t, snapshot.path)
+		var title, integrity string
+		require.NoError(t, raw.QueryRow("SELECT title FROM scenes WHERE id=31").Scan(&title))
+		require.Equal(t, snapshot.title, title)
+		require.NoError(t, raw.QueryRow("PRAGMA quick_check").Scan(&integrity))
+		require.Equal(t, "ok", integrity)
+		require.NoError(t, raw.Close())
+	}
 }

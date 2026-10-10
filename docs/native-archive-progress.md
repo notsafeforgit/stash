@@ -7,6 +7,28 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
+## Backup interference with native workers — fixed, publication pending, 2026-10-10
+
+The supplementary Google Drive backup started its database copy at 11:51:24 UTC.
+The ordinary `backupDatabase` path held Stash's sole write connection through
+11:52:35, so scrape reservations and admissions timed out. The n8n worker reported
+`source_ownership_unavailable` at 11:51:44; this concerns its execution lease,
+not performer ownership. Its original saved submission was acknowledged at
+11:53:41, and the paused run retained its window and progress for lease recovery.
+The continuing full-history scrape advanced from 599 items / 447 files to
+600 / 448. Remote deleted Redgifs items and Reddit `not_found` responses are
+separate source failures; pending dispatch exit 2 is accepted by the service.
+
+Ordinary database backups now use a dedicated read-only WAL connection instead
+of occupying the application writer. A regression reproduces the old wait and
+verifies that the new copy completes while an application write transaction is
+open, includes only committed data, and remains a valid standalone database.
+Closed-database/literal-path backup and existing source metadata, translation
+and checkpoint backup regressions pass. The schema and producer runtime are
+unchanged. No extra production backup or cloud restore was started for this
+check. GitHub/GHCR publication and deployment remain pending; evidence is under
+`.local/n8n-worker-errors-20261010/`.
+
 ## Existing performer profile URL associations — applied, 2026-10-10
 
 The account review repair linked 186 previously undecided tracked accounts to

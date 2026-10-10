@@ -388,17 +388,15 @@ func (db *Database) Reset() error {
 	return nil
 }
 
-// Backup the database. If db is nil, then uses the existing database
-// connection.
+// Backup copies a consistent database snapshot through a separate read-only
+// connection. Holding the application's only write connection for the copy
+// would block edits and worker lease renewals for the entire backup.
 func (db *Database) Backup(backupPath string) (err error) {
-	thisDB := db.writeDB
-	if thisDB == nil {
-		thisDB, err = db.open(false, true)
-		if err != nil {
-			return fmt.Errorf("open database %s failed: %w", db.dbPath, err)
-		}
-		defer thisDB.Close()
+	thisDB, err := db.open(false, false)
+	if err != nil {
+		return fmt.Errorf("open database %s failed: %w", db.dbPath, err)
 	}
+	defer thisDB.Close()
 
 	// if backup path is not in the same directory as the database,
 	// then backup to the same directory first, then move to the final location.
@@ -411,7 +409,7 @@ func (db *Database) Backup(backupPath string) (err error) {
 	}
 
 	logger.Infof("Backing up database into: %s", vacuumOut)
-	_, err = thisDB.Exec(`VACUUM INTO "` + vacuumOut + `"`)
+	_, err = thisDB.Exec("VACUUM INTO ?", vacuumOut)
 	if err != nil {
 		return fmt.Errorf("vacuum failed: %w", err)
 	}

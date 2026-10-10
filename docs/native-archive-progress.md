@@ -45,6 +45,22 @@ The associated published run is `20261008_175444_1545955`, checkpoint
 `dbf8cd08-ea38-43df-9864-6f20429be640`. Recovery copies remain available pending
 final acceptance.
 
+## Scheduled publication and cleanup headroom — fix verified, 2026-10-10
+
+Scheduled run `20261010_015141_781770` published its coordinated native/media
+backup and released checkpoint `4fb711ad-5bfc-4b66-8023-ff1515fdfcd4`. The
+enclosing service then failed during Standard-object cleanup: an inventory
+download used `/tmp`, whose entire memory filesystem is smaller than the
+configured 50 GiB reserve. Root still had approximately 125 GiB free. The
+pending automatic retry was cancelled, leaving the daily timer enabled and the
+published backup intact.
+
+Cleanup now stages those inventories beside its configured history cache,
+where backup headroom is available. All 318 backup tests pass, including a
+regression for temporary-file placement, cleanup and insufficient-space refusal.
+The backup selector from the previous release completed after publication;
+the new runtime and remaining cleanup are being prepared for installation.
+
 ## Useful work after cursor replay — deployed, 2026-10-10
 
 Live full-history attempts exposed a scheduling problem: replaying hundreds of

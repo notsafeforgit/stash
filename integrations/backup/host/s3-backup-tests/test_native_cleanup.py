@@ -73,6 +73,29 @@ class CleanupTests(unittest.TestCase):
         self.history = SnapshotHistory(self.store, self.root / 'history')
         self.cleanup = NativeCleanup(self.history, reserve=0)
 
+    def test_graph_fetch_uses_cache_filesystem_and_keeps_space_guard(self):
+        _, current = self.publish(1)
+        fetch = self.store.fetch_metadata
+        temporary_paths = []
+
+        def cache_fetch(reference, destination, *, reserve):
+            temporary_paths.append(Path(destination))
+            self.assertEqual(Path(destination).parent, self.history.cache)
+            self.assertEqual(reserve, self.cleanup.reserve)
+            return fetch(reference, destination, reserve=reserve)
+
+        with patch.object(self.store, 'fetch_metadata', side_effect=cache_fetch):
+            graph = self.cleanup.graph(publication(current))
+        self.assertTrue(graph['objects'])
+        self.assertEqual(len(temporary_paths), 1)
+        self.assertFalse(temporary_paths[0].exists())
+
+        self.rebuild_caches()
+        self.cleanup.reserve = 1 << 60
+        with self.assertRaisesRegex(InvalidArchive, 'reserved headroom'):
+            self.cleanup.graph(publication(current))
+        self.assertFalse(list(self.history.cache.glob('stash-native-graph-*')))
+
     def test_all_retained_snapshots_protect_shared_objects_unknown_uploads_are_untouched(self):
         first, old = self.publish(1)
         second, _ = self.publish(2)

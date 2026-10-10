@@ -61,7 +61,9 @@ class NativeCleanup:
         name = "native-" + record["archive_uuid"] + ".json"
         graph = self.history._read_cache(name, MASTER_BYTES)
         if graph is None:
-            with tempfile.TemporaryDirectory(prefix="stash-native-graph-") as temp:
+            # The configured cache filesystem has the reserved backup headroom;
+            # the system temp directory may be a much smaller memory filesystem.
+            with tempfile.TemporaryDirectory(prefix="stash-native-graph-", dir=self.history.cache) as temp:
                 _, objects = self.store.fetch_metadata(record["native_archive"], temp, reserve=self.reserve)
             graph = {"reference": record["native_archive"], "objects": objects}
             require_space(self.history.cache, len(json_bytes(graph)) + 128, self.reserve)

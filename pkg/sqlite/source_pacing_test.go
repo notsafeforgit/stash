@@ -122,6 +122,22 @@ func TestSourcePacingFailureCooldownAndOldReceiptReplay(t *testing.T) {
 	require.Equal(t, until, current.AvailableAt)
 }
 
+func TestSourcePacingExtractionFailureRetainsJobBackoffWithoutPausingSite(t *testing.T) {
+	f := newEnrichmentExecutionFixture(t)
+	job := f.admit(t)
+	running := f.claim(t, job.UUID, 0)
+	_, err := f.worker.Fail(t.Context(), f.tokens[0], running.Lease(), "extraction_failed")
+	require.NoError(t, err)
+	current, err := f.worker.Find(t.Context(), f.tokens[0], job.UUID)
+	require.NoError(t, err)
+	require.Equal(t, "queued", current.State)
+	require.Equal(t, 1, current.Failures)
+	require.True(t, current.AvailableAt.After(f.now), "the failed job keeps its retry delay")
+	require.Nil(t, tryPacingEnrichment(t, f, current))
+	download := newPacingDownload(t, f, "https://www.reddit.com/user/different")
+	require.NotNil(t, download.claim(t), "an extractor failure is not evidence of a site-wide outage")
+}
+
 func TestSourcePacingSeparateEnrichmentCollectionsShareServiceOwnership(t *testing.T) {
 	f := newEnrichmentExecutionFixture(t)
 	one := f.admit(t)

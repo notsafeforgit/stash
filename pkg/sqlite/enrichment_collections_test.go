@@ -2,6 +2,7 @@ package sqlite_test
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -79,4 +80,38 @@ func TestEnrichmentCollectionDiscoveryRetainsRuntimeBackoffAndTerminalBoundaries
 		require.Len(t, attempts, 2, "discovery never claims or recovers work")
 		return nil
 	}))
+}
+
+func TestEnrichmentCollectionDiscoveryDrainsFullQueueBeforeNewTargets(t *testing.T) {
+	f := newEnrichmentExecutionFixture(t)
+	policy := strings.Repeat("a", 64)
+	f.admit(t)
+	for i := 1; i < archive.MaxEnrichmentJobs; i++ {
+		post := sourceTestPost(t, f.repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: fmt.Sprintf("queued%d", i)}, "")
+		url, err := observePostURL(f.repo, models.SourcePostURLInput{SourcePostEvidence: postLinkEvidence(post.UUID), URL: fmt.Sprintf("https://www.reddit.com/comments/queued%d", i)})
+		require.NoError(t, err)
+		input := f.target.EnrichmentTargetInput
+		input.PostUUID, input.URLUUID = post.UUID, url.URLUUID
+		target := retainEnrichment(t, f.repo, input, models.EnrichmentSchedule{State: "pending"}, f.now)
+		_, err = f.worker.Admit(t.Context(), f.tokens[0], target.UUID, target.Revision, policy, "1.32.15-dev")
+		require.NoError(t, err)
+	}
+	newCollection := putSourceCollection(t, f.repo, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
+		Label: "Unadmitted backlog", Kind: "feed", Namespace: "native:reddit", State: "active"}})
+	input := f.target.EnrichmentTargetInput
+	input.CollectionUUID, input.CollectionRevision = newCollection.UUID, newCollection.Revision
+	retainEnrichment(t, f.repo, input, models.EnrichmentSchedule{State: "pending"}, f.now)
+	_, token, err := f.service.IssueCredential(t.Context(), f.producers[0].UUID, []models.IngestScope{{CollectionUUID: f.collection.UUID}, {CollectionUUID: newCollection.UUID}}, nil)
+	require.NoError(t, err)
+	page := func(token, after string) []models.EnrichmentCollectionCandidate {
+		result, err := f.worker.ReadyCollections(t.Context(), token, policy, "1.32.15-dev", after, 20)
+		require.NoError(t, err)
+		return result
+	}
+	require.Equal(t, []models.EnrichmentCollectionCandidate{{UUID: f.collection.UUID}}, page(token, ""))
+	require.Empty(t, page(token, f.collection.UUID), "the cursor wraps before visiting unadmitted collections")
+	require.Equal(t, []models.EnrichmentCollectionCandidate{{UUID: f.collection.UUID}}, page(token, ""), "the next poll revisits admitted jobs")
+	_, isolatedToken, err := f.service.IssueCredential(t.Context(), f.producers[1].UUID, []models.IngestScope{{CollectionUUID: newCollection.UUID}}, nil)
+	require.NoError(t, err)
+	require.Equal(t, []models.EnrichmentCollectionCandidate{{UUID: newCollection.UUID}}, page(isolatedToken, ""), "jobs outside a producer's grants do not hide its own work")
 }

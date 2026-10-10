@@ -679,11 +679,11 @@ checkpoint with `source_busy`, preserving parent observations for child-only ret
 Scheduling reservations store service identities, not website credentials or URLs.
 
 Native cooldowns are shared across producers and both work families. Typed
-rate-limit, timeout and extraction failures pause the affected service for at
+rate-limit and timeout failures pause the affected service for at
 least one hour; authentication/challenge failures pause it for at least one day.
 A longer native retry deadline wins. A retained child failure pauses that child's
 service, independently of the post's main service. Missing posts, account access
-denials, local worker failures and busy reservations do not declare a service
+denials, generic extraction failures, local worker failures and busy reservations do not declare a service
 outage. Replaying an old failure receipt does not extend its cooldown. Mirror
 sites use their contacted mirror service, independently of creator-account
 namespaces such as OnlyFans or Patreon.
@@ -702,10 +702,15 @@ does not traverse historical job rows. Authentication requires the collection's
 current root scope; changed historical jobs are ineligible and are never exposed
 through the current root's discovery grant. Claim independently checks authority.
 
-Collection discovery applies those current grants before pagination. It includes
-collections with eligible unadmitted targets or due queued jobs for the requested
-runtime/policy; held, stale, running and terminal jobs alone do not make a
-collection ready. A root grant covers newly registered collections at that root;
+Collection discovery applies those current grants before pagination. While due
+queued jobs exist for the requested runtime/policy and grants, it returns only
+their collections. Reaching the end wraps the cursor back to admitted work,
+without traversing the unadmitted library backlog or repeatedly hitting the
+64-job admission limit. Once that set is empty, discovery includes collections
+with eligible unadmitted targets. Held, stale, running and terminal jobs alone
+do not make a collection ready. Generic extraction failures retain their own
+job retry delay without postponing unrelated work on the same website.
+A root grant covers newly registered collections at that root;
 an exact collection grant with no root covers only that unbound collection.
 Moving a collection cannot reuse its old root grant. The response contains only
 UUIDs, and the caller cannot submit replacement grants. Discovery neither admits

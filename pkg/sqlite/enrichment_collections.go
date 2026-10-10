@@ -23,7 +23,7 @@ func (s *EnrichmentJobStore) Collections(ctx context.Context, q models.Enrichmen
 		return nil, models.ErrEnrichmentInvalid
 	}
 	permissions := []string{}
-	args := []any{q.After}
+	args := []any{}
 	for _, scope := range q.Scopes {
 		if !validSourceRunUUID(scope.CollectionUUID) || (scope.RootUUID != nil && !validSourceRunUUID(*scope.RootUUID)) {
 			return nil, models.ErrEnrichmentInvalid
@@ -38,6 +38,7 @@ func (s *EnrichmentJobStore) Collections(ctx context.Context, q models.Enrichmen
 		permissions = append(permissions, "d.root_uuid=?")
 		args = append(args, root)
 	}
+	permissionArgs := append([]any{}, args...)
 	rows, err := activeEnrichmentJobs(ctx)
 	if err != nil {
 		return nil, err
@@ -70,13 +71,36 @@ func (s *EnrichmentJobStore) Collections(ctx context.Context, q models.Enrichmen
 		jobs = append(jobs, "?")
 		args = append(args, work.CollectionUUID)
 	}
-	queued := "0"
 	if len(jobs) != 0 {
-		queued = "b.uuid IN (" + strings.Join(jobs, ",") + ")"
+		queued := "b.uuid IN (" + strings.Join(jobs, ",") + ")"
+		// Drain admitted work before traversing unadmitted targets. Otherwise a
+		// full queue makes each worker stop at a new collection's admission
+		// error, potentially taking hours to revisit a waiting job. Inspect the
+		// whole bounded, permitted set before applying the cursor: reaching its
+		// end must wrap to those jobs rather than start another library scan.
+		query := `SELECT b.uuid FROM source_collections b JOIN source_collection_revisions d ON d.collection_uuid=b.uuid AND d.revision=b.revision
+ WHERE d.state='active' AND (` + strings.Join(permissions, " OR ") + ") AND " + queued + " ORDER BY b.uuid"
+		admitted := []models.EnrichmentCollectionCandidate{}
+		if err := dbWrapper.Select(ctx, &admitted, query, args...); err != nil {
+			return nil, err
+		}
+		if len(admitted) != 0 {
+			ret := []models.EnrichmentCollectionCandidate{}
+			for _, candidate := range admitted {
+				if candidate.UUID > q.After {
+					ret = append(ret, candidate)
+					if len(ret) == limit {
+						break
+					}
+				}
+			}
+			return ret, nil
+		}
 	}
 	query := `SELECT b.uuid FROM source_collections b JOIN source_collection_revisions d ON d.collection_uuid=b.uuid AND d.revision=b.revision
- WHERE b.uuid>? AND d.state='active' AND (` + strings.Join(permissions, " OR ") + ") AND (" + queued + ` OR EXISTS(
- SELECT 1 FROM enrichment_targets t` + enrichmentReadySources + " WHERE t.collection_uuid=b.uuid AND " + enrichmentReadyConditions + ")) ORDER BY b.uuid LIMIT ?"
+ WHERE b.uuid>? AND d.state='active' AND (` + strings.Join(permissions, " OR ") + `) AND EXISTS(
+ SELECT 1 FROM enrichment_targets t` + enrichmentReadySources + " WHERE t.collection_uuid=b.uuid AND " + enrichmentReadyConditions + ") ORDER BY b.uuid LIMIT ?"
+	args = append([]any{q.After}, permissionArgs...)
 	args = append(args, now.UTC(), limit)
 	ret := []models.EnrichmentCollectionCandidate{}
 	if err := dbWrapper.Select(ctx, &ret, query, args...); err != nil {

@@ -24,6 +24,16 @@ output; they must not alter a worker's policy fingerprint. Use Python `-I` for
 package installation so a development `PYTHONPATH` cannot redirect pip's uninstall
 lookup to the source tree.
 
+Concurrent workers require an SQLite library with the
+[WAL-reset corruption fix](https://sqlite.org/wal.html#walreset).
+Check the producer interpreter itself with
+`python -c 'import sqlite3; print(sqlite3.sqlite_version)'`; a newer SQLite CLI
+does not upgrade Python's library. Production host and n8n producers use SQLite
+3.53.4. The host's isolated environment loads its pinned library from
+`~/.local/share/stash-ingest/sqlite-3.53.4/` through
+`stash_sqlite_runtime.pth`; retain that library, its manifest and the bootstrap
+file when restoring the producer environment.
+
 ## Authentication boundary
 
 The package also provides `stash-intake-folders` for

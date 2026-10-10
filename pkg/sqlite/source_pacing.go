@@ -199,12 +199,14 @@ func enrichmentPendingPacingReady(ctx context.Context, job, collection, rootScop
 func sourcePacingDelay(code string, retry time.Time, now time.Time) time.Duration {
 	var delay time.Duration
 	switch code {
-	case "rate_limited", "timeout", "extraction_failed":
+	case "rate_limited", "timeout":
 		delay = time.Hour
 	case "authentication", "challenge":
 		delay = 24 * time.Hour
 	default:
-		return 0 // Missing posts, denied accounts and local worker failures are not service outages.
+		// Generic extraction failures retain their own job/run retry delay;
+		// they do not establish an outage affecting every account on a site.
+		return 0
 	}
 	return max(delay, retry.Sub(now))
 }

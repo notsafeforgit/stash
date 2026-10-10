@@ -19,8 +19,8 @@ cancelled and unexpectedly skipped jobs.
 Frontend-only changes can skip backend/Python suites relative to a successful
 ancestor publish. The comparison includes intervening failed/cancelled pushes;
 unknown paths, tooling/schema changes and unavailable baselines run everything.
-Embedded-entry tests and compilation always run. Twelve real-Git and gate
-regressions cover selection, deleted/renamed paths and publication failures.
+Embedded-entry tests and compilation always run. Real-Git and gate regressions
+cover selection, deleted/renamed paths and publication failures.
 
 pnpm now installs into its cached store. Go compilation caches advance per
 revision and suite; Python dependency caches distinguish their installers.
@@ -34,8 +34,8 @@ restore reserve remains unchanged.
 The complete local gate passed in 399.64 seconds: 805 UI tests, 678 producer,
 12 library, 146 archive and 317 backup tests, all Go integration tests/lint, and
 workflow lint with ShellCheck. Final cache edits passed the CI checks again.
-Evidence: `.local/ci-speed-20261010/`. GitHub publication verification follows
-the push; this build-tooling change does not require a production restart.
+Evidence: `.local/ci-speed-20261010/`. This build-tooling change does not require
+a production restart.
 
 The first GitHub run exposed a missing cross-job dependency: Go's Python
 interop/restore tests also need the installed producer runtime. The Go runners
@@ -50,6 +50,16 @@ packages without omissions or overlap; a missing-runtime check fails before
 the Go command starts.
 The independent browser workflow reproduced the same 14 failing cases as its
 previous run; these remain separate UI regression work.
+
+The corrected [GitHub publication run](https://github.com/notsafeforgit/stash/actions/runs/38032936438)
+passed every required job at `3940a14f74046e5bb7e0769a6b6c9955ba68f7e5`.
+Validation finished 12 minutes 25 seconds after the run started, and publication
+finished in 18 minutes including the initial Docker cache population. Cached
+backend generation took 4 seconds and Linux compilation took 3 seconds. The
+registry image's revision label matches that commit; its digest is
+`sha256:fec95e82cf66f160951e04786ff03ba9c3fb78dfd7bdd8607657c902ad9f976f`.
+This documentation update also exercises the normal frontend/documentation-only
+selection path against that successful baseline, without a skip-CI directive.
 
 ## GIF conversion provenance and restart recovery — implemented, not deployed, 2026-10-10
 

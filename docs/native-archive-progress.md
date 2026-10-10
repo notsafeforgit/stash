@@ -7,7 +7,7 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
-## Useful work after cursor replay — implementation, 2026-10-10
+## Useful work after cursor replay — deployed, 2026-10-10
 
 Live full-history attempts exposed a scheduling problem: replaying hundreds of
 already processed items used the five-minute turn, leaving only one new
@@ -21,8 +21,36 @@ source cooldowns. Saved-cursor bounds and missing-cursor failures are unchanged.
 Deterministic regressions cover long replay followed by several new checkpoints,
 expiry without renewal, fresh-run expiry and ownership loss during replay and
 new work. The focused producer, run lease and gallery suite passes (62 tests).
-All 687 producer tests pass. Live runtime handoff is pending; production still
-uses producer source `796ae877a744` and the application image recorded below.
+All 687 producer tests pass, including the
+[GitHub producer validation](https://github.com/notsafeforgit/stash/actions/runs/38063404543).
+Producer source `7de9d60c3e8dd35564f94b584f0f9477219193a1` is installed on
+the host and as the existing n8n image's read-only adapter overlay. All 129
+module hashes match; the 22 host and 10 n8n profile files remain unchanged.
+Both runtimes report adapter hash
+`93ee4d470e9cf6b5068b3f6a271b2c54cac96f001a4b1816a7283dd39b8a3ad9`.
+The wheel hash is
+`c07897b1b0317d0d6c38e3d3ec46175f0824db1d87d27303647d4564cab401ed`.
+
+Workers resumed at 15:32:00 UTC after the package handoff. The prior initial
+worker used its configured termination timeout; its expired lease was recovered
+through the API. Compatible policy upgrades preserve 1,329 existing runs, their
+windows, checkpoints and retry deadlines, plus eight metadata policy families
+and all four discovery definitions. The 169 historical holds remain unchanged.
+Only obsolete producer traversal hints were removed; the other 21 journal
+tables in each outbox retain their counts. No source run was resubmitted.
+
+All fourteen timers are active. The initial and incremental queue assignments
+remain intact, as do the pinned SQLite 3.53.4 host runtime and n8n base image.
+Stash was not restarted; its GitHub-built image and schema are unchanged and
+healthy. Future backup selection includes the new adapter and existing queue
+manifest. One selector waits for the original backup to finish, without changing
+its sealed view or configuration. Live observation confirms the same initial
+GlowingGaze_ attempt advancing from 616 to 619 items and 457 to 459 files
+processed between 15:37:03 and 15:37:33 UTC, after its original five-minute turn
+expired. Its fence remains 54, so these are multiple new checkpoints in one
+resumed attempt. Two independent Twitter incremental runs also succeeded after
+the handoff. This does not claim the full profile or all queued work is finished.
+Evidence is under `.local/resumed-work-budget-20261010/`.
 
 ## Initial and incremental scrape queues — deployed, 2026-10-10
 
@@ -778,8 +806,9 @@ with wrapper source `4f0f0594e95e000a75e4819f2494c3a44ce7f04d`.
 The latest application and queue rollout is recorded under
 `.local/initial-scrape-concurrency-20261010/`. Ten site workers are active, with
 host incremental downloads and n8n initial downloads in separate queues. The
-two old global worker timers are disabled. Producer package `796ae877a744`
-remains installed; this scheduling change did not change its policy fingerprints.
+two old global worker timers are disabled. Producer package `7de9d60c3e8d`
+is installed with the bounded work budget after replay; its handoff and compatible
+policy upgrades are recorded under `.local/resumed-work-budget-20261010/`.
 The coordinated post-write backup has published successfully. The current
 scheduled backup retains its original sealed view, configuration and validator.
 One deferred configuration handoff will select this application and its queue

@@ -28,7 +28,7 @@ type GalleryService interface {
 	AddImages(ctx context.Context, g *models.Gallery, toAdd ...int) error
 	RemoveImages(ctx context.Context, g *models.Gallery, toRemove ...int) error
 
-	SetCover(ctx context.Context, g *models.Gallery, coverImageId int) error
+	SetCover(ctx context.Context, g *models.Gallery, mediaUUID string) error
 	ResetCover(ctx context.Context, g *models.Gallery) error
 
 	Destroy(ctx context.Context, i *models.Gallery, fileDeleter *image.FileDeleter, deleteGenerated, deleteFile, destroyFileEntry bool) ([]*models.Image, error)

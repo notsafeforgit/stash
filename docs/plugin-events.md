@@ -141,7 +141,7 @@ and the affected field names:
 | Generate/regenerate a scene cover | `Scene.Update.Post` | `cover_image` |
 | Change image counter | `Image.Update.Post` | `o_counter` |
 | Add/remove gallery images | `Gallery.Update.Post` | `image_ids` |
-| Set/reset gallery cover | `Gallery.Update.Post` | `cover_image_id` |
+| Set/reset gallery cover | `Gallery.Update.Post` | `cover` |
 | Add/remove/reorder subgroups | `Group.Update.Post` | `sub_groups` |
 
 Groups emit only `Group.Create.Post`, `Group.Update.Post` and

@@ -160,7 +160,7 @@ export const GalleryCard: React.FC<GalleryCardProps> = ({
   const preview = (
     <EntityCard.Preview
       image={scrubImage ?? galleryCover(gallery)}
-      previewImage={scrubImage ? null : gallery.cover?.preview_image}
+      previewImage={scrubImage ? null : gallery.cover?.image?.preview_image}
       isPortrait={isPortrait}
       organized={gallery.organized}
     >

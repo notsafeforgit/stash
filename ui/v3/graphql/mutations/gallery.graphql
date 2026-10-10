@@ -44,9 +44,9 @@ mutation RemoveGalleryImages($gallery_id: ID!, $image_ids: [ID!]!) {
   removeGalleryImages(input: { gallery_id: $gallery_id, image_ids: $image_ids })
 }
 
-mutation SetGalleryCover($gallery_id: ID!, $cover_image_id: ID!) {
+mutation SetGalleryCover($gallery_id: ID!, $image_id: ID, $scene_id: ID) {
   setGalleryCover(
-    input: { gallery_id: $gallery_id, cover_image_id: $cover_image_id }
+    input: { gallery_id: $gallery_id, image_id: $image_id, scene_id: $scene_id }
   )
 }
 

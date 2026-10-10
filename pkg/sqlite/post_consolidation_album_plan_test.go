@@ -46,7 +46,7 @@ func TestPostConsolidationPlanGalleryEffectsMatchPublishedChoicesAndProtectEdits
 		require.NoError(t, err)
 		galleryID = *preview.Gallery.LocalID
 		require.NoError(t, repo.Gallery.AddSceneIDs(ctx, galleryID, []int{*manualScene.LocalID}))
-		require.NoError(t, repo.Gallery.SetCover(ctx, galleryID, 41))
+		require.NoError(t, repo.Gallery.SetCover(ctx, galleryID, cover.UUID))
 		_, err = repo.Gallery.UpdatePartial(ctx, galleryID, models.GalleryPartial{Title: models.NewOptionalString("My album"), Details: models.NewOptionalString("My description")})
 		return err
 	}))

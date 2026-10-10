@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useState } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import { Link } from "@tanstack/react-router";
-import { Images, Play } from "lucide-react";
+import { Images, Play, MoreHorizontal } from "lucide-react";
 import { useMsg } from "@/hooks/message";
 import {
   FindGalleryMediaDocument,
@@ -22,6 +22,14 @@ import { Spinner } from "@/components/ui/spinner";
 import { PostEmpty } from "@/components/archive/posts/shared";
 import { AlbumReadError } from "@/components/archive/albums/ordered";
 import { useAlbumPages } from "@/components/archive/albums/read";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { useGalleryCover } from "./use-gallery-cover";
 
 const GalleryMediaPlayback = lazy(() => import("./gallery-media-playback"));
 export type GalleryMediaPage = NonNullable<
@@ -66,6 +74,7 @@ export function GalleryMediaReadError({
 export function GalleryMedia({ id }: { id: string }) {
   const msg = useMsg();
   const client = useApolloClient();
+  const { setCover, pending: coverPending } = useGalleryCover(id);
   const load = useCallback(
     async (offset: number | undefined, signal: AbortSignal) => {
       const response = await client.query({
@@ -192,8 +201,42 @@ export function GalleryMedia({ id }: { id: string }) {
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardFooter>
+              <CardFooter className="justify-between">
                 <Badge variant="secondary">{kind}</Badge>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={msg(
+                          "gallery_media.actions",
+                          "Media actions",
+                        )}
+                      />
+                    }
+                  >
+                    <MoreHorizontal />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem
+                        disabled={coverPending}
+                        onClick={() =>
+                          void setCover(
+                            item.scene ? "scene" : "image",
+                            media.id,
+                          )
+                        }
+                      >
+                        {msg(
+                          "actions.set_as_gallery_cover",
+                          "Set as gallery cover",
+                        )}
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardFooter>
             </Card>
           );

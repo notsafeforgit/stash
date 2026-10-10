@@ -89,7 +89,7 @@ type GalleryWriter interface {
 	AddFileID(ctx context.Context, id int, fileID FileID) error
 	AddImages(ctx context.Context, galleryID int, imageIDs ...int) error
 	RemoveImages(ctx context.Context, galleryID int, imageIDs ...int) error
-	SetCover(ctx context.Context, galleryID int, coverImageID int) error
+	SetCover(ctx context.Context, galleryID int, mediaUUID string) error
 	ResetCover(ctx context.Context, galleryID int) error
 }
 

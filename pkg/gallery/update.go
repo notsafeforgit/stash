@@ -52,8 +52,8 @@ func (s *Service) RemoveImages(ctx context.Context, g *models.Gallery, toRemove 
 	return s.Updated(ctx, g.ID)
 }
 
-func (s *Service) SetCover(ctx context.Context, g *models.Gallery, coverImageID int) error {
-	if err := s.Repository.SetCover(ctx, g.ID, coverImageID); err != nil {
+func (s *Service) SetCover(ctx context.Context, g *models.Gallery, mediaUUID string) error {
+	if err := s.Repository.SetCover(ctx, g.ID, mediaUUID); err != nil {
 		return fmt.Errorf("failed to set cover: %w", err)
 	}
 

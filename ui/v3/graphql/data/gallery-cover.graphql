@@ -1,0 +1,14 @@
+fragment GalleryCoverData on GalleryCover {
+  image {
+    id
+    preview_image {
+      ...PreviewImageData
+    }
+  }
+  scene {
+    id
+    paths {
+      screenshot
+    }
+  }
+}

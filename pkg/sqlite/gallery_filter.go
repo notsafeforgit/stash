@@ -378,8 +378,7 @@ func (qb *galleryFilterHandler) missingCriterionHandler(isMissing *string) crite
 				galleryRepository.tags.leftJoin(f, "tags_join", "galleries.id")
 				f.addWhere("tags_join.gallery_id IS NULL")
 			case "cover":
-				f.addLeftJoin("galleries_images", "cover_join", "cover_join.gallery_id = galleries.id AND cover_join.cover = 1")
-				f.addWhere("cover_join.image_id IS NULL")
+				f.addWhere("NOT EXISTS (SELECT 1 FROM gallery_covers c WHERE c.gallery_id = galleries.id)")
 			default:
 				if err := validateIsMissing(*isMissing, []string{
 					"title", "code", "rating", "details", "photographer",

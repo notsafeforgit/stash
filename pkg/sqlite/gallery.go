@@ -72,6 +72,7 @@ func (r *galleryRow) fromGallery(o models.Gallery) {
 
 type galleryQueryRow struct {
 	galleryRow
+	CoverMediaUUID        null.String `db:"cover_media_uuid"`
 	FolderPath            zero.String `db:"folder_path"`
 	PrimaryFileID         null.Int    `db:"primary_file_id"`
 	PrimaryFileFolderPath zero.String `db:"primary_file_folder_path"`
@@ -81,20 +82,21 @@ type galleryQueryRow struct {
 
 func (r *galleryQueryRow) resolve() *models.Gallery {
 	ret := &models.Gallery{
-		ID:            r.ID,
-		Origin:        r.Origin,
-		Title:         r.Title.String,
-		Code:          r.Code.String,
-		Date:          r.Date.DatePtr(r.DatePrecision),
-		Details:       r.Details.String,
-		Photographer:  r.Photographer.String,
-		Rating:        nullIntPtr(r.Rating),
-		Organized:     r.Organized,
-		StudioID:      nullIntPtr(r.StudioID),
-		FolderID:      nullIntFolderIDPtr(r.FolderID),
-		PrimaryFileID: nullIntFileIDPtr(r.PrimaryFileID),
-		CreatedAt:     r.CreatedAt.Timestamp,
-		UpdatedAt:     r.UpdatedAt.Timestamp,
+		ID:             r.ID,
+		Origin:         r.Origin,
+		Title:          r.Title.String,
+		Code:           r.Code.String,
+		Date:           r.Date.DatePtr(r.DatePrecision),
+		Details:        r.Details.String,
+		Photographer:   r.Photographer.String,
+		Rating:         nullIntPtr(r.Rating),
+		Organized:      r.Organized,
+		StudioID:       nullIntPtr(r.StudioID),
+		FolderID:       nullIntFolderIDPtr(r.FolderID),
+		CoverMediaUUID: nullStringPtr(r.CoverMediaUUID),
+		PrimaryFileID:  nullIntFileIDPtr(r.PrimaryFileID),
+		CreatedAt:      r.CreatedAt.Timestamp,
+		UpdatedAt:      r.UpdatedAt.Timestamp,
 	}
 
 	if r.PrimaryFileFolderPath.Valid && r.PrimaryFileBasename.Valid {
@@ -221,6 +223,7 @@ func (qb *GalleryStore) selectDataset() *goqu.SelectDataset {
 	files := fileTableMgr.table
 	folders := folderTableMgr.table
 	galleryFolder := folderTableMgr.table.As("gallery_folder")
+	cover := goqu.T("gallery_covers")
 
 	return dialect.From(table).LeftJoin(
 		galleriesFilesJoinTable,
@@ -237,8 +240,11 @@ func (qb *GalleryStore) selectDataset() *goqu.SelectDataset {
 	).LeftJoin(
 		galleryFolder,
 		goqu.On(galleryFolder.Col(idColumn).Eq(table.Col("folder_id"))),
+	).LeftJoin(
+		cover, goqu.On(cover.Col(galleryIDColumn).Eq(table.Col(idColumn))),
 	).Select(
 		qb.table().All(),
+		cover.Col("media_uuid").As("cover_media_uuid"),
 		galleriesFilesJoinTable.Col(fileIDColumn).As("primary_file_id"),
 		folders.Col("path").As("primary_file_folder_path"),
 		files.Col("basename").As("primary_file_basename"),
@@ -1065,12 +1071,19 @@ func (qb *GalleryStore) UpdateImages(ctx context.Context, galleryID int, imageID
 	return galleryRepository.images.replace(ctx, galleryID, imageIDs)
 }
 
-func (qb *GalleryStore) SetCover(ctx context.Context, galleryID int, coverImageID int) error {
-	return imageGalleriesTableMgr.setCover(ctx, coverImageID, galleryID)
+func (qb *GalleryStore) SetCover(ctx context.Context, galleryID int, mediaUUID string) error {
+	mediaUUID, err := archiveUUID(mediaUUID)
+	if err != nil {
+		return err
+	}
+	_, err = dbWrapper.Exec(ctx, `INSERT INTO gallery_covers(gallery_id,media_uuid) VALUES (?,?)
+ON CONFLICT(gallery_id) DO UPDATE SET media_uuid=excluded.media_uuid`, galleryID, mediaUUID)
+	return err
 }
 
 func (qb *GalleryStore) ResetCover(ctx context.Context, galleryID int) error {
-	return imageGalleriesTableMgr.resetCover(ctx, galleryID)
+	_, err := dbWrapper.Exec(ctx, "DELETE FROM gallery_covers WHERE gallery_id=?", galleryID)
+	return err
 }
 
 func (qb *GalleryStore) GetSceneIDs(ctx context.Context, id int) ([]int, error) {

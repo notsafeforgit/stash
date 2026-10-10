@@ -3,6 +3,10 @@ import { test, expect } from "./test";
 import { serveSceneMedia } from "./scene-media";
 import { playbackImage, playbackScene } from "../fixtures/album-playback";
 import type { GalleryMediaItem } from "../../src/components/detail/gallery-media";
+import type {
+  FindGalleryCoverQuery,
+  SetGalleryCoverMutationVariables,
+} from "../../src/core/generated-graphql";
 
 async function fixture(
   page: Page,
@@ -11,9 +15,13 @@ async function fixture(
     videoOnly?: boolean;
     empty?: boolean;
     failNext?: boolean;
+    failCover?: boolean;
   } = {},
 ) {
   const pages: number[] = [];
+  const coverWrites: SetGalleryCoverMutationVariables[] = [];
+  const coverReads: string[] = [];
+  let selected: SetGalleryCoverMutationVariables | undefined;
   const image = (id: string): GalleryMediaItem => ({
     __typename: "GalleryMediaItem",
     image: playbackImage(id),
@@ -39,7 +47,55 @@ async function fixture(
   await serveSceneMedia(page);
   await page.route("**/graphql", async (route) => {
     const body = route.request().postDataJSON();
+    if (body.operationName === "SetGalleryCover") {
+      expect(body.query.trim().startsWith("mutation")).toBe(true);
+      coverWrites.push(body.variables);
+      if (options.failCover) {
+        options.failCover = false;
+        return route.fulfill({
+          json: { errors: [{ message: "Cover selection unavailable" }] },
+        });
+      }
+      selected = body.variables;
+      return route.fulfill({ json: { data: { setGalleryCover: true } } });
+    }
     expect(body.query.trim().startsWith("query")).toBe(true);
+    if (body.operationName === "FindGalleryCover") {
+      coverReads.push(body.variables.id);
+      const src = playbackImage().paths.thumbnail;
+      const findGallery: FindGalleryCoverQuery["findGallery"] = {
+        __typename: "Gallery",
+        id: "12",
+        updated_at: "2026-10-10T09:00:00Z",
+        paths: {
+          __typename: "GalleryPathsType",
+          cover: `${src}#image-${selected?.image_id ?? "initial"}`,
+        },
+        cover: selected
+          ? {
+              __typename: "GalleryCover",
+              image: selected.image_id
+                ? {
+                    __typename: "Image",
+                    id: selected.image_id,
+                    preview_image: null,
+                  }
+                : null,
+              scene: selected.scene_id
+                ? {
+                    __typename: "Scene",
+                    id: selected.scene_id,
+                    paths: {
+                      __typename: "ScenePathsType",
+                      screenshot: `${src}#scene-${selected.scene_id}`,
+                    },
+                  }
+                : null,
+            }
+          : null,
+      };
+      return route.fulfill({ json: { data: { findGallery } } });
+    }
     if (body.operationName === "FindGalleryMedia") {
       const offset = body.variables.offset;
       pages.push(offset);
@@ -86,7 +142,7 @@ async function fixture(
       });
     throw new Error(`Unexpected GraphQL operation ${body.operationName}`);
   });
-  return pages;
+  return { pages, coverWrites, coverReads };
 }
 
 for (const desktop of [false, true]) {
@@ -94,7 +150,7 @@ for (const desktop of [false, true]) {
     page,
   }) => {
     if (desktop) await page.setViewportSize({ width: 1280, height: 900 });
-    const pages = await fixture(page);
+    const { pages } = await fixture(page);
     await page.goto("/gallery-media");
     await expect(page.locator("[data-gallery-media]")).toHaveCount(2);
     await page
@@ -146,6 +202,77 @@ test("gallery stops pagination playback when membership changes", async ({
     viewer.getByText("This album changed", { exact: true }),
   ).toBeVisible();
   await expect(viewer.locator("video")).toHaveCount(0);
+});
+
+test("image and scene covers refresh only the selected gallery and keep its media page", async ({
+  page,
+}) => {
+  const state = await fixture(page);
+  await page.goto("/gallery-media");
+  const cover = page.getByRole("img", { name: "Gallery cover", exact: true });
+  await expect(cover).toHaveAttribute("src", /#image-initial$/);
+  await expect(page.locator("[data-gallery-media]")).toHaveCount(2);
+  expect(state.coverWrites).toEqual([]);
+  const initialPages = [...state.pages];
+  for (const kind of ["scene", "image"] as const) {
+    const id = kind === "scene" ? "8" : "7";
+    await page
+      .locator(`[data-gallery-media="${kind}:${id}"]`)
+      .getByRole("button", { name: "Media actions", exact: true })
+      .click();
+    await page
+      .getByRole("menuitem", { name: "Set as gallery cover", exact: true })
+      .click();
+    await expect(cover).toHaveAttribute("src", new RegExp(`#${kind}-${id}$`));
+    expect(state.coverWrites.at(-1)).toEqual({
+      gallery_id: "12",
+      image_id: kind === "image" ? id : null,
+      scene_id: kind === "scene" ? id : null,
+    });
+    expect(state.pages).toEqual(initialPages);
+  }
+  expect(state.coverWrites).toHaveLength(2);
+  expect(new Set(state.coverReads)).toEqual(new Set(["12"]));
+  await page
+    .locator('[data-gallery-media="scene:8"]')
+    .getByRole("button", { name: "Media actions", exact: true })
+    .click();
+  await page.screenshot({
+    path: test.info().outputPath("gallery-cover-menu.png"),
+    animations: "disabled",
+  });
+});
+
+test("a failed cover change retains the previous cover and can be retried", async ({
+  page,
+}) => {
+  const state = await fixture(page, { failCover: true });
+  await page.goto("/gallery-media");
+  const cover = page.getByRole("img", { name: "Gallery cover", exact: true });
+  await expect(cover).toHaveAttribute("src", /#image-initial$/);
+  await page
+    .locator('[data-gallery-media="scene:8"]')
+    .getByRole("button", { name: "Media actions", exact: true })
+    .click();
+  await page
+    .getByRole("menuitem", { name: "Set as gallery cover", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "Could not set the gallery cover. Refresh the gallery and try again.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(cover).toHaveAttribute("src", /#image-initial$/);
+  await page
+    .locator('[data-gallery-media="scene:8"]')
+    .getByRole("button", { name: "Media actions", exact: true })
+    .click();
+  await page
+    .getByRole("menuitem", { name: "Set as gallery cover", exact: true })
+    .click();
+  await expect(cover).toHaveAttribute("src", /#scene-8$/);
+  expect(state.coverWrites).toHaveLength(2);
 });
 
 test("video-only gallery has playable contents", async ({ page }) => {

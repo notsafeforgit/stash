@@ -15,7 +15,6 @@ import {
   useImageListConfig,
   useSceneListConfig,
 } from "src/components/list/entity-list-configs";
-import { useMutation } from "@apollo/client/react";
 import { ListFilterModel } from "src/models/list-filter/filter";
 import {
   GalleriesCriterion,
@@ -29,6 +28,7 @@ import { useConfigurationContextOptional } from "src/hooks/config";
 import { galleryLabel as getGalleryLabel } from "src/lib/gallery-utils";
 import { ImageEditSheet } from "./image-edit-sheet";
 import { SceneEditSheet } from "./scene-edit-sheet";
+import { useGalleryCover } from "./use-gallery-cover";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -71,28 +71,14 @@ export function GalleryImagesTab({ gallery }: { gallery: GalleryData }) {
       makeGalleryFilter(FilterMode.Images, galleryId, galleryLabel, gqlConfig),
     [galleryId, galleryLabel, gqlConfig],
   );
-  // The mutation returns just `boolean`, so we can't update the cache
-  // directly. Refetch only `FindGallery` for this specific gallery —
-  // narrower than `refetchQueries: "active"`, which would also reload
-  // the embedded image list and make the whole page flash.
-  const [setGalleryCover] = useMutation(GQL.SetGalleryCoverDocument, {
-    refetchQueries: [
-      {
-        query: GQL.FindGalleryDocument,
-        variables: { id: gallery.id },
-      },
-    ],
-  });
+  const { setCover } = useGalleryCover(gallery.id);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const getExtraCardProps = useCallback(
     (image: ImageItem) => ({
-      onSetGalleryCover: () =>
-        setGalleryCover({
-          variables: { gallery_id: gallery.id, cover_image_id: image.id },
-        }),
+      onSetGalleryCover: () => setCover("image", image.id),
     }),
-    [setGalleryCover, gallery.id],
+    [setCover],
   );
 
   const { config, lightboxElement, lightboxOpen } = useImageListConfig(
@@ -125,8 +111,17 @@ export function GalleryScenesTab({ gallery }: { gallery: GalleryData }) {
     [gallery.id, label, configData],
   );
   const [editingId, setEditingId] = useState<string | null>(null);
-  const { config, lightboxElement, lightboxOpen } =
-    useSceneListConfig(setEditingId);
+  const { setCover } = useGalleryCover(gallery.id);
+  const setSceneCover = useCallback(
+    (id: string) => setCover("scene", id),
+    [setCover],
+  );
+  const { config, lightboxElement, lightboxOpen } = useSceneListConfig(
+    setEditingId,
+    undefined,
+    undefined,
+    setSceneCover,
+  );
   return (
     <>
       <EntityListPage

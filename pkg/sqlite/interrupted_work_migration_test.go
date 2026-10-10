@@ -17,6 +17,7 @@ import (
 // Historical migration fixtures must have the actual pre-107 job shape.
 func removeInterruptedWorkSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeGalleryCoverSchema(t, raw)
 	var definition string
 	require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name='archive_jobs'").Scan(&definition))
 	if !strings.Contains(definition, "failures INTEGER") {

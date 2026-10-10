@@ -247,6 +247,18 @@ func (t *joinTable) replaceJoins(ctx context.Context, id int, foreignIDs []int) 
 	if err := markMetadataCollectionIntent(ctx, t.table.table.GetTable(), t.idColumn.GetCol().(string), id, foreignIDs); err != nil {
 		return err
 	}
+	if name := t.table.table.GetTable(); name == "galleries_images" || name == "scenes_galleries" {
+		// Keep unchanged memberships (and their selected cover) in place.
+		// INSERT still records the caller's explicit membership intent.
+		q := dialect.Delete(t.table.table).Prepared(true).Where(t.idColumn.Eq(id))
+		if len(foreignIDs) > 0 {
+			q = q.Where(t.fkColumn.NotIn(foreignIDs))
+		}
+		if _, err := exec(ctx, q); err != nil {
+			return err
+		}
+		return t.insertJoins(ctx, id, foreignIDs)
+	}
 
 	if err := t.destroy(ctx, []int{id}); err != nil {
 		return err
@@ -812,41 +824,6 @@ func (t *scenesGroupsTable) modifyJoins(ctx context.Context, id int, v []models.
 
 type imageGalleriesTable struct {
 	joinTable
-}
-
-func (t *imageGalleriesTable) setCover(ctx context.Context, id int, galleryID int) error {
-	if err := t.resetCover(ctx, galleryID); err != nil {
-		return err
-	}
-
-	table := t.table.table
-
-	q := dialect.Update(table).Prepared(true).Set(goqu.Record{
-		"cover": true,
-	}).Where(t.idColumn.Eq(id), table.Col(galleryIDColumn).Eq(galleryID))
-
-	if _, err := exec(ctx, q); err != nil {
-		return fmt.Errorf("setting cover flag in %s: %w", t.table.table.GetTable(), err)
-	}
-
-	return nil
-}
-
-func (t *imageGalleriesTable) resetCover(ctx context.Context, galleryID int) error {
-	table := t.table.table
-
-	q := dialect.Update(table).Prepared(true).Set(goqu.Record{
-		"cover": false,
-	}).Where(
-		table.Col(galleryIDColumn).Eq(galleryID),
-		table.Col("cover").Eq(true),
-	)
-
-	if _, err := exec(ctx, q); err != nil {
-		return fmt.Errorf("unsetting cover flags in %s: %w", t.table.table.GetTable(), err)
-	}
-
-	return nil
 }
 
 type relatedFilesTable struct {

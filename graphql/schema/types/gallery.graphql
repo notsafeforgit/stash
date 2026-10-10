@@ -29,13 +29,18 @@ type Gallery {
   tags: [Tag!]!
   performers: [Performer!]!
 
-  cover: Image
+  cover: GalleryCover
 
   paths: GalleryPathsType! # Resolver
   custom_fields: Map!
   image(index: Int!): Image!
   "Images and scenes together, in source order where known, then file order."
   media(offset: Int! = 0, limit: Int! = 60): GalleryMediaConnection!
+}
+
+type GalleryCover {
+  image: Image
+  scene: Scene
 }
 
 type GalleryMediaConnection {
@@ -147,7 +152,9 @@ input GalleryRemoveInput {
 
 input GallerySetCoverInput {
   gallery_id: ID!
-  cover_image_id: ID!
+  "Select exactly one existing gallery member."
+  image_id: ID
+  scene_id: ID
 }
 
 input GalleryResetCoverInput {

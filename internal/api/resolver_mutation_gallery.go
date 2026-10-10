@@ -419,9 +419,16 @@ func (r *mutationResolver) SetGalleryCover(ctx context.Context, input GallerySet
 		return false, fmt.Errorf("converting gallery id: %w", err)
 	}
 
-	coverImageID, err := strconv.Atoi(input.CoverImageID)
-	if err != nil {
-		return false, fmt.Errorf("converting cover image id: %w", err)
+	if (input.ImageID == nil) == (input.SceneID == nil) {
+		return false, fmt.Errorf("select exactly one gallery cover image or scene")
+	}
+	kind, memberID := models.ArchiveImage, input.ImageID
+	if input.SceneID != nil {
+		kind, memberID = models.ArchiveScene, input.SceneID
+	}
+	coverID, err := strconv.Atoi(*memberID)
+	if err != nil || coverID <= 0 {
+		return false, fmt.Errorf("invalid gallery cover member id")
 	}
 
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
@@ -435,12 +442,19 @@ func (r *mutationResolver) SetGalleryCover(ctx context.Context, input GallerySet
 			return fmt.Errorf("gallery with id %d not found", galleryID)
 		}
 
-		return r.galleryService.SetCover(ctx, gallery, coverImageID)
+		member, err := r.repository.ArchiveEntity.FindByLocalID(ctx, kind, coverID)
+		if err != nil {
+			return err
+		}
+		if member == nil || member.State != models.ArchiveEntityActive {
+			return fmt.Errorf("gallery cover member not found")
+		}
+		return r.galleryService.SetCover(ctx, gallery, member.UUID)
 	}); err != nil {
 		return false, err
 	}
 
-	r.galleryFieldsUpdated(ctx, galleryID, "cover_image_id")
+	r.galleryFieldsUpdated(ctx, galleryID, "cover")
 	return true, nil
 }
 
@@ -466,7 +480,7 @@ func (r *mutationResolver) ResetGalleryCover(ctx context.Context, input GalleryR
 		return false, err
 	}
 
-	r.galleryFieldsUpdated(ctx, galleryID, "cover_image_id")
+	r.galleryFieldsUpdated(ctx, galleryID, "cover")
 	return true, nil
 }
 

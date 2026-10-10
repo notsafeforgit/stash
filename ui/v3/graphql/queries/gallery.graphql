@@ -16,6 +16,19 @@ query FindGallery($id: ID!) {
   }
 }
 
+query FindGalleryCover($id: ID!) {
+  findGallery(id: $id) {
+    id
+    updated_at
+    paths {
+      cover
+    }
+    cover {
+      ...GalleryCoverData
+    }
+  }
+}
+
 query FindGalleryMedia($id: ID!, $offset: Int! = 0, $limit: Int! = 60) {
   findGallery(id: $id) {
     id

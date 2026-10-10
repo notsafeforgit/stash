@@ -16,10 +16,7 @@ fragment GalleryData on Gallery {
     preview
   }
   cover {
-    id
-    preview_image {
-      ...PreviewImageData
-    }
+    ...GalleryCoverData
   }
 
   files {
@@ -58,8 +55,15 @@ fragment SelectGalleryData on Gallery {
     name
   }
   cover {
-    paths {
-      thumbnail
+    image {
+      paths {
+        thumbnail
+      }
+    }
+    scene {
+      paths {
+        screenshot
+      }
     }
   }
   paths {

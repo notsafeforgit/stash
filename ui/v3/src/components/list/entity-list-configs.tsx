@@ -286,6 +286,7 @@ export function useSceneListConfig(
   onEdit: (id: string) => void,
   hidePerformers?: boolean,
   performerImageTargetId?: string,
+  onSetGalleryCover?: (sceneId: string) => void,
 ): {
   config: EntityListPageConfig<
     GQL.FindSceneListQuery,
@@ -321,9 +322,12 @@ export function useSceneListConfig(
         onEdit={() => onEdit(scene.id)}
         hidePerformers={hidePerformers}
         performerImageTargetId={performerImageTargetId}
+        onSetGalleryCover={
+          onSetGalleryCover ? () => onSetGalleryCover(scene.id) : undefined
+        }
       />
     ),
-    [onEdit, hidePerformers, performerImageTargetId],
+    [onEdit, hidePerformers, performerImageTargetId, onSetGalleryCover],
   );
 
   const renderTableRow = useCallback(
@@ -336,12 +340,15 @@ export function useSceneListConfig(
         scene={scene}
         performerImageTargetId={performerImageTargetId}
         onEdit={() => onEdit(scene.id)}
+        onSetGalleryCover={
+          onSetGalleryCover ? () => onSetGalleryCover(scene.id) : undefined
+        }
         onSelectedChanged={onSelectedChanged}
       >
         {defaultRow}
       </SceneRowContextMenu>
     ),
-    [onEdit, performerImageTargetId],
+    [onEdit, performerImageTargetId, onSetGalleryCover],
   );
 
   // Keep tableColumns inside the config hook so embedded scene lists

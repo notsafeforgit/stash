@@ -8,8 +8,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/internal/static"
+	"github.com/stashapp/stash/pkg/gallery"
 	"github.com/stashapp/stash/pkg/image"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
@@ -29,6 +31,7 @@ type GalleryImageFinder interface {
 
 type galleryRoutes struct {
 	routes
+	repository    models.Repository
 	imageRoutes   imageRoutes
 	galleryFinder GalleryFinder
 	imageFinder   GalleryImageFinder
@@ -52,9 +55,20 @@ func (rs galleryRoutes) Cover(w http.ResponseWriter, r *http.Request) {
 	g := r.Context().Value(galleryKey).(*models.Gallery)
 
 	var i *models.Image
+	var scene *models.Scene
 	_ = rs.withReadTxn(r, func(ctx context.Context) error {
-		// Find cover image first
-		i, _ = image.FindGalleryCover(ctx, rs.imageFinder, g.ID, config.GetInstance().GetGalleryCoverRegex())
+		cover, err := gallery.FindCover(ctx, rs.repository, g, config.GetInstance().GetGalleryCoverRegex())
+		if err != nil || cover == nil {
+			return err
+		}
+		i, scene = cover.Image, cover.Scene
+		if scene != nil {
+			if err := scene.LoadPrimaryFile(ctx, rs.fileGetter); err != nil {
+				scene = nil
+				return err
+			}
+			return nil
+		}
 		if i == nil {
 			return nil
 		}
@@ -70,6 +84,17 @@ func (rs galleryRoutes) Cover(w http.ResponseWriter, r *http.Request) {
 
 		return nil
 	})
+	if scene != nil {
+		// Revalidate this alias: the scene cover can change independently of
+		// gallery metadata, including when its generated cover completes.
+		r = r.Clone(r.Context())
+		query := r.URL.Query()
+		query.Del("t")
+		r.URL.RawQuery = query.Encode()
+		server := manager.SceneServer{TxnManager: rs.txnManager, SceneCoverGetter: rs.repository.Scene}
+		server.ServeScreenshot(scene, w, r)
+		return
+	}
 
 	if i == nil {
 		// Fallback to the default placeholder. The URL builder includes

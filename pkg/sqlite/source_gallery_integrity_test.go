@@ -296,7 +296,7 @@ INSERT INTO scenes_galleries(gallery_id, scene_id) VALUES (81, 31), (83, 32);`)
 	for _, table := range []string{"post_gallery_decisions", "post_gallery_links", "source_gallery_write_context", "gallery_membership_events", "gallery_membership_heads"} {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table), "migration must not invent source associations or manual intent")
 	}
-	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM galleries_images WHERE gallery_id=81 AND image_id=41 AND cover=1"))
+	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM gallery_covers c JOIN archive_entities a ON a.uuid=c.media_uuid WHERE c.gallery_id=81 AND a.image_id=41"))
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
 }
 

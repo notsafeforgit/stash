@@ -39,6 +39,7 @@ interface UseSceneContextMenuProps {
   onSelectedChanged?: (selected: boolean, shiftKey: boolean) => void;
   /** Edit handler. When absent, falls back to navigating to the detail page. */
   onEdit?: () => void;
+  onSetGalleryCover?: () => void;
   performerImageTargetId?: string;
 }
 
@@ -52,6 +53,7 @@ export function useSceneContextMenu({
   scene,
   onSelectedChanged,
   onEdit,
+  onSetGalleryCover,
   performerImageTargetId,
 }: UseSceneContextMenuProps) {
   const intl = useIntl();
@@ -164,6 +166,14 @@ export function useSceneContextMenu({
           <SelectAllMenuItem />
           <OpenInNewTabMenuItem href={`/scenes/${scene.id}`} />
           <ContextMenuSeparator />
+          {onSetGalleryCover && (
+            <ContextMenuItem onClick={onSetGalleryCover}>
+              {intl.formatMessage({
+                id: "actions.set_as_gallery_cover",
+                defaultMessage: "Set as gallery cover",
+              })}
+            </ContextMenuItem>
+          )}
           <ContextMenuItem
             onClick={() => performerImage.setFromScene()}
             disabled={performerImage.pending || !scene.paths.screenshot}
@@ -348,6 +358,7 @@ interface SceneRowContextMenuProps {
   /** The trigger element — typically a `<TableRow>`. */
   children: React.ReactElement;
   onEdit?: () => void;
+  onSetGalleryCover?: () => void;
   performerImageTargetId?: string;
   /**
    * Called when the user picks "Select" from the menu. Wires the row into
@@ -367,12 +378,14 @@ export function SceneRowContextMenu({
   scene,
   children,
   onEdit,
+  onSetGalleryCover,
   onSelectedChanged,
   performerImageTargetId,
 }: SceneRowContextMenuProps) {
   const { menuContent, dialogs, onContextMenuOpen } = useSceneContextMenu({
     scene,
     onEdit,
+    onSetGalleryCover,
     onSelectedChanged,
     performerImageTargetId,
   });

@@ -472,6 +472,7 @@ func (s *Server) getGalleryRoutes() chi.Router {
 	repo := s.manager.Repository
 	return galleryRoutes{
 		routes:        routes{txnManager: repo.TxnManager},
+		repository:    repo,
 		imageFinder:   repo.Image,
 		galleryFinder: repo.Gallery,
 		fileGetter:    repo.File,

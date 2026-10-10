@@ -62,6 +62,7 @@ interface SceneCardProps {
   onSelectedChanged?: (selected: boolean, shiftKey: boolean) => void;
   onPreviewClick?: () => void;
   onEdit?: () => void;
+  onSetGalleryCover?: () => void;
   performerImageTargetId?: string;
   zoomIndex?: number;
   hidePerformers?: boolean;
@@ -135,6 +136,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   onSelectedChanged,
   onPreviewClick,
   onEdit,
+  onSetGalleryCover,
   performerImageTargetId,
   hidePerformers = false,
   destination,
@@ -168,6 +170,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
     scene,
     onSelectedChanged,
     onEdit,
+    onSetGalleryCover,
     performerImageTargetId,
   });
 

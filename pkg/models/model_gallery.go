@@ -30,6 +30,9 @@ type Gallery struct {
 
 	FolderID *FolderID `json:"folder_id"`
 
+	// Set through the gallery cover service, independently of metadata edits.
+	CoverMediaUUID *string `json:"cover_media_uuid,omitempty"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
@@ -40,6 +43,13 @@ type Gallery struct {
 }
 
 type GalleryOrigin string
+
+// GalleryCover contains exactly one resolved member, or is nil for an empty
+// gallery. The same selection drives GraphQL and the standalone cover URL.
+type GalleryCover struct {
+	Image *Image `json:"image,omitempty"`
+	Scene *Scene `json:"scene,omitempty"`
+}
 
 const (
 	GalleryOriginManual     GalleryOrigin = "manual"

@@ -4004,5 +4004,7 @@
     "counts": "{images, plural, one {# image} other {# images}} · {scenes, plural, one {# scene} other {# scenes}}",
     "error": "Could not load gallery media"
   },
-  "media": "Media"
+  "media": "Media",
+  "gallery_media.actions": "Media actions",
+  "gallery_media.cover_failed": "Could not set the gallery cover. Refresh the gallery and try again."
 }

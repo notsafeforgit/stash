@@ -22,12 +22,8 @@ export function galleryLabel(g: GalleryLabelable): string {
 }
 
 export function galleryCover(gallery: {
-  image_count: number;
   paths: { cover: string };
-  scenes?: Array<{ paths: { screenshot?: string | null } }>;
+  cover?: { scene?: { paths: { screenshot?: string | null } } | null } | null;
 }): string {
-  return (
-    (gallery.image_count === 0 && gallery.scenes?.[0]?.paths.screenshot) ||
-    gallery.paths.cover
-  );
+  return gallery.cover?.scene?.paths.screenshot || gallery.paths.cover;
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/stashapp/stash/internal/api/urlbuilders"
 	"github.com/stashapp/stash/internal/manager/config"
 
-	"github.com/stashapp/stash/pkg/image"
+	"github.com/stashapp/stash/pkg/gallery"
 	"github.com/stashapp/stash/pkg/models"
 )
 
@@ -66,10 +66,9 @@ func (r *galleryResolver) Folder(ctx context.Context, obj *models.Gallery) (*mod
 	return ret, nil
 }
 
-func (r *galleryResolver) Cover(ctx context.Context, obj *models.Gallery) (ret *models.Image, err error) {
+func (r *galleryResolver) Cover(ctx context.Context, obj *models.Gallery) (ret *models.GalleryCover, err error) {
 	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		// Find cover image first
-		ret, err = image.FindGalleryCover(ctx, r.repository.Image, obj.ID, config.GetInstance().GetGalleryCoverRegex())
+		ret, err = gallery.FindCover(ctx, r.repository, obj, config.GetInstance().GetGalleryCoverRegex())
 		return err
 	}); err != nil {
 		return nil, err

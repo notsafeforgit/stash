@@ -38,6 +38,27 @@ their individual attachment order. Shared media can retain titles from other
 posts. The summary and tab reuse one paginated lookup, and viewing them changes
 no metadata or membership.
 
+## Gallery covers
+
+Any member image or scene can be the gallery's selected cover. Use **Set as
+gallery cover** from a Media item's menu or from an image/scene context menu
+inside the gallery. Only that gallery's cover is refreshed; its media list and
+playback position stay in place. Resetting the cover restores the automatic
+image selection, falling back to a scene screenshot for video-only galleries.
+
+Schema 1000108 stores this choice once in `gallery_covers`, keyed by gallery ID
+and the member's canonical media UUID. It preserves existing image choices
+without changing gallery revisions during migration and removes the old image
+membership flag. Reaffirming membership retains the choice. Removing its member
+clears it; a same-kind merge follows the destination when it remains a member.
+Source-album refreshes protect a selected scene just as they protect an image.
+
+`Gallery.cover` resolves to `{ image, scene }` with one non-null member.
+`setGalleryCover` takes `gallery_id` and exactly one of `image_id` or `scene_id`;
+the member must belong to that gallery. Successful changes notify plugins of
+the `cover` field. `/gallery/{id}/cover` uses the same selection and revalidates
+scene artwork when it changes independently of gallery metadata.
+
 ## Twitter threads and replies
 
 New native captures retain the exact numeric conversation, parent-post, author

@@ -7,6 +7,37 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
+## Image and scene gallery covers — implementation, 2026-10-10
+
+Schema 1000108 replaces the image-membership cover flag with one canonical media
+UUID per gallery. The API and gallery cover URL resolve either an image or a
+scene; mixed Media menus and the separate scene/image lists can select either.
+Cover changes refresh only that gallery's cover fields. Reaffirmed membership,
+canonical UUID adoption and same-kind merges preserve the choice when the
+destination remains a member. Source-album updates protect selected scenes;
+removing the selected member clears the cover.
+
+The isolated 21.66 GiB copy rehearsal preserved all 16,314 galleries and gallery
+identities, 541,975 image memberships, 3,610 scene memberships, 14,974 post links
+and nine explicit covers. Semantic digests matched before and after migration,
+and the migrated database reopened successfully. Historical fixture checks
+caught a missing migration-history entry; the final statement was then applied
+to the already verified copy and checked by fresh migration tests. The temporary
+database has been removed; `.local/gallery-media-covers-20261010/` retains the
+reports and the exact SQL distinction.
+
+All Go integration tests, 805 UI tests, 680 producer tests, 317 backup tests and
+the other pre-push suites passed. The final aggregate run's only remaining
+failure was a test-helper resource-cleanup lint rule; that cleanup was corrected,
+then lint and the focused migration/cover tests passed. The production data
+migration was unchanged by that test-only fix.
+
+Chromium's eight gallery checks passed, including changing both cover types,
+targeted refresh, retained pagination and retry after a failed mutation. Local
+WebKit could not launch because its system dependencies are absent; its normal
+GitHub workflow remains the verification path. This increment does not complete
+automatic GIF image-to-scene conversion or claim a production deployment.
+
 ## Dedupe discovery lock scope — deployed, 2026-10-10
 
 The first resumed fclones pass exposed an overly broad lock: it held the backup

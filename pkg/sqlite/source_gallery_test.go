@@ -213,7 +213,7 @@ func TestSourceGalleryPreservesManualMembershipMetadataAndCover(t *testing.T) {
 		if err := repo.Gallery.AddSceneIDs(ctx, *result.GalleryID, []int{31, 32}); err != nil {
 			return err
 		}
-		if err := repo.Gallery.SetCover(ctx, *result.GalleryID, 41); err != nil {
+		if err := setImageCover(ctx, repo, *result.GalleryID, 41); err != nil {
 			return err
 		}
 		_, err := repo.Gallery.UpdatePartial(ctx, *result.GalleryID, models.GalleryPartial{Title: models.NewOptionalString(""), Details: models.NewOptionalString("Manual description")})
@@ -323,7 +323,7 @@ func TestSourceGalleryEntitySideAddPreservesExistingManualIntent(t *testing.T) {
 	chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveScene, 31)
 	album := syncSourceGallery(t, repo, post.UUID)
 	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error {
-		if err := repo.Gallery.SetCover(ctx, *album.GalleryID, 41); err != nil {
+		if err := setImageCover(ctx, repo, *album.GalleryID, 41); err != nil {
 			return err
 		}
 		keep := &models.UpdateIDs{Mode: models.RelationshipUpdateModeAdd, IDs: []int{*album.GalleryID}}
@@ -341,7 +341,7 @@ func TestSourceGalleryEntitySideAddPreservesExistingManualIntent(t *testing.T) {
 	}
 	raw := openRawDB(t, db.DatabasePath())
 	defer raw.Close()
-	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM galleries_images WHERE cover=1"), "reaffirmation must preserve the existing cover")
+	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM gallery_covers"), "reaffirmation must preserve the existing cover")
 	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error { return repo.Gallery.ResetCover(ctx, *album.GalleryID) }))
 	selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{Complete: true, DeclaredAlbum: true})
 	require.Empty(t, syncSourceGallery(t, repo, post.UUID).Removed, "both explicit choices survive even after the source list and cover protection change")

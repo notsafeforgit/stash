@@ -226,6 +226,7 @@ function GalleryDetailPage() {
                             onViewAlbums={() => setActiveTab("source-albums")}
                           />
                           <GalleryCover
+                            key={galleryCover(gallery)}
                             gallery={gallery}
                             onImageClick={() => setCoverLightboxOpen(true)}
                           />

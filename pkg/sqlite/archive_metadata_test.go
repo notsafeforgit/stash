@@ -235,7 +235,7 @@ INSERT INTO groups_scenes(group_id, scene_id) VALUES (101, 31);`)
 	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM galleries_tags WHERE gallery_id=111 AND tag_id=81"))
 	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM scenes WHERE id=31 AND studio_id=91"))
 	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM groups_scenes WHERE group_id=101 AND scene_id=31"))
-	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM galleries_images WHERE gallery_id=111 AND image_id=41 AND cover=1"))
+	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM gallery_covers c JOIN archive_entities a ON a.uuid=c.media_uuid WHERE c.gallery_id=111 AND a.image_id=41"))
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM sqlite_schema WHERE name='native_metadata_identity_rows'"))
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
 }

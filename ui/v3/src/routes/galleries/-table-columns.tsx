@@ -26,7 +26,7 @@ export function useGalleryTableColumns(): ColumnDef<GalleryItem>[] {
       thumbnailColumn<GalleryItem>(
         galleryCover,
         (g) => entityDestination.gallery(g.id),
-        (g) => g.cover?.preview_image,
+        (g) => g.cover?.image?.preview_image,
       ),
 
       titleColumn<GalleryItem>({

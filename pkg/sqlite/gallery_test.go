@@ -3300,7 +3300,9 @@ func TestGallerySetAndResetCover(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Nil(t, result)
 
-		err = sqb.SetCover(ctx, galleryIDs[galleryIdxWithTwoImages], imageIDs[imageIdx2WithGallery])
+		identity, err := db.Repository().ArchiveEntity.FindByLocalID(ctx, models.ArchiveImage, imageIDs[imageIdx2WithGallery])
+		assert.Nil(t, err)
+		err = sqb.SetCover(ctx, galleryIDs[galleryIdxWithTwoImages], identity.UUID)
 		assert.Nil(t, err)
 
 		result, err = db.Image.CoverByGalleryID(ctx, galleryIDs[galleryIdxWithTwoImages])

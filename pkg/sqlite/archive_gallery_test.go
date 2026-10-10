@@ -90,7 +90,7 @@ VALUES (?, 'performer', 'redirected', 99, ?, CURRENT_TIMESTAMP)`, redirectID, pe
 	}))
 	raw = openRawDB(t, path)
 	defer raw.Close()
-	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM galleries_images WHERE gallery_id=81 AND image_id=41 AND cover=1"))
+	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM gallery_covers c JOIN archive_entities a ON a.uuid=c.media_uuid WHERE c.gallery_id=81 AND a.image_id=41"))
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM sqlite_schema WHERE name='native_gallery_identity_rows'"))
 }
@@ -104,7 +104,7 @@ func TestArchiveGalleryLifecycleAndMembershipRevisions(t *testing.T) {
 	revision := first.Revision
 	for _, edit := range []func(context.Context) error{
 		func(ctx context.Context) error { return repo.Gallery.AddImages(ctx, gallery.ID, 41) },
-		func(ctx context.Context) error { return repo.Gallery.SetCover(ctx, gallery.ID, 41) },
+		func(ctx context.Context) error { return setImageCover(ctx, repo, gallery.ID, 41) },
 		func(ctx context.Context) error { return repo.Gallery.AddSceneIDs(ctx, gallery.ID, []int{31}) },
 		func(ctx context.Context) error {
 			_, err := repo.Gallery.UpdatePartial(ctx, gallery.ID, models.GalleryPartial{Title: models.NewOptionalString("Renamed album")})

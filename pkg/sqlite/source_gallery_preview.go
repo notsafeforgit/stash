@@ -62,8 +62,10 @@ type sourceGalleryMember struct {
 func sourceGalleryMembers(ctx context.Context, id int) ([]sourceGalleryMember, error) {
 	var rows []sourceGalleryMember
 	if err := dbWrapper.Select(ctx, &rows, `SELECT * FROM (
-SELECT a.*, COALESCE(gi.cover, 0) AS cover FROM galleries_images gi JOIN archive_entities a ON a.image_id = gi.image_id WHERE gi.gallery_id = ?
-UNION ALL SELECT a.*, 0 AS cover FROM scenes_galleries gs JOIN archive_entities a ON a.scene_id = gs.scene_id WHERE gs.gallery_id = ?
+SELECT a.*, COALESCE(c.media_uuid = a.uuid, 0) AS cover FROM galleries_images gi
+JOIN archive_entities a ON a.image_id = gi.image_id LEFT JOIN gallery_covers c ON c.gallery_id = gi.gallery_id WHERE gi.gallery_id = ?
+UNION ALL SELECT a.*, COALESCE(c.media_uuid = a.uuid, 0) AS cover FROM scenes_galleries gs
+JOIN archive_entities a ON a.scene_id = gs.scene_id LEFT JOIN gallery_covers c ON c.gallery_id = gs.gallery_id WHERE gs.gallery_id = ?
 ) ORDER BY uuid LIMIT ?`, id, id, maxSourceGalleryMembers+1); err != nil {
 		return nil, err
 	}

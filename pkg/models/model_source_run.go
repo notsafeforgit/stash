@@ -137,7 +137,8 @@ var (
 )
 
 // The caller owns a managed transaction and the server clock. Claim validates
-// the current collection/root, and serializes targets and overlapping paths.
+// the current collection/root, serializes targets globally and overlapping
+// paths within a producer/service. Shared output-file locks protect final writes.
 type SourceRunReaderWriter interface {
 	Submit(context.Context, string, SourceRunRequest, time.Time, int) (*SourceRun, error)
 	Find(context.Context, string) (*SourceRun, error)

@@ -1414,10 +1414,15 @@ There are at most 64 pending/completed/claimed intervals per active run and
 
 Claims prefer the newest uncovered range. Pending download work takes precedence
 over enrichment for the same collection. A collection and the same normalized
-target URL cannot have concurrent owners. Since schema 1000110, overlapping
-destination paths serialize only within the same source service. Reddit and
-Twitter can therefore download concurrently into the same media root; the root
-is not an individual output file. Service cooldowns remain independent.
+target URL cannot have concurrent owners, even across producers and policies.
+With schema 1000110, overlapping destination paths serialize within the same
+producer and source service. The host's incremental worker and n8n's initial
+profile worker can therefore download different accounts on the same site into
+the same media root. Each has one worker per site and a separate dispatch list;
+the initial list includes only full-history profiles. Different sites also run
+independently. A missing lower date bound is not an initial-scrape marker:
+incremental Twitter scrapes can instead stop at existing archive entries.
+Site cooldowns and metadata turns remain shared across producers.
 Server mount identities and resolved paths handle host/container mappings and
 existing symlinks; a missing destination may be created by the worker afterwards.
 The worker must still acquire the existing shared filesystem download lock

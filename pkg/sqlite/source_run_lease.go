@@ -95,16 +95,18 @@ OR EXISTS(SELECT 1 FROM source_run_cooldowns WHERE target_key=? AND available_at
 		return nil, err
 	}
 	if destination != "" {
-		// A shared media root must not serialize unrelated websites. Within
-		// each service, retain boundary-aware destination and mount-alias
-		// exclusion. Workers fence actual output stems across all services.
+		// Each producer has its own queue: the host's incremental sweeps and
+		// n8n's initial profiles may share a site's media root. Serialize
+		// overlapping destinations within that producer/service, including
+		// mount aliases. The global profile/target check above and workers'
+		// shared output-stem locks still exclude duplicate work and writes.
 		if err := dbWrapper.Get(ctx, &busy, `SELECT EXISTS(SELECT 1 FROM source_runs r
  JOIN source_run_pacing p ON p.run_uuid=r.uuid
- WHERE r.state='running' AND p.scope=? AND destination!='' AND
+ WHERE r.state='running' AND p.scope=? AND r.producer_uuid=? AND destination!='' AND
  (destination=? OR substr(destination,1,length(?))=? OR substr(?,1,length(rtrim(destination,'/')||'/'))=rtrim(destination,'/')||'/'
  OR (root_identity=? AND (destination_prefix=? OR destination_prefix='.' OR ?='.'
  OR substr(destination_prefix,1,length(?))=? OR substr(?,1,length(destination_prefix||'/'))=destination_prefix||'/'))))`,
-			scope, destination, strings.TrimRight(destination, "/")+"/", strings.TrimRight(destination, "/")+"/", destination,
+			scope, producer, destination, strings.TrimRight(destination, "/")+"/", strings.TrimRight(destination, "/")+"/", destination,
 			rootIdentity, prefix, prefix, prefix+"/", prefix+"/", prefix); err != nil {
 			return nil, err
 		}

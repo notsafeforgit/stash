@@ -1,4 +1,4 @@
-"""Generate independent per-site dispatch lists without changing worker policies."""
+"""Partition site workers and initial/incremental queues without changing policies."""
 
 import argparse
 import json
@@ -9,7 +9,7 @@ import tempfile
 import uuid
 
 
-def split_profiles(filename):
+def split_profiles(filename, *, lane="all", initial_profiles=()):
     filename = Path(filename).resolve(strict=True)
     document = json.loads(filename.read_text())
     if (document.get("schema") != "stash-gallery-dispatch-v1"
@@ -17,6 +17,11 @@ def split_profiles(filename):
             or not 1 <= len(document["profiles"]) <= 32):
         raise ValueError("Invalid worker dispatch list")
     identity = uuid.UUID(document["uuid"])
+    if lane not in {"all", "initial", "incremental"}:
+        raise ValueError("Invalid worker queue")
+    initial_profiles = set(initial_profiles)
+    if lane != "all" and not initial_profiles:
+        raise ValueError("Select the initial full-history profile IDs explicitly")
     groups, seen = {}, set()
     for entry in document["profiles"]:
         if (set(entry) != {"id", "operation", "profile"} or entry["id"] in seen
@@ -27,10 +32,21 @@ def split_profiles(filename):
         service = profile.get("source_category") or "manual"
         if not isinstance(service, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", service):
             raise ValueError("Invalid worker source category")
+        initial = entry["id"] in initial_profiles
+        if initial and (entry["operation"] != "download"
+                        or profile.get("gallery", {}).get("skip") is not True):
+            raise ValueError("Initial profiles must download full history with skip=true")
+        # Keep metadata dispatch/recovery in both existing worker sets. Only
+        # download profiles change queues; admitted metadata must keep draining.
+        if (lane == "initial" and entry["operation"] == "download" and not initial) or (lane == "incremental" and initial):
+            continue
         groups.setdefault(service, []).append(entry)
+    if not initial_profiles <= seen:
+        raise ValueError("Unknown initial profile ID")
     return {
         service: {"schema": document["schema"],
-                  "uuid": str(uuid.uuid5(identity, "service:" + service)), "profiles": entries}
+                  "uuid": str(uuid.uuid5(identity, "service:" + service + (":" + lane if lane != "all" else ""))),
+                  "profiles": entries}
         for service, entries in sorted(groups.items())
     }
 
@@ -38,8 +54,10 @@ def split_profiles(filename):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("profiles", type=Path)
+    parser.add_argument("--lane", choices=("all", "initial", "incremental"), default="all")
+    parser.add_argument("--initial-profile", action="append", default=[], help="Full-history download entry ID (repeatable)")
     args = parser.parse_args()
-    groups = split_profiles(args.profiles)
+    groups = split_profiles(args.profiles, lane=args.lane, initial_profiles=args.initial_profile)
     # Keep these lists beside the original so relative paths also work through
     # container mounts. Only dispatch identities change; profiles, credentials,
     # producer outboxes and saved source requests are untouched.

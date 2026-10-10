@@ -7,6 +7,32 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
+## Initial and incremental scrape queues — implemented, deployment pending, 2026-10-10
+
+The shared-root exclusion now applies within a producer and site. Host
+incremental scrapes and n8n initial profiles can run concurrently on the same
+site for different accounts. Global profile/target fences, site cooldowns,
+metadata fairness and filesystem output locks remain shared. The host and n8n
+download lists are partitioned explicitly: ordinary downloads on the host,
+full-history downloads on n8n, with one worker per site in each queue. Both
+retain their metadata handlers and pending delivery recovery.
+This uses the existing schema and worker runtime; no request, window, policy or
+checkpoint migration is needed. Twitter's archive-stop incremental scans can
+have no lower date bound, so window shape is not used to identify initial work.
+
+Focused SQLite tests pass for concurrent claims, per-queue exclusion, duplicate
+profiles under different policies, restart retention and shared rate limits.
+Three dispatch-list tests verify the split without changing profile files.
+The 48 producer scheduling/conversion/backup-lock tests and native GIF conversion
+tests pass. A Twitter test now constructs its pinned extractor directly so it
+also runs independently of earlier registry initialization. The already deployed
+GIF fixes retain final MKV paths, retry interrupted completion and preserve
+metadata/gallery associations when replacing stale image records. The installed
+converter hash matches the repository helper.
+
+Production rollout and live queue observation remain pending. Evidence is under
+`.local/initial-scrape-concurrency-20261010/`.
+
 ## Twitter profile routing — deployed, 2026-10-10
 
 Unblocking Twitter exposed a producer bug: a profile dispatcher's undated

@@ -2797,8 +2797,8 @@ python3 scripts/split_worker_profiles.py /private/worker-profiles.json
 ```
 
 Run separate service instances with the generated `worker-dispatch-reddit.json`,
-`worker-dispatch-twitter.json`, etc. Each list includes that site's download,
-full-history and metadata profiles. They share the original producer UUID, outbox,
+`worker-dispatch-twitter.json`, etc. By default each list includes that site's
+download, full-history and metadata profiles. They share the original producer UUID, outbox,
 reviewed profile files and physical filesystem lock directory. Do not copy or
 replace the outbox. Generic download profiles use the `manual` list. Host units
 can use `stash-ingest-worker@host-reddit.timer` with `host-reddit.env`, and an
@@ -2806,12 +2806,33 @@ equivalent instance for each other site. Container workers likewise need separat
 processes and distinct container names selecting their site's dispatch list.
 Include the generated lists, unit definitions and environment files in backups.
 
-Schema 1000110 permits different services to share a media root concurrently.
-The same source/target remains fenced, overlapping destinations within one
-service stay serialized, and per-output locks protect shared filenames across
-sites. A busy file lock produces a retry without exhausting source failures.
-Backup barriers still wait for all active filesystem mutations. A website's
-cooldown can pause that site's workers independently of the other sites.
+For concurrent incremental and initial scrapes, give the host and n8n separate
+producer identities and dispatch lists. Select the full-history entry IDs
+explicitly; an unbounded publication window does not distinguish an initial
+scrape from an incremental Twitter traversal that stops at archived files:
+
+```sh
+python3 scripts/split_worker_profiles.py /host/profiles/worker-dispatch.json \
+  --lane incremental --initial-profile host-reddit-full-history --initial-profile host-twitter-full-history
+python3 scripts/split_worker_profiles.py /n8n/profiles/worker-dispatch.json \
+  --lane initial --initial-profile n8n-reddit-full-history --initial-profile n8n-twitter-full-history
+```
+
+These commands replace the generated per-site lists, preserving profile files,
+policies, outboxes and queued requests. The initial list contains full-history
+downloads only; the incremental list retains ordinary downloads. Both retain
+their metadata handlers so admitted jobs and pending deliveries keep draining.
+Run one instance per site in each producer. This keeps initial n8n scrapes
+serial per site while allowing a different profile's incremental scrape in
+parallel. n8n's existing queue still controls profile submission and completion.
+
+Schema 1000110 permits sharing a media root. Overlapping destinations serialize
+within each producer/service; independent producers and sites can share the
+root. The same source/target remains fenced across all producers, and shared
+per-output locks protect actual filenames, including GIF/MKV siblings. A busy
+file lock produces a retry without exhausting source failures. Backup barriers
+still wait for all active filesystem mutations. Site cooldowns and metadata
+fairness remain shared by both queues; parallel workers do not bypass them.
 
 Download entries use existing scoped run discovery. Enrichment entries require
 `enrichment_collections_protocol: 1`: Stash lists permitted active collections

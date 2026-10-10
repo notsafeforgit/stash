@@ -853,7 +853,10 @@ class GalleryTests(unittest.TestCase):
                      patch.object(TwitterExtractor, "metadata", return_value={}), \
                      patch.object(child, "tweets", lambda _: iter(copy.deepcopy([outside, record]))), \
                      patch.object(NativeDownloadJob, "download", download):
-                    task = NativeDownloadJob(gdl_extractors.find(self.lease.run["target_url"]),
+                    # Other fixtures instantiate extractors directly, which
+                    # compiles their patterns without registering the module.
+                    # Keep this routing test independent of registry load order.
+                    task = NativeDownloadJob(twitter.TwitterUserExtractor.from_url(self.lease.run["target_url"]),
                                              producer=self.producer, lock_directory=self.locks)
                     start = len(self.events())
                     self.assertEqual(task.run(), 0)

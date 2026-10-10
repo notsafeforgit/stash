@@ -935,6 +935,7 @@ func (t *viewHistoryTable) getDates(ctx context.Context, id int) ([]time.Time, e
 		t.dateColumn,
 	).From(table).Where(
 		t.idColumn.Eq(id),
+		t.dateColumn.IsNotNull(),
 	).Order(t.dateColumn.Desc())
 
 	const single = false
@@ -961,6 +962,7 @@ func (t *viewHistoryTable) getManyDates(ctx context.Context, ids []int) ([][]tim
 		t.dateColumn,
 	).From(table).Where(
 		t.idColumn.In(ids),
+		t.dateColumn.IsNotNull(),
 	).Order(t.dateColumn.Desc())
 
 	ret := make([][]time.Time, len(ids))
@@ -1006,6 +1008,7 @@ func (t *viewHistoryTable) getManyLastDate(ctx context.Context, ids []int) ([]*t
 		goqu.MAX(t.dateColumn),
 	).From(table).Where(
 		t.idColumn.In(ids),
+		t.dateColumn.IsNotNull(),
 	).GroupBy(t.idColumn)
 
 	ret := make([]*time.Time, len(ids))
@@ -1060,7 +1063,7 @@ func (t *viewHistoryTable) getManyCount(ctx context.Context, ids []int) ([]int, 
 
 	q := dialect.Select(
 		t.idColumn,
-		goqu.COUNT(t.dateColumn),
+		goqu.COUNT("*"),
 	).From(table).Where(
 		t.idColumn.In(ids),
 	).GroupBy(t.idColumn)

@@ -19,6 +19,7 @@ import (
 // the production migration into an idempotent downgrade/replay adapter.
 func removeGalleryCoverSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeMediaConversionSchema(t, raw)
 	if queryUint(t, raw, "SELECT count(*) FROM sqlite_schema WHERE name='gallery_covers'") == 0 {
 		return
 	}

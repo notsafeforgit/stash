@@ -7,6 +7,33 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
+## Verified GIF image-to-scene transition — implementation, 2026-10-10
+
+Schema 1000109 retains an explicit conversion between the old image UUID/file
+lifetime and the new scene UUID/verified MKV. Automatic publication requires an
+absent original GIF, unchanged admission fences, unique single-file ownership,
+a fresh destination scene and the selected attachment or its retained original
+file evidence. It retires only the stale database entries; the producer owns
+the completed filesystem conversion. Ordinary cross-kind merges remain invalid.
+
+Common metadata values, explicit clears, relationship choices and source/policy
+provenance carry over. The old typed identity and field history remain retained;
+photographer attribution remains distinct from director. Source choices, manual
+and source gallery memberships and selected covers follow the scene. Explicit
+attachment/post/gallery unlinks stay unlinked. Undated image counters retain
+their counts without invented scene activity dates, including through later
+merges, decrements and JSON import/export. The worker checkpoints the conversion
+before previews and durable after-success notifications, so retry does not
+repeat the domain mutation.
+
+The full Go integration suite passed. Subsequent focused regressions cover
+reviewed post provenance, relationship/custom-field transfer, real GIF/MKV
+intake, original-file and ownership conflicts, transaction rollback, interrupted
+completion, UUID adoption, explicit unlinks, migration and counter round trips.
+The populated-copy rehearsal is running; no production writer or producer
+runtime has been changed for this increment. Evidence is retained under
+`.local/gif-domain-transition-20261010/`.
+
 ## Image and scene gallery covers — deployed, 2026-10-10
 
 Schema 1000108 replaces the image-membership cover flag with one canonical media

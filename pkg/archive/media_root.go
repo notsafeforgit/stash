@@ -82,3 +82,24 @@ func OpenMediaRootFile(definition models.MediaRoot, relative string) (*os.File, 
 	defer root.Close()
 	return fsutil.OpenRootRegularFile(root, filepath.FromSlash(relative))
 }
+
+// RequireMediaRootPathAbsent checks the original path of a completed
+// postprocessor conversion. A dangling symlink is present, not an absent file.
+func RequireMediaRootPathAbsent(definition models.MediaRoot, relative string) error {
+	if definition.State != "active" || definition.Binding == nil || !ValidRootRelativePath(relative, false) {
+		return errors.New("conversion requires an active bound media root")
+	}
+	root, _, err := openPinnedRoot(*definition.Binding, true)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	_, err = root.Lstat(filepath.FromSlash(relative))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err == nil {
+		return errors.New("conversion original path is still present")
+	}
+	return err
+}

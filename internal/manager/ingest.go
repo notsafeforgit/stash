@@ -3,6 +3,8 @@ package manager
 import (
 	"context"
 	"errors"
+	"path/filepath"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/internal/ingest"
@@ -11,6 +13,7 @@ import (
 	"github.com/stashapp/stash/pkg/file/video"
 	"github.com/stashapp/stash/pkg/image"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/plugin"
 	"github.com/stashapp/stash/pkg/plugin/hook"
 )
 
@@ -89,6 +92,45 @@ func (s *Manager) finishFileIngestion(ctx context.Context, work ingest.FileWork,
 	if s.PluginCache == nil {
 		return nil
 	}
+	if conversion := published.Conversion; conversion != nil {
+		original := work.Publication.Transformation.Original.PathFence.Path
+		removedEntry := true
+		input := plugin.ImageDestroyInput{
+			ImageDestroyInput: models.ImageDestroyInput{ID: strconv.Itoa(conversion.ImageID), DestroyFileEntry: &removedEntry},
+			Checksum:          conversion.Checksum, Path: original,
+		}
+		if err := s.PluginCache.ExecuteDurablePostHooks(ctx, intakeHookEventID(work, conversion.ImageUUID, hook.ImageDestroyPost), conversion.ImageID, hook.ImageDestroyPost, input, nil); err != nil {
+			return err
+		}
+		if err := guard(ctx); err != nil {
+			return err
+		}
+		fileInput := plugin.FileDestroyInput{ID: strconv.Itoa(conversion.FileID), Path: original, Basename: filepath.Base(original), Fingerprints: conversion.Fingerprints}
+		if err := s.PluginCache.ExecuteDurablePostHooks(ctx, intakeHookEventID(work, conversion.FileUUID, hook.FileDestroyPost), conversion.FileID, hook.FileDestroyPost, fileInput, nil); err != nil {
+			return err
+		}
+		for _, galleryUUID := range conversion.GalleryUUIDs {
+			if galleryUUID == published.GalleryUUID {
+				continue
+			}
+			if err := guard(ctx); err != nil {
+				return err
+			}
+			var gallery *models.ArchiveEntity
+			if err := repo.WithReadTxn(ctx, func(ctx context.Context) error {
+				var err error
+				gallery, err = repo.ArchiveEntity.Resolve(ctx, galleryUUID)
+				return err
+			}); err != nil {
+				return err
+			}
+			if gallery != nil && gallery.State == models.ArchiveEntityActive && gallery.LocalID != nil {
+				if err := s.PluginCache.ExecuteDurablePostHooks(ctx, intakeHookEventID(work, galleryUUID, hook.GalleryUpdatePost), *gallery.LocalID, hook.GalleryUpdatePost, nil, []string{"image_ids", "scene_ids", "cover"}); err != nil {
+					return err
+				}
+			}
+		}
+	}
 	if published.MediaCreated || published.FileLinked || len(published.MetadataFields) > 0 {
 		trigger := hook.ImageUpdatePost
 		fields := metadataHookFields(published.MetadataFields)
@@ -126,6 +168,9 @@ func (s *Manager) finishFileIngestion(ctx context.Context, work ingest.FileWork,
 		}
 		trigger := hook.GalleryUpdatePost
 		fields := []string{"image_ids", "scene_ids"}
+		if published.Conversion != nil {
+			fields = append(fields, "cover")
+		}
 		if published.Gallery == "create" {
 			trigger, fields = hook.GalleryCreatePost, nil
 		}

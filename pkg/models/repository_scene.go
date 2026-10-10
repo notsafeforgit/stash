@@ -122,6 +122,7 @@ type SceneReader interface {
 
 type OHistoryWriter interface {
 	AddO(ctx context.Context, id int, dates []time.Time) ([]time.Time, error)
+	AddUndatedO(ctx context.Context, id int, count int) error
 	DeleteO(ctx context.Context, id int, dates []time.Time) ([]time.Time, error)
 	ResetO(ctx context.Context, id int) (int, error)
 }

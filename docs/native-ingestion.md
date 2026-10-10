@@ -1130,8 +1130,30 @@ Admission snapshots the original path's current file UUID, generation and remova
 fence into durable work. Published source-media evidence retains the portable
 conversion claim without exposing those internal host paths/fences. The claim
 does not assert equal bytes and cannot by itself authorize replacing an image.
-The existing image-to-scene kind conflict still requires the pending domain
-transition implementation.
+
+Schema 1000109 completes the existing-image transition after the worker verifies
+the final MKV. The original GIF must be absent, its captured file lifetime must
+still match, and it must be the image's only file with no other owners. The
+destination must be a newly created scene. The current attachment choice, or
+retained evidence for that exact original file following an explicit unlink,
+must establish the image's association. Ambiguous owners, changed files and
+existing destination scenes remain conflicts.
+
+The transaction retains common field values and their choices, including clears
+and source/policy provenance, follows source associations and gallery membership,
+and moves gallery covers. Explicit source and gallery unlinks stay unlinked.
+The old image UUID remains an image identity redirected to the new scene; its
+history stays retained. Photographer attribution remains in the conversion
+record and image field history, without being relabeled as a director. Image
+counters become undated scene counts rather than fabricated activity dates.
+The removed GIF's database entry is retired with the normal path-removal fence;
+this transaction does not delete files from disk.
+
+The durable publication checkpoint carries the conversion through preview and
+after-success notification retries. Image/file removal, scene creation and
+affected gallery notifications keep stable event IDs across worker restarts.
+Ordinary merges still reject cross-kind redirects; only a recorded conversion
+can connect an image identity to a scene.
 
 The adapter recovers a completed MKV after interruption between conversion and
 the completion/archive write, as well as on ordinary archive skips. Recovery

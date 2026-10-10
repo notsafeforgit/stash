@@ -48,6 +48,18 @@ type IntakePublicationResult struct {
 	Review         []string                 `json:"review"`
 	MetadataState  string                   `json:"metadata_state,omitempty"`
 	MetadataFields []string                 `json:"metadata_fields,omitempty"`
+	Conversion     *IntakeConversionResult  `json:"conversion,omitempty"`
+}
+
+type IntakeConversionResult struct {
+	UUID         string            `json:"uuid"`
+	ImageUUID    string            `json:"image_uuid"`
+	ImageID      int               `json:"image_id"`
+	FileUUID     string            `json:"file_uuid"`
+	FileID       int               `json:"file_id"`
+	Checksum     string            `json:"checksum"`
+	Fingerprints map[string]string `json:"fingerprints"`
+	GalleryUUIDs []string          `json:"gallery_uuids"`
 }
 
 type PublishedIntake struct {
@@ -111,7 +123,7 @@ func (p *PreparedMedia) PublishIntake(ctx context.Context, repo models.Repositor
 			}
 		}
 	}
-	media, err := p.publishMedia(ctx, repo, input.Target, input.Kind, selected)
+	media, conversion, err := p.publishIntakeMedia(ctx, repo, input, selected)
 	if err != nil {
 		return nil, err
 	}
@@ -124,6 +136,7 @@ func (p *PreparedMedia) PublishIntake(ctx context.Context, repo models.Repositor
 		FileUUID: media.File.Identity.UUID, Generation: media.File.File.Base().Generation, ContentUUID: media.File.Proof.Content.UUID,
 		MediaUUID: media.Media.UUID, MediaKind: media.Media.Kind, MediaCreated: media.Created, FileLinked: media.FileLinked,
 		SourceMedia: "not_applicable", Gallery: "not_applicable", Review: []string{},
+		Conversion: conversion,
 	}}
 	if input.Source != nil {
 		if err := publishIntakeSource(ctx, repo, input, ret); err != nil {

@@ -96,6 +96,11 @@ func ToBasicJSON(ctx context.Context, reader ExportGetter, scene *models.Scene) 
 	for _, date := range odates {
 		newSceneJSON.OHistory = append(newSceneJSON.OHistory, json.JSONTime{Time: date})
 	}
+	count, err := reader.GetOCount(ctx, scene.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting o count: %w", err)
+	}
+	newSceneJSON.UndatedOCount = count - len(odates)
 
 	newSceneJSON.CustomFields, err = reader.GetCustomFields(ctx, scene.ID)
 	if err != nil {

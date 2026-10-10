@@ -443,6 +443,11 @@ func (i *Importer) addViewHistory(ctx context.Context) error {
 }
 
 func (i *Importer) addOHistory(ctx context.Context) error {
+	if i.Input.UndatedOCount != 0 {
+		if err := i.ReaderWriter.AddUndatedO(ctx, i.ID, i.Input.UndatedOCount); err != nil {
+			return err
+		}
+	}
 	if len(i.oHistory) > 0 {
 		_, err := i.ReaderWriter.AddO(ctx, i.ID, i.oHistory)
 		if err != nil {

@@ -340,6 +340,26 @@ func (w *FileWorker) validatePublishedInTxn(ctx context.Context, claimed *models
 	if !linked {
 		return models.ErrArchiveIdentityConflict
 	}
+	if conversion := published.Conversion; conversion != nil {
+		if work.Publication.Transformation == nil || !ValidUUID(conversion.UUID) {
+			return ErrInvalid
+		}
+		stored, err := repo.MediaConversion.Find(ctx, conversion.UUID)
+		if err != nil {
+			return err
+		}
+		if stored == nil || stored.ImageUUID != conversion.ImageUUID || stored.OriginalFileUUID != conversion.FileUUID ||
+			stored.OriginalFileUUID != work.Publication.Transformation.Original.FileUUID || stored.FileUUID != published.FileUUID || stored.Generation != published.Generation {
+			return models.ErrArchiveIdentityConflict
+		}
+		converted, err := repo.ArchiveEntity.Resolve(ctx, stored.SceneUUID)
+		if err != nil {
+			return err
+		}
+		if converted == nil || converted.UUID != media.UUID {
+			return models.ErrArchiveIdentityConflict
+		}
+	}
 	return nil
 }
 

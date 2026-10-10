@@ -1,7 +1,23 @@
 # Native schema promotion
 
-The current development schema is 1000099. Production promotion remains a
-separate reviewed cutover; development migrations are rehearsed on copies.
+The current development schema is 1000109; production is at 1000108 as recorded
+in [implementation progress](native-archive-progress.md). New migrations are
+rehearsed on copies before deployment.
+
+Schema 1000109 records verified image-to-video transitions in `media_conversions`.
+The immutable record binds the original image and file lifetime to the new scene
+and verified final file lifetime. It permits only that image-to-scene identity
+redirect; normal merges still require matching kinds. Source/gallery intent and
+chosen covers follow the redirect. Common metadata choices are copied to the
+scene with their source/policy provenance, while the original image's field
+history and photographer attribution remain retained. See
+[conversion admission and publication](native-ingestion.md#completed-file-events).
+
+Scene activity dates now permit NULL for previously undated image counts.
+History and last-date queries exclude NULL; counts, decrements and resets include
+it. Scene merges and JSON imports/exports retain the undated count separately,
+without manufacturing timestamps. Existing dated events migrate unchanged, and
+the migration itself converts no images or media files.
 
 Schema 1000099 retains a canonical HTTP origin for newly observed download
 dependencies. The existing `source_run_attempt_pacing` rows gain a nullable
@@ -27,8 +43,8 @@ it cannot infer historical removals from missing links. Schema 1000096 added
 provider metadata import receipts, following schema 1000095's
 [file deduplication receipts](native-file-deduplication.md).
 The [populated verified release](native-profile-release-verification.json)
-remains at schema 1000097; schemas 1000098–1000099 require populated migration and
-release checks before deployment.
+records the earlier schema-1000097 checkpoint; subsequent migration and release
+checks are recorded in the implementation progress document.
 
 The independent schema begins at primary migration 1000000 and identifies itself
 with `native_schema.lineage = org.notsafeforgit.stash.native-archive`. New

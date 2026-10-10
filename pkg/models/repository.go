@@ -33,6 +33,7 @@ type Repository struct {
 	DefaultFilter               DefaultFilterReaderWriter
 	ConfigurationMigration      ConfigurationMigrationReaderWriter
 	ArchiveEntity               ArchiveEntityReaderWriter
+	MediaConversion             MediaConversionReaderWriter
 	SourceAccount               SourceAccountReaderWriter
 	MediaRoot                   MediaRootReaderWriter
 	SourceCollection            SourceCollectionReaderWriter

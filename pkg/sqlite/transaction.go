@@ -208,6 +208,7 @@ func (db *Database) Repository() models.Repository {
 		DefaultFilter:               &DefaultFilterStore{},
 		ConfigurationMigration:      &ConfigurationMigrationStore{},
 		ArchiveEntity:               &ArchiveEntityStore{},
+		MediaConversion:             &MediaConversionStore{},
 		SourceAccount:               &SourceAccountStore{},
 		MediaRoot:                   &MediaRootStore{},
 		SourceCollection:            &SourceCollectionStore{},

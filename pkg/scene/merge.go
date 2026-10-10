@@ -100,6 +100,7 @@ func (s *Service) Merge(ctx context.Context, sourceIDs []int, destinationID int,
 	// merge o history
 	if options.IncludeOHistory {
 		var allDates []time.Time
+		var undated int
 		for _, src := range sources {
 			thisDates, err := s.Repository.GetODates(ctx, src.ID)
 			if err != nil {
@@ -107,11 +108,21 @@ func (s *Service) Merge(ctx context.Context, sourceIDs []int, destinationID int,
 			}
 
 			allDates = append(allDates, thisDates...)
+			count, err := s.Repository.GetOCount(ctx, src.ID)
+			if err != nil {
+				return fmt.Errorf("getting o count for scene %d: %w", src.ID, err)
+			}
+			undated += count - len(thisDates)
 		}
 
 		if len(allDates) > 0 {
 			if _, err := s.Repository.AddO(ctx, destinationID, allDates); err != nil {
 				return fmt.Errorf("adding o dates to scene %d: %w", destinationID, err)
+			}
+		}
+		if undated > 0 {
+			if err := s.Repository.AddUndatedO(ctx, destinationID, undated); err != nil {
+				return fmt.Errorf("retaining undated count for scene %d: %w", destinationID, err)
 			}
 		}
 	}

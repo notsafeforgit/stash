@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -84,6 +85,18 @@ func (qb *oDateManager) GetUniqueOCount(ctx context.Context) (int, error) {
 
 func (qb *oDateManager) AddO(ctx context.Context, id int, dates []time.Time) ([]time.Time, error) {
 	return qb.tableMgr.addDates(ctx, id, dates)
+}
+
+func (qb *oDateManager) AddUndatedO(ctx context.Context, id, count int) error {
+	if count < 0 || count > 100000 {
+		return errors.New("invalid undated counter")
+	}
+	if count == 0 {
+		return nil
+	}
+	_, err := dbWrapper.Exec(ctx, `WITH RECURSIVE numbers(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM numbers WHERE n<?)
+ INSERT INTO scenes_o_dates(scene_id,o_date) SELECT ?,NULL FROM numbers`, count, id)
+	return err
 }
 
 func (qb *oDateManager) DeleteO(ctx context.Context, id int, dates []time.Time) ([]time.Time, error) {

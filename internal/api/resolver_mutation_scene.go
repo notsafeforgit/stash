@@ -1043,19 +1043,20 @@ func (r *mutationResolver) SceneIncrementO(ctx context.Context, id string) (ret 
 		return 0, fmt.Errorf("converting id: %w", err)
 	}
 
-	var updatedTimes []time.Time
-
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
 		qb := r.repository.Scene
 
-		updatedTimes, err = qb.AddO(ctx, sceneID, nil)
+		if _, err := qb.AddO(ctx, sceneID, nil); err != nil {
+			return err
+		}
+		ret, err = qb.GetOCount(ctx, sceneID)
 		return err
 	}); err != nil {
 		return 0, err
 	}
 
 	r.sceneFieldsUpdated(ctx, sceneID, "o_counter", "o_history")
-	return len(updatedTimes), nil
+	return ret, nil
 }
 
 // deprecated
@@ -1065,19 +1066,20 @@ func (r *mutationResolver) SceneDecrementO(ctx context.Context, id string) (ret 
 		return 0, fmt.Errorf("converting id: %w", err)
 	}
 
-	var updatedTimes []time.Time
-
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
 		qb := r.repository.Scene
 
-		updatedTimes, err = qb.DeleteO(ctx, sceneID, nil)
+		if _, err := qb.DeleteO(ctx, sceneID, nil); err != nil {
+			return err
+		}
+		ret, err = qb.GetOCount(ctx, sceneID)
 		return err
 	}); err != nil {
 		return 0, err
 	}
 
 	r.sceneFieldsUpdated(ctx, sceneID, "o_counter", "o_history")
-	return len(updatedTimes), nil
+	return ret, nil
 }
 
 func (r *mutationResolver) SceneResetO(ctx context.Context, id string) (ret int, err error) {
@@ -1113,11 +1115,16 @@ func (r *mutationResolver) SceneAddO(ctx context.Context, id string, t []*time.T
 	}
 
 	var updatedTimes []time.Time
+	var count int
 
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
 		qb := r.repository.Scene
 
 		updatedTimes, err = qb.AddO(ctx, sceneID, times)
+		if err != nil {
+			return err
+		}
+		count, err = qb.GetOCount(ctx, sceneID)
 		return err
 	}); err != nil {
 		return nil, err
@@ -1125,7 +1132,7 @@ func (r *mutationResolver) SceneAddO(ctx context.Context, id string, t []*time.T
 
 	r.sceneFieldsUpdated(ctx, sceneID, "o_counter", "o_history")
 	return &HistoryMutationResult{
-		Count:   len(updatedTimes),
+		Count:   count,
 		History: sliceutil.ValuesToPtrs(updatedTimes),
 	}, nil
 }
@@ -1143,11 +1150,16 @@ func (r *mutationResolver) SceneDeleteO(ctx context.Context, id string, t []*tim
 	}
 
 	var updatedTimes []time.Time
+	var count int
 
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
 		qb := r.repository.Scene
 
 		updatedTimes, err = qb.DeleteO(ctx, sceneID, times)
+		if err != nil {
+			return err
+		}
+		count, err = qb.GetOCount(ctx, sceneID)
 		return err
 	}); err != nil {
 		return nil, err
@@ -1155,7 +1167,7 @@ func (r *mutationResolver) SceneDeleteO(ctx context.Context, id string, t []*tim
 
 	r.sceneFieldsUpdated(ctx, sceneID, "o_counter", "o_history")
 	return &HistoryMutationResult{
-		Count:   len(updatedTimes),
+		Count:   count,
 		History: sliceutil.ValuesToPtrs(updatedTimes),
 	}, nil
 }

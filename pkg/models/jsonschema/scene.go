@@ -55,6 +55,8 @@ type Scene struct {
 
 	// deprecated - for import only
 	OCounter int `json:"o_counter,omitempty"`
+	// Counts retained from image entities have no observed event timestamps.
+	UndatedOCount int `json:"undated_o_count,omitempty"`
 
 	Details    string        `json:"details,omitempty"`
 	Director   string        `json:"director,omitempty"`

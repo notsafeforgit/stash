@@ -57,6 +57,13 @@ class CheckSelectionTest(unittest.TestCase):
         self.commit("ui/v3/src/routes/another.tsx")
         self.assertEqual(self.select()["backend"], "false")
 
+    def test_post_deployment_notes_do_not_hide_the_next_frontend_only_change(self):
+        self.commit("docs/native-archive-progress.md")
+        self.commit("ui/v3/src/app.tsx")
+        self.assertEqual(self.select()["backend"], "false")
+        self.commit("docs/releases/native.json")
+        self.assertEqual(self.select()["backend"], "true")
+
     def test_manual_runs_and_no_changes_always_run_all_checks(self):
         self.assertEqual(self.select()["backend"], "true")
         self.commit("ui/v3/src/app.tsx")

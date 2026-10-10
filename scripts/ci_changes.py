@@ -25,6 +25,12 @@ def frontend_path(path):
     )
 
 
+def documentation_path(path):
+    # Deployment notes often use [skip ci]. They must not force backend tests
+    # on the next UI push; executable examples/manifests remain outside this.
+    return path.startswith("docs/") and PurePosixPath(path).suffix == ".md"
+
+
 def git(*args, cwd=None):
     return subprocess.run(
         ["git", *args], cwd=cwd, check=True, stdout=subprocess.PIPE,
@@ -52,10 +58,10 @@ def select_checks(event, branch, head, runs, cwd=None):
             paths = [path.decode("utf-8", errors="surrogateescape") for path in paths.split(b"\0") if path]
         except subprocess.CalledProcessError:
             continue
-        if paths and all(frontend_path(path) for path in paths):
+        if paths and all(frontend_path(path) or documentation_path(path) for path in paths):
             return {
                 "backend": "false", "baseline": baseline,
-                "reason": f"Only frontend files changed since successful publish {baseline[:12]}.",
+                "reason": f"Only frontend/Markdown documentation changed since successful publish {baseline[:12]}.",
             }
         return {
             **full, "baseline": baseline,

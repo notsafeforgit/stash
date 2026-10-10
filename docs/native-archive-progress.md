@@ -37,6 +37,20 @@ workflow lint with ShellCheck. Final cache edits passed the CI checks again.
 Evidence: `.local/ci-speed-20261010/`. GitHub publication verification follows
 the push; this build-tooling change does not require a production restart.
 
+The first GitHub run exposed a missing cross-job dependency: Go's Python
+interop/restore tests also need the installed producer runtime. The Go runners
+now install it, and `make it` rejects a missing runtime before compiling or
+executing the suite. SQLite tests now have their own runner, separate from other
+Go packages; the complete tagged package list is partitioned without a maintained
+package allowlist. Markdown deployment notes no longer defeat the next
+frontend-only comparison. Fifteen CI-selection/partition/gate checks pass.
+The corrected full local gate passed in 41.44 seconds, reusing unchanged Go
+results. The actual 78-package inventory partitions into 3 SQLite and 75 other
+packages without omissions or overlap; a missing-runtime check fails before
+the Go command starts.
+The independent browser workflow reproduced the same 14 failing cases as its
+previous run; these remain separate UI regression work.
+
 ## GIF conversion provenance and restart recovery — implemented, not deployed, 2026-10-10
 
 The producer now retains the configured GIF-to-MKV transformation with its

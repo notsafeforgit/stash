@@ -24,6 +24,8 @@ runs:
         # Lint also installs golangci-lint's own dependency graph. Give it its
         # own module cache; the other suites share application/tool modules.
         key: native-modules-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}-${{ inputs.suite == 'lint' && 'lint' || 'app' }}-${{ hashFiles('go.mod', 'go.sum', 'Makefile') }}
+        restore-keys: |
+          native-modules-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}-${{ inputs.suite == 'lint' && 'lint' || 'app' }}-
     - name: Cache incremental Go compilation
       uses: actions/cache@v5
       with:
@@ -37,3 +39,4 @@ runs:
         restore-keys: |
           native-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}-${{ inputs.suite }}-${{ hashFiles('go.mod', 'go.sum', 'Makefile') }}-
           native-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}-${{ inputs.suite }}-
+          native-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}-

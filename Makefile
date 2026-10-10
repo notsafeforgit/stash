@@ -326,15 +326,25 @@ lint:
 # runs unit tests - excluding integration tests
 # Migration fixtures can exceed Go's default ten-minute package budget.
 GO_TEST_TIMEOUT ?= 20m
+GO_TEST_PACKAGES ?= ./...
 .PHONY: test
 test:
-	go test -timeout $(GO_TEST_TIMEOUT) ./...
+	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_PACKAGES)
 
 # runs all tests - including integration tests
 .PHONY: it
-it:
-	$(eval GO_BUILD_TAGS += integration)
-	go test -timeout $(GO_TEST_TIMEOUT) -tags "$(GO_BUILD_TAGS)" ./...
+it: check-producer-runtime
+	go test -timeout $(GO_TEST_TIMEOUT) -tags "$(GO_BUILD_TAGS) integration" $(GO_TEST_PACKAGES)
+
+.PHONY: list-test-packages
+list-test-packages:
+	@go list -tags "$(GO_BUILD_TAGS) integration" ./...
+
+# Fail before compiling/running the full suite when its subprocess runtime is
+# missing. The Python unit-test jobs do not supply another runner's environment.
+.PHONY: check-producer-runtime
+check-producer-runtime:
+	@"$(PRODUCER_PYTHON)" -I -c "import sys; assert sys.version_info >= (3, 12); import gallery_dl, yt_dlp" || { echo 'Run make pre-producer to prepare the Go integration-test runtime.'; exit 1; }
 
 # generates test mocks
 .PHONY: generate-test-mocks
@@ -450,7 +460,7 @@ validate-fork-backend: generate-backend ui-ci
 ACTIONLINT_VERSION ?= v1.7.12
 .PHONY: validate-ci
 validate-ci:
-	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p test_ci_changes.py
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_ci_*.py'
 	go run github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 
 export BACKUP_PYTHON ?= $(abspath .local/native-backup/bin/python)

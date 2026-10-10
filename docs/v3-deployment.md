@@ -60,13 +60,19 @@ The [publisher](../.github/workflows/ghcr-publish.yml) calls the shared
 [native validation workflow](../.github/workflows/native-ci.yml). It generates
 bindings and validates/builds the UI once, shares those exact generated files
 and app/share/offline assets with the Go jobs, and compiles Linux amd64 in
-parallel with backend validation. Go tests, Go lint, and the four Python suites
-run as separate jobs. Publication requires every selected check to succeed;
+parallel with backend validation. SQLite tests, other Go tests, Go lint, and
+the four Python suites run as separate jobs. Go partitions come from the complete
+tagged package list, so new packages are included automatically. Both Go test
+runners install the Python producer used by cross-language fixtures; `make it`
+checks that runtime before starting the long suite. Publication requires every
+selected check to succeed;
 failed, cancelled, or unexpectedly skipped jobs cannot publish.
 
 Frontend-only changes may skip Go lint, the full Go suite and Python suites
 when **every changed path since a successful ancestor publish** is an allowed
-frontend path. Failed/cancelled intervening pushes do not reset that baseline.
+frontend path or Markdown under `docs/`. This includes post-deployment notes
+committed with `[skip ci]`. Executable examples and release manifests are not
+exempt. Failed/cancelled intervening pushes do not reset that baseline.
 Schema, Go embed code, CI/tooling, mixed or unknown paths, missing history/API
 access, and manual dispatches run the full suite. UI validation, embedded-entry
 tests and Linux compilation always run. The check-selection job records the

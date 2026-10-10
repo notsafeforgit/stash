@@ -9,7 +9,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateTranslationWorkSchema(conn *sqlx.DB, allowImportedCompletion bool) error {
+func validateTranslationWorkSchema(conn *sqlx.DB, allowImportedCompletion bool, auditData bool) error {
 	for _, name := range []string{"translation_requests", "translation_request_immutable", "translation_cache", "translation_cache_immutable", "translation_cache_scope",
 		"translation_targets", "translation_targets_request", "translation_targets_post", "translation_targets_request_state", "translation_targets_post_state", "translation_targets_ready",
 		"translation_target_initial", "translation_target_active", "translation_target_identity", "translation_target_scope", "translation_target_history", "translation_target_history_immutable", "translation_target_history_insert", "translation_target_history_update"} {
@@ -32,6 +32,9 @@ func validateTranslationWorkSchema(conn *sqlx.DB, allowImportedCompletion bool) 
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM translation_cache c LEFT JOIN translation_requests r ON r.uuid=c.request_uuid
  LEFT JOIN source_translations s ON s.uuid=c.translation_uuid WHERE r.uuid IS NULL OR (c.translation_uuid IS NOT NULL AND s.uuid IS NULL))
  OR EXISTS(SELECT 1 FROM translation_targets t

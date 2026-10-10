@@ -6,7 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateSourceRunSchema(conn *sqlx.DB, version uint) error {
+func validateSourceRunSchema(conn *sqlx.DB, version uint, auditData bool) error {
 	if version >= NativeSchemaBaseline+110 {
 		var unique bool
 		if err := conn.Get(&unique, `SELECT "unique" FROM pragma_index_list('source_runs') WHERE name='source_runs_running_destination'`); err != nil {
@@ -28,7 +28,7 @@ func validateSourceRunSchema(conn *sqlx.DB, version uint) error {
 		}
 	}
 	if version >= NativeSchemaBaseline+103 {
-		if err := validateSourceRunPolicySchema(conn); err != nil {
+		if err := validateSourceRunPolicySchema(conn, auditData); err != nil {
 			return err
 		}
 	}
@@ -41,14 +41,16 @@ func validateSourceRunSchema(conn *sqlx.DB, version uint) error {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
 	}
-	var unfinished bool
-	if err := conn.Get(&unfinished, `SELECT EXISTS(SELECT 1 FROM source_runs r LEFT JOIN source_run_attempts a ON a.run_uuid=r.uuid AND a.fence=r.fence
+	if auditData {
+		var unfinished bool
+		if err := conn.Get(&unfinished, `SELECT EXISTS(SELECT 1 FROM source_runs r LEFT JOIN source_run_attempts a ON a.run_uuid=r.uuid AND a.fence=r.fence
 WHERE r.state='running' AND (a.run_uuid IS NULL OR a.outcome!='running' OR a.producer_uuid!=r.producer_uuid OR a.owner_uuid!=r.owner_uuid OR a.window!=r.window OR a.progress!=r.progress))
 OR EXISTS(SELECT 1 FROM source_run_attempts a JOIN source_runs r ON r.uuid=a.run_uuid WHERE a.outcome='running' AND (r.state!='running' OR r.fence!=a.fence))`); err != nil {
-		return err
-	}
-	if unfinished {
-		return errors.New("native database has inconsistent source run ownership")
+			return err
+		}
+		if unfinished {
+			return errors.New("native database has inconsistent source run ownership")
+		}
 	}
 	if version < NativeSchemaBaseline+98 {
 		return nil
@@ -65,7 +67,7 @@ OR EXISTS(SELECT 1 FROM source_run_attempts a JOIN source_runs r ON r.uuid=a.run
 	return nil
 }
 
-func validateSourceRunPolicySchema(conn *sqlx.DB) error {
+func validateSourceRunPolicySchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"source_run_policy_upgrades", "source_run_policy_upgrade_fence", "source_run_policy_upgrade_valid", "source_run_policy_upgrade_revision", "source_run_policy_upgrade_immutable", "source_run_policy_upgrade_retained"} {
 		var exists bool
 		if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -76,6 +78,9 @@ func validateSourceRunPolicySchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_run_policy_upgrades p JOIN source_runs r ON r.uuid=p.run_uuid
 WHERE p.expected_revision>=r.revision OR p.effective_after_fence>r.fence OR p.created_at_ms>r.updated_at_ms
 OR p.expected_policy_sha256!=coalesce((SELECT prior.policy_sha256 FROM source_run_policy_upgrades prior

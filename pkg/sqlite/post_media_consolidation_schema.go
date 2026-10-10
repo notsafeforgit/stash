@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validatePostMediaConsolidationSchema(conn *sqlx.DB) error {
+func validatePostMediaConsolidationSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"post_media_supersessions_scope", "post_media_consolidation_edges", "post_media_consolidation_edges_receipt",
 		"post_media_consolidation_edge_scope", "post_media_consolidation_edge_immutable"} {
 		var found bool
@@ -19,6 +19,9 @@ func validatePostMediaConsolidationSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM post_media_consolidation_edges e
 LEFT JOIN post_media_decisions old ON old.uuid=e.previous_uuid
 LEFT JOIN post_media_decisions current ON current.uuid=e.decision_uuid

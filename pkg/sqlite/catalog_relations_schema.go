@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateCatalogRelationsSchema(conn *sqlx.DB) error {
+func validateCatalogRelationsSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"catalog_relations_imports", "catalog_relation_records", "catalog_relations_import_guard", "catalog_relation_record_immutable", "catalog_relation_review"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -18,6 +18,9 @@ func validateCatalogRelationsSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM catalog_relations_imports i
  LEFT JOIN catalog_snapshots s ON s.uuid=i.snapshot_uuid LEFT JOIN catalog_evidence_imports e ON e.snapshot_uuid=i.snapshot_uuid WHERE
  s.state IS NOT 'received' OR i.manifest_sha256 IS NOT s.manifest_sha256 OR e.state IS NULL OR e.state='running'

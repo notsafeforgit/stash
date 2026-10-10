@@ -119,7 +119,7 @@ WHERE e.history_uuid=? AND e.field=? AND m.uuid=?`, row.EntityUUID, row.HistoryU
 	return &models.MetadataFileEditReview{RequestUUID: id, KeptCurrent: true, Field: binding.Field, Request: input, CreatedAt: row.CreatedAt.Timestamp}, nil
 }
 
-func validateMetadataFileKeepSchema(conn *sqlx.DB) error {
+func validateMetadataFileKeepSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"metadata_file_edit_keeps", "metadata_file_edit_keeps_history", "metadata_file_edit_keeps_entity", "metadata_file_edit_keep_immutable", "metadata_file_edit_keep_request_distinct", "metadata_file_edit_apply_request_distinct", "metadata_file_edit_keep_scope"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -130,6 +130,9 @@ func validateMetadataFileKeepSchema(conn *sqlx.DB) error {
 		}
 	}
 	var duplicate bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&duplicate, `SELECT EXISTS(SELECT 1 FROM metadata_file_edit_keeps k JOIN metadata_file_edit_reviews a ON a.request_uuid=k.request_uuid)`); err != nil {
 		return err
 	}

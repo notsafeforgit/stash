@@ -103,10 +103,10 @@ func TestCanonicalPostBackfillPreservesOriginalProofAndReceiptAcrossChainedMerge
 	require.NoError(t, err)
 	before, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorContains(t, f.db.Open(f.db.DatabasePath()), "invalid historical post media backfills")
+	require.ErrorContains(t, f.db.AuditForTesting(f.db.DatabasePath()), "invalid historical post media backfills")
 	after, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
-	require.Equal(t, before, after, "startup rejection does not alter the database")
+	require.Equal(t, before, after, "audit rejection does not alter the database")
 }
 
 func TestCanonicalAlbumBackfillSharesOriginalFilenameProofAndPreservesAttachmentOwner(t *testing.T) {

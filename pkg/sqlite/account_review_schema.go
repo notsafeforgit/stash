@@ -6,7 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateAccountReviewSchema(conn *sqlx.DB) error {
+func validateAccountReviewSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"account_ownership_reviews", "account_ownership_reviews_account", "account_ownership_review_immutable", "account_ownership_review_scope"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -15,6 +15,9 @@ func validateAccountReviewSchema(conn *sqlx.DB) error {
 		if !found {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for after := ""; ; {
 		var id string

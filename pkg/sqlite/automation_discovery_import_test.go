@@ -299,5 +299,5 @@ func TestAutomationDiscoveryCorruptProjectionRefusedBeforeWrites(t *testing.T) {
 	require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name='automation_discovery_record_immutable'").Scan(&guard))
 	_, err := raw.Exec("DROP TRIGGER automation_discovery_record_immutable; UPDATE automation_discovery_records SET phase='matching' WHERE phase='listing';" + guard)
 	require.NoError(t, err)
-	require.Error(t, f.db.Open(f.db.DatabasePath()))
+	require.Error(t, f.db.AuditForTesting(f.db.DatabasePath()))
 }

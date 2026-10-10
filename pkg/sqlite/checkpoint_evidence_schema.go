@@ -11,7 +11,7 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 )
 
-func validateCheckpointEvidenceSchema(conn *sqlx.DB) error {
+func validateCheckpointEvidenceSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"checkpoint_evidence_acceptances", "checkpoint_evidence_target", "checkpoint_evidence_acceptance_immutable",
 		"checkpoint_evidence_acceptance_scope", "checkpoint_evidence_captures", "checkpoint_evidence_capture",
 		"checkpoint_evidence_capture_immutable", "checkpoint_evidence_capture_scope"} {
@@ -22,6 +22,9 @@ func validateCheckpointEvidenceSchema(conn *sqlx.DB) error {
 		if !exists {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for after := ""; ; {
 		var id string

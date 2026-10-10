@@ -92,7 +92,7 @@ func validateDiscoveryScopeRow(get enrichmentGet, row discoveryScopeRow) (*model
 	return plan, nil
 }
 
-func validateDiscoveryScopeSchema(conn *sqlx.DB) error {
+func validateDiscoveryScopeSchema(conn *sqlx.DB, auditData bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"discovery_scope_reviews", "table"}, {"discovery_scope_reviews_listing", "index"},
 		{"discovery_scope_review_initial", "index"}, {"discovery_scope_review_immutable", "trigger"},
@@ -107,6 +107,15 @@ func validateDiscoveryScopeSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if err := conn.Get(&invalid, "SELECT NOT EXISTS(SELECT 1 FROM pragma_table_info('discovery_scope_reviews') WHERE name='created_at' AND upper(type)='DATETIME')"); err != nil {
+		return err
+	}
+	if invalid {
+		return models.ErrSourcePayloadCorrupt
+	}
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM pragma_foreign_key_check('discovery_scope_reviews'))
  OR NOT EXISTS(SELECT 1 FROM pragma_table_info('discovery_scope_reviews') WHERE name='created_at' AND upper(type)='DATETIME')
  OR EXISTS(SELECT 1 FROM discovery_scope_reviews r WHERE r.previous_uuid IS NOT

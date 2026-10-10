@@ -26,7 +26,7 @@ func init() {
 	})
 }
 
-func validatePerformerProfileURLSchema(conn *sqlx.DB) error {
+func validatePerformerProfileURLSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range performerProfileURLObjects {
 		var exists bool
 		if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -37,6 +37,9 @@ func validatePerformerProfileURLSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM performer_profile_url_suppressions s
 LEFT JOIN archive_entities e ON e.uuid=s.performer_uuid WHERE e.uuid IS NULL OR e.kind!='performer')
 OR EXISTS(SELECT 1 FROM account_profile_urls u LEFT JOIN source_accounts a ON a.uuid=u.account_uuid

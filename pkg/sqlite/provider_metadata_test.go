@@ -290,7 +290,7 @@ func TestProviderMetadataRejectsTamperingAndAnonymisesPrivateData(t *testing.T) 
 	require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name='provider_metadata_import_immutable'").Scan(&guard))
 	_, err = raw.Exec("DROP TRIGGER provider_metadata_import_immutable; UPDATE provider_metadata_imports SET remote_id='changed';" + guard)
 	require.NoError(t, err)
-	require.ErrorIs(t, db.Open(db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+	require.ErrorIs(t, db.AuditForTesting(db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 	var remote string
 	require.NoError(t, raw.QueryRow("SELECT remote_id FROM provider_metadata_imports").Scan(&remote))
 	require.Equal(t, "changed", remote)

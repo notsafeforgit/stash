@@ -25,7 +25,7 @@ func init() {
 	})
 }
 
-func validateProviderMetadataSchema(conn *sqlx.DB) error {
+func validateProviderMetadataSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range providerMetadataObjects {
 		var exists bool
 		if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -36,6 +36,9 @@ func validateProviderMetadataSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM provider_metadata_imports p
  LEFT JOIN archive_entities e ON e.uuid=p.entity_uuid
  WHERE e.uuid IS NULL OR e.kind!=p.entity_kind OR e.revision<p.entity_revision)`); err != nil {

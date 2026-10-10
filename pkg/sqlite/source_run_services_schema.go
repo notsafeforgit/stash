@@ -7,7 +7,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateSourceRunServicesSchema(conn *sqlx.DB, origins bool) error {
+func validateSourceRunServicesSchema(conn *sqlx.DB, origins bool, auditData bool) error {
 	names := []string{"source_run_attempt_pacing", "source_run_attempt_pacing_scope",
 		"source_run_attempt_pacing_bind", "source_run_attempt_pacing_current", "source_run_attempt_pacing_transition",
 		"source_run_attempt_failures", "source_run_attempt_failure_current", "source_run_attempt_failure_immutable"}
@@ -29,6 +29,9 @@ func validateSourceRunServicesSchema(conn *sqlx.DB, origins bool) error {
 			"(typeof(p.source_origin)='text' AND p.source_origin=source_origin_v1(p.source_origin) AND source_scope_v1(p.source_origin)=p.scope))"
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_run_attempts a
  JOIN source_run_pacing p ON p.run_uuid=a.run_uuid
  WHERE NOT EXISTS(SELECT 1 FROM source_run_attempt_pacing s

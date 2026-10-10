@@ -9,7 +9,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validatePostConsolidationReviewSchema(conn *sqlx.DB) error {
+func validatePostConsolidationReviewSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"post_consolidation_reviews", "post_consolidation_review_members", "post_consolidation_review_media", "post_consolidation_review_attachments",
 		"post_consolidation_review_immutable", "post_consolidation_review_member_immutable", "post_consolidation_review_media_immutable", "post_consolidation_review_attachment_immutable",
 		"post_consolidation_review_scope", "post_consolidation_review_member_scope", "post_consolidation_review_media_scope", "post_consolidation_review_attachment_scope", "archive_jobs_post_merge_notify", "archive_jobs_work_history"} {
@@ -20,6 +20,9 @@ func validatePostConsolidationReviewSchema(conn *sqlx.DB) error {
 		if !present {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for after := ""; ; {
 		var id string

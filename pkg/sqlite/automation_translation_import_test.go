@@ -466,7 +466,7 @@ func TestAutomationTranslationImportRefusesCorruptReceiptsBeforeWrites(t *testin
 			before, err := os.ReadFile(path)
 			require.NoError(t, err)
 			check := sqlite.NewDatabase()
-			require.Error(t, check.Open(path))
+			require.Error(t, check.AuditForTesting(path))
 			require.NoError(t, check.Close())
 			after, err := os.ReadFile(path)
 			require.NoError(t, err)

@@ -6,7 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateMetadataFileReviewSchema(conn *sqlx.DB) error {
+func validateMetadataFileReviewSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"metadata_file_edit_reviews", "metadata_file_edit_reviews_history", "metadata_file_edit_review_immutable", "metadata_file_edit_review_scope"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -15,6 +15,9 @@ func validateMetadataFileReviewSchema(conn *sqlx.DB) error {
 		if !found {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for after := ""; ; {
 		var id string

@@ -9,7 +9,7 @@ import (
 	"github.com/stashapp/stash/pkg/archive"
 )
 
-func validateTranslationJobSchema(conn *sqlx.DB) error {
+func validateTranslationJobSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"translation_job_targets", "translation_job_targets_job", "translation_targets_request_ready", "archive_jobs_translation_request", "translation_job_target_immutable", "translation_job_target_scope"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -27,6 +27,9 @@ func validateTranslationJobSchema(conn *sqlx.DB) error {
 		return errors.New("native database schema is incomplete: missing translation archive job kind")
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM translation_job_targets b
  LEFT JOIN archive_jobs j ON j.uuid=b.job_uuid LEFT JOIN translation_targets t ON t.uuid=b.target_uuid
  LEFT JOIN translation_target_history h ON h.target_uuid=b.target_uuid AND h.revision=b.target_revision

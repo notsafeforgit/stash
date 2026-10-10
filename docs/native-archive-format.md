@@ -433,7 +433,7 @@ stash --verify-native-snapshot /restore-work/library.sqlite
 
 This command runs before application/configuration initialization and outputs a
 JSON receipt containing the database's SHA-256, byte count, schema version and
-pending file-deletion marker count. It reuses the native startup validators,
+pending file-deletion marker count. It runs native schema checks and the full domain/history audit,
 including the complete release/capture proof checks. It requires this binary's
 exact clean native schema and never upgrades an older snapshot. Missing, foreign,
 dirty, newer or logically inconsistent databases fail with a nonzero exit status.

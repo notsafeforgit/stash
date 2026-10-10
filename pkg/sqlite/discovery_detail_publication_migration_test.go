@@ -93,7 +93,7 @@ func TestDiscoveryDetailPublicationMigrationPreservesPriorEvidence(t *testing.T)
 	}
 }
 
-func TestDiscoveryDetailPublicationCorruptionPreventsOpen(t *testing.T) {
+func TestDiscoveryDetailPublicationCorruptionIsRejectedByAudit(t *testing.T) {
 	for _, change := range []string{
 		"DELETE FROM discovery_published_records",
 		"UPDATE discovery_match_publications SET witness_ordinal=witness_ordinal+1",
@@ -113,7 +113,7 @@ func TestDiscoveryDetailPublicationCorruptionPreventsOpen(t *testing.T) {
 			require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name='discovery_detail_result_immutable'").Scan(&result))
 			_, err := raw.Exec("DROP TRIGGER discovery_match_publication_immutable; DROP TRIGGER discovery_detail_result_immutable; " + change + "; " + publication + "; " + result)
 			require.NoError(t, err)
-			require.ErrorIs(t, f.db.Open(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+			require.ErrorIs(t, f.db.AuditForTesting(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 		})
 	}
 }

@@ -164,7 +164,7 @@ func TestSourceTranslationReplayForgottenScopeAndAtomicFailure(t *testing.T) {
 	require.NoError(t, db.Open(db.DatabasePath()))
 }
 
-func TestSourceTranslationStartupRefusesAlteredResultWithoutWrites(t *testing.T) {
+func TestSourceTranslationAuditRefusesAlteredResultWithoutWrites(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	retainTranslation(t, repo, models.SourceTranslationInput{TranslatedText: "Retained text"})
 	path := db.DatabasePath()
@@ -178,7 +178,7 @@ func TestSourceTranslationStartupRefusesAlteredResultWithoutWrites(t *testing.T)
 	before, err := os.ReadFile(path)
 	require.NoError(t, err)
 	check := sqlite.NewDatabase()
-	require.ErrorIs(t, check.Open(path), models.ErrSourcePayloadCorrupt)
+	require.ErrorIs(t, check.AuditForTesting(path), models.ErrSourcePayloadCorrupt)
 	require.NoError(t, check.Close())
 	after, err := os.ReadFile(filepath.Clean(path))
 	require.NoError(t, err)

@@ -9,7 +9,7 @@ import (
 	"github.com/stashapp/stash/pkg/archive"
 )
 
-func validateSourceFileSchema(conn *sqlx.DB) error {
+func validateSourceFileSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{
 		"source_content_claims", "source_file_observations", "source_file_matches", "source_post_file_evidence",
 		"source_content_claim_reference", "source_content_claim_collection", "source_content_claim_immutable",
@@ -35,6 +35,9 @@ func validateSourceFileSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_content_claims c
  LEFT JOIN source_collection_revisions r ON r.collection_uuid=c.collection_uuid AND r.revision=c.collection_revision
  WHERE r.collection_uuid IS NULL)

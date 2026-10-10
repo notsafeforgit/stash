@@ -33,7 +33,7 @@ func (r translationActivationRecord) decode() (*models.TranslationActivationPlan
 	return plan, nil
 }
 
-func validateTranslationActivationSchema(conn *sqlx.DB) error {
+func validateTranslationActivationSchema(conn *sqlx.DB, auditData bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"translation_activations", "table"}, {"translation_activation_targets", "table"},
 		{"translation_activation_immutable", "trigger"}, {"translation_activation_target_immutable", "trigger"},
@@ -48,6 +48,15 @@ func validateTranslationActivationSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if err := conn.Get(&invalid, "SELECT NOT EXISTS(SELECT 1 FROM pragma_table_info('translation_activations') WHERE name='created_at' AND upper(type)='DATETIME')"); err != nil {
+		return err
+	}
+	if invalid {
+		return models.ErrSourcePayloadCorrupt
+	}
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT NOT EXISTS(SELECT 1 FROM pragma_table_info('translation_activations') WHERE name='created_at' AND upper(type)='DATETIME')
  OR EXISTS(SELECT 1 FROM translation_activations a LEFT JOIN automation_translation_imports i ON i.snapshot_uuid=a.snapshot_uuid
  WHERE (a.snapshot_uuid IS NOT NULL AND (i.state IS NULL OR i.state='running' OR i.manifest_sha256 IS NOT a.manifest_sha256))

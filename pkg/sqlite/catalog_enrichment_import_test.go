@@ -235,7 +235,7 @@ func TestCatalogEnrichmentMigrationPreservesExistingState(t *testing.T) {
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
 }
 
-func TestCatalogEnrichmentStartupRejectsReceiptTampering(t *testing.T) {
+func TestCatalogEnrichmentAuditRejectsReceiptTampering(t *testing.T) {
 	for _, test := range []struct{ name, change, message string }{
 		{"counts", "unresolved_children=0", "invalid catalog enrichment receipt assertion"},
 		{"recording_time", "recorded_at='2020-01-01T00:00:00Z'", "invalid catalog enrichment receipt recording time"},
@@ -252,7 +252,7 @@ func TestCatalogEnrichmentStartupRejectsReceiptTampering(t *testing.T) {
 			require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name='source_enrichment_receipt_immutable'").Scan(&trigger))
 			_, err := raw.Exec("DROP TRIGGER source_enrichment_receipt_immutable; UPDATE source_enrichment_receipts SET " + test.change + "; " + trigger)
 			require.NoError(t, err)
-			require.ErrorContains(t, f.db.Open(path), test.message)
+			require.ErrorContains(t, f.db.AuditForTesting(path), test.message)
 		})
 	}
 }

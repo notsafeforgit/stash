@@ -321,7 +321,7 @@ func TestCatalogMediaImportIncludesArchiveIdentityForZipMembers(t *testing.T) {
 	require.Equal(t, result, advanceMediaImport(t, f, result.ProcessedRecords))
 }
 
-func TestCatalogMediaImportStartupRejectsCorruptReceiptsWithoutWriting(t *testing.T) {
+func TestCatalogMediaImportAuditRejectsCorruptReceiptsWithoutWriting(t *testing.T) {
 	f, binding := mediaImportFixture(t, 1, nil)
 	finishMediaImport(t, f, beginMediaImport(t, f, binding))
 	require.NoError(t, f.db.Close())
@@ -335,7 +335,7 @@ func TestCatalogMediaImportStartupRejectsCorruptReceiptsWithoutWriting(t *testin
 	require.NoError(t, raw.Close())
 	before, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorContains(t, f.db.Open(f.db.DatabasePath()), "invalid catalog media import")
+	require.ErrorContains(t, f.db.AuditForTesting(f.db.DatabasePath()), "invalid catalog media import")
 	after, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

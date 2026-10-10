@@ -28,7 +28,7 @@ func init() {
 	})
 }
 
-func validateFileDeduplicationSchema(conn *sqlx.DB) error {
+func validateFileDeduplicationSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range fileDeduplicationObjects {
 		var exists bool
 		if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -37,6 +37,9 @@ func validateFileDeduplicationSchema(conn *sqlx.DB) error {
 		if !exists {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for after := ""; ; {
 		var id string

@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validatePostMediaBackfillSchema(conn *sqlx.DB, consolidated bool) error {
+func validatePostMediaBackfillSchema(conn *sqlx.DB, consolidated bool, auditData bool) error {
 	for _, name := range []string{"post_media_backfills", "post_media_backfills_post", "post_media_backfill_immutable", "post_media_backfill_scope",
 		"post_media_backfill_decisions", "post_media_backfill_decision_immutable", "post_media_backfill_decision_scope",
 		"post_media_decision_evidence", "post_media_decision_evidence_source", "post_media_decision_evidence_post_file", "post_media_decision_evidence_match",
@@ -34,6 +34,9 @@ JOIN source_post_identities original ON original.canonical_uuid=chosen.canonical
 WHERE chosen.post_uuid=d.post_uuid AND original.post_uuid=e.post_uuid)`
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT
 EXISTS(SELECT 1 FROM post_media_backfills b LEFT JOIN source_posts p ON p.uuid=b.post_uuid
  WHERE p.uuid IS NULL OR b.post_revision>p.revision OR b.selected!=(SELECT count(*) FROM post_media_backfill_decisions d WHERE d.backfill_uuid=b.uuid))

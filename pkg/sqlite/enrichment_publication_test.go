@@ -94,11 +94,12 @@ func TestEnrichmentPublicationCompletesNativeCapturesWithOriginalProvenance(t *t
 	want, err := archive.EnrichmentPublicationResult(*publication)
 	require.NoError(t, err)
 	require.JSONEq(t, string(want), string(status.Result))
-	// Normal reopening validates the complete capture/job association, including
+	// An explicit audit validates the complete capture/job association, including
 	// records whose observing producer differs from the publishing attempt.
 	backup := filepath.Join(t.TempDir(), "published.sqlite")
 	require.NoError(t, f.db.Backup(backup))
 	require.NoError(t, f.db.Close())
+	require.NoError(t, f.db.AuditForTesting(backup))
 	require.NoError(t, f.db.Open(backup))
 	f.repo = f.db.Repository()
 	f.worker.Service = ingest.New(f.repo)
@@ -258,7 +259,7 @@ func TestEnrichmentPublicationConcurrentResponseRecovery(t *testing.T) {
 	require.EqualValues(t, 5, queryUint(t, raw, "SELECT count(*) FROM source_captures"))
 }
 
-func TestEnrichmentPublicationStartupRejectsChangedCaptureLinks(t *testing.T) {
+func TestEnrichmentPublicationAuditRejectsChangedCaptureLinks(t *testing.T) {
 	for _, mutation := range []string{"missing", "relinked"} {
 		t.Run(mutation, func(t *testing.T) {
 			f := newEnrichmentExecutionFixture(t)
@@ -302,7 +303,7 @@ func TestEnrichmentPublicationStartupRejectsChangedCaptureLinks(t *testing.T) {
 			before, err := os.ReadFile(path)
 			require.NoError(t, err)
 			check := sqlite.NewDatabase()
-			require.Error(t, check.Open(path))
+			require.Error(t, check.AuditForTesting(path))
 			require.NoError(t, check.Close())
 			after, err := os.ReadFile(path)
 			require.NoError(t, err)

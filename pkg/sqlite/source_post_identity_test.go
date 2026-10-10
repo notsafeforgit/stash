@@ -399,7 +399,7 @@ INSERT INTO source_post_identifiers(namespace,value,post_uuid) SELECT 'legacy:ca
 	}))
 }
 
-func TestPostIdentityStartupRejectsCorruptRootBeforeWriting(t *testing.T) {
+func TestPostIdentityAuditRejectsCorruptRootBeforeWriting(t *testing.T) {
 	for _, corrupt := range []string{"missing identity", "redirect without receipt", "outdated revision"} {
 		t.Run(corrupt, func(t *testing.T) {
 			db, repo := postIdentityFixture(t)
@@ -434,7 +434,7 @@ func TestPostIdentityStartupRejectsCorruptRootBeforeWriting(t *testing.T) {
 			require.NoError(t, db.Close())
 			before, err := os.ReadFile(db.DatabasePath())
 			require.NoError(t, err)
-			require.ErrorContains(t, db.Open(db.DatabasePath()), "post identity differs")
+			require.ErrorContains(t, db.AuditForTesting(db.DatabasePath()), "post identity differs")
 			after, err := os.ReadFile(db.DatabasePath())
 			require.NoError(t, err)
 			require.Equal(t, before, after)

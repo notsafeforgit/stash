@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateCatalogMembershipSchema(conn *sqlx.DB) error {
+func validateCatalogMembershipSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{
 		"source_collection_post_evidence", "source_collection_post_evidence_post", "source_collection_post_evidence_collection",
 		"source_collection_post_evidence_immutable", "source_collection_post_evidence_active_post", "source_collection_post_evidence_revision",
@@ -30,6 +30,9 @@ func validateCatalogMembershipSchema(conn *sqlx.DB) error {
 		return errors.New("native database schema is incomplete: invalid source_collection_post_evidence.observed_at")
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_collection_post_evidence e
  LEFT JOIN source_posts p ON p.uuid=e.post_uuid
  LEFT JOIN source_collection_revisions c ON c.collection_uuid=e.collection_uuid AND c.revision=e.collection_revision

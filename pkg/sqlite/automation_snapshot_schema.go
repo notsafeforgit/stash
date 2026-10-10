@@ -14,7 +14,7 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 )
 
-func validateAutomationSnapshotSchema(conn *sqlx.DB) error {
+func validateAutomationSnapshotSchema(conn *sqlx.DB, auditData bool) error {
 	objects := map[string]string{
 		"automation_snapshots": "table", "automation_snapshot_tables": "table",
 		"automation_snapshot_chunks": "table", "automation_snapshot_records": "table",
@@ -33,6 +33,9 @@ func validateAutomationSnapshotSchema(conn *sqlx.DB) error {
 	}
 	// The lineage connection is already read-only. One read transaction permits
 	// nested bounded queries without borrowing its single connection again.
+	if !auditData {
+		return nil
+	}
 	tx, err := conn.Beginx()
 	if err != nil {
 		return err

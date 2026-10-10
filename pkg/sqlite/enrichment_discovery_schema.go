@@ -12,7 +12,7 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 )
 
-func validateEnrichmentDiscoverySchema(conn *sqlx.DB) error {
+func validateEnrichmentDiscoverySchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"automation_discovery_lookup", "enrichment_discovery_resolutions", "enrichment_discovery_resolution_immutable"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -21,6 +21,9 @@ func validateEnrichmentDiscoverySchema(conn *sqlx.DB) error {
 		if !found {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for after := ""; ; {
 		var row models.EnrichmentDiscoveryResolution

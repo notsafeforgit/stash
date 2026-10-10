@@ -42,6 +42,9 @@ func validateMetadataFieldSchema(conn *sqlx.DB) error {
 	return nil
 }
 
+const unfinishedMetadataCollectionsQuery = `SELECT EXISTS(SELECT 1 FROM metadata_field_pending)
+OR EXISTS(SELECT 1 FROM metadata_field_decisions INDEXED BY metadata_field_decisions_unsealed WHERE sealed=0)`
+
 func validateMetadataCollectionSchema(conn *sqlx.DB) error {
 	var names []string
 	if err := conn.Select(&names, "SELECT name FROM sqlite_schema WHERE name LIKE 'metadata_%'"); err != nil {
@@ -75,8 +78,7 @@ func validateMetadataCollectionSchema(conn *sqlx.DB) error {
 		}
 	}
 	var unfinished bool
-	if err := conn.Get(&unfinished, `SELECT EXISTS(SELECT 1 FROM metadata_field_pending)
-OR EXISTS(SELECT 1 FROM metadata_field_decisions WHERE sealed=0)`); err != nil {
+	if err := conn.Get(&unfinished, unfinishedMetadataCollectionsQuery); err != nil {
 		return err
 	}
 	if unfinished {

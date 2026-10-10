@@ -272,7 +272,7 @@ func TestTranslationPolicyRejectsStaleInvalidAndUnboundWork(t *testing.T) {
 	}), models.ErrTranslationPolicyInvalid)
 }
 
-func TestTranslationPolicyStartupRejectsCorruptDecisionsWithoutWrites(t *testing.T) {
+func TestTranslationPolicyAuditRejectsCorruptDecisionsWithoutWrites(t *testing.T) {
 	for _, item := range []struct{ trigger, mutation string }{
 		{"translation_policy_revision_immutable", "UPDATE translation_policy_revisions SET definition=json_set(definition,'$.target_language','fr')"},
 		{"capture_translation_entry_immutable", "UPDATE capture_translation_entries SET field='caption' WHERE field='title'"},
@@ -299,7 +299,7 @@ func TestTranslationPolicyStartupRejectsCorruptDecisionsWithoutWrites(t *testing
 			before, err := os.ReadFile(path)
 			require.NoError(t, err)
 			check := sqlite.NewDatabase()
-			require.Error(t, check.Open(path))
+			require.Error(t, check.AuditForTesting(path))
 			require.NoError(t, check.Close())
 			after, err := os.ReadFile(path)
 			require.NoError(t, err)

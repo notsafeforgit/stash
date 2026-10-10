@@ -42,7 +42,7 @@ const catalogPublisherValidationQuery = `SELECT EXISTS(SELECT 1 FROM catalog_pub
  OR (r.outcome='preserved' AND (d.state NOT IN ('linked','unlinked') OR d.state IS NULL
   OR json_extract(r.context_json,'$.current_decision_uuid') IS NOT r.decision_uuid)))`
 
-func validateCatalogPublisherSchema(conn *sqlx.DB) error {
+func validateCatalogPublisherSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"catalog_publisher_imports", "catalog_publisher_records", "catalog_evidence_publisher_candidates", "catalog_publisher_import_guard", "catalog_publisher_record_immutable", "catalog_publisher_review"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -53,6 +53,9 @@ func validateCatalogPublisherSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, catalogPublisherValidationQuery); err != nil {
 		return err
 	}

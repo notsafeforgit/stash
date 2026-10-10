@@ -20,9 +20,15 @@ const (
 	lastCompatibleSchema uint = 86
 )
 
-// validateDatabaseLineage runs before opening a writable migration connection.
-// A matching version number alone is never sufficient to identify our schema.
+// validateDatabaseLineage includes the full domain/history audit used before
+// migrations and during explicit snapshot verification.
 func validateDatabaseLineage(path string) error {
+	return validateNativeDatabase(path, true)
+}
+
+// Routine opens check lineage, schema objects and unfinished write contexts.
+// Auditing all retained rows is a separate migration/verification operation.
+func validateNativeDatabase(path string, auditData bool) error {
 	_, err := os.Stat(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -41,7 +47,10 @@ func validateDatabaseLineage(path string) error {
 	}
 	defer conn.Close()
 	conn.SetMaxOpenConns(1)
+	return validateNativeConnection(conn, auditData)
+}
 
+func validateNativeConnection(conn *sqlx.DB, auditData bool) error {
 	var tables []string
 	if err := conn.Select(&tables, "SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"); err != nil {
 		return fmt.Errorf("reading database identity: %w", err)
@@ -104,7 +113,7 @@ func validateDatabaseLineage(path string) error {
 			}
 		}
 		if version >= NativeSchemaBaseline+104 {
-			if err := validateWorkerPolicySchema(conn); err != nil {
+			if err := validateWorkerPolicySchema(conn, auditData); err != nil {
 				return err
 			}
 		}
@@ -148,13 +157,15 @@ func validateDatabaseLineage(path string) error {
 			if !present["performer_names"] {
 				return errors.New("native database schema is incomplete: missing performer_names")
 			}
-			var missingPrimary bool
-			if err := conn.Get(&missingPrimary, `SELECT EXISTS(SELECT 1 FROM performers
+			if auditData {
+				var missingPrimary bool
+				if err := conn.Get(&missingPrimary, `SELECT EXISTS(SELECT 1 FROM performers
 WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.id AND position = 0))`); err != nil {
-				return err
-			}
-			if missingPrimary {
-				return errors.New("native database schema is incomplete: performer has no canonical name")
+					return err
+				}
+				if missingPrimary {
+					return errors.New("native database schema is incomplete: performer has no canonical name")
+				}
 			}
 		}
 		if version >= NativeSchemaBaseline+3 {
@@ -364,17 +375,17 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+14 {
-			if err := validateAccountConsolidationSchema(conn); err != nil {
+			if err := validateAccountConsolidationSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+15 {
-			if err := validateSourceCollectionSchema(conn); err != nil {
+			if err := validateSourceCollectionSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+16 {
-			if err := validateCapturePublisherSchema(conn); err != nil {
+			if err := validateCapturePublisherSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
@@ -394,12 +405,12 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+108 {
-			if err := validateGalleryCoverSchema(conn); err != nil {
+			if err := validateGalleryCoverSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+109 {
-			if err := validateMediaConversionSchema(conn); err != nil {
+			if err := validateMediaConversionSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
@@ -419,12 +430,12 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+22 {
-			if err := validateMetadataPolicySchema(conn); err != nil {
+			if err := validateMetadataPolicySchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+23 {
-			if err := validateSourceRunSchema(conn, version); err != nil {
+			if err := validateSourceRunSchema(conn, version, auditData); err != nil {
 				return err
 			}
 		}
@@ -434,261 +445,261 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+25 {
-			if err := validateSourceBackfillSchema(conn); err != nil {
+			if err := validateSourceBackfillSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+26 {
-			if err := validateScanJournalSchema(conn); err != nil {
+			if err := validateScanJournalSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+27 {
-			if err := validateScanActivationSchema(conn); err != nil {
+			if err := validateScanActivationSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+28 {
-			if err := validateCatalogIdentitySchema(conn); err != nil {
+			if err := validateCatalogIdentitySchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+29 {
-			if err := validateCatalogRegistrySchema(conn); err != nil {
+			if err := validateCatalogRegistrySchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+30 {
-			if err := validateCatalogSnapshotSchema(conn); err != nil {
+			if err := validateCatalogSnapshotSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+31 {
-			if err := validateCatalogEvidenceSchema(conn); err != nil {
+			if err := validateCatalogEvidenceSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+32 {
-			if err := validateSourcePostLinksSchema(conn); err != nil {
+			if err := validateSourcePostLinksSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+33 {
-			if err := validateCatalogRelationsSchema(conn); err != nil {
+			if err := validateCatalogRelationsSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+34 {
-			if err := validateCatalogPublisherSchema(conn); err != nil {
+			if err := validateCatalogPublisherSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+35 {
-			if err := validateCatalogAttachmentSchema(conn); err != nil {
+			if err := validateCatalogAttachmentSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+36 {
-			if err := validatePostMediaEvidenceSchema(conn); err != nil {
+			if err := validatePostMediaEvidenceSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+37 {
-			if err := validateSourceFileSchema(conn); err != nil {
+			if err := validateSourceFileSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+39 {
-			if err := validateCatalogMembershipSchema(conn); err != nil {
+			if err := validateCatalogMembershipSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+38 {
-			if err := validateCatalogMediaSchema(conn); err != nil {
+			if err := validateCatalogMediaSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+40 {
-			if err := validateAlbumJobSchema(conn, version); err != nil {
+			if err := validateAlbumJobSchema(conn, version, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+41 {
-			if err := validateSourceDocumentSchema(conn); err != nil {
+			if err := validateSourceDocumentSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+42 {
-			if err := validateCatalogDocumentSchema(conn); err != nil {
+			if err := validateCatalogDocumentSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+43 {
-			if err := validateSourceTranslationSchema(conn); err != nil {
+			if err := validateSourceTranslationSchema(conn, auditData); err != nil {
 				return err
 			}
-			if err := validateCatalogTranslationSchema(conn); err != nil {
+			if err := validateCatalogTranslationSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+44 {
-			if err := validateTranslationWorkSchema(conn, version >= NativeSchemaBaseline+47); err != nil {
+			if err := validateTranslationWorkSchema(conn, version >= NativeSchemaBaseline+47, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+45 {
-			if err := validateTranslationJobSchema(conn); err != nil {
+			if err := validateTranslationJobSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+46 {
-			if err := validateAutomationSnapshotSchema(conn); err != nil {
+			if err := validateAutomationSnapshotSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+47 {
-			if err := validateAutomationTranslationSchema(conn); err != nil {
+			if err := validateAutomationTranslationSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+48 {
-			if err := validateTranslationActivationSchema(conn); err != nil {
+			if err := validateTranslationActivationSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+49 {
-			if err := validateTranslationPolicySchema(conn); err != nil {
+			if err := validateTranslationPolicySchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+50 {
-			if err := validateEnrichmentWorkSchema(conn, version >= NativeSchemaBaseline+58, version >= NativeSchemaBaseline+65); err != nil {
+			if err := validateEnrichmentWorkSchema(conn, version >= NativeSchemaBaseline+58, version >= NativeSchemaBaseline+65, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+51 {
 			if version >= NativeSchemaBaseline+53 {
-				if err := validateEnrichmentReleaseSchema(conn); err != nil {
+				if err := validateEnrichmentReleaseSchema(conn, auditData); err != nil {
 					return err
 				}
 			}
-			if err := validateEnrichmentJobSchema(conn, version >= NativeSchemaBaseline+53, version >= NativeSchemaBaseline+65); err != nil {
+			if err := validateEnrichmentJobSchema(conn, version >= NativeSchemaBaseline+53, version >= NativeSchemaBaseline+65, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+52 {
-			if err := validateEnrichmentPublicationSchema(conn, version >= NativeSchemaBaseline+53); err != nil {
+			if err := validateEnrichmentPublicationSchema(conn, version >= NativeSchemaBaseline+53, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+54 {
-			if err := validateSourcePacingSchema(conn); err != nil {
+			if err := validateSourcePacingSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+55 {
-			if err := validateSourceRunServicesSchema(conn, version >= NativeSchemaBaseline+99); err != nil {
+			if err := validateSourceRunServicesSchema(conn, version >= NativeSchemaBaseline+99, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+56 {
-			if err := validateSourceFairnessSchema(conn, version >= NativeSchemaBaseline+65, version >= NativeSchemaBaseline+76); err != nil {
+			if err := validateSourceFairnessSchema(conn, version >= NativeSchemaBaseline+65, version >= NativeSchemaBaseline+76, auditData); err != nil {
 				return err
 			}
 		}
 
 		if version >= NativeSchemaBaseline+57 {
-			if err := validateCatalogEnrichmentSchema(conn); err != nil {
+			if err := validateCatalogEnrichmentSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+58 {
-			if err := validateAutomationEnrichmentSchema(conn); err != nil {
+			if err := validateAutomationEnrichmentSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+59 {
-			if err := validateEnrichmentActivationSchema(conn); err != nil {
+			if err := validateEnrichmentActivationSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+60 {
-			if err := validateAutomationCheckpointSchema(conn); err != nil {
+			if err := validateAutomationCheckpointSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+61 {
-			if err := validateSourceCaptureTimeSchema(conn); err != nil {
+			if err := validateSourceCaptureTimeSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+62 {
-			if err := validateCheckpointEvidenceSchema(conn); err != nil {
+			if err := validateCheckpointEvidenceSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+63 {
-			if err := validateSourceCaptureContextSchema(conn); err != nil {
+			if err := validateSourceCaptureContextSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+64 {
-			if err := validateCheckpointHandoffSchema(conn); err != nil {
+			if err := validateCheckpointHandoffSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+65 {
-			if err := validateEnrichmentHandoffSchema(conn); err != nil {
+			if err := validateEnrichmentHandoffSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+66 {
-			if err := validateSourceFileHistorySchema(conn); err != nil {
+			if err := validateSourceFileHistorySchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+67 {
-			if err := validateMetadataFileReviewSchema(conn); err != nil {
+			if err := validateMetadataFileReviewSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+68 {
-			if err := validateAccountReviewSchema(conn); err != nil {
+			if err := validateAccountReviewSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+88 {
-			if err := validatePostIdentitySchema(conn); err != nil {
+			if err := validatePostIdentitySchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+89 {
-			if err := validatePostSelectionProvenanceSchema(conn); err != nil {
+			if err := validatePostSelectionProvenanceSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+92 {
-			if err := validatePostConsolidationReviewSchema(conn); err != nil {
+			if err := validatePostConsolidationReviewSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+94 {
-			if err := validateMetadataFileKeepSchema(conn); err != nil {
+			if err := validateMetadataFileKeepSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+95 {
-			if err := validateFileDeduplicationSchema(conn); err != nil {
+			if err := validateFileDeduplicationSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+96 {
-			if err := validateProviderMetadataSchema(conn); err != nil {
+			if err := validateProviderMetadataSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+97 {
-			if err := validatePerformerProfileURLSchema(conn); err != nil {
+			if err := validatePerformerProfileURLSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
@@ -698,63 +709,63 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+87 {
-			if err := validateAttachmentDownloadSchema(conn); err != nil {
+			if err := validateAttachmentDownloadSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+86 {
-			if err := validateSourceAssociationReviewSchema(conn); err != nil {
+			if err := validateSourceAssociationReviewSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+85 {
-			if err := validateAttachmentSelectionReviewSchema(conn); err != nil {
+			if err := validateAttachmentSelectionReviewSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+69 {
-			if err := validateAutomationDiscoverySchema(conn); err != nil {
+			if err := validateAutomationDiscoverySchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+70 {
-			if err := validateEnrichmentDiscoverySchema(conn); err != nil {
+			if err := validateEnrichmentDiscoverySchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+71 {
 			if version >= NativeSchemaBaseline+84 {
-				if err := validateDiscoveryScopeSchema(conn); err != nil {
+				if err := validateDiscoveryScopeSchema(conn, auditData); err != nil {
 					return fmt.Errorf("invalid discovery collection bindings: %w", err)
 				}
 			}
-			if err := validateDiscoveryJobSchema(conn); err != nil {
+			if err := validateDiscoveryJobSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+72 {
-			if err := validateDiscoveryMatchSchema(conn); err != nil {
+			if err := validateDiscoveryMatchSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+73 {
-			if err := validateDiscoveryActivationSchema(conn); err != nil {
+			if err := validateDiscoveryActivationSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+74 {
-			if err := validateDiscoveryPublicationSchema(conn, version >= NativeSchemaBaseline+77); err != nil {
+			if err := validateDiscoveryPublicationSchema(conn, version >= NativeSchemaBaseline+77, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+75 {
-			if err := validateDiscoveryRecoverySchema(conn); err != nil {
+			if err := validateDiscoveryRecoverySchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 
 		if version >= NativeSchemaBaseline+76 {
-			if err := validateDiscoveryDetailSchema(conn); err != nil {
+			if err := validateDiscoveryDetailSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
@@ -764,27 +775,27 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+80 {
-			if err := validateCatalogCleanupSchema(conn); err != nil {
+			if err := validateCatalogCleanupSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+81 {
-			if err := validatePostMediaDecisionSchema(conn, version >= NativeSchemaBaseline+90); err != nil {
+			if err := validatePostMediaDecisionSchema(conn, version >= NativeSchemaBaseline+90, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+82 {
-			if err := validatePostMediaBackfillSchema(conn, version >= NativeSchemaBaseline+91); err != nil {
+			if err := validatePostMediaBackfillSchema(conn, version >= NativeSchemaBaseline+91, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+83 {
-			if err := validateEnrichmentRebindSchema(conn); err != nil {
+			if err := validateEnrichmentRebindSchema(conn, auditData); err != nil {
 				return fmt.Errorf("invalid enrichment collection rebindings: %w", err)
 			}
 		}
 		if version >= NativeSchemaBaseline+78 {
-			if err := validateMetadataPolicyImportSchema(conn); err != nil {
+			if err := validateMetadataPolicyImportSchema(conn, auditData); err != nil {
 				return err
 			}
 		}

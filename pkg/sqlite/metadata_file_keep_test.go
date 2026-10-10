@@ -192,7 +192,7 @@ func TestMetadataFileKeepRejectsCorruptReceiptBeforeWrites(t *testing.T) {
 	require.NoError(t, err)
 	before, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorIs(t, f.db.Open(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+	require.ErrorIs(t, f.db.AuditForTesting(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 	after, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

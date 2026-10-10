@@ -344,7 +344,7 @@ func TestEnrichmentJobsCredentialRotationAndHistoricalRootScope(t *testing.T) {
 	require.NoError(t, err, "historical acknowledgement retains its original root scope")
 }
 
-func TestEnrichmentJobsStartupRejectsAlteredCheckpointEvidence(t *testing.T) {
+func TestEnrichmentJobsAuditRejectsAlteredCheckpointEvidence(t *testing.T) {
 	for _, item := range []struct{ name, trigger, mutation string }{
 		{"missing_provenance", "", "DELETE FROM enrichment_checkpoint_records WHERE ordinal=1"},
 		{"storage_accounting", "", "UPDATE enrichment_checkpoint_usage SET byte_size=0"},
@@ -376,7 +376,7 @@ func TestEnrichmentJobsStartupRejectsAlteredCheckpointEvidence(t *testing.T) {
 			before, err := os.ReadFile(path)
 			require.NoError(t, err)
 			check := sqlite.NewDatabase()
-			require.Error(t, check.Open(path))
+			require.Error(t, check.AuditForTesting(path))
 			require.NoError(t, check.Close())
 			after, err := os.ReadFile(path)
 			require.NoError(t, err)

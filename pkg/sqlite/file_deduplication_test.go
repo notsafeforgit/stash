@@ -373,7 +373,7 @@ func TestFileDeduplicationRejectsInvalidPaths(t *testing.T) {
 	require.FileExists(t, filepath.Join(f.root.Binding.Path, f.input.RemovePath))
 }
 
-func TestFileDeduplicationStartupRejectsChangedReceiptWithoutWrites(t *testing.T) {
+func TestFileDeduplicationAuditRejectsChangedReceiptWithoutWrites(t *testing.T) {
 	f := newDeduplicationFixture(t, false)
 	_, err := f.service.Apply(t.Context(), f.request(t))
 	require.NoError(t, err)
@@ -386,7 +386,7 @@ func TestFileDeduplicationStartupRejectsChangedReceiptWithoutWrites(t *testing.T
 	require.NoError(t, raw.Close())
 	before, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorIs(t, f.db.Open(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+	require.ErrorIs(t, f.db.AuditForTesting(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 	after, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, sha256.Sum256(before), sha256.Sum256(after))

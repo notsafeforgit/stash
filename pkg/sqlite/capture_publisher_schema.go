@@ -8,7 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateCapturePublisherSchema(conn *sqlx.DB) error {
+func validateCapturePublisherSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"source_account_identifiers_canonical_kind", "capture_publisher_decisions", "capture_publisher_decisions_account", "capture_publisher_heads",
 		"capture_publisher_decision_scope", "capture_publisher_decision_publish", "capture_publisher_decision_immutable", "capture_publisher_head_scope", "capture_publisher_head_forward",
 		"capture_publisher_claims", "capture_publisher_claims_identifier", "capture_publisher_claim_scope", "capture_publisher_claim_immutable", "capture_publisher_write_context"} {
@@ -26,6 +26,9 @@ func validateCapturePublisherSchema(conn *sqlx.DB) error {
 	}
 	if unfinished {
 		return errors.New("native database has an unfinished capture publisher write")
+	}
+	if !auditData {
+		return nil
 	}
 	if err := conn.Get(&unfinished, `SELECT EXISTS(SELECT 1 FROM capture_publisher_decisions d
 LEFT JOIN capture_publisher_heads h ON h.capture_uuid=d.capture_uuid

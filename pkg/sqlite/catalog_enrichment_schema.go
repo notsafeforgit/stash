@@ -11,7 +11,7 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 )
 
-func validateCatalogEnrichmentSchema(conn *sqlx.DB) error {
+func validateCatalogEnrichmentSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"source_enrichment_receipts", "source_enrichment_receipts_post", "source_enrichment_receipts_collection",
 		"source_enrichment_receipt_immutable", "source_enrichment_receipt_scope", "catalog_enrichment_imports", "catalog_enrichment_records",
 		"catalog_enrichment_import_guard", "catalog_enrichment_record_immutable", "catalog_enrichment_review", "catalog_enrichment_receipt_sources"} {
@@ -24,6 +24,9 @@ func validateCatalogEnrichmentSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM catalog_enrichment_imports i
  LEFT JOIN catalog_snapshots s ON s.uuid=i.snapshot_uuid LEFT JOIN catalog_evidence_imports e ON e.snapshot_uuid=i.snapshot_uuid
  LEFT JOIN source_collection_revisions c ON c.collection_uuid=i.collection_uuid AND c.revision=i.collection_revision

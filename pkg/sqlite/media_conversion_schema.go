@@ -6,7 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateMediaConversionSchema(conn *sqlx.DB) error {
+func validateMediaConversionSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"media_conversions", "media_conversion_scope", "media_conversion_immutable", "media_conversion_retained"} {
 		var exists bool
 		if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -17,6 +17,9 @@ func validateMediaConversionSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM media_conversions c
  LEFT JOIN archive_entities i ON i.uuid=c.image_uuid LEFT JOIN archive_entities s ON s.uuid=c.scene_uuid
  LEFT JOIN archive_entities old ON old.uuid=c.original_file_uuid LEFT JOIN archive_entities new ON new.uuid=c.file_uuid

@@ -301,7 +301,7 @@ func TestCatalogAttachmentImportRollbackBindingsAndAnonymisation(t *testing.T) {
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM catalog_attachment_records"))
 }
 
-func TestCatalogAttachmentImportRequiresEvidenceAndValidStartupReceipts(t *testing.T) {
+func TestCatalogAttachmentImportRequiresEvidenceAndValidAuditReceipts(t *testing.T) {
 	f := receivedEvidenceFixture(t)
 	require.ErrorIs(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		_, err := f.repo.CatalogAttachmentImport.Advance(ctx, f.manifest.UUID, f.sha, 0, catalogImportNow)
@@ -320,5 +320,5 @@ func TestCatalogAttachmentImportRequiresEvidenceAndValidStartupReceipts(t *testi
 	require.NoError(t, err)
 	require.NoError(t, raw.Close())
 	require.NoError(t, f.db.Close())
-	require.ErrorContains(t, f.db.Open(f.db.DatabasePath()), "incomplete catalog attachment import")
+	require.ErrorContains(t, f.db.AuditForTesting(f.db.DatabasePath()), "incomplete catalog attachment import")
 }

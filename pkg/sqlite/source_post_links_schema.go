@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateSourcePostLinksSchema(conn *sqlx.DB) error {
+func validateSourcePostLinksSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{
 		"source_post_urls", "source_post_url_evidence", "source_post_identifier_evidence", "source_post_account_claims",
 		"source_post_urls_page", "source_post_urls_lookup", "source_post_url_evidence_page",
@@ -38,6 +38,9 @@ func validateSourcePostLinksSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT
  EXISTS(SELECT 1 FROM source_post_urls u LEFT JOIN source_posts p ON p.uuid=u.post_uuid WHERE p.uuid IS NULL
  OR NOT EXISTS(SELECT 1 FROM source_post_url_evidence e WHERE e.url_uuid=u.uuid))

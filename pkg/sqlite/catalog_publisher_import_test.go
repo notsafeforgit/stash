@@ -282,7 +282,7 @@ func TestCatalogPublisherImportRequiresRelations(t *testing.T) {
 	}), models.ErrCatalogSnapshotConflict)
 }
 
-func TestCatalogPublisherImportStartupRejectsChangedDecisionContext(t *testing.T) {
+func TestCatalogPublisherImportAuditRejectsChangedDecisionContext(t *testing.T) {
 	f := publisherImportFixture(t, "")
 	advancePublishers(t, f, 0)
 	raw := openRawDB(t, f.db.DatabasePath())
@@ -296,5 +296,5 @@ func TestCatalogPublisherImportStartupRejectsChangedDecisionContext(t *testing.T
 	require.NoError(t, err)
 	require.NoError(t, raw.Close())
 	require.NoError(t, f.db.Close())
-	require.ErrorContains(t, f.db.Open(f.db.DatabasePath()), "incomplete catalog publisher import")
+	require.ErrorContains(t, f.db.AuditForTesting(f.db.DatabasePath()), "incomplete catalog publisher import")
 }

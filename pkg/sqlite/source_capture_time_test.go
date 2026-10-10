@@ -160,7 +160,7 @@ func TestCaptureRecordingTimePublisherReviewDoesNotInventIdentifierObservation(t
 	require.NoError(t, db.Open(db.DatabasePath()))
 }
 
-func TestCaptureRecordingTimeStartupRejectsAlteredRecordingWithoutWriting(t *testing.T) {
+func TestCaptureRecordingTimeAuditRejectsAlteredRecordingWithoutWriting(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:twitter", Value: uuid.NewString()}, "")
 	input := sourceTestCapture(t, post.UUID, 1, "Profile")
@@ -176,7 +176,7 @@ func TestCaptureRecordingTimeStartupRejectsAlteredRecordingWithoutWriting(t *tes
 	require.NoError(t, raw.Close())
 	before, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
-	require.Error(t, db.Open(db.DatabasePath()))
+	require.Error(t, db.AuditForTesting(db.DatabasePath()))
 	after, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

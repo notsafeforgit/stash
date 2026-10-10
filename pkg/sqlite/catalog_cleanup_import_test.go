@@ -272,7 +272,7 @@ func TestCatalogCleanupMigrationPreservesExistingState(t *testing.T) {
 	}
 }
 
-func TestCatalogCleanupStartupRejectsChangedIntent(t *testing.T) {
+func TestCatalogCleanupAuditRejectsChangedIntent(t *testing.T) {
 	for _, change := range []string{"reference_value='reddit:post:other'", "requested_at='2020-01-01T00:00:00Z'", "recorded_at='2020-01-01T00:00:00Z'"} {
 		t.Run(change, func(t *testing.T) {
 			f := cleanupImportFixture(t, 1, nil)
@@ -286,7 +286,7 @@ func TestCatalogCleanupStartupRejectsChangedIntent(t *testing.T) {
 			_, err := raw.Exec("DROP TRIGGER source_cleanup_intent_immutable; UPDATE source_cleanup_intents SET " + change + "; " + trigger)
 			require.NoError(t, err)
 			before := albumJobRows(t, raw, "source_cleanup_intents")
-			require.Error(t, f.db.Open(path))
+			require.Error(t, f.db.AuditForTesting(path))
 			require.Equal(t, before, albumJobRows(t, raw, "source_cleanup_intents"))
 		})
 	}

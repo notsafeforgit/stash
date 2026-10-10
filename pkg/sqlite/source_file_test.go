@@ -380,7 +380,7 @@ func TestSourcePostFileEvidenceRetainsUnavailableMediaAndRetirement(t *testing.T
 	}))
 }
 
-func TestSourceFileStartupRejectsInvalidLocationsBeforeWriting(t *testing.T) {
+func TestSourceFileAuditRejectsInvalidLocationsBeforeWriting(t *testing.T) {
 	f := newSourceFileFixture(t)
 	recordContentClaim(t, f.repo, f.claim)
 	recordFileObservation(t, f.repo, f.observation)
@@ -395,7 +395,7 @@ func TestSourceFileStartupRejectsInvalidLocationsBeforeWriting(t *testing.T) {
 	require.NoError(t, err)
 	before, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorContains(t, f.db.Open(f.db.DatabasePath()), "invalid source file observation paths")
+	require.ErrorContains(t, f.db.AuditForTesting(f.db.DatabasePath()), "invalid source file observation paths")
 	after, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

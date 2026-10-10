@@ -217,7 +217,7 @@ func TestCaptureContextFailureCannotCommitHalfCapture(t *testing.T) {
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM source_capture_contexts"))
 }
 
-func TestCaptureContextStartupRejectsDeletedOrReboundContextWithoutWriting(t *testing.T) {
+func TestCaptureContextAuditRejectsDeletedOrReboundContextWithoutWriting(t *testing.T) {
 	for _, rebind := range []bool{false, true} {
 		name := "deleted"
 		if rebind {
@@ -247,7 +247,7 @@ func TestCaptureContextStartupRejectsDeletedOrReboundContextWithoutWriting(t *te
 			}
 			before := albumJobRows(t, raw, "source_captures")
 			links := albumJobRows(t, raw, "source_capture_contexts")
-			require.ErrorIs(t, db.Open(db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+			require.ErrorIs(t, db.AuditForTesting(db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 			require.Equal(t, before, albumJobRows(t, raw, "source_captures"))
 			require.Equal(t, links, albumJobRows(t, raw, "source_capture_contexts"))
 		})

@@ -296,7 +296,7 @@ func TestSourceDocumentScopeReplayForgottenAndAtomicFailure(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestSourceDocumentStartupRejectsMissingIndexAndCorruptedBytes(t *testing.T) {
+func TestSourceDocumentValidationRejectsMissingIndexAndCorruptedBytes(t *testing.T) {
 	for _, corruption := range []string{"index", "content", "interpretation"} {
 		t.Run(corruption, func(t *testing.T) {
 			db, repo, _, _, input := documentFixture(t)
@@ -326,7 +326,11 @@ func TestSourceDocumentStartupRejectsMissingIndexAndCorruptedBytes(t *testing.T)
 			require.NoError(t, raw.Close())
 			before, err := os.ReadFile(path)
 			require.NoError(t, err)
-			require.Error(t, db.Open(path))
+			if corruption == "index" {
+				require.Error(t, db.Open(path))
+			} else {
+				require.Error(t, db.AuditForTesting(path))
+			}
 			after, err := os.ReadFile(path)
 			require.NoError(t, err)
 			require.Equal(t, before, after)

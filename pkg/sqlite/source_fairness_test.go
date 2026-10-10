@@ -171,7 +171,7 @@ func TestSourceFairnessBlockedClaimStillChecksAuthorizationAtCommit(t *testing.T
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM source_enrichment_waiters"), "rejected claims cannot retain scheduling interest")
 }
 
-func TestSourceFairnessStartupChecksRetainedWaiterScopes(t *testing.T) {
+func TestSourceFairnessAuditChecksRetainedWaiterScopes(t *testing.T) {
 	f := newEnrichmentExecutionFixture(t)
 	job := f.admit(t)
 	newPacingDownload(t, f, "https://reddit.com/user/download")
@@ -184,7 +184,7 @@ func TestSourceFairnessStartupChecksRetainedWaiterScopes(t *testing.T) {
 	defer raw.Close()
 	_, err := raw.Exec("DELETE FROM source_enrichment_waiter_scopes WHERE job_uuid=?", job.UUID)
 	require.NoError(t, err)
-	require.ErrorIs(t, f.db.Open(path), models.ErrSourcePayloadCorrupt)
+	require.ErrorIs(t, f.db.AuditForTesting(path), models.ErrSourcePayloadCorrupt)
 }
 
 func TestSourceFairnessCoolingChildDoesNotReserveItsParent(t *testing.T) {

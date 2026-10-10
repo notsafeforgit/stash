@@ -11,7 +11,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateTranslationPolicySchema(conn *sqlx.DB) error {
+func validateTranslationPolicySchema(conn *sqlx.DB, auditData bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"translation_policies", "table"}, {"translation_policy_revisions", "table"},
 		{"capture_translation_decisions", "table"}, {"capture_translation_entries", "table"},
@@ -29,6 +29,9 @@ func validateTranslationPolicySchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT
  EXISTS(SELECT 1 FROM translation_policies p WHERE p.revision!=(SELECT count(*) FROM translation_policy_revisions r WHERE r.collection_uuid=p.collection_uuid))
  OR EXISTS(SELECT 1 FROM translation_policy_revisions r LEFT JOIN translation_policies p ON p.collection_uuid=r.collection_uuid

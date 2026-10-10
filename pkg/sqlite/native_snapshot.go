@@ -165,8 +165,8 @@ func VerifyNativeSnapshot(ctx context.Context, path string) (*NativeSnapshotRepo
 	if foreignKeys {
 		return nil, errors.New("native snapshot has broken foreign keys")
 	}
-	// This is the same full domain/receipt/provenance validation used before a
-	// normal native open, without its writable connection or recovery effects.
+	// Explicit verification audits full domain/receipt/provenance history in
+	// addition to the structural checks used by a routine native open.
 	if err := validateDatabaseLineage(abs); err != nil {
 		return nil, err
 	}

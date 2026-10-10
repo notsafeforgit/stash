@@ -204,7 +204,7 @@ func TestCheckpointHandoffCaughtLateErrorCannotCommitPartialReview(t *testing.T)
 	require.EqualValues(t, 2, queryUint(t, raw, "SELECT count(*) FROM checkpoint_evidence_captures"))
 }
 
-func TestCheckpointHandoffCorruptSeedRefusesStartupWithoutWrites(t *testing.T) {
+func TestCheckpointHandoffCorruptSeedRefusesAuditWithoutWrites(t *testing.T) {
 	f, input := checkpointHandoffFixture(t)
 	plan := checkpointHandoffPreview(t, f, input)
 	_, err := acceptCheckpointHandoff(f, plan)
@@ -218,7 +218,7 @@ func TestCheckpointHandoffCorruptSeedRefusesStartupWithoutWrites(t *testing.T) {
 	require.NoError(t, raw.Close())
 	before, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
-	require.Error(t, f.db.Open(f.db.DatabasePath()))
+	require.Error(t, f.db.AuditForTesting(f.db.DatabasePath()))
 	after, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

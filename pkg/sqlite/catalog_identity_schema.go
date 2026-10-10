@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateCatalogIdentitySchema(conn *sqlx.DB) error {
+func validateCatalogIdentitySchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"catalog_identity_imports", "catalog_identity_import_records", "catalog_identity_import_page", "catalog_identity_import_review", "catalog_identity_import_immutable", "catalog_identity_record_immutable"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -18,6 +18,9 @@ func validateCatalogIdentitySchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM catalog_identity_imports i WHERE
  i.uuid IS NOT json_extract(i.plan,'$.uuid') OR i.source_uuid IS NOT json_extract(i.plan,'$.source_uuid')
  OR i.namespace IS NOT json_extract(i.plan,'$.namespace') OR i.input_sha256 IS NOT json_extract(i.plan,'$.input_sha256')

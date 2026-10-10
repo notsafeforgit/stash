@@ -79,7 +79,7 @@ func sameReviewArchiveIdentity(get enrichmentGet, requested, recorded string) (b
 	return one == two, err
 }
 
-func validateSourceAssociationReviewSchema(conn *sqlx.DB) error {
+func validateSourceAssociationReviewSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"gallery_association_reviews", "gallery_association_reviews_post", "gallery_association_review_immutable", "gallery_association_review_scope",
 		"attachment_media_reviews", "attachment_media_reviews_attachment", "attachment_media_reviews_post", "attachment_media_review_immutable", "attachment_media_review_scope"} {
 		var exists bool
@@ -89,6 +89,9 @@ func validateSourceAssociationReviewSchema(conn *sqlx.DB) error {
 		if !exists {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for _, table := range []string{"gallery_association_reviews", "attachment_media_reviews"} {
 		for after := ""; ; {

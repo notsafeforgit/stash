@@ -9,7 +9,7 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 )
 
-func validateAutomationCheckpointSchema(conn *sqlx.DB) error {
+func validateAutomationCheckpointSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"automation_checkpoint_imports", "automation_checkpoint_import_guard", "automation_checkpoint_records",
 		"automation_checkpoint_record_immutable", "automation_checkpoint_bodies", "automation_checkpoint_body_immutable",
 		"automation_checkpoint_review", "automation_checkpoint_sources", "automation_enrichment_staged_input"} {
@@ -22,6 +22,9 @@ func validateAutomationCheckpointSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM automation_checkpoint_imports i
  LEFT JOIN automation_enrichment_imports p ON p.snapshot_uuid=i.snapshot_uuid
  WHERE p.state IS NULL OR p.state='running' OR i.manifest_sha256 IS NOT p.manifest_sha256 OR i.policy!='legacy-enrichment-staging-v1'

@@ -15,7 +15,7 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 )
 
-func validateSourceFileHistorySchema(conn *sqlx.DB) error {
+func validateSourceFileHistorySchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"source_file_history", "source_file_history_locations", "source_file_history_edits", "source_file_history_states", "source_file_history_deduplications",
 		"source_file_history_reference", "source_file_history_collection", "source_file_history_observation", "source_file_history_claim",
 		"source_file_history_immutable", "source_file_history_location_immutable", "source_file_history_location_scope", "source_file_history_edit_immutable",
@@ -30,6 +30,9 @@ func validateSourceFileHistorySchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_file_history h
  LEFT JOIN source_collection_revisions c ON c.collection_uuid=h.collection_uuid AND c.revision=h.collection_revision
  LEFT JOIN media_root_revisions r ON r.root_uuid=h.root_uuid AND r.revision=h.root_revision
@@ -60,11 +63,14 @@ func validateSourceFileHistorySchema(conn *sqlx.DB) error {
 		}
 		after = id
 	}
-	return validateCatalogFileHistorySchema(conn)
+	return validateCatalogFileHistorySchema(conn, auditData)
 }
 
-func validateCatalogFileHistorySchema(conn *sqlx.DB) error {
+func validateCatalogFileHistorySchema(conn *sqlx.DB, auditData bool) error {
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM catalog_file_history_imports i
  LEFT JOIN catalog_snapshots s ON s.uuid=i.snapshot_uuid LEFT JOIN catalog_media_imports m ON m.snapshot_uuid=i.snapshot_uuid
  WHERE s.state IS NOT 'received' OR s.manifest_sha256 IS NOT i.manifest_sha256 OR s.collection_uuid IS NOT i.collection_uuid

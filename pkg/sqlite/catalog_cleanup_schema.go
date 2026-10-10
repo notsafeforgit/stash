@@ -12,7 +12,7 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 )
 
-func validateCatalogCleanupSchema(conn *sqlx.DB) error {
+func validateCatalogCleanupSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"source_cleanup_intents", "source_cleanup_intents_collection", "source_cleanup_intent_immutable", "source_cleanup_intent_scope",
 		"catalog_cleanup_imports", "catalog_cleanup_import_guard", "catalog_cleanup_records", "catalog_cleanup_review", "catalog_cleanup_intent_source", "catalog_cleanup_record_immutable"} {
 		var found bool
@@ -24,6 +24,9 @@ func validateCatalogCleanupSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM catalog_cleanup_imports i
  LEFT JOIN catalog_snapshots s ON s.uuid=i.snapshot_uuid LEFT JOIN catalog_evidence_imports e ON e.snapshot_uuid=i.snapshot_uuid
  LEFT JOIN source_collection_revisions c ON c.collection_uuid=i.collection_uuid AND c.revision=i.collection_revision

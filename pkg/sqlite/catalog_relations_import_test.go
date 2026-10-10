@@ -340,7 +340,7 @@ func TestCatalogRelationsImportRetainsInvalidValuesAndForgottenPosts(t *testing.
 	}
 }
 
-func TestCatalogRelationsImportStartupRejectsIncompleteProgress(t *testing.T) {
+func TestCatalogRelationsImportAuditRejectsIncompleteProgress(t *testing.T) {
 	f := relationFixture(t, nil)
 	advanceRelations(t, f, 0)
 	require.NoError(t, f.db.Close())
@@ -348,5 +348,5 @@ func TestCatalogRelationsImportStartupRejectsIncompleteProgress(t *testing.T) {
 	_, err := raw.Exec("UPDATE catalog_relations_imports SET processed_records=processed_records+1,mapped_records=mapped_records+1")
 	require.NoError(t, err)
 	require.NoError(t, raw.Close())
-	require.ErrorContains(t, f.db.Open(f.db.DatabasePath()), "incomplete catalog relationship import receipts")
+	require.ErrorContains(t, f.db.AuditForTesting(f.db.DatabasePath()), "incomplete catalog relationship import receipts")
 }

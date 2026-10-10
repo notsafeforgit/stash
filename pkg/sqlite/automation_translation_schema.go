@@ -11,7 +11,7 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 )
 
-func validateAutomationTranslationSchema(conn *sqlx.DB) error {
+func validateAutomationTranslationSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"automation_translation_imports", "automation_translation_records", "automation_translation_import_guard",
 		"automation_translation_record_immutable", "automation_translation_review", "automation_translation_target", "automation_translation_input"} {
 		var found bool
@@ -23,6 +23,9 @@ func validateAutomationTranslationSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM automation_translation_imports i LEFT JOIN automation_snapshots s ON s.uuid=i.snapshot_uuid
  WHERE s.state IS NOT 'received' OR i.manifest_sha256 IS NOT s.manifest_sha256 OR i.policy!='automation-translations-v1'
  OR i.source_records!=(json_extract(CAST(s.manifest AS TEXT),'$.tables.translation_jobs.rows')+json_extract(CAST(s.manifest AS TEXT),'$.tables.translation_targets.rows'))

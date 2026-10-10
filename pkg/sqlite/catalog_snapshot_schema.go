@@ -8,7 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateCatalogSnapshotSchema(conn *sqlx.DB) error {
+func validateCatalogSnapshotSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"catalog_snapshots", "catalog_snapshot_tables", "catalog_snapshot_chunks", "catalog_snapshot_records", "catalog_snapshot_identity_immutable", "catalog_snapshot_chunk_immutable", "catalog_snapshot_record_immutable", "catalog_snapshot_record_chunk"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -63,6 +63,9 @@ func validateCatalogSnapshotSchema(conn *sqlx.DB) error {
 			"CASE WHEN s.nfo_compacted=1 AND t.source_table IN "+nfoSourceTables+" THEN 0 ELSE t.received_records END!=(SELECT count(*) FROM catalog_snapshot_records r WHERE r.snapshot_uuid=t.snapshot_uuid AND r.source_table=t.source_table)")
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, query); err != nil {
 		return err
 	}

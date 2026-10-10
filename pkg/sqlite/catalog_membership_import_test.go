@@ -215,7 +215,7 @@ func TestCatalogMembershipImportRollbackAndEmptyInput(t *testing.T) {
 	require.Equal(t, result, advanceMembershipImport(t, empty, result.LastOrdinal))
 }
 
-func TestCatalogMembershipStartupRejectsWrongCollectionWithoutWrites(t *testing.T) {
+func TestCatalogMembershipAuditRejectsWrongCollectionWithoutWrites(t *testing.T) {
 	f := membershipImportFixture(t, 3, nil)
 	advanceMembershipImport(t, f, 0)
 	require.NoError(t, f.db.Close())
@@ -230,7 +230,7 @@ func TestCatalogMembershipStartupRejectsWrongCollectionWithoutWrites(t *testing.
 	require.NoError(t, raw.Close())
 	before, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorContains(t, f.db.Open(f.db.DatabasePath()), "invalid catalog membership")
+	require.ErrorContains(t, f.db.AuditForTesting(f.db.DatabasePath()), "invalid catalog membership")
 	after, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

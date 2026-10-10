@@ -6,7 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateCheckpointHandoffSchema(conn *sqlx.DB) error {
+func validateCheckpointHandoffSchema(conn *sqlx.DB, auditData bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"checkpoint_handoffs", "table"}, {"checkpoint_handoffs_evidence", "index"},
 		{"checkpoint_handoff_immutable", "trigger"}, {"checkpoint_handoff_scope", "trigger"},
@@ -18,6 +18,9 @@ func validateCheckpointHandoffSchema(conn *sqlx.DB) error {
 		if !found {
 			return fmt.Errorf("native database schema is incomplete: missing %s", object.name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for after := ""; ; {
 		var id string

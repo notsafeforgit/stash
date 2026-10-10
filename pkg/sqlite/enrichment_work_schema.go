@@ -9,7 +9,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateEnrichmentWorkSchema(conn *sqlx.DB, importedProofs, handoffs bool) error {
+func validateEnrichmentWorkSchema(conn *sqlx.DB, importedProofs, handoffs bool, auditData bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"enrichment_targets", "table"}, {"enrichment_completions", "table"}, {"enrichment_completion_captures", "table"}, {"enrichment_target_history", "table"},
 		{"enrichment_targets_post", "index"}, {"enrichment_targets_post_state", "index"},
@@ -78,6 +78,9 @@ func validateEnrichmentWorkSchema(conn *sqlx.DB, importedProofs, handoffs bool) 
  JOIN enrichment_job_retained_records x ON x.job_uuid=p.job_uuid AND x.capture_uuid=c.uuid
  JOIN enrichment_job_targets j ON j.job_uuid=p.job_uuid AND j.target_uuid=t.uuid AND j.target_revision=r.expected_revision
  WHERE p.completion_uuid=r.uuid)))`, 1)
+	}
+	if !auditData {
+		return nil
 	}
 	if err := conn.Get(&invalid, query); err != nil {
 		return err

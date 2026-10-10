@@ -88,7 +88,7 @@ func validateDiscoveryActivationBindings(get enrichmentGet, row discoveryActivat
 	return nil
 }
 
-func validateDiscoveryActivationSchema(conn *sqlx.DB) error {
+func validateDiscoveryActivationSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"discovery_activations", "discovery_activations_listing", "discovery_activation_immutable", "discovery_activation_source",
 		"discovery_activation_targets", "discovery_activation_targets_target", "discovery_activation_target_immutable", "discovery_activation_target_scope"} {
 		var exists bool
@@ -98,6 +98,9 @@ func validateDiscoveryActivationSchema(conn *sqlx.DB) error {
 		if !exists {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for _, table := range []string{"discovery_activations", "discovery_activation_targets"} {
 		var child, parent string

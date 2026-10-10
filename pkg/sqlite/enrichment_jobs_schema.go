@@ -11,7 +11,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateEnrichmentJobSchema(conn *sqlx.DB, releases, handoffs bool) error {
+func validateEnrichmentJobSchema(conn *sqlx.DB, releases, handoffs bool, auditData bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"enrichment_job_targets", "table"}, {"enrichment_job_attempts", "table"},
 		{"enrichment_checkpoint_receipts", "table"}, {"enrichment_checkpoints", "table"},
@@ -45,6 +45,9 @@ func validateEnrichmentJobSchema(conn *sqlx.DB, releases, handoffs bool) error {
 	}
 	if invalid {
 		return errors.New("native database has an invalid enrichment checkpoint timestamp type")
+	}
+	if !auditData {
+		return nil
 	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM enrichment_job_targets b
  LEFT JOIN archive_jobs j ON j.uuid=b.job_uuid LEFT JOIN enrichment_targets t ON t.uuid=b.target_uuid

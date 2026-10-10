@@ -13,7 +13,7 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 )
 
-func validateDiscoveryJobSchema(conn *sqlx.DB) error {
+func validateDiscoveryJobSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"discovery_listings", "discovery_listings_collection", "discovery_listings_account", "discovery_listing_immutable",
 		"discovery_listing_legacy", "discovery_listing_legacy_immutable", "discovery_listing_jobs", "discovery_listing_job_immutable", "discovery_listing_job_scope",
 		"archive_jobs_discovery_listing", "discovery_listing_pacing_bind", "discovery_job_attempts", "discovery_job_attempt_immutable",
@@ -27,6 +27,9 @@ func validateDiscoveryJobSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM archive_jobs j WHERE j.kind='account.list_page' AND NOT EXISTS(SELECT 1 FROM discovery_listing_jobs b WHERE b.job_uuid=j.uuid))
  OR EXISTS(SELECT 1 FROM discovery_listing_jobs b JOIN archive_jobs j ON j.uuid=b.job_uuid WHERE j.kind!='account.list_page')
  OR EXISTS(SELECT 1 FROM archive_job_attempts a JOIN archive_jobs j ON j.uuid=a.job_uuid AND j.kind='account.list_page'

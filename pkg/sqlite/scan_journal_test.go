@@ -98,7 +98,7 @@ func TestScanJournalRetainsEveryFamilyAndNeverActivatesHistoricalRuntime(t *test
 	require.NoError(t, err)
 	require.NoError(t, f.db.Close())
 	broken := sqlite.NewDatabase()
-	require.ErrorContains(t, broken.Open(path), "incomplete retained scan journal evidence")
+	require.ErrorContains(t, broken.AuditForTesting(path), "incomplete retained scan journal evidence")
 }
 
 func TestScanJournalUnknownInputsConflictsAndLateFailuresRollBack(t *testing.T) {

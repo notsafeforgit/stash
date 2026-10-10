@@ -56,7 +56,7 @@ func TestDiscoveryMatchPublicationMigrationPreservesActivationAndComparison(t *t
 	}
 }
 
-func TestDiscoveryMatchPublicationCorruptionPreventsOpen(t *testing.T) {
+func TestDiscoveryMatchPublicationCorruptionIsRejectedByAudit(t *testing.T) {
 	for _, change := range []string{"DELETE FROM discovery_published_records", "UPDATE discovery_match_publications SET page_sha256='" + strings.Repeat("f", 64) + "'"} {
 		t.Run(change, func(t *testing.T) {
 			f := newDiscoveryPublicationFixture(t)
@@ -72,7 +72,7 @@ func TestDiscoveryMatchPublicationCorruptionPreventsOpen(t *testing.T) {
 			require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name='discovery_match_publication_immutable'").Scan(&guard))
 			_, err := raw.Exec("DROP TRIGGER discovery_match_publication_immutable; " + change + "; " + guard)
 			require.NoError(t, err)
-			require.ErrorIs(t, f.db.Open(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+			require.ErrorIs(t, f.db.AuditForTesting(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 		})
 	}
 }

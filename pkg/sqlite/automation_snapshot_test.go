@@ -310,7 +310,11 @@ func TestAutomationSnapshotCorruptionIsRefusedBeforeWrites(t *testing.T) {
 			require.NoError(t, raw.Close())
 			before, err := os.ReadFile(path)
 			require.NoError(t, err)
-			require.Error(t, f.db.Open(path))
+			if test.name == "missing index" {
+				require.Error(t, f.db.Open(path))
+			} else {
+				require.Error(t, f.db.AuditForTesting(path))
+			}
 			after, err := os.ReadFile(path)
 			require.NoError(t, err)
 			require.Equal(t, before, after)

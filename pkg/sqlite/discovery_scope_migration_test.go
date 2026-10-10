@@ -71,7 +71,7 @@ func TestDiscoveryScopeMigrationPreservesOriginalSearchesAndUnknownObjects(t *te
 	}
 }
 
-func TestDiscoveryScopeStartupRefusesCorruptHistoryAndProjectionBeforeWriting(t *testing.T) {
+func TestDiscoveryScopeAuditRefusesCorruptHistoryAndProjectionBeforeWriting(t *testing.T) {
 	for _, projection := range []bool{false, true} {
 		t.Run(map[bool]string{false: "historical definition", true: "effective view"}[projection], func(t *testing.T) {
 			f := newDiscoveryMatchFixture(t)
@@ -102,7 +102,7 @@ func TestDiscoveryScopeStartupRefusesCorruptHistoryAndProjectionBeforeWriting(t 
 			}
 			before, err := os.ReadFile(f.db.DatabasePath())
 			require.NoError(t, err)
-			require.ErrorContains(t, f.db.Open(f.db.DatabasePath()), "invalid discovery collection bindings")
+			require.ErrorContains(t, f.db.AuditForTesting(f.db.DatabasePath()), "invalid discovery collection bindings")
 			after, err := os.ReadFile(f.db.DatabasePath())
 			require.NoError(t, err)
 			require.Equal(t, before, after)

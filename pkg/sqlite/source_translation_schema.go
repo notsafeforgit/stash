@@ -8,7 +8,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateSourceTranslationSchema(conn *sqlx.DB) error {
+func validateSourceTranslationSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"source_translations", "source_translation_immutable", "source_translation_evidence", "source_translation_evidence_post",
 		"source_translation_evidence_result", "source_translation_evidence_collection", "source_translation_evidence_immutable", "source_translation_evidence_active", "source_translation_evidence_revision"} {
 		var found bool
@@ -27,6 +27,9 @@ func validateSourceTranslationSchema(conn *sqlx.DB) error {
 		return errors.New("native database schema is incomplete: invalid translation receipt time")
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_translation_evidence e
  LEFT JOIN source_translations t ON t.uuid=e.translation_uuid LEFT JOIN source_posts p ON p.uuid=e.post_uuid
  LEFT JOIN source_collection_revisions c ON c.collection_uuid=e.collection_uuid AND c.revision=e.collection_revision

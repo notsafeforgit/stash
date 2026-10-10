@@ -80,9 +80,10 @@ func TestEnrichmentPublishesSupportedPostAdaptersAndChildren(t *testing.T) {
 				}
 				return nil
 			}))
-			// Startup validates the new namespace, retained bytes and publisher proof;
-			// a lost response is recoverable after staging has been released.
+			// Audit the new namespace, retained bytes and publisher proof, then
+			// verify lost-response recovery after restart and staging release.
 			require.NoError(t, f.db.Close())
+			require.NoError(t, f.db.AuditForTesting(f.db.DatabasePath()))
 			require.NoError(t, f.db.Open(f.db.DatabasePath()))
 			f.repo = f.db.Repository()
 			f.worker.Service = ingest.New(f.repo)

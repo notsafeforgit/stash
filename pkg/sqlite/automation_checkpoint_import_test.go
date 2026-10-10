@@ -172,7 +172,7 @@ func TestAutomationCheckpointImportRejectsStaleBindingsAndRollsBackCaughtFailure
 	require.EqualValues(t, 4, p.ProcessedRecords)
 }
 
-func TestAutomationCheckpointStartupRejectsAlteredProjectionWithoutWriting(t *testing.T) {
+func TestAutomationCheckpointValidationRejectsAlteredProjectionWithoutWriting(t *testing.T) {
 	for _, change := range []string{
 		`DROP TRIGGER automation_checkpoint_body_immutable; UPDATE automation_checkpoint_bodies SET body=json_set(body,'$.observation_time_basis','source')`,
 		`DROP TRIGGER automation_checkpoint_record_immutable; UPDATE automation_checkpoint_records SET staged_sha256=printf('%064d',0) WHERE ordinal=2`,
@@ -189,7 +189,12 @@ func TestAutomationCheckpointStartupRejectsAlteredProjectionWithoutWriting(t *te
 			raw.Close()
 			before, err := os.ReadFile(f.db.DatabasePath())
 			require.NoError(t, err)
-			require.Error(t, f.db.Open(f.db.DatabasePath()))
+			if change == `DELETE FROM automation_checkpoint_records WHERE ordinal=2` {
+				require.Error(t, f.db.AuditForTesting(f.db.DatabasePath()))
+			} else {
+				// Missing schema guards must still prevent routine startup.
+				require.Error(t, f.db.Open(f.db.DatabasePath()))
+			}
 			after, err := os.ReadFile(f.db.DatabasePath())
 			require.NoError(t, err)
 			require.Equal(t, before, after)

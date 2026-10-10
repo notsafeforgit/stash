@@ -103,7 +103,7 @@ func TestSourceFileHistoryPreparedAndFinishedArchiveMembers(t *testing.T) {
 	require.NoError(t, f.db.Open(f.db.DatabasePath()))
 }
 
-func TestSourceFileHistoryStartupRejectsAlteredPayloadOrMissingChildrenWithoutWriting(t *testing.T) {
+func TestSourceFileHistoryAuditRejectsAlteredPayloadOrMissingChildrenWithoutWriting(t *testing.T) {
 	for _, scenario := range []string{"value", "clock", "missing-child", "receipt"} {
 		t.Run(scenario, func(t *testing.T) {
 			f, input := fileHistoryFixture(t)
@@ -129,7 +129,7 @@ func TestSourceFileHistoryStartupRejectsAlteredPayloadOrMissingChildrenWithoutWr
 			}
 			before, err := os.ReadFile(f.db.DatabasePath())
 			require.NoError(t, err)
-			require.ErrorIs(t, f.db.Open(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+			require.ErrorIs(t, f.db.AuditForTesting(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 			after, err := os.ReadFile(f.db.DatabasePath())
 			require.NoError(t, err)
 			require.Equal(t, before, after)

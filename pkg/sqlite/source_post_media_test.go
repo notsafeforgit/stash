@@ -259,7 +259,7 @@ func TestSourcePostMediaMigrationPreservesPopulatedAttachmentEvidence(t *testing
 	require.Equal(t, "ok", integrity)
 }
 
-func TestSourcePostMediaStartupRejectsCorruptScopeBeforeWriting(t *testing.T) {
+func TestSourcePostMediaAuditRejectsCorruptScopeBeforeWriting(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	_, attachment := attachmentFixture(t, repo)
 	_, other := attachmentFixture(t, repo)
@@ -268,7 +268,7 @@ func TestSourcePostMediaStartupRejectsCorruptScopeBeforeWriting(t *testing.T) {
 	require.NoError(t, db.Close())
 	raw := openRawDB(t, db.DatabasePath())
 	defer raw.Close()
-	// Restore the real guard after simulating corruption; startup must validate
+	// Restore the real guard after simulating corruption; full audit must validate
 	// retained rows rather than checking only that a trigger name exists.
 	var guard string
 	require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name='source_media_evidence_immutable'").Scan(&guard))
@@ -280,7 +280,7 @@ func TestSourcePostMediaStartupRejectsCorruptScopeBeforeWriting(t *testing.T) {
 	require.NoError(t, err)
 	before, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorContains(t, db.Open(db.DatabasePath()), "invalid source media evidence scope")
+	require.ErrorContains(t, db.AuditForTesting(db.DatabasePath()), "invalid source media evidence scope")
 	after, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

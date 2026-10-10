@@ -8,7 +8,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateSourceCaptureContextSchema(conn *sqlx.DB) error {
+func validateSourceCaptureContextSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"source_capture_contexts", "source_capture_contexts_parent", "source_captures_with_context", "source_capture_context_immutable", "source_capture_context_scope"} {
 		var exists bool
 		if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -19,6 +19,9 @@ func validateSourceCaptureContextSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_capture_contexts x
  LEFT JOIN source_captures c ON c.uuid=x.capture_uuid
  WHERE c.uuid IS NULL OR c.retention_policy!='source-retention-v1+capture-context-v1')

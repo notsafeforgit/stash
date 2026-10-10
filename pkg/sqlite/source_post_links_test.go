@@ -315,7 +315,7 @@ func TestSourcePostLinksRejectInvalidInputsAndReadOnlyWrites(t *testing.T) {
 	require.Equal(t, post.Revision, postLinkRevision(t, repo, post.UUID))
 }
 
-func TestSourcePostLinksStartupRejectsIncompleteEvidence(t *testing.T) {
+func TestSourcePostLinksAuditRejectsIncompleteEvidence(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "one"}, "")
 	_, err := observePostURL(repo, models.SourcePostURLInput{SourcePostEvidence: postLinkEvidence(post.UUID), URL: "https://example.test/post"})
@@ -325,5 +325,5 @@ func TestSourcePostLinksStartupRejectsIncompleteEvidence(t *testing.T) {
 	_, err = raw.Exec("DELETE FROM source_post_url_evidence")
 	require.NoError(t, err)
 	require.NoError(t, raw.Close())
-	require.ErrorContains(t, db.Open(db.DatabasePath()), "incomplete source post link evidence")
+	require.ErrorContains(t, db.AuditForTesting(db.DatabasePath()), "incomplete source post link evidence")
 }

@@ -27,7 +27,7 @@ func canonicalCaptureTime(input *models.SourceCaptureInput) error {
 	return nil
 }
 
-func validateSourceCaptureTimeSchema(conn *sqlx.DB) error {
+func validateSourceCaptureTimeSchema(conn *sqlx.DB, auditData bool) error {
 	var valid bool
 	if err := conn.Get(&valid, `SELECT EXISTS(SELECT 1 FROM pragma_table_info('source_captures') WHERE name='captured_at' AND "notnull"=0 AND upper(type)='DATETIME')
  AND EXISTS(SELECT 1 FROM pragma_table_info('source_captures') WHERE name='recorded_at' AND "notnull"=0 AND upper(type)='DATETIME')
@@ -37,6 +37,9 @@ func validateSourceCaptureTimeSchema(conn *sqlx.DB) error {
 	}
 	if !valid {
 		return errors.New("native database is missing nullable observation and archive recording times")
+	}
+	if !auditData {
+		return nil
 	}
 	if err := conn.Get(&valid, `SELECT NOT EXISTS(SELECT 1 FROM source_captures
  WHERE (captured_at IS NULL)=(recorded_at IS NULL))`); err != nil {

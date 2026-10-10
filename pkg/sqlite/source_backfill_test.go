@@ -210,7 +210,7 @@ func TestSourceBackfillNativeProofRequiresEveryOriginalRequestWindow(t *testing.
 	require.NoError(t, err)
 	require.NoError(t, actual.Close())
 	broken := sqlite.NewDatabase()
-	require.ErrorContains(t, broken.Open(f.db.DatabasePath()), "inconsistent source backfill proof")
+	require.ErrorContains(t, broken.AuditForTesting(f.db.DatabasePath()), "inconsistent source backfill proof")
 }
 
 func TestSourceBackfillRejectsUnknownLegacyShapesAndRollsBack(t *testing.T) {

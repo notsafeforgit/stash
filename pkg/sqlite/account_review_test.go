@@ -276,7 +276,7 @@ func TestAccountReviewCorruptReceiptIsRejectedBeforeWrites(t *testing.T) {
 	require.NoError(t, raw.Close())
 	before, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorIs(t, db.Open(db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+	require.ErrorIs(t, db.AuditForTesting(db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 	after, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

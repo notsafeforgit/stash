@@ -63,7 +63,7 @@ func validateDiscoveryRecoveryTarget(get enrichmentGet, id string) error {
 	return nil
 }
 
-func validateDiscoveryRecoverySchema(conn *sqlx.DB) error {
+func validateDiscoveryRecoverySchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"discovery_listing_recoveries", "discovery_listing_recovery_immutable", "discovery_listing_recovery_scope",
 		"discovery_recovery_job_scope", "discovery_recovery_page_scope", "discovery_recovery_targets", "discovery_recovery_target_immutable", "discovery_recovery_target_scope"} {
 		var exists bool
@@ -73,6 +73,9 @@ func validateDiscoveryRecoverySchema(conn *sqlx.DB) error {
 		if !exists {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for _, table := range []string{"discovery_listing_recoveries", "discovery_recovery_targets"} {
 		var child, parent string

@@ -13,7 +13,7 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 )
 
-func validateAutomationDiscoverySchema(conn *sqlx.DB) error {
+func validateAutomationDiscoverySchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"automation_discovery_input", "automation_discovery_imports", "automation_discovery_import_guard",
 		"automation_discovery_records", "automation_discovery_review", "automation_discovery_accounts", "automation_discovery_posts",
 		"automation_discovery_record_immutable", "automation_discovery_record_scope"} {
@@ -26,6 +26,9 @@ func validateAutomationDiscoverySchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM automation_discovery_imports i
  LEFT JOIN automation_snapshots s ON s.uuid=i.snapshot_uuid
  LEFT JOIN automation_enrichment_imports p ON p.snapshot_uuid=i.snapshot_uuid

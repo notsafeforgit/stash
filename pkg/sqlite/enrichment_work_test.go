@@ -305,7 +305,7 @@ func TestEnrichmentWorkCompletionRollsBackWholeCaptureTransaction(t *testing.T) 
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
 }
 
-func TestEnrichmentWorkStartupRejectsCorruptStateWithoutWrites(t *testing.T) {
+func TestEnrichmentWorkAuditRejectsCorruptStateWithoutWrites(t *testing.T) {
 	for _, item := range []struct{ name, trigger, mutation string }{
 		{"completion_digest", "enrichment_completion_immutable", "UPDATE enrichment_completions SET request_digest='" + strings.Repeat("0", 64) + "'"},
 		{"capture_count", "", "DELETE FROM enrichment_completion_captures"},
@@ -354,7 +354,7 @@ func TestEnrichmentWorkStartupRejectsCorruptStateWithoutWrites(t *testing.T) {
 			before, err := os.ReadFile(path)
 			require.NoError(t, err)
 			check := sqlite.NewDatabase()
-			require.Error(t, check.Open(path))
+			require.Error(t, check.AuditForTesting(path))
 			require.NoError(t, check.Close())
 			after, err := os.ReadFile(path)
 			require.NoError(t, err)

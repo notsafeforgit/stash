@@ -65,7 +65,7 @@ func TestPostMediaMigrationPreservesExistingEvidenceWithoutSelectingIt(t *testin
 	}
 }
 
-func TestPostMediaStartupRejectsCorruptDecisionBeforeWriting(t *testing.T) {
+func TestPostMediaAuditRejectsCorruptDecisionBeforeWriting(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "invalid-media"}, "")
 	media := archiveFind(t, repo, models.ArchiveScene, 31)
@@ -85,7 +85,7 @@ func TestPostMediaStartupRejectsCorruptDecisionBeforeWriting(t *testing.T) {
 	require.NoError(t, err)
 	before, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorContains(t, db.Open(db.DatabasePath()), "invalid post media decisions")
+	require.ErrorContains(t, db.AuditForTesting(db.DatabasePath()), "invalid post media decisions")
 	after, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

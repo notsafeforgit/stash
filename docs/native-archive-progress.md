@@ -4,8 +4,46 @@ This is the implementation record for the
 [full transition plan](native-archive-transition-plan.md). It does not narrow
 that plan's scope or replace its completion criteria. Development remains on
 `v3-rewrite`; merge into `develop` requires verification and the owner's success
-review. The native replacement and its schedules are running; observation of
-scheduled work and independent restore verification remain in progress.
+review. The native replacement and its schedules are running. Independent
+restore verification passed; scheduled-work observation remains in progress.
+
+## Routine startup and full data audits — implementation, 2026-10-10
+
+Routine opens now validate lineage, clean supported versions, schema objects and
+unfinished write contexts without scanning retained catalog receipts, captures,
+decisions or job history. Full row audits remain required by explicit migration
+constructors and closed-snapshot verification. The split changes no stored data
+or schema. Five mixed structure/data queries also have independent column checks,
+so skipping their row audit cannot skip required timestamp types. Metadata
+collection completion still uses the required unsealed-decision partial index.
+
+The full SQLite suite and Go lint pass. A SQLite authorizer
+regression denies reads of archive history and proves routine validation never
+requires them, while full audit does. A malformed canonical-name fixture remains
+rejected by both snapshot verification and migration. Historical corruption
+fixtures now exercise the explicit audit; missing-schema and unfinished-write
+fixtures still exercise startup. Production still uses the application image
+below. Evidence is under
+`.local/startup-audit-separation-20261010/`.
+
+## Original coordinated cloud restore — verified, 2026-10-10
+
+The existing isolated restore completed successfully at 15:46:11 UTC without
+restarting its controller or starting another cloud download. It verified the
+declared file contents, 21 SQLite components, native library domain/history
+checks and ingestion receipt boundaries for both registered producers. The
+restored library is 22,244,438,016 bytes at its captured schema 1000099, with no
+pending file deletions. This is the original pre-cutover boundary, not a claim
+that today's still-running scheduled backup has finished. It does not retrieve
+Deep Archive media.
+
+The result is retained in
+`.local/native-production-cutover-20261008/backup-before-public-finalization-state.json`
+(`passed`, `isolated_restore_complete: true`) and the restored components are in
+`/tank/stash-native-cutover-20261008-01a0ed5e/coordinated-restore-before-public`.
+The associated published run is `20261008_175444_1545955`, checkpoint
+`dbf8cd08-ea38-43df-9864-6f20429be640`. Recovery copies remain available pending
+final acceptance.
 
 ## Useful work after cursor replay — deployed, 2026-10-10
 
@@ -812,9 +850,9 @@ policy upgrades are recorded under `.local/resumed-work-budget-20261010/`.
 The coordinated post-write backup has published successfully. The current
 scheduled backup retains its original sealed view, configuration and validator.
 One deferred configuration handoff will select this application and its queue
-assignments for future backups. Independent restore, the current scheduled
-backup, supplementary home sync, startup audit separation and final owner
-review remain outstanding.
+assignments for future backups. The original independent restore passed at
+15:46:11 UTC. The current scheduled backup, supplementary home sync, startup
+audit separation and final owner review remain outstanding.
 
 ### Historical catalog association repair
 

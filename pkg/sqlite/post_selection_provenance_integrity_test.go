@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPostSelectionProvenanceStartupRejectsUnrelatedCaptureOrManifest(t *testing.T) {
+func TestPostSelectionProvenanceAuditRejectsUnrelatedCaptureOrManifest(t *testing.T) {
 	for _, evidence := range []string{"capture", "manifest"} {
 		t.Run(evidence, func(t *testing.T) {
 			db, repo := postIdentityFixture(t)
@@ -39,10 +39,10 @@ SELECT manifest_uuid FROM source_capture_attachment_manifests WHERE capture_uuid
 			require.NoError(t, db.Close())
 			before, err := os.ReadFile(db.DatabasePath())
 			require.NoError(t, err)
-			require.ErrorContains(t, db.Open(db.DatabasePath()), "another post identity")
+			require.ErrorContains(t, db.AuditForTesting(db.DatabasePath()), "another post identity")
 			after, err := os.ReadFile(db.DatabasePath())
 			require.NoError(t, err)
-			require.Equal(t, before, after, "invalid provenance must fail read-only startup validation")
+			require.Equal(t, before, after, "invalid provenance must fail read-only full audit")
 		})
 	}
 }

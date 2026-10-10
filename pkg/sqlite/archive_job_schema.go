@@ -21,7 +21,7 @@ func validateArchiveJobSchema(conn *sqlx.DB) error {
 	return nil
 }
 
-func validateAlbumJobSchema(conn *sqlx.DB, version uint) error {
+func validateAlbumJobSchema(conn *sqlx.DB, version uint, auditData bool) error {
 	var found bool
 	if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='index' AND name='archive_jobs_resource_history')"); err != nil {
 		return err
@@ -52,6 +52,9 @@ func validateAlbumJobSchema(conn *sqlx.DB, version uint) error {
 	}
 	if version >= NativeSchemaBaseline+92 {
 		allowed += ",'post.merge_notify'"
+	}
+	if !auditData {
+		return nil
 	}
 	if err := conn.Get(&invalid, "SELECT EXISTS(SELECT 1 FROM archive_jobs WHERE kind NOT IN ("+allowed+"))"); err != nil {
 		return err

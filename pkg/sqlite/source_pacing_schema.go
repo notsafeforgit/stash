@@ -7,7 +7,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateSourcePacingSchema(conn *sqlx.DB) error {
+func validateSourcePacingSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"source_pacing", "source_run_pacing", "enrichment_job_pacing", "source_run_pacing_scope", "enrichment_job_pacing_scope",
 		"source_run_pacing_bind", "enrichment_job_pacing_bind", "source_run_pacing_immutable", "enrichment_job_pacing_immutable",
 		"enrichment_attempt_pacing", "enrichment_attempt_pacing_scope", "enrichment_attempt_pacing_bind", "enrichment_attempt_pacing_immutable", "enrichment_attempt_pacing_current"} {
@@ -20,6 +20,9 @@ func validateSourcePacingSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_runs r
  JOIN source_collection_revisions c ON c.collection_uuid=r.collection_uuid AND c.revision=r.collection_revision
  LEFT JOIN source_run_pacing p ON p.run_uuid=r.uuid LEFT JOIN source_pacing s ON s.scope=p.scope

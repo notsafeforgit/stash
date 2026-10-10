@@ -13,7 +13,7 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 )
 
-func validateAutomationEnrichmentSchema(conn *sqlx.DB) error {
+func validateAutomationEnrichmentSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"automation_enrichment_input", "automation_enrichment_imports", "automation_enrichment_import_guard",
 		"automation_enrichment_records", "automation_enrichment_review", "automation_enrichment_targets", "automation_enrichment_completions",
 		"automation_enrichment_record_immutable", "automation_enrichment_cooldowns", "enrichment_completion_legacy_receipt", "enrichment_completion_legacy_capture"} {
@@ -26,6 +26,9 @@ func validateAutomationEnrichmentSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM automation_enrichment_imports i LEFT JOIN automation_snapshots s ON s.uuid=i.snapshot_uuid
  WHERE s.state IS NOT 'received' OR s.manifest_sha256 IS NOT i.manifest_sha256 OR i.policy!='automation-enrichment-v1'
  OR i.source_records!=(SELECT count(*) FROM automation_snapshot_records e WHERE e.snapshot_uuid=i.snapshot_uuid

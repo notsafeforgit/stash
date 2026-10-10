@@ -254,7 +254,7 @@ func TestEnrichmentActivationImportedAliasesAppearOnceAtLatestHold(t *testing.T)
 	}
 }
 
-func TestEnrichmentActivationStartupRejectsChangedScopeAndHistory(t *testing.T) {
+func TestEnrichmentActivationAuditRejectsChangedScopeAndHistory(t *testing.T) {
 	for _, field := range []string{"url", "post_revision", "not_before", "input_hash", "missing"} {
 		t.Run(field, func(t *testing.T) {
 			db, repo := archiveTestDatabase(t)
@@ -298,7 +298,7 @@ func TestEnrichmentActivationStartupRejectsChangedScopeAndHistory(t *testing.T) 
 			before, err := os.ReadFile(path)
 			require.NoError(t, err)
 			check := sqlite.NewDatabase()
-			require.Error(t, check.Open(path))
+			require.Error(t, check.AuditForTesting(path))
 			require.NoError(t, check.Close())
 			after, err := os.ReadFile(path)
 			require.NoError(t, err)

@@ -8,7 +8,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateSourceFairnessSchema(conn *sqlx.DB, handoffs, details bool) error {
+func validateSourceFairnessSchema(conn *sqlx.DB, handoffs, details bool, auditData bool) error {
 	for _, name := range []string{"source_service_turns", "source_service_turns_bind", "source_enrichment_waiters",
 		"source_enrichment_waiters_expiry", "source_enrichment_waiter_scopes", "source_enrichment_waiter_scopes_scope",
 		"source_enrichment_waiter_current", "source_enrichment_waiter_identity", "source_enrichment_waiter_end"} {
@@ -46,6 +46,9 @@ func validateSourceFairnessSchema(conn *sqlx.DB, handoffs, details bool) error {
 	}
 	if details {
 		query = strings.ReplaceAll(query, "enrichment_checkpoints h", "(SELECT job_uuid,body FROM enrichment_checkpoints UNION ALL SELECT job_uuid,body FROM discovery_detail_checkpoints) h")
+	}
+	if !auditData {
+		return nil
 	}
 	err := conn.Get(&invalid, query)
 	if err != nil {

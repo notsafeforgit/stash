@@ -167,7 +167,7 @@ func TestCheckpointEvidenceRejectsStaleReviewAndRollsBackCaughtLateFailure(t *te
 	require.Equal(t, before, queryUint(t, raw, "SELECT count(*) FROM source_captures"))
 }
 
-func TestCheckpointEvidenceStartupRejectsMissingBindingWithoutWriting(t *testing.T) {
+func TestCheckpointEvidenceAuditRejectsMissingBindingWithoutWriting(t *testing.T) {
 	f, input := checkpointEvidenceFixture(t)
 	plan := checkpointEvidencePreview(t, f, input)
 	_, err := acceptCheckpointEvidence(f, plan)
@@ -179,7 +179,7 @@ func TestCheckpointEvidenceStartupRejectsMissingBindingWithoutWriting(t *testing
 	require.NoError(t, raw.Close())
 	before, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
-	require.Error(t, f.db.Open(f.db.DatabasePath()))
+	require.Error(t, f.db.AuditForTesting(f.db.DatabasePath()))
 	after, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

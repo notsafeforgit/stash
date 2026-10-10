@@ -54,7 +54,7 @@ const catalogMediaValidationQuery = `SELECT EXISTS(SELECT 1 FROM catalog_media_i
  OR (e.source_table='files' AND (r.post_uuid IS NOT NULL OR (r.outcome='mapped' AND r.match_uuid IS NULL)))
  OR (e.source_table='appearances' AND r.outcome='mapped' AND r.media_evidence_uuid IS NULL))`
 
-func validateCatalogMediaSchema(conn *sqlx.DB) error {
+func validateCatalogMediaSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"catalog_media_imports", "catalog_media_records", "catalog_media_import_guard", "catalog_media_record_immutable", "catalog_media_review", "catalog_media_claim", "catalog_snapshot_record_phase"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -65,6 +65,9 @@ func validateCatalogMediaSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	err := conn.Get(&invalid, catalogMediaValidationQuery)
 	if err != nil {
 		return err

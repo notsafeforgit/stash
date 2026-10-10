@@ -196,7 +196,7 @@ func TestPostMediaConsolidationCaughtFailureRollsBackIdentityAndChoices(t *testi
 	require.Equal(t, before, identityRows(t, repo, "source_posts", "source_post_identities", "source_post_consolidations", "post_media_decisions", "post_media_links", "post_media_supersessions", "post_media_consolidation_edges"))
 }
 
-func TestPostMediaConsolidationStartupRejectsOlderUnrelatedMergeProof(t *testing.T) {
+func TestPostMediaConsolidationAuditRejectsOlderUnrelatedMergeProof(t *testing.T) {
 	db, repo := postIdentityFixture(t)
 	a := identityPost(t, repo, "legacy:catalog:fixture", "a")
 	b := identityPost(t, repo, "native:reddit", "one-post")
@@ -219,7 +219,7 @@ func TestPostMediaConsolidationStartupRejectsOlderUnrelatedMergeProof(t *testing
 	require.NoError(t, db.Close())
 	before, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorContains(t, db.Open(db.DatabasePath()), "invalid post media consolidation evidence")
+	require.ErrorContains(t, db.AuditForTesting(db.DatabasePath()), "invalid post media consolidation evidence")
 	after, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

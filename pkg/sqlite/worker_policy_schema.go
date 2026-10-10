@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateWorkerPolicySchema(conn *sqlx.DB) error {
+func validateWorkerPolicySchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"metadata_worker_policy_upgrades", "metadata_worker_policy_head", "metadata_worker_policy_valid",
 		"metadata_worker_policy_immutable", "metadata_worker_policy_retained", "metadata_worker_attempt_policies",
 		"metadata_worker_attempt_policy_valid", "metadata_worker_attempt_policy_immutable", "metadata_worker_attempt_policy_retained"} {
@@ -20,6 +20,9 @@ func validateWorkerPolicySchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM metadata_worker_policy_upgrades p
 WHERE p.expected_policy_sha256!=coalesce((SELECT prior.policy_sha256 FROM metadata_worker_policy_upgrades prior
 WHERE prior.kind=p.kind AND prior.original_policy_sha256=p.original_policy_sha256 AND prior.id<p.id ORDER BY prior.id DESC LIMIT 1),p.original_policy_sha256)

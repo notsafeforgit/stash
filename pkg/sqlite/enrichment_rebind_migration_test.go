@@ -66,7 +66,7 @@ func TestEnrichmentRebindMigrationPreservesPendingWorkAndUnknownObjects(t *testi
 	}
 }
 
-func TestEnrichmentRebindStartupRejectsIncompleteReceiptBeforeWriting(t *testing.T) {
+func TestEnrichmentRebindAuditRejectsIncompleteReceiptBeforeWriting(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	input, collection := enrichmentInput(t, repo)
 	now := time.Now().UTC()
@@ -81,13 +81,13 @@ func TestEnrichmentRebindStartupRejectsIncompleteReceiptBeforeWriting(t *testing
 	require.NoError(t, err)
 	before, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorContains(t, db.Open(db.DatabasePath()), "enrichment collection")
+	require.ErrorContains(t, db.AuditForTesting(db.DatabasePath()), "enrichment collection")
 	after, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)
 }
 
-func TestEnrichmentRebindStartupChecksHistoricalCollectionDefinition(t *testing.T) {
+func TestEnrichmentRebindAuditChecksHistoricalCollectionDefinition(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	input, collection := enrichmentInput(t, repo)
 	now := time.Now().UTC()
@@ -114,7 +114,7 @@ func TestEnrichmentRebindStartupChecksHistoricalCollectionDefinition(t *testing.
 	require.NoError(t, err)
 	before, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorContains(t, db.Open(db.DatabasePath()), "invalid enrichment collection rebindings")
+	require.ErrorContains(t, db.AuditForTesting(db.DatabasePath()), "invalid enrichment collection rebindings")
 	after, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

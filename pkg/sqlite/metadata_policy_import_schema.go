@@ -12,7 +12,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateMetadataPolicyImportSchema(conn *sqlx.DB) error {
+func validateMetadataPolicyImportSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"metadata_policy_imports", "metadata_policy_import_collection", "metadata_policy_import_immutable", "metadata_policy_import_documents", "metadata_policy_import_document_immutable", "metadata_policy_import_document_source"} {
 		var found bool
 		if err := conn.Get(&found, `SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)`, name); err != nil {
@@ -23,6 +23,9 @@ func validateMetadataPolicyImportSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM metadata_policy_imports i
 LEFT JOIN metadata_policy_revisions p ON p.collection_uuid=i.collection_uuid AND p.revision=i.policy_revision
 WHERE p.collection_uuid IS NULL OR p.collection_revision!=i.collection_revision

@@ -238,7 +238,7 @@ func TestDiscoveryPublicationRollsBackIdentityWithIncompletePublication(t *testi
 	}
 }
 
-func TestDiscoveryPublicationRejectsChangedProofOnStartup(t *testing.T) {
+func TestDiscoveryPublicationRejectsChangedProofOnAudit(t *testing.T) {
 	for _, change := range []string{"basis='strict-filename-id'", "post_revision=post_revision+1", "created_at='2026-10-01T00:00:00Z'"} {
 		t.Run(change, func(t *testing.T) {
 			f := newDiscoveryExecutionFixture(t, nil)
@@ -255,7 +255,7 @@ func TestDiscoveryPublicationRejectsChangedProofOnStartup(t *testing.T) {
 			require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name='enrichment_discovery_resolution_immutable'").Scan(&guard))
 			_, err = raw.Exec("DROP TRIGGER enrichment_discovery_resolution_immutable; UPDATE enrichment_discovery_resolutions SET " + change + ";" + guard)
 			require.NoError(t, err)
-			require.ErrorIs(t, f.db.Open(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+			require.ErrorIs(t, f.db.AuditForTesting(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 		})
 	}
 }

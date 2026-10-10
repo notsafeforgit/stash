@@ -71,7 +71,7 @@ func TestMetadataPolicyImportMigrationPreservesPoliciesAndDocuments(t *testing.T
 	}
 }
 
-func TestMetadataPolicyImportCorruptProvenancePreventsOpen(t *testing.T) {
+func TestMetadataPolicyImportCorruptProvenanceIsRejectedByAudit(t *testing.T) {
 	for _, change := range []string{
 		"binding=json_set(binding,'$.document.plugin_version','altered')",
 		"plan=json_set(plan,'$.collection.label','altered')",
@@ -89,7 +89,7 @@ func TestMetadataPolicyImportCorruptProvenancePreventsOpen(t *testing.T) {
 			require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name='metadata_policy_import_immutable'").Scan(&trigger))
 			_, err = raw.Exec("DROP TRIGGER metadata_policy_import_immutable; UPDATE metadata_policy_imports SET " + change + "; " + trigger)
 			require.NoError(t, err)
-			require.Error(t, f.db.Open(f.db.DatabasePath()), "restored provenance must match the retained digests")
+			require.Error(t, f.db.AuditForTesting(f.db.DatabasePath()), "restored provenance must match the retained digests")
 		})
 	}
 }

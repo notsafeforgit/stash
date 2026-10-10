@@ -357,7 +357,7 @@ func TestTranslationJobsAdmissionRollsBackMissingOrInvalidBindings(t *testing.T)
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM archive_job_submissions"))
 }
 
-func TestTranslationJobsStartupRefusesLostBindingWithoutWrites(t *testing.T) {
+func TestTranslationJobsAuditRefusesLostBindingWithoutWrites(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	s, _ := translationService(t, repo)
 	request := retainTranslationRequest(t, repo, "Corruption fixture")
@@ -373,7 +373,7 @@ func TestTranslationJobsStartupRefusesLostBindingWithoutWrites(t *testing.T) {
 	before, err := os.ReadFile(path)
 	require.NoError(t, err)
 	check := sqlite.NewDatabase()
-	require.ErrorContains(t, check.Open(path), "translation job target bindings")
+	require.ErrorContains(t, check.AuditForTesting(path), "translation job target bindings")
 	require.NoError(t, check.Close())
 	after, err := os.ReadFile(path)
 	require.NoError(t, err)

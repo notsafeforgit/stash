@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCatalogFileHistoryStartupRejectsReclassifiedReceiptWithoutWriting(t *testing.T) {
+func TestCatalogFileHistoryAuditRejectsReclassifiedReceiptWithoutWriting(t *testing.T) {
 	f := fileHistoryImportFixture(t, 0, nil)
 	require.EqualValues(t, 1, advanceFileHistory(t, f, 0).ReviewRecords)
 	require.NoError(t, f.db.Close())
@@ -20,7 +20,7 @@ func TestCatalogFileHistoryStartupRejectsReclassifiedReceiptWithoutWriting(t *te
 	require.NoError(t, err)
 	before, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorIs(t, f.db.Open(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+	require.ErrorIs(t, f.db.AuditForTesting(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 	after, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

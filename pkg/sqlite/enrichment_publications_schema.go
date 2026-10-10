@@ -11,7 +11,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateEnrichmentPublicationSchema(conn *sqlx.DB, releases bool) error {
+func validateEnrichmentPublicationSchema(conn *sqlx.DB, releases bool, auditData bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"enrichment_publications", "table"}, {"enrichment_published_records", "table"},
 		{"enrichment_published_records_capture", "index"}, {"enrichment_publication_immutable", "trigger"},
@@ -32,6 +32,9 @@ func validateEnrichmentPublicationSchema(conn *sqlx.DB, releases bool) error {
  OR (h.job_uuid IS NOT NULL AND EXISTS(SELECT 1 FROM enrichment_checkpoint_releases x WHERE x.job_uuid=p.job_uuid))`
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT
  EXISTS(SELECT 1 FROM archive_jobs j WHERE j.kind='post.enrich' AND j.state='succeeded'
   AND NOT EXISTS(SELECT 1 FROM enrichment_publications p WHERE p.job_uuid=j.uuid))

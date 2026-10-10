@@ -165,7 +165,6 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"missing album job history index", "DROP INDEX archive_jobs_resource_history", "missing archive_jobs_resource_history"},
 		{"missing file receipt index", "DROP INDEX ingest_receipts_job", "missing file ingestion receipt job association"},
 		{"missing metadata library intent", "DROP TRIGGER metadata_scene_title_library", "missing metadata_scene_title_library"},
-		{"missing canonical name", "INSERT INTO performers(id, created_at, updated_at) VALUES (1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", "performer has no canonical name"},
 		{"foreign primary version", "DROP TABLE native_schema; UPDATE schema_migrations SET version = 87", "unsupported legacy Stash schema"},
 		{"newer legacy fork", "DROP TABLE native_schema; UPDATE schema_migrations SET version = 86; CREATE TABLE fork_schema_migrations(version INTEGER); INSERT INTO fork_schema_migrations VALUES (10)", "unsupported legacy fork schema 10"},
 	} {
@@ -186,6 +185,31 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 			require.Equal(t, before, after, "identity rejection must not change database bytes")
 		})
 	}
+}
+
+func TestNativeHistoryAuditIsExplicitAndStillRequiredForMigration(t *testing.T) {
+	config.InitializeEmpty()
+	path := filepath.Join(t.TempDir(), "native.sqlite")
+	writeEmptyNativeFixture(t, path)
+	raw := openRawDB(t, path)
+	_, err := raw.Exec("INSERT INTO performers(id, created_at, updated_at) VALUES (1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
+	require.NoError(t, err)
+	require.NoError(t, raw.Close())
+
+	before, err := os.ReadFile(path)
+	require.NoError(t, err)
+	_, err = sqlite.VerifyNativeSnapshot(t.Context(), path)
+	require.ErrorContains(t, err, "performer has no canonical name")
+	after, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, before, after, "full audit must remain read-only")
+
+	// Opening an already migrated library does not audit its historical rows.
+	db := sqlite.NewDatabase()
+	require.NoError(t, db.Open(path))
+	require.NoError(t, db.Close())
+	_, err = sqlite.NewMigrator(db)
+	require.ErrorContains(t, err, "performer has no canonical name")
 }
 
 func TestNativePromotionSQLFailureRollsBackSchemaChanges(t *testing.T) {

@@ -68,7 +68,7 @@ func TestDiscoveryDetailMigrationPreservesListingRecoveryAndPacing(t *testing.T)
 		})
 	}
 }
-func TestDiscoveryDetailCorruptionPreventsOpeningWriter(t *testing.T) {
+func TestDiscoveryDetailCorruptionIsRejectedByAudit(t *testing.T) {
 	for _, change := range []struct{ table, guard, set string }{
 		{"discovery_detail_checkpoints", "discovery_detail_checkpoint_transition", "body=replace(body,'2026-10-04','2026-10-03')"},
 		{"discovery_detail_checkpoint_records", "discovery_detail_checkpoint_record_immutable", "digest='" + strings.Repeat("f", 64) + "'"},
@@ -89,7 +89,7 @@ func TestDiscoveryDetailCorruptionPreventsOpeningWriter(t *testing.T) {
 			require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name=?", change.guard).Scan(&guard))
 			_, err = raw.Exec("DROP TRIGGER " + change.guard + "; UPDATE " + change.table + " SET " + change.set + "; " + guard)
 			require.NoError(t, err)
-			require.ErrorIs(t, f.db.Open(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+			require.ErrorIs(t, f.db.AuditForTesting(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 		})
 	}
 }

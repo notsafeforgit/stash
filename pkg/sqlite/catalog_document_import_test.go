@@ -352,7 +352,7 @@ func TestCatalogDocumentImportFallbackOrderingAndExplicitPriority(t *testing.T) 
 	}
 }
 
-func TestCatalogDocumentStartupRejectsAlteredReceiptWithoutWrites(t *testing.T) {
+func TestCatalogDocumentAuditRejectsAlteredReceiptWithoutWrites(t *testing.T) {
 	f := documentImportFixture(t, 0, true, nil)
 	finishDocuments(t, f)
 	require.NoError(t, f.db.Close())
@@ -367,7 +367,7 @@ func TestCatalogDocumentStartupRejectsAlteredReceiptWithoutWrites(t *testing.T) 
 	require.NoError(t, raw.Close())
 	before, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorContains(t, f.db.Open(f.db.DatabasePath()), "invalid catalog document")
+	require.ErrorContains(t, f.db.AuditForTesting(f.db.DatabasePath()), "invalid catalog document")
 	after, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

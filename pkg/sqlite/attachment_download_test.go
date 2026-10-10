@@ -124,7 +124,7 @@ func TestAttachmentDownloadSchemaAnonymisesAndRejectsCorruptScopeBeforeWrites(t 
 	require.NoError(t, raw.Close())
 	before, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorContains(t, f.db.Open(f.db.DatabasePath()), "inconsistent attachment download")
+	require.ErrorContains(t, f.db.AuditForTesting(f.db.DatabasePath()), "inconsistent attachment download")
 	after, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

@@ -268,7 +268,7 @@ func TestDiscoveryRecoveryCannotChangeOriginalAccountOrEraseHistoryWithoutRefere
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM discovery_listing_recoveries"))
 }
 
-func TestDiscoveryRecoveryLostReferencesPreventOpen(t *testing.T) {
+func TestDiscoveryRecoveryLostReferencesAreRejectedByAudit(t *testing.T) {
 	for _, corruption := range []string{"DELETE FROM discovery_recovery_targets", "DELETE FROM discovery_listing_recoveries"} {
 		t.Run(corruption, func(t *testing.T) {
 			f := newDiscoveryMatchHistoryFixture(t, true)
@@ -278,7 +278,7 @@ func TestDiscoveryRecoveryLostReferencesPreventOpen(t *testing.T) {
 			defer raw.Close()
 			_, err := raw.Exec(corruption)
 			require.NoError(t, err)
-			require.ErrorIs(t, f.db.Open(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+			require.ErrorIs(t, f.db.AuditForTesting(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 		})
 	}
 }

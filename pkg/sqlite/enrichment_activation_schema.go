@@ -33,7 +33,7 @@ func (r enrichmentActivationRecord) decode() (*models.EnrichmentActivationPlan, 
 	return plan, nil
 }
 
-func validateEnrichmentActivationSchema(conn *sqlx.DB) error {
+func validateEnrichmentActivationSchema(conn *sqlx.DB, auditData bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"enrichment_activations", "table"}, {"enrichment_activation_targets", "table"},
 		{"enrichment_activation_immutable", "trigger"}, {"enrichment_activation_target_immutable", "trigger"},
@@ -48,6 +48,15 @@ func validateEnrichmentActivationSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if err := conn.Get(&invalid, "SELECT NOT EXISTS(SELECT 1 FROM pragma_table_info('enrichment_activations') WHERE name='created_at' AND upper(type)='DATETIME')"); err != nil {
+		return err
+	}
+	if invalid {
+		return models.ErrSourcePayloadCorrupt
+	}
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT NOT EXISTS(SELECT 1 FROM pragma_table_info('enrichment_activations') WHERE name='created_at' AND upper(type)='DATETIME')
  OR EXISTS(SELECT 1 FROM enrichment_activations a LEFT JOIN automation_enrichment_imports i ON i.snapshot_uuid=a.snapshot_uuid
  WHERE (a.snapshot_uuid IS NOT NULL AND (i.state IS NULL OR i.state='running' OR i.manifest_sha256 IS NOT a.manifest_sha256))

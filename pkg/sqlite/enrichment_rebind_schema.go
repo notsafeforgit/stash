@@ -30,7 +30,7 @@ func (r enrichmentRebindingRow) decode() (*models.EnrichmentRebindPlan, error) {
 	return plan, nil
 }
 
-func validateEnrichmentRebindSchema(conn *sqlx.DB) error {
+func validateEnrichmentRebindSchema(conn *sqlx.DB, auditData bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"enrichment_rebindings", "table"}, {"enrichment_rebinding_targets", "table"},
 		{"enrichment_rebinding_immutable", "trigger"}, {"enrichment_rebinding_target_immutable", "trigger"}, {"enrichment_rebinding_target_scope", "trigger"},
@@ -45,6 +45,15 @@ func validateEnrichmentRebindSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if err := conn.Get(&invalid, "SELECT NOT EXISTS(SELECT 1 FROM pragma_table_info('enrichment_rebindings') WHERE name='created_at' AND upper(type)='DATETIME')"); err != nil {
+		return err
+	}
+	if invalid {
+		return models.ErrSourcePayloadCorrupt
+	}
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT
 NOT EXISTS(SELECT 1 FROM pragma_table_info('enrichment_rebindings') WHERE name='created_at' AND upper(type)='DATETIME')
 OR EXISTS(SELECT 1 FROM enrichment_rebindings r

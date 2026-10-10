@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateCatalogRegistrySchema(conn *sqlx.DB) error {
+func validateCatalogRegistrySchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"catalog_registry_imports", "catalog_registry_import_records", "catalog_registry_record_page", "catalog_registry_record_review", "catalog_registry_import_immutable", "catalog_registry_record_immutable", "catalog_account_mappings", "catalog_collection_mappings", "catalog_account_mapping_immutable", "catalog_collection_mapping_immutable"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -18,6 +18,9 @@ func validateCatalogRegistrySchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM catalog_registry_imports i JOIN catalog_identity_imports p ON p.uuid=i.identity_import_uuid WHERE
  i.uuid IS NOT json_extract(i.plan,'$.uuid') OR i.source_uuid IS NOT json_extract(i.plan,'$.source_uuid')
  OR i.source_uuid!=p.source_uuid OR i.identity_import_uuid IS NOT json_extract(i.plan,'$.identity_import_uuid')

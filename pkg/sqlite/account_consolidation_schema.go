@@ -6,7 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateAccountConsolidationSchema(conn *sqlx.DB) error {
+func validateAccountConsolidationSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"source_account_consolidations", "source_account_consolidations_destination",
 		"source_account_consolidation_context", "source_account_consolidation_scope", "source_account_consolidation_immutable",
 		"source_account_namespace_immutable", "source_account_identifier_immutable", "source_account_evidence_immutable",
@@ -27,6 +27,9 @@ func validateAccountConsolidationSchema(conn *sqlx.DB) error {
 	}
 	if unfinished {
 		return errors.New("native database has unfinished source account consolidation")
+	}
+	if !auditData {
+		return nil
 	}
 	if err := conn.Get(&unfinished, "SELECT EXISTS(SELECT 1 FROM source_accounts WHERE canonical_uuid IS NULL)"); err != nil {
 		return err

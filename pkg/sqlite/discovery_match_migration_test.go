@@ -56,7 +56,7 @@ func TestDiscoveryComparisonMigrationPreservesSourcePagesAndImportEvidence(t *te
 	}
 }
 
-func TestDiscoveryComparisonReopenRejectsCorruptReferencesAndReceipts(t *testing.T) {
+func TestDiscoveryComparisonValidationRejectsCorruptReferencesAndReceipts(t *testing.T) {
 	for _, test := range []struct{ name, guard, change string }{
 		{"receipt", "discovery_match_page_immutable", "UPDATE discovery_match_pages SET matches_sha256='" + strings.Repeat("f", 64) + "'"},
 		{"ordinals", "discovery_match_evidence_immutable", "UPDATE discovery_match_evidence SET record_ordinals='[1,0]'"},
@@ -86,11 +86,10 @@ func TestDiscoveryComparisonReopenRejectsCorruptReferencesAndReceipts(t *testing
 					require.NoError(t, err)
 				}
 			}
-			err := f.db.Open(f.db.DatabasePath())
 			if test.name == "missing-guard" {
-				require.ErrorContains(t, err, "missing discovery_match_target_scope")
+				require.ErrorContains(t, f.db.Open(f.db.DatabasePath()), "missing discovery_match_target_scope")
 			} else {
-				require.ErrorIs(t, err, models.ErrSourcePayloadCorrupt)
+				require.ErrorIs(t, f.db.AuditForTesting(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 			}
 		})
 	}

@@ -232,7 +232,7 @@ func TestAttachmentSelectionReviewAnonymisesAndRejectsCorruptReceiptBeforeWrites
 	require.NoError(t, err)
 	before, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorContains(t, db.Open(db.DatabasePath()), "source-list selection review")
+	require.ErrorContains(t, db.AuditForTesting(db.DatabasePath()), "source-list selection review")
 	after, err := os.ReadFile(db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

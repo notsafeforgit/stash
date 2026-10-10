@@ -6,7 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateGalleryCoverSchema(conn *sqlx.DB) error {
+func validateGalleryCoverSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"gallery_covers", "gallery_covers_media", "gallery_cover_scope_insert", "gallery_cover_scope_update",
 		"gallery_cover_image_removed", "gallery_cover_scene_removed", "gallery_cover_media_retired",
 		"gallery_cover_image_replaced", "gallery_cover_scene_replaced",
@@ -20,6 +20,9 @@ func validateGalleryCoverSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM gallery_covers c
 LEFT JOIN galleries g ON g.id=c.gallery_id LEFT JOIN archive_entities a ON a.uuid=c.media_uuid
 WHERE g.id IS NULL OR a.uuid IS NULL OR a.state!='active' OR NOT (

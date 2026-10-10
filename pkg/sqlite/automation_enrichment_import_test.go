@@ -305,7 +305,7 @@ func TestAutomationEnrichmentImportCoalescesOnlyProvenAliases(t *testing.T) {
 	}
 }
 
-func TestAutomationEnrichmentStartupRejectsChangedProjections(t *testing.T) {
+func TestAutomationEnrichmentAuditRejectsChangedProjections(t *testing.T) {
 	for _, test := range []struct{ name, trigger, change string }{
 		{"attempts", "automation_enrichment_record_immutable", "UPDATE automation_enrichment_records SET historical_attempts=0 WHERE historical_attempts IS NOT NULL"},
 		{"seed counts", "automation_enrichment_record_immutable", "UPDATE automation_enrichment_records SET seed_counts='{}' WHERE disposition='seed_progress'"},
@@ -331,7 +331,7 @@ func TestAutomationEnrichmentStartupRejectsChangedProjections(t *testing.T) {
 			require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name=?", test.trigger).Scan(&definition))
 			_, err := raw.Exec("DROP TRIGGER " + test.trigger + "; " + test.change + "; " + definition)
 			require.NoError(t, err)
-			require.Error(t, f.db.Open(f.db.DatabasePath()))
+			require.Error(t, f.db.AuditForTesting(f.db.DatabasePath()))
 		})
 	}
 }

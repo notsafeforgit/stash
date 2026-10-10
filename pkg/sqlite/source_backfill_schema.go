@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateSourceBackfillSchema(conn *sqlx.DB) error {
+func validateSourceBackfillSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"source_backfill_decisions", "source_backfill_subject", "source_backfill_immutable", "source_backfill_requests", "source_backfill_request_reference", "source_backfill_request_valid", "source_backfill_request_immutable"} {
 		var exists bool
 		if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -18,6 +18,9 @@ func validateSourceBackfillSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_backfill_decisions d WHERE d.basis='source_runs' AND
   (json_type(d.evidence,'$.completion.requests') IS NOT 'array'
    OR json_type(d.evidence,'$.targets') IS NOT 'array'

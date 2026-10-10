@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateMetadataPolicySchema(conn *sqlx.DB) error {
+func validateMetadataPolicySchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{
 		"metadata_policies", "metadata_policy_revisions", "metadata_policy_revision_scope", "metadata_policy_revision_publish",
 		"metadata_policy_revision_immutable", "metadata_policy_identity_immutable", "metadata_decision_policies", "metadata_decision_policy_history",
@@ -22,6 +22,9 @@ func validateMetadataPolicySchema(conn *sqlx.DB) error {
 		}
 	}
 	var unfinished bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&unfinished, `SELECT EXISTS(SELECT 1 FROM metadata_policies p LEFT JOIN metadata_policy_revisions r
 ON r.collection_uuid=p.collection_uuid AND r.revision=p.revision WHERE r.collection_uuid IS NULL)`); err != nil {
 		return err

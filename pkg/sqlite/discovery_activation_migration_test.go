@@ -54,7 +54,7 @@ func TestDiscoveryActivationMigrationPreservesOriginalPagesAndComparisons(t *tes
 	}
 }
 
-func TestDiscoveryActivationCorruptReceiptOrLostBindingPreventsOpen(t *testing.T) {
+func TestDiscoveryActivationCorruptReceiptOrLostBindingIsRejectedByAudit(t *testing.T) {
 	for _, change := range []string{"UPDATE discovery_activations SET plan_sha256='" + strings.Repeat("f", 64) + "'", "DELETE FROM discovery_activation_targets"} {
 		t.Run(change, func(t *testing.T) {
 			f := newDiscoveryMatchFixture(t)
@@ -68,7 +68,7 @@ func TestDiscoveryActivationCorruptReceiptOrLostBindingPreventsOpen(t *testing.T
 			require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name='discovery_activation_immutable'").Scan(&guard))
 			_, err = raw.Exec("DROP TRIGGER discovery_activation_immutable; " + change + "; " + guard)
 			require.NoError(t, err)
-			require.ErrorIs(t, f.db.Open(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+			require.ErrorIs(t, f.db.AuditForTesting(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 		})
 	}
 }

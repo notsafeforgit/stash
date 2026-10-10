@@ -52,7 +52,11 @@ type Migrator struct {
 }
 
 func NewMigrator(db *Database) (*Migrator, error) {
-	if err := validateDatabaseLineage(db.dbPath); err != nil {
+	return newMigrator(db, true)
+}
+
+func newMigrator(db *Database, auditData bool) (*Migrator, error) {
+	if err := validateNativeDatabase(db.dbPath, auditData); err != nil {
 		return nil, err
 	}
 	m := &Migrator{
@@ -218,9 +222,10 @@ func (m *Migrator) PostMigrate(ctx context.Context) error {
 
 // Read both versions through one validated connection. Native databases have
 // no active fork ledger; only historical import inputs need that lookup.
-// Each new migrator still performs the complete pre-write integrity check.
+// Reading versions for a routine open checks schema/lineage and write guards;
+// explicit migration constructors also audit historical rows before writing.
 func (db *Database) getSchemaVersions() (uint, uint, error) {
-	m, err := NewMigrator(db)
+	m, err := newMigrator(db, false)
 	if err != nil {
 		return 0, 0, err
 	}

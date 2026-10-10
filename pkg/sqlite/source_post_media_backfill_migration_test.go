@@ -62,7 +62,7 @@ func TestPostMediaBackfillMigrationRetainsEvidenceAndExistingChoices(t *testing.
 	}
 }
 
-func TestPostMediaBackfillStartupRejectsIncompleteReceiptBeforeWriting(t *testing.T) {
+func TestPostMediaBackfillAuditRejectsIncompleteReceiptBeforeWriting(t *testing.T) {
 	f, post, _ := postBackfillFixture(t)
 	result, err := applyPostBackfill(f.repo, postBackfillRequest(previewPostBackfill(t, f.repo, post)))
 	require.NoError(t, err)
@@ -79,7 +79,7 @@ func TestPostMediaBackfillStartupRejectsIncompleteReceiptBeforeWriting(t *testin
 	require.NoError(t, err)
 	before, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
-	require.ErrorContains(t, f.db.Open(f.db.DatabasePath()), "invalid historical post media backfills")
+	require.ErrorContains(t, f.db.AuditForTesting(f.db.DatabasePath()), "invalid historical post media backfills")
 	after, err := os.ReadFile(f.db.DatabasePath())
 	require.NoError(t, err)
 	require.Equal(t, before, after)

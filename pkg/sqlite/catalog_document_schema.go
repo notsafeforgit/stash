@@ -75,7 +75,7 @@ const catalogDocumentValidationQuery = `SELECT EXISTS(SELECT 1 FROM catalog_docu
    AND json_extract(candidate.data,'$.values.relpath')=s.relative_path
    ORDER BY json_extract(candidate.data,'$.values.captured_at') DESC,json_extract(candidate.data,'$.values.content_sha256') DESC LIMIT 1))))`
 
-func validateCatalogDocumentSchema(conn *sqlx.DB) error {
+func validateCatalogDocumentSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"catalog_document_imports", "catalog_document_records", "catalog_document_import_guard", "catalog_document_record_immutable", "catalog_document_review", "catalog_snapshot_documents_path"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -90,6 +90,9 @@ func validateCatalogDocumentSchema(conn *sqlx.DB) error {
 	var compactable bool
 	if err := conn.Get(&compactable, `SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='catalog_document_pending_imports')`); err != nil {
 		return err
+	}
+	if !auditData {
+		return nil
 	}
 	if compactable {
 		imports = "catalog_document_pending_imports"

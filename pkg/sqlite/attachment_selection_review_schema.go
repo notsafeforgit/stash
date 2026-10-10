@@ -6,7 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateAttachmentSelectionReviewSchema(conn *sqlx.DB) error {
+func validateAttachmentSelectionReviewSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"attachment_selection_reviews", "attachment_selection_reviews_post", "attachment_selection_review_immutable", "attachment_selection_review_scope"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -15,6 +15,9 @@ func validateAttachmentSelectionReviewSchema(conn *sqlx.DB) error {
 		if !found {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for after := ""; ; {
 		var id string

@@ -282,7 +282,7 @@ func TestTranslationActivationConcurrentReplayRetainsOneReceipt(t *testing.T) {
 	require.EqualValues(t, 2, queryUint(t, raw, "SELECT count(*) FROM translation_target_history"))
 }
 
-func TestTranslationActivationStartupRejectsCorruptReceiptsWithoutWrites(t *testing.T) {
+func TestTranslationActivationAuditRejectsCorruptReceiptsWithoutWrites(t *testing.T) {
 	for _, item := range []struct{ name, mutation string }{
 		{"hash", "UPDATE translation_activations SET input_sha256=printf('%064d',0)"},
 		{"plan", "UPDATE translation_activations SET plan=json_set(plan,'$.entries[0].not_before','2020-01-01T00:00:00Z')"},
@@ -324,7 +324,7 @@ func TestTranslationActivationStartupRejectsCorruptReceiptsWithoutWrites(t *test
 			before, err := os.ReadFile(path)
 			require.NoError(t, err)
 			check := sqlite.NewDatabase()
-			require.Error(t, check.Open(path))
+			require.Error(t, check.AuditForTesting(path))
 			require.NoError(t, check.Close())
 			after, err := os.ReadFile(path)
 			require.NoError(t, err)

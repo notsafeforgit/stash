@@ -328,7 +328,7 @@ func TestEnrichmentHandoffCannotReplaceSeedOrFinishWithoutItsPublication(t *test
 	require.Equal(t, "pending", readEnrichmentTarget(t, f.repo, f.plan.ReleasedTargetUUID).State)
 }
 
-func TestEnrichmentHandoffMissingProjectionRefusesStartupWithoutWrites(t *testing.T) {
+func TestEnrichmentHandoffMissingProjectionRefusesAuditWithoutWrites(t *testing.T) {
 	f := newHandoffExecutionFixture(t)
 	f.admit(t)
 	path := f.db.DatabasePath()
@@ -339,7 +339,7 @@ func TestEnrichmentHandoffMissingProjectionRefusesStartupWithoutWrites(t *testin
 	require.NoError(t, raw.Close())
 	before, err := os.ReadFile(path)
 	require.NoError(t, err)
-	require.Error(t, f.db.Open(path))
+	require.Error(t, f.db.AuditForTesting(path))
 	after, err := os.ReadFile(path)
 	require.NoError(t, err)
 	require.Equal(t, before, after)

@@ -301,7 +301,7 @@ func TestTranslationWorkAtomicPublicationAndForgottenPost(t *testing.T) {
 	require.NoError(t, db.Open(db.DatabasePath()))
 }
 
-func TestTranslationWorkStartupRejectsCorruptStateWithoutWrites(t *testing.T) {
+func TestTranslationWorkAuditRejectsCorruptStateWithoutWrites(t *testing.T) {
 	for _, item := range []struct{ name, trigger, mutation string }{
 		{"request", "translation_request_immutable", "UPDATE translation_requests SET original_text='Changed original'"},
 		{"cache", "translation_cache_immutable", "UPDATE translation_cache SET uuid='11111111-1111-5111-8111-111111111111'"},
@@ -325,7 +325,7 @@ func TestTranslationWorkStartupRejectsCorruptStateWithoutWrites(t *testing.T) {
 			before, err := os.ReadFile(path)
 			require.NoError(t, err)
 			check := sqlite.NewDatabase()
-			require.Error(t, check.Open(path))
+			require.Error(t, check.AuditForTesting(path))
 			require.NoError(t, check.Close())
 			after, err := os.ReadFile(path)
 			require.NoError(t, err)

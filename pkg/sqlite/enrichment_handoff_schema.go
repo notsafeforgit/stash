@@ -8,7 +8,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateEnrichmentHandoffSchema(conn *sqlx.DB) error {
+func validateEnrichmentHandoffSchema(conn *sqlx.DB, auditData bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"enrichment_handoff_jobs", "table"}, {"enrichment_job_retained_records", "table"}, {"enrichment_job_seed_services", "table"},
 		{"enrichment_handoff_job_immutable", "trigger"}, {"enrichment_handoff_job_scope", "trigger"},
@@ -24,6 +24,9 @@ func validateEnrichmentHandoffSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM archive_jobs j WHERE j.kind='post.enrich'
  AND (json_type(j.arguments,'$.handoff') IS NOT NULL)!=EXISTS(SELECT 1 FROM enrichment_handoff_jobs h WHERE h.job_uuid=j.uuid))
  OR EXISTS(SELECT 1 FROM enrichment_handoff_jobs h LEFT JOIN archive_jobs j ON j.uuid=h.job_uuid

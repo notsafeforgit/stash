@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validatePostMediaEvidenceSchema(conn *sqlx.DB) error {
+func validatePostMediaEvidenceSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"source_media_evidence_post", "source_media_evidence_active_post", "source_media_evidence_revision"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -29,6 +29,9 @@ func validatePostMediaEvidenceSchema(conn *sqlx.DB) error {
 		return errors.New("native database schema is incomplete: invalid source_media_evidence scope columns")
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_media_evidence e
  LEFT JOIN source_posts p ON p.uuid=e.post_uuid
  LEFT JOIN source_attachments a ON a.uuid=e.attachment_uuid

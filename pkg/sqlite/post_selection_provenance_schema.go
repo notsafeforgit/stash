@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validatePostSelectionProvenanceSchema(conn *sqlx.DB) error {
+func validatePostSelectionProvenanceSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"post_attachment_decision_capture_scope", "post_attachment_decision_manifest_scope"} {
 		var exists bool
 		if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=? AND type='trigger')", name); err != nil {
@@ -16,6 +16,9 @@ func validatePostSelectionProvenanceSchema(conn *sqlx.DB) error {
 		if !exists {
 			return fmt.Errorf("native post selection schema is incomplete: missing %s", name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for _, query := range []string{
 		`SELECT EXISTS(SELECT 1 FROM post_attachment_decisions d

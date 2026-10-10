@@ -9,7 +9,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateSourceDocumentSchema(conn *sqlx.DB) error {
+func validateSourceDocumentSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{
 		"source_document_contents", "source_document_content_immutable", "source_documents", "source_documents_content", "source_document_immutable",
 		"source_document_sources", "source_document_sources_post", "source_document_sources_location", "source_document_sources_document",
@@ -39,6 +39,9 @@ func validateSourceDocumentSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_documents d LEFT JOIN source_document_contents c ON c.content_sha256=d.content_sha256 WHERE c.content_sha256 IS NULL)
 OR EXISTS(SELECT 1 FROM source_document_sources s
  LEFT JOIN source_documents d ON d.uuid=s.document_uuid

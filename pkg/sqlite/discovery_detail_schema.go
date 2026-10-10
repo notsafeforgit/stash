@@ -13,7 +13,7 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 )
 
-func validateDiscoveryDetailSchema(conn *sqlx.DB) error {
+func validateDiscoveryDetailSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"discovery_detail_jobs", "discovery_detail_job_immutable", "discovery_detail_job_scope", "archive_jobs_discovery_detail", "discovery_detail_pacing_bind", "discovery_detail_attempts", "discovery_detail_attempt_immutable", "discovery_detail_attempt_scope", "discovery_detail_checkpoint_receipts", "discovery_detail_checkpoint_receipt_immutable", "discovery_detail_checkpoint_receipt_scope", "discovery_detail_checkpoints", "discovery_detail_checkpoint_initial", "discovery_detail_checkpoint_transition", "discovery_detail_checkpoint_records", "discovery_detail_checkpoint_records_receipt", "discovery_detail_checkpoint_record_immutable", "discovery_detail_checkpoint_record_scope", "discovery_detail_checkpoint_usage", "discovery_detail_checkpoint_usage_insert", "discovery_detail_checkpoint_usage_update", "discovery_detail_checkpoint_usage_delete", "discovery_detail_results", "discovery_detail_result_immutable", "discovery_detail_result_scope", "discovery_detail_success"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -24,6 +24,9 @@ func validateDiscoveryDetailSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT
  EXISTS(SELECT 1 FROM archive_jobs j WHERE j.kind='post.verify_candidate' AND NOT EXISTS(SELECT 1 FROM discovery_detail_jobs b WHERE b.job_uuid=j.uuid))
  OR EXISTS(SELECT 1 FROM discovery_detail_jobs b JOIN archive_jobs j ON j.uuid=b.job_uuid WHERE j.kind!='post.verify_candidate')

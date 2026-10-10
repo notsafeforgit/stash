@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateSourceCollectionSchema(conn *sqlx.DB) error {
+func validateSourceCollectionSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{
 		"media_roots", "media_root_revisions", "media_root_revision_scope", "media_root_revision_publish", "media_root_revision_immutable", "media_root_identity_immutable",
 		"source_accounts_collection_scope", "source_collections", "source_collection_revisions", "source_collection_target", "source_collection_root", "source_collection_account",
@@ -24,6 +24,9 @@ func validateSourceCollectionSchema(conn *sqlx.DB) error {
 		}
 	}
 	var unfinished bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&unfinished, `SELECT EXISTS(SELECT 1 FROM media_roots b LEFT JOIN media_root_revisions r ON r.root_uuid=b.uuid AND r.revision=b.revision WHERE r.root_uuid IS NULL)
 OR EXISTS(SELECT 1 FROM source_collections b LEFT JOIN source_collection_revisions r ON r.collection_uuid=b.uuid AND r.revision=b.revision WHERE r.collection_uuid IS NULL)`); err != nil {
 		return err

@@ -1,8 +1,20 @@
 # Native schema promotion
 
-The current development schema is 1000109; production is at 1000108 as recorded
-in [implementation progress](native-archive-progress.md). New migrations are
-rehearsed on copies before deployment.
+The current development and production schema is 1000110, as recorded in
+[implementation progress](native-archive-progress.md). New migrations are
+rehearsed on copies before deployment. Schema 1000110 permits independent source
+workers to share a media root while retaining account, target and file fences.
+
+Routine startup validates lineage, the clean supported schema version, required
+tables/columns/indexes/triggers, and unfinished write contexts. It does not scan
+all retained catalog receipts, captures, decisions or job history. The required
+partial index bounds the check for unsealed metadata decisions. Each domain
+mutation continues to enforce its transaction guards and constraints.
+
+Explicit migration constructors and `stash --verify-native-snapshot <path>`
+retain the full domain/history audit. Snapshot verification additionally checks
+SQLite integrity, foreign keys and file identity without writing to the source.
+Separating startup from this audit requires no schema migration or data rewrite.
 
 Schema 1000109 records verified image-to-video transitions in `media_conversions`.
 The immutable record binds the original image and file lifetime to the new scene
@@ -1031,7 +1043,7 @@ and creates disabled logical collections without scrape targets or root bindings
 Original source-qualified keys remain migration references to native accounts and
 collections. Captured IDs establish accounts, while uncertain locators remain
 provisional or unresolved. Imported publishers do not assign depicted performers.
-SQL guards and startup validation reconcile receipts, evidence counts and mappings.
+SQL guards and full data validation reconcile receipts, evidence counts and mappings.
 Normal database backups include these records; anonymisation removes them before
 source accounts and collections. See the [registry import contracts](native-source-identity.md#importing-the-performer-registry).
 
@@ -1078,7 +1090,7 @@ collection/root revisions. Its source timestamp may be unknown; `observed_at`
 records receipt of the assertion, and `created_at` records native insertion.
 Signatures cover its provenance and complete child values. Partial event writes
 cannot commit, even when a caller discards a late error. Startup validates the
-graph, signatures and import receipts before normal opening.
+graph, signatures and import receipts during migration and full snapshot verification.
 
 Locations refer to source file observations, including unavailable files and
 ZIP members. Deduplication points to a declared content claim, which need not be
@@ -1326,7 +1338,7 @@ includes exact original text, output, source and target languages, and provider.
 Unknown values remain null, distinct from empty strings. Original/output text
 is valid UTF-8, bounded to 4 MiB each, with no whitespace or Unicode normalization.
 The native original-text SHA-256 hashes its exact UTF-8 bytes; null original text
-has no hash. Reading a result and startup validation verify its identity/hash.
+has no hash. Reading a result and full data validation verify its identity/hash.
 
 `source_translation_evidence` separately retains each post association,
 optional historical collection revision, provenance, source timestamp and
@@ -2028,7 +2040,7 @@ New decisions require the current post revision, current active scene/image
 revision and complete reviewed decision set. Capture selection validates that the
 chosen decision still governs that post/media pair. Selected field history keeps
 the direct association reference as well as capture and policy provenance. All
-references have foreign keys, immutable history guards and startup validation;
+references have foreign keys, immutable history guards and full data validation;
 UUID adoption cascades references without rewriting the recorded review.
 
 The migration creates empty association tables and preserves existing attachment

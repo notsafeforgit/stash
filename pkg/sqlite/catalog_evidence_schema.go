@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateCatalogEvidenceSchema(conn *sqlx.DB) error {
+func validateCatalogEvidenceSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"catalog_evidence_imports", "catalog_evidence_posts", "catalog_evidence_records", "catalog_evidence_import_guard", "catalog_evidence_post_immutable", "catalog_evidence_record_immutable", "catalog_evidence_review", "catalog_snapshot_observation_children", "catalog_snapshot_post_urls"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -18,6 +18,9 @@ func validateCatalogEvidenceSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM catalog_evidence_imports i JOIN catalog_snapshots s ON s.uuid=i.snapshot_uuid WHERE
  s.state!='received' OR i.manifest_sha256!=s.manifest_sha256
  OR i.source_records!=(SELECT coalesce(sum(t.received_records),0) FROM catalog_snapshot_tables t WHERE t.snapshot_uuid=s.uuid AND t.source_table IN ('account_snapshots','posts','observations','observation_details'))

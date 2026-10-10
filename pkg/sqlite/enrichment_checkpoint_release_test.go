@@ -163,7 +163,7 @@ func TestEnrichmentCheckpointReleaseSwallowedFailureDoesNotCommit(t *testing.T) 
 	require.EqualValues(t, 1, queryUint(t, raw, "SELECT count(*) FROM archive_jobs WHERE state='succeeded'"))
 }
 
-func TestEnrichmentCheckpointReleaseStartupRejectsChangedEvidence(t *testing.T) {
+func TestEnrichmentCheckpointReleaseAuditRejectsChangedEvidence(t *testing.T) {
 	for _, mutation := range []string{"references", "receipt", "missing_release", "payload", "collection"} {
 		t.Run(mutation, func(t *testing.T) {
 			f := newEnrichmentExecutionFixture(t)
@@ -207,7 +207,7 @@ func TestEnrichmentCheckpointReleaseStartupRejectsChangedEvidence(t *testing.T) 
 			before, err := os.ReadFile(path)
 			require.NoError(t, err)
 			check := sqlite.NewDatabase()
-			require.Error(t, check.Open(path))
+			require.Error(t, check.AuditForTesting(path))
 			require.NoError(t, check.Close())
 			after, err := os.ReadFile(path)
 			require.NoError(t, err)

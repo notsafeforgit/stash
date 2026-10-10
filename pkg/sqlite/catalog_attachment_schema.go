@@ -44,7 +44,7 @@ const catalogAttachmentValidationQuery = `SELECT EXISTS(SELECT 1 FROM catalog_at
  OR (r.outcome='mapped' AND r.selection_changed=0
   AND json_extract(r.context_json,'$.current_selection_uuid') IS NOT r.selection_uuid))`
 
-func validateCatalogAttachmentSchema(conn *sqlx.DB) error {
+func validateCatalogAttachmentSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"catalog_attachment_imports", "catalog_attachment_records", "catalog_attachment_import_guard", "catalog_attachment_record_immutable", "catalog_attachment_review"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -55,6 +55,9 @@ func validateCatalogAttachmentSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, catalogAttachmentValidationQuery); err != nil {
 		return err
 	}

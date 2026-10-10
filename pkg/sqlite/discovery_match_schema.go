@@ -12,7 +12,7 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 )
 
-func validateDiscoveryMatchSchema(conn *sqlx.DB) error {
+func validateDiscoveryMatchSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"discovery_match_targets", "discovery_match_targets_source", "discovery_match_targets_pending", "discovery_match_target_scope", "discovery_match_target_transition",
 		"discovery_match_pages", "discovery_match_page_immutable", "discovery_match_page_scope", "discovery_match_candidates", "discovery_match_candidates_page",
 		"discovery_match_candidate_transition", "discovery_match_evidence", "discovery_match_evidence_candidate", "discovery_match_evidence_immutable"} {
@@ -23,6 +23,9 @@ func validateDiscoveryMatchSchema(conn *sqlx.DB) error {
 		if !found {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for _, table := range []string{"discovery_match_targets", "discovery_match_pages", "discovery_match_candidates", "discovery_match_evidence"} {
 		var child, parent string

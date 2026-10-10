@@ -75,7 +75,7 @@ func TestDiscoveryListingCorruptEvidenceIsRefusedBeforeWrites(t *testing.T) {
 			require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name='discovery_page_immutable'").Scan(&guard))
 			_, err = raw.Exec("DROP TRIGGER discovery_page_immutable; UPDATE discovery_pages SET " + change + "; " + guard)
 			require.NoError(t, err)
-			require.ErrorIs(t, f.db.Open(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
+			require.ErrorIs(t, f.db.AuditForTesting(f.db.DatabasePath()), models.ErrSourcePayloadCorrupt)
 		})
 	}
 }

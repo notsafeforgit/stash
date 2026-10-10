@@ -303,7 +303,7 @@ func TestSourceAssociationReviewAnonymisesAndRejectsCorruptReceiptsBeforeWrites(
 			require.NoError(t, err)
 			before, err := os.ReadFile(db.DatabasePath())
 			require.NoError(t, err)
-			require.ErrorContains(t, db.Open(db.DatabasePath()), "source association review")
+			require.ErrorContains(t, db.AuditForTesting(db.DatabasePath()), "source association review")
 			after, err := os.ReadFile(db.DatabasePath())
 			require.NoError(t, err)
 			require.Equal(t, before, after)

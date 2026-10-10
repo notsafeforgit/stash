@@ -93,7 +93,7 @@ func verifyDiscoveryPublication(get enrichmentGet, selectRows enrichmentSelect, 
 	return nil
 }
 
-func validateDiscoveryPublicationSchema(conn *sqlx.DB, details bool) error {
+func validateDiscoveryPublicationSchema(conn *sqlx.DB, details bool, auditData bool) error {
 	names := []string{"discovery_match_publications", "discovery_match_publication_immutable", "discovery_match_publication_scope",
 		"discovery_published_records", "discovery_published_records_capture", "discovery_published_record_immutable", "discovery_published_record_scope"}
 	if details {
@@ -114,6 +114,9 @@ func validateDiscoveryPublicationSchema(conn *sqlx.DB, details bool) error {
 		if !exists {
 			return fmt.Errorf("native database schema is incomplete: missing %s", name)
 		}
+	}
+	if !auditData {
+		return nil
 	}
 	for _, table := range []string{"discovery_match_publications", "discovery_published_records"} {
 		var child, parent string

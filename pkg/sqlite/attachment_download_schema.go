@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateAttachmentDownloadSchema(conn *sqlx.DB) error {
+func validateAttachmentDownloadSchema(conn *sqlx.DB, auditData bool) error {
 	for _, name := range []string{"source_attachment_downloads", "attachment_download_transfer_phase", "attachment_download_sequence_phase", "attachment_download_history", "attachment_download_immutable", "attachment_download_scope", "attachment_download_receipt"} {
 		var exists bool
 		if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -18,6 +18,9 @@ func validateAttachmentDownloadSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_attachment_downloads d
  LEFT JOIN ingest_receipts r ON r.producer_uuid=d.producer_uuid AND r.event_uuid=d.event_uuid
  LEFT JOIN ingest_receipts c ON c.producer_uuid=d.producer_uuid AND c.event_uuid=d.capture_event_uuid

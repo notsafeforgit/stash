@@ -58,7 +58,7 @@ func TestPostConsolidationReviewAnonymiseRemovesRequestsChoicesAndNotifications(
 	}
 }
 
-func TestPostConsolidationReviewStartupRejectsCorruptReceiptsWithoutWriting(t *testing.T) {
+func TestPostConsolidationReviewAuditRejectsCorruptReceiptsWithoutWriting(t *testing.T) {
 	for _, corrupt := range []string{"gallery scope", "member missing", "retry revision"} {
 		t.Run(corrupt, func(t *testing.T) {
 			db, repo, review := postMergeNotificationFixture(t)
@@ -113,10 +113,10 @@ func TestPostConsolidationReviewStartupRejectsCorruptReceiptsWithoutWriting(t *t
 			require.NoError(t, db.Close())
 			before, err := os.ReadFile(db.DatabasePath())
 			require.NoError(t, err)
-			require.Error(t, db.Open(db.DatabasePath()))
+			require.Error(t, db.AuditForTesting(db.DatabasePath()))
 			after, err := os.ReadFile(db.DatabasePath())
 			require.NoError(t, err)
-			require.Equal(t, before, after, "invalid recovery evidence must be rejected before any startup write")
+			require.Equal(t, before, after, "invalid recovery evidence must be rejected before any audit write")
 		})
 	}
 }

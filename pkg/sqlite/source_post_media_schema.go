@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validatePostMediaDecisionSchema(conn *sqlx.DB, consolidated bool) error {
+func validatePostMediaDecisionSchema(conn *sqlx.DB, consolidated bool, auditData bool) error {
 	for _, name := range []string{"post_media_decisions", "post_media_links", "post_media_decisions_media", "post_media_links_media",
 		"post_media_decision_scope", "post_media_decision_immutable", "post_media_head_forward",
 		"post_media_supersessions", "post_media_supersessions_decision", "post_media_supersession_scope", "post_media_supersession_immutable",
@@ -30,7 +30,7 @@ func validatePostMediaDecisionSchema(conn *sqlx.DB, consolidated bool) error {
 	invalidReplacement := "old.post_uuid!=current.post_uuid OR old.post_revision>=current.post_revision"
 	invalidCapture := "p.post_uuid!=c.post_uuid"
 	if consolidated {
-		if err := validatePostMediaConsolidationSchema(conn); err != nil {
+		if err := validatePostMediaConsolidationSchema(conn, auditData); err != nil {
 			return err
 		}
 		invalidReplacement = `(old.post_uuid=current.post_uuid AND old.post_revision>=current.post_revision)
@@ -55,6 +55,9 @@ WHERE (l.decision_uuid IS NULL)=(s.previous_uuid IS NULL))
 OR EXISTS(SELECT 1 FROM metadata_decision_post_media l LEFT JOIN metadata_field_decisions d ON d.uuid=l.decision_uuid
 LEFT JOIN source_captures c ON c.uuid=d.capture_uuid LEFT JOIN post_media_decisions p ON p.uuid=l.post_media_decision_uuid
 WHERE d.uuid IS NULL OR d.origin!='source' OR c.uuid IS NULL OR p.uuid IS NULL OR (%s) OR p.state!='linked')`, invalidReplacement, invalidCapture)
+	if !auditData {
+		return nil
+	}
 	if err := conn.Get(&invalid, query); err != nil {
 		return err
 	}

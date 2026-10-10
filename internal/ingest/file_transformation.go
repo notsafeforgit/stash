@@ -24,6 +24,16 @@ type FileTransformation struct {
 }
 
 func (p *PreparedMedia) publishIntakeMedia(ctx context.Context, repo models.Repository, input IntakePublication, selected *models.ArchiveEntity) (*PublishedMedia, *IntakeConversionResult, error) {
+	if input.Transformation != nil && input.Transformation.ReviewedImageUUID != "" {
+		var err error
+		selected, err = repo.ArchiveEntity.Find(ctx, input.Transformation.ReviewedImageUUID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if selected == nil || selected.Kind != models.ArchiveImage || selected.State != models.ArchiveEntityActive || selected.Revision != input.Transformation.ReviewedImageRevision {
+			return nil, nil, ErrManualFileChanged
+		}
+	}
 	if selected == nil && input.Transformation != nil && input.Transformation.Original.FileUUID != "" {
 		// An explicit source unlink must survive conversion. The original file's
 		// unique image owner and retained attachment/file evidence can establish
@@ -35,7 +45,7 @@ func (p *PreparedMedia) publishIntakeMedia(ctx context.Context, repo models.Repo
 		if len(owners) > 1 {
 			return nil, nil, ErrAmbiguousMedia
 		}
-		if len(owners) == 1 && owners[0].Kind == models.ArchiveImage {
+		if len(owners) == 1 && owners[0].Kind == models.ArchiveImage && input.Source != nil {
 			for after, checked := "", 0; selected == nil && checked < 1000; {
 				evidence, err := repo.SourceAttachment.MediaEvidence(ctx, input.Source.AttachmentUUID, after, 100)
 				if err != nil {
@@ -110,11 +120,21 @@ func (p *PreparedMedia) publishIntakeMedia(ctx context.Context, repo models.Repo
 	if err := absent(ctx); err != nil {
 		return nil, nil, fmt.Errorf("verify converted GIF: %w", err)
 	}
-	media, err := p.publishMedia(ctx, repo, input.Target, input.Kind, nil)
+	var destination *models.ArchiveEntity
+	if input.Transformation.ReviewedSceneUUID != "" {
+		destination, err = repo.ArchiveEntity.Find(ctx, input.Transformation.ReviewedSceneUUID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if destination == nil || destination.State != models.ArchiveEntityActive || destination.Kind != models.ArchiveScene || destination.Revision != input.Transformation.ReviewedSceneRevision {
+			return nil, nil, ErrManualFileChanged
+		}
+	}
+	media, err := p.publishMedia(ctx, repo, input.Target, input.Kind, destination)
 	if err != nil {
 		return nil, nil, err
 	}
-	if !media.Created {
+	if (destination == nil && !media.Created) || (destination != nil && (media.Created || media.Media.UUID != destination.UUID)) {
 		return nil, nil, ErrAmbiguousMedia
 	}
 	conversionUUID := uuid.NewSHA1(uuid.MustParse(input.UUID), []byte("gif-to-video")).String()
@@ -123,6 +143,7 @@ func (p *PreparedMedia) publishIntakeMedia(ctx context.Context, repo models.Repo
 		SceneUUID: media.Media.UUID, ExpectedSceneRevision: media.Media.Revision,
 		OriginalFileUUID: original.FileUUID, OriginalGeneration: original.Generation,
 		FileUUID: media.File.Identity.UUID, Generation: media.File.File.Base().Generation,
+		ReuseReviewedScene: destination != nil,
 	})
 	if err != nil {
 		return nil, nil, err
@@ -167,6 +188,12 @@ func (p *PreparedMedia) publishIntakeMedia(ctx context.Context, repo models.Repo
 type IntakeTransformation struct {
 	Kind     string     `json:"kind"`
 	Original FileTarget `json:"original"`
+	// These identities are frozen only by application-authenticated local
+	// review. Producer transformation claims cannot supply them.
+	ReviewedImageUUID     string `json:"reviewed_image_uuid,omitempty"`
+	ReviewedImageRevision int    `json:"reviewed_image_revision,omitempty"`
+	ReviewedSceneUUID     string `json:"reviewed_scene_uuid,omitempty"`
+	ReviewedSceneRevision int    `json:"reviewed_scene_revision,omitempty"`
 }
 
 // Retain the portable claim with source-media evidence after publication.
@@ -204,7 +231,15 @@ func validIntakeTransformation(input IntakePublication) bool {
 		return true
 	}
 	original := value.Original
-	if !validFileTransformation(&FileTransformation{Kind: value.Kind, OriginalRelativePath: original.RelativePath}, input.Kind, input.Target.RelativePath, input.Source != nil) ||
+	reviewed := ValidUUID(value.ReviewedImageUUID) && value.ReviewedImageRevision > 0
+	if reviewed {
+		if input.Source != nil || ((value.ReviewedSceneUUID != "" || value.ReviewedSceneRevision != 0) && (!ValidUUID(value.ReviewedSceneUUID) || value.ReviewedSceneRevision < 1)) {
+			return false
+		}
+	} else if value.ReviewedImageUUID != "" || value.ReviewedImageRevision != 0 || value.ReviewedSceneUUID != "" || value.ReviewedSceneRevision != 0 {
+		return false
+	}
+	if !validFileTransformation(&FileTransformation{Kind: value.Kind, OriginalRelativePath: original.RelativePath}, input.Kind, input.Target.RelativePath, input.Source != nil || reviewed) ||
 		original.RootUUID != input.Target.RootUUID || !ValidUUID(original.RootUUID) ||
 		original.PathFence.CaseSensitive != input.Target.PathFence.CaseSensitive ||
 		filepath.Dir(original.PathFence.Path) != filepath.Dir(input.Target.PathFence.Path) ||

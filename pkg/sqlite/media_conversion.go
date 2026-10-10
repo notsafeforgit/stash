@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/txn"
@@ -78,21 +79,43 @@ func (s *MediaConversionStore) ConvertImage(ctx context.Context, input models.Im
 		return nil, err
 	}
 	fields := &MetadataFieldStore{}
-	// An automatically converted GIF never overwrites another scene's edits.
-	// The intake service also requires that it created this destination.
+	// Automatic conversion requires a fresh scene. A reviewed legacy repair
+	// can reuse the already scanned MKV, but may only fill empty fields or
+	// retain an identical value. Existing choices and scene-only fields stay.
+	keep := map[string]bool{}
 	for _, definition := range models.MetadataFields(models.ArchiveScene) {
 		state, err := fields.State(ctx, scene.UUID, definition.Name)
 		if err != nil {
 			return nil, err
 		}
 		if state.Decision != nil || state.Protected || !bytes.Equal(state.Value, definition.ClearValue) {
-			return nil, models.ErrMetadataFieldConflict
+			if !input.ReuseReviewedScene {
+				return nil, models.ErrMetadataFieldConflict
+			}
+			var sourceDefinition *models.MetadataFieldDefinition
+			for _, field := range models.MetadataFields(models.ArchiveImage) {
+				if field.Name == definition.Name {
+					sourceDefinition = &field
+					break
+				}
+			}
+			if sourceDefinition != nil {
+				source, err := fields.State(ctx, image.UUID, definition.Name)
+				if err != nil {
+					return nil, err
+				}
+				if !bytes.Equal(source.Value, state.Value) && (source.Decision != nil || source.Protected || !bytes.Equal(source.Value, sourceDefinition.ClearValue)) {
+					return nil, models.ErrMetadataFieldConflict
+				}
+			}
+			keep[definition.Name] = true
 		}
 	}
 	var occupied bool
 	if err := dbWrapper.Get(ctx, &occupied, `SELECT EXISTS(SELECT 1 FROM scenes_galleries WHERE scene_id=?)
  OR EXISTS(SELECT 1 FROM scenes_o_dates WHERE scene_id=?)
- OR EXISTS(SELECT 1 FROM scenes_view_dates WHERE scene_id=?)`, *scene.LocalID, *scene.LocalID, *scene.LocalID); err != nil {
+ OR EXISTS(SELECT 1 FROM scenes_view_dates WHERE scene_id=?)
+ OR EXISTS(SELECT 1 FROM gallery_membership_events WHERE media_uuid=?)`, *scene.LocalID, *scene.LocalID, *scene.LocalID, scene.UUID); err != nil {
 		return nil, err
 	}
 	if occupied {
@@ -122,16 +145,23 @@ func (s *MediaConversionStore) ConvertImage(ctx context.Context, input models.Im
 		input.OriginalGeneration, input.FileUUID, input.Generation, old.Photographer, old.OCounter); err != nil {
 		return nil, err
 	}
+	copiedFields := []any{scene.UUID, image.UUID}
 	for _, definition := range models.MetadataFields(models.ArchiveImage) {
 		if definition.Name == "photographer" {
 			continue // Retained as an image attribution, never relabeled director.
 		}
+		if keep[definition.Name] {
+			continue
+		}
 		if err := copyConvertedMetadataField(ctx, image, scene, definition); err != nil {
 			return nil, err
 		}
+		copiedFields = append(copiedFields, definition.Name)
 	}
-	if _, err := dbWrapper.Exec(ctx, "UPDATE scenes SET created_at=? WHERE id=?", old.CreatedAt, *scene.LocalID); err != nil {
-		return nil, err
+	if !input.ReuseReviewedScene {
+		if _, err := dbWrapper.Exec(ctx, "UPDATE scenes SET created_at=? WHERE id=?", old.CreatedAt, *scene.LocalID); err != nil {
+			return nil, err
+		}
 	}
 	if old.OCounter > 0 {
 		if _, err := dbWrapper.Exec(ctx, `WITH RECURSIVE numbers(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM numbers WHERE n<?)
@@ -152,13 +182,15 @@ func (s *MediaConversionStore) ConvertImage(ctx context.Context, input models.Im
 	// A source choice is scoped to its original media identity. Copy its field
 	// provenance only after that identity resolves to the converted scene, while
 	// the copied heads still refer to the image's original decisions.
-	if _, err := dbWrapper.Exec(ctx, `INSERT INTO metadata_decision_post_media(decision_uuid,post_media_decision_uuid)
+	if len(copiedFields) > 2 {
+		if _, err := dbWrapper.Exec(ctx, `INSERT INTO metadata_decision_post_media(decision_uuid,post_media_decision_uuid)
  SELECT target.decision_uuid,p.post_media_decision_uuid
  FROM metadata_field_heads source
  JOIN metadata_decision_post_media p ON p.decision_uuid=source.decision_uuid
  JOIN metadata_field_heads target ON target.entity_uuid=? AND target.field=source.field
- WHERE source.entity_uuid=?`, scene.UUID, image.UUID); err != nil {
-		return nil, err
+	WHERE source.entity_uuid=? AND target.field IN (`+strings.TrimSuffix(strings.Repeat("?,", len(copiedFields)-2), ",")+`)`, copiedFields...); err != nil {
+			return nil, err
+		}
 	}
 	if _, err := dbWrapper.Exec(ctx, "DELETE FROM images WHERE id=?", *image.LocalID); err != nil {
 		return nil, err

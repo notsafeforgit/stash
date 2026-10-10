@@ -26,6 +26,7 @@ type ManualFileInput struct {
 	CollectionUUID     string                   `json:"collection_uuid"`
 	RelativePath       string                   `json:"relative_path"`
 	MediaKind          models.ArchiveEntityKind `json:"media_kind"`
+	OriginalGIFPath    string                   `json:"original_gif_path,omitempty"`
 }
 
 type ManualFileRequest struct {
@@ -45,6 +46,8 @@ type ManualFilePreview struct {
 	Size                   int64     `json:"size"`
 	ModifiedAt             time.Time `json:"modified_at"`
 	ExistingFileUUID       string    `json:"existing_file_uuid,omitempty"`
+	OriginalImageUUID      string    `json:"original_image_uuid,omitempty"`
+	ExistingSceneUUID      string    `json:"existing_scene_uuid,omitempty"`
 	FileSignature          string    `json:"file_signature,omitempty"`
 	Signature              string    `json:"signature"`
 }
@@ -81,12 +84,17 @@ type ManualFileStatus struct {
 }
 
 type manualFilePlan struct {
-	Preview    ManualFilePreview
-	Target     FileTarget
-	Inspection archive.MediaFileInspection
+	Preview        ManualFilePreview
+	Target         FileTarget
+	Inspection     archive.MediaFileInspection
+	Transformation *IntakeTransformation `json:",omitempty"`
 }
 
 func validManualFileInput(input ManualFileInput) bool {
+	if input.OriginalGIFPath != "" && (input.ScanCollectionUUID != "" || !validFileTransformation(
+		&FileTransformation{Kind: "gif-to-video", OriginalRelativePath: input.OriginalGIFPath}, input.MediaKind, input.RelativePath, true)) {
+		return false
+	}
 	return (input.ScanCollectionUUID == "" || ValidUUID(input.ScanCollectionUUID)) && ValidUUID(input.CollectionUUID) && archive.ValidRootRelativePath(input.RelativePath, false) &&
 		!strings.HasSuffix(strings.ToLower(input.RelativePath), ".part") && (input.MediaKind == models.ArchiveScene || input.MediaKind == models.ArchiveImage)
 }
@@ -160,6 +168,14 @@ func (s *Service) manualFilePlan(ctx context.Context, input ManualFileInput) (*m
 		RootUUID: root.UUID, RootRevision: root.Revision, Filename: path.Base(input.RelativePath),
 		Size: inspection.Snapshot.Size, ModifiedAt: inspection.Snapshot.ModifiedAt, ExistingFileUUID: pinned.FileUUID,
 	}}
+	if input.OriginalGIFPath != "" {
+		plan.Transformation, err = s.manualGIFTransformation(ctx, input, *root, sensitive)
+		if err != nil {
+			return nil, err
+		}
+		plan.Preview.OriginalImageUUID = plan.Transformation.ReviewedImageUUID
+		plan.Preview.ExistingSceneUUID = plan.Transformation.ReviewedSceneUUID
+	}
 	// Folder discovery needs a filesystem version that remains stable when
 	// registration creates or updates the database's file identity. Hash the
 	// confined inspection, including ctime/inode (or full digest fallback),
@@ -206,7 +222,8 @@ func validFileWork(work FileWork) bool {
 		return false
 	}
 	if work.Version == 1 {
-		return work.Manual == nil && ValidUUID(work.ProducerUUID) && ValidUUID(work.EventUUID) && archive.ValidSHA256(work.SHA256)
+		return work.Manual == nil && (work.Publication.Transformation == nil || work.Publication.Transformation.ReviewedImageUUID == "") &&
+			ValidUUID(work.ProducerUUID) && ValidUUID(work.EventUUID) && archive.ValidSHA256(work.SHA256)
 	}
 	m := work.Manual
 	if work.Version != 2 || m == nil || work.ProducerUUID != "" || work.EventUUID != "" || !work.ObservedAt.IsZero() ||
@@ -223,6 +240,13 @@ func validFileWork(work FileWork) bool {
 		return false
 	}
 	p := work.Publication
+	if m.Request.OriginalGIFPath != "" {
+		if p.Transformation == nil || p.Transformation.ReviewedImageUUID == "" || p.Transformation.Original.RelativePath != m.Request.OriginalGIFPath {
+			return false
+		}
+	} else if p.Transformation != nil {
+		return false
+	}
 	return p.Source == nil && p.UUID == manualIntakeUUID(m.Request.RequestUUID) && p.Kind == m.Request.MediaKind &&
 		p.CollectionUUID == m.Request.CollectionUUID && p.Target.RelativePath == m.Request.RelativePath
 }
@@ -298,7 +322,7 @@ func (s *Service) SubmitManualFile(ctx context.Context, input ManualFileRequest)
 		work := FileWork{Version: 2, Size: plan.Inspection.Snapshot.Size, SHA256: plan.Inspection.SHA256,
 			Manual: &ManualFileWork{Request: input, RootRevision: plan.Preview.RootRevision, Inspection: plan.Inspection, ScanCollectionRevision: plan.Preview.ScanCollectionRevision},
 			Publication: IntakePublication{UUID: manualIntakeUUID(input.RequestUUID), CollectionUUID: input.CollectionUUID,
-				CollectionRevision: plan.Preview.CollectionRevision, PolicyRevision: plan.Preview.PolicyRevision, Target: plan.Target, Kind: input.MediaKind}}
+				CollectionRevision: plan.Preview.CollectionRevision, PolicyRevision: plan.Preview.PolicyRevision, Target: plan.Target, Kind: input.MediaKind, Transformation: plan.Transformation}}
 		args, err := json.Marshal(work)
 		if err != nil {
 			return err

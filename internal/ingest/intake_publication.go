@@ -75,7 +75,7 @@ type PublishedIntake struct {
 // receipt remain caller work.
 // A publisher account never becomes a depicted performer implicitly.
 func (p *PreparedMedia) PublishIntake(ctx context.Context, repo models.Repository, input IntakePublication) (*PublishedIntake, error) {
-	if !ValidUUID(input.UUID) {
+	if !ValidUUID(input.UUID) || !validIntakeTransformation(input) {
 		return nil, ErrInvalid
 	}
 	if err := validatePublicationCollection(ctx, repo, input); err != nil {

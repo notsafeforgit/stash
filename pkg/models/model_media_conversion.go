@@ -30,12 +30,14 @@ type ImageConversionInput struct {
 	OriginalGeneration    int64
 	FileUUID              string
 	Generation            int64
+	ReuseReviewedScene    bool
 }
 
 type MediaConversionReaderWriter interface {
 	Find(context.Context, string) (*MediaConversion, error)
 	// ConvertImage runs only after the intake service verifies the converted
 	// video, original path absence, file lifetime and selected source attachment.
-	// The destination must be newly created and have no metadata choices.
+	// A fresh destination has no metadata choices. Explicit local review may
+	// reuse a scene only when its metadata is compatible with the image.
 	ConvertImage(context.Context, ImageConversionInput) (*MediaConversion, error)
 }

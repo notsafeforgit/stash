@@ -20,7 +20,8 @@ func manualIntakeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, archive.ErrMediaDirectoryLimit):
 		ingestJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "directory_review_limit"})
 	case errors.Is(err, ingest.ErrManualFileChanged), errors.Is(err, ingest.ErrDefinition), errors.Is(err, models.ErrMetadataPolicyConflict),
-		errors.Is(err, models.ErrFilePathChanged), errors.Is(err, models.ErrFileGenerationConflict), errors.Is(err, archive.ErrMediaFileChanged):
+		errors.Is(err, models.ErrFilePathChanged), errors.Is(err, models.ErrFileGenerationConflict), errors.Is(err, archive.ErrMediaFileChanged),
+		errors.Is(err, models.ErrArchiveIdentityConflict), errors.Is(err, models.ErrMetadataFieldConflict):
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "intake_preview_changed"})
 	case errors.Is(err, models.ErrArchiveJobConflict):
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "intake_request_changed"})

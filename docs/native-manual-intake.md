@@ -50,6 +50,26 @@ collection folder and reviewed root binding. Traversal, escaping symlinks, ZIP
 members, partial downloads and removed archive paths are rejected. Restoring a
 removed path requires a separate explicit restoration.
 
+For a completed legacy GIF conversion, an explicit application request can also
+include `original_gif_path`. The destination must be its same-stem `.mkv` with
+`media_kind: "scene"`; the GIF must already be absent. Preview identifies and
+pins the original file's sole image owner, its revision and file lifetime. It
+returns `original_image_uuid` and, if the MKV is already registered,
+`existing_scene_uuid`. Apply uses the same saved signature and durable receipt.
+This option is unavailable to automatic folder scans or producer event claims.
+
+This repairs older images even when their imported post associations have no
+attachment manifest. It creates no new source capture. The shared conversion
+transaction retains metadata, performers, tags, post links, gallery memberships
+and covers, then redirects the old image identity to the scene. An already
+registered scene can be reused only with compatible metadata, one owned file,
+and no gallery-membership or activity history. Its populated fields and their
+choices stay unchanged; conflicting values fail without retiring the image.
+Concurrent image/scene edits, original-file reappearance and changed file
+lifetimes invalidate the repair. Encoding and filesystem publication remain
+the caller's responsibility; the worker verifies the final MKV before changing
+Stash's records.
+
 Preview returns the filename, size, modified time, root/collection/policy
 revisions, optional existing file UUID, and a `signature`. It omits the server's
 absolute mount path and filesystem identity tokens. An existing file UUID means

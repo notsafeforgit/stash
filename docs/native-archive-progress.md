@@ -7,7 +7,7 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
-## Initial and incremental scrape queues — implemented, deployment pending, 2026-10-10
+## Initial and incremental scrape queues — deployed, 2026-10-10
 
 The shared-root exclusion now applies within a producer and site. Host
 incremental scrapes and n8n initial profiles can run concurrently on the same
@@ -30,7 +30,32 @@ GIF fixes retain final MKV paths, retry interrupted completion and preserve
 metadata/gallery associations when replacing stale image records. The installed
 converter hash matches the repository helper.
 
-Production rollout and live queue observation remain pending. Evidence is under
+The [source publisher](https://github.com/notsafeforgit/stash/actions/runs/38060991184)
+and [wrapper publisher](https://github.com/notsafeforgit/stash-s6/actions/runs/38061894506)
+passed all required checks. Source `a592e80911a888824ed7c740805868c8ada5b92c`
+is deployed from wrapper digest
+`sha256:001f487fa570faa6aad1b16c782eaf2cd6463f5c1da021f322b1de66016b847a`,
+healthy at 15:08:57 UTC on unchanged schema 1000110. The worker list reload
+briefly stopped the ten workers; all resumed at 15:04:52 UTC before the Stash
+restart. n8n itself was not restarted. The 32 profile files and their policies,
+producer identities and outboxes are unchanged.
+
+Live attempt history confirms an n8n initial scrape for GlowingGaze_ overlapping
+host incremental scrapes for remote-scallion9475 and lilianjuice. The first
+incremental run completed successfully while the initial scrape continued.
+The initial traversal retained its 615-item/456-file checkpoint; this observation
+does not claim its full history has completed. The independent Twitter worker
+advanced from zero to seven files processed. All fourteen existing worker,
+intake and scheduling timers are active. Gallery #3664 links to the existing
+MKV scene #373593 with no stale GIF file, and its cover responds with HTTP 200.
+
+Future backup configuration includes the new queue assignments and matching
+registry-extracted validator. Its selector waits for the original sealed
+backup, whose configuration remains unchanged. Three superseded waiting
+selectors were found still running because earlier matching missed their
+relative script paths; only those selectors were replaced, leaving the backup
+and restore processes alone. There is now one selector for this release. Root
+free space is about 125 GiB. Evidence is under
 `.local/initial-scrape-concurrency-20261010/`.
 
 ## Twitter profile routing — deployed, 2026-10-10
@@ -728,19 +753,22 @@ also passed.
 ## Current release position — 2026-10-10 UTC
 
 Production is healthy on schema **1000110**, source
-`8d2e8cc15b0a15b05b5c49e9ca006a6c5f9da222`, pinned wrapper
-`ghcr.io/notsafeforgit/stash-s6@sha256:824ee3e856184057624b5d54ae7f1e2499be7e616065ec424e52f759fc4c4143`.
+`a592e80911a888824ed7c740805868c8ada5b92c`, pinned wrapper
+`ghcr.io/notsafeforgit/stash-s6@sha256:001f487fa570faa6aad1b16c782eaf2cd6463f5c1da021f322b1de66016b847a`.
 The verified source image is
-`ghcr.io/notsafeforgit/stash@sha256:4aeccdd635c53fed5f457f02090ff2da90383115ff94aa875dd0edc0b2e3fd34`,
+`ghcr.io/notsafeforgit/stash@sha256:a76d2016be4c8deef425eb3a335e5760bee0547bee0c92df20c934cc683d4eeb`,
 with wrapper source `4f0f0594e95e000a75e4819f2494c3a44ce7f04d`.
-The application and producer rollout is recorded under
-`.local/source-site-concurrency-20261010/`; ten independent site worker timers
-are active and the two global worker timers are disabled. The coordinated
-post-write backup has published successfully. The current scheduled backup
-retains its original sealed view, configuration and validator. A deferred
-configuration handoff will select this application and producer release for
-future backups. Independent restore, the current scheduled backup, supplementary
-home sync, startup audit separation and final owner review remain outstanding.
+The latest application and queue rollout is recorded under
+`.local/initial-scrape-concurrency-20261010/`. Ten site workers are active, with
+host incremental downloads and n8n initial downloads in separate queues. The
+two old global worker timers are disabled. Producer package `796ae877a744`
+remains installed; this scheduling change did not change its policy fingerprints.
+The coordinated post-write backup has published successfully. The current
+scheduled backup retains its original sealed view, configuration and validator.
+One deferred configuration handoff will select this application and its queue
+assignments for future backups. Independent restore, the current scheduled
+backup, supplementary home sync, startup audit separation and final owner
+review remain outstanding.
 
 ### Historical catalog association repair
 

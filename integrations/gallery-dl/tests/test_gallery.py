@@ -840,13 +840,14 @@ class GalleryTests(unittest.TestCase):
                 output.write(b"fixture " + url.encode())
             return True
 
-        for include, child in (("timeline", twitter.TwitterTimelineExtractor),
-                               ("tweets", twitter.TwitterTweetsExtractor),
-                               ("media", twitter.TwitterMediaExtractor),
-                               ("with-replies", twitter.TwitterWithRepliesExtractor),
-                               ("highlights", twitter.TwitterHighlightsExtractor),
-                               ("likes", twitter.TwitterLikesExtractor)):
-            with self.subTest(include=include):
+        cases = [("https://x.com/example", include, child) for include, child in (
+            ("timeline", twitter.TwitterTimelineExtractor), ("tweets", twitter.TwitterTweetsExtractor),
+            ("media", twitter.TwitterMediaExtractor), ("with-replies", twitter.TwitterWithRepliesExtractor),
+            ("highlights", twitter.TwitterHighlightsExtractor), ("likes", twitter.TwitterLikesExtractor))]
+        cases.append(("https://x.com/i/user/99", "timeline", twitter.TwitterTimelineExtractor))
+        for target, include, child in cases:
+            with self.subTest(target=target, include=include):
+                self.lease.run["target_url"] = target
                 config.set(("extractor", "twitter"), "include", [include])
                 with patch.object(TwitterExtractor, "login"), \
                      patch.object(TwitterExtractor, "metadata", return_value={}), \

@@ -7,6 +7,41 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
+## Twitter profile routing — deployed, 2026-10-10
+
+Unblocking Twitter exposed a producer bug: a profile dispatcher's undated
+handoff to its timeline was checked as if it were a tweet. Thirteen profile
+runs stopped with `source_rejected` before reaching posts. The native worker
+now accepts the pinned Twitter profile dispatcher's timeline, tweets, media,
+replies, highlights and likes routes. Each child still applies the original
+window to actual tweets; undated tweets and unrelated children remain rejected.
+The profile remains one subscribed source; internal routes create no additional
+source definitions.
+
+All 685 producer tests passed, including real gallery-dl profile dispatch with
+inside/outside-window tweets and original attachment association. Numeric-ID
+profile routing is covered too. The
+[GitHub producer checks](https://github.com/notsafeforgit/stash/actions/runs/38059412632)
+passed for source `796ae877a744e9fbd0f888a38a581da128fe5a4a`. Its verified Python
+package is installed in the host and mounted read-only in n8n. The published
+Stash image from `3175cd8810d7` remains in service; this client-only change did
+not require another Stash restart.
+
+The guarded worker handoff updated 1,356 pending runs and nine metadata policy
+mappings, preserving source definitions, windows, checkpoints and retry delays.
+It retained the 169 legacy holds. All ten site workers and four existing intake
+and scheduling timers resumed at 14:29:58 UTC. The 13 routing failures were
+returned to their original runs with revision-guarded retry requests, retaining
+their original windows and progress. At 14:33:27 UTC, a Twitter run completed
+successfully with eight source items and eight files processed. At 14:35 UTC,
+five of the original 64 metadata jobs had completed (three Twitter, two Reddit);
+the remaining 59 were queued. All 30,816 host outbox events were acknowledged.
+
+Future backup configuration includes this package and the fixed host SQLite
+runtime. Its selector waits for the original sealed backup attempt, whose
+configuration remains unchanged. Evidence is under
+`.local/twitter-profile-routing-20261010/`.
+
 ## Metadata queue scheduling and host recovery — deployed, 2026-10-10
 
 The 64 admitted metadata jobs consisted of 49 Twitter and 15 Reddit jobs. The

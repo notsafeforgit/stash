@@ -7,7 +7,7 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running. Independent
 restore verification passed; scheduled-work observation remains in progress.
 
-## Routine startup and full data audits — implementation, 2026-10-10
+## Routine startup and full data audits — deployed, 2026-10-10
 
 Routine opens now validate lineage, clean supported versions, schema objects and
 unfinished write contexts without scanning retained catalog receipts, captures,
@@ -22,9 +22,24 @@ regression denies reads of archive history and proves routine validation never
 requires them, while full audit does. A malformed canonical-name fixture remains
 rejected by both snapshot verification and migration. Historical corruption
 fixtures now exercise the explicit audit; missing-schema and unfinished-write
-fixtures still exercise startup. Production still uses the application image
-below. Evidence is under
-`.local/startup-audit-separation-20261010/`.
+fixtures still exercise startup. The complete
+[GitHub source validation and publication](https://github.com/notsafeforgit/stash/actions/runs/38066174993)
+and [wrapper publication](https://github.com/notsafeforgit/stash-s6/actions/runs/38067217407)
+passed for source `3e710df7486dac8ed552cb9fd684426db82fc46d`.
+
+The digest-pinned registry image restarted successfully at 16:23:13 UTC and
+reported healthy after **1.076 seconds**, including service restart time.
+Schema 1000110 is unchanged. n8n was not restarted and no scraper timers were
+paused. All fourteen timers remain active, all profile files are unchanged, and
+future backup configuration now selects the matching registry-extracted
+validator. No deferred backup selectors remain. Root free space is approximately
+123 GiB. Gallery #3664 still points to MKV scene #373593 and its cover returns
+HTTP 200. The installed host/n8n producer modules and converter match source.
+The in-flight initial scrape retained its request window and 652-item/478-file
+checkpoint. After the old attempt's lease expired, the worker automatically
+reclaimed the same run at fence 5 by 16:27:06 UTC, with no failures or manual
+requeue. This proves restart recovery without waiting for profile completion.
+Evidence is under `.local/startup-audit-separation-20261010/`.
 
 ## Original coordinated cloud restore — verified, 2026-10-10
 
@@ -45,7 +60,7 @@ The associated published run is `20261008_175444_1545955`, checkpoint
 `dbf8cd08-ea38-43df-9864-6f20429be640`. Recovery copies remain available pending
 final acceptance.
 
-## Scheduled publication and cleanup headroom — fix verified, 2026-10-10
+## Scheduled publication and cleanup headroom — deployed, 2026-10-10
 
 Scheduled run `20261010_015141_781770` published its coordinated native/media
 backup and released checkpoint `4fb711ad-5bfc-4b66-8023-ff1515fdfcd4`. The
@@ -58,8 +73,21 @@ published backup intact.
 Cleanup now stages those inventories beside its configured history cache,
 where backup headroom is available. All 318 backup tests pass, including a
 regression for temporary-file placement, cleanup and insufficient-space refusal.
-The backup selector from the previous release completed after publication;
-the new runtime and remaining cleanup are being prepared for installation.
+The backup selector from the previous release completed after publication.
+Runtime `3e710df7486d` is installed and selected by the backup service and its
+three command launchers, with source-module verification and SQLite 3.53.4.
+The backup configuration includes its SQLite bootstrap alongside the retained
+library and manifest.
+
+Only the failed native cleanup was replayed, under the existing backup lock;
+it passed at 16:08:19 UTC. It protected 251,139 objects, with no retired snapshots
+or newly retired chunks. Recorded S3 calls were 256 listings, 34 HEADs, 9 metadata
+GETs, 12 tag reads and 2 policy reads; no cold media was retrieved and no new
+backup was created. The stale interruption marker for this exact completed run
+was retained in the deployment evidence and removed from the recovery trigger.
+Both daily and interrupted-backup timers remain enabled. Other routine media
+cleanup will run on the next scheduled cycle. Evidence is under
+`.local/startup-audit-separation-20261010/`.
 
 ## Useful work after cursor replay — deployed, 2026-10-10
 
@@ -103,7 +131,9 @@ GlowingGaze_ attempt advancing from 616 to 619 items and 457 to 459 files
 processed between 15:37:03 and 15:37:33 UTC, after its original five-minute turn
 expired. Its fence remains 54, so these are multiple new checkpoints in one
 resumed attempt. Two independent Twitter incremental runs also succeeded after
-the handoff. This does not claim the full profile or all queued work is finished.
+the handoff. Later observation confirms that this GlowingGaze_ initial run
+completed at fence 54 with 684 items and 509 files processed, without failures.
+This does not claim that all queued profiles have finished.
 Evidence is under `.local/resumed-work-budget-20261010/`.
 
 ## Initial and incremental scrape queues — deployed, 2026-10-10
@@ -852,23 +882,25 @@ also passed.
 ## Current release position — 2026-10-10 UTC
 
 Production is healthy on schema **1000110**, source
-`a592e80911a888824ed7c740805868c8ada5b92c`, pinned wrapper
-`ghcr.io/notsafeforgit/stash-s6@sha256:001f487fa570faa6aad1b16c782eaf2cd6463f5c1da021f322b1de66016b847a`.
+`3e710df7486dac8ed552cb9fd684426db82fc46d`, pinned wrapper
+`ghcr.io/notsafeforgit/stash-s6@sha256:768bbbb28589dbd1d9239d8c684642de7057b83b283ed3754b36cb65ff03c8d5`.
 The verified source image is
-`ghcr.io/notsafeforgit/stash@sha256:a76d2016be4c8deef425eb3a335e5760bee0547bee0c92df20c934cc683d4eeb`,
+`ghcr.io/notsafeforgit/stash@sha256:4cc5a4c7ed85565956e2c33e5fae98b4eec70405d200e23d77e3b10db22d4c68`,
 with wrapper source `4f0f0594e95e000a75e4819f2494c3a44ce7f04d`.
-The latest application and queue rollout is recorded under
+The latest application rollout is recorded under
+`.local/startup-audit-separation-20261010/`; queue assignments remain from
 `.local/initial-scrape-concurrency-20261010/`. Ten site workers are active, with
 host incremental downloads and n8n initial downloads in separate queues. The
 two old global worker timers are disabled. Producer package `7de9d60c3e8d`
 is installed with the bounded work budget after replay; its handoff and compatible
 policy upgrades are recorded under `.local/resumed-work-budget-20261010/`.
-The coordinated post-write backup has published successfully. The current
-scheduled backup retains its original sealed view, configuration and validator.
-One deferred configuration handoff will select this application and its queue
-assignments for future backups. The original independent restore passed at
-15:46:11 UTC. The current scheduled backup, supplementary home sync, startup
-audit separation and final owner review remain outstanding.
+The coordinated post-write and October 10 scheduled backups have published
+successfully. The scheduled run's native cleanup failed on temporary filesystem
+headroom, then passed with the installed fix; no backup was repeated. Future
+backup configuration includes the current producer, queue assignments and fixed
+backup runtime. The original independent restore passed at 15:46:11 UTC.
+Routine startup now completes without the full history audit. Supplementary
+home sync and final owner review remain outstanding.
 
 ### Historical catalog association repair
 

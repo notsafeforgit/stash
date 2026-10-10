@@ -141,6 +141,21 @@ def atomic_text(path, encoding="utf-8", newline=None):
             os.unlink(temporary)
 
 
+def twitter_collection_queue(extractor, url, data):
+    """A profile dispatcher routes to dated post collections, not a post itself."""
+    from gallery_dl.extractor import twitter
+
+    child = data.get("_extractor")
+    allowed = (twitter.TwitterTimelineExtractor, twitter.TwitterTweetsExtractor,
+               twitter.TwitterMediaExtractor, twitter.TwitterWithRepliesExtractor,
+               twitter.TwitterHighlightsExtractor, twitter.TwitterLikesExtractor)
+    return (isinstance(extractor, twitter.TwitterUserExtractor)
+            and set(data) <= {"_extractor", "category", "subcategory"}
+            and data.get("category", "twitter") == "twitter"
+            and data.get("subcategory", "user") == "user"
+            and child in allowed and child.from_url(url) is not None)
+
+
 def twitter_evidence(extractor):
     """Keep original membership before gallery-dl turns videos into previews."""
     if not all(hasattr(extractor, name) for name in ("_extract_files", "_extract_media_source", "_transform_tweet")):
@@ -213,7 +228,7 @@ class NativeDownloadJob(job.DownloadJob):
             raise InvalidData("Extractor target differs from the claimed collection")
         if (parent is not None and self._native_source_date is None and not self.producer.window.traversal
                 and not (parent._native_collection_child and extractor.category == parent.extractor.category
-                         and extractor.category in ('instagram', 'bluesky', 'tiktok'))):
+                         and extractor.category in ('instagram', 'bluesky', 'tiktok', 'twitter'))):
             raise InvalidData("Child extraction has no approved source-post window")
         self.producer.window.configure(extractor, inherited=parent is not None)
         if hasattr(extractor, "_async_items"):
@@ -303,7 +318,8 @@ class NativeDownloadJob(job.DownloadJob):
                 except StopIteration:
                     return
                 if kind == Message.Queue and (instagram.collection_queue(self.extractor, url, data)
-                                              or social_media.collection_queue(self.extractor, url, data)):
+                                              or social_media.collection_queue(self.extractor, url, data)
+                                              or twitter_collection_queue(self.extractor, url, data)):
                     # This is routing to a post collection, not a dated post.
                     # The child applies the original window to each source item.
                     self._native_collection_route = (url, data["_extractor"])

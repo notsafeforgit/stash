@@ -17,13 +17,14 @@ from gallery_dl import config, exception
 from gallery_dl import archive as gdl_archive
 from gallery_dl import extractor as gdl_extractors
 from gallery_dl.extractor.common import Extractor, Message
+from gallery_dl.extractor import twitter
 from gallery_dl.extractor.twitter import TwitterExtractor
 from gallery_dl.extractor.reddit import RedditExtractor
 from gallery_dl.extractor.redgifs import RedgifsAPI, RedgifsImageExtractor
 
 from stash_ingest.encoding import InvalidData, decode
 from stash_ingest.filesystem import Root
-from stash_ingest.gallery import NativeDownloadJob
+from stash_ingest.gallery import NativeDownloadJob, twitter_collection_queue
 from stash_ingest.outbox import Outbox
 from stash_ingest.producer import Producer
 from stash_ingest.publication_lock import ACTIVE, PublicationBarrier
@@ -815,6 +816,61 @@ class GalleryTests(unittest.TestCase):
         with self.assertRaises(SourcePaused):
             self.task().run()
         self.assertEqual(self.lease.checkpoints, [])
+
+    def test_twitter_profile_routes_to_posts_with_the_original_window(self):
+        self.narrow_window()
+        self.lease.run["target_url"] = "https://x.com/example"
+        lower = snowflake("2026-10-01T00:00:00.100Z")
+        upper = snowflake("2026-10-01T00:00:00.300Z")
+        record = {"rest_id": lower, "legacy": {
+            "id_str": lower, "lang": "en", "full_text": "Caption", "entities": {}, "user_id_str": "99",
+            "extended_entities": {"media": [
+                {"id_str": "101", "type": "photo", "media_url_https": "https://pbs.twimg.com/media/first.jpg",
+                 "original_info": {"width": 100, "height": 200}}]}},
+            "user": {"id_str": "99", "screen_name": "example", "name": "Example", "description": "Bio",
+                     "created_at": "Thu Oct 01 00:00:00 +0000 2026", "location": "", "verified": False,
+                     "protected": False, "profile_image_url_https": ""}}
+        outside = copy.deepcopy(record)
+        outside["rest_id"] = outside["legacy"]["id_str"] = upper
+        config.set(("extractor",), "filename", "{media_id}_{num}.{extension}")
+
+        def download(child, url):
+            child.pathfmt.part_enable()
+            with child.pathfmt.open("wb") as output:
+                output.write(b"fixture " + url.encode())
+            return True
+
+        for include, child in (("timeline", twitter.TwitterTimelineExtractor),
+                               ("tweets", twitter.TwitterTweetsExtractor),
+                               ("media", twitter.TwitterMediaExtractor),
+                               ("with-replies", twitter.TwitterWithRepliesExtractor),
+                               ("highlights", twitter.TwitterHighlightsExtractor),
+                               ("likes", twitter.TwitterLikesExtractor)):
+            with self.subTest(include=include):
+                config.set(("extractor", "twitter"), "include", [include])
+                with patch.object(TwitterExtractor, "login"), \
+                     patch.object(TwitterExtractor, "metadata", return_value={}), \
+                     patch.object(child, "tweets", lambda _: iter(copy.deepcopy([outside, record]))), \
+                     patch.object(NativeDownloadJob, "download", download):
+                    task = NativeDownloadJob(gdl_extractors.find(self.lease.run["target_url"]),
+                                             producer=self.producer, lock_directory=self.locks)
+                    start = len(self.events())
+                    self.assertEqual(task.run(), 0)
+                events = self.events()[start:]
+                self.assertEqual([e["kind"] for e in events], ["source.capture", "file.completed"])
+                self.assertEqual(events[0]["post"], {"namespace": "native:twitter", "value": lower})
+                self.assertEqual(events[1]["source"]["attachment"]["value"], "101")
+
+    def test_twitter_profile_routing_does_not_exempt_posts_or_unrelated_children(self):
+        parent = twitter.TwitterUserExtractor.from_url("https://x.com/example")
+        child = twitter.TwitterTimelineExtractor
+        data = {"_extractor": child}
+        self.assertTrue(twitter_collection_queue(parent, "https://x.com/example/timeline", data))
+        self.assertFalse(twitter_collection_queue(parent, "https://example.test/", data))
+        self.assertFalse(twitter_collection_queue(parent, "https://x.com/example/timeline", {**data, "tweet_id": 123}))
+        self.assertFalse(twitter_collection_queue(parent, "https://x.com/example/photo", {"_extractor": twitter.TwitterAvatarExtractor}))
+        self.assertFalse(twitter_collection_queue(child.from_url("https://x.com/example/timeline"),
+                                                 "https://x.com/example/timeline", data))
 
     def test_actual_twitter_transformation_retains_original_membership_and_each_media_id(self):
         self.narrow_window()

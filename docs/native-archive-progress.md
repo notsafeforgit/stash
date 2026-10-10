@@ -7,6 +7,51 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
+## Metadata queue scheduling and host recovery — deployed, 2026-10-10
+
+The 64 admitted metadata jobs consisted of 49 Twitter and 15 Reddit jobs. The
+collection dispatcher kept traversing unadmitted targets while the queue was
+full, returning after each admission error. Admitted work now takes precedence
+within each producer's grants and runtime policy; cursor wrap returns directly
+to that bounded set. The limit remains 64. Generic extraction failures retain
+their job retry delay without creating a site-wide pause. Explicit rate-limit,
+timeout and authentication/challenge pacing remains enforced.
+
+Focused SQLite regressions cover a full admitted queue with unrelated new work,
+permission boundaries, cursor wrap and extraction-failure isolation. The related
+fairness/runtime tests and pinned Go lint passed, followed by the full GitHub
+validation gate. The
+[source publisher](https://github.com/notsafeforgit/stash/actions/runs/38057244605)
+and [wrapper publisher](https://github.com/notsafeforgit/stash-s6/actions/runs/38058434465)
+published source `3175cd8810d7aec49e307a0c6e847ca336c2739a`. Its exact GHCR wrapper
+digest became healthy at 14:13:38 UTC with unchanged schema 1000110. No worker
+timers were paused for deployment and n8n was not restarted. A guarded update
+released only the unchanged Twitter `extraction_failed` pause from the old
+scheduler; individual job retry deadlines remain unchanged. By 14:20 UTC, three
+of the original 64 jobs had succeeded (two Reddit, one Twitter), leaving 61
+queued. Twitter download attempts also resumed, exposing a separate profile
+routing rejection; these attempts are not counted as successful downloads.
+
+During diagnosis, the host outbox reported malformed scheduling pages and one
+unreadable acknowledged capture row. The isolated host interpreter was using
+SQLite 3.50.2, affected by the upstream WAL-reset race; n8n and Stash already used
+3.53.4. This version mismatch is a plausible cause, not proof of the particular
+race. The host now loads pinned SQLite 3.53.4, built from the official amalgamation
+and checked against its published SHA3-256. Nineteen outbox tests passed on it.
+
+Recovered all 28,108 event identities from surviving event rows and indexes.
+The missing acknowledged capture was reconstructed from its original native
+receipt; only that row's unavailable local attempt/fence counters were reset.
+Both pending bodies were retained byte-for-byte and subsequently acknowledged.
+All other journal/queue tables were copied unchanged; disposable enrichment
+traversal hints were reset. Integrity and foreign-key checks pass, and all twelve
+host timers resumed. The original damaged database remains private for recovery.
+Future backup configuration includes the pinned library, manifest and bootstrap.
+Its selector waits for the original sealed S3 attempt to finish; that attempt
+continues with its original configuration.
+
+Evidence: `.local/metadata-queue-drain-20261010/`.
+
 ## Independent site scraper workers — deployed, 2026-10-10
 
 The native scheduler reserved the entire media root for one download, and each

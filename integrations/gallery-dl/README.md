@@ -211,6 +211,12 @@ posts are still visited. Linked child work uses its accepted parent post's date.
 Postprocessor initialization waits for an accepted post, and its proposed
 destination is checked before initialization or post callbacks can run.
 
+Twitter profile URLs dispatch to the configured timeline, tweets, media, replies,
+highlights or likes collection. That routing message has no publication date;
+the child applies the original window to each actual tweet. This exception only
+accepts the pinned profile dispatcher's post-collection routes, not undated
+tweets, profile pictures or unrelated child extractors.
+
 Date limits apply to each extractor instance. They replace inherited
 `date-min`, `date-max`, `date-after` and `date-before` without changing the shared
 configuration file. Child extractors do not apply unrelated upload-date limits

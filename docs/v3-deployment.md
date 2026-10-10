@@ -38,7 +38,7 @@ The restriction cleared later on October 9: source revision `48cdadac2a`
 [published successfully](https://github.com/notsafeforgit/stash/actions/runs/37994520342),
 and the [wrapper build](https://github.com/notsafeforgit/stash-s6/actions/runs/37997504208)
 consumed that exact source digest. The production unit now uses its verified
-GHCR digest; [the progress record](native-archive-progress.md#current-release-position--2026-10-09-utc)
+GHCR digest; [the progress record](native-archive-progress.md#current-release-position--2026-10-10-utc)
 retains the current identities. The earlier restriction does not describe the
 current Actions state.
 

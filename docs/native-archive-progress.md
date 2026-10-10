@@ -7,7 +7,7 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement is running; the controlled worker rollout remains
 in progress.
 
-## Incidental post authors outside account review — implementation, 2026-10-10
+## Incidental post authors outside account review — deployed, 2026-10-10
 
 Account review and the general review inbox now default to accounts with a direct
 current source association or an ownership choice. Merely capturing an author
@@ -22,8 +22,22 @@ incidental authors; the reported Herb-Anderson example came from the
 ZeldaHentaiAI subreddit. Three additional accounts had real imported OnlyFans
 folders with missing account associations. Those associations were repaired
 through the native API, preserving their existing disabled metadata rules, so
-they remain in tracked-account review. Validation and publication are pending;
-this section does not yet claim deployment.
+they remain in tracked-account review. Live API verification found **102**
+incidental authors outside the default queue: **277** tracked undecided accounts
+out of **379** known undecided accounts. The example's two post publisher
+associations remain intact. Desktop and mobile Chromium checks verified the
+default search, All known accounts, and the original account deep link.
+
+The [source build](https://github.com/notsafeforgit/stash/actions/runs/38010776665) and
+[wrapper build](https://github.com/notsafeforgit/stash-s6/actions/runs/38012781179) succeeded; production uses their verified
+GHCR digest, recorded below. No migration was needed, and the scraper services
+resumed. All fork-gate components passed, together with 11 focused Chromium
+account-review tests. Local WebKit execution was unavailable because the
+Fedora host lacks the browser's required Ubuntu libraries.
+The HTTPS hostname was unreachable from the deployment host before and after
+deployment; API and browser checks used the direct production service.
+Private release and verification evidence is under
+`.local/incidental-account-review-20261010/`.
 See [account review scope](native-source-collections.md#account-review-and-incidental-authors).
 
 ## One source per Reddit profile — deployed, 2026-10-09
@@ -108,16 +122,18 @@ numbering gaps, ambiguous candidates, stale previews, existing choices and
 durable job replay. Chromium desktop/mobile review and policy-switching checks
 also passed.
 
-## Current release position — 2026-10-09 UTC
+## Current release position — 2026-10-10 UTC
 
 Production is healthy on schema **1000106**, source
-`89bf128a1a98aa2a686bf3946d1973e299929659`, pinned wrapper
-`ghcr.io/notsafeforgit/stash-s6@sha256:31a87131499b742aac60a6cc5c58875f2cda898f7191e111ae3488c389a0437e`.
+`4b8ca713e9e8f6d3124462a8c4f2c9d6833fc66a`, pinned wrapper
+`ghcr.io/notsafeforgit/stash-s6@sha256:104e43df53e96c17b6650dab2a07fe07ee99459339ba9af481e34452b2dd565b`.
 The verified source image is
-`ghcr.io/notsafeforgit/stash@sha256:bb7a6bb63e19d542f97cb3af47ec195b6081415c7ed3ec7ce84fba5139c95531`,
+`ghcr.io/notsafeforgit/stash@sha256:a5428bed8a07250372c34259530be05d1b39b39f8ade60aef485838228edec7d`,
 with wrapper source `4f0f0594e95e000a75e4819f2494c3a44ce7f04d`.
-The source consolidation and matching producer deployment are recorded under
-`.local/reddit-profile-sources-20261009/`; the current worker timer is active.
+The account-review release is recorded under
+`.local/incidental-account-review-20261010/`. The source consolidation and existing
+producer/backup runtime are recorded under `.local/reddit-profile-sources-20261009/`;
+the current worker timer is active.
 The current backup publisher retains its sealed configuration until publication;
 its pending successor selects this release and its matching backup tools.
 The explicit [catalog association repair](catalog-association-repair.md) now

@@ -7,7 +7,7 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
-## Dedupe discovery lock scope — implemented, deployment pending, 2026-10-10
+## Dedupe discovery lock scope — deployed, 2026-10-10
 
 The first resumed fclones pass exposed an overly broad lock: it held the backup
 lock and every worker publication barrier while scanning the entire library.
@@ -24,8 +24,22 @@ recovery of a lost removal response. The backup already snapshots this journal
 as an operating SQLite database; concurrent candidate-only discovery cannot
 remove media across that boundary. The full fork gate passed in 200.91 seconds,
 including 680 producer, 317 backup and 805 UI tests, Go integration tests, and
-lint. The installed client still has the older scope until the reviewed runtime
-is deployed. Evidence: `.local/dedupe-lock-scope-20261010/`.
+lint.
+
+Commit `f3f4340a2` is installed in a separate versioned dedupe runtime; the host
+scraper fingerprint and n8n image remain unchanged. Both shell launchers and the
+systemd environment select that runtime. All 21 dedupe/host tests also pass
+against the installed wheel, and the service returned its expected daily
+cooldown without rescanning. The wheel, module digests and release selection
+are declared for the next coordinated backup; this does not claim their cloud
+publication has already finished. No application image was rebuilt locally or
+restarted for this host-tool change.
+
+The preceding live pass completed with 952 verified removals and 804
+`file_requires_intake` review outcomes out of 1,756 candidate pairs, with no
+pending requests. Its scan was allowed to finish before activation. The existing
+cloud restore retained its original process identities and its I/O counters
+advanced. Evidence: `.local/dedupe-lock-scope-20261010/`.
 
 ## Native schedule resumption — observing, 2026-10-10
 

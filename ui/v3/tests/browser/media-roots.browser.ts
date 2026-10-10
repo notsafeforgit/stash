@@ -35,6 +35,7 @@ async function archive(
       [
         {
           ...mediaRoot(),
+          state: options.retired ? "retired" : "active",
           origin: "review",
           reason: "Initial root",
           recorded_at: "2026-10-05T21:00:00Z",
@@ -321,21 +322,63 @@ test("disables an offline root without probing and retains success when refresh 
   });
 });
 
-test("keeps retired roots inspectable without editing or probing their folders", async ({
-  page,
-}) => {
-  const remote = await archive(page, { retired: true });
-  await page.goto(`/media-roots?root=${rootID}`);
-  await expect(page.getByLabel("Root name", { exact: true })).toBeDisabled();
-  await expect(
-    page.getByRole("button", { name: "Check folder", exact: true }),
-  ).toBeDisabled();
-  await expect(
-    page.getByRole("button", { name: "Save media root", exact: true }),
-  ).toBeDisabled();
-  await page
-    .getByRole("button", { name: "Media root history", exact: true })
-    .click();
-  await expect(page.getByText("Initial root", { exact: true })).toBeVisible();
-  expect(remote.writes).toEqual([]);
-});
+for (const [label, state] of [
+  ["Active", "active"],
+  ["Disabled", "disabled"],
+] as const) {
+  test(`restores a retired root as ${state} with the same identity, binding and history`, async ({
+    page,
+  }) => {
+    const remote = await archive(page, { retired: true });
+    await page.goto(`/media-roots?root=${rootID}`);
+    await expect(page.getByLabel("Root name", { exact: true })).toBeEnabled();
+    const status = page.getByRole("group", { name: "Status", exact: true });
+    await expect(
+      status.getByRole("button", { name: "Retired", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await page
+      .getByRole("button", { name: "Media root history", exact: true })
+      .click();
+    await expect(page.getByText("Initial root", { exact: true })).toBeVisible();
+    expect(remote.writes).toEqual([]);
+    expect(remote.probes).toEqual([]);
+
+    await status.getByRole("button", { name: label, exact: true }).click();
+    const reason = `Restore as ${state}`;
+    await page
+      .getByLabel("Reason for this change (optional)", { exact: true })
+      .fill(reason);
+    expect(remote.writes).toEqual([]);
+    await page
+      .getByRole("button", { name: "Save media root", exact: true })
+      .click();
+    await expect(
+      page.getByText("Media root saved", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      status.getByRole("button", { name: label, exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(remote.writes).toEqual([
+      {
+        uuid: rootID,
+        expected_revision: mediaRoot().revision,
+        label: mediaRoot().label,
+        state,
+        binding: mediaRoot().binding,
+        reason,
+      },
+    ]);
+    expect(remote.roots.get(rootID)).toMatchObject({
+      uuid: rootID,
+      revision: mediaRoot().revision + 1,
+      state,
+      binding: mediaRoot().binding,
+    });
+    expect(remote.probes).toEqual([]);
+    await page
+      .getByRole("button", { name: "Media root history", exact: true })
+      .click();
+    await expect(page.getByText("Initial root", { exact: true })).toBeVisible();
+    await expect(page.getByText(reason, { exact: true })).toBeVisible();
+  });
+}

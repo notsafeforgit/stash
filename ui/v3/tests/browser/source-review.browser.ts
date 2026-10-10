@@ -130,39 +130,21 @@ async function archive(
         return;
       }
       result = committed;
-    } else if (path.endsWith("/capture-summaries"))
+    } else if (path.endsWith("/capture-history"))
       result = {
         requested_uuid: path.split("/").at(-2),
         revisions: [
           {
             uuid: sourceIds.revision,
+            count: 2,
+            unknown_count: 1,
+            first_seen: "2026-09-30T08:00:00Z",
+            last_seen: "2026-09-30T08:00:00Z",
             metadata: {
               title: "Full retained caption",
               original_text: "One shared description",
               published_at: "2026-09-29",
             },
-          },
-        ],
-        captures: [
-          {
-            uuid: sourceIds.capture,
-            post_uuid: sourceIds.post,
-            revision_uuid: sourceIds.revision,
-            origin: "gallery-dl",
-            platform: "reddit",
-            captured_at: "2026-09-30T08:00:00Z",
-            recorded_at: null,
-            extractor_version: "1.32.15",
-          },
-          {
-            uuid: sourceIds.secondCapture,
-            post_uuid: sourceIds.post,
-            revision_uuid: sourceIds.revision,
-            origin: "legacy-nfo",
-            platform: "reddit",
-            captured_at: null,
-            recorded_at: "2026-09-30T09:00:00Z",
-            extractor_version: null,
           },
         ],
       };
@@ -196,6 +178,9 @@ for (const image of [false, true]) {
       expect(remote.paths.some((p) => p.endsWith("/capture-summaries"))).toBe(
         false,
       );
+      expect(remote.paths.some((p) => p.endsWith("/capture-history"))).toBe(
+        false,
+      );
       expect(remote.paths.some((p) => p.endsWith("/history"))).toBe(false);
       await expect(
         page.getByRole("link", {
@@ -209,12 +194,22 @@ for (const image of [false, true]) {
       await expect(
         page.getByText("One shared description", { exact: true }),
       ).toHaveCount(1);
-      await page
-        .getByRole("button", { name: "2 loaded captures", exact: true })
-        .click();
       await expect(
-        page.getByText(/Observation time unknown · stored/),
+        page.getByText("2 observations", { exact: true }),
       ).toBeVisible();
+      await expect(
+        page.getByText("Observation time unknown for 1 imported record.", {
+          exact: true,
+        }),
+      ).toBeVisible();
+      // Strict Mode can start and abort an initial read. Every read still
+      // targets this post, and its shared description is rendered only once.
+      expect([
+        ...new Set(remote.paths.filter((p) => p.endsWith("/capture-history"))),
+      ]).toEqual([`/api/v3/archive/posts/${sourceIds.post}/capture-history`]);
+      expect(remote.paths.some((p) => p.endsWith("/capture-summaries"))).toBe(
+        false,
+      );
       await page
         .getByRole("button", { name: "Review source link", exact: true })
         .click();

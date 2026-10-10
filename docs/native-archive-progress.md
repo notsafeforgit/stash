@@ -7,6 +7,22 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement is running; the controlled worker rollout remains
 in progress.
 
+## Browser regression fixtures — corrected, 2026-10-10
+
+The fourteen failing browser cases came from expectations left behind by earlier
+native changes. Source review now mocks the current deduplicated capture-history
+response, verifies one displayed post description and observation counts, and
+requires reads to remain lazy and limited to the selected post. Recovery of a
+saved source-order choice verifies one gallery refresh after confirmation and
+no repeated write. Retired-root tests now exercise explicit restoration to both
+Active and Disabled while preserving the UUID, binding and revision history;
+opening the root still performs no write or folder probe.
+
+All 64 checks across the three affected suites pass in Chromium and WebKit.
+The complete local fork gate passes in 37.89 seconds with its existing caches.
+Only test fixtures/assertions and this record changed; the complete GitHub
+browser workflow will run on the push. Evidence: `.local/browser-repair-20261010/`.
+
 ## Parallel native validation — implemented, 2026-10-10
 
 The publisher and native PRs share one validation/build workflow. Go tests,

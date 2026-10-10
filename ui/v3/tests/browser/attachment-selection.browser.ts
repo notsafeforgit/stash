@@ -363,11 +363,19 @@ for (const desktop of [false, true]) {
       }),
     ).toBeVisible();
     const original = remote.writes[0]!;
+    await expect(page.locator("[data-album-refresh-count]")).toHaveAttribute(
+      "data-album-refresh-count",
+      "0",
+    );
     await open(page, desktop);
     await expect(
       page.getByRole("button", { name: "Preview source order", exact: true }),
     ).toBeDisabled();
     expect(remote.writes).toEqual([original]);
+    await expect(page.locator("[data-album-refresh-count]")).toHaveAttribute(
+      "data-album-refresh-count",
+      "0",
+    );
     await page
       .getByRole("button", {
         name: "Check and retry saved change",
@@ -380,7 +388,7 @@ for (const desktop of [false, true]) {
     expect(remote.writes).toEqual([original]);
     await expect(page.locator("[data-album-refresh-count]")).toHaveAttribute(
       "data-album-refresh-count",
-      "0",
+      "1",
     );
   });
 }

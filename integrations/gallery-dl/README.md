@@ -502,6 +502,24 @@ their contents. Restore with `podman load --input <image.oci.tar>` and verify th
 loaded ID before starting its Quadlet. A Containerfile referring to an
 unretained intermediate local image is insufficient recovery coverage.
 
+An existing deployment can update only the pure-Python producer package through
+a versioned, read-only mount of `stash_ingest` over the environment's installed
+package directory. Build a wheel from the committed source and verify every
+module against that source. This option requires unchanged dependencies,
+entry-point definitions and `stash_ingest_bootstrap.py`; otherwise rebuild the
+runtime through its release pipeline. Verify the overlay in a disposable
+container using the same image and Python environment before activation.
+
+For a package update, briefly stop producer timers/services and preserve their
+outboxes. Deliver retained source requests with their original bytes and runtime
+before installing the same verified wheel for host callers. Retain all
+profile definitions; review the changed execution fingerprints and apply the
+bounded policy upgrades to existing pending work before resuming the original
+timer cadences. Keep the image identity separate from the overlay's source
+revision. Declare the wheel, module manifest, mounted package directory and
+Quadlet changes in the coordinated backup configuration, so recovery restores
+the exact package rather than relying on mutable workspace files.
+
 Use the `stash-ingest` console command for download workers. Its bootstrap
 initializes gallery-dl logging once, including the lowercase levels used by
 configured actions such as `error:network security`. Logs go to stderr while

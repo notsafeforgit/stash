@@ -7,7 +7,7 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
-## Verified GIF image-to-scene transition — implementation, 2026-10-10
+## Verified GIF image-to-scene transition — deployed, 2026-10-10
 
 Schema 1000109 retains an explicit conversion between the old image UUID/file
 lifetime and the new scene UUID/verified MKV. Automatic publication requires an
@@ -29,9 +29,48 @@ repeat the domain mutation.
 The full Go integration suite passed. Subsequent focused regressions cover
 reviewed post provenance, relationship/custom-field transfer, real GIF/MKV
 intake, original-file and ownership conflicts, transaction rollback, interrupted
-completion, UUID adoption, explicit unlinks, migration and counter round trips.
-The populated-copy rehearsal is running; no production writer or producer
-runtime has been changed for this increment. Evidence is retained under
+completion, UUID adoption, explicit unlinks, migration and counter round trips;
+Go lint passes with zero issues. The populated-copy rehearsal passed in 548.09
+seconds, preserving all 3,920 dated activity events, nine covers, 541,988 image
+memberships, 3,610 scene memberships and media/identity counts. The migrated
+database reopened successfully and the temporary copy was removed.
+
+The producer wheel matches all 129 source modules. All 22 host and ten n8n
+profiles retain their definitions and resolve to the same staged runtime.
+Two conversion-provenance tests pass against the read-only package overlay in
+a disposable n8n container.
+
+The [source publisher](https://github.com/notsafeforgit/stash/actions/runs/38044516746)
+and [wrapper publisher](https://github.com/notsafeforgit/stash-s6/actions/runs/38045578360)
+passed. Production runs source `f9bd4801a45029f01466430ee129158e711754d6`,
+wrapper digest `sha256:5ee22c3c8a82468b2e36a7d4937526aa29e59ae551b550145285216df8dbcc8c`,
+and schema 1000109. Its matching backup validator was extracted from the registry
+image. The pre-migration snapshot remains retained. Gallery #3664's scene cover
+and gallery #6274's image cover both return HTTP 200 with JPEG data.
+
+The application restart did not drain scrapes or stop n8n. The subsequent
+producer-package handoff briefly stopped n8n and six producer/intake timers.
+It delivered 24 retained requests with their original bytes and materialized
+1,214 already queued intent windows before changing the installed code; this
+started no website downloads. Existing APIs then approved the new execution
+fingerprint for 1,367 pending source runs and nine metadata policies, preserving
+progress, windows, retry deadlines, failures and source definitions. The 169
+legacy deferred holds were unchanged. One expired worker lease was recovered
+through the normal API before the handoff.
+
+The host now uses the verified wheel; n8n and its worker retain the same base
+image with a versioned, read-only package mount. Live checks verified all 32
+unchanged profiles against the installed runtime and all six original timer
+cadences resumed. The wheel, module manifest, package directory and Quadlets
+are included in the staged backup configuration. These checks establish the
+runtime update and queue preservation, not completion of the queued downloads.
+
+The original scheduled backup had already sealed its captured state. Its
+process, configuration and validator remain unchanged, and the independent
+restore continues with its original process identities. A lock-protected helper
+will select the new backup configuration only after that backup finishes;
+publication of the new runtime components remains pending. Root free space is
+about 133 GiB. Evidence is retained under
 `.local/gif-domain-transition-20261010/`.
 
 ## Image and scene gallery covers — deployed, 2026-10-10
@@ -64,7 +103,7 @@ types, targeted refresh, retained pagination and retry after a failed mutation.
 All six shards of the [GitHub browser run](https://github.com/notsafeforgit/stash/actions/runs/38041354341)
 passed, including WebKit. The [source publisher](https://github.com/notsafeforgit/stash/actions/runs/38041354350)
 and [wrapper publisher](https://github.com/notsafeforgit/stash-s6/actions/runs/38042395496)
-also passed. Production runs source `9c6d507f633a257db99f73d808fb9814e858c030`,
+also passed. That rollout selected source `9c6d507f633a257db99f73d808fb9814e858c030`,
 wrapper digest `sha256:b8e15454972887d866f4ad0d6fb04a11cc6db79c0d6c2091f6512bd776a20da7`,
 and schema 1000108. The pre-migration backup remains retained. Live gallery
 #3664 resolves its scene cover and gallery #6274 its image cover; both return

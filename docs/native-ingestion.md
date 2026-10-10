@@ -1314,9 +1314,11 @@ service-wide outage. Source completion still does not certify media intake.
 The download executor also requires `source_run_fairness_protocol: 1`. Running
 attempts expose `turn_until`, five minutes after their recorded start, independent
 of lease renewals. On reaching it, the worker finishes its current file/checkpoint
-and yields before further source work. A resumed traversal may finish replay and
-one new checkpoint first, preventing a long replay from repeatedly consuming the
-whole turn without progress. It reports `state: "retry"` and
+and yields before further source work. After bounded replay reaches its saved
+cursor, a resumed traversal gets one five-minute slice for new work, shared by
+all child extractors. Checkpoints and heartbeats do not renew that slice, and
+lease ownership, cancellation and source cooldowns still apply throughout. This
+keeps replay from consuming the useful work budget on every attempt. It reports `state: "retry"` and
 `error_code: "source_turn_complete"`, with no `error_scope` or retry override.
 This preserves pending windows and progress, applies the normal target cooldown,
 and leaves the failure count unchanged. The CLI reports an acknowledged yield

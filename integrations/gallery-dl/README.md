@@ -186,8 +186,10 @@ by completion, cancellation or expiry, and expired retries retain dependencies.
 The executor also requires `source_run_fairness_protocol: 1`. Its server-derived
 `turn_until` is five minutes after the attempt starts and cannot be extended by
 heartbeats. The worker finishes its current file and checkpoint before yielding
-at a source boundary. A resumed traversal may finish replay and one new checkpoint
-first, so a long saved prefix cannot prevent progress indefinitely. This is a
+at a source boundary. A resumed traversal gets one five-minute slice for new work
+after reaching its saved cursor, shared by all child extractors. Checkpoints and
+heartbeats cannot renew that slice. Replay remains bounded by the saved item count;
+lease ownership, cancellation and source cooldowns still apply throughout. This is a
 cooperative budget, not a hard wall-clock limit. An acknowledged yield returns
 `state: "yielded"` and the incomplete CLI exit code. Native history records
 `retry` / `source_turn_complete` while preserving progress and the normal target

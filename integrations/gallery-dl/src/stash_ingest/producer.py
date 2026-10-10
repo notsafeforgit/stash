@@ -2,11 +2,12 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
+import time
 import uuid
 
 from .encoding import InvalidData, digest, encode, identifier, utc_now
 from .retention import POLICY, retain
-from .runs import SourceFailure, SourcePaused
+from .runs import SourceFailure, SourcePaused, SourceTurnComplete
 from .source_window import SourceWindow
 from . import source
 from .scan_resume import PREFIX as LEGACY_CURSOR_PREFIX
@@ -24,7 +25,8 @@ class Prepared:
 
 
 class Producer:
-    def __init__(self, outbox, lease, root, *, extractor_version, configuration_check=None, source_category=None):
+    def __init__(self, outbox, lease, root, *, extractor_version, configuration_check=None, source_category=None,
+                 clock=time.monotonic):
         lease.check()
         run = lease.run
         if (outbox.producer != lease.client.producer or outbox.endpoint != lease.client.endpoint
@@ -57,8 +59,9 @@ class Producer:
         self.items_seen = run["progress"]["items_seen"]
         self.files_completed = run["progress"]["files_completed"]
         self.resume_cursor = run["progress"]["cursor"]
-        self.turn_start_items = self.items_seen
         self.turn_replay = bool(self.resume_cursor)
+        self.clock = clock
+        self.resumed_work_deadline = None
         recovery = run.get("recovery") or {}
         self.replay_archive = recovery.get("replay_archive", False)
         if type(self.replay_archive) is not bool:
@@ -74,11 +77,19 @@ class Producer:
             raise self.source_failure
         if self.publication_failure is not None:
             raise self.publication_failure
-        # Replaying a saved cursor may itself take a full turn. Allow one new
-        # checkpoint afterward so repeated cooperative yields cannot trap the
-        # run forever replaying the same already captured prefix.
-        if turn and (not self.turn_replay or self.items_seen > self.turn_start_items):
+        if not turn:
+            return
+        if not self.turn_replay:
             self.lease.check_turn()
+        elif not self.resume_cursor:
+            # Replay may consume the entire server turn. Give useful work one
+            # bounded slice after it catches up, shared by every child extractor.
+            # Lease ownership, cancellation and source cooldowns still apply.
+            now = self.clock()
+            if self.resumed_work_deadline is None:
+                self.resumed_work_deadline = now + 300
+            if now >= self.resumed_work_deadline:
+                raise SourceTurnComplete("Resumed source time budget reached; checkpointing for the next turn")
 
     def fail_source(self, code, scope):
         self.check(turn=False)

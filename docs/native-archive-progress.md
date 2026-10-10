@@ -7,6 +7,23 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
+## Useful work after cursor replay — implementation, 2026-10-10
+
+Live full-history attempts exposed a scheduling problem: replaying hundreds of
+already processed items used the five-minute turn, leaving only one new
+checkpoint before another yield. Recent GlowingGaze_ attempts advanced by one
+item per five-to-six-minute retry. The producer now grants one bounded
+five-minute slice after reaching the saved cursor. Every child extractor shares
+it; progress and heartbeats do not reset it. Fresh runs retain the server turn,
+and all paths still enforce lease ownership, root/configuration checks and
+source cooldowns. Saved-cursor bounds and missing-cursor failures are unchanged.
+
+Deterministic regressions cover long replay followed by several new checkpoints,
+expiry without renewal, fresh-run expiry and ownership loss during replay and
+new work. The focused producer, run lease and gallery suite passes (62 tests).
+All 687 producer tests pass. Live runtime handoff is pending; production still
+uses producer source `796ae877a744` and the application image recorded below.
+
 ## Initial and incremental scrape queues — deployed, 2026-10-10
 
 The shared-root exclusion now applies within a producer and site. Host

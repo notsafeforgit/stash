@@ -114,24 +114,61 @@ class ProducerTests(unittest.TestCase):
         with self.assertRaises(InvalidData):
             self.producer.report_download(first, "failed", reason_code="download_failed")
 
-    def test_expired_turn_allows_cursor_replay_and_one_new_checkpoint(self):
+    def test_long_replay_gets_one_bounded_slice_for_multiple_new_checkpoints(self):
         prepared = self.producer.prepare(reddit_data("saved"))
         cursor, _ = self.producer.cursor(prepared)
         self.lease.run["progress"] = {"items_seen": 10, "files_completed": 10, "cursor": cursor}
-        resumed = Producer(self.box, self.lease, self.root, extractor_version="fixture")
+        now = [0]
+        resumed = Producer(self.box, self.lease, self.root, extractor_version="fixture", clock=lambda: now[0])
         def expired():
             self.lease.check()
             raise SourceTurnComplete("turn complete")
         self.lease.check_turn = expired
+        now[0] = 900  # Reaching the saved cursor can already take several turns.
         saved = resumed.prepare(reddit_data("saved"))
         key, replay = resumed.cursor(saved)
         resumed.checkpoint(key, replay, False)
-        new = resumed.prepare(reddit_data("new"))
-        key, replay = resumed.cursor(new)
-        resumed.checkpoint(key, replay, False)
-        self.assertEqual(self.lease.checkpoints[-1][0], 11)
+        resumed.check()
+        for elapsed in (20, 140, 299):
+            now[0] = 900 + elapsed
+            new = resumed.prepare(reddit_data(str(elapsed)))
+            key, replay = resumed.cursor(new)
+            self.assertFalse(replay)
+            resumed.checkpoint(key, replay, True)
+        self.assertEqual([row[:2] for row in self.lease.checkpoints], [(11, 11), (12, 12), (13, 13)])
+        now[0] = 1200
         with self.assertRaises(SourceTurnComplete):
             resumed.prepare(reddit_data("later"))
+        # Finishing/checkpointing an already started file does not start a new slice.
+        resumed.check(turn=False)
+        resumed.checkpoint(key, False, True)
+        with self.assertRaises(SourceTurnComplete):
+            resumed.check()
+
+    def test_fresh_work_still_obeys_the_server_turn(self):
+        def expired():
+            raise SourceTurnComplete("turn complete")
+        self.lease.check_turn = expired
+        with self.assertRaises(SourceTurnComplete):
+            self.producer.prepare(reddit_data())
+        self.assertEqual(self.box.status()["counts"].get("pending", 0), 0)
+
+    def test_replay_and_resumed_work_still_require_live_ownership(self):
+        prepared = self.producer.prepare(reddit_data("saved"))
+        cursor, _ = self.producer.cursor(prepared)
+        self.lease.run["progress"] = {"items_seen": 10, "files_completed": 10, "cursor": cursor}
+        resumed = Producer(self.box, self.lease, self.root, extractor_version="fixture", clock=lambda: 900)
+        self.lease.active = False
+        with self.assertRaises(SourcePaused):
+            resumed.check()
+        self.lease.active = True
+        resumed.cursor(prepared)
+        resumed.check()
+        self.lease.active = False
+        with self.assertRaises(SourcePaused):
+            resumed.prepare(reddit_data("later"))
+        with self.assertRaises(SourcePaused):
+            resumed.check(turn=False)
 
     def test_shared_destination_lock_fences_concurrent_workers(self):
         with destination_lock(self.locks, ROOT, "same-stem", self.producer.check):

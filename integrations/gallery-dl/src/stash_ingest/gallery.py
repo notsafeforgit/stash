@@ -19,7 +19,7 @@ from .encoding import InvalidData
 from .filesystem import destination_lock
 from .runs import SourceFailure, SourcePaused, SourceTurnComplete
 from .outbox import Capacity
-from .publication_lock import publication_lock
+from .publication_lock import PublicationBusy, publication_lock
 from .source_window import validate_keywords
 from .scan_resume import legacy_cursor
 
@@ -88,11 +88,24 @@ def callback_owner(callback):
     return getattr(callback, "__self__", None)
 
 
+@contextmanager
+def worker_publication(owner, check):
+    try:
+        with publication_lock(owner.lock_directory, check):
+            yield
+    except PublicationBusy as exc:
+        # gallery-dl may catch an exception in a child job or finalizer. Keep
+        # the temporary stop on the shared producer so neither a parent nor
+        # the worker can subsequently mistake that traversal for success.
+        owner.producer.publication_failure = exc
+        raise
+
+
 def publication_guard(method):
     @functools.wraps(method)
     def guarded(self, *args, **kwargs):
         check = self.producer.root.verify if method.__name__ == "handle_finalize" else self.producer.check
-        with publication_lock(self.lock_directory, check):
+        with worker_publication(self, check):
             return method(self, *args, **kwargs)
     return guarded
 
@@ -100,7 +113,7 @@ def publication_guard(method):
 def publication_callback(owner, callback):
     @functools.wraps(callback)
     def guarded(*args, **kwargs):
-        with publication_lock(owner.lock_directory, owner.producer.root.verify):
+        with worker_publication(owner, owner.producer.root.verify):
             return callback(*args, **kwargs)
     return guarded
 
@@ -229,6 +242,8 @@ class NativeDownloadJob(job.DownloadJob):
             result = super().run()
             if self.producer.source_failure is not None:
                 raise self.producer.source_failure
+            if self.producer.publication_failure is not None:
+                raise self.producer.publication_failure
             if self._native_parent is None and not result:
                 self.producer.traversed()
             return result
@@ -305,6 +320,8 @@ class NativeDownloadJob(job.DownloadJob):
         try:
             return super().dispatch(guarded())
         except SourceTurnComplete:
+            raise exception.StopExtraction() from None
+        except PublicationBusy:
             raise exception.StopExtraction() from None
         except (InvalidData, Capacity, SourcePaused) as exc:
             self.producer.failure_code = ("outbox_capacity" if isinstance(exc, Capacity) else

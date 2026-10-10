@@ -37,6 +37,7 @@ class Producer:
         self.configuration_check = configuration_check or (lambda: None)
         self.failure_code = None
         self.source_failure = None
+        self.publication_failure = None
         self.window = SourceWindow(run.get("window"))
 
         self.path_prefix = run["path_prefix"]
@@ -71,6 +72,8 @@ class Producer:
         self.configuration_check()
         if self.source_failure is not None:
             raise self.source_failure
+        if self.publication_failure is not None:
+            raise self.publication_failure
         # Replaying a saved cursor may itself take a full turn. Allow one new
         # checkpoint afterward so repeated cooperative yields cannot trap the
         # run forever replaying the same already captured prefix.

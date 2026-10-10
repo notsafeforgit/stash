@@ -321,6 +321,69 @@ func TestSourceRunRestartRecoveryCheckpointsAndTokenRotation(t *testing.T) {
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
 }
 
+func TestSourceRunPublicationWaitPreservesRetryBudgetAndProgress(t *testing.T) {
+	f := newSourceRunFixture(t)
+	input := f.request()
+	r := f.claim(t, f.submit(t, input))
+	progress := models.SourceRunProgress{ItemsSeen: 17, FilesCompleted: 11, Cursor: "post_17"}
+	_, err := f.coordinator.Progress(t.Context(), f.token, r.Lease(), progress)
+	require.NoError(t, err)
+	// A real source error remains counted through later local lock contention.
+	r = f.finish(t, r, "retry")
+	require.Equal(t, 1, r.Failures)
+	f.now = r.AvailableAt
+	for i := 0; i < 10; i++ {
+		r = f.claim(t, r)
+		require.NotNil(t, r)
+		require.Equal(t, input.Window, *r.Window)
+		require.Equal(t, progress, r.Progress)
+		queued, err := f.coordinator.Finish(t.Context(), f.token, r.Lease(), models.SourceRunOutcome{State: "retry", ErrorCode: "worker_publication_busy"})
+		require.NoError(t, err)
+		require.Equal(t, "queued", queued.State)
+		require.Equal(t, 1, queued.Failures)
+		require.Equal(t, []models.SourceWindow{input.Window}, queued.Pending)
+		require.Empty(t, queued.Completed)
+		require.Equal(t, progress, queued.Progress)
+		require.GreaterOrEqual(t, queued.AvailableAt.Sub(f.now), 30*time.Second)
+		require.Nil(t, f.claim(t, queued), "a local lock wait must still delay the next attempt")
+		f.now = queued.AvailableAt
+		r = queued
+	}
+	require.NoError(t, f.db.Close())
+	require.NoError(t, f.db.Open(f.db.DatabasePath()))
+	r = f.claim(t, r)
+	require.NotNil(t, r)
+	require.Equal(t, progress, r.Progress)
+	require.Equal(t, input.Window, *r.Window)
+	r = f.finish(t, r, "succeeded")
+	require.Equal(t, "succeeded", r.State)
+	require.Equal(t, []models.SourceWindow{input.Window}, r.Completed)
+	require.Empty(t, r.Pending)
+	attempts, err := f.coordinator.Attempts(t.Context(), f.token, r.UUID, 0)
+	require.NoError(t, err)
+	require.Len(t, attempts, 12)
+	for _, attempt := range attempts[1:11] {
+		require.Equal(t, "retry", attempt.Outcome)
+		require.Equal(t, "worker_publication_busy", attempt.ErrorCode)
+		require.Equal(t, progress, attempt.Progress)
+	}
+}
+
+func TestSourceRunPublicationWaitCannotReportSourceFailureOrCompletion(t *testing.T) {
+	f := newSourceRunFixture(t)
+	r := f.claim(t, f.submit(t, f.request()))
+	for _, outcome := range []models.SourceRunOutcome{
+		{State: "succeeded", ErrorCode: "worker_publication_busy"},
+		{State: "deferred", ErrorCode: "worker_publication_busy"},
+		{State: "retry", ErrorCode: "worker_publication_busy", ErrorScope: "service:reddit"},
+		{State: "retry", ErrorCode: "worker_publication_busy", RetryAfterSeconds: 60},
+	} {
+		_, err := f.coordinator.Finish(t.Context(), f.token, r.Lease(), outcome)
+		require.ErrorIs(t, err, models.ErrSourceRunInvalid)
+		require.Equal(t, r, f.find(t, r.UUID))
+	}
+}
+
 func TestSourceRunRetryLimitsDeferralsAndReviewCannotBeBypassedByTimers(t *testing.T) {
 	f := newSourceRunFixture(t)
 	input := f.request()

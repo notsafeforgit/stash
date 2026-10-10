@@ -132,6 +132,12 @@ download, postprocessing, completion and archive update. Initialization,
 directory/finalization work and callbacks outside a file are guarded too. A
 current file can finish after lease loss; new file work still checks the lease.
 The locks are reentrant within a worker thread, including nested callbacks.
+A worker that times out waiting for the backup/dedupe boundary returns
+`retry` / `worker_publication_busy`. The server preserves its window, saved
+progress and source failure count, and waits at least 30 seconds before another
+attempt. Child/finalizer contention cannot report a successful traversal;
+completed files and their durable delivery events remain available on retry.
+Deploy the corresponding server retry handling before updating producers.
 
 The Twitter adapter also preserves `reply_user_id` from the raw API response,
 alongside the extractor's `conversation_id` and `reply_id`. Native capture intake

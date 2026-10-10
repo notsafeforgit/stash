@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from unittest.mock import Mock, patch
 
@@ -16,6 +17,7 @@ from stash_ingest.configuration import Configuration
 from stash_ingest.encoding import InvalidData, decode, encode
 from stash_ingest.gallery import NativeDownloadJob
 from stash_ingest.outbox import Capacity, Conflict, Outbox
+from stash_ingest.publication_lock import PublicationBarrier, PublicationBusy
 from stash_ingest.runs import SourceFailure, SourcePaused, SourceTurnComplete
 from stash_ingest.worker import Delivery, execute
 from helpers import PRODUCER, ROOT, RUN, capture, receipt
@@ -206,11 +208,61 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(result["outbox"]["counts"]["pending"], 4)
         self.lease.finish.assert_called_once_with("deferred", error_code="worker_configuration_or_source")
 
+    def test_backup_lock_timeout_retries_and_downloads_after_release(self):
+        self.lease.finish.return_value = {"state": "queued"}
+        with PublicationBarrier([self.profile.locks.path]):
+            with patch("stash_ingest.publication_lock._deadline", return_value=time.monotonic() + 0.05):
+                result = self.run_worker()
+        self.assertEqual(result["state"], "retry")
+        self.assertEqual(result["error_code"], "worker_publication_busy")
+        self.lease.finish.assert_called_once_with("retry", error_code="worker_publication_busy")
+        self.assertEqual(self.downloaded, [])
+        self.assertFalse(any(decode(row[0])["kind"] == "file.completed"
+                             for row in self.box.db.execute("SELECT body FROM events")))
+        self.lease.finish.reset_mock()
+        self.lease.finish.return_value = {"state": "succeeded"}
+        self.assertEqual(self.run_worker()["state"], "source_succeeded")
+        self.assertEqual(len(self.downloaded), 2)
+        self.lease.finish.assert_called_once_with("succeeded", error_code="")
+
+    def test_finalizer_lock_timeout_keeps_completed_files_and_retries(self):
+        def factory(*args, **kwargs):
+            task = self.job(*args, **kwargs)
+            finalize = task.handle_finalize
+
+            def busy_finalize():
+                if task.archive is not None:
+                    self.addCleanup(task.archive.close)
+                with PublicationBarrier([self.profile.locks.path]):
+                    with patch("stash_ingest.publication_lock._deadline", return_value=time.monotonic() + 0.05):
+                        return finalize()
+
+            task.handle_finalize = busy_finalize
+            return task
+
+        self.lease.finish.return_value = {"state": "queued"}
+        result = self.run_worker(factory)
+        self.assertEqual(result["state"], "retry")
+        self.assertEqual(result["error_code"], "worker_publication_busy")
+        self.assertEqual(len(self.downloaded), 2)
+        completions = [decode(row[0]) for row in self.box.db.execute("SELECT body FROM events")
+                       if decode(row[0])["kind"] == "file.completed"]
+        self.assertEqual(len(completions), 2)
+        for event in completions:
+            self.assertTrue((self.profile.root.path / event["relative_path"]).is_file())
+        self.lease.finish.assert_called_once_with("retry", error_code="worker_publication_busy")
+        self.lease.finish.reset_mock()
+        self.lease.finish.return_value = {"state": "succeeded"}
+        self.assertEqual(self.run_worker()["state"], "source_succeeded")
+        self.assertEqual(len(self.downloaded), 2, "completed files must not be downloaded again")
+        self.lease.finish.assert_called_once_with("succeeded", error_code="")
+
     def test_download_access_storage_and_interruption_failures_are_not_success(self):
         for failure, state, code in ((4, "retry", "source_download_failed"),
                                      (16, "deferred", "source_access_or_configuration"),
                                      (OSError(), "retry", "worker_storage_unavailable"),
                                      (Capacity("full"), "retry", "outbox_capacity"),
+                                     (PublicationBusy("busy"), "retry", "worker_publication_busy"),
                                      (InvalidData("configuration"), "deferred", "worker_configuration_or_source"),
                                      (KeyboardInterrupt(), "retry", "worker_interrupted"),
                                      (RuntimeError("unexpected"), "retry", "worker_execution_failed")):

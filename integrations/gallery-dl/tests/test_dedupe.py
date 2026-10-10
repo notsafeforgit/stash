@@ -327,7 +327,7 @@ class DedupeTests(unittest.TestCase):
                 try:
                     fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
                     with redirect_stderr(io.StringIO()):
-                        self.assertEqual(1, main(argv))
+                        self.assertEqual(2, main(argv), "worker contention is temporarily busy")
                 finally:
                     os.close(fd)
                 self.assertFalse(client.calls)

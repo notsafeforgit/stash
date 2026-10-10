@@ -1432,11 +1432,13 @@ It does not certify that every queued file event has finished ingestion.
 Remaining windows keep the run queued; otherwise it succeeds. A failure restores
 the claimed window, retains its checkpoint, and uses exponential retry delay
 starting at five minutes. Eight consecutive failures cause a durable deferral.
-Expired leases and `worker_interrupted` restore the pending window and saved
-progress without incrementing failures; recovery waits at least 30 seconds and
-respects any configured target cooldown. Repeated Stash restarts cannot exhaust
-the scrape's failure budget. Timers and manual submissions cannot clear it or shorten an
-existing delay. Target cooldown also survives changes of scan policy.
+Expired leases, `worker_interrupted` and `worker_publication_busy` restore the
+pending window and saved progress without incrementing failures; recovery waits
+at least 30 seconds and respects any configured target cooldown. Repeated Stash
+restarts or backup/dedupe lock waits cannot exhaust the scrape's failure budget.
+The two worker codes accept only `retry`, without a source scope or retry-delay
+override. Timers and manual submissions cannot clear a durable deferral or
+shorten an existing delay. Target cooldown also survives changes of scan policy.
 
 Lease renewal, progress and completion require producer UUID, worker UUID,
 current fence and an unexpired server deadline. Publication checks the deadline

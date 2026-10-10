@@ -7,6 +7,38 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
+## Existing performer profile URL associations — applied, 2026-10-10
+
+The account review repair linked 186 previously undecided tracked accounts to
+existing performers: 122 Reddit, 63 Twitter and one Bluesky. Each link required
+a unique typed account identifier matched by an existing performer profile URL.
+URLs copied from scraped biographies were excluded as ownership evidence;
+name-only matches, ambiguous identifiers and prior review choices were retained.
+The original post-association backfill did not visit every standalone account.
+All changes used revision-guarded native ownership preview/apply APIs, with
+durable requests and verified receipts under `.local/account-owner-links-20261010/`.
+The supplied lilsoftykitty account is linked to performer #463. There are 91
+tracked undecided accounts remaining: 63 unique name-only candidates, one
+ambiguous name and 27 without an exact name match.
+
+## Temporary filesystem-boundary contention — implemented, not yet deployed
+
+Two source runs were incorrectly deferred with `worker_configuration_or_source`
+after their worker timed out behind a backup/dedupe publication lock. Contention
+now raises a distinct temporary error and reports `retry` /
+`worker_publication_busy`; the server retains the original source window,
+checkpoint and failure count with at least a 30-second retry delay. Shared
+producer state prevents child or finalizer errors from being swallowed as
+successful traversal. Completed downloads and their delivery events survive.
+
+Focused regressions exercise a real held lock, successful continuation after
+release, a finalizer timeout after completed files, and more than eight retries
+without exhausting the source failure budget. SQLite reopen preserves the
+original window and checkpoint. Genuine configuration errors and real source
+failure accounting remain unchanged. Deploy server handling before the producer
+package; then retry only the two diagnosed deferred runs through the normal
+review API. This is not a schema change or a new migration.
+
 ## Verified GIF image-to-scene transition — deployed, 2026-10-10
 
 Schema 1000109 retains an explicit conversion between the old image UUID/file

@@ -7,6 +7,7 @@ from .client import Client, Unavailable, drain_once
 from .encoding import InvalidData, encode, identifier
 from .outbox import Capacity, Conflict, Outbox
 from .producer import Producer
+from .publication_lock import PublicationBusy
 from .runs import RunLease, SourceFailure, SourcePaused, SourceTurnComplete
 
 
@@ -138,6 +139,8 @@ def execute(box, client, configuration, run_uuid):
             result = {"state": "paused", "run_uuid": run_uuid, "error_code": "source_ownership_unavailable"}
         except Capacity:
             outcome, error = "retry", "outbox_capacity"
+        except PublicationBusy:
+            outcome, error = "retry", "worker_publication_busy"
         except (InvalidData, exception.GalleryDLException):
             outcome, error = "deferred", "worker_configuration_or_source"
         except (OSError, sqlite3.Error):

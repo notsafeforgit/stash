@@ -21,6 +21,10 @@ ACTIVE = "native-publication-active.lock"
 _local = threading.local()
 
 
+class PublicationBusy(BlockingIOError):
+    """A valid filesystem boundary is temporarily held by another operation."""
+
+
 def _directory(path):
     path = Path(path).resolve(strict=True)
     info = path.stat()
@@ -50,7 +54,7 @@ def _wait(fd, mode, deadline, check):
     while True:
         check()
         if time.monotonic() >= deadline:
-            raise InvalidData("Timed out waiting for the filesystem publication boundary")
+            raise PublicationBusy("Timed out waiting for the filesystem publication boundary")
         try:
             fcntl.flock(fd, mode | fcntl.LOCK_NB)
             return

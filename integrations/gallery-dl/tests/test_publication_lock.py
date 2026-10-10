@@ -7,7 +7,7 @@ import time
 import unittest
 
 from stash_ingest.encoding import InvalidData
-from stash_ingest.publication_lock import ACTIVE, GATE, PublicationBarrier, publication_lock
+from stash_ingest.publication_lock import ACTIVE, GATE, PublicationBarrier, PublicationBusy, publication_lock
 
 
 def lock_process(directory, exclusive, entered, leave):
@@ -103,7 +103,7 @@ class PublicationLockTests(unittest.TestCase):
                 self.fail("accepted redirected lock")
         (self.root / ACTIVE).unlink()
         with PublicationBarrier([self.root]):
-            with self.assertRaises(InvalidData):
+            with self.assertRaises(PublicationBusy):
                 with publication_lock(self.root, timeout=0.05):
                     self.fail("worker ignored backup exclusion")
 

@@ -5,7 +5,8 @@ This is the implementation record for the
 that plan's scope or replace its completion criteria. Development remains on
 `v3-rewrite`; merge into `develop` requires verification and the owner's success
 review. The native replacement and its schedules are running. Independent
-restore verification passed; scheduled-work observation remains in progress.
+restore and native home-copy verification passed. The implementation is ready
+for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
 ## Supplementary home backup upload order — 2026-10-10
 
@@ -22,8 +23,27 @@ the native integrity scan. Successful upload phases are recorded so retries
 retain their progress. The failure/retry fixture and shell syntax checks pass.
 Stash and scraper processes were not restarted.
 
-The resumed upload started at 17:29:03 UTC. Completion remains pending;
-`rclone-backup-homedir-resume-20261010.service` retains the stage on failure.
+The resumed snapshot upload completed at 17:36:22 UTC. Bounded remote reads
+confirmed the 19,173,167,104-byte native database, both producer snapshots and
+their receipt. Current native service, backup/worker configuration and the
+reordered home entrypoint also match their uploaded copies by size and MD5.
+No database download, new capture or integrity rescan was needed.
+
+The retired `stash-dev` directory was then preserved in the existing dated
+backup area with a single server-side directory move. Its folder identity is
+unchanged. The resumed general home sync uploaded all 64 changed files; its
+remaining work is ordinary rotation of obsolete files for other applications.
+That maintenance is not part of the native migration acceptance criteria.
+`rclone-backup-homedir-resume-finish-20261010.service` continues under the same
+lock and retention policy. It retains the stage on failure and removes only
+that owned stage after successful retention, preserving the original native
+database snapshot. Completed upload phases are not repeated on retry.
+
+All implementation acceptance checks are now recorded; the remaining transition
+step is the owner's success review before merging into `develop`. The fetched
+target branch is an ancestor, so the reviewed source can be fast-forwarded
+without a separate conflict resolution or application change.
+
 The installed home script hash is
 `28b0341b28734aa363f8f39411d103413aff4366a43c98e61f7c3de91f1da3a1`.
 Evidence and the exact before/after script are under

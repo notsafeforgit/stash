@@ -1,5 +1,5 @@
 {
-  "status": "native_live_home_backup_and_owner_acceptance_pending",
+  "status": "native_live_owner_acceptance_pending",
   "boundary_uuid": "8c462d7a-ee41-4508-a4c8-b4ab55c7ca13",
   "native_schema": 1000110,
   "public_native_activated": true,
@@ -877,11 +877,10 @@
     "manifest_sha256": "091b55067fe1f2932450f2f8ac9274301242ffec1961c74850d9ca56dcf43c6c"
   },
   "remaining": [
-    "supplementary_home_backup_completion",
     "owner_acceptance_before_develop_merge"
   ],
-  "scope": "Running native production with dated migration and recovery evidence. Supplementary home backup and owner acceptance remain pending. Ordinary scrape/translation queues continue on their schedules; clearing every backlog is not a migration acceptance gate. No new migration reconciliation or cold-media restore was run for this review.",
-  "checked_at": "2026-10-10T17:14:59.130212+00:00",
+  "scope": "Native migration, rollout and recovery checks are complete for their recorded scopes. The supplementary native database, producer snapshots and current service/backup configuration are verified on Drive. Ordinary home retention for other applications continues separately, as do scheduled scrape and translation queues. Owner success review remains required before merging develop. No additional migration reconciliation or cold-media restore was run for this review.",
+  "checked_at": "2026-10-10T17:52:28.608996+00:00",
   "n8n_staging": {
     "status": "passed_installed_paused",
     "unchanged_tables": 142,
@@ -2531,18 +2530,18 @@
       "failure": "Connection reset by peer during native snapshot request",
       "completion_observed": false,
       "retry_started_at": "2026-10-10T11:51:24Z",
-      "service": "rclone-backup-homedir.service",
-      "pid": 1513750,
-      "status": "uploading_original_captured_snapshots_first",
-      "checked_at": "2026-10-10T17:31:11.570897+00:00",
+      "service": "rclone-backup-homedir-resume-finish-20261010.service",
+      "pid": 2836731,
+      "status": "native_copies_verified_general_home_maintenance_running",
+      "checked_at": "2026-10-10T17:52:28.608996+00:00",
       "service_state": {
-        "service": "rclone-backup-homedir-resume-20261010.service",
+        "service": "rclone-backup-homedir-resume-finish-20261010.service",
         "ActiveState": "active",
         "SubState": "running",
-        "MainPID": 2793561
+        "MainPID": 2836731
       },
-      "native_snapshot_remote_completion_observed": false,
-      "note": "General home cleanup delayed the captured native/producer copies. At 17:29:03 UTC the original stage was retained by directory rename, preserving every file identity, and upload resumed snapshots-first under the same lock and remote backup directory. No recapture or integrity rescan; future normal invocations use the same new order. Stash and scrapers were not restarted.",
+      "native_snapshot_remote_completion_observed": true,
+      "note": "The original snapshot phase completed at 17:36:22 UTC, with remote metadata checks for the native database and both producer snapshots. Current native configurations match their remote copies. General home sync has uploaded all 64 changed files and is rotating obsolete files from other applications into the existing dated backup area. That unrelated maintenance does not block native migration acceptance. The controller preserves completed phases and removes only its own stage after successful retention.",
       "priority_deployment": {
         "evidence": ".local/home-backup-priority-20261010/deployment.json",
         "sha256": "927da49d178ee9589bd4ee4b81681f61f4c03b18614132ec08f694dd3f6f8ec8",
@@ -2552,6 +2551,89 @@
         "started_at": "2026-10-10T17:29:03.504847+00:00",
         "installed_sha256": "28b0341b28734aa363f8f39411d103413aff4366a43c98e61f7c3de91f1da3a1",
         "resume_unit": "rclone-backup-homedir-resume-20261010.service"
+      },
+      "original_service": "rclone-backup-homedir.service",
+      "original_pid": 1513750,
+      "native_scope_complete": true,
+      "native_snapshot_verification": {
+        "evidence": ".local/home-backup-priority-20261010/native-home-remote.json",
+        "sha256": "760971a811b96ebc0f184f72f559d9c0ae2a1d20b3577db447296d28ba8b1525",
+        "checked_at": "2026-10-10T17:37:14.103422+00:00",
+        "status": "passed",
+        "snapshot_phase": {
+          "started_at": "2026-10-10T17:29:03.519465+00:00",
+          "completed_at": "2026-10-10T17:36:22.827081+00:00"
+        },
+        "scope": "Successful original snapshot upload and bounded remote presence/size/hash-metadata reads. No download, new capture or repeated database integrity scan. General home sync and retention are still separate ongoing phases.",
+        "records": [
+          {
+            "path": "services/stash-native/config/backups/stash-native.sqlite.1000109.20261010_045124",
+            "bytes": 19173167104,
+            "remote_md5": "98b590395a95976dcec687685a8c08a0",
+            "remote_modtime": "2026-10-10T11:52:31.670Z"
+          },
+          {
+            "path": ".local/state/stash-ingest/host.sqlite.bak",
+            "bytes": 46624768,
+            "remote_md5": "55e83f18a233c8c7684601e9845fd0cc",
+            "remote_modtime": "2026-10-10T12:17:10.521Z"
+          },
+          {
+            "path": "services/n8n/data/native-archive/producer.sqlite.bak",
+            "bytes": 346898432,
+            "remote_md5": "eab24f3f44f12626f25b42f7e628edb0",
+            "remote_modtime": "2026-10-10T12:17:12.463Z"
+          },
+          {
+            "path": "services/stash-native/config/backups/worker-database-snapshots.json",
+            "bytes": 4936,
+            "remote_md5": "f0d65cfb2c23ef55d1a4cb49f79f67e6",
+            "remote_modtime": "2026-10-10T12:17:13.265Z"
+          }
+        ]
+      },
+      "current_configuration_verification": {
+        "evidence": ".local/home-backup-priority-20261010/native-config-remote.json",
+        "sha256": "ea1ce8c627a39d1760fcc9c703dd1bd472575c4f2420677c2daf462781d6709a",
+        "checked_at": "2026-10-10T17:50:42.709409+00:00",
+        "status": "passed",
+        "files": [
+          {
+            "path": ".config/containers/systemd/stash.container",
+            "bytes": 2234,
+            "md5_matches": true
+          },
+          {
+            "path": ".config/stash-native-backup/host-backup.json",
+            "bytes": 20564,
+            "md5_matches": true
+          },
+          {
+            "path": ".config/stash-native-backup/workers.json",
+            "bytes": 21744,
+            "md5_matches": true
+          },
+          {
+            "path": "bin/rclone-backup-homedir.sh",
+            "bytes": 5552,
+            "md5_matches": true
+          }
+        ],
+        "scope": "Current native service, backup/worker configuration and reordered home entrypoint match their uploaded Drive copies. No secret contents printed."
+      },
+      "retired_development_directory": {
+        "evidence": ".local/home-backup-priority-20261010/retired-folder-move.json",
+        "sha256": "696fd52fd980127c09d66838925444a12ebaad2eec0bc34cdceea9093d20c9a6",
+        "started_at": "2026-10-10T17:40:45.907621+00:00",
+        "source": "drive:yggdrasil-home-backup/services/stash-dev",
+        "destination": "drive:yggdrasil-backups-deleted/2026-10-10/103900-retired-development/services/stash-dev",
+        "destination_absent": true,
+        "dry_run_directory_move": true,
+        "snapshot_reupload": false,
+        "new_service": "rclone-backup-homedir-resume-finish-20261010.service",
+        "status": "preserved_by_server_directory_move",
+        "directory_id_unchanged": true,
+        "completed_at": "2026-10-10T17:40:57.108008+00:00"
       }
     },
     "source_runs": [
@@ -3014,8 +3096,8 @@
     }
   },
   "completion_review": {
-    "checked_at": "2026-10-10T17:14:59.130212+00:00",
-    "status": "implementation_verified_for_recorded_scopes_acceptance_pending",
+    "checked_at": "2026-10-10T17:52:28.608996+00:00",
+    "status": "implementation_verified_owner_success_review_pending",
     "method": "Review existing reconciliation algorithms and results, passing release gates and bounded current-runtime checks. Do not repeat multi-million-row comparisons, artwork reconstruction or cloud restore solely for a final status report.",
     "criteria": [
       {
@@ -3108,9 +3190,10 @@
           "latest_rollout.independent_restore",
           "latest_rollout.scheduled_backup",
           "docs/native-archive-progress.md#complete-populated-local-restore-proof--2026-10-08",
-          "docs/native-archive-format.md"
+          "docs/native-archive-format.md",
+          "latest_rollout.home_backup"
         ],
-        "result": "Cloud native restore passed. Separate populated local recovery replayed both producer outboxes and an interrupted file deletion. Daily publication and native cleanup verified; supplementary Google Drive copy still running."
+        "result": "Cloud native restore passed. Separate populated local recovery replayed both producer outboxes and an interrupted file deletion. Daily publication/native cleanup and the supplementary native Drive copies are verified. Ordinary home retention for other applications continues independently."
       },
       {
         "criterion": "Clean runtime dependency boundary",
@@ -3125,11 +3208,20 @@
     "review_items": {
       "account_link_choices": "The prior targeted repair left 91 tracked undecided accounts. Name-only/ambiguous candidates remain review work, not permission to invent ownership.",
       "source_backlog": "Scheduled profiles and historical retrieval passes are still draining; completed sample runs do not certify every profile.",
-      "supplementary_home_backup": "Observe the original captured snapshot upload, now prioritized ahead of general home cleanup; retained staged files and durable phase completion allow retry without recapture.",
+      "supplementary_home_backup": "Native database/producer copies and current native configuration are verified on Drive. Only unrelated general home retention remains; the existing controller continues without recapturing or reuploading completed snapshots.",
       "translation_retries": "Operational follow-up: observe the 64 existing retries after the tested length correction. Their deadlines were not reset, and waiting for all completions is not a separate merge gate.",
       "owner_acceptance": "Required by the original goal before merging v3-rewrite directly into develop."
     },
     "rollback": "Native writes are active. Prefer a forward fix; take a native snapshot/export before recovery. Never run the frozen compatible binary against the promoted database. Returning to that runtime requires separately validated conversion and preservation of post-cutover changes.",
-    "develop_merged": false
+    "develop_merged": false,
+    "merge_preview": {
+      "target_branch": "develop",
+      "target_revision": "d4e02f754712f67ee1307e444d58fa8039b39e38",
+      "target_is_ancestor": true,
+      "source_branch": "v3-rewrite",
+      "verified_application_revision": "b0e481c8694d6d4fbedaeb133d3fab4b72cdf1c2",
+      "subsequent_changes": "documentation only",
+      "owner_approval_received": false
+    }
   }
 }

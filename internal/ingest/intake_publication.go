@@ -24,6 +24,7 @@ type IntakePublication struct {
 	Target             FileTarget               `json:"target"`
 	Kind               models.ArchiveEntityKind `json:"media_kind"`
 	Source             *IntakeSource            `json:"source,omitempty"`
+	Transformation     *IntakeTransformation    `json:"transformation,omitempty"`
 }
 
 type IntakeSource struct {
@@ -157,7 +158,7 @@ func collectionIncludesFile(collection *models.SourceCollection, target FileTarg
 }
 
 func validatePublicationCollection(ctx context.Context, repo models.Repository, input IntakePublication) error {
-	if !ValidUUID(input.CollectionUUID) || input.CollectionRevision <= 0 || !archive.ValidRootRelativePath(input.Target.RelativePath, false) {
+	if !ValidUUID(input.CollectionUUID) || input.CollectionRevision <= 0 || !archive.ValidRootRelativePath(input.Target.RelativePath, false) || !validIntakeTransformation(input) {
 		return ErrInvalid
 	}
 	current, err := repo.SourceCollection.Find(ctx, input.CollectionUUID)
@@ -189,9 +190,10 @@ func publishIntakeSource(ctx context.Context, repo models.Repository, input Inta
 		return models.ErrSourceAttachmentConflict
 	}
 	details, err := json.Marshal(struct {
-		ContentUUID string `json:"content_uuid"`
-		Generation  int64  `json:"generation"`
-	}{media.File.Proof.Content.UUID, media.File.Proof.Generation})
+		ContentUUID    string                      `json:"content_uuid"`
+		Generation     int64                       `json:"generation"`
+		Transformation *fileTransformationEvidence `json:"transformation,omitempty"`
+	}{media.File.Proof.Content.UUID, media.File.Proof.Generation, transformationEvidence(input.Transformation)})
 	if err != nil {
 		return err
 	}

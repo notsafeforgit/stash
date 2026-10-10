@@ -145,6 +145,16 @@ def drain_once(outbox, client, *, owner=None):
 
     try:
         capabilities = client.capabilities()
+        if capabilities.get("file_transformation_protocol") != 1:
+            ready = []
+            for delivery in deliveries:
+                if "transformation" in decode(delivery.body):
+                    fail(delivery, "file_transformation_unavailable", delay=60)
+                else:
+                    ready.append(delivery)
+            deliveries = ready
+            if not deliveries:
+                return counts
         # The server replays known file receipts even with processing disabled.
         # One batch keeps the request deadline safely inside the delivery lease.
         results = client.batch(deliveries)

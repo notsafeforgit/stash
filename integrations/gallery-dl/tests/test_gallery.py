@@ -692,11 +692,69 @@ class GalleryTests(unittest.TestCase):
         file = self.events()[-1]
         self.assertEqual(file["media_kind"], "scene")
         self.assertTrue(file["relative_path"].endswith(".mkv"))
+        self.assertEqual(file["transformation"], {"kind": "gif-to-video",
+                         "original_relative_path": file["relative_path"][:-4] + ".gif"})
         with patch("gallery_dl.postprocessor.exec.ExecPP._exec", side_effect=AssertionError("Already converted")):
             task = self.task(data)
             task.download = lambda _: self.fail("Archived GIF was downloaded again")
             self.assertEqual(task.run(), 0)
         self.assertEqual(self.events()[-1]["relative_path"], file["relative_path"])
+        self.assertEqual(self.events()[-1]["transformation"], file["transformation"])
+
+    def test_interrupted_gif_completion_recovers_conversion_after_outbox_reopen(self):
+        config.set(("extractor",), "postprocessors", [{"name": "exec", "event": "after",
+                    "command": ["python3", "/fixture/gif_to_av1_qsv.py", "{_path}"]}])
+        data = reddit_data(extension="gif", url="https://i.redd.it/abc123.gif", _url="https://i.redd.it/abc123.gif")
+
+        def convert(args, shell):
+            original = Path(args[-1])
+            original.rename(original.with_suffix(".mkv"))
+            return 0
+
+        with patch("gallery_dl.postprocessor.exec.ExecPP._exec", side_effect=convert), \
+                patch.object(self.producer, "complete", side_effect=OSError("interrupted before local completion")):
+            self.assertNotEqual(self.task(data).run(), 0)
+        self.assertFalse(any(e["kind"] == "file.completed" for e in self.events()))
+        self.box.close()
+        self.box = Outbox(self.directory / "outbox.sqlite", self.lease.client.endpoint, PRODUCER)
+        self.addCleanup(self.box.close)
+        self.producer = Producer(self.box, self.lease, self.root, extractor_version="fixture")
+        with patch("gallery_dl.postprocessor.exec.ExecPP._exec", side_effect=AssertionError("Already converted")):
+            task = self.task(data)
+            task.download = lambda _: self.fail("Converted GIF was downloaded again")
+            self.assertEqual(task.run(), 0)
+        event = self.events()[-1]
+        self.assertEqual(event["transformation"], {"kind": "gif-to-video",
+                         "original_relative_path": event["relative_path"][:-4] + ".gif"})
+
+    def test_unconfigured_mkv_sibling_does_not_claim_gif_conversion(self):
+        original = self.media / "Account" / "postabc123_abc123.gif"
+        original.parent.mkdir()
+        original.with_suffix(".mkv").write_bytes(b"unrelated video")
+        data = reddit_data(extension="gif", url="https://i.redd.it/abc123.gif", _url="https://i.redd.it/abc123.gif")
+        self.assertEqual(self.task(data).run(), 0)
+        event = self.events()[-1]
+        self.assertEqual(event["media_kind"], "image")
+        self.assertNotIn("transformation", event)
+
+    def test_converted_gif_recovery_respects_forced_downloads(self):
+        config.set(("extractor",), "skip", False)
+        config.set(("extractor",), "postprocessors", [{"name": "exec", "event": "after",
+                    "command": ["python3", "/fixture/gif_to_av1_qsv.py", "{_path}"]}])
+        original = self.media / "Account" / "postabc123_abc123.gif"
+        original.parent.mkdir()
+        original.with_suffix(".mkv").write_bytes(b"previous conversion")
+
+        def convert(args, shell):
+            self.assertEqual(Path(args[-1]), original)
+            original.replace(original.with_suffix(".mkv"))
+            return 0
+
+        data = reddit_data(extension="gif", url="https://i.redd.it/abc123.gif", _url="https://i.redd.it/abc123.gif")
+        with patch("gallery_dl.postprocessor.exec.ExecPP._exec", side_effect=convert) as converter:
+            self.assertEqual(self.task(data).run(), 0)
+            self.assertEqual(converter.call_count, 1)
+        self.assertEqual(self.events()[-1]["sha256"], hashlib.sha256(original.with_suffix(".mkv").read_bytes()).hexdigest())
 
     def test_resume_missing_checkpoint_cannot_report_success(self):
         self.producer.resume_cursor = "missing"

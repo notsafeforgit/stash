@@ -202,7 +202,7 @@ func (s *Service) PreviewManualFile(ctx context.Context, input ManualFileInput) 
 }
 
 func validFileWork(work FileWork) bool {
-	if work.Size <= 0 {
+	if work.Size <= 0 || !validIntakeTransformation(work.Publication) {
 		return false
 	}
 	if work.Version == 1 {

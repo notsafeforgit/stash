@@ -70,6 +70,7 @@ func TestAttachmentDownloadHTTPHistoryReplayAndPortableRestore(t *testing.T) {
 	capabilities := request(http.MethodGet, ingestPath+"/capabilities", token, nil)
 	require.Equal(t, http.StatusOK, capabilities.Code)
 	require.Contains(t, capabilities.Body.String(), `"attachment_download_protocol":1`)
+	require.Contains(t, capabilities.Body.String(), `"file_transformation_protocol":1`)
 	require.Contains(t, capabilities.Body.String(), `"attachment.download"`)
 	batch := func(event any, auth string) []ingestBatchResult {
 		t.Helper()

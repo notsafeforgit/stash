@@ -1111,6 +1111,36 @@ revision and root. Submit that capture first. Paths must name a final regular
 file within the permitted root and directory prefix; `.part` paths are rejected.
 The server owns file UUIDs, generations, removal fences, and capture UUIDs.
 
+Servers accepting conversion provenance advertise `file_transformation_protocol: 1`.
+For the configured GIF-to-MKV postprocessor, the completion event also contains:
+
+```json
+{
+  "transformation": {
+    "kind": "gif-to-video",
+    "original_relative_path": "account/animation.gif"
+  }
+}
+```
+
+The final path must be `account/animation.mkv`, its media kind must be `scene`,
+and the event must retain its source capture/attachment. Only this same-stem
+conversion is accepted; producers cannot supply a replaced Stash image UUID.
+Admission snapshots the original path's current file UUID, generation and removal
+fence into durable work. Published source-media evidence retains the portable
+conversion claim without exposing those internal host paths/fences. The claim
+does not assert equal bytes and cannot by itself authorize replacing an image.
+The existing image-to-scene kind conflict still requires the pending domain
+transition implementation.
+
+The adapter recovers a completed MKV after interruption between conversion and
+the completion/archive write, as well as on ordinary archive skips. Recovery
+requires the configured converter and an absent GIF; it honors `skip: false`.
+Final size and SHA-256 still describe the verified MKV. Workers require this
+capability before starting; delivery retains conversion events with their exact
+bytes and retries while the capability is unavailable. Deploy the server before
+the corresponding producer runtime.
+
 A file item returns status 202 with an immutable `queued` receipt and job UUID.
 Status initially reports `registration_committed: false` and
 `media_ingested: false`. After verified file/media/source/album publication,

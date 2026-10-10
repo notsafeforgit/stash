@@ -337,7 +337,8 @@ class NativeDownloadJob(job.DownloadJob):
             self._native_initializing = False
         self.hooks = collections.defaultdict(list, self.hooks)
         self._archive_write_file = self._archive_write_skip = self._archive_write_after = False
-        self._native_skip_rule = self._skipexc
+        # Upstream does not initialize the skip exception when skip is false.
+        self._native_skip_rule = self._skipexc = getattr(self, "_skipexc", None)
         if self.producer.legacy_resume and self._native_skip_rule is None:
             # Old full-history/no-skip runs did not use checkpoint stop rules.
             self.producer.resume_cursor = ""
@@ -376,6 +377,17 @@ class NativeDownloadJob(job.DownloadJob):
         for event, callbacks in self.hooks.items():
             self.hooks[event] = [publication_callback(self, callback) for callback in callbacks]
         filename.install(self)
+        original_exists = self.pathfmt.exists
+
+        def exists():
+            if original_exists():
+                return True
+            # The converter atomically publishes MKV before deleting GIF. A
+            # crash before our completion/archive write must recover that final
+            # output even if the website can no longer serve the original.
+            return bool(self.extractor.config("skip", True) and self._converted_gif(self.pathfmt))
+
+        self.pathfmt.exists = exists
         original_download = self.download
 
         def download(url):
@@ -533,14 +545,16 @@ class NativeDownloadJob(job.DownloadJob):
         if self._native_prepared is None:
             raise InvalidData("File completion has no durable source capture")
         path = Path(pathfmt.realpath) if pathfmt.extension and pathfmt.realpath else None
-        if (path is not None and not path.is_file() and path.suffix.lower() == ".gif"
-                and filename.install(self).gif and path.with_suffix(".mkv").is_file()):
-            path = path.with_suffix(".mkv")
+        original_path = None
+        converted = self._converted_gif(pathfmt)
+        if converted is not None:
+            original_path = path
+            path = converted
         completed = path is not None and path.is_file()
         if not completed and not skipped:
             raise InvalidData("Successful download has no resolved final file; it remains unfinished")
         if completed:
-            self.producer.complete(self._native_prepared, path)
+            self.producer.complete(self._native_prepared, path, original_path=original_path)
             self._native_phase = None
             if self.archive is not None:
                 self.archive.add(pathfmt.kwdict)
@@ -556,3 +570,11 @@ class NativeDownloadJob(job.DownloadJob):
             # Completed bytes and their queued event survive a lost lease or
             # outage. The next source boundary stops before more extraction.
             pass
+
+    def _converted_gif(self, pathfmt):
+        if pathfmt.extension and pathfmt.realpath and filename.install(self).gif:
+            original = Path(pathfmt.realpath)
+            if (original.suffix.lower() == ".gif" and not original.is_file()
+                    and original.with_suffix(".mkv").is_file()):
+                return original.with_suffix(".mkv")
+        return None

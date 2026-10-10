@@ -7,6 +7,39 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement is running; the controlled worker rollout remains
 in progress.
 
+## GIF conversion provenance and restart recovery — implemented, not deployed, 2026-10-10
+
+The producer now retains the configured GIF-to-MKV transformation with its
+completed-file event, including the original GIF path and unchanged source
+attachment reference. Admission freezes the original file UUID/generation and
+removal fence as server-owned work. Published source-media evidence retains the
+portable conversion claim. The claim is not a byte-equivalence assertion and
+cannot select a Stash image to replace. Workers negotiate the new capability;
+delivery defers unsupported conversion events without discarding their bytes or
+blocking unrelated files.
+
+A new interruption regression exposed a second gap: when conversion succeeded
+before the completion/archive write, the retry tried to download the GIF again.
+The adapter now recognizes the configured converter's final MKV in that case,
+retaining completion and source evidence after reopening the outbox. Forced
+downloads still work; an unrelated MKV without the converter does not count as
+a completed GIF.
+
+All 678 producer tests and the complete ingestion package pass. Focused native
+tests cover admission/replay across a database restart, retained original-file
+lifetimes, invalid claims, and a real
+probed video with portable source evidence. The HTTP capability regression
+passes. Private validation evidence is in `.local/gif-conversion-20261010/`.
+
+The existing-image-to-scene domain transition is still pending. It must preserve
+metadata choices (including explicit clears), identity/history, source links,
+manual gallery membership and covers, and restartable after-success work before
+removing the stale image/file entries. Do not treat the new transformation claim
+alone as authority to bypass the media-kind conflict. A bounded live inspection
+found three failed association jobs, all for the already repaired gallery #3664
+attachment now linked to scene #373593; it found no other failed MKV association
+in that queue. This increment changes no production runtime or database schema.
+
 ## Internal account migration identifiers — deployed, 2026-10-10
 
 Account review now shows handles, service IDs and profile URLs without listing

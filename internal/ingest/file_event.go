@@ -30,6 +30,7 @@ type FileEvent struct {
 	SHA256             string                   `json:"sha256"`
 	MediaKind          models.ArchiveEntityKind `json:"media_kind"`
 	Source             *FileEventSource         `json:"source,omitempty"`
+	Transformation     *FileTransformation      `json:"transformation,omitempty"`
 }
 
 type FileEventSource struct {
@@ -67,6 +68,9 @@ func validateFileEvent(event FileEvent) error {
 		return ErrUnsupported
 	}
 	if event.Source != nil && !ValidUUID(event.Source.CaptureEventUUID) {
+		return ErrInvalid
+	}
+	if !validFileTransformation(event.Transformation, event.MediaKind, event.RelativePath, event.Source != nil) {
 		return ErrInvalid
 	}
 	return nil
@@ -156,6 +160,13 @@ func (s *Service) FileCompleted(ctx context.Context, token string, raw []byte, d
 			return err
 		}
 		publication.Target = *target
+		if event.Transformation != nil {
+			original, err := CaptureFileTarget(ctx, s.Repo, *root, event.Transformation.OriginalRelativePath, sensitive)
+			if err != nil {
+				return err
+			}
+			publication.Transformation = &IntakeTransformation{Kind: event.Transformation.Kind, Original: *original}
+		}
 		var postUUID, captureUUID string
 		if event.Source != nil {
 			captureReceipt, err := s.Repo.Ingest.FindReceipt(ctx, event.ProducerUUID, event.Source.CaptureEventUUID)

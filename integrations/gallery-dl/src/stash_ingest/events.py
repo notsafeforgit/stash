@@ -72,7 +72,7 @@ def validate(body):
             raise InvalidData("Source must satisfy the retention policy before queuing")
     elif kind == "file.completed":
         if (not COMMON | FILE <= event.keys()
-                or not set(event) <= COMMON | FILE | {"source"}
+                or not set(event) <= COMMON | FILE | {"source", "transformation"}
                 or len(body) > MAX_FILE_EVENT_BYTES or event["root_uuid"] is None):
             raise InvalidData("Invalid file event envelope")
         path = event["relative_path"]
@@ -91,6 +91,16 @@ def validate(body):
                 raise InvalidData("Invalid file source reference")
             identifier(source["capture_event_uuid"])
             reference(source["attachment"])
+        transformation = event.get("transformation")
+        if "transformation" in event:
+            original = transformation.get("original_relative_path") if isinstance(transformation, dict) else None
+            if (not isinstance(transformation, dict)
+                    or set(transformation) != {"kind", "original_relative_path"}
+                    or transformation["kind"] != "gif-to-video" or source is None
+                    or event["media_kind"] != "scene" or not path.endswith(".mkv")
+                    or not isinstance(original, str) or original[-4:].lower() != ".gif"
+                    or original[:-4] + ".mkv" != path):
+                raise InvalidData("Invalid GIF-to-video transformation")
     elif kind == "attachment.download":
         if (not COMMON | DOWNLOAD <= event.keys()
                 or not set(event) <= COMMON | DOWNLOAD | {"file_event_uuid", "reason_code"}

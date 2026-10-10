@@ -138,7 +138,7 @@ class Producer:
         # asks to record the same start again.
         return self.outbox.enqueue(previous[1])
 
-    def complete(self, prepared, path):
+    def complete(self, prepared, path, *, original_path=None):
         # This file may finish after ownership loss. Persist it first; the next
         # source boundary and run checkpoint still require the live lease.
         self.relative(path)
@@ -153,6 +153,8 @@ class Producer:
         event = {**self.context, "event_uuid": str(uuid.uuid4()), "kind": "file.completed", "observed_at": utc_now(),
                  "relative_path": relative, "size": size, "sha256": sha256, "media_kind": kind,
                  "source": {"capture_event_uuid": prepared.event_uuid, "attachment": prepared.attachment}}
+        if original_path is not None:
+            event["transformation"] = {"kind": "gif-to-video", "original_relative_path": self.relative(original_path)}
         event_id = self.outbox.enqueue(encode(event))
         self.report_download(prepared, "downloaded", file_event_uuid=event_id)
         return event_id

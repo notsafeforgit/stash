@@ -70,12 +70,13 @@ class ProducerTests(unittest.TestCase):
         path = self.media / "transformed.mkv"
         path.write_bytes(b"final transformed media")
         self.lease.active = False
-        self.producer.complete(prepared, path)
+        self.producer.complete(prepared, path, original_path=path.with_suffix(".gif"))
         rows = [decode(r[0]) for r in self.box.db.execute("SELECT body FROM events ORDER BY seq")]
         self.assertEqual([r["kind"] for r in rows], ["source.capture", "file.completed", "attachment.download"])
         self.assertEqual(rows[1]["relative_path"], "transformed.mkv")
         self.assertEqual(rows[1]["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
         self.assertEqual(rows[1]["source"]["capture_event_uuid"], prepared.event_uuid)
+        self.assertEqual(rows[1]["transformation"], {"kind": "gif-to-video", "original_relative_path": "transformed.gif"})
         with self.assertRaises(SourcePaused):
             self.producer.prepare(reddit_data("next"))
 

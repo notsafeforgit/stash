@@ -4,8 +4,32 @@ This is the implementation record for the
 [full transition plan](native-archive-transition-plan.md). It does not narrow
 that plan's scope or replace its completion criteria. Development remains on
 `v3-rewrite`; merge into `develop` requires verification and the owner's success
-review. The native replacement is running; the controlled worker rollout remains
-in progress.
+review. The native replacement and its schedules are running; observation of
+scheduled work and independent restore verification remain in progress.
+
+## Native schedule resumption — observing, 2026-10-10
+
+The seven held host timers have resumed with their original cadences. Native
+host ingestion and local-file intake are enabled, and the already running n8n
+worker stayed running. All ten selected timers are active. Nine inactive legacy
+catalog units are reversibly masked, with their original definitions retained.
+The resumption checked the current deployment, all ten native service commands,
+22 host profiles and the completed coordinated backup publication; it did not
+reuse the older helper's obsolete runtime and inactive-n8n assumptions.
+
+The first scheduled Twitter, Reddit and Instagram submissions succeeded. The
+host dispatcher is admitting their queued work, local intake is advancing, and
+411 media-verification jobs completed after resumption. The existing n8n source
+run also advanced its downloaded-file checkpoint. These observations do not yet
+establish completion of every newly queued profile or enrichment pass.
+
+Dedupe correctly deferred while another operation held its lock. The initial
+scheduled backup encountered the resumption helper's temporary backup lock and
+is awaiting its existing fifteen-minute retry. Its best-effort dedupe launcher
+also lacked its execute bit; the installed launcher's mode is now corrected to
+0700, with its contents unchanged. The independent cloud restore remains the
+same live process and has not been restarted. Root free space is about 135 GiB.
+Evidence: `.local/native-schedule-rollout-20261010/`.
 
 ## Browser regression fixtures — corrected, 2026-10-10
 
@@ -20,8 +44,17 @@ opening the root still performs no write or folder probe.
 
 All 64 checks across the three affected suites pass in Chromium and WebKit.
 The complete local fork gate passes in 37.89 seconds with its existing caches.
-Only test fixtures/assertions and this record changed; the complete GitHub
-browser workflow will run on the push. Evidence: `.local/browser-repair-20261010/`.
+Only test fixtures/assertions and this record changed. The [GitHub publisher](https://github.com/notsafeforgit/stash/actions/runs/38035132447)
+passed, and the registry image's revision matches `a768fb592`. This test-only
+increment did not deploy an application image.
+
+The [complete browser run](https://github.com/notsafeforgit/stash/actions/runs/38035132436)
+has an additional WebKit clipboard-fallback failure. Its trace stops responding
+after Copy; on the retry, the correct error message appears before reopening the
+menu hangs. Ten focused repetitions and the complete sixteen-check image-file
+suite pass locally in the pinned Playwright container. The GitHub failure
+remains unresolved; these local checks are not evidence that the complete
+browser workflow passed. Evidence: `.local/browser-repair-20261010/`.
 
 ## Parallel native validation — implemented, 2026-10-10
 

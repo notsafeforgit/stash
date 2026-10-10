@@ -86,8 +86,8 @@ redirect pip's uninstall discovery. Producer wheel builds discard obsolete
 `scripts/verify_producer_install.py`. A staged worker policy must fingerprint the
 same code as the actual installed runtime; source-import tests alone cannot prove it.
 Host/n8n launch paths now select the native adapter. The n8n initial-profile
-queue and native download worker are running; the remaining host schedules are
-still held for their controlled rollout checks. Do not equate an installed
+queue and native download worker are running; host scrape, intake, dedupe and
+backup schedules have resumed and their execution is being observed. Do not equate an installed
 launcher, active timer or admitted job with completed ingestion.
 `integrations/archive` provides the standard-library `stash-archive` tool for
 compressed native SQLite snapshots, original artwork and explicit configuration

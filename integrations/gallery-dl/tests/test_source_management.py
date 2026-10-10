@@ -8,6 +8,7 @@ import uuid
 
 from stash_ingest.client import Client, Unavailable
 from stash_ingest.encoding import InvalidData, decode, digest, encode
+from stash_ingest.publication_lock import PublicationBusy
 from stash_ingest.source_management import (DEFINITION, SourceManagementClient, inspect, intent, load_plan,
                                             management_lock, prepare, validate_plan)
 from helpers import ROOT, PRODUCER
@@ -254,7 +255,7 @@ class SourceManagementTests(unittest.TestCase):
 
     def test_concurrent_management_cannot_enter_same_shared_root(self):
         with management_lock(self.directory, ROOT):
-            with self.assertRaises(InvalidData):
+            with self.assertRaises(PublicationBusy):
                 with management_lock(self.directory, ROOT):
                     self.fail("Concurrent management acquired the same lock")
 

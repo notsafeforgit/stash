@@ -371,7 +371,7 @@ def validate_report(report):
 
 
 def verify_maintenance_locks(report, lock_fd):
-    """The inherited backup descriptor must fence the dedupe journal too."""
+    """Fence dedupe requests/results; discovery may still save candidate hints."""
     validate_report(report)
     if not report.get("maintenance_locks"):
         return

@@ -603,6 +603,11 @@ Do not enumerate its database/WAL files as an opaque state directory.
 Resolved version-3 reports also bind its library-lock path. Native capture
 verifies the inherited backup descriptor holds that exact exclusive flock;
 matching a filename or observing another process's lock is insufficient.
+This excludes dedupe preview/removal and receipt publication. Read-only discovery
+may continue and commit a new candidate manifest during capture; the SQLite
+snapshot retains one committed journal view, and no candidate can change media
+until the backup releases its lock. A restored pending candidate still requires
+native preview and byte verification against the matching restored media view.
 The journal must exist before the first native backup. Restore it with the
 matching library/media view before restarting dedupe. Version-1/2 inventories
 remain readable for earlier snapshots and declarations without maintenance.

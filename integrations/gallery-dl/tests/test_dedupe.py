@@ -1,5 +1,5 @@
 import copy
-from contextlib import closing, redirect_stderr, redirect_stdout
+from contextlib import closing, contextmanager, redirect_stderr, redirect_stdout
 import fcntl
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
@@ -19,7 +19,7 @@ from stash_ingest.dedupe import Journal, apply_saved, exclusive_lock, main, priv
 from stash_ingest.dedupe_candidates import directory_identity, discover, pairs_from_report
 from stash_ingest.dedupe_client import DeduplicationClient, validate_preview, validate_receipt
 from stash_ingest.encoding import InvalidData, decode, encode
-from stash_ingest.publication_lock import ACTIVE, PublicationBarrier
+from stash_ingest.publication_lock import ACTIVE, GATE, PublicationBarrier, publication_lock
 
 ROOT = str(uuid.uuid4())
 KEEP = str(uuid.uuid4())
@@ -317,6 +317,10 @@ class DedupeTests(unittest.TestCase):
                 with exclusive_lock(base / "library.lock"), redirect_stderr(io.StringIO()):
                     self.assertEqual(2, main(argv))
                 self.assertFalse(client.calls)
+                self.assertTrue(Journal.has_active(base / "state"))
+                # A blocked apply retains discovery. Recovery must not reread
+                # an expensive report, even if it is no longer available.
+                report_path.unlink()
                 # A worker active on a different thread/process cannot be
                 # bypassed. Holding its ordinary shared lock is sufficient.
                 fd = os.open(worker / ACTIVE, os.O_RDWR | os.O_CREAT, 0o600)
@@ -327,13 +331,124 @@ class DedupeTests(unittest.TestCase):
                 finally:
                     os.close(fd)
                 self.assertFalse(client.calls)
-                self.assertFalse(Journal.has_active(base / "state"))
+                self.assertTrue(Journal.has_active(base / "state"))
                 # Blocked candidates finish as review, not successful removal.
                 client.blocked = "different_media_owners"
                 with redirect_stdout(io.StringIO()) as output:
                     self.assertEqual(3, main(argv))
                 self.assertFalse(json.loads(output.getvalue())["all_removed"])
                 self.assertFalse(any(kind == "apply" for kind, _ in client.calls))
+
+    def test_discovery_allows_workers_and_backup_but_preview_requires_all_locks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            media = base / "media"
+            media.mkdir()
+            workers = [base / "host", base / "n8n"]
+            for worker in workers:
+                worker.mkdir()
+            for i in range(2):
+                (media / f"{i}.mp4").write_bytes(b"fixture\n" * 100)
+            library_lock = base / "library.lock"
+            argv = ["--endpoint", MemoryClient.endpoint, "--root", str(media), "--root-uuid", ROOT,
+                    "--state-dir", str(base / "state"), "--library-lock", str(library_lock), "--all-content",
+                    "--lock-root", str(workers[0]), "--lock-root", str(workers[1]), "--lock-timeout", "0.1"]
+            client = MemoryClient(media)
+            client.blocked = "different_media_owners"
+
+            def discover_while_active(*_, **__):
+                # Separate flock descriptors exercise real exclusion, without
+                # timing-dependent sleeps or needing a full-library scan.
+                with exclusive_lock(library_lock), PublicationBarrier(workers, timeout=0.1) as backup:
+                    backup.check()
+                for worker in workers:
+                    with publication_lock(worker, timeout=0.1):
+                        pass
+                with self.assertRaises(BlockingIOError), exclusive_lock(base / "state" / "run.lock"):
+                    self.fail("only discovery's state lock should remain held")
+                self.assertFalse(client.calls)
+                return [{"keep_path": "0.mp4", "remove_path": "1.mp4"}]
+
+            def guarded_preview(pair):
+                for path in [library_lock, *(worker / name for worker in workers for name in (GATE, ACTIVE))]:
+                    with self.assertRaises(BlockingIOError), exclusive_lock(path):
+                        self.fail("all mutation locks must precede preview")
+                return MemoryClient.preview(client, pair)
+
+            with patch("stash_ingest.dedupe.DeduplicationClient", return_value=client), \
+                    patch("stash_ingest.dedupe.discover", side_effect=discover_while_active) as discovery, \
+                    patch.object(client, "preview", side_effect=guarded_preview), redirect_stdout(io.StringIO()):
+                self.assertEqual(3, main(argv))
+            discovery.assert_called_once()
+            self.assertEqual(["preview"], [kind for kind, _ in client.calls])
+            self.assertFalse(Journal.has_active(base / "state"))
+
+    def test_pair_boundary_yields_to_backup_and_recovers_uncertain_removal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            client, journal, _ = self.fixture(directory)
+            base = Path(directory)
+            library_lock = base / "library.lock"
+            worker = base / "worker"
+            worker.mkdir()
+            held_by_backup = None
+            pause_after_pair = True
+            checked_calls = []
+
+            def check_locked():
+                for path in (library_lock, worker / GATE, worker / ACTIVE):
+                    with self.assertRaises(BlockingIOError), exclusive_lock(path):
+                        self.fail("preview, recovery and apply all require exclusion")
+
+            @contextmanager
+            def boundary():
+                nonlocal held_by_backup, pause_after_pair
+                with exclusive_lock(library_lock), PublicationBarrier([worker], timeout=0.1):
+                    yield check_locked
+                # Downloads and backups can proceed between pairs. Keep the
+                # backup lock to force the remaining candidate to wait/retry.
+                with publication_lock(worker, timeout=0.1):
+                    pass
+                if pause_after_pair:
+                    pause_after_pair = False
+                    held_by_backup = os.open(library_lock, os.O_RDWR)
+                    fcntl.flock(held_by_backup, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            def guarded(method):
+                def call(value):
+                    check_locked()
+                    checked_calls.append(method.__name__)
+                    return method(value)
+                return call
+
+            try:
+                with patch.object(client, "preview", side_effect=guarded(client.preview)), \
+                        patch.object(client, "receipt", side_effect=guarded(client.receipt)), \
+                        patch.object(client, "apply", side_effect=guarded(client.apply)):
+                    with self.assertRaises(BlockingIOError):
+                        apply_saved(client, journal, boundary=boundary)
+                    self.assertEqual(1, len(journal.results))
+                    self.assertEqual(2, len(list(client.root.iterdir())))
+                    os.close(held_by_backup)
+                    held_by_backup = None
+                    client.journal = resumed = Journal(journal.directory, journal.config)
+                    self.assertEqual(journal.run_uuid, resumed.run_uuid)
+                    self.assertEqual(journal.records, resumed.records)
+                    # Losing a response releases the boundary and leaves the
+                    # exact request recoverable, without another removal.
+                    client.lose_after = True
+                    with self.assertRaises(Unavailable):
+                        apply_saved(client, resumed, boundary=boundary)
+                    with exclusive_lock(library_lock), publication_lock(worker, timeout=0.1):
+                        pass
+                    client.journal = recovered = Journal(journal.directory, journal.config)
+                    result = apply_saved(client, recovered, boundary=boundary)
+                self.assertTrue(result["all_removed"])
+                self.assertEqual(2, result["committed"])
+                self.assertEqual(["preview", "receipt", "apply", "preview", "receipt", "apply", "receipt"], checked_calls)
+                self.assertEqual(["0.mp4"], [p.name for p in client.root.iterdir()])
+            finally:
+                if held_by_backup is not None:
+                    os.close(held_by_backup)
 
     def test_preview_and_receipt_validation(self):
         pair = {"root_uuid": ROOT, "keep_path": "a.mp4", "remove_path": "b.mp4"}

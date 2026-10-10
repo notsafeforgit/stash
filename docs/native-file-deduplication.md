@@ -1,10 +1,9 @@
 # Fclones-backed file deduplication
 
-Fclones remains the duplicate discovery engine. The development backend implements
-a preview/apply service for redundant
-physical media files in schema 1000095. The `stash-dedupe` host client is available
-in the native producer package. The installed host launcher still uses catalogs;
-its deployment and associated scan/sidecar-cleanup handoff remain outstanding.
+Fclones remains the duplicate discovery engine. The native backend implements
+a preview/apply service for redundant physical media files in schema 1000095.
+The installed scheduled/pre-backup host launcher uses this native API through
+`stash-dedupe-host`, provided by the native producer package.
 This service is not a scene/image merge operation.
 
 An automatic candidate must contain two distinct, indexed, nonempty regular
@@ -116,11 +115,20 @@ stash-dedupe --endpoint http://localhost:8009 \
 ```
 
 Supply **every** worker lock root from the deployment inventory. The client
-acquires its state lock, the existing backup/dedupe lock, and all native-worker
-publication barriers before discovery or API calls. It retains those locks
-through receipt recovery and removal, rechecking directory/mount and lock-file
-identities before operations. These cooperative barriers do not stop legacy
-downloaders; activate this caller with the native worker handoff.
+holds its state lock throughout the run to prevent concurrent dedupe callers.
+Read-only fclones discovery does not hold the backup/dedupe lock or worker
+publication barriers, so downloads and backups can continue during the scan.
+Each pending pair independently acquires the backup/dedupe lock and all worker
+barriers before preview, receipt recovery or removal, and releases them when
+that pair finishes. Directory/mount and lock-file identities are rechecked
+before operations. A backup winning the lock between pairs leaves the saved
+run pending for its next invocation, without repeating discovery. These
+cooperative barriers do not stop legacy downloaders.
+
+Discovery is a hint, not a frozen media snapshot. A candidate changed or removed
+while discovery ran must still pass the native preview and full-byte verification;
+a stale or missing candidate becomes a review outcome without deletion. Report
+path/size checks also reject changes detected before the manifest is saved.
 
 The private `dedupe.sqlite3` journal retains each run's manifest and immutable
 per-pair intents/results without creating a file for every request or receipt.
@@ -181,12 +189,17 @@ explicit in JSON and permit the backup to continue. Failed/uncertain work exits
 completed maintenance pass or a documented skip; the underlying diagnostic CLI
 retains its separate review/busy exit codes.
 
-The packaged `systemd/stash-native-dedupe.service` and `dedupe.env.example` use
-the installed producer runtime. The staged host replacement keeps the existing
-half-hour timer and daily cooldown, and the pre-backup wrapper invokes
+The packaged `systemd/stash-native-dedupe.service` and `dedupe.env.example` select
+an explicit `STASH_DEDUPE_EXECUTABLE`. Dedupe needs only the standard-library
+package, so it can use its own versioned virtual environment without changing
+the runtime fingerprints of active scraper jobs. Retain its exact wheel,
+module digests and release selection as backup components alongside the
+launchers; restore that wheel without gallery-dl extras into the recorded path.
+The installed host replacement keeps the existing half-hour timer and daily
+cooldown, and the pre-backup wrapper invokes
 `stash-dedupe-host --before-backup` before backup takes the shared library lock.
-It has no catalog writer or global cleanup operation. Complete direct-file
-scan scheduling before dropping the old post-dedupe scan trigger.
+It has no catalog writer or global cleanup operation. Native local-file intake
+provides direct-file discovery independently of the dedupe timer.
 
 Declare this runtime under the worker inventory's top-level `maintenance` list:
 

@@ -1893,15 +1893,17 @@ policies or enable scrapers. See the [native contract](../../docs/native-ingesti
 
 `stash-dedupe` uses bounded `fclones group` discovery and the native Stash
 preview/apply API. It preserves the oldest copy, saves requests before sending
-them, recovers committed receipts after interruption, and holds the existing
-backup lock plus every inventoried native worker publication barrier. Stash
+them, and recovers committed receipts after interruption. Read-only discovery
+allows downloads and backups to continue; each candidate's preview/recovery/apply
+holds the existing backup lock plus every inventoried native worker publication
+barrier, releasing them between pairs. Stash
 verifies full bytes and preserves provenance; different media owners remain
 review cases. See the [client guide](../../docs/native-file-deduplication.md#native-host-client)
-for arguments, persistent state, exit codes and the outstanding deployment
-boundary. `stash-dedupe-host` supplies the scheduled/pre-backup configuration,
+for arguments, persistent state and exit codes.
+`stash-dedupe-host` supplies the scheduled/pre-backup configuration,
 completion cooldown and private key-file handling. Its compact SQLite journal
 is inventoried as an operating database for coordinated backup. The installed
-legacy dedupe launcher has not switched.
+host launcher selects this native caller.
 
 ## Historical source albums
 

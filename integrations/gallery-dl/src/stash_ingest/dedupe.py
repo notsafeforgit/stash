@@ -2,7 +2,7 @@
 
 import argparse
 from collections import Counter
-from contextlib import closing, contextmanager
+from contextlib import closing, contextmanager, nullcontext
 import fcntl
 import json
 import os
@@ -264,47 +264,56 @@ class Journal:
         return report
 
 
-def apply_saved(client, journal, check=lambda: None):
+def apply_saved(client, journal, check=lambda: None, *, boundary=None):
     for key, pair in journal.records.items():
         check()
         if key in journal.results:
             continue
-        if key not in journal.intents:
-            try:
-                preview = client.preview(pair)
-            except Unavailable as error:
-                if error.code != "file_not_found" or error.status != 404:
-                    raise
-                journal.save_result(key, {"state": "review", "reason": error.code})
-                continue
-            if not preview["eligible"]:
-                journal.save_result(key, {"state": "review", "reason": preview["blocked_reason"]})
-                continue
-            # Earlier removals can advance the owner's revision. Preview each
-            # next pair only after recovering/committing the preceding one.
-            journal.save_intent(key, preview)
-        request = journal.intents[key]["request"]
-        check()
-        receipt = client.receipt(request)
-        if receipt is None:
-            check()
-            try:
-                receipt = client.apply(request)
-            except Unavailable as error:
-                if (error.status, error.code) not in {
-                        (409, "deduplication_preview_changed"), (409, "deduplication_bytes_differ"),
-                        (404, "file_not_found")}:
-                    raise
-                # A replay racing a prior response may see a changed preview.
-                # Prefer its committed receipt over classifying it as rejected.
-                receipt = client.receipt(request)
-                if receipt is None:
-                    journal.save_result(key, {"state": "review", "reason": error.code})
-                    continue
-        validate_receipt(receipt, request)
-        journal.save_result(key, {"state": "committed", "receipt": receipt})
+        # Discovery is only a hint. Each pair gets a fresh, independently
+        # releasable mutation boundary before any preview/recovery/apply call.
+        # A backup taking the lock between pairs leaves the saved run resumable.
+        with (boundary() if boundary else nullcontext(check)) as guarded:
+            guarded()
+            apply_pair(client, journal, key, pair, guarded)
     check()
     return journal.finish()
+
+
+def apply_pair(client, journal, key, pair, check):
+    if key not in journal.intents:
+        try:
+            preview = client.preview(pair)
+        except Unavailable as error:
+            if error.code != "file_not_found" or error.status != 404:
+                raise
+            journal.save_result(key, {"state": "review", "reason": error.code})
+            return
+        if not preview["eligible"]:
+            journal.save_result(key, {"state": "review", "reason": preview["blocked_reason"]})
+            return
+        # Earlier removals can advance the owner's revision. Preview each
+        # next pair only after recovering/committing the preceding one.
+        journal.save_intent(key, preview)
+    request = journal.intents[key]["request"]
+    check()
+    receipt = client.receipt(request)
+    if receipt is None:
+        check()
+        try:
+            receipt = client.apply(request)
+        except Unavailable as error:
+            if (error.status, error.code) not in {
+                    (409, "deduplication_preview_changed"), (409, "deduplication_bytes_differ"),
+                    (404, "file_not_found")}:
+                raise
+            # A replay racing a prior response may see a changed preview.
+            # Prefer its committed receipt over classifying it as rejected.
+            receipt = client.receipt(request)
+            if receipt is None:
+                journal.save_result(key, {"state": "review", "reason": error.code})
+                return
+    validate_receipt(receipt, request)
+    journal.save_result(key, {"state": "committed", "receipt": receipt})
 
 
 def run(args):
@@ -317,29 +326,40 @@ def run(args):
               "worker_roots": [directory_identity(p) for p in roots],
               "library_lock": str(Path(args.library_lock).absolute()), "all_content": args.all_content}
     with exclusive_lock(state / "run.lock") as state_check:
-        with exclusive_lock(config["library_lock"]) as library_check:
-            with PublicationBarrier(roots, timeout=args.lock_timeout) as barrier:
-                def check():
-                    state_check()
-                    library_check()
-                    check_directory(state_identity)
-                    check_directory(root)
-                    for worker_root in config["worker_roots"]:
-                        check_directory(worker_root)
-                    barrier.check()
+        def check():
+            state_check()
+            check_directory(state_identity)
+            check_directory(root)
+            for worker_root in config["worker_roots"]:
+                check_directory(worker_root)
 
-                check()
-                if Journal.has_active(state):
-                    journal = Journal(state, config)
-                else:
-                    if args.report:
-                        pairs = pairs_from_report(read_regular(args.report, MAX_REPORT_BYTES), root,
-                                                  all_content=args.all_content)
-                    else:
-                        pairs = discover(args.fclones, root, all_content=args.all_content)
-                    check()
-                    journal = Journal.create(state, config, pairs)
-                return apply_saved(client, journal, check)
+        @contextmanager
+        def boundary():
+            with exclusive_lock(config["library_lock"]) as library_check:
+                with PublicationBarrier(roots, timeout=args.lock_timeout) as barrier:
+                    def guarded():
+                        check()
+                        library_check()
+                        barrier.check()
+
+                    guarded()
+                    yield guarded
+
+        check()
+        if Journal.has_active(state):
+            journal = Journal(state, config)
+        else:
+            # Fclones never mutates media. Do not block downloads and backups
+            # for a full-library scan; Stash rechecks each candidate and proves
+            # equal bytes under its own file-lifetime/deletion guards at Apply.
+            if args.report:
+                pairs = pairs_from_report(read_regular(args.report, MAX_REPORT_BYTES), root,
+                                          all_content=args.all_content)
+            else:
+                pairs = discover(args.fclones, root, all_content=args.all_content)
+            check()
+            journal = Journal.create(state, config, pairs)
+        return apply_saved(client, journal, check, boundary=boundary)
 
 
 def main(argv=None):
@@ -360,7 +380,7 @@ def main(argv=None):
         print(json.dumps(report, sort_keys=True))
         return 3 if report["review"] else 0
     except BlockingIOError:
-        print("Backup, dedupe or state lock is busy; no new work started", file=sys.stderr)
+        print("Backup, dedupe or state lock is busy; pending candidates retained", file=sys.stderr)
         return 2
     except (InvalidData, Unavailable) as error:
         print(str(error), file=sys.stderr)

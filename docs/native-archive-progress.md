@@ -7,6 +7,26 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
+## Dedupe discovery lock scope — implemented, deployment pending, 2026-10-10
+
+The first resumed fclones pass exposed an overly broad lock: it held the backup
+lock and every worker publication barrier while scanning the entire library.
+The native client now holds only its own state lock during read-only discovery.
+Each candidate separately acquires the backup/worker locks for preview, receipt
+recovery and verified removal, releasing them between pairs. If backup wins a
+later lock, the pending manifest survives and the next invocation resumes it
+without repeating discovery. Stash's existing full-byte verification and file
+lifetime checks still authorize every removal.
+
+The sixteen focused client/HTTP tests pass, including real flock checks during
+discovery and between pairs, blocked retry without the original report, and
+recovery of a lost removal response. The backup already snapshots this journal
+as an operating SQLite database; concurrent candidate-only discovery cannot
+remove media across that boundary. The full fork gate passed in 200.91 seconds,
+including 680 producer, 317 backup and 805 UI tests, Go integration tests, and
+lint. The installed client still has the older scope until the reviewed runtime
+is deployed. Evidence: `.local/dedupe-lock-scope-20261010/`.
+
 ## Native schedule resumption — observing, 2026-10-10
 
 The seven held host timers have resumed with their original cadences. Native
@@ -23,9 +43,10 @@ host dispatcher is admitting their queued work, local intake is advancing, and
 run also advanced its downloaded-file checkpoint. These observations do not yet
 establish completion of every newly queued profile or enrichment pass.
 
-Dedupe correctly deferred while another operation held its lock. The initial
-scheduled backup encountered the resumption helper's temporary backup lock and
-is awaiting its existing fifteen-minute retry. Its best-effort dedupe launcher
+Dedupe initially deferred while another operation held its lock. The initial
+scheduled backup encountered a busy backup lock; a later retry was blocked by
+the resumed fclones pass, whose lock scope is corrected above. Backup remains
+on its existing fifteen-minute retry. Its best-effort dedupe launcher
 also lacked its execute bit; the installed launcher's mode is now corrected to
 0700, with its contents unchanged. The independent cloud restore remains the
 same live process and has not been restarted. Root free space is about 135 GiB.
@@ -49,12 +70,14 @@ passed, and the registry image's revision matches `a768fb592`. This test-only
 increment did not deploy an application image.
 
 The [complete browser run](https://github.com/notsafeforgit/stash/actions/runs/38035132436)
-has an additional WebKit clipboard-fallback failure. Its trace stops responding
-after Copy; on the retry, the correct error message appears before reopening the
-menu hangs. Ten focused repetitions and the complete sixteen-check image-file
-suite pass locally in the pinned Playwright container. The GitHub failure
-remains unresolved; these local checks are not evidence that the complete
-browser workflow passed. Evidence: `.local/browser-repair-20261010/`.
+initially had an additional WebKit clipboard-fallback failure. Its trace stopped
+responding after Copy; on the retry, the correct error message appeared before
+reopening the menu hung. Ten focused repetitions and the complete sixteen-check image-file
+suite passed locally in the pinned Playwright container. Rerunning only the
+failed WebKit shard on a fresh GitHub runner passed all 168 checks in 9.4 minutes,
+and the full workflow is now successful. No assertions were weakened or source
+changes made for that rerun; the earlier browser hang did not reproduce and its
+trace remains retained. Evidence: `.local/browser-repair-20261010/`.
 
 ## Parallel native validation — implemented, 2026-10-10
 

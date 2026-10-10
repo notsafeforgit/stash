@@ -26,6 +26,7 @@ export enum View {
   StudioImages = "studio_images",
 
   GalleryImages = "gallery_images",
+  GalleryScenes = "gallery_scenes",
 
   StudioScenes = "studio_scenes",
   StudioGroups = "studio_groups",

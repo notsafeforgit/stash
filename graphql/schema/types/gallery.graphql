@@ -34,6 +34,22 @@ type Gallery {
   paths: GalleryPathsType! # Resolver
   custom_fields: Map!
   image(index: Int!): Image!
+  "Images and scenes together, in source order where known, then file order."
+  media(offset: Int! = 0, limit: Int! = 60): GalleryMediaConnection!
+}
+
+type GalleryMediaConnection {
+  items: [GalleryMediaItem!]!
+  count: Int!
+  signature: String!
+  next_offset: Int
+}
+
+type GalleryMediaItem {
+  image: Image
+  scene: Scene
+  source_post_uuid: ID
+  source_position: Int
 }
 
 input GalleryCreateInput {

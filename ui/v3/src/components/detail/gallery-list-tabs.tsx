@@ -11,7 +11,10 @@ import {
 } from "src/core/generated-graphql";
 import { EntityListPage } from "src/components/list";
 import { View } from "src/components/list/views";
-import { useImageListConfig } from "src/components/list/entity-list-configs";
+import {
+  useImageListConfig,
+  useSceneListConfig,
+} from "src/components/list/entity-list-configs";
 import { useMutation } from "@apollo/client/react";
 import { ListFilterModel } from "src/models/list-filter/filter";
 import {
@@ -25,6 +28,7 @@ import {
 import { useConfigurationContextOptional } from "src/hooks/config";
 import { galleryLabel as getGalleryLabel } from "src/lib/gallery-utils";
 import { ImageEditSheet } from "./image-edit-sheet";
+import { SceneEditSheet } from "./scene-edit-sheet";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -107,6 +111,33 @@ export function GalleryImagesTab({ gallery }: { gallery: GalleryData }) {
         keyboardShortcutsDisabled={lightboxOpen}
       />
       <ImageEditSheet id={editingId} onClose={() => setEditingId(null)} />
+      {lightboxElement}
+    </>
+  );
+}
+
+export function GalleryScenesTab({ gallery }: { gallery: GalleryData }) {
+  const ctx = useConfigurationContextOptional();
+  const label = getGalleryLabel(gallery);
+  const configData = ctx?.configuration;
+  const defaultFilter = useMemo(
+    () => makeGalleryFilter(FilterMode.Scenes, gallery.id, label, configData),
+    [gallery.id, label, configData],
+  );
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const { config, lightboxElement, lightboxOpen } =
+    useSceneListConfig(setEditingId);
+  return (
+    <>
+      <EntityListPage
+        key={gallery.id}
+        config={config}
+        defaultFilter={defaultFilter}
+        view={View.GalleryScenes}
+        mobileChromeFixed
+        keyboardShortcutsDisabled={lightboxOpen}
+      />
+      <SceneEditSheet id={editingId} onClose={() => setEditingId(null)} />
       {lightboxElement}
     </>
   );

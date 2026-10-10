@@ -4,6 +4,7 @@ import { ReviewQueueFixture } from "./review-queue";
 import { reviewQueueSearchSchema } from "@/core/native-archive/review-queue-api";
 import { savedActionSearchSchema } from "@/core/native-archive/saved-actions";
 import { SourceAlbumsFixture } from "./source-albums";
+import { GalleryMediaFixture } from "./gallery-media";
 import { PerformerSourcesFixture } from "./performer-sources";
 import { SourcePostsFixture } from "./source-posts";
 import { ArchiveActivityFixture } from "./archive-activity";
@@ -423,6 +424,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/source-albums",
       component: SourceAlbumsFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/gallery-media",
+      component: GalleryMediaFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

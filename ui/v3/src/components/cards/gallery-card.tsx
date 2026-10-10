@@ -4,13 +4,14 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import { useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
+import { useIntl } from "react-intl";
 import * as GQL from "src/core/generated-graphql";
 import { EntityCard } from "./entity-card";
 import { Button } from "src/components/ui/button";
 import { useCardAspect } from "src/components/list/card-aspect-context";
 import { useCardLayout } from "src/components/list/card-layout-context";
 import { cn } from "src/lib/utils";
-import { galleryLabel } from "src/lib/gallery-utils";
+import { galleryLabel, galleryCover } from "src/lib/gallery-utils";
 import { HoverScrubber } from "./hover-scrubber";
 import { useGalleryContextMenu } from "./use-gallery-context-menu";
 
@@ -29,6 +30,7 @@ type GalleryCardGallery = Pick<
   | "files"
   | "folder"
   | "performers"
+  | "scenes"
 >;
 
 interface GalleryCardProps {
@@ -98,6 +100,7 @@ export const GalleryCard: React.FC<GalleryCardProps> = ({
   onEdit,
   onPreview,
 }) => {
+  const intl = useIntl();
   const cardAspect = useCardAspect();
   const cardLayout = useCardLayout();
   const isPortrait = cardAspect === "portrait";
@@ -156,7 +159,7 @@ export const GalleryCard: React.FC<GalleryCardProps> = ({
 
   const preview = (
     <EntityCard.Preview
-      image={scrubImage ?? gallery.paths.cover}
+      image={scrubImage ?? galleryCover(gallery)}
       previewImage={scrubImage ? null : gallery.cover?.preview_image}
       isPortrait={isPortrait}
       organized={gallery.organized}
@@ -168,9 +171,19 @@ export const GalleryCard: React.FC<GalleryCardProps> = ({
           date={gallery.date}
         />
       ) : (
-        gallery.image_count > 0 && (
-          <span className="entity-card-badge entity-card-badge-count">
-            {gallery.image_count}
+        (gallery.image_count > 0 || gallery.scenes.length > 0) && (
+          <span
+            className="entity-card-badge entity-card-badge-count"
+            title={intl.formatMessage(
+              {
+                id: "gallery_media.counts",
+                defaultMessage:
+                  "{images, plural, one {# image} other {# images}} · {scenes, plural, one {# scene} other {# scenes}}",
+              },
+              { images: gallery.image_count, scenes: gallery.scenes.length },
+            )}
+          >
+            {gallery.image_count + gallery.scenes.length}
           </span>
         )
       )}

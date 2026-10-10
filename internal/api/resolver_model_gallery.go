@@ -152,6 +152,47 @@ func (r *galleryResolver) ImageCount(ctx context.Context, obj *models.Gallery) (
 	return ret, nil
 }
 
+func (r *galleryResolver) Media(ctx context.Context, obj *models.Gallery, offset, limit int) (*GalleryMediaConnection, error) {
+	var page *models.GalleryMediaReferences
+	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
+		var err error
+		page, err = r.repository.SourceGallery.LibraryMedia(ctx, obj.ID, offset, limit)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	images, scenes := []int{}, []int{}
+	for _, item := range page.Items {
+		if item.Kind == models.ArchiveImage {
+			images = append(images, item.LocalID)
+		} else {
+			scenes = append(scenes, item.LocalID)
+		}
+	}
+	imageRows, imageErrors := loaders.From(ctx).ImageByID.LoadAll(images)
+	if err := firstError(imageErrors); err != nil {
+		return nil, err
+	}
+	sceneRows, sceneErrors := loaders.From(ctx).SceneByID.LoadAll(scenes)
+	if err := firstError(sceneErrors); err != nil {
+		return nil, err
+	}
+	ret := &GalleryMediaConnection{Count: page.Count, Signature: page.Signature, NextOffset: page.NextOffset, Items: []*GalleryMediaItem{}}
+	i, s := 0, 0
+	for _, item := range page.Items {
+		row := &GalleryMediaItem{SourcePostUUID: item.SourcePostUUID, SourcePosition: item.SourcePosition}
+		if item.Kind == models.ArchiveImage {
+			row.Image = imageRows[i]
+			i++
+		} else {
+			row.Scene = sceneRows[s]
+			s++
+		}
+		ret.Items = append(ret.Items, row)
+	}
+	return ret, nil
+}
+
 func (r *galleryResolver) Chapters(ctx context.Context, obj *models.Gallery) (ret []*models.GalleryChapter, err error) {
 	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
 		ret, err = r.repository.GalleryChapter.FindByGalleryID(ctx, obj.ID)

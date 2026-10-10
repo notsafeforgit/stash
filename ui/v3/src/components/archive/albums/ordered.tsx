@@ -390,7 +390,7 @@ export function SourceAlbum({
           key={`${api.endpoint}:${post}`}
           post={post}
           endpoint={api.endpoint}
-          onChanged={result.reload}
+          onChanged={published}
         />
       </PostSection>
       {page &&

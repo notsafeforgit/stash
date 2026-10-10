@@ -3,6 +3,22 @@
 The native gallery repository can maintain a logical gallery for a source
 post or an evidenced Twitter thread, with ordered image/video attachments and
 explicit membership choices.
+
+Gallery pages open on **Media**, which browses images and scenes together and
+plays both kinds in one viewer. It reads the existing `galleries_images` and
+`scenes_galleries` membership, including manual additions. Selected attachments
+establish source order; shared Twitter thread galleries follow post ID order,
+then attachment order. Repeated media appears once in gallery membership, while
+the **Source albums** inspection retains repeated positions and missing slots.
+Other gallery members follow in file order. Separate **Images** and **Scenes**
+tabs retain the normal list filters and editing controls. Video-only galleries
+use a scene screenshot as their cover, and card counts include both kinds.
+
+`Gallery.media(offset, limit)` returns a bounded mixed page with source position
+references and a signature of gallery membership and selected ordering. The
+viewer stops if successive pages disagree. Reads use gallery membership indexes
+and the selected source lists without reconstructing capture payloads. This is
+a read API/UI change; no schema migration or catalog reimport is required.
 `pkg/archive.ExtractCapturedAlbum` derives the source list under
 `captured-attachments-v2`. Native intake and the application-authorized
 [historical album backfill](native-ingestion.md#historical-source-album-backfill)

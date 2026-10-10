@@ -20,3 +20,14 @@ export function galleryLabel(g: GalleryLabelable): string {
   if (g.files?.[0]?.path) return fileStemFromPath(g.files[0].path);
   return g.id ?? "";
 }
+
+export function galleryCover(gallery: {
+  image_count: number;
+  paths: { cover: string };
+  scenes?: Array<{ paths: { screenshot?: string | null } }>;
+}): string {
+  return (
+    (gallery.image_count === 0 && gallery.scenes?.[0]?.paths.screenshot) ||
+    gallery.paths.cover
+  );
+}

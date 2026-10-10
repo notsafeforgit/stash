@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useIntl } from "react-intl";
 import type { EntityColumnDef as ColumnDef } from "@/components/list/entity-table";
 import type * as GQL from "src/core/generated-graphql";
-import { galleryLabel } from "src/lib/gallery-utils";
+import { galleryLabel, galleryCover } from "src/lib/gallery-utils";
 import {
   selectionColumn,
   thumbnailColumn,
@@ -24,7 +24,7 @@ export function useGalleryTableColumns(): ColumnDef<GalleryItem>[] {
       selectionColumn<GalleryItem>(),
 
       thumbnailColumn<GalleryItem>(
-        (g) => g.paths.cover,
+        galleryCover,
         (g) => entityDestination.gallery(g.id),
         (g) => g.cover?.preview_image,
       ),
@@ -53,6 +53,13 @@ export function useGalleryTableColumns(): ColumnDef<GalleryItem>[] {
         id: "images_count",
         header: intl.formatMessage({ id: "image_count" }),
         getValue: (g) => g.image_count,
+      }),
+
+      numberColumn<GalleryItem>({
+        id: "scenes_count",
+        sortable: false,
+        header: intl.formatMessage({ id: "scene_count" }),
+        getValue: (g) => g.scenes.length,
       }),
 
       ratingColumn<GalleryItem>({

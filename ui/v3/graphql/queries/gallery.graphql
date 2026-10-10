@@ -16,6 +16,35 @@ query FindGallery($id: ID!) {
   }
 }
 
+query FindGalleryMedia($id: ID!, $offset: Int! = 0, $limit: Int! = 60) {
+  findGallery(id: $id) {
+    id
+    media(offset: $offset, limit: $limit) {
+      count
+      signature
+      next_offset
+      items {
+        source_post_uuid
+        source_position
+        image {
+          id
+          title
+          paths {
+            thumbnail
+          }
+        }
+        scene {
+          id
+          title
+          paths {
+            screenshot
+          }
+        }
+      }
+    }
+  }
+}
+
 query FindGalleriesForSelect(
   $filter: FindFilterType
   $gallery_filter_ast: FilterASTInput

@@ -19,9 +19,9 @@ import { DetailEditTransition } from "src/components/detail/detail-edit-transiti
 import { DetailEditorLayout } from "@/components/detail/detail-editor-layout";
 import { Button } from "src/components/ui/button";
 import { cn } from "src/lib/utils";
-import { Images, Pencil, CheckCircle2Icon } from "lucide-react";
+import { Images, Film, Pencil, CheckCircle2Icon } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
-import { galleryLabel } from "src/lib/gallery-utils";
+import { galleryLabel, galleryCover } from "src/lib/gallery-utils";
 import { GalleryDetailsTab } from "src/components/detail/gallery-detail-tabs";
 import { GalleryActionsMenu } from "src/components/detail/gallery-actions-menu";
 import { GalleryEditForm } from "src/components/detail/gallery-edit-form";
@@ -29,7 +29,11 @@ import { Lightbox } from "src/components/lightbox";
 import { GallerySourceAlbums } from "@/components/archive/albums/gallery";
 import { GalleryOrigin } from "@/components/archive/albums/gallery-origin";
 import { useGallerySources } from "@/components/archive/albums/gallery-sources";
-import { GalleryImagesTab } from "src/components/detail/gallery-list-tabs";
+import {
+  GalleryImagesTab,
+  GalleryScenesTab,
+} from "src/components/detail/gallery-list-tabs";
+import { GalleryMedia } from "@/components/detail/gallery-media";
 import { useDocumentTitle } from "src/hooks/title";
 
 // ── Route search params ────────────────────────────────────────────────────────
@@ -52,7 +56,7 @@ function GalleryCover({
   const [failed, setFailed] = React.useState(false);
   const [isPortrait, setIsPortrait] = React.useState(false);
 
-  if (!gallery.paths.cover || failed) {
+  if (!galleryCover(gallery) || failed) {
     return (
       <div className="w-full shrink-0 aspect-square flex items-center justify-center bg-muted rounded text-muted-foreground">
         <Images size={32} />
@@ -70,7 +74,7 @@ function GalleryCover({
       aria-label="View full image"
     >
       <img
-        src={gallery.paths.cover}
+        src={galleryCover(gallery)}
         alt={galleryLabel(gallery)}
         className="w-full h-auto"
         onLoad={(e) => {
@@ -93,6 +97,7 @@ function GalleryDetailPage() {
   const intl = useIntl();
   const [editOpen, setEditOpen] = useState(false);
   const [coverLightboxOpen, setCoverLightboxOpen] = useState(false);
+  const [mediaVersion, setMediaVersion] = useState(0);
   const sources = useGallerySources(galleryId);
   const reloadSources = sources.reload;
 
@@ -101,6 +106,7 @@ function GalleryDetailPage() {
     fetchPolicy: "cache-first",
   });
   const refreshGallery = useCallback(async () => {
+    setMediaVersion((version) => version + 1);
     reloadSources();
     await refetch();
   }, [refetch, reloadSources]);
@@ -121,6 +127,20 @@ function GalleryDetailPage() {
 
   const entityTabs: DetailTabsTab[] = gallery
     ? [
+        {
+          id: "media",
+          icon: Images,
+          label: intl.formatMessage({
+            id: "media",
+            defaultMessage: "Media",
+          }),
+          content: (
+            <GalleryMedia
+              key={`${gallery.id}:${gallery.updated_at}:${mediaVersion}`}
+              id={gallery.id}
+            />
+          ),
+        },
         ...(gallery.image_count > 0
           ? [
               {
@@ -131,6 +151,19 @@ function GalleryDetailPage() {
                   defaultMessage: "Images",
                 }),
                 content: <GalleryImagesTab gallery={gallery} />,
+              },
+            ]
+          : []),
+        ...(gallery.scenes.length > 0
+          ? [
+              {
+                id: "scenes",
+                icon: Film,
+                label: intl.formatMessage({
+                  id: "scenes",
+                  defaultMessage: "Scenes",
+                }),
+                content: <GalleryScenesTab gallery={gallery} />,
               },
             ]
           : []),
@@ -286,11 +319,11 @@ function GalleryDetailPage() {
         </DetailPageState>
       </CollectionDetailLayout>
 
-      {gallery?.paths.cover && (
+      {gallery && galleryCover(gallery) && (
         <Lightbox
           open={coverLightboxOpen}
           onClose={() => setCoverLightboxOpen(false)}
-          slides={[{ src: gallery.paths.cover, alt: galleryLabel(gallery) }]}
+          slides={[{ src: galleryCover(gallery), alt: galleryLabel(gallery) }]}
         />
       )}
     </>

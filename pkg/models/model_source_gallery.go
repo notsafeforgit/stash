@@ -77,9 +77,26 @@ type GalleryMembershipEvent struct {
 	CreatedAt     time.Time
 }
 
+// GalleryMediaReference identifies an actual gallery member and its optional
+// source position. Manually added members remain part of the same mixed list.
+type GalleryMediaReference struct {
+	Kind           ArchiveEntityKind
+	LocalID        int
+	SourcePostUUID *string
+	SourcePosition *int
+}
+
+type GalleryMediaReferences struct {
+	Items      []GalleryMediaReference
+	Count      int
+	Signature  string
+	NextOffset *int
+}
+
 var ErrSourceGalleryConflict = errors.New("source album or gallery changed; review a fresh preview")
 
 type SourceGalleryReaderWriter interface {
+	LibraryMedia(context.Context, int, int, int) (*GalleryMediaReferences, error)
 	FilenameBackfillPosts(context.Context, string, int) ([]SelectedSourcePost, error)
 	PreviewAssociationReview(context.Context, GalleryAssociationReviewInput) (*GalleryAssociationReviewPreview, error)
 	ApplyAssociationReview(context.Context, GalleryAssociationReviewApplyInput) (*GalleryAssociationReview, bool, error)

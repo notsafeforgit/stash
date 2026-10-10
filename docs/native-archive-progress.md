@@ -7,6 +7,26 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement is running; the controlled worker rollout remains
 in progress.
 
+## Mixed gallery browsing — implementation, 2026-10-10
+
+Gallery pages now open a unified Media view with images and scenes in selected
+source order, including shared Twitter replies. Manually added items remain
+visible, repeated source attachments share their existing gallery member, and
+explicit exclusions remain excluded. A bounded GraphQL read reuses existing
+membership and attachment selections; it adds no schema migration or catalog
+reimport. The viewer plays both kinds across pages and stops on changed
+membership/order. Images and Scenes tabs retain their normal list controls.
+Cards include both kinds in their count and use a scene screenshot when there
+are no images. Groups remain the separate movie/scene organization.
+
+Focused SQLite tests cover ordering, gaps, repeated media, manual additions,
+exclusions, video-only galleries, out-of-order thread arrivals and indexed
+queries. Six Chromium regressions cover desktop/mobile mixed playback,
+pagination, changed membership, failed-page recovery, video-only and empty
+galleries. Full release validation and registry publication are pending; this
+entry does not claim
+deployment. Private evidence: `.local/mixed-gallery-20261010/`.
+
 ## Incidental post authors outside account review — deployed, 2026-10-10
 
 Account review and the general review inbox now default to accounts with a direct

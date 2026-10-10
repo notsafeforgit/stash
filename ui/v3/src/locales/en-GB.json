@@ -3991,5 +3991,18 @@
   "provider_metadata.empty": "No recorded imports on this page",
   "provider_metadata.entry": "{provider} · {date}",
   "provider_metadata.remote_id": "Provider ID: {id}",
-  "provider_metadata.refresh": "Refresh imports"
+  "provider_metadata.refresh": "Refresh imports",
+  "gallery_media": {
+    "order": "Images and scenes appear together in source order where known, followed by other gallery items in file order.",
+    "loading": "Loading gallery media",
+    "empty": "No images or scenes in this gallery",
+    "view": "View gallery",
+    "viewer": "Gallery viewer",
+    "viewer_help": "Browse images and play scenes in this gallery's order.",
+    "changed": "Close the viewer and reload the gallery before continuing.",
+    "position": "{position, number} of {count, number}",
+    "counts": "{images, plural, one {# image} other {# images}} · {scenes, plural, one {# scene} other {# scenes}}",
+    "error": "Could not load gallery media"
+  },
+  "media": "Media"
 }

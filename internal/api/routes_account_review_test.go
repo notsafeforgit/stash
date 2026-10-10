@@ -48,6 +48,13 @@ func TestNativeAccountReviewHTTPExplicitSelectionRecoveryAndDiscovery(t *testing
 			if err != nil {
 				return err
 			}
+			for n := 0; n < 9; n++ {
+				_, err = repo.SourceAccount.ObserveIdentifier(ctx, account.UUID, models.AccountReference{Namespace: account.Namespace, Kind: "legacy_key", Value: fmt.Sprintf("imported%d", n)},
+					models.AccountIdentifierEvidence{Key: "migration", Basis: "catalog-import", Origin: "fixture", FirstObserved: now, LastObserved: now})
+				if err != nil {
+					return err
+				}
+			}
 			if i == 1 {
 				for n := 0; n < 9; n++ {
 					_, err = repo.SourceAccount.ObserveIdentifier(ctx, account.UUID, models.AccountReference{Namespace: account.Namespace, Kind: "id", Value: fmt.Sprintf("id%d", n)},
@@ -93,6 +100,15 @@ func TestNativeAccountReviewHTTPExplicitSelectionRecoveryAndDiscovery(t *testing
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &page))
 		if scope == "all" {
 			require.Len(t, page, 2)
+			for _, row := range page {
+				for _, identifier := range row.Identifiers {
+					require.NotEqual(t, "legacy_key", identifier.Reference.Kind)
+				}
+				if row.UUID != input.AccountUUID {
+					require.Len(t, row.Identifiers, 1)
+					require.False(t, row.MoreIdentifiers, "migration keys must not crowd out the visible summary")
+				}
+			}
 		} else {
 			require.Empty(t, page, "observed identifiers alone do not create review work")
 		}
@@ -115,6 +131,32 @@ func TestNativeAccountReviewHTTPExplicitSelectionRecoveryAndDiscovery(t *testing
 	var identifiers []models.AccountReviewIdentifier
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &identifiers))
 	require.Len(t, identifiers, 10)
+	var paginated []models.AccountReviewIdentifier
+	for after := ""; ; {
+		w := request(http.MethodGet, "/source-accounts/"+input.AccountUUID+"/identifiers?limit=3&after="+after, nil)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var page []models.AccountReviewIdentifier
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &page))
+		for _, row := range page {
+			require.NotEqual(t, "legacy_key", row.Reference.Kind)
+			require.Greater(t, row.UUID, after)
+			after = row.UUID
+		}
+		paginated = append(paginated, page...)
+		if len(page) < 3 {
+			break
+		}
+	}
+	require.Equal(t, identifiers, paginated, "filter before pagination so hidden keys cannot truncate discovery")
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		retained, err := repo.SourceAccount.Identifiers(ctx, input.AccountUUID, "", 100)
+		require.NoError(t, err)
+		require.Len(t, retained, 19, "migration identifiers remain available internally")
+		matches, err := repo.SourceAccount.Lookup(ctx, models.AccountReference{Namespace: "native:reddit", Kind: "legacy_key", Value: "imported0"}, "", 100)
+		require.NoError(t, err)
+		require.Len(t, matches, 2, "migration replay still resolves its original references")
+		return nil
+	}))
 	w = request(http.MethodGet, "/source-account-identifiers/"+identifier.UUID+"/evidence", nil)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var evidence []accountReviewEvidence

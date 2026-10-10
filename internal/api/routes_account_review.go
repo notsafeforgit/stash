@@ -116,7 +116,7 @@ func (rs *nativeArchiveRoutes) reviewAccountIdentifiers(w http.ResponseWriter, r
 		if account == nil {
 			return ingest.ErrNotFound
 		}
-		identifiers, err := rs.repo.SourceAccount.Identifiers(ctx, id, after, limit)
+		identifiers, err := rs.repo.SourceAccount.ReviewIdentifiers(ctx, id, after, limit)
 		if err != nil {
 			return err
 		}

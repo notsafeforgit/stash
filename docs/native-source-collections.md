@@ -59,6 +59,11 @@ account into the tracked scope. Source account pickers and identity lookups stil
 search all known accounts. No captured attribution, media, or account evidence
 is deleted by this filtering.
 
+Account cards, identifier details and consolidation pickers show service handles,
+IDs and profile URLs. Imported `legacy_key` references remain internal for import
+replay and identity resolution. Review queries exclude them before pagination, so
+they neither fill a page nor count toward the card's additional identifiers.
+
 ## Media roots and server folders
 
 Open **Media roots** from the desktop utility menu or mobile navigation drawer.

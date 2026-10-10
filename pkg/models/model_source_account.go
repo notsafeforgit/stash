@@ -98,6 +98,8 @@ type SourceAccountReaderWriter interface {
 	PerformerIdentities(context.Context, string, string, int) (*PerformerSourceIdentities, error)
 	ReviewAccounts(context.Context, AccountReviewFilter) ([]AccountReviewState, error)
 	ReviewAccount(context.Context, string) (*AccountReviewState, error)
+	// ReviewIdentifiers excludes internal migration keys before pagination.
+	ReviewIdentifiers(context.Context, string, string, int) ([]*AccountIdentifier, error)
 	ReviewOwnershipHistory(context.Context, string, int, int) ([]AccountReviewOwnership, error)
 	PreviewOwnership(context.Context, AccountOwnershipReviewInput) (*AccountOwnershipPreview, error)
 	ApplyOwnershipReview(context.Context, AccountOwnershipReviewApplyInput) (*AccountOwnershipReview, bool, error)

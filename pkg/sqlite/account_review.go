@@ -108,7 +108,7 @@ func (s *SourceAccountStore) ReviewAccount(ctx context.Context, id string) (*mod
 	}
 	// A card carries a bounded summary; identifiers and their source evidence
 	// have separate pagination. Never inspect every catalog to render a link.
-	identifiers, err := s.Identifiers(ctx, id, "", 9)
+	identifiers, err := s.ReviewIdentifiers(ctx, id, "", 9)
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +116,33 @@ func (s *SourceAccountStore) ReviewAccount(ctx context.Context, id string) (*mod
 	for _, identifier := range identifiers[:min(len(identifiers), 8)] {
 		ret.Identifiers = append(ret.Identifiers, models.AccountReviewIdentifier{UUID: identifier.UUID,
 			AccountUUID: identifier.AccountUUID, Reference: identifier.Reference})
+	}
+	return ret, nil
+}
+
+// ReviewIdentifiers keeps migration references out of account review without
+// removing them from identity lookup, import replay, or consolidation.
+func (s *SourceAccountStore) ReviewIdentifiers(ctx context.Context, value, after string, limit int) ([]*models.AccountIdentifier, error) {
+	account, err := s.Resolve(ctx, value)
+	if err != nil {
+		return nil, err
+	}
+	if account == nil {
+		return nil, models.ErrSourceAccountConflict
+	}
+	after, limit, err = accountPage(after, limit)
+	if err != nil {
+		return nil, err
+	}
+	var rows []accountIdentifierRow
+	if err := dbWrapper.Select(ctx, &rows, `SELECT * FROM source_account_identifiers
+WHERE account_uuid IN (SELECT uuid FROM source_accounts WHERE canonical_uuid=?)
+ AND kind!='legacy_key' AND uuid>? ORDER BY uuid LIMIT ?`, account.UUID, after, limit); err != nil {
+		return nil, err
+	}
+	ret := make([]*models.AccountIdentifier, 0, len(rows))
+	for _, row := range rows {
+		ret = append(ret, row.resolve())
 	}
 	return ret, nil
 }

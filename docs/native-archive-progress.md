@@ -7,7 +7,7 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
-## Image and scene gallery covers — implementation, 2026-10-10
+## Image and scene gallery covers — deployed, 2026-10-10
 
 Schema 1000108 replaces the image-membership cover flag with one canonical media
 UUID per gallery. The API and gallery cover URL resolve either an image or a
@@ -32,11 +32,25 @@ failure was a test-helper resource-cleanup lint rule; that cleanup was corrected
 then lint and the focused migration/cover tests passed. The production data
 migration was unchanged by that test-only fix.
 
-Chromium's eight gallery checks passed, including changing both cover types,
-targeted refresh, retained pagination and retry after a failed mutation. Local
-WebKit could not launch because its system dependencies are absent; its normal
-GitHub workflow remains the verification path. This increment does not complete
-automatic GIF image-to-scene conversion or claim a production deployment.
+Chromium's eight local gallery checks passed, including changing both cover
+types, targeted refresh, retained pagination and retry after a failed mutation.
+All six shards of the [GitHub browser run](https://github.com/notsafeforgit/stash/actions/runs/38041354341)
+passed, including WebKit. The [source publisher](https://github.com/notsafeforgit/stash/actions/runs/38041354350)
+and [wrapper publisher](https://github.com/notsafeforgit/stash-s6/actions/runs/38042395496)
+also passed. Production runs source `9c6d507f633a257db99f73d808fb9814e858c030`,
+wrapper digest `sha256:b8e15454972887d866f4ad0d6fb04a11cc6db79c0d6c2091f6512bd776a20da7`,
+and schema 1000108. The pre-migration backup remains retained. Live gallery
+#3664 resolves its scene cover and gallery #6274 its image cover; both return
+HTTP 200 with JPEG data.
+
+The application restarted without draining scrapes or pausing the worker timer.
+n8n retained its process identity; the existing source run retained its progress
+and was reclaimed with a new ownership fence and zero failures. The in-progress
+backup had already sealed its immutable checkpoint, so its original process,
+configuration and validator remain in place until that attempt finishes. A
+lock-protected handoff selects the new validator for subsequent backups. The
+independent restore retained its original process. This release does not yet
+complete automatic GIF image-to-scene conversion or the overall transition.
 
 ## Dedupe discovery lock scope — deployed, 2026-10-10
 

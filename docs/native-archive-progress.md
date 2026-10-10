@@ -7,6 +7,46 @@ that plan's scope or replace its completion criteria. Development remains on
 review. The native replacement and its schedules are running; observation of
 scheduled work and independent restore verification remain in progress.
 
+## Independent site scraper workers — deployed, 2026-10-10
+
+The native scheduler reserved the entire media root for one download, and each
+host/n8n dispatch process ran one profile at a time. Consequently a long Reddit
+pass could block Twitter despite their independent source queues. Schema 1000110
+allows different services to reserve the shared root concurrently. Same-service
+overlap, identical collection/target exclusion and mount identity checks remain.
+Actual output stems are protected across services by shared file locks; contention
+now retries without consuming the source failure budget.
+
+Production has eight independent host workers (Bluesky, Coomer, Instagram, Kemono,
+manual, Reddit, TikTok and Twitter), plus separate n8n Reddit and Twitter workers.
+Their ten timers replace the two global worker timers. All 32 existing profiles,
+producer identities and outboxes remain in use. The handoff approved the matching
+runtime for 1,359 pending runs and ten metadata policies, preserving admissions,
+windows, checkpoints and retry deadlines. The 169 legacy holds remain unchanged.
+The host's 10,000-entry metadata cursor limit was also full of retired runtime
+policies. Removed 10,000 host and 3,582 n8n obsolete traversal hints, retaining all
+other producer tables and pending job/capture data. These hints can be recreated;
+this did not remove the separate native metadata job backlog.
+
+Real SQLite fixtures verify simultaneous Reddit/Twitter claims at the same root,
+same-site exclusion and migration preservation of queued/running work. All 683
+producer tests and the full GitHub gate passed. The
+[source publisher](https://github.com/notsafeforgit/stash/actions/runs/38053689663)
+and [wrapper publisher](https://github.com/notsafeforgit/stash-s6/actions/runs/38054899782)
+published source `8d2e8cc15b0a15b05b5c49e9ca006a6c5f9da222`. Production became healthy
+on schema 1000110 at 13:27:18 UTC; worker verification passed after the handoff at
+13:29 UTC. Nine workers completed polling cycles while the n8n Reddit worker was
+executing a download. Twitter's 500 queued downloads retain their separate
+`extraction_failed` cooldown until 15:48:07 UTC (08:48 Pacific). Concurrent Twitter
+download execution therefore remains unobserved in production; the workers and
+transactional claim path are ready without requiring Reddit to finish.
+
+Future backups include the 23 added worker configuration/manifest files and the
+matching registry-extracted validator. Their configuration selector waits for the
+original sealed S3 attempt to finish. The original S3, home-sync and independent
+restore processes remain intact. Evidence is under
+`.local/source-site-concurrency-20261010/`.
+
 ## Backup interference with native workers — deployed, 2026-10-10
 
 The supplementary Google Drive backup started its database copy at 11:51:24 UTC.
@@ -581,17 +621,17 @@ also passed.
 
 ## Current release position — 2026-10-10 UTC
 
-Production is healthy on schema **1000109**, source
-`e92f0849e69e68b06a015052ab01b8f4bd9ac3d1`, pinned wrapper
-`ghcr.io/notsafeforgit/stash-s6@sha256:773be803d327f8b72a31b86905d80c3a6e501617040609736bde7dc4fc39e2d8`.
+Production is healthy on schema **1000110**, source
+`8d2e8cc15b0a15b05b5c49e9ca006a6c5f9da222`, pinned wrapper
+`ghcr.io/notsafeforgit/stash-s6@sha256:824ee3e856184057624b5d54ae7f1e2499be7e616065ec424e52f759fc4c4143`.
 The verified source image is
-`ghcr.io/notsafeforgit/stash@sha256:1142ad93de040495dd21b2fd18ce8170f699d27a7c8bb4ee70ba81b9a64caf4b`,
+`ghcr.io/notsafeforgit/stash@sha256:4aeccdd635c53fed5f457f02090ff2da90383115ff94aa875dd0edc0b2e3fd34`,
 with wrapper source `4f0f0594e95e000a75e4819f2494c3a44ce7f04d`.
-The application backup fix is recorded under
-`.local/n8n-worker-errors-20261010/`. The unchanged producer rollout is recorded
-under `.local/publication-retry-20261010/`; its six original timers are active. The
-coordinated post-write backup has published successfully. The current scheduled
-backup retains its original sealed view, configuration and validator. A deferred
+The application and producer rollout is recorded under
+`.local/source-site-concurrency-20261010/`; ten independent site worker timers
+are active and the two global worker timers are disabled. The coordinated
+post-write backup has published successfully. The current scheduled backup
+retains its original sealed view, configuration and validator. A deferred
 configuration handoff will select this application and producer release for
 future backups. Independent restore, the current scheduled backup, supplementary
 home sync, startup audit separation and final owner review remain outstanding.

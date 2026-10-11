@@ -8,7 +8,7 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
-## Numeric Redgifs links and uv — implementation verified, rollout pending
+## Numeric Redgifs links and uv — deployed, 2026-10-11 UTC
 
 Reddit's numeric Redgifs watch URLs are now recognized by both the native
 attachment manifest and the producer. A captured single-item API response can
@@ -23,9 +23,39 @@ The producer dependency now pins Codeberg master commit
 `a7b7dc950f35caa149230552cb158fe32410eeac` (`1.33.0-dev`, October 11).
 Host/test setup uses uv for environments and installation, CI caches uv, and
 application image package installation uses uv. n8n and the production wrapper
-already use uv. Local validation passed 706 producer, 146 archive and 320 backup
-tests, the shared Go attachment contract, and CI workflow checks. Production
-activation and recovery of the deferred run remain pending publication.
+already use uv. Host and all n8n workers now use complete uv-created environments
+with that exact gallery-dl commit and the unchanged yt-dlp pin. Their 34 download
+and metadata profiles retain the same configuration files. The host and container
+runtimes were verified live; new captures report `1.33.0-dev`, and new
+`file.completed` receipts are arriving.
+
+The [source release](https://github.com/notsafeforgit/stash/actions/runs/38144474288)
+and [wrapper release](https://github.com/notsafeforgit/stash-s6/actions/runs/38146016654)
+passed and published. Production runs source `a88712aab3d092fe5d658f9ddc5154706489f60b`
+from wrapper digest
+`sha256:0e18022a0520bc658c453637f7a9d5f12ca97a51f99c0a4bea9a0320803f9092`;
+its binary matches the GitHub artifact. Schema remains `1000113`. Local validation
+passed 706 producer, 146 archive and 320 backup tests, the shared Go attachment
+contract, HTTP recovery fixtures and CI workflow checks. Recorded HTTP fixtures
+retain their original extractor version instead of being relabeled during upgrades.
+
+The handoff preserved original requests, pagination, completed media and retry
+state for 1,787 queued/deferred download runs. It requeued 27 failures verified
+against retained numeric Redgifs captures, recovered one expired worker lease,
+and resumed all 16 previously active worker/admission/recovery timers. Recovery
+has produced successful work; unrelated rejection cases were not blindly retried.
+For the example post `1oof507`, the clip already existed as scene `374221` under
+repost `1vaklyr`. Matching captured Redgifs IDs and HD URLs proved the association;
+the numeric attachment now links to that existing scene without another download.
+
+Thirteen existing metadata jobs retain their original `1.32.15-dev` runtime and
+checkpoints through a bounded worker that admits no new jobs, uses the shared
+low-priority request budget, and disables its timer when those jobs are terminal.
+Ordinary new scrape work uses `1.33.0-dev`. The running S3 backup was not interrupted.
+The new uv backup runtime and restore inventory (including the retained metadata
+runtime, about 50 MB of environment archives total) are staged to activate under
+the backup lock after its current run completes; its in-flight configuration is
+unchanged.
 
 ## Shared gallery-dl configuration — deployed, 2026-10-11 UTC
 

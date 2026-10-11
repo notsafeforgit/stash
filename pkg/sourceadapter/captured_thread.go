@@ -1,9 +1,10 @@
-package archive
+package sourceadapter
 
 import (
 	"errors"
 	"strconv"
 
+	"github.com/stashapp/stash/pkg/jsonutil"
 	"github.com/stashapp/stash/pkg/models"
 )
 
@@ -35,7 +36,7 @@ func threadID(fields ...capturedField) (string, error) {
 // ExtractCapturedThread reads only the captured tweet's relationships. Quotes,
 // retweets, feed-owner profiles and filenames never establish a reply chain.
 func ExtractCapturedThread(raw []byte) (*models.SourceThreadFacts, error) {
-	data, err := DecodeJSONObject(raw, MaxSourcePayloadBytes)
+	data, err := jsonutil.DecodeJSONObject(raw, MaxSourcePayloadBytes)
 	if err != nil {
 		return nil, err
 	}

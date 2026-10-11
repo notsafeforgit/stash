@@ -1,10 +1,11 @@
-package archive
+package sourceadapter
 
 import (
 	"errors"
 	"regexp"
 	"strings"
 
+	"github.com/stashapp/stash/pkg/jsonutil"
 	"github.com/stashapp/stash/pkg/models"
 )
 
@@ -122,7 +123,7 @@ func CapturedPostPlatform(post models.SourcePostIdentifier) string {
 // envelope, independently of album membership. Crossposts keep their own ID.
 // Unsupported extractors need an explicit identity adapter before network intake.
 func ExtractCapturedPost(raw []byte) (*models.SourcePostIdentifier, error) {
-	data, err := DecodeJSONObject(raw, MaxSourcePayloadBytes)
+	data, err := jsonutil.DecodeJSONObject(raw, MaxSourcePayloadBytes)
 	if err != nil {
 		return nil, err
 	}

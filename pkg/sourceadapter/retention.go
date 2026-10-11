@@ -1,9 +1,13 @@
-package archive
+package sourceadapter
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/stashapp/stash/pkg/models"
+)
 
 const SourceRetentionVersion = "gallery-dl-retained-v1"
-const MaxSourcePayloadBytes = 4 << 20
+const MaxSourcePayloadBytes = models.MaxSourcePayloadBytes
 
 type sourceObject = map[string]interface{}
 

@@ -490,6 +490,37 @@ must still satisfy the qualified-namespace rules.
 Reddit crossposts and independent social posts keep their own identity. Supported
 Imgur/Redgifs child hosts retain their enclosing post scope, caption and publisher.
 A social extractor's parent feed/profile does not replace its actual post.
+
+### Source interpretation and archive validation
+
+`pkg/sourceadapter` owns the offline interpretation of gallery-dl/child-extractor
+captures: post and publisher identifiers, profile URLs, attachment membership,
+thread facts, text/date projection, source retention and capture partition rules.
+It receives supplied metadata and returns claims. It has no repository, worker,
+HTTP client or filesystem access; its dependency test keeps that boundary explicit.
+`pkg/jsonutil` supplies the shared lossless JSON representation, including exact
+large IDs and rejection of duplicate keys and invalid Unicode.
+
+`pkg/archive/source_adapter.go` is the application boundary. It applies the
+ordinary attachment-manifest validator to parsed membership. Core still owns
+profile hashes, bounded references, lossless capture reconstruction, evidence
+digests and scope validation. Ingestion and SQLite services authenticate producers,
+verify post/capture/file relationships, preserve explicit choices and commit
+associations and receipts transactionally. Recognizing a handle or URL cannot
+itself link a performer, merge accounts, select a file or override an unlink.
+
+The adapters are compiled, pure Go interpreters, not runtime notification plugins.
+The Python producer remains responsible for extraction and download URL matching;
+both sides use the existing shared fixtures. Adding a service should extend the
+adapter and its fixtures without adding website parsing to archive transactions.
+Scheduling and request/checkpoint protocols remain separate concerns.
+
+This separation preserves the existing protocol, retention policy identifiers,
+capture hashes and database schema. It requires no catalog rewrite, queue reset,
+new source request or producer runtime upgrade. The source-tracking opt-in remains
+unchanged. Adapter tests cover interpretation; archive and ingestion/database
+tests cover accepted evidence, conflicting claims, replay and explicit decisions.
+
 Unknown post adapters are rejected even when their account parser is supported.
 Post support alone does not establish attachment membership or enable a download
 worker: file selection and source-window adapters currently cover Reddit, Twitter,

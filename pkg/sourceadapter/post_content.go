@@ -1,8 +1,10 @@
-package archive
+package sourceadapter
 
 import (
 	"encoding/json"
 	"strings"
+
+	"github.com/stashapp/stash/pkg/jsonutil"
 )
 
 // PostContentRetentionVersion omits counters and viewer/search state which do
@@ -19,11 +21,11 @@ var tiktokPostNoise = sourceKeys("diggCount shareCount commentCount playCount co
 // RetainPostContent is a storage policy, separate from the producer transport
 // policy. Existing outboxes remain acceptable after this storage change.
 func RetainPostContent(raw []byte) (json.RawMessage, error) {
-	value, err := DecodeJSONObject(raw, MaxSourcePayloadBytes)
+	value, err := jsonutil.DecodeJSONObject(raw, MaxSourcePayloadBytes)
 	if err != nil {
 		return nil, err
 	}
-	return EncodeSourceJSON(retainPostContent(value, "", ""))
+	return jsonutil.EncodeSourceJSON(retainPostContent(value, "", ""))
 }
 
 func retainPostContent(value any, platform, role string) any {

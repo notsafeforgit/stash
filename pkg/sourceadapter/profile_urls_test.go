@@ -1,9 +1,9 @@
-package archive_test
+package sourceadapter_test
 
 import (
 	"testing"
 
-	"github.com/stashapp/stash/pkg/archive"
+	"github.com/stashapp/stash/pkg/sourceadapter"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,9 +29,9 @@ func TestCapturedProfileURLsOnlyUseMatchingAccountMetadata(t *testing.T) {
 		{"invalid profile URLs", `{"category":"twitter","author":{"id":123,"name":"Example","url":"javascript:alert(1)","description":"https://user:pass@site.invalid http://site.invalid:99/"}}`, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			retained, err := archive.RetainSourcePayload([]byte(tc.raw))
+			retained, err := sourceadapter.RetainSourcePayload([]byte(tc.raw))
 			require.NoError(t, err)
-			links, err := archive.ExtractCapturedProfileURLs(retained)
+			links, err := sourceadapter.ExtractCapturedProfileURLs(retained)
 			require.NoError(t, err)
 			require.ElementsMatch(t, tc.want, links)
 		})
@@ -39,8 +39,8 @@ func TestCapturedProfileURLsOnlyUseMatchingAccountMetadata(t *testing.T) {
 }
 
 func TestProfileURLComparisonPreservesPathsAndRecognizesAccountAliases(t *testing.T) {
-	require.Equal(t, archive.ProfileURLKey("https://x.com/Example?ref=profile"), archive.ProfileURLKey("http://www.twitter.com/example/"))
-	require.Equal(t, archive.ProfileURLKey("http://www.site.invalid/me/"), archive.ProfileURLKey("https://site.invalid/me"))
-	require.NotEqual(t, archive.ProfileURLKey("https://site.invalid/Me"), archive.ProfileURLKey("https://site.invalid/me"))
-	require.NotEqual(t, archive.ProfileURLKey("https://site.invalid/?id=1"), archive.ProfileURLKey("https://site.invalid/?id=2"))
+	require.Equal(t, sourceadapter.ProfileURLKey("https://x.com/Example?ref=profile"), sourceadapter.ProfileURLKey("http://www.twitter.com/example/"))
+	require.Equal(t, sourceadapter.ProfileURLKey("http://www.site.invalid/me/"), sourceadapter.ProfileURLKey("https://site.invalid/me"))
+	require.NotEqual(t, sourceadapter.ProfileURLKey("https://site.invalid/Me"), sourceadapter.ProfileURLKey("https://site.invalid/me"))
+	require.NotEqual(t, sourceadapter.ProfileURLKey("https://site.invalid/?id=1"), sourceadapter.ProfileURLKey("https://site.invalid/?id=2"))
 }

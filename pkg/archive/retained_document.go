@@ -1,7 +1,6 @@
 package archive
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -10,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/stashapp/stash/pkg/jsonutil"
 	"github.com/stashapp/stash/pkg/models"
 )
 
@@ -37,12 +37,7 @@ func DocumentIdentity(doc models.SourceDocument) (string, error) {
 		!documentText(doc.ParseStatus, 128, false) || len(doc.Warnings) > 4<<20 || len(doc.Parsed) > 4<<20 {
 		return "", models.ErrSourceDocumentInvalid
 	}
-	if !utf8.Valid(doc.Warnings) || !json.Valid(doc.Warnings) || !validJSONSurrogates(doc.Warnings) {
-		return "", models.ErrSourceDocumentInvalid
-	}
-	decoder := json.NewDecoder(bytes.NewReader(doc.Warnings))
-	decoder.UseNumber()
-	warnings, err := decodeSourceJSON(decoder, 0)
+	warnings, err := jsonutil.DecodeJSON(doc.Warnings, 4<<20)
 	if err != nil {
 		return "", models.ErrSourceDocumentInvalid
 	}

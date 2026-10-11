@@ -87,17 +87,6 @@ func ValidateCaptureContext(link models.SourceCaptureContext, child, parent *mod
 	return nil
 }
 
-// CapturedContextPath is the payload location used for the post and publisher.
-// Feed/profile context does not replace a social post's own publisher.
-func CapturedContextPath(raw []byte) (string, error) {
-	data, err := DecodeJSONObject(raw, MaxSourcePayloadBytes)
-	if err != nil {
-		return "", err
-	}
-	_, path, _, err := capturedSourceContext(data)
-	return path, err
-}
-
 func (t *EnrichmentTranscript) CaptureContext(ordinal int, capture, parentCapture string) (*models.SourceCaptureContext, error) {
 	if ordinal < 0 || ordinal >= len(t.Records) || !translationUUID(capture) {
 		return nil, models.ErrEnrichmentInvalid

@@ -1,4 +1,4 @@
-package archive
+package sourceadapter
 
 import (
 	"errors"

@@ -1,6 +1,4 @@
-// Package archive owns source identity and provenance rules for the native
-// library. Source accounts and depicted performers are distinct concepts.
-package archive
+package sourceadapter
 
 import (
 	"net/url"

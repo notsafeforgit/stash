@@ -1,14 +1,16 @@
-package archive
+package sourceadapter
 
 import (
 	"errors"
 	"fmt"
 	"strconv"
 
+	"github.com/stashapp/stash/pkg/jsonutil"
 	"github.com/stashapp/stash/pkg/models"
 )
 
 const CapturedAlbumPolicy = "captured-attachments-v2"
+const MaxManifestEntries = models.MaxSourceAttachmentEntries
 
 // CapturedAlbum is source-list evidence, independent of local file availability.
 // The caller records it against the matching post/capture before selecting it.
@@ -107,7 +109,7 @@ func capturedAlbumEntries(result *CapturedAlbum, raw interface{}, metadata sourc
 // unavailable media; they cannot prove the full source list or its order.
 // Unsupported or insufficient metadata returns nil, never a guessed gallery.
 func ExtractCapturedAlbum(raw []byte) (*CapturedAlbum, error) {
-	data, err := DecodeJSONObject(raw, MaxSourcePayloadBytes)
+	data, err := jsonutil.DecodeJSONObject(raw, MaxSourcePayloadBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -209,10 +211,6 @@ func ExtractCapturedAlbum(raw []byte) (*CapturedAlbum, error) {
 		}
 	default:
 		return nil, nil
-	}
-	result.Manifest, err = NormalizeAttachmentManifest(result.Manifest)
-	if err != nil {
-		return nil, err
 	}
 	return result, nil
 }

@@ -1,10 +1,9 @@
-package archive
+package sourceadapter
 
 import (
 	"testing"
 
 	"github.com/stashapp/stash/pkg/models"
-
 	"github.com/stretchr/testify/require"
 )
 

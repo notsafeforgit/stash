@@ -1,4 +1,4 @@
-package archive
+package sourceadapter
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/stashapp/stash/pkg/jsonutil"
 	"github.com/stashapp/stash/pkg/models"
 )
 
@@ -93,7 +94,7 @@ func CapturedAccountReferences(raw []byte) (*CapturedAccount, error) {
 }
 
 func extractCapturedAccount(raw []byte, requireID bool) (*CapturedAccount, error) {
-	data, err := DecodeJSONObject(raw, MaxSourcePayloadBytes)
+	data, err := jsonutil.DecodeJSONObject(raw, MaxSourcePayloadBytes)
 	if err != nil {
 		return nil, err
 	}

@@ -9,7 +9,7 @@ import (
 )
 
 const AttachmentManifestVersion = "attachments-v1"
-const MaxManifestEntries = 4096
+const MaxManifestEntries = models.MaxSourceAttachmentEntries
 const MaxManifestPositions = 1000000
 const MaxManifestBytes = 4 << 20
 

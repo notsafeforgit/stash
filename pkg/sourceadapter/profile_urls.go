@@ -1,4 +1,4 @@
-package archive
+package sourceadapter
 
 import (
 	"html"
@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/stashapp/stash/pkg/jsonutil"
 	"github.com/stashapp/stash/pkg/models"
 )
 
@@ -37,7 +38,7 @@ func ExtractCapturedProfileURLs(raw []byte) ([]string, error) {
 	if err != nil || identity == nil {
 		return nil, err
 	}
-	data, err := DecodeJSONObject(raw, MaxSourcePayloadBytes)
+	data, err := jsonutil.DecodeJSONObject(raw, MaxSourcePayloadBytes)
 	if err != nil {
 		return nil, err
 	}

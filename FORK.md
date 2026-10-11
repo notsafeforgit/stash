@@ -102,6 +102,12 @@ negotiation, jq evaluation, and notifications after successful changes. Hooks
 cannot veto committed changes. Native archive consistency must not depend on
 catalogMetadata or any other plugin receiving a notification.
 
+Keep captured website-format interpretation in the offline `pkg/sourceadapter`
+package. Core archive services validate its claims and retain ownership of hashes,
+scope checks, explicit decisions and transactional associations. Adapters must not
+gain repository, filesystem, worker or network access; see the
+[source interpretation boundary](docs/native-ingestion.md#source-interpretation-and-archive-validation).
+
 Use shared domain services for both GraphQL and native ingestion. Producers send
 idempotent events with durable receipts and scoped Stash API tokens; they do not write
 the library database. Keep after-success behavior consistent across API edits,

@@ -214,16 +214,20 @@ test("image and scene covers refresh only the selected gallery and keep its medi
   await expect(page.locator("[data-gallery-media]")).toHaveCount(2);
   expect(state.coverWrites).toEqual([]);
   const initialPages = [...state.pages];
+  const setCover = page.getByRole("menuitem", {
+    name: "Set as gallery cover",
+    exact: true,
+  });
   for (const kind of ["scene", "image"] as const) {
     const id = kind === "scene" ? "8" : "7";
     await page
       .locator(`[data-gallery-media="${kind}:${id}"]`)
       .getByRole("button", { name: "Media actions", exact: true })
       .click();
-    await page
-      .getByRole("menuitem", { name: "Set as gallery cover", exact: true })
-      .click();
+    await setCover.click();
     await expect(cover).toHaveAttribute("src", new RegExp(`#${kind}-${id}$`));
+    // The cover can update before the previous menu's exit animation ends.
+    await expect(setCover).toHaveCount(0);
     expect(state.coverWrites.at(-1)).toEqual({
       gallery_id: "12",
       image_id: kind === "image" ? id : null,

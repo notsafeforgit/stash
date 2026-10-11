@@ -41,6 +41,13 @@ media roots showed one item and one page; both account review and its queue
 showed 91 undecided tracked accounts across four pages. Browser errors were
 empty. Evidence and screenshots are under `.local/pagination-20261010/`.
 
+The separate [browser workflow](https://github.com/notsafeforgit/stash/actions/runs/38101455197)
+passed the pagination cases but failed an existing gallery-cover test in WebKit:
+it opened a second menu before the previous menu's exit animation completed.
+This reproduced in one of five local runs. The test now waits for dismissal;
+20 repeated Chromium/WebKit runs, browser type checking and formatting pass.
+This follow-up changes only the test and needs no application rebuild.
+
 ## Legacy GIF backlog — repaired and deployed, 2026-10-10
 
 A complete filename inventory of the media root and Stash's file records found

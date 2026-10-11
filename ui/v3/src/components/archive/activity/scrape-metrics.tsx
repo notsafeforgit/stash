@@ -35,6 +35,7 @@ export function ScrapeMetrics({ refresh }: { refresh: number }) {
   const [api] = useState(() => createScrapeMetricsAPI());
   const [retry, setRetry] = useState(0);
   const [offset, setOffset] = useState(0);
+  const [checksOpen, setChecksOpen] = useState(false);
   const load = useCallback(
     (signal: AbortSignal) => api(offset, signal),
     [api, offset],
@@ -140,7 +141,7 @@ export function ScrapeMetrics({ refresh }: { refresh: number }) {
                 "Requests count granted attempts; a stopped worker may not send its last grant. Posts count once per run, even when they contain multiple files. Errors include rate limits.",
               )}
             </p>
-            <Collapsible>
+            <Collapsible open={checksOpen} onOpenChange={setChecksOpen}>
               <CollapsibleTrigger render={<Button variant="outline" />}>
                 {msg("scrape_metrics.checks", "Account checks, oldest first")}
               </CollapsibleTrigger>

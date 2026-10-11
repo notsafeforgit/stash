@@ -82,6 +82,32 @@ async function archive(page: Page, many = false) {
             ...activityJobDetail(),
             summary: { ...activityJob(), attempt_count: 30, max_attempts: 40 },
           };
+    } else if (path === "activity/scrape-metrics") {
+      const offset = Number(url.searchParams.get("offset"));
+      result = {
+        since: "2026-10-10T00:00:00Z",
+        metrics: [
+          {
+            source_scope: "service:twitter",
+            class: "routine",
+            operation: "listing",
+            requests: 12,
+            responses: 12,
+            rate_limited: 1,
+            errors: 1,
+            new_posts: 0,
+            repeated_posts: 0,
+          },
+        ],
+        accounts: Array.from({ length: offset === 0 ? 50 : 1 }, (_, index) => ({
+          collection_uuid: `40000000-0000-4000-8000-${String(offset + index + 1).padStart(12, "0")}`,
+          label: `Account ${offset + index + 1}`,
+          url: `https://x.com/account${offset + index + 1}`,
+          last_success_ms: 0,
+          overdue_seconds: 0,
+        })),
+        total: 51,
+      };
     } else if (path === "activity/runs") result = [activityRun()];
     else if (path === `activity/runs/${activityIds.run}`) {
       const detail = activityRunDetail();
@@ -134,6 +160,47 @@ async function archive(page: Page, many = false) {
 }
 
 for (const desktop of [false, true]) {
+  test(`scrape request metrics retain expanded account paging on ${desktop ? "desktop" : "mobile"}`, async ({
+    page,
+  }) => {
+    if (desktop) await page.setViewportSize({ width: 1280, height: 900 });
+    const remote = await archive(page);
+    await page.goto("/archive-activity?view=runs");
+    const card = page
+      .locator('[data-slot="card"]')
+      .filter({ hasText: "Scrape request budget" });
+    await expect(
+      card.getByText("Routine checks · Post listings"),
+    ).toBeVisible();
+    await card
+      .getByRole("button", {
+        name: "Account checks, oldest first",
+        exact: true,
+      })
+      .click();
+    const summary = card.getByRole("status");
+    await expect(summary).toHaveText("Page 1 of 2 · 51 items");
+    await card.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(summary).toBeVisible();
+    await expect(summary).toHaveText("Page 2 of 2 · 51 items");
+    await expect(
+      card.getByRole("link", { name: "Account 51", exact: true }),
+    ).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: "Next", exact: true }),
+    ).toBeDisabled();
+    await card.getByRole("button", { name: "Previous", exact: true }).click();
+    await expect(summary).toHaveText("Page 1 of 2 · 51 items");
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      )
+      .toBe(true);
+    expect(remote.writes).toEqual([]);
+  });
+
   test(`activity navigation and lazy history on ${desktop ? "desktop" : "mobile"}`, async ({
     page,
   }, testInfo) => {

@@ -8,6 +8,47 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Metadata gap recovery — deployed, 2026-10-11 UTC
+
+Normal scrape captures now complete matching pending metadata targets by reusing
+the existing capture, including across collections. Dispatch and execution also
+check for reusable evidence before a source fetch. Original timestamps and
+payloads are preserved; partial child checkpoints remain protected. A live
+reuse-only pass completed **368** pending targets with **zero website requests**.
+
+Historical `post.enrich` workers are enabled last in the host site dispatchers.
+Every HTTP attempt, redirect and retry shares the native source request budget.
+Ready downloads take precedence, including n8n initial imports and work arriving
+after a metadata lease was claimed. Metadata no longer receives an age/fairness
+promotion. Yielding retains checkpoints without consuming failure attempts.
+Independent verification and duplicate listing workers remain unscheduled.
+See [scrape requests and metadata](native-source-runs.md) for the full behavior.
+
+The [source release](https://github.com/notsafeforgit/stash/actions/runs/38110018318)
+and [wrapper release](https://github.com/notsafeforgit/stash-s6/actions/runs/38111042714)
+published `c78dded0c780d1f5b61a75446824dcdeca4ac01d`.
+The source digest is
+`sha256:651a39cefb2b0ec27d56a13160af1613a7ac57bce92aefe7da267c1718696182`;
+production runs wrapper digest
+`sha256:61fada78f697a0f225c59ff8d381b731501c0c7f2cbd91dec1d9011caf7160ee`.
+Schema 1000112 completed successfully with its local pre-migration backup retained.
+All 132 producer modules match the host installation and n8n's read-only overlay;
+the n8n image and pinned SQLite 3.53.4 runtime remain unchanged. The backup
+inventory now declares the matching published Stash reader and producer runtime.
+
+The handoff recovered three interrupted leases and approved the new execution
+policy for 1,604 pending source runs and four retained metadata policies. Original
+requests, progress, checkpoints and holds were preserved. Live verification found
+Reddit and Twitter downloads running, a successful scrape after resumption, and
+zero metadata request permits while that higher-priority work was active.
+The historical backlog remains pending for idle capacity; it is not fully drained.
+
+The final `make validate-fork` and GitHub release gates passed, including 700
+producer tests and 809 UI unit tests. Regressions cover cross-collection capture
+reuse, normal-capture completion, stale fences, shared rate-limit waits,
+redirect accounting, child checkpoints and priority changes after a claim.
+Private deployment and runtime evidence are under `.local/metadata-gaps-20261011/`.
+
 ## Scrape request efficiency — deployed, 2026-10-11 UTC
 
 Reddit and Twitter now persist remote page cursors and the last completed
@@ -21,7 +62,7 @@ Host and n8n producers share per-service source request budgets. Waiting daily
 checks take priority over initial imports and historical recovery, while media
 transfers remain concurrent. Archive activity shows request, rate-limit, error,
 new/repeated-post and overdue-account metrics with exact pagination totals.
-Automatic per-post enrichment and duplicate listing workers are unscheduled;
+This release unscheduled automatic per-post enrichment and duplicate listing workers;
 normal downloads retain the metadata in their original source responses.
 See [scrape requests and checkpoints](native-source-runs.md) for the resulting
 metadata tradeoffs, request spacing and checkpoint semantics.

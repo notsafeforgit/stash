@@ -8,6 +8,47 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Source monitoring subscriptions — deployed, 2026-10-11 UTC
+
+Schema 1000114 stores generic monitoring subscriptions separately from source
+provenance, gallery-dl settings and scheduling. Performer **Source accounts**,
+account review and source collections expose **Automatic monitoring** switches;
+performers can stop every currently linked account together. Current ownership
+and merge redirects determine scope. Queued automatic checks are cancelled and
+stale offline requests cannot restart them. An already running attempt may finish;
+manual/initial imports, source metadata and media remain available. New sources
+and incidental authors default off.
+
+The production import subscribed exactly 941 existing targets: 437 Reddit,
+503 Twitter and 1 Instagram. It attached 1,568 existing automatic runs through
+the application API, preserving request windows, progress and retry state;
+180 other pending runs were left independent. Host daily/recovery schedules and n8n source-management version 2
+now use the same API subscriptions. The old text lists are no longer the live
+scheduled input. Downloader versions and shared configuration are unchanged.
+
+Source `2ab0707bb78d95c605c260babe20d5764fdda6ae` passed the full
+[GitHub release gate](https://github.com/notsafeforgit/stash/actions/runs/38155374298) and published
+`ghcr.io/notsafeforgit/stash@sha256:5eb64c441119ae8147787dc77229ea91b028131305fa984bc661c513e73dec91`. The
+[wrapper release](https://github.com/notsafeforgit/stash-s6/actions/runs/38156872287) published the deployed image
+`ghcr.io/notsafeforgit/stash-s6@sha256:d4df739560ba8f30e11717bc1790296fee1a348819b56197ce1e0ea62e35869d`.
+Its binary matches the Actions artifact. Health, scoped producer list reads and
+host/n8n runtime fingerprints were verified after rollout.
+
+Local verification included all Go packages, the complete producer suite (721
+cases), 816 UI unit tests, 26 Chromium browser cases and Go lint. WebKit could
+not start because required host libraries were unavailable. A consistent full
+native copy rehearsed the additive migration with all 1,792 active runs and
+existing schema objects unchanged. The production migration retained its local
+pre-migration copy; the temporary rehearsal copy was removed after success.
+
+The existing incremental backup is configured for the matching validator and
+worker restore artifacts. Subscription tables accompany the normal incremental
+database backup. All sixteen host/n8n timers resumed, successful media receipts
+were observed, and initial and incremental Reddit runs were executing concurrently.
+See [source collections](native-source-collections.md) and the reusable
+[gallery-dl setup guide](../integrations/gallery-dl/QUICKSTART.md).
+Private delivery evidence is under `.local/source-subscriptions-20261011/`.
+
 ## Source adapter separation — deployed, 2026-10-11 UTC
 
 Captured website interpretation now lives in the offline `pkg/sourceadapter`

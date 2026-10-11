@@ -8,6 +8,39 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Shared gallery-dl configuration — deployed, 2026-10-11 UTC
+
+Fifteen site download profiles (eleven host, four n8n) now reference the shared
+gallery-dl JSON file. n8n adds its existing path overrides; initial scans retain
+the global skip override, and Twitter recovery uses a small separate JSON layer.
+All seventeen download profiles, including the two unchanged manual profiles,
+were checked in both runtime environments for identical effective settings.
+
+New callers resolve the layers at admission. Producer schema 17 stores one
+normalized configuration per profile/root/policy, with credential references
+rather than credential values. Dispatch includes saved policies after edits,
+so queued jobs and retries retain their settings. Explicit runtime policy
+upgrades preserved the original requests, progress, retry deadlines and state
+of 1,886 pending/deferred runs. Host and n8n timers resumed; read-only verification
+observed simultaneous Reddit/Twitter incremental and initial work, successful
+attempts, resumed pagination and newly completed files.
+
+The producer and backup tools run
+`f89f6005c378c51c5e782dce9e99b011d31852dc`. Local producer (705), archive (146),
+and backup (320) tests passed; the corresponding
+[GitHub validation jobs](https://github.com/notsafeforgit/stash/actions/runs/38141008737)
+passed too. This rollout updates host packages and the existing n8n module mount;
+the Stash application continues running its published `a165fdf40027` image below.
+
+Backup inventory resolves the shared files, container path mappings and saved
+configuration dependencies (324 components). An existing invalid file declaration
+for the producer module directory caused the daily backup to fail before capture;
+the verified wheel already contains those modules, so the redundant directory
+entry was removed. The failed unsealed attempt was retired by recovery, and the
+backup was restarted using the corrected tools. This does not claim that the
+new backup has finished publication. Private rollout and verification evidence
+is under `.local/shared-gallery-config-20261011/`.
+
 ## Optional source tracking — deployed, 2026-10-11 UTC
 
 Fresh installations default to `source_tracking_enabled: false`. Settings →

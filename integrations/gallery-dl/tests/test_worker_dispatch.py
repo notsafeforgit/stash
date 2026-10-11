@@ -49,9 +49,8 @@ class WorkerDispatchTests(unittest.TestCase):
                 Profiles(self.profile_path)
 
     def test_continuously_busy_download_does_not_starve_metadata_after_restart(self):
-        with (patch("stash_ingest.worker_dispatch.Configuration") as download_profile,
-              patch("stash_ingest.worker_dispatch.EnrichmentConfiguration") as metadata_profile,
-              patch("stash_ingest.worker_dispatch.Dispatcher") as download,
+        with (patch("stash_ingest.worker_dispatch.EnrichmentConfiguration") as metadata_profile,
+              patch("stash_ingest.worker_dispatch.ProfileDispatcher") as download,
               patch("stash_ingest.worker_dispatch.CollectionDispatcher") as metadata):
             download.return_value.once.return_value = {"state": "yielded"}
             metadata.return_value.once.return_value = {"state": "completed"}
@@ -62,13 +61,12 @@ class WorkerDispatchTests(unittest.TestCase):
                 self.assertEqual(WorkerDispatcher(box, self.transport, self.profiles).once()["profile_id"], "metadata")
             with closing(self.open()) as box:
                 self.assertEqual(WorkerDispatcher(box, self.transport, self.profiles).once()["profile_id"], "download")
-            self.assertEqual(download_profile.call_count, 2)
+            self.assertEqual(download.call_count, 2)
             self.assertEqual(metadata_profile.call_count, 1)
 
     def test_process_death_after_selection_still_advances_to_peer(self):
-        with (patch("stash_ingest.worker_dispatch.Configuration"),
-              patch("stash_ingest.worker_dispatch.EnrichmentConfiguration"),
-              patch("stash_ingest.worker_dispatch.Dispatcher") as download,
+        with (patch("stash_ingest.worker_dispatch.EnrichmentConfiguration"),
+              patch("stash_ingest.worker_dispatch.ProfileDispatcher") as download,
               patch("stash_ingest.worker_dispatch.CollectionDispatcher") as metadata):
             download.return_value.once.side_effect = RuntimeError("process disappeared")
             with closing(self.open()) as box, self.assertRaises(RuntimeError):
@@ -82,9 +80,8 @@ class WorkerDispatchTests(unittest.TestCase):
         self.document['profiles'][1]['priority'] = 2
         self.profile_path.write_bytes(encode(self.document))
         self.profiles = Profiles(self.profile_path)
-        with (patch('stash_ingest.worker_dispatch.Configuration'),
-              patch('stash_ingest.worker_dispatch.EnrichmentConfiguration'),
-              patch('stash_ingest.worker_dispatch.Dispatcher') as daily,
+        with (patch('stash_ingest.worker_dispatch.EnrichmentConfiguration'),
+              patch('stash_ingest.worker_dispatch.ProfileDispatcher') as daily,
               patch('stash_ingest.worker_dispatch.CollectionDispatcher') as recovery,
               closing(self.open()) as box):
             worker = WorkerDispatcher(box, self.transport, self.profiles)
@@ -97,7 +94,7 @@ class WorkerDispatchTests(unittest.TestCase):
             self.assertEqual(worker.once()['profile_id'], 'metadata')
 
     def test_broken_profile_is_reported_without_paths_or_access_values_and_peers_run(self):
-        with (patch("stash_ingest.worker_dispatch.Configuration", side_effect=InvalidData("fixture-private-access /private/path")),
+        with (patch("stash_ingest.worker_dispatch.ProfileDispatcher", side_effect=InvalidData("fixture-private-access /private/path")),
               patch("stash_ingest.worker_dispatch.EnrichmentConfiguration"),
               patch("stash_ingest.worker_dispatch.CollectionDispatcher") as metadata):
             metadata.return_value.once.return_value = {"state": "completed"}
@@ -112,7 +109,7 @@ class WorkerDispatchTests(unittest.TestCase):
         with closing(self.open()) as box:
             value = dispatch_fixtures.EnrichmentDispatchTests.stage(self, box, policy="b" * 64)
             with (patch("stash_ingest.worker_dispatch.deliver_enrichment", return_value={"state": "ownership_required"}) as delivery,
-                  patch("stash_ingest.worker_dispatch.Configuration", side_effect=OSError("missing")),
+                  patch("stash_ingest.worker_dispatch.ProfileDispatcher", side_effect=OSError("missing")),
                   patch("stash_ingest.worker_dispatch.EnrichmentConfiguration", side_effect=OSError("missing"))):
                 result = WorkerDispatcher(box, self.transport, self.profiles).once()
                 delivery.assert_called_once_with(box, self.transport, None, value.job_uuid)
@@ -127,7 +124,7 @@ class WorkerDispatchTests(unittest.TestCase):
                 self.assertTrue(two.save(two.state(), after_entry="metadata"))
                 return {"state": "completed"}
             with (patch("stash_ingest.worker_dispatch.deliver_enrichment", side_effect=delivered),
-                  patch("stash_ingest.worker_dispatch.Configuration") as profile):
+                  patch("stash_ingest.worker_dispatch.ProfileDispatcher") as profile):
                 self.assertEqual(one.once()["state"], "contended")
                 profile.assert_not_called()
 

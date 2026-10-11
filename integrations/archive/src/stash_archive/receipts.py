@@ -124,7 +124,7 @@ def verify_ingestion_receipts(library, outboxes, expected_origin):
     reports, producers = [], set()
     for queue in outboxes:
         if (queue.execute("PRAGMA application_id").fetchone()[0] != 0x5354494F
-                or queue.execute("PRAGMA user_version").fetchone()[0] not in range(1, 17)):
+                or queue.execute("PRAGMA user_version").fetchone()[0] not in range(1, 18)):
             raise InvalidArchive("Unsupported producer snapshot for receipt verification")
         binding = queue.execute("SELECT endpoint,producer FROM binding").fetchall()
         if len(binding) != 1 or origin(binding[0][0]) != expected_origin:

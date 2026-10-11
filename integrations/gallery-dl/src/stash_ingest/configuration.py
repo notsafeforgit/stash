@@ -16,6 +16,7 @@ from .events import sha256
 from .filesystem import Root
 
 SCHEMA = "stash-gallery-worker-v1"
+LAYERED_SCHEMA = "stash-gallery-worker-layers-v1"
 CONFIG_LIMIT = 1 << 20
 ASSET_LIMIT = 4 << 20
 GALLERY_COMMIT = "c40eb2a42fbaa1d26a2bb7c96804b7f47d1f73f8"
@@ -152,6 +153,7 @@ def runtime_identity():
 class Configuration:
     def __init__(self, filename):
         filename = Path(filename).resolve(strict=True)
+        self.filename = filename
         self._initialize(_json_file(filename), filename.parent)
 
     @classmethod
@@ -162,6 +164,9 @@ class Configuration:
         return result
 
     def _initialize(self, value, base):
+        if isinstance(value, dict) and value.get("schema") == LAYERED_SCHEMA:
+            from .config_migration import resolve_layers
+            value = resolve_layers(value, base)
         required = {"schema", "root", "locks", "gallery", "bindings"}
         if (not isinstance(value, dict) or not required <= set(value) or set(value) - required - {"source_category", "source_mode", "source_adapter", "scan_mode"}
                 or value["schema"] != SCHEMA or not isinstance(value["gallery"], dict)
@@ -185,12 +190,16 @@ class Configuration:
         assets = self._bindings(value["bindings"], base, values={"media_root": str(self.root.path)}, kinds={"media_root": "path"})
         self._gallery = self._expand(value["gallery"])
         self._validate(self._gallery)
+        # Save the unexpanded policy, never cookies/tokens. Local references can
+        # still rotate access credentials without changing a queued run's rules.
+        self.document, self.base = copy.deepcopy(value), base
+        self.runtime = runtime_identity()
         self.policy_sha256 = digest(encode({"version": SCHEMA, "operation": "download",
                                            "source_category": self.source_category,
                                            "source_mode": self.source_mode,
                                            "source_adapter": self.source_adapter,
                                            "scan_mode": self.scan_mode,
-                                           "runtime": runtime_identity(), "gallery_sha256": digest(profile_bytes(value["gallery"])),
+                                           "runtime": self.runtime, "gallery_sha256": digest(profile_bytes(value["gallery"])),
                                            "assets": assets}, CONFIG_LIMIT))
 
     def _bindings(self, bindings, base, *, values=None, kinds=None):

@@ -221,6 +221,9 @@ def admit(app, policies, client, runtime, box, call, supplied):
         finally:
             os.close(parent)
         value = request(runtime, client, call, path, supplied, box.clock())
+        from .configuration_store import remember
+        for profile in runtime.profiles.values():
+            remember(box, profile)
         registration(app, policies, client, runtime, value, path)
         groups = []
         calls = SourceCalls(box)

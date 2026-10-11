@@ -291,9 +291,9 @@ class DetailDispatchTests(DetailFixture):
             {"id": "downloads", "operation": "download", "profile": "downloads.json"},
             {"id": "details", "operation": "post.verify_candidate", "profile": "details.json"}]}))
         profiles = Profiles(profile_path)
-        with patch("stash_ingest.worker_dispatch.Configuration"), \
+        with patch("stash_ingest.profile_dispatch.Configuration"), \
                 patch("stash_ingest.worker_dispatch.DiscoveryDetailConfiguration"), \
-                patch("stash_ingest.worker_dispatch.Dispatcher") as download, \
+                patch("stash_ingest.worker_dispatch.ProfileDispatcher") as download, \
                 patch("stash_ingest.worker_dispatch.DiscoveryDetailCollectionDispatcher") as detail:
             download.return_value.once.return_value = {"state": "yielded"}
             detail.return_value.once.return_value = {"state": "completed"}

@@ -200,7 +200,7 @@ class ReceiptBoundaryTests(ReceiptFixture):
         with self.assertRaisesRegex(InvalidArchive, "identity is missing"): self.verify()
 
     def test_future_outbox_version_and_writable_transaction_refused(self):
-        self.box.db.execute("PRAGMA user_version=17")
+        self.box.db.execute("PRAGMA user_version=18")
         with self.assertRaisesRegex(InvalidArchive, "Unsupported producer"): self.verify()
         self.db.execute("BEGIN")
         try:

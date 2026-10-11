@@ -16,6 +16,7 @@ from test_run_queue import request, admission
 
 
 def schema_thirteen(db):
+    db.execute("DROP TABLE IF EXISTS worker_configurations")
     for table in ("discovery_detail_executions", "discovery_detail_dispatch", "discovery_detail_collection_dispatch"):
         db.execute("DROP TABLE " + table)
     db.execute("ALTER TABLE worker_dispatch DROP COLUMN discovery_detail_delivery_after")

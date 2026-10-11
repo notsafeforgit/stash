@@ -407,6 +407,54 @@ process does not certify that its file events were delivered.
 
 ## Automatic source dispatch
 
+### Shared gallery-dl configuration
+
+Use `stash-ingest-config --layered` to reference existing JSON files instead of
+copying their settings into every worker profile. Supply `--config` in the same
+order as gallery-dl: the shared config first, then environment/site overrides.
+Objects merge recursively; lists and scalar values replace earlier values.
+Conditional filename/directory maps retain their order.
+
+For example, a `stash-gallery-worker-layers-v1` profile contains the normal
+`root` and `locks` declarations plus:
+
+```json
+{
+  "config_files": [
+    "/home/node/.n8n-files/gallery-dl/config.json",
+    "/home/node/.n8n/workflowConfigs/n8n-gdl-overrides.json"
+  ],
+  "working_directory": "/home/node",
+  "source_category": "reddit",
+  "scan_mode": "initial",
+  "full_history": true
+}
+```
+
+Host routine profiles reference the same shared file at its host path, use
+`scan_mode: "routine"` and omit `full_history`. The latter supplies the existing
+global `skip: true` override for initial/recovery scans. Small site-specific
+overrides, such as Twitter recovery traversal, belong in another JSON layer.
+No new include syntax is required inside the shared gallery-dl files.
+
+New caller executions resolve these files automatically. Before admission, the
+producer saves one normalized configuration per profile/root/policy in its
+outbox (`worker_configurations`, producer schema 17). Queued callers, repeated
+n8n executions, interrupted jobs and retries keep their original policy. The
+dispatcher rotates across current and saved policies, so a config edit does not
+strand queued work. An idle older policy is checked at most every five minutes.
+These snapshots contain credential references, never resolved tokens/cookies;
+credential rotation remains possible. Referenced helpers remain hash-checked.
+A producer/helper code upgrade still requires the existing explicit policy
+upgrade procedure; changing config does not authorize replacing executable code
+for an already admitted run.
+
+Keep the producer outbox, profiles, shared files and override files in backups.
+The worker inventory resolves their dependencies, including those still needed
+by saved configurations. When upgrading an existing deployment, register its
+old effective profiles in the outbox before replacing them with layered profiles
+and preserve every pending run's original request and execution progress.
+
 `dispatch --profile FILE` performs one bounded scheduling cycle: deliver one
 ready event batch, resolve up to 50 pending caller URLs, submit one queued source
 request, then discover up to 50

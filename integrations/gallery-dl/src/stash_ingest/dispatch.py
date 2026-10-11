@@ -102,7 +102,9 @@ class Dispatcher:
 
 def dispatch_once(box, client, configuration):
     """Deliver, admit and attempt work once; no outcome certifies media intake."""
-    dispatcher = Dispatcher(box, client, configuration)
+    from .profile_dispatch import ProfileDispatcher
+    dispatcher = (Dispatcher(box, client, configuration) if hasattr(configuration, "policy_sha256")
+                  else ProfileDispatcher(box, client, configuration))
     requests = RunQueue(box)
     calls = SourceCalls(box)
     backfills = BackfillCalls(box)

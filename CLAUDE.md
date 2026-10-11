@@ -249,6 +249,10 @@ local, and source completion remains distinct from verified media intake.
 `stash-ingest-config` stages new profiles from ordered gallery-dl JSON layers.
 Preserve conditional map order and layered private references; conversion does
 not activate a worker or replace the existing configuration files.
+`--layered` emits `stash-gallery-worker-layers-v1` references instead of flattened
+copies. Download admissions save the normalized policy in producer schema 17;
+dispatch must retain access to old policies after shared config edits. Include
+both JSON layers and saved-policy dependencies in the host backup inventory.
 `stash-ingest dispatch` discovers scoped work through the native API. Producer
 schema 7 retains pagination/backoff, caller URL snapshots and each ticket's original submission
 assignments. `ticket-status` checks completed source windows against those

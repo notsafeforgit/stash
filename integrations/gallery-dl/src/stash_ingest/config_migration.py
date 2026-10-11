@@ -9,7 +9,7 @@ import re
 import sys
 import tempfile
 
-from .configuration import (ASSET_LIMIT, SCHEMA, Configuration, _access_option, _asset,
+from .configuration import (ASSET_LIMIT, SCHEMA, LAYERED_SCHEMA, Configuration, _access_option, _asset,
                             _json_file, _path, private_arguments, profile_bytes)
 from .encoding import InvalidData, digest, encode
 
@@ -63,10 +63,12 @@ def legacy_processor(options):
 class Converter:
     """Preserve effective JSON order and private-value provenance across layers."""
 
-    def __init__(self, filenames, root, locks, *, working_directory=None, assets=(), category=None):
+    def __init__(self, filenames, root, locks, *, working_directory=None, assets=(), category=None,
+                 read_document=_json_file, local_path=None):
         if not 1 <= len(filenames) <= 16:
             raise InvalidData("Choose one to sixteen ordered gallery-dl JSON files")
         self.working = Path(working_directory or os.getcwd()).resolve(strict=True)
+        self.resolve_local_path = local_path
         self.root_uuid, self.root = Configuration._root(root, self.working, media=True)
         _, self.locks = Configuration._root(locks, self.working, media=False)
         self.root_definition = {"uuid": self.root_uuid, "path": str(self.root.path), "identity": list(self.root.identity)}
@@ -78,7 +80,7 @@ class Converter:
         merged = None
         for filename in filenames:
             path = Path(filename).resolve(strict=True)
-            value = _json_file(path)
+            value = read_document(path)
             if not isinstance(value, dict):
                 raise InvalidData("Gallery-dl configuration must be a JSON object")
             incoming = Setting.read(value, path)
@@ -165,6 +167,8 @@ class Converter:
     def local_path(self, value):
         if not isinstance(value, str) or not value or "${stash:" in value:
             raise InvalidData("Expected an ordinary local gallery-dl path")
+        if self.resolve_local_path is not None:
+            return self.resolve_local_path(value, self.working)
         expanded = os.path.expandvars(os.path.expanduser(value))
         if "$" in expanded or any(ord(c) < 32 for c in expanded):
             raise InvalidData("A local gallery-dl path has an unresolved environment reference")
@@ -293,6 +297,41 @@ class Converter:
                              for kind in ("path", "asset", "private")}}
 
 
+def resolve_layers(value, base, *, path_resolver=_path, read_document=_json_file, scope=True):
+    """Resolve shared gallery-dl files at admission, retaining private references.
+
+    Inventory can translate container paths and conservatively inspect all
+    configured extractors without requiring the gallery-dl runtime (scope=False).
+    """
+    required = {"schema", "root", "locks", "config_files"}
+    optional = {"working_directory", "assets", "source_category", "source_mode", "source_adapter", "scan_mode", "full_history"}
+    if (not isinstance(value, dict) or not required <= value.keys() or value.keys() - required - optional
+            or value["schema"] != LAYERED_SCHEMA or not isinstance(value["config_files"], list)
+            or not 1 <= len(value["config_files"]) <= 16
+            or type(value.get("full_history", False)) is not bool
+            or not isinstance(value.get("assets", []), list) or len(value.get("assets", [])) > 64):
+        raise InvalidData("Invalid layered gallery-dl worker configuration")
+    working = path_resolver(value.get("working_directory", str(base)), base)
+    root, locks = copy.deepcopy(value["root"]), copy.deepcopy(value["locks"])
+    for directory in (root, locks):
+        if not isinstance(directory, dict) or "path" not in directory:
+            raise InvalidData("Layered worker requires a root and lock directory")
+        directory["path"] = str(path_resolver(directory["path"], base))
+    converter = Converter([path_resolver(name, base) for name in value["config_files"]], root, locks,
+                          working_directory=working,
+                          assets=[path_resolver(name, base) for name in value.get("assets", [])],
+                          category=value.get("source_category") if scope else None,
+                          read_document=read_document,
+                          local_path=None if path_resolver is _path else path_resolver)
+    result = converter.convert()
+    for key in ("source_category", "source_mode", "source_adapter", "scan_mode"):
+        if key in value:
+            result[key] = value[key]
+    if value.get("full_history", False):
+        result["gallery"]["skip"] = True
+    return result
+
+
 def publish_profile(destination, value):
     """Publish a new private file atomically; never overwrite live configuration."""
     destination = Path(destination).absolute()
@@ -329,6 +368,8 @@ def main(argv=None):
     parser.add_argument("--source-adapter", choices=("gallery-dl", "yt-dlp"), default="gallery-dl",
                         help="Use gallery-dl site selection or its explicit yt-dlp bridge")
     parser.add_argument("--full-history", action="store_true", help="Preserve the wrappers' global skip=true override in this profile")
+    parser.add_argument("--layered", action="store_true", help="Reference shared JSON files; resolve them for each new caller")
+    parser.add_argument("--scan-mode", choices=("routine", "initial", "recovery"), default="initial")
     parser.add_argument("--output", required=True, help="New, inactive profile file; must not exist")
     args = parser.parse_args(argv)
     try:
@@ -340,6 +381,17 @@ def main(argv=None):
         value['source_adapter'] = args.source_adapter
         if args.full_history:
             value["gallery"]["skip"] = True
+        value['scan_mode'] = args.scan_mode
+        if args.layered:
+            value = {"schema": LAYERED_SCHEMA, "root": value["root"], "locks": value["locks"],
+                     "config_files": [str(Path(name).resolve(strict=True)) for name in args.config],
+                     "working_directory": str(converter.working), "source_mode": args.source_mode,
+                     "source_adapter": args.source_adapter, "scan_mode": args.scan_mode,
+                     "full_history": args.full_history}
+            if args.category:
+                value["source_category"] = args.category
+            if args.asset:
+                value["assets"] = [str(_path(name, converter.working)) for name in args.asset]
         checked = Configuration.from_document(value, Path(args.output).absolute().parent)
         publish_profile(args.output, value)
         print(encode({**converter.report(), "state": "converted", "policy_sha256": checked.policy_sha256,

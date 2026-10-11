@@ -13,13 +13,15 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import sqlite3
 import stat
 import string
 import sys
 
 import source_state_inventory
 
-from stash_ingest.configuration import Configuration, _access_option, _pointer, merge_values
+from stash_ingest.configuration import Configuration, LAYERED_SCHEMA, _access_option, _pointer, merge_values
+from stash_ingest.config_migration import resolve_layers
 from stash_ingest.dedupe import JOURNAL_NAME
 from stash_ingest.dedupe_host import configuration as dedupe_configuration
 from stash_ingest.intake_folder import configuration as intake_configuration
@@ -78,7 +80,7 @@ class Inventory:
     def document(self, path, role="config"):
         return decode_json(self.read(path, role))
 
-    def worker(self, spec):
+    def worker(self, spec, *, saved_document=None):
         required = {"name", "profile", "home", "working_directory", "outboxes"}
         optional = {"path_mappings", "environment", "lock_roots", "source_management", "state_directories"}
         if (not isinstance(spec, dict) or not required <= spec.keys() or spec.keys() - required - optional
@@ -113,7 +115,12 @@ class Inventory:
         # cookie/argument paths follow the worker's explicit cwd/home instead.
         profile_base = absolute(spec["profile"]).parent
         profile = path(spec["profile"])
-        document = self.document(profile, "worker_profile")
+        document = self.document(profile, "worker_profile") if saved_document is None else saved_document
+        if isinstance(document, dict) and document.get("schema") == LAYERED_SCHEMA:
+            # Preserve JSON order and inspect the entire shared configuration.
+            # This is a dependency inventory, not source selection/execution.
+            document = resolve_layers(document, profile_base, path_resolver=path,
+                                      read_document=self.document, scope=False)
         if (not isinstance(document, dict) or document.get("schema") not in SCHEMAS
                 or not isinstance(document.get("bindings"), dict) or not isinstance(document.get("gallery"), dict)):
             raise InvalidArchive("Unknown worker profile schema")
@@ -121,6 +128,20 @@ class Inventory:
             raise InvalidArchive("Too many worker bindings")
         for outbox in spec["outboxes"]:
             self.add(path(outbox), "producer_outbox")
+            if saved_document is None:
+                # Frozen policies can still refer to helpers/archives removed
+                # from the current settings. Retain their dependency closure too.
+                with sqlite3.connect(path(outbox).as_uri() + "?mode=ro", uri=True) as db:
+                    exists = db.execute("SELECT 1 FROM sqlite_schema WHERE name='worker_configurations'").fetchone()
+                    if exists:
+                        rows = db.execute("SELECT document,document_sha256 FROM worker_configurations WHERE profile=? LIMIT 1025",
+                                          (str(absolute(spec["profile"])),)).fetchall()
+                        if len(rows) > 1024:
+                            raise InvalidArchive("Too many saved worker configurations")
+                        for body, expected in rows:
+                            if hashlib.sha256(body).hexdigest() != expected:
+                                raise InvalidArchive("Saved worker configuration changed")
+                            self.worker(spec, saved_document=decode_json(body))
         roots = spec.get("lock_roots", [])
         if not isinstance(roots, list):
             raise InvalidArchive("Invalid worker publication roots")

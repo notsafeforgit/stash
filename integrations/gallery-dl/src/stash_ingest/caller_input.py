@@ -49,6 +49,9 @@ def record_file_call(calls, args):
         if mode == 'traversal' and (since is not None or args.lookback_seconds is not None or args.operation != 'download'):
             raise InvalidData('A traversal scan cannot request a publication-time range or enrichment operation')
         window = windows.normalize({'since': since, 'until': until, **({'basis': 'traversal'} if mode == 'traversal' else {})})
+        if args.profile:
+            from .configuration_store import remember
+            remember(calls.box, profile)
         return {"targets": targets, "root_uuid": root, "policy_sha256": policy, "operation": args.operation,
                 "cooldown_seconds": args.cooldown, "window": window}
 

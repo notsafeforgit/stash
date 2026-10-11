@@ -7,7 +7,7 @@ import uuid
 from stash_ingest import events
 from stash_ingest.client import drain_once
 from stash_ingest.encoding import InvalidData, decode, encode
-from stash_ingest.outbox import Conflict, Outbox
+from stash_ingest.outbox import Conflict, Outbox, SCHEMA
 from helpers import PRODUCER, capture, file_event, receipt
 
 
@@ -134,10 +134,11 @@ class DownloadOutboxTests(unittest.TestCase):
         parent = capture()
         self.box.enqueue(encode(parent))
         before = tuple(self.box.db.execute("SELECT * FROM events").fetchone())
+        self.box.db.execute("DROP TABLE IF EXISTS worker_configurations")
         self.box.db.execute("PRAGMA user_version=15")
         self.box.close()
         self.box = self.open()
-        self.assertEqual(self.box.db.execute("PRAGMA user_version").fetchone()[0], 16)
+        self.assertEqual(self.box.db.execute("PRAGMA user_version").fetchone()[0], SCHEMA)
         self.assertEqual(tuple(self.box.db.execute("SELECT * FROM events").fetchone()), before)
 
     def test_typed_bounded_reports_reject_unverifiable_states_and_secrets(self):

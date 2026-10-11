@@ -193,6 +193,8 @@ def main(argv=None):
                 if args.source_mode is not None and mode != profile.source_mode:
                     raise InvalidData('Caller mode differs from the reviewed worker profile')
                 policy, mode = profile.policy_sha256, profile.source_mode
+                from .configuration_store import remember
+                remember(box, profile)
             intent = requests.enqueue({**({"retrieval_url": args.retrieval_url} if args.retrieval_url else {}), "collection_uuid": args.collection, "collection_revision": args.revision,
                 "policy_sha256": policy, "operation": args.operation, "cooldown_seconds": args.cooldown,
                 "window": {"since": args.since, "until": args.until,
@@ -225,14 +227,23 @@ def main(argv=None):
                       "operation": "download", "source_mode": profile.source_mode, "state": "validated"}
         elif args.command == "execute-run":
             from .configuration import Configuration
+            from .configuration_store import Configurations
             from .worker import execute as execute_source
+            saved = Configurations(box)
+            profile = Configuration(args.profile)
+            saved.remember(profile)
+            run = client._request("GET", "/runs/" + args.run_uuid)
+            policy = run.get("execution_policy_sha256", run.get("policy_sha256"))
+            for row in saved.rows(args.profile):
+                if row["policy_sha256"] == policy and row["root_uuid"] == run.get("root_uuid"):
+                    profile = saved.load(row)
+                    break
             with worker_output():
-                output = execute_source(box, client, Configuration(args.profile), args.run_uuid)
+                output = execute_source(box, client, profile, args.run_uuid)
         elif args.command == "dispatch":
-            from .configuration import Configuration
             from .dispatch import dispatch_once
             with worker_output():
-                output = dispatch_once(box, client, Configuration(args.profile))
+                output = dispatch_once(box, client, args.profile)
         elif args.command == "dispatch-all":
             from .worker_dispatch import Profiles, dispatch_all
             with worker_output():

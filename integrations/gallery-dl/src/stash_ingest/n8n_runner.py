@@ -94,6 +94,8 @@ def main(argv=None):
                         raise InvalidData('n8n date backfills require a publication-window profile')
                     if profile.source_category != platform or profile._gallery.get("skip") is not True:
                         raise InvalidData("n8n backfills require a reviewed service profile with global skip=true")
+                    from .configuration_store import remember
+                    remember(box, profile)
                     return {"version": 1, "root_uuid": profile.root_uuid, "platform": platform, "account": args.identity,
                             "component": args.mode, "policy_sha256": profile.policy_sha256,
                             "window": {"since": None, "until": args.until or datetime.fromtimestamp(box.clock(), timezone.utc).isoformat(timespec="milliseconds")},

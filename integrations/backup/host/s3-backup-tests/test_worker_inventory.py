@@ -383,6 +383,43 @@ class WorkerInventoryTests(unittest.TestCase):
         self.assertEqual(paths.count(str(self.outbox)), 1)
         self.assertEqual(report['worker_lock_roots'], [str(self.root / 'locks')])
 
+    def test_layered_profiles_and_frozen_policy_dependencies_are_backed_up(self):
+        original = self.document
+        base = self.root / 'gallery.json'
+        overlay = self.root / 'n8n-overrides.json'
+        new_cookie = self.root / 'new-cookie.txt'
+        new_cookie.write_text('new-private-value')
+        base.write_text(json.dumps({'extractor': {'base-directory': '/container/media',
+            'archive': ['/container/archives', '{category}.sqlite3'], 'cookies': '/container/new-cookie.txt',
+            'postprocessors': [{'name': 'python', 'function': '/container/helper.py:prepare'}]}}))
+        overlay.write_text(json.dumps({'extractor': {'sleep': 3}}))
+        self.document = {'schema': 'stash-gallery-worker-layers-v1',
+                         'root': dict(original['root'], path='/container/media'),
+                         'locks': dict(original['locks'], path='/container/locks'),
+                         'config_files': ['gallery.json', 'n8n-overrides.json'],
+                         'working_directory': '/container', 'source_category': 'twitter'}
+        virtual = dict(self.spec, profile='/container/profile.json', home='/container',
+                       working_directory='/container', outboxes=['/container/queue.sqlite'],
+                       path_mappings=[{'from': '/container', 'to': str(self.root)}])
+        frozen = json.dumps(original).encode()
+        with sqlite3.connect(self.outbox) as db:
+            db.execute('INSERT INTO worker_configurations(profile,root_uuid,policy_sha256,runtime_sha256,document,document_sha256) VALUES(?,?,?,?,?,?)',
+                       ('/container/profile.json', original['root']['uuid'], 'a'*64, 'b'*64, frozen, hashlib.sha256(frozen).hexdigest()))
+        self.save([virtual])
+        report = collect(str(self.inventory))
+        paths = {c['path'] for c in report['components']}
+        for file in (base, overlay, new_cookie, self.cookies, self.private, self.helper, self.outbox):
+            self.assertIn(str(file), paths)
+        self.assertNotIn(self.secret, json.dumps(report))
+        self.assertNotIn('new-private-value', json.dumps(report))
+
+    def test_changed_saved_policy_stops_backup_dependency_inspection(self):
+        with sqlite3.connect(self.outbox) as db:
+            db.execute('INSERT INTO worker_configurations(profile,root_uuid,policy_sha256,runtime_sha256,document,document_sha256) VALUES(?,?,?,?,?,?)',
+                       (str(self.profile), self.document['root']['uuid'], 'a'*64, 'b'*64, b'{}', 'c'*64))
+        with self.assertRaisesRegex(InvalidArchive, 'Saved worker configuration changed'):
+            collect(str(self.inventory))
+
     def test_private_layers_and_environment_sources_retain_files_without_values(self):
         second = self.root / 'second.json'
         second.write_bytes(json_bytes({'headers': {'additional': self.secret}, 'cookie_path': str(self.cookies)}))

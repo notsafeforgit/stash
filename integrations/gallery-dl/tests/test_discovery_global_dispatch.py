@@ -41,12 +41,12 @@ class GlobalDiscoveryDispatchTests(unittest.TestCase):
 
     def patched_profiles(self, stack):
         result = {}
-        for name, state in (("Dispatcher", "source_succeeded"), ("CollectionDispatcher", "completed"),
+        for name, state in (("ProfileDispatcher", "source_succeeded"), ("CollectionDispatcher", "completed"),
                             ("DiscoveryCollectionDispatcher", "page_delivered")):
             value = stack.enter_context(patch("stash_ingest.worker_dispatch." + name))
             value.return_value.once.return_value = {"state": state}
             result[name] = value
-        for name in ("Configuration", "EnrichmentConfiguration", "DiscoveryConfiguration"):
+        for name in ("EnrichmentConfiguration", "DiscoveryConfiguration"):
             stack.enter_context(patch("stash_ingest.worker_dispatch." + name))
         return result
 
@@ -65,7 +65,7 @@ class GlobalDiscoveryDispatchTests(unittest.TestCase):
             enriched = enrichment_fixtures.EnrichmentDispatchTests.stage(self, box)
             discovered = discovery_fixtures.DiscoveryDispatchTests.stage(self, box)
             with ExitStack() as stack:
-                for name in ("Configuration", "EnrichmentConfiguration", "DiscoveryConfiguration"):
+                for name in ("EnrichmentConfiguration", "DiscoveryConfiguration"):
                     stack.enter_context(patch("stash_ingest.worker_dispatch." + name, side_effect=OSError("private fixture path")))
                 enrich = stack.enter_context(patch("stash_ingest.worker_dispatch.deliver_enrichment", return_value={"state": "completed"}))
                 discover = stack.enter_context(patch("stash_ingest.worker_dispatch.deliver_discovery", return_value={"state": "page_delivered"}))

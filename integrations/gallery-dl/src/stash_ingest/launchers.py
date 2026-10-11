@@ -145,6 +145,8 @@ def main(service, argv=None):
                           + (" (additional lines omitted)" if len(ignored) > 100 else ""), file=sys.stderr)
                 if not targets:
                     raise InvalidData("Saved source list contains no usable targets")
+                from .configuration_store import remember
+                remember(box, profile)
                 return {"targets": targets, "root_uuid": profile.root_uuid, "operation": "download",
                         "policy_sha256": profile.policy_sha256, "cooldown_seconds": 0, "window": window}
 

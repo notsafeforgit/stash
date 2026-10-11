@@ -7,7 +7,7 @@ from .backfill_calls import BackfillCalls, advance_once
 from .client import Unavailable, drain_once
 from .collection_dispatch import CollectionDispatcher
 from .configuration import Configuration, _json_file, _path
-from .dispatch import Dispatcher
+from .profile_dispatch import ProfileDispatcher
 from .discovery_collection_dispatch import DiscoveryCollectionDispatcher
 from .discovery_configuration import DiscoveryConfiguration
 from .discovery_journal import DiscoveryJournal
@@ -111,7 +111,7 @@ class WorkerDispatcher:
                 return {"state": "contended", **deliveries, "profiles": skipped}
             try:
                 if entry["operation"] == "download":
-                    result = Dispatcher(self.box, self.transport, Configuration(entry["profile"])).once()
+                    result = ProfileDispatcher(self.box, self.transport, entry["profile"]).once()
                 elif entry["operation"] == "post.enrich":
                     result = CollectionDispatcher(self.box, self.transport, EnrichmentConfiguration(entry["profile"])).once()
                 elif entry["operation"] == "account.list_page":

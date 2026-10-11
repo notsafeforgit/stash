@@ -51,6 +51,7 @@ func (rs *ingestRoutes) router() http.Handler {
 	r.Route(ingestPath, func(r chi.Router) {
 		r.Get("/capabilities", rs.capabilities)
 		r.Post("/collections/lookup", rs.lookupCollections)
+		r.Post("/subscriptions/list", rs.producerSubscriptions)
 		r.Post("/batches", rs.batch)
 		r.Get("/receipts/{event}", rs.receipt)
 		r.Get("/receipts/{event}/status", rs.receiptStatus)
@@ -195,6 +196,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"source_backfill_protocol":                1,
 		"profile_source_protocol":                 1,
 		"collection_lookup":                       true,
+		"source_subscriptions":                    true,
 		"enrichment_protocol":                     2,
 		"enrichment_dispatch_protocol":            1,
 		"enrichment_source_pacing_protocol":       1,

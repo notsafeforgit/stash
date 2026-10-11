@@ -101,6 +101,34 @@ never reached the setup directory, retry revokes that unusable setup token and
 issues a replacement. An existing completed setup cannot be rebound to a
 different server or folder.
 
+## Optional automatic monitoring
+
+Create a profile/feed source in **Source collections**, select its library folder,
+URL and service namespace, and turn on **Automatic monitoring**. For example, a
+Reddit profile uses `native:reddit` and one `https://www.reddit.com/user/example/`
+URL. Account ownership links let you manage those switches on a performer page;
+feeds and aggregator sources do not need a performer.
+
+After setup, use:
+
+```sh
+stash-gallery monitor --service reddit --dry-run
+stash-gallery monitor --service reddit
+stash-gallery worker
+```
+
+Schedule `monitor` daily and `worker` repeatedly with your existing scheduler.
+An occasional `monitor --service reddit --recovery` uses the lower-priority
+recovery policy. Repeat for your other services. The command uses your saved
+folder, token and shared gallery-dl configuration, with small per-service worker
+profiles. No application API key is needed for routine monitoring.
+
+Turn off a switch in Stash to stop daily and recovery checks. Existing media and
+manual imports remain available; a current scrape can finish, while queued
+monitoring is cancelled. Stash stores generic subscriptions, and the integration
+keeps scheduling, website credentials and extractor settings. New sources and
+incidental post authors are never subscribed automatically.
+
 ## 4. Download and resume
 
 ```sh

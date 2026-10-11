@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { test, expect, chooseSection } from "./test";
 import { account, performer, ids } from "../fixtures/account-review";
+import { collection } from "../fixtures/collections";
 
 test.use({
   expectedConsoleErrors: ["the server responded with a status of 503"],
@@ -14,12 +15,26 @@ async function archive(
     many?: boolean;
     failed?: boolean;
     changedOnNext?: boolean;
+    monitoring?: boolean;
   } = {},
 ) {
   const requests: URL[] = [];
   const writes: string[] = [];
   let failed = options.failed;
   let revision = 3;
+  let monitoring = true;
+  let subscriptionRevision = 1;
+  const subscription = () => ({
+    enabled: monitoring,
+    revision: subscriptionRevision,
+    collection: {
+      ...collection(),
+      label: "Example profile",
+      kind: "account",
+      state: "active",
+      target_url: "https://www.reddit.com/user/example/",
+    },
+  });
   await page.route("**/api/v3/archive/**", async (route) => {
     const url = new URL(route.request().url());
     requests.push(url);
@@ -27,7 +42,22 @@ async function archive(
       writes.push(route.request().method());
     const path = url.pathname;
     let result: unknown;
-    if (path.endsWith("/entity-identities/performer/7")) {
+    if (path.endsWith("/subscriptions")) {
+      result = {
+        items: options.monitoring ? [subscription()] : [],
+        total: options.monitoring ? 1 : 0,
+      };
+    } else if (path.endsWith("/subscription")) {
+      const input = route.request().postDataJSON();
+      expect(input.expected_revision).toBe(subscriptionRevision);
+      monitoring = input.enabled;
+      subscriptionRevision++;
+      result = subscription();
+    } else if (path.endsWith("/stop-monitoring")) {
+      monitoring = false;
+      subscriptionRevision++;
+      result = { stopped: 1 };
+    } else if (path.endsWith("/entity-identities/performer/7")) {
       result = {
         uuid: ids.performer,
         kind: "performer",
@@ -255,3 +285,38 @@ test("a performer changed between pages requires a fresh read", async ({
     page.getByText("Could not load performer sources", { exact: true }),
   ).toHaveCount(0);
 });
+
+for (const desktop of [false, true]) {
+  test(`monitoring can stop individually or for all owned accounts on ${desktop ? "desktop" : "mobile"}`, async ({
+    page,
+  }) => {
+    const remote = await archive(page, { monitoring: true });
+    await openSources(page, desktop);
+    const toggle = page.getByRole("switch", { name: "Example profile" });
+    await expect(toggle).toBeChecked();
+    await toggle.click();
+    await expect(toggle).not.toBeChecked();
+    await expect(toggle).toBeEnabled();
+    await toggle.click();
+    await expect(toggle).toBeChecked();
+    const stop = page.getByRole("button", {
+      name: "Stop monitoring all linked accounts",
+    });
+    await expect(stop).toBeEnabled();
+    await stop.click();
+    await expect(toggle).not.toBeChecked();
+    await expect(
+      page.getByText("Linked to this performer", { exact: true }),
+    ).toBeVisible();
+    expect(remote.writes).toEqual(["PUT", "PUT", "POST"]);
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      )
+      .toBe(true);
+    await page.screenshot({
+      path: `test-results/source-monitoring-${desktop ? "desktop" : "mobile"}.png`,
+      fullPage: true,
+    });
+  });
+}

@@ -1152,7 +1152,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"source_enrichment_waiter_scopes", "source_enrichment_waiters", "source_service_turns",
 			"metadata_request_permits", "source_request_posts", "source_request_metrics", "source_request_permits", "source_request_budgets", "source_check_health",
 			"source_run_attempt_failures", "source_run_attempt_pacing", "enrichment_attempt_pacing", "source_run_pacing", "enrichment_job_pacing", "source_pacing",
-			"source_run_retrievals", "source_run_policy_upgrades", "source_run_requests", "source_run_attempts", "source_run_reviews", "source_runs", "source_run_cooldowns",
+			"source_run_subscriptions", "source_subscriptions", "source_run_retrievals", "source_run_policy_upgrades", "source_run_requests", "source_run_attempts", "source_run_reviews", "source_runs", "source_run_cooldowns",
 			"enrichment_checkpoint_releases", "enrichment_published_records", "enrichment_publications",
 			"enrichment_checkpoints", "enrichment_checkpoint_records", "enrichment_checkpoint_receipts", "enrichment_job_attempts", "enrichment_job_targets",
 			"metadata_worker_attempt_policies", "metadata_worker_policy_upgrades",

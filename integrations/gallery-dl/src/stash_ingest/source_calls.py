@@ -47,13 +47,23 @@ def migrate(db):
 
 
 def definition(value):
-    if not isinstance(value, dict) or set(value) != {"root_uuid", "operation", "policy_sha256", "cooldown_seconds", "window"}:
+    if not isinstance(value, dict) or set(value) - {'subscriptions'} != {"root_uuid", "operation", "policy_sha256", "cooldown_seconds", "window"}:
         raise InvalidData("Caller definitions require a root, operation, policy, cooldown and window")
     if value["root_uuid"] is not None or value["operation"] == "download":
         identifier(value["root_uuid"])
     if (value["operation"] not in ("download", "enrich") or not sha256(value["policy_sha256"])
             or type(value["cooldown_seconds"]) is not int or not 0 <= value["cooldown_seconds"] <= 86400):
         raise InvalidData("Invalid caller source definition")
+    if 'subscriptions' in value:
+        bindings = value['subscriptions']
+        if not isinstance(bindings, dict) or not 1 <= len(bindings) <= 10000:
+            raise InvalidData('Invalid subscription snapshot')
+        for target, binding in bindings.items():
+            target_url(target)
+            if (not isinstance(binding, dict) or set(binding) != {'collection_uuid', 'revision'}
+                    or type(binding['revision']) is not int or not 1 <= binding['revision'] <= 2147483647):
+                raise InvalidData('Invalid subscription binding')
+            identifier(binding['collection_uuid'])
     return {**value, "window": windows.normalize(value["window"])}
 
 
@@ -71,6 +81,8 @@ def snapshot(value):
     if len(targets) > 10000 or len(set(targets)) != len(targets) or sum(len(target.encode()) for target in targets) > 8 << 20:
         raise InvalidData("Caller targets must be unique and bounded")
     spec = definition({key: item for key, item in value.items() if key != "targets"})
+    if 'subscriptions' in spec and set(spec['subscriptions']) != set(targets):
+        raise InvalidData('Every monitored target requires its frozen subscription')
     return spec, targets
 
 
@@ -97,7 +109,7 @@ class SourceCalls:
     def _definition(self, row):
         if digest(row["definition"]) != row["definition_sha256"]:
             raise InvalidData("Caller definition differs from its recorded digest")
-        value = definition(decode(row["definition"], 8192))
+        value = definition(decode(row["definition"], 8 << 20))
         if (row["operation"], row["until_stamp"]) != (value["operation"], value["window"]["until"]):
             raise InvalidData("Caller scheduling fields differ from its frozen definition")
         return value
@@ -138,7 +150,7 @@ class SourceCalls:
         if (self.db.execute("SELECT count(*) FROM source_calls").fetchone()[0] >= self.max_calls
                 or self.db.execute("SELECT count(*) FROM source_call_targets").fetchone()[0] + len(targets) > self.max_targets):
             raise Capacity("Caller capacity exhausted; existing snapshots are retained")
-        now, body = self.box.clock(), encode(spec, 8192)
+        now, body = self.box.clock(), encode(spec, 8 << 20)
         self.db.execute("""INSERT INTO source_calls(uuid,request_sha256,definition,definition_sha256,
             operation,until_stamp,target_count,created_at) VALUES(?,?,?,?,?,?,?,?)""",
             (call_uuid, request_sha256, body, digest(body), spec["operation"], spec["window"]["until"], len(targets), now))
@@ -221,7 +233,12 @@ class SourceCalls:
                 raise InvalidData("Collection binding requires one active match")
             candidate = match["candidates"][0]
             ticket = str(uuid.uuid5(uuid.UUID(delivery.call_uuid), "source/" + str(item["position"])))
-            spec = {key: value for key, value in delivery.definition.items() if key != "root_uuid"}
+            spec = {key: value for key, value in delivery.definition.items() if key not in ("root_uuid", 'subscriptions')}
+            if 'subscriptions' in delivery.definition:
+                binding = delivery.definition['subscriptions'][item['target_url']]
+                if binding['collection_uuid'] != candidate['collection_uuid']:
+                    raise Conflict('Subscription target resolved to a different source collection')
+                spec['subscription_revision'] = binding['revision']
             spec.update(collection_uuid=candidate["collection_uuid"], collection_revision=candidate["collection_revision"])
             if "retrieval_url" in candidate:
                 spec["retrieval_url"] = candidate["retrieval_url"]

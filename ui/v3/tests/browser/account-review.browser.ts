@@ -74,7 +74,8 @@ async function archive(
     requests.push(url);
     const path = url.pathname;
     let result: unknown;
-    if (path.endsWith("/source-accounts")) {
+    if (path.endsWith("/subscriptions")) result = { items: [], total: 0 };
+    else if (path.endsWith("/source-accounts")) {
       lists.push(url);
       if (pageFails) {
         return route.fulfill({ status: 503, json: { error: "unavailable" } });

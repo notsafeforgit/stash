@@ -13,6 +13,7 @@ import (
 
 func removeLibraryFolderSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSourceSubscriptionSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER media_root_scan_revision;
 ALTER TABLE media_roots DROP COLUMN scan_revision;
 ALTER TABLE media_roots DROP COLUMN scan_enabled;

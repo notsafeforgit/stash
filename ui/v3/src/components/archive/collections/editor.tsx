@@ -32,6 +32,7 @@ import { CollectionForm } from "./form";
 import { CollectionHistory } from "./history";
 import { MetadataPolicyEditor } from "../metadata-policy/editor";
 import { ManualIntake } from "../manual-intake/editor";
+import { SourceMonitoring } from "../source-monitoring";
 
 export function CollectionEditor({
   api,
@@ -320,6 +321,17 @@ export function CollectionEditor({
           </CardContent>
         </Card>
       )}
+      {data?.current?.target_url &&
+        data.current.root_uuid &&
+        ["account", "feed", "subreddit", "search", "collection"].includes(
+          data.current.kind,
+        ) && (
+          <SourceMonitoring
+            key={data.current.revision}
+            scope="collection"
+            id={id}
+          />
+        )}
       {data?.current && (
         <MetadataPolicyEditor
           collections={api}

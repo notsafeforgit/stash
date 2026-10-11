@@ -1,9 +1,16 @@
 # Native schema promotion
 
-The current development and production schema is 1000110, as recorded in
-[implementation progress](native-archive-progress.md). New migrations are
-rehearsed on copies before deployment. Schema 1000110 permits independent source
-workers to share a media root while retaining account, target and file fences.
+The development schema is 1000114. The deployed schema and release are recorded
+in [implementation progress](native-archive-progress.md). New migrations are
+rehearsed on copies before deployment. Schema 1000114 adds opt-in monitoring
+subscriptions and immutable associations for scheduled runs, separate from
+source definitions, downloader configuration and manual imports. Existing
+sources default to monitoring off; importing an installation's subscription
+list is an explicit operation. See [source collections](native-source-collections.md).
+
+Schema 1000113 makes library folders and ingestion roots one configuration.
+Schema 1000110 permits independent source workers to share a media root while
+retaining account, target and file fences.
 
 Routine startup validates lineage, the clean supported schema version, required
 tables/columns/indexes/triggers, and unfinished write contexts. It does not scan

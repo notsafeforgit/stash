@@ -177,7 +177,7 @@ func (s *SourceRunStore) Submit(ctx context.Context, producer string, input mode
 		return nil, err
 	}
 	if !validJobTime(now) || !validSourceRunUUID(producer) || !validSourceRunUUID(input.RequestUUID) || !validSourceRunUUID(input.CollectionUUID) ||
-		input.CollectionRevision < 1 || !archive.ValidSHA256(input.PolicySHA256) || (input.Operation != "download" && input.Operation != "enrich") ||
+		input.CollectionRevision < 1 || input.SubscriptionRevision < 0 || !archive.ValidSHA256(input.PolicySHA256) || (input.Operation != "download" && input.Operation != "enrich") ||
 		input.CooldownSeconds < 0 || input.CooldownSeconds > 86400 || maxActive < 1 || maxActive > 100000 {
 		return nil, models.ErrSourceRunInvalid
 	}
@@ -254,6 +254,9 @@ func (s *SourceRunStore) enqueue(ctx context.Context, input models.SourceRunRequ
 	if input.Window.Basis != "" {
 		workDefinition = append(workDefinition, input.Window.Basis)
 	}
+	if input.SubscriptionRevision != 0 {
+		workDefinition = append(workDefinition, struct{ SubscriptionRevision int }{input.SubscriptionRevision})
+	}
 	work, err := sourceRunHash(workDefinition)
 	if err != nil {
 		return nil, false, err
@@ -319,6 +322,20 @@ VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, c.UUID, c.Revision, c.RootUUID, rootRe
 	}
 	if created && input.RetrievalURL != "" {
 		if _, err := dbWrapper.Exec(ctx, "INSERT INTO source_run_retrievals(run_uuid,url) VALUES(?,?)", id, input.RetrievalURL); err != nil {
+			return nil, false, err
+		}
+	}
+	if created && input.SubscriptionRevision != 0 {
+		if _, err := dbWrapper.Exec(ctx, "INSERT INTO source_run_subscriptions(run_uuid,collection_uuid,revision) VALUES(?,?,?)", id, c.UUID, input.SubscriptionRevision); err != nil {
+			return nil, false, err
+		}
+	}
+	if active, err := sourceRunSubscriptionActive(ctx, id); err != nil {
+		return nil, false, err
+	} else if !active {
+		// A delayed producer snapshot gets a durable cancellation receipt, not
+		// a retry loop or a new scrape after the owner has stopped monitoring.
+		if _, err := dbWrapper.Exec(ctx, "UPDATE source_runs SET state='cancelled',error_code='monitoring_stopped',revision=revision+1,updated_at_ms=? WHERE uuid=? AND state IN ('queued','deferred')", now.UnixMilli(), id); err != nil {
 			return nil, false, err
 		}
 	}

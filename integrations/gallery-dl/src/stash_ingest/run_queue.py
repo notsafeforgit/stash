@@ -13,12 +13,15 @@ from . import tickets
 
 def specification(value):
     fields = {"collection_uuid", "collection_revision", "operation", "policy_sha256", "cooldown_seconds", "window"}
-    if not isinstance(value, dict) or set(value) - {"retrieval_url"} != fields:
+    if not isinstance(value, dict) or set(value) - {"retrieval_url", 'subscription_revision'} != fields:
         raise InvalidData("Source requests accept only the typed collection, policy and window fields")
     if "retrieval_url" in value:
         from .collections import target_url
         target_url(value["retrieval_url"])
     identifier(value["collection_uuid"])
+    if 'subscription_revision' in value and (type(value['subscription_revision']) is not int
+            or not 1 <= value['subscription_revision'] <= 2147483647):
+        raise InvalidData('Invalid subscription revision')
     if (type(value["collection_revision"]) is not int or not 1 <= value["collection_revision"] <= 2147483647
             or value["operation"] not in ("download", "enrich") or not sha256(value["policy_sha256"])
             or type(value["cooldown_seconds"]) is not int or not 0 <= value["cooldown_seconds"] <= 86400):

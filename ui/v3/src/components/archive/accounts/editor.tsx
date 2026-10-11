@@ -26,6 +26,7 @@ import { AccountName, AccountOwner, AccountService } from "./shared";
 import { AccountHistory, AccountIdentifiers } from "./evidence";
 import { OwnershipForm } from "./ownership-form";
 import { AccountConsolidation } from "./consolidation";
+import { SourceMonitoring } from "../source-monitoring";
 
 export function AccountEditor({
   api,
@@ -313,6 +314,7 @@ export function AccountEditor({
               onLockChange={setConsolidationLocked}
               onSelect={onSelect}
             />
+            <SourceMonitoring scope="account" id={account.uuid} />
             <AccountIdentifiers
               key={`identifiers:${account.uuid}:${account.revision}`}
               api={api}

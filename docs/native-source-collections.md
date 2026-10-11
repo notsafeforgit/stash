@@ -30,16 +30,37 @@ state is independent of the account's live profile subscription. Each Reddit
 profile has one source URL, such as `https://www.reddit.com/user/example/`.
 New/top submissions and author-search passes are execution details of that source;
 they are not separate editable subscriptions. Pausing or retiring the profile
-blocks all its passes. The n8n add/remove flow registers or disables this one
-source and updates the gallery-dl subscription list. Editing a collection directly
-does not rewrite the saved list.
+blocks all its passes. **Automatic monitoring** is a separate, reversible switch
+on performer source tabs, account review and source collections. Turn it off to
+stop daily and periodic recovery checks while retaining the source, posts and
+media. **Stop monitoring all linked accounts** uses exact current ownership,
+including merge redirects; it never matches performer names or depicted people.
+Manual downloads and initial imports remain independent. Queued monitored runs
+are cancelled; a running attempt can finish delivering its data. An offline
+snapshot cannot start a new attempt after its subscription has changed.
+
+Subscriptions live in the normal Stash database (`source_subscriptions`, schema
+1000114). New sources default off. Migration does not subscribe observed authors
+or all existing collections: deployments explicitly import their intended target
+lists. Routine database backups cover subscriptions with the rest of the archive.
+The authenticated application API reads `/api/v3/archive/subscriptions` and
+changes `/api/v3/archive/collections/{uuid}/subscription` with
+`{"expected_revision": 0, "enabled": true}`. The producer API provides a
+read-only, root-scoped enabled list via `POST /api/v3/ingest/subscriptions/list`
+with `root_uuid`, `namespace` and an optional `after` cursor in the JSON body.
+
+The gallery-dl integration consumes that list; Stash does not hold extractor
+configuration, website credentials, a gallery-dl list-file format or a scheduler.
+Host launchers use `--subscriptions`; n8n source management runtime version 2
+omits `lists` and updates the same subscriptions. Version 1 remains readable for
+already saved workflow plans. Convert automatic callers together before treating
+the Stash switch as authoritative; an explicitly supplied local list remains a
+one-off input and is not monitored subscription work.
 Merely creating or activating a collection does not schedule downloads or assign
 performer metadata.
 Worker activation and metadata policy remain separate operations. Existing
-collections now expose **Edit metadata rules**, including fixed performer
-selection for folder scans. **Media roots** provides folder registration and
-binding review. Historical policy import and live worker activation remain
-unfinished.
+collections expose **Edit metadata rules**, including fixed performer selection
+for folder scans. **Settings → Library** manages folders and their bindings.
 
 ## Account review and incidental authors
 
@@ -259,3 +280,10 @@ validate it against the subscribed profile. Each pass has separate coalescing an
 completion coverage, while the profile permits only one running pass at a time.
 Backfill completion still requires all relevant passes. Current-source edits
 continue to use normal revision checks; they do not rewrite immutable receipts.
+
+When migrating an external scheduler, an owner can attach an existing queued or
+deferred run with `PUT /api/v3/archive/runs/{uuid}/subscription`, passing
+`expected_run_revision` and `subscription_revision`. This checks both revisions
+and preserves the original request, windows, progress and retry deadline. The
+immutable association makes a lost response safe to retry. Select only audited
+automatic runs; manual and initial imports keep their independent intent.

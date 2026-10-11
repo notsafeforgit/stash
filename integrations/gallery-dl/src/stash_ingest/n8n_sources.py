@@ -22,14 +22,15 @@ FORMAT = "stash-n8n-source-request-v1"
 class Runtime:
     def __init__(self, path):
         value = decode(read_regular(path, 256 << 10), 256 << 10)
-        if (not isinstance(value, dict) or set(value) != {"version", "root_uuid", "locks", "state", "lists", "new_source_policy"}
-                or type(value["version"]) is not int or value["version"] != 1
-                or not isinstance(value["lists"], dict) or set(value["lists"]) != {"reddit", "twitter"}):
+        if (not isinstance(value, dict) or type(value.get('version')) is not int or value['version'] not in (1, 2)
+                or set(value) != {"version", "root_uuid", "locks", "state", "new_source_policy"} | ({'lists'} if value['version'] == 1 else set())
+                or value['version'] == 1 and (not isinstance(value["lists"], dict) or set(value["lists"]) != {"reddit", "twitter"})):
             raise InvalidData("Configure the reviewed native source-management runtime")
+        self.version = value['version']
         self.root = identifier(value["root_uuid"])
         self.locks, self.state = (self.directory(value[key]) for key in ("locks", "state"))
-        self.lists = {platform: self.filename(filename) for platform, filename in value["lists"].items()}
-        if len(set(self.lists.values())) != 2:
+        self.lists = {platform: self.filename(filename) for platform, filename in value.get("lists", {}).items()}
+        if self.version == 1 and len(set(self.lists.values())) != 2:
             raise InvalidData("Each service needs its own saved source list")
         self.policy = source_policy.definition(value["new_source_policy"])
         if self.policy["enabled"] is not True or self.policy["apply_to_scans"] is not False:
@@ -237,6 +238,10 @@ def run(app, policies, producer, runtime, value, call):
             # Return the original result after later owner edits, without
             # issuing new writes or claiming a current scrape has completed.
             return receipt["result"]
+        if runtime.version == 2:
+            from . import n8n_subscriptions
+            plan = load(plan_path) if plan_path.exists() else n8n_subscriptions.prepare(app, policies, producer, runtime, value, directory, call)
+            return n8n_subscriptions.apply(app, policies, producer, runtime, value, directory, plan)
         plan = load(plan_path) if plan_path.exists() else prepare(app, policies, producer, runtime, value, directory, call)
         return apply(app, policies, producer, runtime, value, directory, plan)
 

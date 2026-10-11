@@ -267,6 +267,30 @@ def check_capabilities(value, state):
         raise InvalidData('Stash must support native file intake and source runs at the selected folder')
 
 
+def monitoring_profile(directory, service, recovery):
+    """Use the setup's shared config; only traversal policy differs per service."""
+    mode = 'recovery' if recovery else 'routine'
+    name = f'monitor-{service}-{mode}'
+    path = directory / (name + '.json')
+    with (directory / 'monitoring.lock').open('a') as lock:
+        os.chmod(lock.name, 0o600)
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        value = read_private(directory / 'gallery-worker.json')
+        value.update(source_mode='published', source_category=service, scan_mode=mode, full_history=recovery)
+        Configuration.from_document(value, directory).check()
+        ensure_document(path, value)
+        dispatch_path = directory / 'dispatch.json'
+        dispatch = read_private(dispatch_path)
+        entry = {'id': name, 'operation': 'download', 'profile': str(path)}
+        previous = [item for item in dispatch['profiles'] if item['id'] == name]
+        if previous and previous != [entry]:
+            raise InvalidData('Monitoring dispatcher entry has changed')
+        if not previous:
+            dispatch['profiles'].append(entry)
+            publish(dispatch_path, encode(dispatch, LIMIT), replace=True)
+    return path
+
+
 def main(argv=None):
     default = Path(os.environ.get('XDG_STATE_HOME', str(Path.home() / '.local/state'))) / 'stash-gallery'
     parser = argparse.ArgumentParser(description='Download into Stash with gallery-dl and resume saved work.')
@@ -284,6 +308,10 @@ def main(argv=None):
     commands.add_parser('status', help='Local durable queue counts; does not contact websites')
     commands.add_parser('drain', help='Send saved events to Stash without scraping')
     commands.add_parser('worker', help='Perform one background dispatch; schedule repeatedly to drain queued work')
+    monitor = commands.add_parser('monitor', help='Queue enabled Stash subscriptions for one service; schedule daily')
+    monitor.add_argument('--service', required=True, choices=('reddit', 'twitter', 'instagram', 'coomer', 'kemono', 'bluesky', 'tiktok'))
+    monitor.add_argument('--recovery', action='store_true', help='Lower-priority periodic historical recovery')
+    monitor.add_argument('--dry-run', action='store_true', help='Preview enabled URLs without queuing source work')
     download = commands.add_parser('download', help='Register and download source URLs using the existing producer')
     download.add_argument('urls', nargs='*')
     download.add_argument('-i', '--input-file', action='append', default=[])
@@ -332,6 +360,15 @@ def main(argv=None):
             import logging
             from gallery_dl import output
             output.initialize_logging(logging.WARNING)
+            if args.command == 'monitor':
+                from stash_ingest.launchers import main as launcher_main
+                profile = monitoring_profile(directory, args.service, args.recovery)
+                options = common + ['--profile', str(profile), '--subscriptions']
+                if args.recovery:
+                    options.append('--recovery')
+                if args.dry_run:
+                    options.append('--dry-run')
+                return launcher_main(args.service, options)
             if args.command in ('download', 'resume'):
                 options = common + ['--runtime', str(directory / 'manual.json'), '--api-key-env', args.api_key_env]
                 if args.command == 'resume':

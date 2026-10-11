@@ -37,6 +37,7 @@ type Repository struct {
 	SourceAccount               SourceAccountReaderWriter
 	MediaRoot                   MediaRootReaderWriter
 	SourceCollection            SourceCollectionReaderWriter
+	SourceSubscription          SourceSubscriptionReaderWriter
 	CapturePublisher            CapturePublisherReaderWriter
 	Ingest                      IngestReaderWriter
 	ArchiveJob                  ArchiveJobReaderWriter

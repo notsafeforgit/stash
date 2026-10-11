@@ -18,6 +18,7 @@ from .encoding import InvalidData, digest, encode, identifier
 from .launcher_inputs import date_min, instagram_list, instagram_target, mirror_list, mirror_target, reddit_list, reddit_name, reddit_urls, social_list, social_target, twitter_list, twitter_target
 from .outbox import Capacity, Outbox
 from .source_calls import SourceCalls
+from .subscriptions import NoSubscriptions, subscribed_targets
 from . import windows
 
 URL_SERVICES = ('coomer', 'kemono', 'bluesky', 'tiktok')
@@ -26,6 +27,7 @@ URL_SERVICES = ('coomer', 'kemono', 'bluesky', 'tiktok')
 def parser_for(service):
     parser = argparse.ArgumentParser(description=f"Record native {service} scrape requests; source execution runs through the dispatcher.")
     targets = parser.add_mutually_exclusive_group()
+    targets.add_argument('--subscriptions', action='store_true', help='Read enabled source subscriptions from Stash; no local target list')
     targets.add_argument('--url' if service in URL_SERVICES else '--username', dest='username')
     if service == "twitter":
         targets.add_argument("--user-id", "--gid", dest="user_id")
@@ -36,8 +38,7 @@ def parser_for(service):
         parser.add_argument("--date-min")
         parser.add_argument("--date-min-relative")
         parser.add_argument("--date-min-days", type=int)
-    parser.add_argument("--config-file", default=os.environ.get(service.upper() + "_LIST_CONFIG",
-                        str(Path.home() / ".config/gallery-dl" / (service + "-list.conf"))))
+    parser.add_argument("--config-file", help='Explicit local list for a one-off run; use --subscriptions for automatic monitoring')
     parser.add_argument("--recovery", action="store_true", help="Use the lower-priority historical recovery profile, including alternative Reddit searches")
     parser.add_argument("--full-history", action="store_true", help="Use the reviewed global skip=true profile")
     parser.add_argument("--strict-errors", action="store_true", help="Exit 0 only after this caller's source work is confirmed complete")
@@ -54,21 +55,27 @@ def parser_for(service):
 
 
 def options(service, args):
+    if args.subscriptions and (args.config_file or service == 'reddit' and args.saved):
+        raise InvalidData('Subscription runs use the API list, including any subscribed saved-post feed')
+    config_file = args.config_file or os.environ.get(service.upper() + '_LIST_CONFIG',
+        str(Path.home() / '.config/gallery-dl' / (service + '-list.conf')))
     full_history = args.recovery or args.full_history or (service == "reddit" and args.mode == "top")
     profile_env = "STASH_INGEST_" + service.upper() + ("_RECOVERY_PROFILE" if args.recovery else "_FULL_HISTORY_PROFILE" if full_history else "_PROFILE")
     profile = args.profile or os.environ.get(profile_env)
     if service == "twitter":
         direct = twitter_target(args.username, "user") if args.username else twitter_target(args.user_id, "id") if args.user_id else None
-        source = {"url": direct} if direct else {"list_file": str(Path(args.config_file).absolute())}
+        source = {"url": direct} if direct else {"list_file": str(Path(config_file).absolute())}
     elif service == "instagram":
-        source = {"url": instagram_target(args.username)} if args.username else {"list_file": str(Path(args.config_file).absolute())}
+        source = {"url": instagram_target(args.username)} if args.username else {"list_file": str(Path(config_file).absolute())}
     elif service in URL_SERVICES:
         target = mirror_target if service in ('coomer', 'kemono') else social_target
-        source = {'url': target(args.username, service)} if args.username else {'list_file': str(Path(args.config_file).absolute())}
+        source = {'url': target(args.username, service)} if args.username else {'list_file': str(Path(config_file).absolute())}
     else:
         source = ({"user": reddit_name(args.username)} if args.username else
                   {"subreddit": reddit_name(args.subreddit, "subreddit")} if args.subreddit else
-                  {"list_file": str(Path(args.config_file).absolute())})
+                  {"list_file": str(Path(config_file).absolute())})
+    if args.subscriptions:
+        source = {'subscriptions': True}
     result = {"launcher": service + "-v1", "source": source, "full_history": bool(full_history),
               "profile": str(Path(profile).absolute()) if profile else None, "until": args.until}
     if service == "reddit":
@@ -119,7 +126,7 @@ def main(service, argv=None):
     args = parser_for(service).parse_args(argv)
     try:
         value = options(service, args)
-        if args.dry_run:
+        if args.dry_run and not args.subscriptions:
             targets, window, ignored = expand(service, value, time.time())
             print(json.dumps({"state": "preview", "targets": targets, "window": window,
                               "full_history": value["full_history"], "ignored_lines": ignored}, sort_keys=True))
@@ -127,6 +134,12 @@ def main(service, argv=None):
         if not all((args.outbox, args.endpoint, args.producer, value["profile"])):
             raise InvalidData("Configure the native outbox, endpoint, producer and matching service profile")
         call = caller_uuid(service, args.producer, args.call, value.get("mode"))
+        if args.subscriptions and args.dry_run:
+            profile = Configuration(value['profile'])
+            targets, _ = subscribed_targets(Client(args.endpoint, args.producer, token_env=args.token_env),
+                profile.root_uuid, service, mode=value.get('mode', 'new'), recovery=value['full_history'])
+            print(json.dumps({'state': 'preview', 'targets': targets}, sort_keys=True))
+            return 0
         with closing(Outbox(args.outbox, args.endpoint, args.producer)) as box:
             calls = SourceCalls(box)
 
@@ -139,7 +152,20 @@ def main(service, argv=None):
                     raise InvalidData('Date-based launchers require a publication-window profile')
                 if value["full_history"] and profile._gallery.get("skip") is not True:
                     raise InvalidData("Full-history and top scans require a reviewed profile with global skip=true")
-                targets, window, ignored = expand(service, value, box.clock())
+                monitors = None
+                if args.subscriptions:
+                    targets, monitors = subscribed_targets(Client(args.endpoint, args.producer, token_env=args.token_env),
+                        profile.root_uuid, service, mode=value.get('mode', 'new'), recovery=value['full_history'])
+                    # The subscription owns its target URL. Date windows still
+                    # come from this scheduler invocation, not application state.
+                    window = windows.normalize({'since': date_min(value['date_min'], value['date_min_relative'],
+                        value['date_min_days'], box.clock()) if service == 'reddit' else None,
+                        'until': value['until'] or datetime.fromtimestamp(box.clock(), timezone.utc).isoformat(timespec='milliseconds')})
+                    ignored = []
+                    if not targets:
+                        raise NoSubscriptions
+                else:
+                    targets, window, ignored = expand(service, value, box.clock())
                 if ignored:
                     print("Ignored saved-list line numbers: " + ",".join(map(str, ignored[:100]))
                           + (" (additional lines omitted)" if len(ignored) > 100 else ""), file=sys.stderr)
@@ -147,16 +173,24 @@ def main(service, argv=None):
                     raise InvalidData("Saved source list contains no usable targets")
                 from .configuration_store import remember
                 remember(box, profile)
-                return {"targets": targets, "root_uuid": profile.root_uuid, "operation": "download",
+                definition = {"targets": targets, "root_uuid": profile.root_uuid, "operation": "download",
                         "policy_sha256": profile.policy_sha256, "cooldown_seconds": 0, "window": window}
+                if monitors is not None:
+                    definition['subscriptions'] = monitors
+                return definition
 
             recorded = calls.record(call, digest(encode(value, 16384)), prepare)
+            if 'subscriptions' in recorded['definition']:
+                recorded['definition'] = {k: v for k, v in recorded['definition'].items() if k != 'subscriptions'}
             result = {"call_uuid": call, "state": "recorded", "call": recorded, "intake_completion": "inspect_native_receipts"}
             if args.strict_errors:
                 result["completion"] = inspect_call(calls, Client(args.endpoint, args.producer, token_env=args.token_env), call)
                 result["state"] = result["completion"]["state"]
             print(json.dumps(result, sort_keys=True))
             return 0 if not args.strict_errors or result["state"] == "source_succeeded" else 2
+    except NoSubscriptions:
+        print(json.dumps({'state': 'idle', 'reason': 'no_enabled_subscriptions'}))
+        return 0
     except (InvalidData, Unavailable, Capacity) as error:
         print(str(error), file=sys.stderr)
     except (OSError, sqlite3.Error):

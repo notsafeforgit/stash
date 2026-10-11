@@ -19,14 +19,15 @@ type SourceWindow struct {
 // PolicySHA256 identifies the effective, secret-free worker configuration and
 // adapter version. It never contains executable commands or website logins.
 type SourceRunRequest struct {
-	RetrievalURL       string       `json:"retrieval_url,omitempty"`
-	RequestUUID        string       `json:"request_uuid"`
-	CollectionUUID     string       `json:"collection_uuid"`
-	CollectionRevision int          `json:"collection_revision"`
-	Operation          string       `json:"operation"` // download or enrich
-	PolicySHA256       string       `json:"policy_sha256"`
-	Window             SourceWindow `json:"window"`
-	CooldownSeconds    int          `json:"cooldown_seconds"`
+	SubscriptionRevision int          `json:"subscription_revision,omitempty"`
+	RetrievalURL         string       `json:"retrieval_url,omitempty"`
+	RequestUUID          string       `json:"request_uuid"`
+	CollectionUUID       string       `json:"collection_uuid"`
+	CollectionRevision   int          `json:"collection_revision"`
+	Operation            string       `json:"operation"` // download or enrich
+	PolicySHA256         string       `json:"policy_sha256"`
+	Window               SourceWindow `json:"window"`
+	CooldownSeconds      int          `json:"cooldown_seconds"`
 }
 
 type SourceRun struct {

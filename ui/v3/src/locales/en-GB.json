@@ -4065,5 +4065,16 @@
     "restart_required": "Restart required",
     "pending_disable": "Source tracking is still running. Restart Stash to turn it off.",
     "pending_enable": "Source tracking is still off. Restart Stash to turn it on."
+  },
+  "source_monitoring": {
+    "refresh": "Refresh monitoring",
+    "title": "Automatic monitoring",
+    "help": "Your scheduled worker checks enabled sources daily and during periodic recovery. Turning a source off cancels queued monitoring; a scrape already running can finish. Existing media and manual imports are preserved.",
+    "inactive": "Activate this source before enabling monitoring.",
+    "loading": "Updating monitoring",
+    "failed": "Could not confirm monitoring settings",
+    "failed_help": "Refresh to check the current setting before trying again.",
+    "empty": "No configured scrape sources",
+    "stop_performer": "Stop monitoring all linked accounts"
   }
 }

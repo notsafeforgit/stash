@@ -130,6 +130,21 @@ class GallerySetupTests(unittest.TestCase):
         return self.command('setup', '--endpoint', self.remote.endpoint, '--root', ROOT,
                             '--media-path', str(self.media), *args)
 
+    def test_monitoring_profiles_share_config_and_are_registered_for_dispatch(self):
+        self.assertEqual(self.install()[0], 0)
+        original = json.loads((self.directory / 'gallery-worker.json').read_text())
+        routine = setup.monitoring_profile(self.directory, 'reddit', False)
+        recovery = setup.monitoring_profile(self.directory, 'reddit', True)
+        setup.monitoring_profile(self.directory, 'reddit', False)
+        for path, mode in ((routine, 'routine'), (recovery, 'recovery')):
+            document = json.loads(path.read_text())
+            self.assertEqual(document['config_files'], original['config_files'])
+            self.assertEqual(document['scan_mode'], mode)
+            self.assertEqual(document['source_mode'], 'published')
+            self.assertEqual(document['source_category'], 'reddit')
+        dispatch = json.loads((self.directory / 'dispatch.json').read_text())
+        self.assertEqual(len(dispatch['profiles']), 4)
+
     def test_setup_repeat_check_and_foreground_use_existing_contracts(self):
         before_runtime = runtime_identity()
         code, output, error = self.install()

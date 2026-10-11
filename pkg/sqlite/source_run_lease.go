@@ -51,6 +51,12 @@ func (s *SourceRunStore) Claim(ctx context.Context, id, producer, owner, policy 
 	if row.State != "queued" || row.Available > now.UnixMilli() {
 		return nil, nil
 	}
+	if active, err := sourceRunSubscriptionActive(ctx, id); err != nil {
+		return nil, err
+	} else if !active {
+		_, err := dbWrapper.Exec(ctx, "UPDATE source_runs SET state='cancelled',error_code='monitoring_stopped',revision=revision+1,updated_at_ms=? WHERE uuid=?", now.UnixMilli(), id)
+		return nil, err
+	}
 	r, err := row.resolve(ctx)
 	if err != nil {
 		return nil, err

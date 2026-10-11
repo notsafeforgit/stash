@@ -7,6 +7,17 @@ import (
 )
 
 func validateSourceRunSchema(conn *sqlx.DB, version uint, auditData bool) error {
+	if version >= NativeSchemaBaseline+114 {
+		for _, name := range []string{"source_subscriptions", "source_subscriptions_enabled", "source_subscription_revision", "source_run_subscriptions", "source_run_subscriptions_collection", "source_run_subscription_immutable"} {
+			var exists bool
+			if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+				return err
+			}
+			if !exists {
+				return fmt.Errorf("native database schema is incomplete: missing %s", name)
+			}
+		}
+	}
 	if version >= NativeSchemaBaseline+110 {
 		var unique bool
 		if err := conn.Get(&unique, `SELECT "unique" FROM pragma_index_list('source_runs') WHERE name='source_runs_running_destination'`); err != nil {

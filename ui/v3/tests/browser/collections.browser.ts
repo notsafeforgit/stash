@@ -52,6 +52,10 @@ async function archive(
   let refreshFails = false;
   await page.route("**/api/v3/archive/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/subscriptions")) {
+      await route.fulfill({ json: { items: [], total: 0 } });
+      return;
+    }
     if (url.pathname.endsWith("/page-info")) {
       const resource = url.searchParams.get("resource");
       const entries =

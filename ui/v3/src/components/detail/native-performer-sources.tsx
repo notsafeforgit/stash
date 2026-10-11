@@ -1,4 +1,5 @@
 import { ProviderMetadataHistory } from "./provider-metadata-history";
+import { SourceMonitoring } from "../archive/source-monitoring";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
@@ -318,6 +319,7 @@ export function NativePerformerSources({ localId }: { localId: string }) {
       )}
       {data && (
         <>
+          <SourceMonitoring scope="performer" id={data.performer.uuid} />
           {String(data.performer.local_id) !== localId && (
             <Alert>
               <AlertTitle>

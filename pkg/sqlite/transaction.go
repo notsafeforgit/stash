@@ -213,6 +213,7 @@ func (db *Database) Repository() models.Repository {
 		SourceAccount:               &SourceAccountStore{},
 		MediaRoot:                   &MediaRootStore{},
 		SourceCollection:            &SourceCollectionStore{},
+		SourceSubscription:          &SourceSubscriptionStore{},
 		CapturePublisher:            &CapturePublisherStore{},
 		Ingest:                      &IngestStore{},
 		SourceEvidence:              &SourceEvidenceStore{gallery: db.Gallery},

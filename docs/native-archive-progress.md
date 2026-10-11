@@ -8,6 +8,31 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Imported folder ownership gaps — repaired, 2026-10-11 UTC
+
+The post-based association repair never visited imported accounts with folders
+but no post-account claims. The later profile-URL pass deliberately left name-only
+matches unresolved. This omitted `hppywifehppylife18`, despite its unique existing
+performer #414 and 1,052 scenes plus 51 images already attributed to that performer
+in the imported author folder.
+
+A targeted account-level repair linked 60 such accounts: 30 Reddit, 29 Twitter
+and one Instagram. Each required a recognized imported author folder whose typed
+identifiers uniquely resolved to that account, one exact performer name/alias
+match, existing performer attribution on media in that folder, no competing
+performer profile URL and no prior ownership choice. All 60 lacked post-account
+claims. Writes used the normal revision-guarded ownership preview/apply APIs;
+all saved receipts and resulting links were verified. The 1,067 existing choices
+were preserved. No source request, media rescan or deployment was needed.
+
+There are now 29 tracked undecided accounts: 27 without an exact performer match,
+`cocosfilth` with two performer candidates, and `mladlenafisher` whose imported
+collection points at the library root rather than a corroborated author folder.
+These were left for review. Plans, evidence, requests and verification are under
+`.local/account-folder-owners-20261011/`; the authoritative ownership decisions
+are in the main database and its ordinary backup coverage. This historical data
+repair does not enable general name-only matching for newly scraped publishers.
+
 ## Unified library folders — deployed, 2026-10-11 UTC
 
 Settings → Library now edits the native folder records used by scans and

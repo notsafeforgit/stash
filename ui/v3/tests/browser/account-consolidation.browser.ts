@@ -84,7 +84,8 @@ async function archive(
     const path = url.pathname;
     reads.push(url);
     let result: unknown;
-    if (path.endsWith("/source-accounts")) {
+    if (path.endsWith("/subscriptions")) result = { items: [], total: 0 };
+    else if (path.endsWith("/source-accounts")) {
       lists.push(url);
       result = [source, target].filter(
         (row) => row.uuid === row.canonical_uuid,

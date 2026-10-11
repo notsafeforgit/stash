@@ -8,6 +8,8 @@ from pathlib import Path
 import sys
 from unittest.mock import patch
 
+from http_fixture_runtime import use_recorded_metadata_version
+
 from stash_ingest.cli import main
 from stash_ingest.client import Client
 from stash_ingest.encoding import decode, encode
@@ -19,6 +21,8 @@ from stash_ingest.enrichment_worker import execute
 from stash_ingest.outbox import Outbox
 from stash_ingest.runs import SourcePaused
 
+
+use_recorded_metadata_version()
 
 setup = json.load(sys.stdin)
 directory = Path(setup["directory"])

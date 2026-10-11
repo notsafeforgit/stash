@@ -8,6 +8,8 @@ from pathlib import Path
 import sys
 from unittest.mock import patch
 
+from http_fixture_runtime import use_recorded_metadata_version
+
 from stash_ingest.cli import main
 from stash_ingest.client import Client
 from stash_ingest.discovery_configuration import DiscoveryConfiguration, SCHEMA
@@ -18,6 +20,8 @@ from stash_ingest.job_lease import JobLease
 from stash_ingest.outbox import Conflict, Outbox
 from stash_ingest.runs import SourcePaused
 
+
+use_recorded_metadata_version()
 
 setup = json.load(sys.stdin)
 directory = Path(setup["directory"])

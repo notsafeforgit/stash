@@ -9,6 +9,8 @@ import sys
 import time
 from unittest.mock import patch
 
+from http_fixture_runtime import use_recorded_metadata_version
+
 from stash_ingest.cli import main
 from stash_ingest.client import Client
 from stash_ingest.discovery_detail_client import DiscoveryDetailClient
@@ -18,6 +20,8 @@ from stash_ingest.discovery_detail_journal import DiscoveryDetailJournal
 from stash_ingest.discovery_detail_worker import execute
 from stash_ingest.encoding import decode, encode
 from stash_ingest.outbox import Outbox
+
+use_recorded_metadata_version()
 
 setup = decode(sys.stdin.buffer.read(), preserve_numbers=True)
 directory = Path(setup["directory"])

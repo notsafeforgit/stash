@@ -8,7 +8,7 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
-## Unified library folders — implementation, 2026-10-11 UTC
+## Unified library folders — deployed, 2026-10-11 UTC
 
 Settings → Library now edits the native folder records used by scans and
 ingestion. The former Media roots navigation entry is removed and its route
@@ -18,8 +18,30 @@ Offline and disabled folders retain their paths and survive cleanup.
 
 Schema 1000113 promotes the old YAML folder list once, reusing existing root
 UUIDs and bindings and preserving scan exclusions. The YAML writer is removed;
-the remaining GraphQL list reads the database. Publication and live migration
-are pending. See the [folder contract](native-ingestion.md#library-folders-and-logical-roots).
+the remaining GraphQL list reads the database. See the
+[folder contract](native-ingestion.md#library-folders-and-logical-roots).
+
+The [source release](https://github.com/notsafeforgit/stash/actions/runs/38116952799)
+and [wrapper release](https://github.com/notsafeforgit/stash-s6/actions/runs/38118051680)
+published `c7c60309c750df3b48bc87986bd021a316b7504b`.
+The source digest is
+`sha256:9db9af15e2b8e27ce974c8ecd0951d7f82febb7ea5e12be771b3aa8f77ac46e9`;
+production runs wrapper digest
+`sha256:96d4f75b9b52ad174cdda1aa532dd091cca4d96fd7afdaf85bfb17d65c5b640f`.
+The migration finished successfully and retained its local pre-113 backup.
+The `/media/porn` folder retains UUID `f549662a-1dd1-5363-9d92-7f8067259aeb`
+and binding revision 2, with image and video scanning enabled at scan revision 1.
+Its configuration import checkpoint is published and the old YAML list is gone.
+
+The full `make validate-fork` and GitHub release gates passed. All 42 targeted
+Chromium/WebKit checks and the
+[full browser workflow](https://github.com/notsafeforgit/stash/actions/runs/38116952801)
+passed. Read-only checks of the actual deployed mobile and desktop settings
+confirmed the folder values and old-route redirect without submitting edits.
+The backup declaration now uses the matching published Stash reader. n8n and
+producer runtimes were unchanged, and site worker timers remained active.
+Private release, migration and browser evidence is under
+`.local/library-folders-20261011/`.
 
 ## Metadata gap recovery — deployed, 2026-10-11 UTC
 

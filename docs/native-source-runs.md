@@ -32,7 +32,9 @@ Reviewed `stash-gallery-worker-v1` profiles have a `scan_mode`:
   accept `--recovery` and select `STASH_INGEST_<SITE>_RECOVERY_PROFILE`. Reddit
   includes its alternative author searches in this mode. Production recovery
   schedules run weekly, independently of daily routine checks; an existing
-  running service is not started again by its timer.
+  running service is not started again by its timer. The weekly Twitter profile
+  selects the broader timeline traversal and its search fallbacks, using remote
+  search cursors. Initial profile imports retain one n8n worker per site.
 
 Profile files and runtime modules contribute to the execution policy hash.
 Updating existing work requires native policy upgrades that preserve original

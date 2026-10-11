@@ -8,6 +8,54 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Scrape request efficiency — deployed, 2026-10-11 UTC
+
+Reddit and Twitter now persist remote page cursors and the last completed
+attachment within each page. Partial pages replay safely; existing item-only
+checkpoints catch up to their anchor before adopting page checkpoints. Routine
+checks use one recent listing with a four-post overlap. Broader Reddit searches
+and Twitter timeline/search recovery run weekly at lower priority. Other
+extractors retain item-based resume until a dedicated page adapter is available.
+
+Host and n8n producers share per-service source request budgets. Waiting daily
+checks take priority over initial imports and historical recovery, while media
+transfers remain concurrent. Archive activity shows request, rate-limit, error,
+new/repeated-post and overdue-account metrics with exact pagination totals.
+Automatic per-post enrichment and duplicate listing workers are unscheduled;
+normal downloads retain the metadata in their original source responses.
+See [scrape requests and checkpoints](native-source-runs.md) for the resulting
+metadata tradeoffs, request spacing and checkpoint semantics.
+
+The [source release](https://github.com/notsafeforgit/stash/actions/runs/38106587355)
+and [wrapper release](https://github.com/notsafeforgit/stash-s6/actions/runs/38106875736)
+published source `c3e368ed5226a52a282ac2481f787a36726bc6f3`.
+The source digest is
+`sha256:04f4bf8d74357f47544131b57c983dbb8eaec0c6acc1fecc087ece572e6a7879`;
+production uses wrapper digest
+`sha256:fc926cd3949de7ff2d47a8dcef3e596a5f0e6429b459127088f66a39484cc4c7`.
+Schema 1000111 finished successfully, retaining the local pre-migration copy.
+The installed producer is from `3fd7dec0dce2a71f2df48fc57c81d0b717f3eefc`;
+the later source change only fixes the metrics panel's expanded state and tests.
+All 132 producer modules match in the host environment and n8n's read-only
+overlay. The n8n image and pinned SQLite runtime remain unchanged.
+
+The handoff recovered two interrupted leases and upgraded 1,700 pending runs
+through the API without changing their original requests, windows or progress.
+Existing legacy holds and metadata recovery records were preserved. Original
+worker and launcher timers resumed at 03:15 UTC; initial imports retain one n8n
+worker per site. The backup inventory now includes weekly recovery settings,
+the matching published Stash reader and retained producer runtime.
+
+`make validate-fork` passed, including 809 UI unit tests and 698 producer tests.
+The [complete browser workflow](https://github.com/notsafeforgit/stash/actions/runs/38106587416)
+passed all Chromium and WebKit shards. Live desktop/mobile checks verified
+metrics rendering and account-check pagination against 2,249 API results.
+Routine Reddit and Twitter runs have completed under the new budget, initial
+imports are running, and a queued Reddit retry retains a remote page cursor.
+The observed retry reports a removed Redgifs item, rather than a budget or
+checkpoint failure. Ordinary queued work is not implied to be finished.
+Private deployment and live evidence are under `.local/scrape-efficiency-20261011/`.
+
 ## Pagination totals — deployed, 2026-10-11 UTC
 
 Previous/Next archive views now show a localized page position, total pages and

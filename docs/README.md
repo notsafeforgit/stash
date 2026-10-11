@@ -28,6 +28,7 @@ provides the frozen fallback for users who do not migrate.
 | [Metadata policy migration](native-metadata-policy-migration.md) | Retained plugin/folder settings, explicit conversions and resumable native policy imports |
 | [Native source albums](native-source-albums.md) | Ordered post attachments, partial downloads, gallery membership, and source-evidence requirements |
 | [Native ingestion](native-ingestion.md) | Scoped ingestion, receipts, verified files, source-run coordination, native metadata policies, and preview/apply contracts |
+| [Scrape requests and checkpoints](native-source-runs.md) | Remote-page resume, routine and historical checks, shared request budgets, metadata reuse and scrape metrics |
 | [Native bulk updates](native-bulk-updates.md) | Completed versus queued edits, caller conversion, cache refresh and host helpers |
 | [Native entity queries](native-queries.md) | Filter expressions, explicit IDs, full-selection totals and converted clients |
 | [Portable native archives](native-archive-format.md) | Compressed database/artwork snapshots, explicit operating-state components, verified restores and offline inspection |
@@ -70,7 +71,8 @@ installation and community links; those downloads are mainline releases.
   is the requested full implementation plan for retiring v2.5 compatibility,
   promoting fork storage, importing existing catalogs, and moving gallery-dl
   and n8n to native ingestion. It includes migration, backup, cutover, and
-  verification requirements; the production transition has not been executed.
+  verification requirements; the progress record tracks the completed cutover
+  and remaining owner review.
 - The [TV implementation plan](../ui/v3/docs/tv-mode-plan.md) records the
   accepted scope and performance constraints behind the implemented feature.
 - The [2026-09-08 v3 quality audit](../ui/v3/docs/quality-audit-2026-09-08.md)
@@ -78,8 +80,8 @@ installation and community links; those downloads are mainline releases.
   offline deployment isolation with migration and recovery.
 - [Retiring v2.5 compatibility](v3-schema-promotion.md) is the earlier, narrower
   schema-promotion outline. The native archive transition plan extends it to
-  all current sidecars, catalog data, producers, and operational state. Current
-  runtime compatibility remains in place until the planned cutover.
+  all current sidecars, catalog data, producers, and operational state. The
+  compatible release is frozen; current development uses the native model.
 - The [original rewrite plan](../ui/v3/docs/archive/rewrite-plan.md) and
   [early evaluation](../ui/v3/docs/archive/rewrite-plan-evaluation.md) are
   historical snapshots, not current checklists.

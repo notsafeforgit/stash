@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useCallback } from "react";
+import { useApolloClient } from "@apollo/client/react";
+import { MediaRoots } from "@/components/archive/media-roots";
+import { mediaRootSearchSchema } from "@/core/native-archive/media-root-api";
 import { createFileRoute } from "@tanstack/react-router";
-import { useIntl } from "react-intl";
-import { Folder, Minus } from "lucide-react";
 import type * as GQL from "src/core/generated-graphql";
 import {
   useConfigurationContext,
@@ -9,139 +10,12 @@ import {
   useConfigureGeneral,
 } from "src/hooks/config";
 import { useMsg } from "src/hooks/message";
-import { Button } from "src/components/ui/button";
-import { Checkbox } from "src/components/ui/checkbox";
-import { Label } from "src/components/ui/label";
-import { DirectorySelectionDialog } from "src/components/shared/directory-selection-dialog";
 import {
   SettingsSection,
   SettingStringList,
   SettingSwitch,
   SettingText,
 } from "src/components/settings/setting-row";
-import { stripQuotes } from "src/utils/text";
-
-interface StashConfig {
-  path: string;
-  excludeVideo: boolean;
-  excludeImage: boolean;
-}
-
-function StashesEditor({
-  stashes,
-  onChange,
-}: {
-  stashes: StashConfig[];
-  onChange: (v: StashConfig[]) => void;
-}) {
-  const intl = useIntl();
-  const [addOpen, setAddOpen] = useState(false);
-
-  function setStash(index: number, patch: Partial<StashConfig>) {
-    onChange(stashes.map((s, i) => (i === index ? { ...s, ...patch } : s)));
-  }
-
-  return (
-    <div className="space-y-3">
-      {stashes.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          {intl.formatMessage({
-            id: "setup.folder.no_paths_added",
-            defaultMessage: "No library folders added yet.",
-          })}
-        </p>
-      )}
-      {stashes.map((stash, i) => (
-        <div
-          key={stash.path}
-          className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div className="flex min-w-0 items-center gap-2">
-            <Folder className="size-4 shrink-0 text-muted-foreground" />
-            <code className="truncate text-sm">{stash.path}</code>
-          </div>
-          <div className="flex shrink-0 items-center gap-4">
-            <div className="flex items-center gap-1.5">
-              <Checkbox
-                id={`stash-${i}-exclude-video`}
-                checked={stash.excludeVideo}
-                onCheckedChange={(v) =>
-                  setStash(i, { excludeVideo: v === true })
-                }
-              />
-              <Label
-                htmlFor={`stash-${i}-exclude-video`}
-                className="text-xs font-normal"
-              >
-                {intl.formatMessage({
-                  id: "config.general.exclude_video",
-                  defaultMessage: "Exclude video",
-                })}
-              </Label>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Checkbox
-                id={`stash-${i}-exclude-image`}
-                checked={stash.excludeImage}
-                onCheckedChange={(v) =>
-                  setStash(i, { excludeImage: v === true })
-                }
-              />
-              <Label
-                htmlFor={`stash-${i}-exclude-image`}
-                className="text-xs font-normal"
-              >
-                {intl.formatMessage({
-                  id: "config.general.exclude_image",
-                  defaultMessage: "Exclude image",
-                })}
-              </Label>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={intl.formatMessage({
-                id: "actions.delete",
-                defaultMessage: "Delete",
-              })}
-              onClick={() => onChange(stashes.filter((_, j) => j !== i))}
-            >
-              <Minus className="size-4" />
-            </Button>
-          </div>
-        </div>
-      ))}
-      <Button type="button" variant="outline" onClick={() => setAddOpen(true)}>
-        {intl.formatMessage({
-          id: "actions.add_directory",
-          defaultMessage: "Add directory",
-        })}
-        …
-      </Button>
-      <DirectorySelectionDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        title={intl.formatMessage({
-          id: "actions.add_directory",
-          defaultMessage: "Add directory",
-        })}
-        onConfirm={(paths) => {
-          setAddOpen(false);
-          const existing = new Set(stashes.map((s) => s.path));
-          const added = Array.from(new Set(paths.map(stripQuotes)))
-            .filter((p) => !existing.has(p))
-            .map((path) => ({
-              path,
-              excludeVideo: false,
-              excludeImage: false,
-            }));
-          if (added.length > 0) onChange([...stashes, ...added]);
-        }}
-      />
-    </div>
-  );
-}
 
 function commaListToArray(value: string): string[] {
   return value
@@ -151,6 +25,12 @@ function commaListToArray(value: string): string[] {
 }
 
 function SettingsLibraryPage() {
+  const { root, create, ...filter } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const client = useApolloClient();
+  const refreshFolders = useCallback(() => {
+    void client.refetchQueries({ include: ["Configuration"] });
+  }, [client]);
   const { configuration } = useConfigurationContext();
   const general = configuration.general;
   const defaults = configuration.defaults;
@@ -168,21 +48,25 @@ function SettingsLibraryPage() {
   const msg = useMsg();
 
   return (
-    <div className="max-w-3xl space-y-8 p-6">
+    <div className="flex max-w-4xl flex-col gap-8 p-4 md:p-6">
       <SettingsSection
-        title={msg("library", "Library")}
+        title={msg("media_roots.title", "Library folders")}
         description={msg(
-          "config.general.directory_locations_to_your_content",
-          "Directory locations to your content",
+          "media_roots.description",
+          "Manage folders used by library scans and downloads.",
         )}
       >
-        <StashesEditor
-          stashes={general.stashes.map((s) => ({
-            path: s.path,
-            excludeVideo: s.excludeVideo,
-            excludeImage: s.excludeImage,
-          }))}
-          onChange={(v) => saveGeneral({ stashes: v })}
+        <MediaRoots
+          key={JSON.stringify(filter)}
+          embedded
+          filter={filter}
+          selected={root}
+          create={create}
+          onChanged={refreshFolders}
+          onFilterChange={(filter) => void navigate({ search: filter })}
+          onSelect={(root, create) =>
+            void navigate({ search: { ...filter, root, create } })
+          }
         />
       </SettingsSection>
 
@@ -341,5 +225,6 @@ function SettingsLibraryPage() {
 }
 
 export const Route = createFileRoute("/settings/library")({
+  validateSearch: mediaRootSearchSchema,
   component: SettingsLibraryPage,
 });

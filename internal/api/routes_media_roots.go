@@ -42,6 +42,8 @@ func (rs *nativeArchiveRoutes) putRoot(w http.ResponseWriter, r *http.Request) {
 		Label            string                   `json:"label"`
 		State            string                   `json:"state"`
 		Binding          *models.MediaRootBinding `json:"binding"`
+		UnboundPath      string                   `json:"unbound_path"`
+		Scan             *models.MediaRootScan    `json:"scan"`
 		Reason           string                   `json:"reason"`
 	}
 	if err := readIngestJSON(w, r, 24576, &input); err != nil {
@@ -58,7 +60,7 @@ func (rs *nativeArchiveRoutes) putRoot(w http.ResponseWriter, r *http.Request) {
 		var err error
 		result, err = rs.repo.MediaRoot.Put(ctx, models.MediaRootInput{
 			UUID: id, ExpectedRevision: input.ExpectedRevision,
-			MediaRootDefinition: models.MediaRootDefinition{Label: input.Label, State: input.State, Binding: input.Binding},
+			MediaRootDefinition: models.MediaRootDefinition{Label: input.Label, State: input.State, Binding: input.Binding, UnboundPath: input.UnboundPath, Scan: input.Scan},
 			Origin:              "review", Reason: input.Reason,
 		})
 		return err

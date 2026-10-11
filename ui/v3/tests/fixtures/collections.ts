@@ -31,6 +31,13 @@ export function collection(input = collectionInput()): Collection {
 }
 export function mediaRoot(): MediaRoot {
   return {
+    unbound_path: "",
+    scan: {
+      revision: 0,
+      enabled: true,
+      exclude_video: false,
+      exclude_image: false,
+    },
     uuid: rootID,
     label: "Media library",
     state: "active",

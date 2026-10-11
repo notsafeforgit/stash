@@ -195,7 +195,7 @@ export function SavedActions({
         });
       case "root":
         return navigate({
-          to: "/media-roots",
+          to: "/settings/library",
           search: {
             root: location.id,
             create: location.create,

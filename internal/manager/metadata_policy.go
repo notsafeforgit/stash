@@ -3,6 +3,8 @@ package manager
 import (
 	"context"
 
+	"github.com/stashapp/stash/internal/manager/config"
+
 	"github.com/stashapp/stash/pkg/file"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/metadata"
@@ -10,15 +12,15 @@ import (
 	"github.com/stashapp/stash/pkg/plugin/hook"
 )
 
-func metadataHandlerRequired(repo models.Repository) file.Filter {
+func metadataHandlerRequired(repo models.Repository, folders config.StashConfigs) file.Filter {
 	return file.FilterFunc(func(ctx context.Context, media models.File) bool {
 		if repo.MetadataPolicy == nil || media.Base().ZipFileID != nil {
 			return false
 		}
 		kind := models.ArchiveImage
-		if useAsVideo(media.Base().Path) {
+		if useAsVideo(media.Base().Path, folders) {
 			kind = models.ArchiveScene
-		} else if !useAsImage(media.Base().Path) {
+		} else if !useAsImage(media.Base().Path, folders) {
 			return false
 		}
 		matches, err := repo.MetadataPolicy.MatchScan(ctx, media.Base().Path)

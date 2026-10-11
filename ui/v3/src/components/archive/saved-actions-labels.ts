@@ -30,7 +30,7 @@ export function useSavedActionLabels() {
         "Post-merge notifications",
       ),
       collection: msg("saved_actions.collection", "Source collection changes"),
-      media_root: msg("saved_actions.media_root", "Media root changes"),
+      media_root: msg("saved_actions.media_root", "Library folder changes"),
       metadata_policy: msg(
         "saved_actions.metadata_policy",
         "Import policy changes",

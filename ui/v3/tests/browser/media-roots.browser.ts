@@ -8,6 +8,12 @@ import {
   type MediaRootRevision,
 } from "../../src/core/native-archive/media-root-api";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    window.name = "library-folder-fixture";
+  });
+});
+
 test.use({
   expectedConsoleErrors: [
     "the server responded with a status of 400",
@@ -136,7 +142,19 @@ async function archive(
           label: input.label,
           state: input.state,
           binding: input.binding,
-          revision: input.expected_revision + 1,
+          scan: input.scan ?? mediaRoot().scan,
+          unbound_path: input.unbound_path ?? "",
+          revision: (() => {
+            const before = roots.get(id);
+            return before &&
+              before.label === input.label &&
+              before.state === input.state &&
+              JSON.stringify(before.binding) ===
+                JSON.stringify(input.binding) &&
+              before.unbound_path === (input.unbound_path ?? "")
+              ? before.revision
+              : input.expected_revision + 1;
+          })(),
         };
         roots.set(id, found);
         history.set(id, [
@@ -176,235 +194,135 @@ async function archive(
   return { roots, writes, probes, requests };
 }
 
-test("registers a checked folder with a stable caller UUID and exposes mobile navigation", async ({
+test("configures a folder in Library settings and redirects the former page", async ({
   page,
 }) => {
   const remote = await archive(page);
   await page.goto("/media-roots");
+  await expect(page).toHaveURL(/\/settings\/library/);
   await page
-    .getByRole("button", { name: "New media root", exact: true })
+    .getByRole("button", { name: "Add library folder", exact: true })
     .click();
-  await page.getByLabel("Root name", { exact: true }).fill("Purchased media");
-  await page
-    .getByRole("switch", {
-      name: "Associate a folder on this server",
-      exact: true,
-    })
-    .check();
+  await page.getByLabel("Folder name", { exact: true }).fill("Purchased media");
   const path = page.getByLabel("Folder path on the Stash server", {
     exact: true,
   });
   await path.fill("relative/path");
-  await page.getByRole("button", { name: "Check folder", exact: true }).click();
+  await page.getByRole("button", { name: "Save folder", exact: true }).click();
   await expect(
     page.getByText("Use an absolute server path", { exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Save media root", exact: true }),
-  ).toBeDisabled();
   expect(remote.writes).toEqual([]);
   await path.fill("/media/purchased");
-  await page.getByRole("button", { name: "Check folder", exact: true }).click();
-  await expect(page.getByText("Folder checked", { exact: true })).toBeVisible();
-  expect(remote.writes).toEqual([]);
-  await path.fill("/media/changed");
-  await expect(
-    page.getByRole("button", { name: "Save media root", exact: true }),
-  ).toBeDisabled();
-  await page.getByRole("button", { name: "Check folder", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Save media root", exact: true }),
-  ).toBeEnabled();
   await page
-    .getByRole("button", { name: "Save media root", exact: true })
-    .click();
-  await expect(
-    page.getByText("Media root saved", { exact: true }),
-  ).toBeVisible();
+    .getByRole("switch", { name: "Scan images", exact: true })
+    .uncheck();
+  await page.getByRole("button", { name: "Save folder", exact: true }).click();
+  await expect(page.getByText("Folder saved", { exact: true })).toBeVisible();
   expect(remote.writes).toHaveLength(1);
   expect(remote.writes[0]).toMatchObject({
     expected_revision: 0,
     label: "Purchased media",
     binding: {
-      path: "/media/changed",
+      path: "/media/purchased",
       directory_identity: "directory:checked",
     },
+    scan: { enabled: true, exclude_image: true, exclude_video: false },
   });
   expect(remote.writes[0]?.uuid).toMatch(/^[a-f\d-]{36}$/);
+  await page.screenshot({
+    path: test.info().outputPath("library-folder-editor.png"),
+    fullPage: true,
+  });
   await page
     .getByRole("button", { name: "Open navigation menu", exact: true })
     .click();
-  await page
-    .getByRole("dialog")
-    .getByRole("link", { name: "Media roots", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
-    page.getByText("Purchased media", { exact: true }),
-  ).toBeVisible();
-  await page.screenshot({
-    path: test.info().outputPath("media-roots-mobile.png"),
-    fullPage: true,
-  });
+    page
+      .getByRole("dialog")
+      .getByRole("link", { name: "Media roots", exact: true }),
+  ).toHaveCount(0);
 });
 
-test("recovers a committed root update without a new probe or PUT and loads historical bindings lazily", async ({
+test("recovers a scan-settings save after a lost response without another write", async ({
   page,
 }) => {
   const remote = await archive(page, { loseResponse: true });
-  await page.goto(`/media-roots?root=${rootID}`);
-  await page.getByLabel("Root name", { exact: true }).fill("Renamed root");
-  expect(remote.requests.some((url) => url.pathname.endsWith("/history"))).toBe(
-    false,
-  );
+  await page.goto(`/settings/library?root=${rootID}`);
   await page
-    .getByRole("button", { name: "Save media root", exact: true })
-    .click();
+    .getByRole("switch", { name: "Scan videos", exact: true })
+    .uncheck();
+  await page.getByRole("button", { name: "Save folder", exact: true }).click();
   await expect(
-    page.getByText("Could not complete this step", { exact: true }),
+    page.getByText("Confirm this saved folder change", { exact: true }),
   ).toBeVisible();
-  await expect.poll(() => remote.writes.length).toBe(1);
-  await page.reload();
   await page
-    .getByRole("button", { name: "Check and retry root change", exact: true })
+    .getByRole("button", { name: "Check and retry folder change", exact: true })
     .click();
-  await expect(
-    page.getByText("Media root saved", { exact: true }),
-  ).toBeVisible();
-  expect(remote.probes).toEqual([]);
+  await expect(page.getByText("Folder saved", { exact: true })).toBeVisible();
   expect(remote.writes).toHaveLength(1);
-  await page
-    .getByRole("button", { name: "Media root history", exact: true })
-    .click();
-  await expect(page.getByText("Revision 2", { exact: false })).toBeVisible();
-  expect(
-    remote.requests
-      .filter((url) => url.pathname.endsWith("/history"))
-      .at(-1)
-      ?.searchParams.get("limit"),
-  ).toBe("25");
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.screenshot({
-    path: test.info().outputPath("media-root-editor-desktop.png"),
-    fullPage: true,
-  });
+  expect(remote.probes).toEqual([]);
+  expect(remote.roots.get(rootID)?.revision).toBe(1);
+  expect(remote.roots.get(rootID)?.scan.exclude_video).toBe(true);
+  await expect(
+    page.getByRole("switch", { name: "Scan videos", exact: true }),
+  ).not.toBeChecked();
 });
 
-test("rejects a changed directory and requires review before another save", async ({
+test("retains an offline folder path and loads storage history only when expanded", async ({
+  page,
+}) => {
+  const remote = await archive(page);
+  await page.goto(`/settings/library?root=${rootID}`);
+  await page
+    .getByRole("button", { name: "Advanced folder options", exact: true })
+    .click();
+  await page
+    .getByRole("switch", { name: "Folder is offline", exact: true })
+    .check();
+  await page.getByRole("button", { name: "Save folder", exact: true }).click();
+  await expect(page.getByText("Folder saved", { exact: true })).toBeVisible();
+  expect(remote.writes[0]).toMatchObject({
+    uuid: rootID,
+    binding: null,
+    unbound_path: "/media/library",
+    scan: { enabled: true },
+  });
+  expect(remote.probes).toEqual([]);
+  expect(
+    remote.requests.filter((url) => url.pathname.endsWith("/history")),
+  ).toHaveLength(0);
+  await page
+    .getByRole("button", { name: "Storage details and history", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Folder binding history", exact: true })
+    .click();
+  await expect(page.getByText("Initial root", { exact: true })).toBeVisible();
+});
+
+test("rejects a replaced directory without silently changing the folder", async ({
   page,
 }) => {
   const remote = await archive(page, { invalidBinding: true });
-  await page.goto(`/media-roots?root=${rootID}`);
+  await page.goto(`/settings/library?root=${rootID}`);
   await page
     .getByLabel("Folder path on the Stash server", { exact: true })
     .fill("/new/location");
-  await page.getByRole("button", { name: "Check folder", exact: true }).click();
-  await expect(page.getByText("Folder checked", { exact: true })).toBeVisible();
-  await page
-    .getByRole("button", { name: "Save media root", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Save folder", exact: true }).click();
   await expect(
     page.getByText("The directory changed after it was checked", {
       exact: true,
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Save media root", exact: true }),
+    page.getByRole("button", { name: "Save folder", exact: true }),
   ).toBeDisabled();
   await page
-    .getByRole("button", { name: "Review current root", exact: true })
+    .getByRole("button", { name: "Review current folder", exact: true })
     .click();
   await expect(
     page.getByLabel("Folder path on the Stash server", { exact: true }),
   ).toHaveValue("/media/library");
   expect(remote.writes).toHaveLength(1);
-  expect(remote.probes).toEqual(["/new/location"]);
 });
-
-test("disables an offline root without probing and retains success when refresh fails", async ({
-  page,
-}) => {
-  const remote = await archive(page, { refreshFails: true });
-  await page.goto(`/media-roots?root=${rootID}`);
-  await page
-    .getByRole("group", { name: "Status", exact: true })
-    .getByRole("button", { name: "Disabled", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Save media root", exact: true })
-    .click();
-  await expect(
-    page.getByText("The root is saved, but this view could not be refreshed", {
-      exact: true,
-    }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Media root saved", { exact: true }),
-  ).toBeVisible();
-  expect(remote.probes).toEqual([]);
-  expect(remote.writes[0]).toMatchObject({
-    state: "disabled",
-    binding: mediaRoot().binding,
-  });
-});
-
-for (const [label, state] of [
-  ["Active", "active"],
-  ["Disabled", "disabled"],
-] as const) {
-  test(`restores a retired root as ${state} with the same identity, binding and history`, async ({
-    page,
-  }) => {
-    const remote = await archive(page, { retired: true });
-    await page.goto(`/media-roots?root=${rootID}`);
-    await expect(page.getByLabel("Root name", { exact: true })).toBeEnabled();
-    const status = page.getByRole("group", { name: "Status", exact: true });
-    await expect(
-      status.getByRole("button", { name: "Retired", exact: true }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await page
-      .getByRole("button", { name: "Media root history", exact: true })
-      .click();
-    await expect(page.getByText("Initial root", { exact: true })).toBeVisible();
-    expect(remote.writes).toEqual([]);
-    expect(remote.probes).toEqual([]);
-
-    await status.getByRole("button", { name: label, exact: true }).click();
-    const reason = `Restore as ${state}`;
-    await page
-      .getByLabel("Reason for this change (optional)", { exact: true })
-      .fill(reason);
-    expect(remote.writes).toEqual([]);
-    await page
-      .getByRole("button", { name: "Save media root", exact: true })
-      .click();
-    await expect(
-      page.getByText("Media root saved", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      status.getByRole("button", { name: label, exact: true }),
-    ).toHaveAttribute("aria-pressed", "true");
-    expect(remote.writes).toEqual([
-      {
-        uuid: rootID,
-        expected_revision: mediaRoot().revision,
-        label: mediaRoot().label,
-        state,
-        binding: mediaRoot().binding,
-        reason,
-      },
-    ]);
-    expect(remote.roots.get(rootID)).toMatchObject({
-      uuid: rootID,
-      revision: mediaRoot().revision + 1,
-      state,
-      binding: mediaRoot().binding,
-    });
-    expect(remote.probes).toEqual([]);
-    await page
-      .getByRole("button", { name: "Media root history", exact: true })
-      .click();
-    await expect(page.getByText("Initial root", { exact: true })).toBeVisible();
-    await expect(page.getByText(reason, { exact: true })).toBeVisible();
-  });
-}

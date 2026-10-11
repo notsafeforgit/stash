@@ -18,9 +18,13 @@ import (
 
 func (r *mutationResolver) MoveFiles(ctx context.Context, input MoveFilesInput) (bool, error) {
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		stashPaths, err := manager.ReadLibraryPaths(ctx, r.repository)
+		if err != nil {
+			return err
+		}
 		fileStore := r.repository.File
 		folderStore := r.repository.Folder
-		mover := file.NewMover(fileStore, folderStore, manager.GetInstance().Config.GetStashPaths().Paths())
+		mover := file.NewMover(fileStore, folderStore, stashPaths.Paths())
 		mover.RegisterHooks(ctx)
 
 		var (
@@ -58,7 +62,6 @@ func (r *mutationResolver) MoveFiles(ctx context.Context, input MoveFilesInput) 
 			folderPath := *input.DestinationFolder
 
 			// ensure folder path is within the library
-			stashPaths := manager.GetInstance().Config.GetStashPaths()
 			if err := r.validateFolderPath(stashPaths, folderPath); err != nil {
 				return err
 			}

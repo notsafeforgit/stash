@@ -14,7 +14,6 @@ import {
   Puzzle,
   Link2,
   FolderOpen,
-  HardDrive,
   FileText,
   History,
 } from "lucide-react";
@@ -163,14 +162,6 @@ export function useNavItems(opts?: {
           }),
           icon: <FolderOpen className="size-4" />,
           to: "/collections",
-        },
-        {
-          label: intl.formatMessage({
-            id: "media_roots.title",
-            defaultMessage: "Media roots",
-          }),
-          icon: <HardDrive className="size-4" />,
-          to: "/media-roots",
         },
         {
           label: intl.formatMessage({

@@ -32,6 +32,8 @@ type cleanJob struct {
 // CleanOptions provides options for scanning files.
 type CleanOptions struct {
 	Paths []string
+	// SkipPath protects registered folders that are temporarily disabled.
+	SkipPath func(string) bool
 
 	// IgnoreZipFileContents will skip checking the contents of zip files when determining whether to clean a file.
 	// This can significantly speed up the clean process, but will potentially miss removed files within zip files.
@@ -233,6 +235,9 @@ func (j *cleanJob) assessFiles(ctx context.Context, toDelete *deleteSet) error {
 
 // flagFolderForDelete adds folders to the toDelete set, with the leaf folders added first
 func (j *cleanJob) flagFileForDelete(ctx context.Context, toDelete *deleteSet, f models.File) error {
+	if j.options.SkipPath != nil && j.options.SkipPath(f.Base().Path) {
+		return nil
+	}
 	r := j.Repository
 	// add contained files first
 	containedFiles, err := r.File.FindByZipFileID(ctx, f.Base().ID)
@@ -322,6 +327,9 @@ func (j *cleanJob) assessFolders(ctx context.Context, toDelete *deleteSet) error
 }
 
 func (j *cleanJob) flagFolderForDelete(ctx context.Context, toDelete *deleteSet, folder *models.Folder) error {
+	if j.options.SkipPath != nil && j.options.SkipPath(folder.Path) {
+		return nil
+	}
 	// it is possible that child folders may be included while parent folders are not
 	// so we need to check child folders separately
 	toDelete.addFolder(folder.ID, folder.Path)
@@ -341,6 +349,9 @@ func isNotFound(err error) bool {
 }
 
 func (j *cleanJob) shouldClean(ctx context.Context, f models.File) bool {
+	if j.options.SkipPath != nil && j.options.SkipPath(f.Base().Path) {
+		return false
+	}
 	path := f.Base().Path
 
 	info, err := f.Base().Info(j.FS)
@@ -369,6 +380,9 @@ func (j *cleanJob) shouldClean(ctx context.Context, f models.File) bool {
 }
 
 func (j *cleanJob) shouldCleanFolder(ctx context.Context, f *models.Folder) bool {
+	if j.options.SkipPath != nil && j.options.SkipPath(f.Path) {
+		return false
+	}
 	path := f.Path
 
 	info, err := f.Info(j.FS)

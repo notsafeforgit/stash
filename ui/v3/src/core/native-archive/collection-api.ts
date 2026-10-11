@@ -105,7 +105,7 @@ export const collectionInputSchema = definitionSchema
       ctx.addIssue({
         code: "custom",
         path: ["path_prefix"],
-        message: "Use a relative folder beneath the media root.",
+        message: "Use a relative path beneath the library folder.",
       });
   });
 const historySchema = collectionSchema.extend({
@@ -113,12 +113,25 @@ const historySchema = collectionSchema.extend({
   reason: z.string(),
   recorded_at: z.string(),
 });
+export const mediaRootScanSchema = z.object({
+  revision: revision,
+  enabled: z.boolean(),
+  exclude_video: z.boolean(),
+  exclude_image: z.boolean(),
+});
 export const mediaRootSchema = z.object({
   uuid,
   label: z.string(),
   state: definitionStateSchema,
   revision: revision.positive(),
   created_at: z.string(),
+  unbound_path: z.string().default(""),
+  scan: mediaRootScanSchema.default({
+    revision: 0,
+    enabled: false,
+    exclude_video: false,
+    exclude_image: false,
+  }),
   binding: z
     .object({ path: z.string(), directory_identity: z.string() })
     .nullable(),

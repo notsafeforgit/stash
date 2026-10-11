@@ -237,8 +237,8 @@ func (s *Manager) postInit(ctx context.Context) error {
 		}
 	}
 	if s.Database.Ready() == nil {
-		if err := s.PromoteDefaultFilterConfig(ctx); err != nil {
-			return fmt.Errorf("promoting default-filter configuration: %w", err)
+		if err := s.PromoteConfiguration(ctx); err != nil {
+			return fmt.Errorf("promoting configuration: %w", err)
 		}
 	}
 

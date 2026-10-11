@@ -5,8 +5,8 @@ import { BottomTabBar } from "@/components/layout/bottom-tab-bar";
 import { UserMenu } from "@/components/layout/user-menu";
 
 export function MediaRootsFixture() {
-  const { root, create, ...filter } = useSearch({ from: "/media-roots" });
-  const navigate = useNavigate({ from: "/media-roots" });
+  const { root, create, ...filter } = useSearch({ from: "/settings/library" });
+  const navigate = useNavigate({ from: "/settings/library" });
   return (
     <MockedProvider>
       <div className="flex min-h-0 flex-1 flex-col">

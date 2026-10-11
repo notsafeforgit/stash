@@ -323,7 +323,7 @@ function Editor({
         <p>
           {msg(
             "manual_intake.inactive",
-            "Use an active folder or batch collection with a bound media root to import files.",
+            "Choose an active collection with an available library folder to import files.",
           )}
         </p>
       ) : (

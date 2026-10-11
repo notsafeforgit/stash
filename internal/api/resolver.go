@@ -426,3 +426,9 @@ func firstError(errs []error) error {
 
 	return nil
 }
+
+func (r *Resolver) ConfigGeneralResult() ConfigGeneralResultResolver {
+	return &configGeneralResultResolver{r}
+}
+
+type configGeneralResultResolver struct{ *Resolver }

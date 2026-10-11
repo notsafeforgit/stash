@@ -17,6 +17,23 @@ type MediaRootDefinition struct {
 	Label   string            `json:"label"`
 	State   string            `json:"state"` // active, disabled, retired
 	Binding *MediaRootBinding `json:"binding"`
+	// UnboundPath is only populated while there is no verified local binding.
+	UnboundPath string         `json:"unbound_path"`
+	Scan        *MediaRootScan `json:"scan,omitempty"`
+}
+
+type MediaRootScan struct {
+	Revision     int  `json:"revision"`
+	Enabled      bool `json:"enabled"`
+	ExcludeVideo bool `json:"exclude_video"`
+	ExcludeImage bool `json:"exclude_image"`
+}
+
+func (r MediaRootDefinition) LocalPath() string {
+	if r.Binding != nil {
+		return r.Binding.Path
+	}
+	return r.UnboundPath
 }
 
 type MediaRoot struct {

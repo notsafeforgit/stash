@@ -30,6 +30,7 @@ import (
 )
 
 type ScanJob struct {
+	stashPaths    config.StashConfigs
 	scanner       *file.Scanner
 	input         ScanMetadataInput
 	subscriptions *subscriptionManager
@@ -49,7 +50,7 @@ func (j *ScanJob) Execute(ctx context.Context, progress *job.Progress) error {
 		return nil
 	}
 
-	sp := getScanPaths(input.Paths)
+	sp := getScanPaths(input.Paths, j.stashPaths)
 	paths := make([]string, len(sp))
 	for i, p := range sp {
 		paths[i] = p.Path
@@ -72,9 +73,9 @@ func (j *ScanJob) Execute(ctx context.Context, progress *job.Progress) error {
 	}
 
 	// HACK - these should really be set in the scanner initialization
-	j.scanner.FileHandlers = getScanHandlers(j.input, taskQueue, progress)
-	j.scanner.ScanFilters = []file.PathFilter{newScanFilter(c, repo, minModTime)}
-	j.scanner.HandlerRequiredFilters = []file.Filter{newHandlerRequiredFilter(cfg, repo), metadataHandlerRequired(repo)}
+	j.scanner.FileHandlers = getScanHandlers(j.input, taskQueue, progress, j.stashPaths)
+	j.scanner.ScanFilters = []file.PathFilter{newScanFilter(c, repo, minModTime, j.stashPaths)}
+	j.scanner.HandlerRequiredFilters = []file.Filter{newHandlerRequiredFilter(cfg, repo, j.stashPaths), metadataHandlerRequired(repo, j.stashPaths)}
 
 	logger.Infof("Starting scan of %d paths with %d parallel tasks", len(paths), nTasks)
 
@@ -460,6 +461,7 @@ type sceneFinder interface {
 
 // handlerRequiredFilter returns true if a File's handler needs to be executed despite the file not being updated.
 type handlerRequiredFilter struct {
+	stashPaths config.StashConfigs
 	extensionConfig
 	txnManager    txn.Manager
 	SceneFinder   sceneFinder
@@ -471,10 +473,11 @@ type handlerRequiredFilter struct {
 	videoFileNamingAlgorithm models.HashAlgorithm
 }
 
-func newHandlerRequiredFilter(c *config.Config, repo models.Repository) *handlerRequiredFilter {
+func newHandlerRequiredFilter(c *config.Config, repo models.Repository, folders config.StashConfigs) *handlerRequiredFilter {
 	processes := c.GetParallelTasksWithAutoDetection()
 
 	return &handlerRequiredFilter{
+		stashPaths:               folders,
 		extensionConfig:          newExtensionConfig(c),
 		txnManager:               repo.TxnManager,
 		SceneFinder:              repo.Scene,
@@ -487,8 +490,8 @@ func newHandlerRequiredFilter(c *config.Config, repo models.Repository) *handler
 
 func (f *handlerRequiredFilter) Accept(ctx context.Context, ff models.File) bool {
 	path := ff.Base().Path
-	isVideoFile := useAsVideo(path)
-	isImageFile := useAsImage(path)
+	isVideoFile := useAsVideo(path, f.stashPaths)
+	isImageFile := useAsImage(path, f.stashPaths)
 	isZipFile := fsutil.MatchExtension(path, f.zipExt)
 
 	var counter fileCounter
@@ -569,11 +572,11 @@ type scanFilter struct {
 	stashIgnoreFilter *file.StashIgnoreFilter
 }
 
-func newScanFilter(c *config.Config, repo models.Repository, minModTime time.Time) *scanFilter {
+func newScanFilter(c *config.Config, repo models.Repository, minModTime time.Time, folders config.StashConfigs) *scanFilter {
 	return &scanFilter{
 		extensionConfig:   newExtensionConfig(c),
 		txnManager:        repo.TxnManager,
-		stashPaths:        c.GetStashPaths(),
+		stashPaths:        folders,
 		generatedPath:     c.GetGeneratedPath(),
 		videoExcludeRegex: generateRegexps(c.GetExcludes()),
 		imageExcludeRegex: generateRegexps(c.GetImageExcludes()),
@@ -594,7 +597,7 @@ func (f *scanFilter) Accept(ctx context.Context, path string, info fs.FileInfo, 
 	}
 
 	s := f.stashPaths.GetStashFromDirPath(path)
-	if s == nil {
+	if s == nil || s.ScanDisabled {
 		logger.Debugf("Skipping %s as it is not in the stash library", path)
 		return false
 	}
@@ -605,8 +608,8 @@ func (f *scanFilter) Accept(ctx context.Context, path string, info fs.FileInfo, 
 		return false
 	}
 
-	isVideoFile := useAsVideo(path)
-	isImageFile := useAsImage(path)
+	isVideoFile := useAsVideo(path, f.stashPaths)
+	isImageFile := useAsImage(path, f.stashPaths)
 	isZipFile := fsutil.MatchExtension(path, f.zipExt)
 
 	if !info.IsDir() && !isVideoFile && !isImageFile && !isZipFile {
@@ -650,19 +653,19 @@ func (c *scanConfig) GetCreateGalleriesFromFolders() bool {
 	return c.createGalleriesFromFolders
 }
 
-func videoFileFilter(ctx context.Context, f models.File) bool {
-	return useAsVideo(f.Base().Path)
+func videoFileFilter(folders config.StashConfigs) file.Filter {
+	return file.FilterFunc(func(_ context.Context, f models.File) bool { return useAsVideo(f.Base().Path, folders) })
 }
 
-func imageFileFilter(ctx context.Context, f models.File) bool {
-	return useAsImage(f.Base().Path)
+func imageFileFilter(folders config.StashConfigs) file.Filter {
+	return file.FilterFunc(func(_ context.Context, f models.File) bool { return useAsImage(f.Base().Path, folders) })
 }
 
 func galleryFileFilter(ctx context.Context, f models.File) bool {
 	return isZip(f.Base().Basename)
 }
 
-func getScanHandlers(options ScanMetadataInput, taskQueue *job.TaskQueue, progress *job.Progress) []file.Handler {
+func getScanHandlers(options ScanMetadataInput, taskQueue *job.TaskQueue, progress *job.Progress, folders config.StashConfigs) []file.Handler {
 	mgr := GetInstance()
 	c := mgr.Config
 	r := mgr.Repository
@@ -670,7 +673,7 @@ func getScanHandlers(options ScanMetadataInput, taskQueue *job.TaskQueue, progre
 
 	return []file.Handler{
 		&file.FilteredHandler{
-			Filter: file.FilterFunc(imageFileFilter),
+			Filter: imageFileFilter(folders),
 			Handler: &image.ScanHandler{
 				MetadataPolicy:     mgr.applyScanMetadata,
 				CreatorUpdater:     r.Image,
@@ -702,7 +705,7 @@ func getScanHandlers(options ScanMetadataInput, taskQueue *job.TaskQueue, progre
 			},
 		},
 		&file.FilteredHandler{
-			Filter: file.FilterFunc(videoFileFilter),
+			Filter: videoFileFilter(folders),
 			Handler: &scene.ScanHandler{
 				MetadataPolicy:       mgr.applyScanMetadata,
 				CreatorUpdater:       r.Scene,

@@ -8,6 +8,19 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Unified library folders — implementation, 2026-10-11 UTC
+
+Settings → Library now edits the native folder records used by scans and
+ingestion. The former Media roots navigation entry is removed and its route
+redirects to the selected folder in settings. Folder scanning options are
+independent of storage binding revisions, preserving active source-run leases.
+Offline and disabled folders retain their paths and survive cleanup.
+
+Schema 1000113 promotes the old YAML folder list once, reusing existing root
+UUIDs and bindings and preserving scan exclusions. The YAML writer is removed;
+the remaining GraphQL list reads the database. Publication and live migration
+are pending. See the [folder contract](native-ingestion.md#library-folders-and-logical-roots).
+
 ## Metadata gap recovery — deployed, 2026-10-11 UTC
 
 Normal scrape captures now complete matching pending metadata targets by reusing

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/stashapp/stash/internal/manager"
+	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/file"
 	"github.com/stashapp/stash/pkg/gallery"
 	"github.com/stashapp/stash/pkg/image"
@@ -261,6 +262,10 @@ func (r *mutationResolver) galleryUpdate(ctx context.Context, input models.Galle
 }
 
 func (r *mutationResolver) GalleryDestroy(ctx context.Context, input models.GalleryDestroyInput) (bool, error) {
+	folders, err := manager.LibraryPaths(ctx, r.repository)
+	if err != nil {
+		return false, err
+	}
 	galleryIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
 	if err != nil {
 		return false, fmt.Errorf("converting ids: %w", err)
@@ -313,7 +318,7 @@ func (r *mutationResolver) GalleryDestroy(ctx context.Context, input models.Gall
 	for _, gallery := range galleries {
 		// don't delete stash library paths
 		path := gallery.Path
-		if deleteFile && path != "" && !isStashPath(path) {
+		if deleteFile && path != "" && !isStashPath(path, folders) {
 			// try to remove the folder - it is possible that it is not empty
 			// so swallow the error if present
 			_ = os.Remove(path)
@@ -340,8 +345,7 @@ func (r *mutationResolver) GalleryDestroy(ctx context.Context, input models.Gall
 	return true, nil
 }
 
-func isStashPath(path string) bool {
-	stashConfigs := manager.GetInstance().Config.GetStashPaths()
+func isStashPath(path string, stashConfigs config.StashConfigs) bool {
 	for _, config := range stashConfigs {
 		if path == config.Path {
 			return true

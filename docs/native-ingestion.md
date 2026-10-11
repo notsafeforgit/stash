@@ -1589,7 +1589,7 @@ other native administration. JSON uses snake_case keys.
 | --- | --- |
 | `GET /media-roots?after=<uuid>` | Up to 50 logical roots and their reviewed local bindings |
 | `POST /media-roots/probe` | Read-only check of `server_path`; returns canonical `path` and `directory_identity` without creating a root |
-| `POST /media-roots`, `PUT /media-roots/<uuid>` | Complete definition: `expected_revision` (zero on create), `label`, `state`, checked `binding: {path, directory_identity}` (null unbinds), `reason`; new bindings/reactivation reverify the directory. Optional body `uuid` must match the PUT path |
+| `POST /media-roots`, `PUT /media-roots/<uuid>` | Complete definition: `expected_revision` (zero on create), `label`, `state`, checked `binding: {path, directory_identity}` (null unbinds), optional `unbound_path` for an offline folder, `reason`; new bindings/reactivation reverify the directory. Optional body `uuid` must match the PUT path. Optional `scan: {revision, enabled, exclude_video, exclude_image}` changes library scan options; omission preserves existing options |
 | `GET /media-roots/<uuid>/history?after=<revision>` | Immutable definitions and bindings, default 25, bounded `limit` from 1 to 100 |
 | `GET /collections?after=<uuid>` | Up to 50 current source collections |
 | `POST /collections`, `PUT /collections/<uuid>` | Complete definition: `expected_revision`, `label`, `kind`, `namespace`, `state`, `target_url`, nullable `account_uuid` and `root_uuid`, `path_prefix`, `reason`; path prefix is `.` for the whole root |
@@ -1599,6 +1599,34 @@ other native administration. JSON uses snake_case keys.
 | `GET /collections/<uuid>/metadata-policy/history?after=<revision>` | Up to 50 immutable revisions in ascending order |
 | `POST /metadata-policy/preview` | Existing `collection_uuid`, `entity_uuid`, and one of its `file_uuid` values; optional `source: {capture_uuid, attachment_uuid}` and `include_data` |
 | `POST /metadata-policy/apply` | The same selection plus the preview `digest`; recomputes it in the write transaction and rejects changed selections/candidates with 409 |
+
+### Library folders and logical roots
+
+From schema 1000113, Settings → Library manages one set of folders for ordinary
+scanning and native ingestion. The separate Media roots navigation entry is
+removed; `/media-roots` bookmarks redirect to `/settings/library` with their
+selected folder and filters intact. Storage UUIDs and binding history are shown
+under the folder's expandable storage details.
+
+The first startup after migration imports the old YAML `stash` list by local
+path, preserving existing root UUIDs, bindings and scan exclusions. It commits
+the database records before removing the writable YAML list, with a checkpoint
+for interrupted publication. Unavailable paths remain registered as offline
+folders without inventing a verified filesystem binding. GraphQL
+`configuration.general.stashes` is a read-only projection of these records;
+`configureGeneral` no longer accepts a separate folder list.
+
+Scan options have an independent optimistic `scan.revision`. Changing image or
+video exclusions, or turning scanning off, does not change the storage binding
+revision pinned by an ongoing scrape. New folders default to scanning on in the
+UI; API callers that omit `scan` create an ingestion-only root. Disabled scans
+preserve existing media and still allow downloads. Offline, disabled and retired
+folders are excluded from scans and protected from cleanup; disabling or
+retiring the root also prevents new ingestion. Reactivating a folder verifies
+its local binding again. Binding history does not claim to record scan-option
+history.
+
+### Metadata policy definitions
 
 A definition can contain both `scene` and `image` rules. This directory example
 initializes filenames and assigns an explicitly selected performer UUID:

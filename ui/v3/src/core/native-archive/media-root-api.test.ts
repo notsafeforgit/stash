@@ -37,6 +37,8 @@ function server() {
       label: value.label,
       state: value.state,
       binding: value.binding,
+      scan: value.scan ?? mediaRoot().scan,
+      unbound_path: value.unbound_path ?? "",
       revision: value.expected_revision + 1,
       origin: "review",
       reason: value.reason,

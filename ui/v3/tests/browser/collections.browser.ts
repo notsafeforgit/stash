@@ -237,7 +237,7 @@ test("creates a collection with a selected publisher and folder without assignin
     "native:reddit",
   );
   const rootInput = page.getByRole("combobox", {
-    name: "Media root",
+    name: "Library folder",
     exact: true,
   });
   // A user scrolls/taps the next field before typing; WebKit's programmatic
@@ -251,13 +251,13 @@ test("creates a collection with a selected publisher and folder without assignin
     })
     .click();
   await page
-    .getByLabel("Folder within the media root", { exact: true })
+    .getByLabel("Subfolder within the library folder", { exact: true })
     .fill("../outside");
   await expect(
     page.getByRole("button", { name: "Save collection", exact: true }),
   ).toBeDisabled();
   await page
-    .getByLabel("Folder within the media root", { exact: true })
+    .getByLabel("Subfolder within the library folder", { exact: true })
     .fill("River, reddit");
   await page
     .getByRole("button", { name: "Save collection", exact: true })

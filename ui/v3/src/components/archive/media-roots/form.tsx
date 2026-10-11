@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
 import { useMsg } from "@/hooks/message";
@@ -18,30 +18,28 @@ import {
   FieldGroup,
   FieldLabel,
   FieldDescription,
-  FieldError,
 } from "@/components/ui/field";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { DirectorySelectionDialog } from "@/components/shared/directory-selection-dialog";
 import { useCollectionLabels } from "../collections/shared";
 import { ReviewError } from "@/components/detail/native-metadata/shared";
 
-const formSchema = mediaRootInputSchema
-  .extend({
-    bound: z.boolean(),
-    serverPath: z.string().max(4096),
-  })
-  .superRefine((value, context) => {
-    if (
-      value.bound
-        ? !value.binding || value.serverPath !== value.binding.path
-        : value.binding !== null
-    )
-      context.addIssue({
-        code: "custom",
-        path: ["serverPath"],
-        message: "Check the folder before saving.",
-      });
-  });
+const formSchema = mediaRootInputSchema.extend({
+  serverPath: z.string().max(4096),
+  offline: z.boolean(),
+  scan: z.object({
+    revision: z.number().int().nonnegative(),
+    enabled: z.boolean(),
+    exclude_video: z.boolean(),
+    exclude_image: z.boolean(),
+  }),
+});
 
 export function MediaRootError({
   error,
@@ -65,7 +63,7 @@ export function MediaRootError({
         <p>
           {msg(
             "media_roots.invalid_binding_help",
-            "Check the server path and mount, then check the folder again before saving a new binding.",
+            "Check the server path and mount, or mark the folder offline under Advanced folder options.",
           )}
         </p>
         {error.detail && (
@@ -98,47 +96,48 @@ export function MediaRootForm({
   const labels = useCollectionLabels();
   const id = useId();
   const [busy, setBusy] = useState(false);
+  const [browse, setBrowse] = useState(false);
   const [error, setError] = useState<unknown>();
-  const [checked, setChecked] = useState(false);
-  const pending = useRef<AbortController | null>(null);
-  useEffect(() => () => pending.current?.abort(), []);
   const blocked = disabled || busy;
   const form = useForm({
     defaultValues: {
       ...input,
-      bound: !!input.binding,
-      serverPath: input.binding?.path ?? "",
+      scan: input.scan ?? {
+        revision: 0,
+        enabled: true,
+        exclude_video: false,
+        exclude_image: false,
+      },
+      serverPath: input.binding?.path ?? input.unbound_path ?? "",
+      offline: !input.binding && !!input.unbound_path,
     },
     validators: { onChange: formSchema },
-    onSubmit: ({ value }) => {
-      const { bound: _bound, serverPath: _serverPath, ...request } = value;
-      return onSave(request);
+    onSubmit: async ({ value }) => {
+      setBusy(true);
+      setError(undefined);
+      try {
+        const { serverPath, offline, ...request } = value;
+        let binding = input.binding;
+        if (!serverPath || offline) binding = null;
+        else if (
+          !binding ||
+          binding.path !== serverPath ||
+          (input.state !== "active" && value.state === "active")
+        ) {
+          binding = await api.probe(serverPath);
+        }
+        await onSave({
+          ...request,
+          binding,
+          unbound_path: binding ? "" : serverPath,
+        });
+      } catch (error) {
+        setError(error);
+      } finally {
+        setBusy(false);
+      }
     },
   });
-  async function probe() {
-    if (blocked) return;
-    const controller = new AbortController();
-    pending.current?.abort();
-    pending.current = controller;
-    setBusy(true);
-    setChecked(false);
-    setError(undefined);
-    try {
-      const binding = await api.probe(
-        form.getFieldValue("serverPath"),
-        controller.signal,
-      );
-      if (!controller.signal.aborted) {
-        form.setFieldValue("serverPath", binding.path);
-        form.setFieldValue("binding", binding);
-        setChecked(true);
-      }
-    } catch (error) {
-      if (!controller.signal.aborted) setError(error);
-    } finally {
-      if (!controller.signal.aborted) setBusy(false);
-    }
-  }
   return (
     <form
       className="flex flex-col gap-4"
@@ -155,13 +154,13 @@ export function MediaRootForm({
               data-disabled={blocked}
               data-invalid={!field.state.meta.isValid}
             >
-              <FieldLabel htmlFor={`${id}-label`}>
-                {msg("media_roots.name", "Root name")}
+              <FieldLabel htmlFor={`${id}-name`}>
+                {msg("media_roots.name", "Folder name")}
               </FieldLabel>
               <Input
-                id={`${id}-label`}
-                disabled={blocked}
+                id={`${id}-name`}
                 value={field.state.value}
+                disabled={blocked}
                 maxLength={1024}
                 aria-invalid={!field.state.meta.isValid}
                 onBlur={field.handleBlur}
@@ -170,194 +169,193 @@ export function MediaRootForm({
             </Field>
           )}
         </form.Field>
-        <form.Field name="bound">
+        <form.Field name="serverPath">
+          {(field) => (
+            <Field
+              data-disabled={blocked}
+              data-invalid={!field.state.meta.isValid}
+            >
+              <FieldLabel htmlFor={`${id}-path`}>
+                {msg("media_roots.path", "Folder path on the Stash server")}
+              </FieldLabel>
+              <Input
+                id={`${id}-path`}
+                value={field.state.value}
+                disabled={blocked}
+                maxLength={4096}
+                aria-invalid={!field.state.meta.isValid}
+                onBlur={field.handleBlur}
+                onChange={(event) => field.handleChange(event.target.value)}
+              />
+              <FieldDescription>
+                {msg(
+                  "library_folders.path_help",
+                  "Use the path visible to Stash, such as /media/porn inside its container. Saving does not move files or start a scan.",
+                )}
+              </FieldDescription>
+              <Button
+                className="w-fit"
+                type="button"
+                variant="outline"
+                disabled={blocked}
+                onClick={() => setBrowse(true)}
+              >
+                {msg("actions.browse", "Browse")}
+              </Button>
+            </Field>
+          )}
+        </form.Field>
+        <form.Field name="scan.enabled">
           {(field) => (
             <Field orientation="horizontal" data-disabled={blocked}>
               <Switch
-                id={`${id}-bound`}
+                id={`${id}-scan`}
                 checked={field.state.value}
                 disabled={blocked}
-                onCheckedChange={(value) => {
-                  field.handleChange(value);
-                  form.setFieldValue(
-                    "binding",
-                    value &&
-                      form.getFieldValue("serverPath") === input.binding?.path
-                      ? input.binding
-                      : null,
-                  );
-                  setChecked(false);
-                  setError(undefined);
-                }}
+                onCheckedChange={field.handleChange}
               />
               <FieldContent>
-                <FieldLabel htmlFor={`${id}-bound`}>
-                  {msg(
-                    "media_roots.bound",
-                    "Associate a folder on this server",
-                  )}
+                <FieldLabel htmlFor={`${id}-scan`}>
+                  {msg("library_folders.scan", "Include in library scans")}
                 </FieldLabel>
                 <FieldDescription>
                   {msg(
-                    "media_roots.bound_help",
-                    "An unbound root keeps its identity and collection paths for a later restore or relocation. It cannot accept file ingestion until a folder is bound.",
+                    "library_folders.scan_help",
+                    "Discover files in this folder during scans. Turning this off preserves existing media and allows downloads to continue.",
                   )}
                 </FieldDescription>
               </FieldContent>
             </Field>
           )}
         </form.Field>
-        <form.Subscribe selector={(state) => state.values.bound}>
-          {(bound) =>
-            bound && (
-              <>
-                <form.Field name="serverPath">
-                  {(field) => (
-                    <Field
-                      data-disabled={blocked}
-                      data-invalid={!field.state.meta.isValid}
-                    >
-                      <FieldLabel htmlFor={`${id}-path`}>
-                        {msg(
-                          "media_roots.path",
-                          "Folder path on the Stash server",
-                        )}
-                      </FieldLabel>
-                      <Input
-                        id={`${id}-path`}
-                        disabled={blocked}
-                        value={field.state.value}
-                        maxLength={4096}
-                        aria-invalid={!field.state.meta.isValid}
-                        onBlur={field.handleBlur}
-                        onChange={(event) => {
-                          field.handleChange(event.target.value);
-                          form.setFieldValue(
-                            "binding",
-                            event.target.value === input.binding?.path
-                              ? input.binding
-                              : null,
-                          );
-                          setChecked(false);
-                          setError(undefined);
-                        }}
-                      />
-                      <FieldDescription>
-                        {msg(
-                          "media_roots.path_help",
-                          "Use the existing absolute path visible to Stash, including its container mount. Registration does not move files, create folders or start a scan.",
-                        )}
-                      </FieldDescription>
-                    </Field>
-                  )}
-                </form.Field>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-fit"
-                  disabled={blocked}
-                  onClick={() => void probe()}
-                >
-                  {busy && <Spinner data-icon="inline-start" />}
-                  {msg("media_roots.check", "Check folder")}
-                </Button>
-                {checked && (
-                  <Alert>
-                    <AlertTitle>
-                      {msg("media_roots.checked", "Folder checked")}
-                    </AlertTitle>
-                    <AlertDescription>
-                      {msg(
-                        "media_roots.checked_help",
-                        "Stash can open this directory. Saving a new binding or reactivating a root checks this directory identity again.",
-                      )}
-                    </AlertDescription>
-                  </Alert>
-                )}
-                {error !== undefined && <MediaRootError error={error} />}
-              </>
-            )
-          }
-        </form.Subscribe>
-        <form.Field name="state">
+        <form.Field name="scan.exclude_video">
           {(field) => (
-            <Field data-disabled={blocked}>
-              <FieldLabel id={`${id}-state`}>
-                {msg("collections.state", "Status")}
-              </FieldLabel>
-              <ToggleGroup
-                variant="outline"
-                aria-labelledby={`${id}-state`}
+            <Field orientation="horizontal" data-disabled={blocked}>
+              <Switch
+                id={`${id}-video`}
+                checked={!field.state.value}
                 disabled={blocked}
-                value={[field.state.value]}
-                onValueChange={(values) => {
-                  if (values[0]) field.handleChange(values[0]);
-                }}
-              >
-                <ToggleGroupItem value="active">
-                  {labels.states.active}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="disabled">
-                  {labels.states.disabled}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="retired">
-                  {labels.states.retired}
-                </ToggleGroupItem>
-              </ToggleGroup>
-              <FieldDescription>
-                {msg(
-                  "media_roots.state_help",
-                  "Disabled pauses use of this root. Retired marks it as no longer in use. Both retain their folder binding and can be restored by choosing Active and saving, which verifies the folder again. Neither deletes media or collections.",
-                )}
-              </FieldDescription>
+                onCheckedChange={(value) => field.handleChange(!value)}
+              />
+              <FieldLabel htmlFor={`${id}-video`}>
+                {msg("library_folders.videos", "Scan videos")}
+              </FieldLabel>
             </Field>
           )}
         </form.Field>
-        <form.Field name="reason">
+        <form.Field name="scan.exclude_image">
           {(field) => (
-            <Field
-              data-disabled={blocked}
-              data-invalid={!field.state.meta.isValid}
-            >
-              <FieldLabel htmlFor={`${id}-reason`}>
-                {msg("collections.reason", "Reason for this change (optional)")}
-              </FieldLabel>
-              <Input
-                id={`${id}-reason`}
-                value={field.state.value}
+            <Field orientation="horizontal" data-disabled={blocked}>
+              <Switch
+                id={`${id}-images`}
+                checked={!field.state.value}
                 disabled={blocked}
-                aria-invalid={!field.state.meta.isValid}
-                onBlur={field.handleBlur}
-                onChange={(event) => field.handleChange(event.target.value)}
+                onCheckedChange={(value) => field.handleChange(!value)}
               />
+              <FieldLabel htmlFor={`${id}-images`}>
+                {msg("library_folders.images", "Scan images")}
+              </FieldLabel>
             </Field>
           )}
         </form.Field>
       </FieldGroup>
-      <form.Subscribe selector={(state) => state.values}>
-        {(values) => {
-          const valid = formSchema.safeParse(values).success;
-          return (
-            <>
-              {!valid && (
-                <FieldError>
-                  {msg(
-                    "media_roots.invalid_form",
-                    "Enter a root name and check any new folder before saving. Remove control characters from names and reasons.",
-                  )}
-                </FieldError>
+      <Collapsible>
+        <CollapsibleTrigger render={<Button type="button" variant="ghost" />}>
+          {msg("library_folders.advanced", "Advanced folder options")}
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-4">
+          <FieldGroup>
+            <form.Field name="offline">
+              {(field) => (
+                <Field orientation="horizontal" data-disabled={blocked}>
+                  <Switch
+                    id={`${id}-offline`}
+                    checked={field.state.value}
+                    disabled={blocked}
+                    onCheckedChange={field.handleChange}
+                  />
+                  <FieldContent>
+                    <FieldLabel htmlFor={`${id}-offline`}>
+                      {msg("library_folders.offline", "Folder is offline")}
+                    </FieldLabel>
+                    <FieldDescription>
+                      {msg(
+                        "library_folders.offline_help",
+                        "Keep the path and associations without verifying this mount. Turn this off when it is available again. Downloads cannot use an unverified folder.",
+                      )}
+                    </FieldDescription>
+                  </FieldContent>
+                </Field>
               )}
-              <Button
-                type="submit"
-                className="w-fit"
-                disabled={blocked || !valid}
-              >
-                {msg("media_roots.save", "Save media root")}
-              </Button>
-            </>
-          );
-        }}
+            </form.Field>
+            <form.Field name="state">
+              {(field) => (
+                <Field data-disabled={blocked}>
+                  <FieldLabel id={`${id}-state`}>
+                    {msg("collections.state", "Status")}
+                  </FieldLabel>
+                  <ToggleGroup
+                    variant="outline"
+                    aria-labelledby={`${id}-state`}
+                    disabled={blocked}
+                    value={[field.state.value]}
+                    onValueChange={(values) => {
+                      if (values[0]) field.handleChange(values[0]);
+                    }}
+                  >
+                    <ToggleGroupItem value="active">
+                      {labels.states.active}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="disabled">
+                      {labels.states.disabled}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="retired">
+                      {labels.states.retired}
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                  <FieldDescription>
+                    {msg(
+                      "library_folders.state_help",
+                      "Active folders can scan and receive downloads. Disabled pauses both. Retired marks a folder no longer in use; it can be reactivated. These settings do not delete media or associations.",
+                    )}
+                  </FieldDescription>
+                </Field>
+              )}
+            </form.Field>
+          </FieldGroup>
+        </CollapsibleContent>
+      </Collapsible>
+      {error !== undefined && <MediaRootError error={error} />}
+      <form.Subscribe selector={(state) => state.canSubmit}>
+        {(canSubmit) => (
+          <Button
+            className="w-fit"
+            type="submit"
+            disabled={blocked || !canSubmit}
+          >
+            {busy && <Spinner data-icon="inline-start" />}
+            {msg("media_roots.save", "Save folder")}
+          </Button>
+        )}
       </form.Subscribe>
+      {browse && (
+        <DirectorySelectionDialog
+          open={browse}
+          onOpenChange={setBrowse}
+          title={msg("actions.add_directory", "Add directory")}
+          onConfirm={(paths) => {
+            setBrowse(false);
+            if (paths[0]) {
+              form.setFieldValue("serverPath", paths[0]);
+              if (!form.getFieldValue("label"))
+                form.setFieldValue(
+                  "label",
+                  paths[0].split(/[\\/]/u).filter(Boolean).at(-1) ?? paths[0],
+                );
+            }
+          }}
+        />
+      )}
     </form>
   );
 }

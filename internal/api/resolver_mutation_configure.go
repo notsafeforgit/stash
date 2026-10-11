@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -85,34 +84,6 @@ func (r *mutationResolver) setConfigFloat(key string, value *float64) {
 
 func (r *mutationResolver) ConfigureGeneral(ctx context.Context, input ConfigGeneralInput) (*ConfigGeneralResult, error) {
 	c := config.GetInstance()
-
-	// #4709 - allow stash paths even if they do not exist, so that users may configure stash
-	// for disconnected drives or network storage.
-	existingPaths := c.GetStashPaths()
-	if input.Stashes != nil {
-		for _, s := range input.Stashes {
-			// Only validate existence of new paths
-			isNew := true
-			for _, path := range existingPaths {
-				if path.Path == s.Path {
-					isNew = false
-					break
-				}
-			}
-			if isNew {
-				s.Path = strings.Trim(s.Path, "\"")
-				s.Path = filepath.Clean(s.Path)
-
-				// if it exists, it must be directory
-				exists, err := fsutil.DirExists(s.Path)
-				// allow it to not exist but if it does exist it must be a directory
-				if !exists && !errors.Is(err, fs.ErrNotExist) {
-					return makeConfigGeneralResult(), err
-				}
-			}
-		}
-		c.SetInterface(config.Stash, input.Stashes)
-	}
 
 	checkConfigOverride := func(key string) error {
 		if c.HasOverride(key) {

@@ -143,6 +143,10 @@ models:
   FilterASTConditionInput:
     model: github.com/stashapp/stash/pkg/models.FilterASTCondition
   # force resolvers
+  ConfigGeneralResult:
+    fields:
+      stashes:
+        resolver: true
   ConfigResult:
     fields:
       plugins:

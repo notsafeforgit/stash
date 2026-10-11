@@ -17,6 +17,7 @@ type StashConfig struct {
 	Path         string `json:"path"`
 	ExcludeVideo bool   `json:"excludeVideo"`
 	ExcludeImage bool   `json:"excludeImage"`
+	ScanDisabled bool   `json:"-"`
 }
 
 type StashConfigs []*StashConfig

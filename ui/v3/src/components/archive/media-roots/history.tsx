@@ -62,7 +62,7 @@ export function MediaRootHistory({
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger render={<Button type="button" variant="outline" />}>
-        {msg("media_roots.history", "Media root history")}
+        {msg("media_roots.history", "Folder binding history")}
         <ChevronDown data-icon="inline-end" />
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-3 pt-3">

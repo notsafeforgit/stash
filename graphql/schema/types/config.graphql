@@ -76,8 +76,6 @@ enum BlobsStorageType {
 }
 
 input ConfigGeneralInput {
-  "Array of file paths to content"
-  stashes: [StashConfigInput!]
   "Path to the SQLite database"
   databasePath: String
   "Path to backup directory"

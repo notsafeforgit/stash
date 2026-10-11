@@ -35,6 +35,7 @@ import { IntlProvider } from "react-intl";
 import {
   createRootRoute,
   createRoute,
+  redirect,
   createRouter,
   Outlet,
   RouterProvider,
@@ -334,6 +335,7 @@ const settingsRoute = createRoute({
     </div>
   ),
 });
+const libraryFolderFixture = window.name === "library-folder-fixture";
 const router = createRouter({
   routeTree: rootRoute.addChildren([
     createRoute({
@@ -418,7 +420,9 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/media-roots",
       validateSearch: mediaRootSearchSchema,
-      component: MediaRootsFixture,
+      beforeLoad: ({ search }) => {
+        throw redirect({ to: "/settings/library", search, replace: true });
+      },
     }),
     createRoute({
       getParentRoute: () => rootRoute,
@@ -506,8 +510,20 @@ const router = createRouter({
       path: "/entity-cards",
       component: EntityCardsFixture,
     }),
+    ...(libraryFolderFixture
+      ? [
+          createRoute({
+            getParentRoute: () => rootRoute,
+            path: "/settings/library",
+            validateSearch: mediaRootSearchSchema,
+            component: MediaRootsFixture,
+          }),
+        ]
+      : []),
     settingsRoute.addChildren(
-      SETTINGS_NAV_ITEMS.map((item) =>
+      SETTINGS_NAV_ITEMS.filter(
+        (item) => !libraryFolderFixture || item.to !== "/settings/library",
+      ).map((item) =>
         createRoute({
           getParentRoute: () => settingsRoute,
           path: item.to.slice("/settings/".length),

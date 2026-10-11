@@ -735,12 +735,21 @@ func (i *Config) GetSFWContentMode() bool {
 	return i.getBool(SFWContentMode)
 }
 
-// GetStashPaths returns the configured stash library paths.
+// GetStashPaths returns the historical setup/import input only. Runtime callers
+// read the canonical library folders through manager.LibraryPaths.
 // Works opposite to the usual case - it will return the override
 // value only if the main value is not set.
 func (i *Config) GetStashPaths() StashConfigs {
 	i.RLock()
 	defer i.RUnlock()
+	return i.legacyStashPaths()
+}
+
+// Only setup and one-time configuration import read this historical list.
+func (i *Config) legacyStashPaths() StashConfigs {
+	if i.main.Exists(libraryFolderImportMarker) {
+		return nil
+	}
 
 	var ret StashConfigs
 

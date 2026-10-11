@@ -72,7 +72,10 @@ function RootSearch({
           {(field) => (
             <Field data-invalid={!field.state.meta.isValid}>
               <FieldLabel htmlFor={`${id}-q`}>
-                {msg("media_roots.search", "Search root names or server paths")}
+                {msg(
+                  "media_roots.search",
+                  "Search folder names or server paths",
+                )}
               </FieldLabel>
               <Input
                 id={`${id}-q`}
@@ -127,7 +130,7 @@ function RootSearch({
       <form.Subscribe selector={(state) => state.canSubmit}>
         {(canSubmit) => (
           <Button type="submit" className="w-fit" disabled={!canSubmit}>
-            {msg("media_roots.search_action", "Find media roots")}
+            {msg("media_roots.search_action", "Find folders")}
           </Button>
         )}
       </form.Subscribe>
@@ -139,12 +142,16 @@ export function MediaRoots({
   filter,
   selected,
   create = false,
+  embedded = false,
+  onChanged,
   onFilterChange,
   onSelect,
 }: {
   filter: MediaRootFilter;
   selected?: string;
   create?: boolean;
+  embedded?: boolean;
+  onChanged?: (root: MediaRoot) => void;
   onFilterChange: (filter: MediaRootFilter) => void;
   onSelect: (id?: string, create?: boolean) => void;
 }) {
@@ -199,6 +206,7 @@ export function MediaRoots({
   );
   const changed = useCallback(
     (root: MediaRoot) => {
+      onChanged?.(root);
       setCountRevision((value) => value + 1);
       if (create) {
         setCursor("");
@@ -210,7 +218,7 @@ export function MediaRoots({
         value.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
       const matches =
         (root.uuid === q ||
-          [root.label, root.binding?.path ?? ""].some((value) =>
+          [root.label, root.binding?.path ?? root.unbound_path].some((value) =>
             fold(value).includes(fold(q)),
           )) &&
         (!state || root.state === state);
@@ -225,26 +233,33 @@ export function MediaRoots({
           : page,
       );
     },
-    [q, state, create],
+    [q, state, create, onChanged],
   );
   return (
     <div
       ref={setScroller}
-      className="min-h-0 flex-1 overflow-y-auto"
+      className={cn(!embedded && "min-h-0 flex-1 overflow-y-auto")}
       data-scroll-restoration-id="media-roots"
     >
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 md:p-6">
-        <header className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold">
-            {msg("media_roots.title", "Media roots")}
-          </h1>
-          <p className="text-muted-foreground">
-            {msg(
-              "media_roots.description",
-              "Manage the server folders behind portable collection paths.",
-            )}
-          </p>
-        </header>
+      <div
+        className={cn(
+          "flex w-full flex-col gap-6",
+          !embedded && "mx-auto max-w-4xl p-4 md:p-6",
+        )}
+      >
+        {!embedded && (
+          <header className="flex flex-col gap-2">
+            <h1 className="text-2xl font-semibold">
+              {msg("media_roots.title", "Library folders")}
+            </h1>
+            <p className="text-muted-foreground">
+              {msg(
+                "media_roots.description",
+                "Manage folders used by library scans and downloads.",
+              )}
+            </p>
+          </header>
+        )}
         {selected && (
           <MediaRootEditor
             key={selected}
@@ -262,7 +277,7 @@ export function MediaRoots({
             onClick={() => onSelect(requestUUID(), true)}
           >
             <Plus data-icon="inline-start" />
-            {msg("media_roots.new", "New media root")}
+            {msg("media_roots.new", "Add library folder")}
           </Button>
           <RootSearch filter={filter} onChange={onFilterChange} />
           {busy && <Spinner />}
@@ -286,8 +301,20 @@ export function MediaRoots({
                   </CardHeader>
                   <CardContent>
                     <p data-selectable-text className="wrap-anywhere">
-                      {root.binding?.path ??
+                      {root.binding?.path ||
+                        root.unbound_path ||
                         msg("media_roots.unbound", "No local folder")}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {root.scan.enabled
+                        ? msg(
+                            "library_folders.scanning_on",
+                            "Included in library scans",
+                          )
+                        : msg(
+                            "library_folders.scanning_off",
+                            "Library scanning is off",
+                          )}
                     </p>
                   </CardContent>
                   <CardFooter>
@@ -296,7 +323,7 @@ export function MediaRoots({
                       variant="outline"
                       onClick={() => onSelect(root.uuid)}
                     >
-                      {msg("media_roots.manage", "Manage root")}
+                      {msg("media_roots.manage", "Edit folder")}
                     </Button>
                   </CardFooter>
                 </Card>
@@ -305,12 +332,12 @@ export function MediaRoots({
               <Empty>
                 <EmptyHeader>
                   <EmptyTitle>
-                    {msg("media_roots.empty", "No matching media roots")}
+                    {msg("media_roots.empty", "No matching library folders")}
                   </EmptyTitle>
                   <EmptyDescription>
                     {msg(
                       "media_roots.empty_help",
-                      "Try another search or register a root for an existing server folder.",
+                      "Try another search or add a library folder.",
                     )}
                   </EmptyDescription>
                 </EmptyHeader>

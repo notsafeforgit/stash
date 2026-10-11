@@ -120,7 +120,7 @@ export function CollectionHistory({
                 )}
                 {row.root_uuid && (
                   <>
-                    <dt>{msg("collections.root", "Media root")}</dt>
+                    <dt>{msg("collections.root", "Library folder")}</dt>
                     <dd data-selectable-text className="wrap-anywhere">
                       {row.root_uuid}
                     </dd>

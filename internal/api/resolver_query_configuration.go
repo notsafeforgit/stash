@@ -86,7 +86,6 @@ func makeConfigGeneralResult() *ConfigGeneralResult {
 	customPerformerImageLocation := config.GetCustomPerformerImageLocation()
 
 	return &ConfigGeneralResult{
-		Stashes:                       config.GetStashPaths(),
 		DatabasePath:                  config.GetDatabasePath(),
 		BackupDirectoryPath:           config.GetBackupDirectoryPath(),
 		DeleteTrashPath:               config.GetDeleteTrashPath(),

@@ -14,7 +14,8 @@ import (
 )
 
 type fingerprintCalculator struct {
-	Config *config.Config
+	Config  *config.Config
+	IsVideo func(string) bool
 }
 
 func (c *fingerprintCalculator) calculateOshash(f *models.BaseFile, o file.Opener) (*models.Fingerprint, error) {
@@ -64,7 +65,7 @@ func (c *fingerprintCalculator) CalculateFingerprints(f *models.BaseFile, o file
 	var ret []models.Fingerprint
 	calculateMD5 := true
 
-	if useAsVideo(f.Path) {
+	if c.IsVideo(f.Path) {
 		var (
 			fp  *models.Fingerprint
 			err error

@@ -86,12 +86,14 @@ func TestMediaRootRevisionAndMountReview(t *testing.T) {
 		history, err := repo.MediaRoot.History(ctx, id, 0, 2)
 		require.NoError(t, err)
 		require.Len(t, history, 2)
+		first.Scan = nil // Binding history omits independently versioned scan settings.
 		require.Equal(t, *first, history[0].MediaRoot)
 		require.Equal(t, "Initial mount", history[0].Reason)
 		require.False(t, history[0].RecordedAt.IsZero())
 		next, err := repo.MediaRoot.History(ctx, id, history[1].Revision, 2)
 		require.NoError(t, err)
 		require.Len(t, next, 2)
+		rebound.Scan, retired.Scan = nil, nil
 		require.Equal(t, *rebound, next[0].MediaRoot)
 		require.Equal(t, *retired, next[1].MediaRoot)
 		return nil

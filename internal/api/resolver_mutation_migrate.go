@@ -45,7 +45,7 @@ func (r *mutationResolver) Migrate(ctx context.Context, input manager.MigrateInp
 		BackupPath:     input.BackupPath,
 		Config:         mgr.Config,
 		Database:       mgr.Database,
-		AfterMigration: mgr.PromoteDefaultFilterConfig,
+		AfterMigration: mgr.PromoteConfiguration,
 	}
 
 	if err := t.PreExecute(); err != nil {

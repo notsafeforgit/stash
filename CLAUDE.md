@@ -15,6 +15,14 @@ source/wrapper digests, and report any GitHub-side execution block explicitly.
 
 New plugins use the independent [`apiVersion: 3` contract](docs/plugin-manifests.md). Preserve its settings, UI contributions, capability checks, and after-success notifications. Only `apiVersion: 3` manifests load. Unversioned manifests and legacy UI injection are rejected and reported through `pluginLoadErrorsV3` and Settings → Plugins. Native catalog invariants belong in core services. New Twitter captures retain numeric thread/parent/publisher relationships in schema 1000105; evidenced self-replies share a source gallery while retaining each post and its attachment order. See [source albums](docs/native-source-albums.md#twitter-threads-and-replies).
 
+Library folders and ingestion roots share the native `media_roots` records from
+schema 1000113. Manage them in Settings → Library; do not restore a parallel YAML
+`stash` writer or a separate root navigation page. Scan options have their own
+revision so edits cannot invalidate running scrape bindings. Read one folder
+snapshot per operation through `manager.LibraryPaths`, or `ReadLibraryPaths`
+inside an existing repository transaction. See the
+[folder contract](docs/native-ingestion.md#library-folders-and-logical-roots).
+
 Some implementation notes below describe intermediate staging gates. Use the
 dated progress/cutover records for current deployment status; do not repeat a
 completed migration, reconciliation or restore because an older note calls it

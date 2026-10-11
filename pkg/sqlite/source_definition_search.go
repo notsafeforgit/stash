@@ -36,8 +36,8 @@ func sourceDefinitionSearch(filter models.SourceDefinitionFilter, collection boo
 			where += " OR r.target_url LIKE ? ESCAPE '\\' OR r.path_prefix LIKE ? ESCAPE '\\'"
 			args = append(args, query, query)
 		} else {
-			where += " OR r.server_path LIKE ? ESCAPE '\\'"
-			args = append(args, query)
+			where += " OR r.server_path LIKE ? ESCAPE '\\' OR r.unbound_path LIKE ? ESCAPE '\\'"
+			args = append(args, query, query)
 		}
 		where += ")"
 	}

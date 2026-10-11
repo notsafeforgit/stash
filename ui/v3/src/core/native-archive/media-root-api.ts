@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { accountUUIDSchema as uuid } from "./account-review-api";
-import { mediaRootSchema, definitionStateSchema } from "./collection-api";
+import {
+  mediaRootSchema,
+  mediaRootScanSchema,
+  definitionStateSchema,
+} from "./collection-api";
 import {
   createArchiveRequest,
   nativeArchiveEndpoint,
@@ -29,6 +33,8 @@ export const mediaRootInputSchema = z
     label: text(1024).refine((value) => value.trim().length > 0),
     state: definitionStateSchema,
     binding: rootBindingSchema.nullable(),
+    unbound_path: text(4096).optional(),
+    scan: mediaRootScanSchema.optional(),
     reason: text(4096),
   })
   .strict();
@@ -43,6 +49,7 @@ export const mediaRootSearchSchema = z.object({
   create: z.boolean().optional().catch(undefined),
 });
 const historySchema = mediaRootSchema.extend({
+  scan: mediaRootScanSchema.optional(),
   origin: z.string(),
   reason: z.string(),
   recorded_at: z.string(),
@@ -53,10 +60,19 @@ export type MediaRootFilter = z.infer<typeof mediaRootFilterSchema>;
 export type RootBinding = z.infer<typeof rootBindingSchema>;
 export type MediaRootRevision = z.infer<typeof historySchema>;
 
-export function sameRootDefinition(input: MediaRootInput, root: MediaRoot) {
+export function sameRootDefinition(
+  input: MediaRootInput,
+  root: Omit<MediaRoot, "scan"> & { scan?: MediaRoot["scan"] },
+) {
   return (
     input.label === root.label &&
     input.state === root.state &&
+    (input.unbound_path === undefined ||
+      input.unbound_path === root.unbound_path) &&
+    (input.scan === undefined ||
+      (input.scan.enabled === root.scan?.enabled &&
+        input.scan.exclude_video === root.scan?.exclude_video &&
+        input.scan.exclude_image === root.scan?.exclude_image)) &&
     input.binding?.path === root.binding?.path &&
     input.binding?.directory_identity === root.binding?.directory_identity
   );
@@ -99,6 +115,25 @@ export function createMediaRootAPI(
   }
   async function recover(input: MediaRootInput) {
     try {
+      if (input.scan) {
+        const current = await root(input.uuid);
+        if (
+          [input.expected_revision, input.expected_revision + 1].includes(
+            current.revision,
+          ) &&
+          [input.scan.revision, input.scan.revision + 1].includes(
+            current.scan.revision,
+          ) &&
+          sameRootDefinition(input, current)
+        )
+          return current;
+        if (
+          current.revision === input.expected_revision &&
+          current.scan.revision === input.scan.revision
+        )
+          return null;
+        throw new NativeArchiveError(409, "preview_changed");
+      }
       const rows = await history(input.uuid, input.expected_revision, 1);
       const found = rows[0];
       if (found) {

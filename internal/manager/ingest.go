@@ -29,7 +29,7 @@ func (s *Manager) NewIngestFileWorker(service *ingest.Service) *ingest.FileWorke
 		if kind == models.ArchiveScene {
 			decorator = &video.Decorator{FFProbe: s.FFProbe}
 		}
-		return &file.Scanner{FingerprintCalculator: &fingerprintCalculator{s.Config}, FileDecorators: []file.Decorator{decorator}}
+		return &file.Scanner{FingerprintCalculator: &fingerprintCalculator{Config: s.Config, IsVideo: func(string) bool { return kind == models.ArchiveScene }}, FileDecorators: []file.Decorator{decorator}}
 	}
 	return ingest.NewFileWorker(service, scanner, s.finishFileIngestion)
 }

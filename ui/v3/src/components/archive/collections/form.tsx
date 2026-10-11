@@ -254,7 +254,7 @@ export function CollectionForm({
         </form.Field>
         <Field data-disabled={disabled}>
           <FieldLabel htmlFor={`${id}-root`}>
-            {msg("collections.root", "Media root")}
+            {msg("collections.root", "Library folder")}
           </FieldLabel>
           <LookupPicker
             id={`${id}-root`}
@@ -276,7 +276,7 @@ export function CollectionForm({
           <FieldDescription>
             {msg(
               "collections.root_help",
-              "Choose a registered media root to associate a folder with this collection.",
+              "Choose a library folder configured in Settings → Library for this collection.",
             )}
           </FieldDescription>
         </Field>
@@ -287,7 +287,7 @@ export function CollectionForm({
               data-invalid={!field.state.meta.isValid}
             >
               <FieldLabel htmlFor={`${id}-path`}>
-                {msg("collections.path", "Folder within the media root")}
+                {msg("collections.path", "Subfolder within the library folder")}
               </FieldLabel>
               <Input
                 id={`${id}-path`}

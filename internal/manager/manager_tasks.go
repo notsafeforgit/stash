@@ -31,8 +31,8 @@ func TaskDescWithPaths(label string, paths []string) string {
 	return label + ": " + strings.Join(paths, ", ")
 }
 
-func useAsVideo(pathname string) bool {
-	stash := config.StashConfigs.GetStashFromDirPath(instance.Config.GetStashPaths(), pathname)
+func useAsVideo(pathname string, folders config.StashConfigs) bool {
+	stash := folders.GetStashFromDirPath(pathname)
 
 	if instance.Config.IsCreateImageClipsFromVideos() && stash != nil && stash.ExcludeVideo {
 		return false
@@ -40,8 +40,8 @@ func useAsVideo(pathname string) bool {
 	return isVideo(pathname)
 }
 
-func useAsImage(pathname string) bool {
-	stash := config.StashConfigs.GetStashFromDirPath(instance.Config.GetStashPaths(), pathname)
+func useAsImage(pathname string, folders config.StashConfigs) bool {
+	stash := folders.GetStashFromDirPath(pathname)
 	if instance.Config.IsCreateImageClipsFromVideos() && stash != nil && stash.ExcludeVideo {
 		return isImage(pathname) || isVideo(pathname)
 	}
@@ -63,17 +63,22 @@ func isImage(pathname string) bool {
 	return fsutil.MatchExtension(pathname, imgExt)
 }
 
-func getScanPaths(inputPaths []string) []*config.StashConfig {
-	stashPaths := config.GetInstance().GetStashPaths()
+func getScanPaths(inputPaths []string, stashPaths config.StashConfigs) []*config.StashConfig {
 
 	if len(inputPaths) == 0 {
-		return stashPaths
+		var ret config.StashConfigs
+		for _, folder := range stashPaths {
+			if !folder.ScanDisabled {
+				ret = append(ret, folder)
+			}
+		}
+		return ret
 	}
 
 	var ret config.StashConfigs
 	for _, p := range inputPaths {
 		s := stashPaths.GetStashFromDirPath(p)
-		if s == nil {
+		if s == nil || s.ScanDisabled {
 			logger.Warnf("%s is not in the configured stash paths", p)
 			continue
 		}
@@ -88,12 +93,10 @@ func getScanPaths(inputPaths []string) []*config.StashConfig {
 }
 
 // Filters the input array for paths that are within the paths managed by stash
-func filterStashPaths(inputPaths []string) []string {
+func filterStashPaths(inputPaths []string, stashPaths config.StashConfigs) []string {
 	if len(inputPaths) == 0 {
 		return inputPaths
 	}
-
-	stashPaths := config.GetInstance().GetStashPaths()
 
 	var ret []string
 	for _, p := range inputPaths {
@@ -136,6 +139,10 @@ func (s *Manager) Scan(ctx context.Context, input ScanMetadataInput) (int, error
 	}
 
 	cfg := config.GetInstance()
+	folders, err := LibraryPaths(ctx, s.Repository)
+	if err != nil {
+		return 0, err
+	}
 
 	scanner := &file.Scanner{
 		Repository: file.NewRepository(s.Repository),
@@ -144,26 +151,27 @@ func (s *Manager) Scan(ctx context.Context, input ScanMetadataInput) (int, error
 				Decorator: &video.Decorator{
 					FFProbe: s.FFProbe,
 				},
-				Filter: file.FilterFunc(videoFileFilter),
+				Filter: videoFileFilter(folders),
 			},
 			&file.FilteredDecorator{
 				Decorator: &file_image.Decorator{
 					FFProbe: s.FFProbe,
 				},
-				Filter: file.FilterFunc(imageFileFilter),
+				Filter: imageFileFilter(folders),
 			},
 		},
-		FingerprintCalculator: &fingerprintCalculator{s.Config},
+		FingerprintCalculator: &fingerprintCalculator{Config: s.Config, IsVideo: func(path string) bool { return useAsVideo(path, folders) }},
 		FS:                    &file.OsFS{},
 		ZipFileExtensions:     cfg.GetGalleryExtensions(),
 		// ScanFilters is set in ScanJob.Execute
 		// HandlerRequiredFilters is set in ScanJob.Execute
 		// #4425 - isRootPath compares these against the NFC paths stored during scanning
-		RootPaths: fsutil.NormalizePaths(cfg.GetStashPaths().Paths()),
+		RootPaths: fsutil.NormalizePaths(folders.Paths()),
 		Rescan:    input.Rescan,
 	}
 
 	scanJob := ScanJob{
+		stashPaths:    folders,
 		scanner:       scanner,
 		input:         input,
 		subscriptions: s.scanSubs,

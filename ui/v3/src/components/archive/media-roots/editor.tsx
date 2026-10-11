@@ -24,6 +24,11 @@ import {
 } from "@/components/ui/card";
 import { MediaRootForm, MediaRootError } from "./form";
 import { MediaRootHistory } from "./history";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 export function MediaRootEditor({
   api,
@@ -82,6 +87,13 @@ export function MediaRootEditor({
               label: current?.label ?? "",
               state: current?.state ?? "active",
               binding: current?.binding ?? null,
+              unbound_path: current?.unbound_path ?? "",
+              scan: current?.scan ?? {
+                revision: 0,
+                enabled: true,
+                exclude_video: false,
+                exclude_image: false,
+              },
               reason: "",
             } satisfies MediaRootInput);
         if (!controller.signal.aborted) {
@@ -143,18 +155,16 @@ export function MediaRootEditor({
     <div className="flex flex-col gap-4">
       <Button type="button" variant="ghost" className="w-fit" onClick={onBack}>
         <ArrowLeft data-icon="inline-start" />
-        {msg("media_roots.back", "Back to media roots")}
+        {msg("media_roots.back", "Back to library folders")}
       </Button>
       {busy && <Spinner />}
       {applied && (
         <Alert>
-          <AlertTitle>
-            {msg("media_roots.saved", "Media root saved")}
-          </AlertTitle>
+          <AlertTitle>{msg("media_roots.saved", "Folder saved")}</AlertTitle>
           <AlertDescription>
             {msg(
               "media_roots.saved_help",
-              "The archive has recorded this root definition and its binding history.",
+              "The folder settings are saved for library scans and downloads.",
             )}
           </AlertDescription>
         </Alert>
@@ -165,7 +175,7 @@ export function MediaRootEditor({
             <AlertTitle>
               {msg(
                 "media_roots.refresh_failed",
-                "The root is saved, but this view could not be refreshed",
+                "The folder is saved, but this view could not be refreshed",
               )}
             </AlertTitle>
             <AlertDescription>
@@ -186,10 +196,10 @@ export function MediaRootEditor({
         <Alert>
           <AlertTitle>
             {saved.state === "pending"
-              ? msg("media_roots.pending", "Confirm this saved root change")
+              ? msg("media_roots.pending", "Confirm this saved folder change")
               : msg(
                   "media_roots.conflict",
-                  "Review the root and folder before saving again",
+                  "Review the folder before saving again",
                 )}
           </AlertTitle>
           <AlertDescription>
@@ -213,8 +223,8 @@ export function MediaRootEditor({
               }
             >
               {saved.state === "pending"
-                ? msg("media_roots.recover", "Check and retry root change")
-                : msg("media_roots.reload", "Review current root")}
+                ? msg("media_roots.recover", "Check and retry folder change")
+                : msg("media_roots.reload", "Review current folder")}
             </Button>
           </AlertDescription>
         </Alert>
@@ -223,12 +233,13 @@ export function MediaRootEditor({
         <Card>
           <CardHeader>
             <CardTitle>
-              {data.current?.label ?? msg("media_roots.new", "New media root")}
+              {data.current?.label ??
+                msg("media_roots.new", "Add library folder")}
             </CardTitle>
             <CardDescription>
               {msg(
                 "media_roots.editor_help",
-                "A stable root identity connects portable collection paths to a folder on this server.",
+                "Configure this folder once for library scans and downloads.",
               )}
             </CardDescription>
           </CardHeader>
@@ -237,7 +248,7 @@ export function MediaRootEditor({
               <p>
                 {msg(
                   "media_roots.retired_help",
-                  "This root is retired. Choose Active or Disabled and save to restore it with the same identity and history. Activating it verifies its folder again.",
+                  "This folder is retired. Choose Active or Disabled under Advanced folder options to restore it with the same associations.",
                 )}
               </p>
             )}
@@ -248,12 +259,35 @@ export function MediaRootEditor({
               disabled={!ready || busy || !!saved}
               onSave={deliver}
             />
-            {data.current && (
-              <MediaRootHistory key={data.current.revision} api={api} id={id} />
-            )}
-            <p data-selectable-text className="wrap-anywhere font-mono text-xs">
-              {id}
-            </p>
+            <Collapsible>
+              <CollapsibleTrigger render={<Button variant="ghost" />}>
+                {msg(
+                  "library_folders.storage_details",
+                  "Storage details and history",
+                )}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="flex flex-col gap-4">
+                <p>
+                  {msg(
+                    "library_folders.worker_paths",
+                    "Download workers use this folder's storage ID with their own local mount path. Existing worker mappings remain valid when scan options change.",
+                  )}
+                </p>
+                <p
+                  data-selectable-text
+                  className="wrap-anywhere font-mono text-xs"
+                >
+                  {id}
+                </p>
+                {data.current && (
+                  <MediaRootHistory
+                    key={data.current.revision}
+                    api={api}
+                    id={id}
+                  />
+                )}
+              </CollapsibleContent>
+            </Collapsible>
           </CardContent>
         </Card>
       )}

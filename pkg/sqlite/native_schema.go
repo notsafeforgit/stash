@@ -617,6 +617,16 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return fmt.Errorf("native database schema is incomplete: missing metadata_request_permits")
 			}
 		}
+		if version >= NativeSchemaBaseline+113 {
+			var columns int
+			if err := conn.Get(&columns, `SELECT (SELECT count(*) FROM pragma_table_info('media_roots') WHERE name IN ('scan_revision','scan_enabled','exclude_video','exclude_image'))
++ (SELECT count(*) FROM pragma_table_info('media_root_revisions') WHERE name='unbound_path')`); err != nil {
+				return err
+			}
+			if columns != 5 {
+				return errors.New("native database schema is incomplete: library folder settings")
+			}
+		}
 		if version >= NativeSchemaBaseline+55 {
 			if err := validateSourceRunServicesSchema(conn, version >= NativeSchemaBaseline+99, auditData); err != nil {
 				return err

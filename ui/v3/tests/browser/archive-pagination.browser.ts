@@ -6,6 +6,12 @@ test.use({
   expectedConsoleErrors: ["the server responded with a status of 503"],
 });
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    window.name = "library-folder-fixture";
+  });
+});
+
 const id = (value: number) =>
   `00000000-0000-4000-8000-${String(value).padStart(12, "0")}`;
 
@@ -65,10 +71,10 @@ for (const viewport of [
       path: testInfo.outputPath(`pagination-${viewport.name}.png`),
     });
     const search = page.getByRole("textbox", {
-      name: "Search root names or server paths",
+      name: "Search folder names or server paths",
     });
     await search.fill("Root 50");
-    await page.getByRole("button", { name: "Find media roots" }).click();
+    await page.getByRole("button", { name: "Find folders" }).click();
     await expect(
       page.getByText("Page 1 of 1 · 1 item", { exact: true }),
     ).toBeVisible();
@@ -76,7 +82,7 @@ for (const viewport of [
       page.getByRole("button", { name: "Previous", exact: true }),
     ).toBeDisabled();
     await search.fill("Missing");
-    await page.getByRole("button", { name: "Find media roots" }).click();
+    await page.getByRole("button", { name: "Find folders" }).click();
     await expect(
       page.getByText("Page 0 of 0 · 0 items", { exact: true }),
     ).toBeVisible();
@@ -149,7 +155,7 @@ test("a failed count can be retried without replacing the loaded rows", async ({
     return route.fulfill({ json: [mediaRoot()] });
   });
   await page.goto("/media-roots");
-  await expect(page.getByRole("button", { name: "Manage root" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit folder" })).toBeVisible();
   await expect(
     page.getByRole("status").filter({ hasText: "Could not load item count" }),
   ).toBeVisible();
@@ -158,5 +164,5 @@ test("a failed count can be retried without replacing the loaded rows", async ({
   await expect(
     page.getByText("Page 1 of 1 · 1 item", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Manage root" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit folder" })).toBeVisible();
 });

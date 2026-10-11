@@ -22,18 +22,24 @@ type mediaRootRow struct {
 	State             string    `db:"state"`
 	ServerPath        *string   `db:"server_path"`
 	DirectoryIdentity *string   `db:"directory_identity"`
+	UnboundPath       string    `db:"unbound_path"`
+	ScanRevision      int       `db:"scan_revision"`
+	ScanEnabled       bool      `db:"scan_enabled"`
+	ExcludeVideo      bool      `db:"exclude_video"`
+	ExcludeImage      bool      `db:"exclude_image"`
 	Origin            string    `db:"origin"`
 	Reason            string    `db:"reason"`
 	CreatedAt         Timestamp `db:"created_at"`
 	RecordedAt        Timestamp `db:"recorded_at"`
 }
 
-const mediaRootSelect = `SELECT b.uuid,b.created_at,r.revision,r.label,r.state,r.server_path,r.directory_identity,r.origin,r.reason,r.created_at AS recorded_at
+const mediaRootSelect = `SELECT b.uuid,b.created_at,r.revision,r.label,r.state,r.server_path,r.directory_identity,r.unbound_path,b.scan_revision,b.scan_enabled,b.exclude_video,b.exclude_image,r.origin,r.reason,r.created_at AS recorded_at
 FROM media_roots b JOIN media_root_revisions r ON r.root_uuid=b.uuid`
 
 func (r mediaRootRow) resolve() *models.MediaRoot {
 	ret := &models.MediaRoot{UUID: r.UUID, Revision: r.Revision, CreatedAt: r.CreatedAt.Timestamp,
-		MediaRootDefinition: models.MediaRootDefinition{Label: r.Label, State: r.State}}
+		MediaRootDefinition: models.MediaRootDefinition{Label: r.Label, State: r.State, UnboundPath: r.UnboundPath,
+			Scan: &models.MediaRootScan{Revision: r.ScanRevision, Enabled: r.ScanEnabled, ExcludeVideo: r.ExcludeVideo, ExcludeImage: r.ExcludeImage}}}
 	if r.ServerPath != nil && r.DirectoryIdentity != nil {
 		ret.Binding = &models.MediaRootBinding{Path: *r.ServerPath, DirectoryIdentity: *r.DirectoryIdentity}
 	}
@@ -82,6 +88,30 @@ func (s *MediaRootStore) Put(ctx context.Context, input models.MediaRootInput) (
 	if (current == nil && input.ExpectedRevision != 0) || (current != nil && current.Revision != input.ExpectedRevision) {
 		return nil, models.ErrSourceDefinitionConflict
 	}
+	if input.Scan == nil {
+		input.Scan = &models.MediaRootScan{}
+		if current != nil {
+			input.Scan = current.Scan
+		}
+	}
+	if input.UnboundPath != "" && (input.Binding != nil || !validAccountText(input.UnboundPath, 4096, false) || !filepath.IsAbs(input.UnboundPath) || filepath.Clean(input.UnboundPath) != input.UnboundPath) {
+		return nil, models.ErrMediaRootBindingInvalid
+	}
+	if input.Scan.Revision < 0 || (current == nil && input.Scan.Revision != 0) || (current != nil && input.Scan.Revision != current.Scan.Revision) {
+		return nil, models.ErrSourceDefinitionConflict
+	}
+	// A path is configured once. A nested folder may override scan options, but
+	// two logical roots cannot claim the same current local path.
+	if path := input.LocalPath(); path != "" {
+		var duplicate bool
+		if err := dbWrapper.Get(ctx, &duplicate, `SELECT EXISTS(SELECT 1 FROM media_roots b JOIN media_root_revisions r ON r.root_uuid=b.uuid AND r.revision=b.revision
+WHERE b.uuid!=? AND (r.server_path=? OR r.unbound_path=?))`, id, path, path); err != nil {
+			return nil, err
+		}
+		if duplicate {
+			return nil, fmt.Errorf("%w: folder is already registered", models.ErrSourceDefinitionConflict)
+		}
+	}
 	// Labels and disabling an offline mount do not need that mount online.
 	// A new binding or reactivation always rechecks the actual open directory.
 	if input.Binding != nil {
@@ -94,8 +124,15 @@ func (s *MediaRootStore) Put(ctx context.Context, input models.MediaRootInput) (
 			}
 		}
 	}
-	if current != nil && reflect.DeepEqual(current.MediaRootDefinition, input.MediaRootDefinition) {
-		return current, nil
+	if current != nil {
+		oldDefinition, newDefinition := current.MediaRootDefinition, input.MediaRootDefinition
+		oldDefinition.Scan, newDefinition.Scan = nil, nil
+		if reflect.DeepEqual(oldDefinition, newDefinition) {
+			if err := saveRootScan(ctx, id, current.Scan, input.Scan); err != nil {
+				return nil, err
+			}
+			return s.Find(ctx, id)
+		}
 	}
 	if current == nil {
 		if _, err := dbWrapper.Exec(ctx, "INSERT INTO media_roots(uuid) VALUES(?)", id); err != nil {
@@ -106,11 +143,36 @@ func (s *MediaRootStore) Put(ctx context.Context, input models.MediaRootInput) (
 	if input.Binding != nil {
 		serverPath, identity = &input.Binding.Path, &input.Binding.DirectoryIdentity
 	}
-	if _, err := dbWrapper.Exec(ctx, `INSERT INTO media_root_revisions(root_uuid,revision,label,state,server_path,directory_identity,origin,reason)
-VALUES(?,?,?,?,?,?,?,?)`, id, input.ExpectedRevision+1, input.Label, input.State, serverPath, identity, input.Origin, input.Reason); err != nil {
+	if _, err := dbWrapper.Exec(ctx, `INSERT INTO media_root_revisions(root_uuid,revision,label,state,server_path,directory_identity,unbound_path,origin,reason)
+VALUES(?,?,?,?,?,?,?,?,?)`, id, input.ExpectedRevision+1, input.Label, input.State, serverPath, identity, input.UnboundPath, input.Origin, input.Reason); err != nil {
+		return nil, err
+	}
+	previousScan := &models.MediaRootScan{}
+	if current != nil {
+		previousScan = current.Scan
+	}
+	if err := saveRootScan(ctx, id, previousScan, input.Scan); err != nil {
 		return nil, err
 	}
 	return s.Find(ctx, id)
+}
+
+func saveRootScan(ctx context.Context, id string, previous, input *models.MediaRootScan) error {
+	if reflect.DeepEqual(previous, input) {
+		return nil
+	}
+	result, err := dbWrapper.Exec(ctx, `UPDATE media_roots SET scan_revision=scan_revision+1,scan_enabled=?,exclude_video=?,exclude_image=? WHERE uuid=? AND scan_revision=?`, input.Enabled, input.ExcludeVideo, input.ExcludeImage, id, input.Revision)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return models.ErrSourceDefinitionConflict
+	}
+	return nil
 }
 
 func (s *MediaRootStore) Find(ctx context.Context, value string) (*models.MediaRoot, error) {
@@ -162,7 +224,11 @@ func (s *MediaRootStore) History(ctx context.Context, value string, after, limit
 	}
 	ret := make([]models.MediaRootRevision, 0, len(rows))
 	for _, row := range rows {
-		ret = append(ret, models.MediaRootRevision{MediaRoot: *row.resolve(), Origin: row.Origin, Reason: row.Reason, RecordedAt: row.RecordedAt.Timestamp})
+		root := row.resolve()
+		// Binding history does not assert historical scan settings. Those use
+		// an independent current revision and never alter storage authority.
+		root.Scan = nil
+		ret = append(ret, models.MediaRootRevision{MediaRoot: *root, Origin: row.Origin, Reason: row.Reason, RecordedAt: row.RecordedAt.Timestamp})
 	}
 	return ret, nil
 }

@@ -198,7 +198,11 @@ func (j *GenerateJob) Execute(ctx context.Context, progress *job.Progress) error
 				}
 
 				if len(j.input.Paths) > 0 {
-					paths := filterStashPaths(j.input.Paths)
+					folders, err := ReadLibraryPaths(ctx, r)
+					if err != nil {
+						return err
+					}
+					paths := filterStashPaths(j.input.Paths, folders)
 					j.queueTasks(ctx, g, paths, queue)
 				}
 			}

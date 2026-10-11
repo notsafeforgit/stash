@@ -612,7 +612,7 @@ export function MetadataPolicyPreview({
                 <p>
                   {msg(
                     "metadata_policy.needs_folder",
-                    "Associate a media root and folder with this collection before testing file rules.",
+                    "Choose a library folder and subfolder for this collection before testing file rules.",
                   )}
                 </p>
               )}

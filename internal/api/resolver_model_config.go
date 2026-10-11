@@ -7,6 +7,10 @@ import (
 	"github.com/stashapp/stash/internal/manager/config"
 )
 
+func (r *configGeneralResultResolver) SourceTrackingActive(ctx context.Context, obj *ConfigGeneralResult) (bool, error) {
+	return r.sourceTrackingActive, nil
+}
+
 func (r *configGeneralResultResolver) Stashes(ctx context.Context, obj *ConfigGeneralResult) ([]*config.StashConfig, error) {
 	mgr := manager.GetInstance()
 	if mgr.Database.Ready() != nil {

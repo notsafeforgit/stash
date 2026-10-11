@@ -4,6 +4,10 @@
 > [project documentation](docs/README.md) for v3 development, compatibility, and
 > deployment. The installation and community links below refer to mainline Stash.
 
+Source tracking is off by default, and S3 backup requires separate host setup.
+Neither is required for a local library or StashDB. See
+[optional integrations](docs/optional-integrations.md).
+
 [![Build](https://github.com/stashapp/stash/actions/workflows/build.yml/badge.svg?branch=develop&event=push)](https://github.com/stashapp/stash/actions/workflows/build.yml)
 [![Docker pulls](https://img.shields.io/docker/pulls/stashapp/stash?logo=docker)](https://hub.docker.com/r/stashapp/stash 'DockerHub')
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/stashapp?logo=github)](https://github.com/sponsors/stashapp)

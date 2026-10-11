@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SourceTrackingSettings } from "@/components/settings/source-tracking-settings";
 import { createFileRoute } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { useMutation, useQuery } from "@apollo/client/react";
@@ -255,6 +256,7 @@ function SettingsServicesPage() {
 
   return (
     <div className="max-w-3xl space-y-8 p-6">
+      <SourceTrackingSettings />
       <SettingsSection title="DLNA">
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-3 text-sm font-medium">

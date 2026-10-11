@@ -202,6 +202,17 @@ const root = createRootRoute({
       <ConfigurationProvider
         configuration={{
           ...playerConfiguration,
+          general: {
+            ...playerConfiguration.general,
+            sourceTrackingEnabled:
+              new URLSearchParams(location.search).has("source-tracking") ||
+              new URLSearchParams(location.search).has(
+                "source-tracking-pending",
+              ),
+            sourceTrackingActive: new URLSearchParams(location.search).has(
+              "source-tracking",
+            ),
+          },
           ui: { frontPageContent: rows },
         }}
       >

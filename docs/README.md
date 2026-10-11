@@ -12,6 +12,7 @@ provides the frozen fallback for users who do not migrate.
 | Guide | Use it for |
 | --- | --- |
 | [System architecture](ARCHITECTURE.md) | Runtime map, browser entry points, backend services, storage, compatibility, and request flows |
+| [Optional integrations](optional-integrations.md) | Local-library defaults, opt-in source tracking, and independent host-owned S3 backup |
 | [v3 development](../ui/v3/docs/development.md) | Local setup, generation, builds, and validation order |
 | [v3 dependencies](v3-dependencies.md) | Dependency versions, native security updates, and shadcn maintenance |
 | [v3 frontend architecture](../ui/v3/docs/architecture.md) | Startup, module/state ownership, typed list sources, cache updates, and extension points |

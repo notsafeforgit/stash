@@ -1,4 +1,5 @@
 import { Outlet, useRouterState } from "@tanstack/react-router";
+import { SourceTrackingGate } from "@/components/archive/source-tracking-gate";
 import { Header } from "./header";
 import { BottomTabBar } from "./bottom-tab-bar";
 import { MobileNavigationProvider } from "./mobile-navigation";
@@ -21,6 +22,10 @@ export function AppShell() {
   // Keep the outgoing page's chrome while the destination loader is pending.
   const pathname = useRouterState({
     select: (s) => s.matches.at(-1)?.pathname ?? s.location.pathname,
+  });
+  // Route IDs omit a reverse proxy's base path, unlike browser pathnames.
+  const sourceRouteId = useRouterState({
+    select: (s) => s.matches.at(-1)?.routeId ?? "",
   });
   const isDetailPage = DETAIL_ROUTE_RE.test(pathname);
   const ownsMobileNavigation =
@@ -45,7 +50,9 @@ export function AppShell() {
         <DownloadProgressBar />
         <DownloadNotifications />
         <RouteViewport>
-          <Outlet />
+          <SourceTrackingGate routeId={sourceRouteId}>
+            <Outlet />
+          </SourceTrackingGate>
         </RouteViewport>
         {!ownsMobileNavigation && <BottomTabBar />}
       </div>

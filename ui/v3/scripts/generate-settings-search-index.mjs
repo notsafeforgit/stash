@@ -58,6 +58,23 @@ for (const file of readdirSync(routesDir).sort()) {
       break;
     }
   }
+  // Shared settings sections can be embedded within a route as well as owning
+  // a whole page. Include their rows under the containing settings destination.
+  for (const match of pageSource.matchAll(
+    /import\s*\{([^}]+)\}\s*from\s*"(@\/components\/settings\/[^"\n]+)"/g,
+  )) {
+    const names = match[1].split(",").map((name) => name.trim());
+    if (
+      !names.some(
+        (name) =>
+          pageSource.includes(`<${name} `) ||
+          pageSource.includes(`<${name}/`) ||
+          pageSource.includes(`<${name}>`),
+      )
+    )
+      continue;
+    pageSource += `\n${readFileSync(join(root, "src", `${match[2].slice(2)}.tsx`), "utf8")}`;
+  }
   const src = pageSource.replace(/\s+/g, " ");
 
   // Section boundaries: list of [position, {id, default}] then assign each

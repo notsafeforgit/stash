@@ -26,12 +26,46 @@ type nativeArchiveRoutes struct {
 
 // This router is mounted behind application authentication. Producer bearer
 // tokens grant no access to collection configuration or library metadata edits.
+// Full source routes are useful for isolated service fixtures. Production
+// always supplies its explicit installation setting to routerWithSourceTracking.
 func (rs *nativeArchiveRoutes) router() http.Handler {
+	return rs.routerWithSourceTracking(true)
+}
+
+func (rs *nativeArchiveRoutes) routerWithSourceTracking(enabled bool) http.Handler {
 	r := chi.NewRouter()
 	r.Use(nativeAdminOrigin)
 	r.Post("/file-deduplication/preview", rs.previewFileDeduplication)
 	r.Post("/file-deduplication/apply", rs.applyFileDeduplication)
 	r.Get("/file-deduplication/requests/{request}", rs.fileDeduplicationRequest)
+	r.Get("/metadata-fields/{kind}", rs.fields)
+	r.Get("/entity-identities/{kind}/{localID}", rs.metadataEntity)
+	r.Get("/entities/{entity}/metadata-fields", rs.entityMetadataFields)
+	r.Get("/entities/{entity}/metadata-fields/{field}/history", rs.entityMetadataHistory)
+	r.Get("/entities/{entity}/provider-metadata-history", rs.entityProviderMetadataHistory)
+	r.Get("/entities/{entity}/file-edits", rs.entityFileEdits)
+	r.Post("/metadata-file-edits/preview", rs.previewFileEdit)
+	r.Post("/metadata-file-edits/apply", rs.applyFileEdit)
+	r.Get("/metadata-file-edits/requests/{request}", rs.fileEditReview)
+	r.Get("/file-history/{history}", rs.sourceFileHistory)
+	r.Get("/media-roots", rs.roots)
+	r.Post("/media-roots/probe", rs.probeRoot)
+	r.Post("/media-roots", rs.putRoot)
+	r.Get("/media-roots/{root}", rs.root)
+	r.Get("/media-roots/{root}/history", rs.rootHistory)
+	r.Put("/media-roots/{root}", rs.putRoot)
+	r.Get("/page-info", func(w http.ResponseWriter, r *http.Request) {
+		resource := r.URL.Query().Get("resource")
+		if !enabled && resource != "media-roots" && resource != "root-history" && resource != "provider-history" && resource != "shares" {
+			sourceTrackingDisabled(w, r)
+			return
+		}
+		rs.archivePageInfo(w, r)
+	})
+	if !enabled {
+		r.Handle("/*", http.HandlerFunc(sourceTrackingDisabled))
+		return r
+	}
 	r.Get("/activity/jobs", rs.activityJobs)
 	r.Get("/activity/jobs/{job}", rs.activityJob)
 	r.Get("/activity/jobs/{job}/attempts", rs.activityJobAttempts)
@@ -62,7 +96,6 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/account-consolidation/apply", rs.applyAccountConsolidation)
 	r.Post("/account-consolidation/requests/{request}/check", rs.checkAccountConsolidation)
 	r.Get("/source-accounts/{account}/consolidation-history", rs.accountConsolidationHistory)
-	r.Get("/metadata-fields/{kind}", rs.fields)
 	r.Get("/posts", rs.browseSourcePosts)
 	r.Get("/posts/{post}", rs.sourcePost)
 	r.Get("/posts/{post}/identity", rs.sourcePostIdentity)
@@ -119,14 +152,6 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/posts/{post}/media-backfill-preview", rs.postMediaBackfillPreview)
 	r.Post("/posts/{post}/media-backfills", rs.applyPostMediaBackfill)
 	r.Get("/post-media-backfills/{request}", rs.postMediaBackfillResult)
-	r.Get("/entity-identities/{kind}/{localID}", rs.metadataEntity)
-	r.Get("/entities/{entity}/metadata-fields", rs.entityMetadataFields)
-	r.Get("/entities/{entity}/metadata-fields/{field}/history", rs.entityMetadataHistory)
-	r.Get("/entities/{entity}/provider-metadata-history", rs.entityProviderMetadataHistory)
-	r.Get("/entities/{entity}/file-edits", rs.entityFileEdits)
-	r.Post("/metadata-file-edits/preview", rs.previewFileEdit)
-	r.Post("/metadata-file-edits/apply", rs.applyFileEdit)
-	r.Get("/metadata-file-edits/requests/{request}", rs.fileEditReview)
 	r.Post("/metadata-policy-imports/preview", rs.previewPolicyImport)
 	r.Post("/metadata-policy-imports", rs.applyPolicyImport)
 	r.Get("/metadata-policy-imports/{import}", rs.policyImport)
@@ -144,13 +169,6 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/metadata-policy/draft-preview", rs.previewPolicyDraft)
 	r.Post("/metadata-policy/references", rs.policyReferences)
 	r.Post("/metadata-policy/apply", rs.apply)
-	r.Get("/page-info", rs.archivePageInfo)
-	r.Get("/media-roots", rs.roots)
-	r.Post("/media-roots/probe", rs.probeRoot)
-	r.Post("/media-roots", rs.putRoot)
-	r.Get("/media-roots/{root}", rs.root)
-	r.Get("/media-roots/{root}/history", rs.rootHistory)
-	r.Put("/media-roots/{root}", rs.putRoot)
 	r.Get("/collections", rs.collections)
 	r.Post("/collections", rs.putCollection)
 	r.Get("/collections/{collection}", rs.collection)
@@ -331,7 +349,6 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/catalog-snapshots/{snapshot}/file-history-import", rs.advanceCatalogFileHistoryImport)
 	r.Get("/catalog-snapshots/{snapshot}/file-history-import/records", rs.catalogFileHistoryRecords)
 	r.Get("/catalog-snapshots/{snapshot}/file-history-import/records/{ordinal}", rs.catalogFileHistoryRecord)
-	r.Get("/file-history/{history}", rs.sourceFileHistory)
 	r.Get("/file-observations/{observation}/history", rs.observationFileHistory)
 	r.Get("/content-claims/{claim}/history", rs.claimFileHistory)
 	return r

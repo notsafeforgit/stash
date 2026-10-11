@@ -1,4 +1,6 @@
 fragment ConfigGeneralData on ConfigGeneralResult {
+  sourceTrackingEnabled
+  sourceTrackingActive
   stashes {
     path
     excludeVideo

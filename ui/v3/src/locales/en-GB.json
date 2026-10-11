@@ -4053,5 +4053,17 @@
     "state_help": "Active folders can scan and receive downloads. Disabled pauses both. Retired marks a folder no longer in use; it can be reactivated. These settings do not delete media or associations.",
     "storage_details": "Storage details and history",
     "worker_paths": "Download workers use this folder's storage ID with their own local mount path. Existing worker mappings remain valid when scan options change."
+  },
+  "source_tracking": {
+    "disabled": "Source tracking is off",
+    "enable_help": "Enable source tracking in Settings → Services and restart Stash to use posts, accounts and source collections. Existing data is preserved while it is off.",
+    "open_settings": "Open service settings",
+    "title": "Source tracking",
+    "description": "Optional tools for tracking website posts, accounts, albums and imports from gallery-dl or other producers. Download workers and schedules require separate setup. Local library scanning and metadata providers work independently.",
+    "enable": "Enable source tracking",
+    "restart_help": "Off by default. Changes take effect after restarting Stash. Turning this off preserves imported media, metadata and queued work.",
+    "restart_required": "Restart required",
+    "pending_disable": "Source tracking is still running. Restart Stash to turn it off.",
+    "pending_enable": "Source tracking is still off. Restart Stash to turn it on."
   }
 }

@@ -59,6 +59,7 @@ const (
 
 	TranslationWorkerEnabled = "translation_worker_enabled"
 	TranslationShellPath     = "translation_shell_path"
+	SourceTrackingEnabled    = "source_tracking_enabled"
 
 	BlobsStorage = "blobs_storage"
 
@@ -839,6 +840,11 @@ func (i *Config) GetFFProbePath() string {
 
 func (i *Config) GetTranslationWorkerEnabled() bool {
 	return i.getBool(TranslationWorkerEnabled)
+}
+
+// Source tracking is an optional integration, read when the server starts.
+func (i *Config) GetSourceTrackingEnabled() bool {
+	return i.getBool(SourceTrackingEnabled)
 }
 
 func (i *Config) GetTranslationShellPath() string {
@@ -2140,6 +2146,7 @@ func (i *Config) setDefaultValues() {
 	i.setDefault(NoBrowser, NoBrowserDefault)
 	i.setDefault(NotificationsEnabled, NotificationsEnabledDefault)
 	i.setDefault(TranslationWorkerEnabled, false)
+	i.setDefault(SourceTrackingEnabled, false)
 	i.setDefault(TranslationShellPath, "trans")
 	i.setDefault(ShowOneTimeMovedNotification, ShowOneTimeMovedNotificationDefault)
 

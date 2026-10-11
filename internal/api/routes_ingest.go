@@ -31,7 +31,10 @@ type ingestRoutes struct {
 // A producer token reaches only this router. Session cookies, general API keys,
 // query tokens, GraphQL and the application fallback are never part of its auth.
 func withIngestRoutes(private http.Handler, service *ingest.Service, fileIngestion bool) http.Handler {
-	producer := (&ingestRoutes{service: service, fileIngestion: fileIngestion}).router()
+	var producer http.Handler = http.HandlerFunc(sourceTrackingDisabled)
+	if service != nil {
+		producer = (&ingestRoutes{service: service, fileIngestion: fileIngestion}).router()
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == ingestPath || strings.HasPrefix(r.URL.Path, ingestPath+"/") {
 			producer.ServeHTTP(w, r)

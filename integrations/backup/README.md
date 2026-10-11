@@ -1,5 +1,11 @@
 # Host backup integration
 
+This integration is optional. Installing or starting Stash does not install its
+timers, configure AWS credentials or upload anything. The scripts and examples
+below describe an explicitly configured host deployment. Ordinary local backup
+and checkpoint APIs do not require S3 or source tracking; see
+[optional integrations](../../docs/optional-integrations.md).
+
 This directory tracks the existing host daily backup, restore and audit tools
 while they are converted to the native archive contract. `baseline.json` records
 the exact installed files captured before conversion. The baseline commit is a

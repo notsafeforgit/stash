@@ -13,6 +13,14 @@ deploy another local-image fallback or treat a Git push as publication. Follow
 the [deployment runbook](docs/v3-deployment.md), retain the actual run URLs and
 source/wrapper digests, and report any GitHub-side execution block explicitly.
 
+Fresh installations have source tracking off. The saved
+`source_tracking_enabled` option in Settings → Services takes effect on restart;
+GraphQL `sourceTrackingActive` reports the running capability. Keep ingestion
+routes/workers and source UI gated together without disabling library folders,
+StashDB/providers or deletion recovery. The owner's deployment explicitly enables
+it. S3 backup is separate host setup, not a default Stash service. See
+[optional integrations](docs/optional-integrations.md).
+
 New plugins use the independent [`apiVersion: 3` contract](docs/plugin-manifests.md). Preserve its settings, UI contributions, capability checks, and after-success notifications. Only `apiVersion: 3` manifests load. Unversioned manifests and legacy UI injection are rejected and reported through `pluginLoadErrorsV3` and Settings → Plugins. Native catalog invariants belong in core services. New Twitter captures retain numeric thread/parent/publisher relationships in schema 1000105; evidenced self-replies share a source gallery while retaining each post and its attachment order. See [source albums](docs/native-source-albums.md#twitter-threads-and-replies).
 
 Library folders and ingestion roots share the native `media_roots` records from

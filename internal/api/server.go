@@ -32,15 +32,12 @@ import (
 
 	"github.com/stashapp/stash/internal/api/loaders"
 	"github.com/stashapp/stash/internal/build"
-	"github.com/stashapp/stash/internal/ingest"
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/internal/sharing"
 	"github.com/stashapp/stash/pkg/fsutil"
-	"github.com/stashapp/stash/pkg/gallery"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/plugin"
-	"github.com/stashapp/stash/pkg/translation"
 	"github.com/stashapp/stash/pkg/utils"
 	"github.com/stashapp/stash/ui"
 )
@@ -225,16 +222,18 @@ func Initialize() (*Server, error) {
 	imageService := mgr.ImageService
 	galleryService := mgr.GalleryService
 	groupService := mgr.GroupService
+	sourceTracking := cfg.GetSourceTrackingEnabled()
 	resolver := &Resolver{
-		shares:            server.shares,
-		scraperCacheStore: mgr.ScraperCache,
-		repository:        repo,
-		sceneService:      sceneService,
-		imageService:      imageService,
-		galleryService:    galleryService,
-		groupService:      groupService,
-		bulkUpdater:       mgr,
-		hookExecutor:      pluginCache,
+		sourceTrackingActive: sourceTracking,
+		shares:               server.shares,
+		scraperCacheStore:    mgr.ScraperCache,
+		repository:           repo,
+		sceneService:         sceneService,
+		imageService:         imageService,
+		galleryService:       galleryService,
+		groupService:         groupService,
+		bulkUpdater:          mgr,
+		hookExecutor:         pluginCache,
 	}
 
 	gqlSrv := gqlHandler.New(NewExecutableSchema(Config{Resolvers: resolver}))
@@ -270,22 +269,14 @@ func Initialize() (*Server, error) {
 		gqlPlayground.Handler("GraphQL playground", endpoint, gqlPlayground.WithGraphiqlEnablePluginExplorer(true))(w, r)
 	})
 
-	ingestion := ingest.New(repo)
-	server.enrichmentMaintenance = &archiveWorkerRuntime{worker: ingest.NewEnrichmentMaintenance(ingestion)}
-	server.discoveryMaintenance = &archiveWorkerRuntime{worker: ingest.NewDiscoveryMaintenance(ingestion)}
-	server.discoveryComparison = &archiveWorkerRuntime{worker: ingest.NewDiscoveryComparisonWorker(ingestion)}
-	server.discoveryPublication = &archiveWorkerRuntime{worker: ingest.NewDiscoveryPublicationWorker(ingestion)}
-	if worker := mgr.NewIngestFileWorker(ingestion); worker != nil {
-		server.ingestWorker = &archiveWorkerRuntime{worker: worker}
+	ingestion, archiveRoutes := server.configureSourceTracking(sourceTracking)
+	if ingestion != nil {
+		r.Mount("/api/v3/ingest-admin", (&ingestRoutes{service: ingestion}).adminRouter())
+	} else {
+		r.Mount("/api/v3/ingest-admin", http.HandlerFunc(sourceTrackingDisabled))
 	}
-	albums := gallery.NewAlbumBackfill(repo)
-	server.albumWorker = &archiveWorkerRuntime{worker: mgr.NewAlbumBackfillWorker(albums)}
-	server.postMergeNotifications = &archiveWorkerRuntime{worker: mgr.NewPostMergeNotificationWorker(gallery.NewPostMergeNotifications(repo))}
-	translations := translation.New(repo)
-	server.translationWorker = newTranslationWorkerRuntime(config.GetInstance(), translations)
-	r.Mount("/api/v3/ingest-admin", (&ingestRoutes{service: ingestion}).adminRouter())
 	r.Mount("/api/v3/backups", (&nativeBackupRoutes{manager: mgr}).router())
-	r.Mount("/api/v3/archive", (&nativeArchiveRoutes{repo: repo, notifyMetadata: mgr.RegisterMetadataPolicyHooks, albums: albums, translations: translations, fileIngestion: server.ingestWorker != nil}).router())
+	r.Mount("/api/v3/archive", archiveRoutes.routerWithSourceTracking(sourceTracking))
 	r.Mount("/performer", server.getPerformerRoutes())
 	r.Mount("/scene", server.getSceneRoutes())
 	r.Mount("/gallery", server.getGalleryRoutes())

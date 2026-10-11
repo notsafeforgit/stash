@@ -1,3 +1,5 @@
+import { useSourceTracking } from "@/hooks/use-source-tracking";
+import { sourceTrackingTabs } from "@/core/source-tracking";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useCallback, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -90,6 +92,7 @@ function GalleryCover({
 // ── Gallery detail page ───────────────────────────────────────────────────────
 
 function GalleryDetailPage() {
+  const sourceTracking = useSourceTracking();
   const { galleryId } = Route.useParams();
   const { tab } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -98,7 +101,7 @@ function GalleryDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [coverLightboxOpen, setCoverLightboxOpen] = useState(false);
   const [mediaVersion, setMediaVersion] = useState(0);
-  const sources = useGallerySources(galleryId);
+  const sources = useGallerySources(galleryId, sourceTracking);
   const reloadSources = sources.reload;
 
   const { data, loading, error, refetch } = useQuery(GQL.FindGalleryDocument, {
@@ -220,11 +223,13 @@ function GalleryDetailPage() {
                       />
                       <div className="md:flex-1 md:min-h-0 md:overflow-y-auto">
                         <div className="flex flex-col items-stretch gap-3 p-3">
-                          <GalleryOrigin
-                            gallery={gallery}
-                            sources={sources}
-                            onViewAlbums={() => setActiveTab("source-albums")}
-                          />
+                          {sourceTracking && (
+                            <GalleryOrigin
+                              gallery={gallery}
+                              sources={sources}
+                              onViewAlbums={() => setActiveTab("source-albums")}
+                            />
+                          )}
                           <GalleryCover
                             key={galleryCover(gallery)}
                             gallery={gallery}
@@ -310,7 +315,7 @@ function GalleryDetailPage() {
               </aside>
               <div className="md:flex-1 md:min-w-0 md:min-h-0 md:flex md:flex-col">
                 <DetailTabs
-                  tabs={entityTabs}
+                  tabs={sourceTrackingTabs(entityTabs, sourceTracking)}
                   activeTab={activeTab}
                   onTabChange={setActiveTab}
                 />

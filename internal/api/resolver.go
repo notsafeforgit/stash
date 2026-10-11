@@ -34,13 +34,14 @@ type hookExecutor interface {
 }
 
 type Resolver struct {
-	shares            *sharing.Service
-	scraperCacheStore *scraper.Cache
-	repository        models.Repository
-	sceneService      manager.SceneService
-	imageService      manager.ImageService
-	galleryService    manager.GalleryService
-	groupService      manager.GroupService
+	sourceTrackingActive bool
+	shares               *sharing.Service
+	scraperCacheStore    *scraper.Cache
+	repository           models.Repository
+	sceneService         manager.SceneService
+	imageService         manager.ImageService
+	galleryService       manager.GalleryService
+	groupService         manager.GroupService
 
 	bulkUpdater  bulkUpdater
 	hookExecutor hookExecutor

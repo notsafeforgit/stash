@@ -1,3 +1,5 @@
+import { useSourceTracking } from "@/hooks/use-source-tracking";
+import { sourceTrackingTabs } from "@/core/source-tracking";
 import { NativeMetadataReview } from "@/components/detail/native-metadata-review";
 import { NativeSourceReview } from "@/components/detail/native-source-review";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
@@ -187,6 +189,7 @@ function SceneToolbar({
 // ── Scene detail page ─────────────────────────────────────────────────────────
 
 function SceneDetailPage() {
+  const sourceTracking = useSourceTracking();
   const { sceneId } = Route.useParams();
   const { t, autoplay, tab } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -598,7 +601,7 @@ function SceneDetailPage() {
           {toolbar}
         </>
       }
-      tabs={tabs}
+      tabs={sourceTrackingTabs(tabs, sourceTracking)}
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onBack={goBack}

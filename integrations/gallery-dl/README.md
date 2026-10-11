@@ -1,5 +1,11 @@
 # Native Stash producer
 
+This integration is optional. Enable **Settings → Services → Source tracking**
+and restart Stash before registering producers or running workers. It defaults
+to off; host/n8n schedules and website access still require their own setup.
+See [optional integrations](../../docs/optional-integrations.md). A disabled
+server returns `source_tracking_disabled` without acknowledging queued events.
+
 This package implements durable delivery and a gallery-dl download adapter.
 Host and n8n workers scrape directly into the native archive through durable
 source runs and delivery journals. See [scrape requests and checkpoints](../../docs/native-source-runs.md)

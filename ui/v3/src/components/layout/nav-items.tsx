@@ -18,6 +18,7 @@ import {
   History,
 } from "lucide-react";
 import { getRegisteredNavItems, type NavPlacement } from "@/plugins";
+import { useSourceTracking } from "@/hooks/use-source-tracking";
 
 export interface NavItem {
   label: React.ReactNode;
@@ -101,6 +102,7 @@ export function useNavItems(opts?: {
   placement?: NavPlacement | readonly NavPlacement[];
 }): NavItem[] {
   const intl = useIntl();
+  const sourceTracking = useSourceTracking();
   const placement = opts?.placement ?? "main";
   const placements = typeof placement === "string" ? [placement] : placement;
 
@@ -113,66 +115,67 @@ export function useNavItems(opts?: {
       hotkey: item.hotkey,
     }));
 
-  const archiveItems: NavItem[] = placements.includes("utility")
-    ? [
-        {
-          label: intl.formatMessage({
-            id: "review_queue.title",
-            defaultMessage: "Review queue",
-          }),
-          icon: <History className="size-4" />,
-          to: "/review-queue",
-        },
-        {
-          label: intl.formatMessage({
-            id: "archive_activity.title",
-            defaultMessage: "Archive activity",
-          }),
-          icon: <History className="size-4" />,
-          to: "/archive-activity",
-        },
-        {
-          label: intl.formatMessage({
-            id: "import_history.title",
-            defaultMessage: "Import history",
-          }),
-          icon: <History className="size-4" />,
-          to: "/import-history",
-        },
-        {
-          label: intl.formatMessage({
-            id: "saved_actions.title",
-            defaultMessage: "Saved actions",
-          }),
-          icon: <History className="size-4" />,
-          to: "/saved-actions",
-        },
-        {
-          label: intl.formatMessage({
-            id: "source_posts.title",
-            defaultMessage: "Source posts",
-          }),
-          icon: <FileText className="size-4" />,
-          to: "/source-posts",
-        },
-        {
-          label: intl.formatMessage({
-            id: "collections.title",
-            defaultMessage: "Source collections",
-          }),
-          icon: <FolderOpen className="size-4" />,
-          to: "/collections",
-        },
-        {
-          label: intl.formatMessage({
-            id: "account_review.title",
-            defaultMessage: "Account review",
-          }),
-          icon: <Link2 className="size-4" />,
-          to: "/account-review",
-        },
-      ]
-    : [];
+  const archiveItems: NavItem[] =
+    sourceTracking && placements.includes("utility")
+      ? [
+          {
+            label: intl.formatMessage({
+              id: "review_queue.title",
+              defaultMessage: "Review queue",
+            }),
+            icon: <History className="size-4" />,
+            to: "/review-queue",
+          },
+          {
+            label: intl.formatMessage({
+              id: "archive_activity.title",
+              defaultMessage: "Archive activity",
+            }),
+            icon: <History className="size-4" />,
+            to: "/archive-activity",
+          },
+          {
+            label: intl.formatMessage({
+              id: "import_history.title",
+              defaultMessage: "Import history",
+            }),
+            icon: <History className="size-4" />,
+            to: "/import-history",
+          },
+          {
+            label: intl.formatMessage({
+              id: "saved_actions.title",
+              defaultMessage: "Saved actions",
+            }),
+            icon: <History className="size-4" />,
+            to: "/saved-actions",
+          },
+          {
+            label: intl.formatMessage({
+              id: "source_posts.title",
+              defaultMessage: "Source posts",
+            }),
+            icon: <FileText className="size-4" />,
+            to: "/source-posts",
+          },
+          {
+            label: intl.formatMessage({
+              id: "collections.title",
+              defaultMessage: "Source collections",
+            }),
+            icon: <FolderOpen className="size-4" />,
+            to: "/collections",
+          },
+          {
+            label: intl.formatMessage({
+              id: "account_review.title",
+              defaultMessage: "Account review",
+            }),
+            icon: <Link2 className="size-4" />,
+            to: "/account-review",
+          },
+        ]
+      : [];
   const items = [
     ...(placements.includes("main") ? BUILTIN_NAV_ITEMS : []),
     ...archiveItems,

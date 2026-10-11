@@ -83,6 +83,13 @@ use an old binary to roll back a native database after native writes begin.
 
 ## API, UI, and plugin contracts
 
+Source tracking is an installation opt-in (`source_tracking_enabled`, default
+false). Preserve its API, worker and UI boundaries; ordinary library folders,
+provider metadata, playback and deletion recovery remain core. Disabling must
+preserve existing source data and undelivered work. S3 publication remains an
+independent opt-in host integration, never an application startup dependency.
+See [optional integrations](docs/optional-integrations.md).
+
 V3 is the application; v2.5 UI/API compatibility is no longer a requirement.
 Version the supported contract, inventory actual callers, and regenerate them
 together. Remove old adapters only after converting their consumers, including

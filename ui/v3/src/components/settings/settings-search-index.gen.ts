@@ -629,6 +629,22 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     },
   },
   {
+    to: "/settings/services",
+    section: {
+      id: "source_tracking.title",
+      defaultMessage: "Source tracking",
+    },
+    label: {
+      id: "source_tracking.enable",
+      defaultMessage: "Enable source tracking",
+    },
+    description: {
+      id: "source_tracking.restart_help",
+      defaultMessage:
+        "Off by default. Changes take effect after restarting Stash. Turning this off preserves imported media, metadata and queued work.",
+    },
+  },
+  {
     to: "/settings/system",
     section: {
       id: "config.application_paths.heading",

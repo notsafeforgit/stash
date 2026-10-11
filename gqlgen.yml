@@ -147,6 +147,8 @@ models:
     fields:
       stashes:
         resolver: true
+      sourceTrackingActive:
+        resolver: true
   ConfigResult:
     fields:
       plugins:

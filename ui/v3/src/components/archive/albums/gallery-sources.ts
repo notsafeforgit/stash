@@ -3,7 +3,7 @@ import { createSourceAlbumAPI } from "@/core/native-archive/source-album-api";
 import { useAlbumPages } from "./read";
 
 // The summary and Source albums tab share one bounded, paginated lookup.
-export function useGallerySources(localId: string) {
+export function useGallerySources(localId: string, enabled = true) {
   const api = useMemo(() => createSourceAlbumAPI(), []);
   const load = useCallback(
     async (after: string | undefined, signal: AbortSignal) => {
@@ -21,7 +21,7 @@ export function useGallerySources(localId: string) {
     },
     [api, localId],
   );
-  return { ...useAlbumPages(load), endpoint: api.endpoint };
+  return { ...useAlbumPages(load, enabled), endpoint: api.endpoint };
 }
 
 export type GallerySources = ReturnType<typeof useGallerySources>;

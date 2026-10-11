@@ -13,19 +13,21 @@ export function useAlbumPages<T, C, H>(
     cursor: C | undefined,
     signal: AbortSignal,
   ) => Promise<AlbumReadPage<T, C, H>>,
+  enabled = true,
 ) {
   const [data, setData] = useState<AlbumReadPage<T, C, H>>();
   const [error, setError] = useState<unknown>();
-  const [busy, setBusy] = useState(true);
+  const [busy, setBusy] = useState(enabled);
   const [version, setVersion] = useState(0);
   const pending = useRef<AbortController | null>(null);
   const reload = useCallback(() => setVersion((value) => value + 1), []);
   // biome-ignore lint/correctness/useExhaustiveDependencies: A reload replaces all pages with one current read.
   useEffect(() => {
     const controller = new AbortController();
-    setBusy(true);
+    setBusy(enabled);
     setData(undefined);
     setError(undefined);
+    if (!enabled) return;
     void load(undefined, controller.signal)
       .then((page) => {
         if (!controller.signal.aborted) setData(page);
@@ -41,9 +43,10 @@ export function useAlbumPages<T, C, H>(
       pending.current?.abort();
       pending.current = null;
     };
-  }, [load, version]);
+  }, [load, version, enabled]);
   async function more() {
-    if (!data || data.next === null || busy || pending.current) return;
+    if (!enabled || !data || data.next === null || busy || pending.current)
+      return;
     const controller = new AbortController();
     pending.current = controller;
     setBusy(true);

@@ -76,6 +76,8 @@ enum BlobsStorageType {
 }
 
 input ConfigGeneralInput {
+  "Enable source posts, account tracking and ingestion after restarting Stash. Defaults to false."
+  sourceTrackingEnabled: Boolean
   "Path to the SQLite database"
   databasePath: String
   "Path to backup directory"
@@ -216,6 +218,10 @@ input ConfigGeneralInput {
 }
 
 type ConfigGeneralResult {
+  "Saved source tracking setting. Changes take effect after restarting Stash."
+  sourceTrackingEnabled: Boolean!
+  "Whether source tracking is enabled in the running server."
+  sourceTrackingActive: Boolean!
   "Array of file paths to content"
   stashes: [StashConfig!]!
   "Path to the SQLite database"

@@ -34,15 +34,16 @@ var (
 
 	// map of env vars to config keys
 	envBinds = map[string]string{
-		"host":          Host,
-		"port":          Port,
-		"external_host": ExternalHost,
-		"generated":     Generated,
-		"metadata":      Metadata,
-		"blobs":         BlobsPath,
-		"cache":         Cache,
-		"stash":         Stash,
-		"ui":            UILocation,
+		"host":                    Host,
+		"port":                    Port,
+		"external_host":           ExternalHost,
+		"generated":               Generated,
+		"metadata":                Metadata,
+		"blobs":                   BlobsPath,
+		"cache":                   Cache,
+		"stash":                   Stash,
+		"ui":                      UILocation,
+		"source_tracking_enabled": SourceTrackingEnabled,
 	}
 )
 

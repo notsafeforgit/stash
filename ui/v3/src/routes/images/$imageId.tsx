@@ -1,3 +1,5 @@
+import { useSourceTracking } from "@/hooks/use-source-tracking";
+import { sourceTrackingTabs } from "@/core/source-tracking";
 import { NativeMetadataReview } from "@/components/detail/native-metadata-review";
 import { NativeSourceReview } from "@/components/detail/native-source-review";
 import { ImageViewer } from "@/components/detail/image-viewer";
@@ -173,6 +175,7 @@ function ImageToolbar({
 // ── Image detail page ─────────────────────────────────────────────────────────
 
 function ImageDetailPage() {
+  const sourceTracking = useSourceTracking();
   const { imageId } = Route.useParams();
   const { tab } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -349,7 +352,7 @@ function ImageDetailPage() {
           onDeleted={goBack}
         />
       }
-      tabs={tabs}
+      tabs={sourceTrackingTabs(tabs, sourceTracking)}
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onBack={goBack}

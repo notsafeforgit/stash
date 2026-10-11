@@ -1,3 +1,5 @@
+import { useSourceTracking } from "@/hooks/use-source-tracking";
+import { sourceTrackingTabs } from "@/core/source-tracking";
 import { ProviderMetadataHistory } from "@/components/detail/provider-metadata-history";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useState, useCallback } from "react";
@@ -178,6 +180,7 @@ function PerformerToolbar({
 // ── Performer detail page ─────────────────────────────────────────────────────
 
 function PerformerDetailPage() {
+  const sourceTracking = useSourceTracking();
   const { performerId } = Route.useParams();
   const { tab } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -390,7 +393,7 @@ function PerformerDetailPage() {
               </aside>
               <div className="md:flex-1 md:min-w-0 md:min-h-0 md:flex md:flex-col">
                 <DetailTabs
-                  tabs={entityTabs}
+                  tabs={sourceTrackingTabs(entityTabs, sourceTracking)}
                   activeTab={activeTab}
                   onTabChange={setActiveTab}
                 />

@@ -7,6 +7,8 @@ export const playerConfiguration: GQL.ConfigDataFragment = {
   plugins: {},
   general: {
     __typename: "ConfigGeneralResult",
+    sourceTrackingEnabled: false,
+    sourceTrackingActive: false,
     maxTranscodeSize: null,
     maxStreamingTranscodeSize: null,
     logFile: null,

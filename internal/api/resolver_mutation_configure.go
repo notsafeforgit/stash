@@ -108,6 +108,13 @@ func (r *mutationResolver) ConfigureGeneral(ctx context.Context, input ConfigGen
 	}
 
 	existingDBPath := c.GetDatabasePath()
+	if input.SourceTrackingEnabled != nil {
+		if err := checkConfigOverride(config.SourceTrackingEnabled); err != nil {
+			return makeConfigGeneralResult(), err
+		}
+		c.SetBool(config.SourceTrackingEnabled, *input.SourceTrackingEnabled)
+	}
+
 	if input.DatabasePath != nil && existingDBPath != *input.DatabasePath {
 		if err := checkConfigOverride(config.Database); err != nil {
 			return makeConfigGeneralResult(), err

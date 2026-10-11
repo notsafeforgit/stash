@@ -1,6 +1,7 @@
 # Native producer ingestion
 
-The development server exposes a separate, versioned producer interface at
+When [source tracking](optional-integrations.md#source-tracking) is enabled,
+the server exposes a separate, versioned producer interface at
 `/api/v3/ingest`. Protocol 1 currently accepts `source.capture` events for
 Reddit, Twitter, Bluesky, TikTok, Instagram posts/reels and individual stories, Patreon, Fansly and
 Kemono/Coomer post identities. It records sanitized source evidence,
@@ -32,8 +33,8 @@ producer outbox. Whole-call inspection requires source coverage for every
 original ticket. Launcher integration, additional
 post adapters, host/n8n activation, catalog import, and native administration/review
 UI remain required.
-Existing scrapes have not switched to this interface. Root, collection and policy
-administration endpoints are described below.
+Deployment status is recorded in [implementation progress](native-archive-progress.md).
+Root, collection and policy administration endpoints are described below.
 
 ## Performer links from captured profiles
 

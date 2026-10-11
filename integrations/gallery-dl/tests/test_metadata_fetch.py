@@ -526,6 +526,56 @@ main()
             with self.subTest(output=output), self.assertRaises(InvalidData):
                 _exchange([sys.executable, "-B", "-c", script], b"{}", 5, reserve_source=lambda url: True)
 
+    def test_each_http_attempt_uses_budget_and_yield_retains_parent(self):
+        script = '''
+import requests
+from gallery_dl import extractor
+from gallery_dl.extractor.common import Extractor, Message
+from stash_ingest.metadata_fetch import main
+def fake_send(adapter, request, **kwargs):
+    assert request.url.endswith(('/one', '/redirected')), 'a denied request must not reach the network'
+    response = requests.Response()
+    response.status_code, response._content, response.request = 200, b'{}', request
+    response._content_consumed, response.url = True, request.url
+    if request.url.endswith('/one'):
+        response.status_code = 302
+        response.headers['Location'] = 'https://fixture.invalid/redirected'
+    return response
+requests.adapters.HTTPAdapter.send = fake_send
+class Fixture(Extractor):
+    category, subcategory, pattern = 'reddit', 'submission', r'https://fixture.invalid/.*'
+    def items(self):
+        yield Message.Directory, '', {'id':'abc123', 'title':'Original caption'}
+        yield Message.Queue, 'https://fixture.invalid/child', {'id':'abc123', 'title':'Original caption'}
+class Child(Fixture):
+    category, subcategory = 'redgifs', 'image'
+    def items(self):
+        session = requests.Session()
+        session.get('https://fixture.invalid/one')
+        session.get('https://fixture.invalid/two')
+        yield Message.Directory, '', {'id':'child'}
+extractor.find = lambda url: (Child if url.endswith('/child') else Fixture).from_url(url)
+main()
+'''
+        class Budget:
+            def __init__(self):
+                self.requests, self.responses = [], []
+            def __call__(self, url):
+                return True
+            def request(self, url):
+                self.requests.append(url)
+                return {'request_uuid': str(__import__('uuid').uuid4())} if url.endswith(('/one', '/redirected')) else None
+            def report(self, result):
+                self.responses.append(result)
+        budget = Budget()
+        result = _exchange([sys.executable, '-B', '-c', script], encode({'url': URL, 'settings': {},
+            'resume': None, 'source_pacing': True, 'request_budget': True}), 5, reserve_source=budget)
+        self.assertEqual(budget.requests, ['https://fixture.invalid/one', 'https://fixture.invalid/redirected', 'https://fixture.invalid/two'])
+        self.assertEqual([r['status'] for r in budget.responses], [302, 200])
+        self.assertNotEqual(budget.responses[0]['request_uuid'], budget.responses[1]['request_uuid'])
+        self.assertEqual(result['pending'][0]['reason'], 'budget_yield')
+        self.assertEqual(Bundle(URL, SUPPORTED_VERSION, result).metadata(0)['title'], 'Original caption')
+
     def test_rate_limit_stops_on_first_response_without_leaking_body(self):
         script = '''
 from gallery_dl import extractor

@@ -10,6 +10,7 @@ from .metadata_fetch import fetch
 from .outbox import Capacity, Conflict
 from .runs import SourcePaused
 from .worker_policy import execution_policy
+from .request_budget import MetadataBudget
 
 
 def _deliver(journal, client, value):
@@ -85,6 +86,13 @@ def execute_metadata(box, transport, configuration, job_uuid, journal_type, clie
                 _configuration(configuration, current["job"], definition["url"])
             value = journal.prepare(current)
             job = current["job"]
+            if (client_type is EnrichmentClient and configuration is not None and value.body is None
+                    and value.state['pending'] is None and job['state'] in ('queued', 'cancelled')):
+                reused = client.reuse(definition['arguments']['target_uuid'], definition['arguments']['target_revision'])
+                if reused is not None:
+                    journal.change(value, phase='completed', reserved=0, state={**value.state,
+                        'reuse_completion': reused, 'pending': None, 'error_code': ''})
+                    return _result(journal, job_uuid, 'reused')
             if job["state"] == "succeeded":
                 if value.body is not None:
                     _note(journal, value, "unacknowledged_source_evidence", review=True)
@@ -155,7 +163,7 @@ def execute_metadata(box, transport, configuration, job_uuid, journal_type, clie
                     return _result(journal, job_uuid, "capacity")
                 result = fetcher(value.definition["url"], configuration.settings(),
                                  resume=resume, check=check,
-                                 reserve_source=lease.reserve_source)
+                                 reserve_source=MetadataBudget(lease) if client_type is EnrichmentClient else lease.reserve_source)
                 if (isinstance(result, dict) and set(result) == {"error"}
                         and isinstance(result["error"], str) and result["error"] in ERRORS):
                     value = journal.intent(value, lease.job, "failure", {"error_code": result["error"]})

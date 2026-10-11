@@ -32,6 +32,7 @@ class EnrichmentDispatchTests(unittest.TestCase):
         self.native_ready = patch.object(EnrichmentClient, "ready_jobs", return_value=[]).start()
         self.targets = patch.object(EnrichmentClient, "ready", return_value=[]).start()
         self.admit = patch.object(EnrichmentClient, "admit", return_value={"uuid": str(uuid.uuid4())}).start()
+        self.reuse = patch.object(EnrichmentClient, 'reuse', return_value=None).start()
         self.describe = patch.object(EnrichmentClient, "describe", return_value={"job": {}}).start()
         self.capabilities = patch.object(EnrichmentClient, "capabilities", return_value={"enrichment_dispatch_protocol": 1}).start()
 
@@ -73,6 +74,17 @@ class EnrichmentDispatchTests(unittest.TestCase):
             self.assertEqual(self.worker(box).once()["job_uuid"], job)
         self.admit.assert_called_once()
         self.executor.assert_called_once()
+
+    def test_existing_capture_fills_gap_without_admitting_or_fetching(self):
+        target = self.target()
+        self.targets.return_value = [target]
+        self.reuse.return_value = {'uuid': str(uuid.uuid4())}
+        with closing(self.open()) as box:
+            result = self.worker(box).once()
+        self.assertEqual(result['state'], 'reused')
+        self.reuse.assert_called_once_with(target['uuid'], target['revision'])
+        self.admit.assert_not_called()
+        self.executor.assert_not_called()
 
     def test_process_death_after_selection_preserves_cursor_and_wraps_before_new_admission(self):
         first = {"sequence": 1, "uuid": str(uuid.uuid4())}

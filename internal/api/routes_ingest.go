@@ -195,6 +195,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"enrichment_protocol":                     2,
 		"enrichment_dispatch_protocol":            1,
 		"enrichment_source_pacing_protocol":       1,
+		"enrichment_gap_protocol":                 1,
 		"max_enrichment_checkpoint_bytes":         archive.MaxEnrichmentTranscriptBytes,
 		"discovery_protocol":                      1,
 		"discovery_readiness_protocol":            1,

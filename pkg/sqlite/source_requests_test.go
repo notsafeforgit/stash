@@ -13,8 +13,8 @@ import (
 
 func removeSourceRequestSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
-	_, err := raw.Exec(`DROP TABLE source_request_posts; DROP TABLE source_request_metrics; DROP TABLE source_request_permits; DROP TABLE source_request_budgets; DROP TABLE source_check_health;
- DELETE FROM native_migration_history WHERE version=1000111;`)
+	_, err := raw.Exec(`DROP TABLE IF EXISTS metadata_request_permits; DROP TABLE source_request_posts; DROP TABLE source_request_metrics; DROP TABLE source_request_permits; DROP TABLE source_request_budgets; DROP TABLE source_check_health;
+ DELETE FROM native_migration_history WHERE version IN (1000111,1000112);`)
 	require.NoError(t, err)
 }
 

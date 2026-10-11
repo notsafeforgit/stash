@@ -53,11 +53,11 @@ func sourcePacingReadyFor(ctx context.Context, scope, collection string, enrichm
  OR EXISTS(SELECT 1 FROM archive_jobs j INDEXED BY archive_jobs_active_work
   JOIN enrichment_attempt_pacing p ON p.job_uuid=j.uuid AND p.fence=j.fence
   WHERE j.kind IN ('post.enrich','account.list_page','post.verify_candidate') AND j.state IN ('queued','running') AND j.state='running'
-   AND j.uuid!=? AND (p.scope=? OR json_extract(j.arguments,'$.collection_uuid')=?))
+   AND j.uuid!=? AND (? OR j.kind!='post.enrich') AND (p.scope=? OR json_extract(j.arguments,'$.collection_uuid')=?))
  OR EXISTS(SELECT 1 FROM source_runs r INDEXED BY source_runs_expired
   JOIN source_run_attempt_pacing p ON p.run_uuid=r.uuid AND p.fence=r.fence AND p.reserved=1
   WHERE r.state='running' AND r.uuid!=? AND (p.scope=? OR r.collection_uuid=?) AND (? OR r.operation='enrich'))`,
-		scope, now.UnixMilli(), now.UnixMilli(), ignoreJob, scope, collection, ignoreRun, scope, collection, enrichment); err != nil {
+		scope, now.UnixMilli(), now.UnixMilli(), ignoreJob, enrichment, scope, collection, ignoreRun, scope, collection, enrichment); err != nil {
 		return false, err
 	}
 	if busy {
@@ -131,7 +131,8 @@ func reserveMetadataSource(ctx context.Context, job *models.ArchiveJob, collecti
 	}
 	// Match the reviewed metadata worker's bounded child extractor set. Source
 	// pacing is not permission to reserve unrelated websites or arbitrary hosts.
-	if scope != rootScope && scope != "service:redgifs" && scope != "service:imgur" {
+	twitterAsset := rootScope == "service:twitter" && (scope == "host:abs.twimg.com" || scope == "host:abs-0.twimg.com")
+	if scope != rootScope && scope != "service:redgifs" && scope != "service:imgur" && !twitterAsset {
 		return false, models.ErrEnrichmentInvalid
 	}
 	var held, cooling bool
@@ -142,6 +143,9 @@ func reserveMetadataSource(ctx context.Context, job *models.ArchiveJob, collecti
 		return false, err
 	}
 	if held || cooling {
+		if held && !cooling && job.Kind == models.ArchiveJobEnrichPost {
+			return sourcePacingReadyFor(ctx, scope, collection, true, job.UUID, "", now)
+		}
 		return held && !cooling, nil
 	}
 	if _, err := (&SourceRunStore{}).Recover(ctx, now, 100); err != nil {

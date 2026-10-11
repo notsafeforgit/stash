@@ -44,12 +44,15 @@ func (rs *ingestRoutes) enrichmentRoutes(r chi.Router) {
 		r.Post("/collections/{collection}/ready", rs.readyEnrichment)
 		r.Post("/collections/{collection}/jobs/ready", rs.readyEnrichmentJobs)
 		r.Post("/targets/{target}/jobs", rs.admitEnrichment)
+		r.Post("/targets/{target}/reuse", rs.reuseEnrichment)
 		r.Post("/handoffs/{handoff}/jobs", rs.admitEnrichmentHandoff)
 		r.Get("/jobs/{job}", rs.describeEnrichment)
 		r.Get("/jobs/{job}/seed", rs.readEnrichmentSeed)
 		r.Post("/jobs/{job}/claim", rs.claimEnrichment)
 		r.Post("/jobs/{job}/renew", rs.renewEnrichment)
 		r.Post("/jobs/{job}/source", rs.reserveEnrichmentSource)
+		r.Post("/jobs/{job}/requests", rs.requestEnrichmentSource)
+		r.Post("/jobs/{job}/requests/result", rs.reportEnrichmentSource)
 		r.Get("/jobs/{job}/checkpoint", rs.readEnrichmentCheckpoint)
 		r.Post("/jobs/{job}/checkpoint", rs.saveEnrichmentCheckpoint)
 		r.Post("/jobs/{job}/publish", rs.publishEnrichment)
@@ -57,6 +60,18 @@ func (rs *ingestRoutes) enrichmentRoutes(r chi.Router) {
 		r.Get("/jobs/{job}/publication", rs.readEnrichmentPublication)
 		r.Get("/jobs/{job}/release", rs.readEnrichmentRelease)
 	})
+}
+
+func (rs *ingestRoutes) reuseEnrichment(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		ExpectedRevision int `json:"expected_revision"`
+	}
+	if err := readIngestJSON(w, r, 1024, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	value, err := rs.enrichmentWorker().ReuseCaptured(r.Context(), ingestToken(r), chi.URLParam(r, "target"), input.ExpectedRevision)
+	writeEnrichmentWorker(w, value, err)
 }
 
 func (rs *ingestRoutes) admitEnrichmentHandoff(w http.ResponseWriter, r *http.Request) {

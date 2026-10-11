@@ -572,16 +572,17 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 		complete = sourcePacingAtomic(ctx)
 	}
 	state, attempt := outcome.State, outcome.State
+	yielded := job.Kind == models.ArchiveJobEnrichPost && outcome.State == "retry" && outcome.ErrorCode == "budget_yield"
 	if job.Kind == models.ArchiveJobEnrichPost && state == "succeeded" {
 		enrichmentJobSuccessGuard(ctx, job.UUID)
 	}
 	available := job.AvailableAt.UnixMilli()
 	if state == "retry" {
 		state, available = "queued", outcome.RetryAt.UnixMilli()
-		if metadataJobKind(job.Kind) {
+		if metadataJobKind(job.Kind) && !yielded {
 			available = max(available, enrichmentRetryAt(job, now).UnixMilli())
 		}
-		if job.Failures+1 >= job.MaxAttempts {
+		if !yielded && job.Failures+1 >= job.MaxAttempts {
 			state, attempt = "failed", "failed"
 		}
 	}
@@ -595,7 +596,7 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 	if err := finishJobAttempt(ctx, job, now, attempt, string(result), outcome.ErrorCode); err != nil {
 		return nil, err
 	}
-	if attempt == "retry" || attempt == "failed" {
+	if !yielded && (attempt == "retry" || attempt == "failed") {
 		job.Failures++
 	}
 	_, err = dbWrapper.Exec(ctx, `UPDATE archive_jobs SET state=?,available_at_ms=?,result=?,error_code=?,failures=?,owner_uuid=NULL,lease_until_ms=NULL,revision=revision+1,updated_at_ms=? WHERE uuid=?`, state, available, string(result), outcome.ErrorCode, job.Failures, now.UnixMilli(), job.UUID)

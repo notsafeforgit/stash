@@ -49,7 +49,7 @@ class EnrichmentClientTests(unittest.TestCase):
 
     def test_capability_and_response_byte_limits(self):
         good = {"enrichment_protocol": 2, "max_enrichment_checkpoint_bytes": MAX_BYTES,
-                "enrichment_source_pacing_protocol": 1}
+                "enrichment_source_pacing_protocol": 1, "enrichment_gap_protocol": 1}
         self.transport.capabilities.return_value = good
         self.client.capabilities()
         for invalid in ({"enrichment_protocol": True}, {"max_enrichment_checkpoint_bytes": MAX_BYTES - 1},

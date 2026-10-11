@@ -608,6 +608,15 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				}
 			}
 		}
+		if version >= NativeSchemaBaseline+112 {
+			var found bool
+			if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='metadata_request_permits')"); err != nil {
+				return err
+			}
+			if !found {
+				return fmt.Errorf("native database schema is incomplete: missing metadata_request_permits")
+			}
+		}
 		if version >= NativeSchemaBaseline+55 {
 			if err := validateSourceRunServicesSchema(conn, version >= NativeSchemaBaseline+99, auditData); err != nil {
 				return err

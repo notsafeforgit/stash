@@ -256,7 +256,21 @@ func (s *Service) Capture(ctx context.Context, token string, raw []byte, digest 
 			return err
 		}
 		receipt, err = s.Repo.Ingest.RecordReceipt(ctx, models.IngestReceipt{ProducerUUID: event.ProducerUUID, EventUUID: event.EventUUID, Digest: digest, CredentialUUID: credential.UUID, CollectionUUID: collection.UUID, CollectionRevision: collection.Revision, RootUUID: event.RootUUID, RunUUID: event.RunUUID, Kind: event.Kind, PostUUID: post.UUID, CaptureUUID: capture.UUID, Result: encoded})
-		return err
+		if err != nil {
+			return err
+		}
+		// Normal source responses satisfy historical metadata gaps for this
+		// same post, including targets imported under a different collection.
+		targets, err := s.Repo.EnrichmentWork.Targets(ctx, models.EnrichmentTargetQuery{PostUUID: post.UUID, State: "pending", Limit: 100})
+		if err != nil {
+			return err
+		}
+		for _, target := range targets {
+			if _, err := s.Repo.EnrichmentWork.ReuseCaptured(ctx, target.UUID, target.Revision, time.Now()); err != nil && !errors.Is(err, models.ErrEnrichmentConflict) {
+				return err
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err

@@ -159,7 +159,14 @@ class EnrichmentJournal:
         if size > value.reserved_bytes:
             raise Conflict("Enrichment capacity must be reserved before use")
         if selected == "completed":
-            self.client_type._completion(decode(state, STATE_LIMIT).get(self.completion_field), value.job_uuid, work=value.definition["arguments"])
+            completed = decode(state, STATE_LIMIT)
+            if self.client_type is EnrichmentClient and 'reuse_completion' in completed:
+                work = value.definition['arguments']
+                self.client_type.reuse_receipt(completed['reuse_completion'], work['target_uuid'], work['target_revision'])
+                if data is not None or completed['pending'] is not None:
+                    raise Conflict('Captured reuse cannot discard pending source evidence')
+            else:
+                self.client_type._completion(completed.get(self.completion_field), value.job_uuid, work=value.definition["arguments"])
         with self.box.transaction():
             current = self.find(value.job_uuid)
             if current is None or current.revision != value.revision or current.phase == "completed":

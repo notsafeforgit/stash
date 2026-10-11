@@ -185,6 +185,10 @@ class EnrichmentDispatcher:
             if not self.configuration.accepts(target["url"]):
                 continue
             try:
+                if self.client_type is EnrichmentClient:
+                    reused = self.client.reuse(target['uuid'], target['revision'])
+                    if reused is not None:
+                        return {'state': 'reused', 'target_uuid': target['uuid'], 'completion_uuid': reused['uuid']}
                 job = self.client.admit(target["uuid"], target["revision"], self.key[1], self.configuration.extractor_version)
             except Unavailable as error:
                 if error.status == 409:

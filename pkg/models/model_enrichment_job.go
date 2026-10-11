@@ -166,6 +166,8 @@ type EnrichmentJobReaderWriter interface {
 	Attempt(context.Context, string, int64) (*EnrichmentJobAttempt, error)
 	CheckLease(context.Context, EnrichmentJobLease, time.Time) (*ArchiveJob, error)
 	ReserveSource(context.Context, EnrichmentJobLease, string, time.Time) (bool, error)
+	RequestSource(context.Context, EnrichmentJobLease, SourceRequestInput, time.Time) (*SourceRequestPermit, error)
+	ReportSourceRequest(context.Context, EnrichmentJobLease, SourceRequestResult, time.Time) error
 	Checkpoint(context.Context, EnrichmentJobLease, int, json.RawMessage, time.Time) (*EnrichmentCheckpointReceipt, error)
 	CheckpointHead(context.Context, string) (*EnrichmentCheckpoint, error)
 	CheckpointReceipts(context.Context, string, int, int) ([]EnrichmentCheckpointReceipt, error)

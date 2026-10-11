@@ -87,7 +87,8 @@ def safe_config(settings):
     for category, values in {
         "reddit": {"comments": 0, "morecomments": False, "recursion": 0, "previews": False, "videos": True},
         "twitter": {"replies": True, "retweets": True, "quoted": False, "conversations": False,
-                    "text-tweets": True, "cards": False, "videos": True, "images": True, "twitpic": False},
+                    "text-tweets": True, "cards": False, "videos": True, "images": True, "twitpic": False,
+                    "expand": False, "quoted-expand": False, "showreplies": False, "showmore": False, "metadata-user": False},
         "tiktok": {"photos": True, "videos": True, "audio": False, "covers": False, "subtitles": False},
     }.items():
         selected = extractors.setdefault(category, {})
@@ -107,8 +108,14 @@ class SourceBusy(RuntimeError):
     pass
 
 
+class BudgetYield(RuntimeError):
+    pass
+
+
 def classify(exc):
     name = type(exc).__name__
+    if name == 'BudgetYield':
+        return 'budget_yield'
     if name == "SourceBusy":
         return "source_busy"
     if name == "RateLimited" or getattr(exc, "status", None) == 429:
@@ -297,6 +304,17 @@ def _exchange(command, body, timeout, check=lambda: None, reserve_source=None):
                                                 raise InvalidData("Invalid metadata source reservation")
                                             sending, offset = encode({"allowed": allowed}) + b"\n", 0
                                             selector.register(process.stdin, selectors.EVENT_WRITE)
+                                        elif set(frame) == {'request'} and hasattr(reserve_source, 'request'):
+                                            contacts += 1
+                                            if contacts > 8 * (MAX_RECORDS + MAX_REFERENCES) or offset != len(sending):
+                                                raise InvalidData('Too many metadata source requests')
+                                            permit = reserve_source.request(public_url(frame['request']))
+                                            sending, offset = encode({'permit': permit}) + b'\n', 0
+                                            selector.register(process.stdin, selectors.EVENT_WRITE)
+                                        elif set(frame) == {'response'} and hasattr(reserve_source, 'report'):
+                                            reserve_source.report(frame['response'])
+                                            sending, offset = b'{"recorded":true}\n', 0
+                                            selector.register(process.stdin, selectors.EVENT_WRITE)
                                         elif set(frame) == {"result"}:
                                             result, finished = frame["result"], True
                                         else:
@@ -331,6 +349,8 @@ def fetch(url, settings, resume=None, *, timeout=180, check=lambda: None, reserv
         request["allow_empty"] = True
     if reserve_source is not None:
         request["source_pacing"] = True
+        if hasattr(reserve_source, 'request'):
+            request['request_budget'] = True
     body = encode(request, INPUT_LIMIT)
     try:
         result = _exchange([sys.executable, "-B", "-m", "stash_ingest.metadata_fetch"], body, timeout, check, reserve_source)
@@ -357,7 +377,7 @@ def main(collector=None):
         raw = sys.stdin.buffer.readline(INPUT_LIMIT + 2)
         request = decode(raw.removesuffix(b"\n"), INPUT_LIMIT, preserve_numbers=True)
         if (not isinstance(request, dict) or not {"url", "settings", "resume"} <= set(request)
-                or set(request) - {"url", "settings", "resume", "source_pacing", "allow_empty"}):
+                or set(request) - {"url", "settings", "resume", "source_pacing", "allow_empty", "request_budget"}):
             raise InvalidData("Invalid metadata fetch request")
         options = {}
         if "allow_empty" in request:
@@ -367,6 +387,9 @@ def main(collector=None):
         paced = "source_pacing" in request
         if paced and request["source_pacing"] is not True:
             raise InvalidData("Invalid metadata source protocol")
+        budgeted = request.get('request_budget', False)
+        if type(budgeted) is not bool or (budgeted and not paced):
+            raise InvalidData('Invalid metadata request budget')
         from .configuration import runtime_identity
         runtime_identity()
         runtime_validated = True
@@ -378,6 +401,31 @@ def main(collector=None):
 
         downloader.find = forbidden
         send = requests.sessions.Session.send
+        adapter_send = requests.adapters.HTTPAdapter.send
+
+        def exchange(frame):
+            stream.write(encode(frame, 16384) + b'\n')
+            stream.flush()
+            return decode(sys.stdin.buffer.readline(16384), 16383)
+
+        def budgeted_send(adapter, request, **kwargs):
+            permit = None
+            if budgeted:
+                reply = exchange({'request': public_url(request.url)})
+                permit = reply.get('permit')
+                if permit is None:
+                    raise BudgetYield()
+            response = None
+            try:
+                response = adapter_send(adapter, request, **kwargs)
+            finally:
+                if permit is not None:
+                    from .request_budget import retry_after
+                    result = {'request_uuid': permit['request_uuid'], 'status': 0 if response is None else response.status_code,
+                              'retry_after_seconds': 0 if response is None else retry_after(response)}
+                    if exchange({'response': result}) != {'recorded': True}:
+                        raise InvalidData('Metadata request response was not recorded')
+            return response
 
         def guarded(session, request, **kwargs):
             response = send(session, request, **kwargs)
@@ -387,12 +435,18 @@ def main(collector=None):
             return response
 
         requests.sessions.Session.send = guarded
+        # Report each response before Session follows its redirect. Nesting
+        # permits around Session.send would overwrite the outer permit.
+        if budgeted:
+            requests.adapters.HTTPAdapter.send = budgeted_send
         def reserve_source(url):
             stream.write(encode({"contact": public_url(url)}, 16384) + b"\n")
             stream.flush()
             reply = decode(sys.stdin.buffer.readline(256), 255)
             if not isinstance(reply, dict) or set(reply) != {"allowed"} or type(reply["allowed"]) is not bool:
                 raise InvalidData("Invalid metadata source reservation")
+            if budgeted and not reply['allowed']:
+                raise BudgetYield()
             return reply["allowed"]
 
         result = (collector or collect)(request["url"], request["settings"], request["resume"],

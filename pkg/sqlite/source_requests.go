@@ -126,6 +126,9 @@ func (s *SourceRunStore) RequestSource(ctx context.Context, lease models.SourceR
 		return nil, err
 	}
 	if maintained < hour {
+		if _, err := dbWrapper.Exec(ctx, `DELETE FROM metadata_request_permits WHERE granted_at_ms<? AND NOT EXISTS(SELECT 1 FROM archive_jobs j WHERE j.uuid=job_uuid AND j.state='running')`, stamp-86400000); err != nil {
+			return nil, err
+		}
 		for _, query := range []string{"DELETE FROM source_request_metrics WHERE hour<?", "DELETE FROM source_request_posts WHERE hour<?"} {
 			if _, err := dbWrapper.Exec(ctx, query, hour-24*30); err != nil {
 				return nil, err

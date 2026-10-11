@@ -14,7 +14,7 @@ from .metadata_bundle import Bundle, ERRORS, MAX_BYTES, MAX_RECORDS, MAX_REFEREN
 
 PREFIX = "/enrichment"
 MAX_RESPONSE = MAX_BYTES + 4096
-RETRYABLE = {"rate_limited", "extraction_failed", "timeout", "worker_failed", "source_busy"}
+RETRYABLE = {"rate_limited", "extraction_failed", "timeout", "worker_failed", "source_busy", "budget_yield"}
 CAPTURE_POLICY = "source-retention-v1+capture-context-v1"
 
 
@@ -39,10 +39,46 @@ class EnrichmentClient:
         if (type(capabilities.get("enrichment_protocol")) is not int or capabilities["enrichment_protocol"] != 2
                 or type(capabilities.get("enrichment_source_pacing_protocol")) is not int
                 or capabilities["enrichment_source_pacing_protocol"] != 1
+                or capabilities.get("enrichment_gap_protocol") != 1
                 or type(capabilities.get("max_enrichment_checkpoint_bytes")) is not int
                 or capabilities["max_enrichment_checkpoint_bytes"] < MAX_BYTES):
             raise Unavailable("native_enrichment_worker_unavailable")
         return capabilities
+
+    @staticmethod
+    def reuse_receipt(value, target, revision):
+        if (not isinstance(value, dict) or value.get('target_uuid') != target
+                or value.get('expected_revision') != revision or value.get('basis') != 'captures'
+                or not isinstance(value.get('capture_uuids'), list) or not 1 <= len(value['capture_uuids']) <= MAX_RECORDS):
+            raise Unavailable('invalid_response')
+        try:
+            identifier(value['uuid'])
+            for capture in value['capture_uuids']:
+                identifier(capture)
+        except (InvalidData, KeyError):
+            raise Unavailable('invalid_response') from None
+        return value
+
+    def reuse(self, target, revision):
+        value = self.client._request('POST', PREFIX + '/targets/' + identifier(target) + '/reuse',
+                                     encode({'expected_revision': revision}))
+        return None if value is None else self.reuse_receipt(value, target, revision)
+
+    def request_source(self, job, request_id, url):
+        from .request_budget import operation
+        from .runs import source_scope
+        value = self.client._request('POST', self.path(job['uuid'], '/requests'), encode({
+            **self.lease(job), 'request_uuid': request_id, 'url': url, 'class': 'recovery', 'operation': operation(url)}))
+        if (not isinstance(value, dict) or value.get('request_uuid') != request_id
+                or not source_scope(value.get('source_scope')) or type(value.get('ready')) is not bool
+                or type(value.get('wait_ms')) is not int or not 0 <= value['wait_ms'] <= 30000):
+            raise Unavailable('invalid_response')
+        return value
+
+    def report_source(self, job, result):
+        value = self.client._request('POST', self.path(job['uuid'], '/requests/result'), encode({**self.lease(job), **result}))
+        if value != {'recorded': True}:
+            raise Unavailable('invalid_response')
 
     @staticmethod
     def target_cursor(target):

@@ -27,7 +27,7 @@ func removeSourceFairnessSchema(t *testing.T, raw *sql.DB) {
 	require.NoError(t, err)
 }
 
-func TestSourceFairnessDownloadPreferenceEndsAfterFourStarts(t *testing.T) {
+func TestSourceFairnessGapFillingNeverOverridesReadyDownloads(t *testing.T) {
 	f := newEnrichmentExecutionFixture(t)
 	job := f.admit(t)
 	d := newPacingDownload(t, f, "https://reddit.com/user/first")
@@ -43,16 +43,19 @@ func TestSourceFairnessDownloadPreferenceEndsAfterFourStarts(t *testing.T) {
 		require.NoError(t, err)
 	}
 	d = newPacingDownload(t, f, "https://reddit.com/user/next")
-	require.Nil(t, d.claim(t), "live enrichment interest gets the next turn")
+	r := d.claim(t)
+	require.NotNil(t, r, "downloads retain priority after any number of starts")
+	require.Nil(t, tryPacingEnrichment(t, f, job))
+	_, err := d.coordinator.Finish(t.Context(), d.token, r.Lease(), models.SourceRunOutcome{State: "succeeded"})
+	require.NoError(t, err)
 	enriching := tryPacingEnrichment(t, f, job)
 	require.NotNil(t, enriching)
 	raw := openRawDB(t, f.db.DatabasePath())
 	defer raw.Close()
 	require.Zero(t, queryUint(t, raw, "SELECT download_starts FROM source_service_turns WHERE scope='service:reddit'"))
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM source_enrichment_waiters"))
-	_, err := f.worker.Fail(t.Context(), f.tokens[0], enriching.Lease(), "not_found")
+	_, err = f.worker.Fail(t.Context(), f.tokens[0], enriching.Lease(), "not_found")
 	require.NoError(t, err)
-	require.NotNil(t, d.claim(t), "download preference resumes after the enrichment turn")
 }
 
 func TestSourceFairnessLiveWaitingAgesButAbandonedInterestExpires(t *testing.T) {
@@ -67,17 +70,13 @@ func TestSourceFairnessLiveWaitingAgesButAbandonedInterestExpires(t *testing.T) 
 				require.Nil(t, tryPacingEnrichment(t, f, job), "a refresh preserves the original wait time")
 			}
 			f.now = f.now.Add(time.Minute)
-			if live {
-				require.Nil(t, d.claim(t))
-				require.NotNil(t, tryPacingEnrichment(t, f, job))
-			} else {
-				require.NotNil(t, d.claim(t), "an unattended queue does not reserve the service")
-			}
+			require.NotNil(t, d.claim(t), "waiting age cannot promote a metadata gap above monitoring")
+			require.Nil(t, tryPacingEnrichment(t, f, job))
 		})
 	}
 }
 
-func TestSourceFairnessOldestCollectionWinsConcurrentClaims(t *testing.T) {
+func TestSourceFairnessDownloadsWinConcurrentClaimsAgainstOlderGaps(t *testing.T) {
 	f := newEnrichmentExecutionFixture(t)
 	one := f.admit(t)
 	collection := putSourceCollection(t, f.repo, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
@@ -124,12 +123,9 @@ func TestSourceFairnessOldestCollectionWinsConcurrentClaims(t *testing.T) {
 	for _, err := range errs {
 		require.NoError(t, err)
 	}
-	require.NotNil(t, results[0], "the oldest collection owns the next turn")
+	require.Nil(t, results[0])
 	require.Nil(t, results[1])
-	require.Nil(t, run)
-	_, err = f.worker.Fail(t.Context(), f.tokens[0], results[0].Lease(), "not_found")
-	require.NoError(t, err)
-	require.NotNil(t, download.claim(t), "one enrichment start restores download preference")
+	require.NotNil(t, run, "download priority holds regardless of the concurrent claim order")
 }
 
 func TestSourceFairnessHeldTargetDoesNotReserveService(t *testing.T) {

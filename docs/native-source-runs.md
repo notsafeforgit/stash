@@ -1,20 +1,27 @@
 # Scrape requests, checkpoints and metadata
 
 The native download workers retain metadata from the same gallery-dl responses
-that discover media. Production dispatch lists omit `post.enrich`,
-`post.verify_candidate` and `account.list_page`: these would fetch individual
-posts or duplicate profile listings separately. Captured, pending deliveries
-remain recoverable without reopening the source. Explicit metadata recovery
-adapters remain available for an intentional repair.
+that discover media. A normal capture also completes matching pending historical
+metadata targets, including targets in another collection, by associating the
+existing capture. Dispatch and execution check for reusable captures before
+admitting or claiming a separate fetch. This preserves the original observation
+time and does not copy the payload or manufacture another observation.
 
-This means old imports do not automatically gain missing fields, and later post
-edits, profile changes or deletion states are not independently refreshed. A
-normal scrape can still update a post it encounters again. Listing responses
-may omit detail-only fields. Existing original text, account data, attachment
-membership and reply relationships remain available when the source includes
-them. External-host resolution needed to download Reddit media is retained;
-it is not optional metadata enrichment. Extended Twitter user lookups, tweet
-expansion and Reddit comment fetches are disabled in the download adapter.
+`post.enrich` is gap recovery only, using idle source capacity. It fills old
+imports that have no retained gallery-dl post capture; it does not refetch every
+downloaded post to refresh detail-only fields, later edits or profile changes.
+Running jobs and retained partial child transcripts are protected from reuse;
+their durable delivery/checkpoint path remains responsible for completion.
+Held, excluded and failed targets are not automatically reopened. Dispatch lists
+still omit `post.verify_candidate` and `account.list_page`, avoiding separate
+verification and duplicate profile listing requests.
+
+Listing responses may omit detail-only fields. Existing original text, account
+data, attachment membership and reply relationships remain available when the
+source includes them. External-host resolution needed to download Reddit media
+is retained; it is not optional metadata enrichment. Extended Twitter user
+lookups, tweet expansion and Reddit comment fetches are disabled. Gap recovery
+also disables Twitter expansion, replies and extra user lookups.
 
 ## Worker modes
 
@@ -73,6 +80,18 @@ historical recovery. A higher-priority worker downloading media does not reserve
 unused API capacity. Waiters expire and must hold a current lease. Permits are
 idempotent, scoped to a run/fence and short lived. No source URLs, cookies or
 response bodies are retained in budget records.
+
+Schema 1000112 extends the same budget to historical metadata jobs. Every HTTP
+attempt, redirect, retry and external-media resolution requires a permit. These
+jobs cannot gain priority through age or a fairness turn: any ready same-service
+download takes precedence, even after a metadata job has claimed a lease.
+Download claims do not wait for an idle metadata lease. Metadata checks both its
+parent service and the contacted host, and yields before its next request when
+higher-priority work appears. An already in-flight HTTP request can finish.
+`budget_yield` retains partial records and checkpoints without consuming the
+failure/retry budget. Historical requests and rate limits appear in the existing
+recovery metrics. The capability `enrichment_gap_protocol: 1` prevents older
+servers from running a producer that expects these guarantees.
 
 Archive activity → Scrape runs shows hourly aggregates for the preceding 24
 hours, with 30-day retention. Requests count granted attempts; an interrupted

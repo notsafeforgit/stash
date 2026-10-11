@@ -78,3 +78,31 @@ def report(producer, permit, response=None):
             'retry_after_seconds': 0 if response is None else retry_after(response)}, 4096))
     if result != {'recorded': True}:
         raise InvalidData('Invalid source request acknowledgement')
+
+
+class MetadataBudget:
+    """A source reservation with HTTP callbacks for the isolated metadata child."""
+    def __init__(self, lease):
+        self.lease = lease
+
+    def __call__(self, url):
+        return self.lease.reserve_source(url)
+
+    def request(self, url):
+        lease, request_id = self.lease, str(uuid.uuid4())
+        while True:
+            with lease.lock:
+                lease.check()
+                result = lease.client.request_source(lease.job, request_id, url)
+                lease.check()
+            if result['ready']:
+                return result
+            if result['wait_ms'] == 0:
+                return None
+            if lease.stop.wait(result['wait_ms'] / 1000):
+                raise SourcePaused('Metadata worker stopped while awaiting idle budget')
+
+    def report(self, result):
+        with self.lease.lock:
+            self.lease.check()
+            self.lease.client.report_source(self.lease.job, result)

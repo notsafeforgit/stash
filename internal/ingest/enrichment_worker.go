@@ -140,7 +140,7 @@ func (c *EnrichmentCoordinator) ReserveSource(ctx context.Context, token string,
 
 func enrichmentFailureState(code string) string {
 	switch code {
-	case "rate_limited", "extraction_failed", "timeout", "worker_failed", "source_busy":
+	case "rate_limited", "extraction_failed", "timeout", "worker_failed", "source_busy", "budget_yield":
 		return "retry"
 	case "authentication", "access_denied", "challenge", "not_found", "unsupported_extractor",
 		"result_too_large", "invalid_checkpoint", "not_a_post_url", "runtime_changed", "post_identity_conflict":
@@ -189,7 +189,7 @@ func (c *EnrichmentCoordinator) Fail(ctx context.Context, token string, lease mo
 			return nil
 		}
 		expected := state
-		if current.Failures+1 >= current.MaxAttempts {
+		if code != "budget_yield" && current.Failures+1 >= current.MaxAttempts {
 			expected = "failed"
 		}
 		before, err := c.Service.Repo.EnrichmentJob.CheckLease(ctx, models.EnrichmentJobLease{ArchiveJobLease: lease, ProducerUUID: credential.ProducerUUID}, c.Now())
@@ -200,6 +200,9 @@ func (c *EnrichmentCoordinator) Fail(ctx context.Context, token string, lease mo
 		if state == "retry" {
 			// The repository applies the failure-based minimum backoff.
 			outcome.RetryAt = c.Now().Add(5 * time.Minute)
+			if code == "budget_yield" {
+				outcome.RetryAt = c.Now().Add(time.Minute)
+			}
 		}
 		after, err := c.Service.Repo.ArchiveJob.Finish(ctx, lease, c.Now(), outcome)
 		if err != nil {

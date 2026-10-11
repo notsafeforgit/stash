@@ -8,6 +8,45 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Bulk deletion — deployed, 2026-10-11 UTC
+
+Scene and image selection deletion now batches durable journal preparation and
+filesystem flushes, shares parent-directory flushes, and uses up to eight workers
+for independent filesystem work. All intents are durable before staging starts;
+database commit and crash recovery retain the existing journal format. Nested
+paths and trash keep their ordered recovery behavior.
+
+The UI submits sequential batches of 50 and shows confirmed progress. It refreshes
+the affected lists once after completion or failure, keeping the dialog mounted
+while batches finish. A failed batch stops further requests, reports confirmed
+deletions and refreshes the list; it never automatically retries an uncertain
+response. Earlier successful batches remain committed.
+
+An isolated complete API benchmark deleting 120 image fixtures on the media
+filesystem, in batches of 50/50/20, improved from **6.03 seconds to 1.66 seconds**.
+It compared the previous published binary with the exact new Actions binary,
+using temporary databases and no generated previews. No production library media
+was deleted. Real deletion time still depends on associated files and hooks.
+
+The [source release](https://github.com/notsafeforgit/stash/actions/runs/38128319141)
+and [wrapper release](https://github.com/notsafeforgit/stash-s6/actions/runs/38129500371)
+published `311805a69db9f07be12a251e86cf4f5eff645ae3`.
+The source digest is
+`sha256:328e8d145f557eb07f1133c719eb2ec273fa6c8ba02d4341c62e2533048c6fd2`;
+production runs wrapper digest
+`sha256:20d171dfd781c233c69312bdb45568714b027b51158cb6a1bc7659c2a5c123ea`.
+The running image, version and binary hash were verified. Schema remains 1000113;
+no migration ran. The backup declaration uses the matching published reader.
+Stash restarted without draining scrapes, pausing worker timers or restarting n8n.
+
+The full `make validate-fork` and GitHub source release gates passed, together
+with deletion crash/recovery tests, race checks, and the
+[full Chromium/WebKit workflow](https://github.com/notsafeforgit/stash/actions/runs/38128319039).
+Read-only checks opened and cancelled both deployed bulk deletion dialogs, with
+mutations blocked and no page errors. The live API is healthy and has no pending
+file-deletion markers. Private benchmark, validation, release and live-check
+evidence is under `.local/bulk-deletion-20261011/`.
+
 ## Imported folder ownership gaps — repaired, 2026-10-11 UTC
 
 The post-based association repair never visited imported accounts with folders

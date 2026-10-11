@@ -1,5 +1,12 @@
 # Native Stash producer
 
+For a fresh installation, start with the [gallery-dl quickstart](QUICKSTART.md).
+`stash-gallery setup` generates the local configuration and scoped Stash
+credentials; `download`, `resume`, `check`, `status`, `drain` and `worker` use the
+existing producer contracts. No n8n, S3 or installation-specific wrapper is
+required. The reference below covers advanced workers, protocol details and
+historical migration tools.
+
 This integration is optional. Enable **Settings → Services → Source tracking**
 and restart Stash before registering producers or running workers. It defaults
 to off; host/n8n schedules and website access still require their own setup.

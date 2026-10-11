@@ -34,7 +34,7 @@ func nativeProducerRuntime(t *testing.T) (string, string) {
 	require.NoError(t, err)
 	// Register Python inputs with Go's test cache. Files read only by the child
 	// interpreter would otherwise let a changed producer reuse an old result.
-	for _, directory := range []string{"src/stash_ingest", "tests"} {
+	for _, directory := range []string{"src", "src/stash_ingest", "tests"} {
 		entries, err := os.ReadDir(filepath.Join(packagePath, directory))
 		require.NoError(t, err)
 		for _, entry := range entries {

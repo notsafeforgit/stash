@@ -4,6 +4,8 @@ import hashlib
 from pathlib import Path
 
 import stash_ingest
+import stash_gallery
+import stash_ingest_bootstrap
 
 
 def modules(directory):
@@ -22,3 +24,9 @@ if expected != actual:
     changed = sorted(key for key in expected.keys() & actual.keys() if expected[key] != actual[key])
     raise SystemExit(f'Installed producer differs: extra={extra}, missing={missing}, changed={changed}')
 print(f'Installed producer matches all {len(expected)} current source modules')
+for module in (stash_gallery, stash_ingest_bootstrap):
+    installed_file = Path(module.__file__).resolve()
+    source_file = source.parent / installed_file.name
+    if installed_file == source_file or installed_file.read_bytes() != source_file.read_bytes():
+        raise SystemExit(f'Installed command differs from current sources: {module.__name__}')
+print('Installed setup and producer commands match current sources')

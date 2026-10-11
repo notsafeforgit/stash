@@ -20,8 +20,10 @@ are reported separately, so the UI remains consistent until restart.
 
 Enabling source tracking does not install gallery-dl, create subscriptions or
 start host/n8n schedules. Set up the
-[producer integration](../integrations/gallery-dl/README.md), scoped Stash tokens,
-collections and the workers you want to run. Website credentials remain with
+[gallery-dl quickstart](../integrations/gallery-dl/QUICKSTART.md) with
+`stash-gallery setup` to provision a folder-scoped token and local worker
+configuration. `stash-gallery download` registers requested sources and imports
+through the existing ingestion API. Website credentials remain with
 those workers. The switch is independent of ordinary metadata scraper/provider
 support, including StashDB.
 

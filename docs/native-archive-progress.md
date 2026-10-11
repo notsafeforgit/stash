@@ -8,6 +8,34 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Post content browsing — deployed, 2026-10-11 UTC
+
+Post lists, post details and scene/image Sources now show the source publication
+date and **Post content and versions**. Observation counts, first/last scrape
+times and unknown-capture-time messages are removed from browsing. Meaningful
+text and attachment changes remain retained. The existing content store already
+ignores Reddit/Twitter discovery URLs and listing types; a new ingestion test
+confirms profile, subreddit, saved-feed and search events reuse one post and
+unchanged content while preserving changed captions and album items. Internal
+collection/capture and delivery records still support scoped ingestion, metadata
+policies and retries without copying the post payload.
+
+Application source `020c5a431c0399e087e859c41415c7839b6d2a43` passed the
+[release gate](https://github.com/notsafeforgit/stash/actions/runs/38183690943) and published
+`ghcr.io/notsafeforgit/stash@sha256:195b673194e51c1ce5bfe92a043e8b1345d38fed689e927f82a45206d18c4ea0`. The
+[wrapper build](https://github.com/notsafeforgit/stash-s6/actions/runs/38185300844) published the deployed image
+`ghcr.io/notsafeforgit/stash-s6@sha256:9eb38b4a8492739d3d9ca670ff384a998c9d0be5c3428d9a6635981134d177d4`. Its binary matches the Actions artifact and the
+running service is healthy on schema 1000114. This release requires no database
+migration or worker-runtime update.
+
+Local validation passed the full fork gate, 816 UI unit tests and 23 relevant
+Chromium browser cases; mobile/desktop layouts were visually reviewed. A separate
+CI browser run exposed a stale account-consolidation mock from the prior
+monitoring change. Fixture-only follow-up `58a758a13` adds its missing
+subscriptions response, with all six affected Chromium cases passing locally.
+The [browser CI rerun](https://github.com/notsafeforgit/stash/actions/runs/38184635826)
+checks that follow-up separately; the deployed application code is unchanged by it.
+
 ## Source monitoring subscriptions — deployed, 2026-10-11 UTC
 
 Schema 1000114 stores generic monitoring subscriptions separately from source

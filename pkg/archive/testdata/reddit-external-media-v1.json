@@ -778,6 +778,313 @@
       "complete": false,
       "kind": "unknown",
       "manifest_error": false
+    },
+    {
+      "name": "numeric Redgifs link resolves its observed named API item",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg",
+          "html": "https://www.redgifs.com/ifr/gentleexampleanimal"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com/watch/773615132055332143",
+          "url_overridden_by_dest": "https://v3.redgifs.com/watch/773615132055332143"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+        "source_extractor_url": "https://v3.redgifs.com/watch/773615132055332143",
+        "count": 1
+      },
+      "attachment": {
+        "namespace": "native:redgifs",
+        "value": "773615132055332143"
+      },
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "773615132055332143"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "numeric Redgifs rejects different extraction target",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg",
+          "html": "https://www.redgifs.com/ifr/gentleexampleanimal"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com/watch/773615132055332143",
+          "url_overridden_by_dest": "https://v3.redgifs.com/watch/773615132055332143"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+        "source_extractor_url": "https://v3.redgifs.com/watch/999999999999999999",
+        "count": 1
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "773615132055332143"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "numeric Redgifs rejects missing extraction target",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg",
+          "html": "https://www.redgifs.com/ifr/gentleexampleanimal"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com/watch/773615132055332143",
+          "url_overridden_by_dest": "https://v3.redgifs.com/watch/773615132055332143"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+        "count": 1
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "773615132055332143"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "numeric Redgifs rejects mismatched API permalink",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg",
+          "html": "https://www.redgifs.com/ifr/unrelatedclip"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com/watch/773615132055332143",
+          "url_overridden_by_dest": "https://v3.redgifs.com/watch/773615132055332143"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+        "source_extractor_url": "https://v3.redgifs.com/watch/773615132055332143",
+        "count": 1
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "773615132055332143"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "numeric Redgifs rejects missing API permalink",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com/watch/773615132055332143",
+          "url_overridden_by_dest": "https://v3.redgifs.com/watch/773615132055332143"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+        "source_extractor_url": "https://v3.redgifs.com/watch/773615132055332143",
+        "count": 1
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "773615132055332143"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "numeric Redgifs rejects expanded gallery",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": "gallery-id",
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg",
+          "html": "https://www.redgifs.com/ifr/gentleexampleanimal"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com/watch/773615132055332143",
+          "url_overridden_by_dest": "https://v3.redgifs.com/watch/773615132055332143"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+        "source_extractor_url": "https://v3.redgifs.com/watch/773615132055332143",
+        "count": 2
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "773615132055332143"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "numeric Redgifs rejects unobserved download URL",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg",
+          "html": "https://www.redgifs.com/ifr/gentleexampleanimal"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com/watch/773615132055332143",
+          "url_overridden_by_dest": "https://v3.redgifs.com/watch/773615132055332143"
+        },
+        "_url": "https://media.redgifs.com/UnrelatedClip.mp4",
+        "source_extractor_url": "https://v3.redgifs.com/watch/773615132055332143",
+        "count": 1
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "773615132055332143"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "numeric Redgifs rejects poster rendition",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg",
+          "html": "https://www.redgifs.com/ifr/gentleexampleanimal"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com/watch/773615132055332143",
+          "url_overridden_by_dest": "https://v3.redgifs.com/watch/773615132055332143"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg",
+        "source_extractor_url": "https://v3.redgifs.com/watch/773615132055332143",
+        "count": 1
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "773615132055332143"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "numeric Redgifs rejects lookalike extraction host",
+      "source": {
+        "category": "redgifs",
+        "id": "gentleexampleanimal",
+        "gallery": null,
+        "urls": {
+          "hd": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+          "sd": "https://media.redgifs.com/GentleExampleAnimal-mobile.mp4",
+          "poster": "https://media.redgifs.com/GentleExampleAnimal-poster.jpg",
+          "html": "https://www.redgifs.com/ifr/gentleexampleanimal"
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://v3.redgifs.com/watch/773615132055332143",
+          "url_overridden_by_dest": "https://v3.redgifs.com/watch/773615132055332143"
+        },
+        "_url": "https://media.redgifs.com/GentleExampleAnimal.mp4",
+        "source_extractor_url": "https://v3.redgifs.com.example.test/watch/773615132055332143",
+        "count": 1
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "773615132055332143"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "numeric Redgifs retains Reddit fallback identity",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://v3.redgifs.com/watch/773615132055332143",
+        "url_overridden_by_dest": "https://v3.redgifs.com/watch/773615132055332143",
+        "preview": {
+          "reddit_video_preview": {
+            "fallback_url": "https://v.redd.it/fallback1/CMAF_1080.mp4?source=fallback",
+            "dash_url": "https://v.redd.it/fallback1/DASHPlaylist.mpd"
+          }
+        },
+        "_url": "ytdl:https://v.redd.it/fallback1/CMAF_720.mp4"
+      },
+      "attachment": {
+        "namespace": "native:redgifs",
+        "value": "773615132055332143"
+      },
+      "manifest": {
+        "namespace": "native:redgifs",
+        "value": "773615132055332143"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
     }
   ]
 }

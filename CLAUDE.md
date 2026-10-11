@@ -97,8 +97,9 @@ Native producer tests require Python 3.12 or newer. `make pre-producer` installs
 the pinned gallery-dl/yt-dlp test dependencies into `.local/native-producer`;
 `PRODUCER_PYTHON` can select another prepared environment. The supported package
 in `integrations/gallery-dl` uses only the standard library for delivery.
-Producer/backup installation uses Python `-I` so workspace `PYTHONPATH` cannot
-redirect pip's uninstall discovery. Producer wheel builds discard obsolete
+Producer/backup environments and dependency installation use `uv venv` and
+`uv pip --python` with explicit interpreter paths. Verification uses Python
+`-I` so workspace `PYTHONPATH` cannot shadow installed modules. Producer wheel builds discard obsolete
 `build/lib` modules, and both setup targets verify installed source files with
 `scripts/verify_producer_install.py`. A staged worker policy must fingerprint the
 same code as the actual installed runtime; source-import tests alone cannot prove it.

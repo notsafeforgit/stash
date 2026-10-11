@@ -20,9 +20,8 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm/v6" ];   then BIN=stash-linux-arm32v6; \
 FROM --platform=$TARGETPLATFORM alpine:3.24 AS app
 COPY --from=binary /stash /usr/bin/
 
-RUN apk upgrade --no-cache && apk add --no-cache ca-certificates python3 py3-requests py3-requests-toolbelt py3-lxml py3-pip ffmpeg libavif-apps tzdata aom-libs libdav1d libde265 x265-libs libjpeg-turbo libpng vips vips-tools vips-heif vips-jxl vips-magick vips-poppler \
-    && python3 -m pip install --break-system-packages --upgrade "pip>=26.2" \
-    && python3 -m pip install --break-system-packages mechanicalsoup cloudscraper stashapp-tools
+RUN apk upgrade --no-cache && apk add --no-cache ca-certificates python3 py3-requests py3-requests-toolbelt py3-lxml uv ffmpeg libavif-apps tzdata aom-libs libdav1d libde265 x265-libs libjpeg-turbo libpng vips vips-tools vips-heif vips-jxl vips-magick vips-poppler \
+    && uv pip install --system --break-system-packages --no-cache mechanicalsoup cloudscraper stashapp-tools
 # Replace distro libraries and modules with the matching security builds.
 RUN find /usr/lib \( -name 'libheif.so*' -o -name 'libvips.so*' -o -name 'libvips-cpp.so*' \) -delete \
     && rm -rf /usr/lib/vips-modules-* /usr/lib/*-linux-gnu/vips-modules-*

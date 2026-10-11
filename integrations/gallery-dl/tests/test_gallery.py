@@ -298,6 +298,9 @@ class GalleryTests(unittest.TestCase):
     def test_reddit_legacy_redgifs_iframe_download_and_replay(self):
         self.check_reddit_linked_redgifs_download_and_skip("https://v3.redgifs.com/ifr/LinkedClip")
 
+    def test_reddit_numeric_redgifs_link_download_and_replay(self):
+        self.check_reddit_linked_redgifs_download_and_skip("https://v3.redgifs.com/watch/773615132055332143")
+
     def check_reddit_linked_redgifs_download_and_skip(self, url):
         self.narrow_window()
         config.set(("extractor", "reddit"), "parent-metadata", "_reddit")
@@ -306,6 +309,7 @@ class GalleryTests(unittest.TestCase):
         clip = {"id": "linkedclip", "createDate": 1577836800, "gallery": None,
                 "userName": "different-host-account",
                 "urls": {"hd": "https://media.redgifs.com/LinkedClip.mp4",
+                         "html": "https://www.redgifs.com/ifr/linkedclip",
                          "poster": "https://media.redgifs.com/LinkedClip-poster.jpg"}}
         downloaded = []
 
@@ -333,7 +337,7 @@ class GalleryTests(unittest.TestCase):
             self.assertEqual(capture["source"]["_url"], clip["urls"]["hd"])
             self.assertEqual(completed["source"], {
                 "capture_event_uuid": capture["event_uuid"],
-                "attachment": {"namespace": "native:redgifs", "value": "linkedclip"},
+                "attachment": {"namespace": "native:redgifs", "value": url.rsplit('/', 1)[-1].lower()},
             })
             self.assertEqual(completed["media_kind"], "scene")
 

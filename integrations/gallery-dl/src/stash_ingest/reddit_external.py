@@ -26,7 +26,7 @@ def linked(value):
         return None
     parsed = urlsplit(value)
     if parsed.hostname in ('redgifs.com', 'www.redgifs.com', 'm.redgifs.com', 'v3.redgifs.com'):
-        match = re.fullmatch(r'/(?:watch|ifr)/([A-Za-z]{1,256})/?', parsed.path)
+        match = re.fullmatch(r'/(?:watch|ifr)/([A-Za-z0-9]{1,256})/?', parsed.path)
         if match:
             return {'namespace': 'native:redgifs', 'value': match[1].lower()}, 'unknown'
         return None
@@ -114,7 +114,7 @@ def attachment(data, source, download):
                      if (identity := redgifs_image_id(data.get(key))) is not None), None)
     redgifs_id = ref['value'] if ref['namespace'] == 'native:redgifs' else image_id
     if redgifs_id is not None:
-        if source.get('category') == 'redgifs' and str(source.get('id', '')).lower() == redgifs_id:
+        if source.get('category') == 'redgifs' and redgifs_item_matches(source, redgifs_id):
             urls = source.get('urls')
             if isinstance(urls, dict):
                 for key in ('hd', 'sd', 'gif', 'silent'):
@@ -126,3 +126,20 @@ def attachment(data, source, download):
     if preview_matches(data, download):
         return ref
     return None
+
+
+def redgifs_item_matches(source, identity):
+    item_id = str(source.get('id', '')).lower()
+    if item_id == identity:
+        return True
+    # Numeric watch links resolve to named API items. The captured request and
+    # API permalink establish that alias for a single-item response; a gallery
+    # expansion must not attribute its other items to the original watch link.
+    if (re.fullmatch(r'[0-9]{1,30}', identity) is None or source.get('gallery')
+            or source.get('count') != 1):
+        return False
+    request = linked(source.get('source_extractor_url'))
+    urls = source.get('urls')
+    resolved = linked(urls.get('html')) if isinstance(urls, dict) else None
+    return (request is not None and request[0] == {'namespace': 'native:redgifs', 'value': identity}
+            and resolved is not None and resolved[0] == {'namespace': 'native:redgifs', 'value': item_id})

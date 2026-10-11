@@ -464,11 +464,12 @@ validate-ci:
 	go run github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 
 export BACKUP_PYTHON ?= $(abspath .local/native-backup/bin/python)
+UV ?= uv
 
 .PHONY: pre-backup validate-backup
 pre-backup:
-	python3 -m venv .local/native-backup
-	.local/native-backup/bin/python -I -m pip install ./integrations/archive ./integrations/gallery-dl ./integrations/backup
+	$(UV) venv --allow-existing --python python3 .local/native-backup
+	$(UV) pip install --python .local/native-backup/bin/python ./integrations/archive ./integrations/gallery-dl ./integrations/backup
 	.local/native-backup/bin/python -I -B scripts/verify_producer_install.py
 
 validate-backup:
@@ -487,8 +488,8 @@ export PRODUCER_PYTHON ?= $(abspath .local/native-producer/bin/python)
 
 .PHONY: pre-producer
 pre-producer:
-	python3 -m venv .local/native-producer
-	.local/native-producer/bin/python -I -m pip install './integrations/gallery-dl[gallery]'
+	$(UV) venv --allow-existing --python python3 .local/native-producer
+	$(UV) pip install --python .local/native-producer/bin/python './integrations/gallery-dl[gallery]'
 	.local/native-producer/bin/python -I -B scripts/verify_producer_install.py
 
 validate-producer:

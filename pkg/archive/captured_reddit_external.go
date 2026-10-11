@@ -10,7 +10,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-var capturedRedgifsWatch = regexp.MustCompile(`^/(?:watch|ifr)/([A-Za-z]{1,256})/?$`)
+var capturedRedgifsWatch = regexp.MustCompile(`^/(?:watch|ifr)/([A-Za-z0-9]{1,256})/?$`)
 
 // A linked clip has an explicit identity even when its external gallery's
 // membership is unavailable. Only direct file links establish a single item.

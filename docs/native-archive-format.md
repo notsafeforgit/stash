@@ -519,7 +519,8 @@ unmatched database can otherwise prune deletion markers.
 Install into a prepared Python environment:
 
 ```sh
-python3 -m pip install ./integrations/archive
+uv venv .venv
+uv pip install --python .venv/bin/python ./integrations/archive
 ```
 
 Export a native library and its original artwork:

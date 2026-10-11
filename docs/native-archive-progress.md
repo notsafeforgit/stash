@@ -8,6 +8,25 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Numeric Redgifs links and uv — implementation verified, rollout pending
+
+Reddit's numeric Redgifs watch URLs are now recognized by both the native
+attachment manifest and the producer. A captured single-item API response can
+resolve that numeric link to its named clip when its extraction target and
+returned permalink agree. Downloads must still match an observed rendition;
+unrelated children, poster files and gallery expansions are rejected. Both
+retained failing captures for Reddit post `1oof507` resolve offline to the same
+attachment, including Reddit's video fallback. No source requests were needed
+to reproduce the error.
+
+The producer dependency now pins Codeberg master commit
+`a7b7dc950f35caa149230552cb158fe32410eeac` (`1.33.0-dev`, October 11).
+Host/test setup uses uv for environments and installation, CI caches uv, and
+application image package installation uses uv. n8n and the production wrapper
+already use uv. Local validation passed 706 producer, 146 archive and 320 backup
+tests, the shared Go attachment contract, and CI workflow checks. Production
+activation and recovery of the deferred run remain pending publication.
+
 ## Shared gallery-dl configuration — deployed, 2026-10-11 UTC
 
 Fifteen site download profiles (eleven host, four n8n) now reference the shared

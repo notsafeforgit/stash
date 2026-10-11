@@ -13,7 +13,8 @@ for shared request budgets, routine/initial/recovery modes, pagination and the
 metadata retained without separate per-post enrichment.
 
 Python 3.12 or newer is required. Runtime delivery uses only the standard
-library. Install the local package with `python -I -m pip install ./integrations/gallery-dl`
+library. Create an environment with `uv venv .venv`, then install the local
+package with `uv pip install --python .venv/bin/python ./integrations/gallery-dl`
 in the runner's environment when integrating it; do not replace a live wrapper
 with this CLI. The CLI can queue source requests, drain captured events and
 execute one claimed download attempt using an explicitly reviewed local profile.

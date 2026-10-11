@@ -83,7 +83,7 @@ Lint workflows. Native PRs use the same validation workflow; `develop` retains
 its downloadable development release using the publisher's validated artifacts.
 Browser regressions retain their separate workflow.
 
-Dependency caches cover pnpm's actual configured store, pip downloads, Go
+Dependency caches cover pnpm's actual configured store, uv downloads/builds, Go
 modules, and per-suite incremental Go compilation. BuildKit caches container
 libraries independently of the application binary; base images are still
 pulled. Dispatch with `refresh_container_dependencies=true` to rebuild those

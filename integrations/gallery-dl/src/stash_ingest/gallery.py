@@ -23,7 +23,7 @@ from .publication_lock import PublicationBusy, publication_lock
 from .source_window import validate_keywords
 from .scan_resume import legacy_cursor
 
-SUPPORTED_VERSION = "1.32.15-dev"
+SUPPORTED_VERSION = "1.33.0-dev"
 
 
 def source_url(extractor):

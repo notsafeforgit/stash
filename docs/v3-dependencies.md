@@ -54,8 +54,8 @@ use `heif-info --version` and `vips --version` to verify the loaded libraries.
 Build images with `--pull` to receive updates for FFmpeg, AV1/HEVC libraries,
 Python, and other distro packages. Update the source-build scripts explicitly
 when new libheif or libvips releases are required.
-Package installation also upgrades the base image's packages. Images that use
-the distro pip explicitly upgrade it to at least 26.2 (26.2.1 in this refresh).
+Package installation also upgrades the base image's packages. Python package
+installation uses uv; the images no longer install or bootstrap distro pip.
 
 The separate `stash-s6` repository copies only the Stash executable. Its runtime
 needs the same libheif fix independently; its matching refresh also moves to

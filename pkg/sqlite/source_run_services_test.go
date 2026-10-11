@@ -61,14 +61,13 @@ func TestSourceRunServicesReserveBeforeChildAndReleaseAfterFinish(t *testing.T) 
 	require.ErrorIs(t, err, models.ErrSourceRunLease)
 }
 
-func TestSourceRunServicesCompetingChildReservationsAreAtomic(t *testing.T) {
+func TestSourceRunServicesDownloadsPreemptCompetingMetadataChildReservation(t *testing.T) {
 	f := newEnrichmentExecutionFixture(t)
 	job := f.admit(t)
 	enriching := f.claim(t, job.UUID, 0)
 	d := newPacingDownload(t, f, "https://x.com/different")
 	r := d.claim(t)
 	var download *models.SourceRunServiceReservation
-	var enrichment bool
 	var one, two error
 	start := make(chan struct{})
 	var group sync.WaitGroup
@@ -78,24 +77,27 @@ func TestSourceRunServicesCompetingChildReservationsAreAtomic(t *testing.T) {
 	})
 	group.Go(func() {
 		<-start
-		enrichment, two = f.worker.ReserveSource(t.Context(), f.tokens[0], enriching.Lease(), "https://redgifs.com/watch/two")
+		_, two = f.worker.ReserveSource(t.Context(), f.tokens[0], enriching.Lease(), "https://redgifs.com/watch/two")
 	})
 	close(start)
 	group.Wait()
 	require.NoError(t, one)
 	require.NoError(t, two)
-	require.NotEqual(t, download.Ready, enrichment)
+	require.True(t, download.Ready, "downloads take priority regardless of which reservation arrived first")
+	ready, err := f.worker.ReserveSource(t.Context(), f.tokens[0], enriching.Lease(), "https://redgifs.com/watch/two")
+	require.NoError(t, err)
+	require.False(t, ready, "a previously reserved metadata child must yield before its next request")
 }
 
 func TestSourceRunServicesBusyDependencyWaitsBeforeRetryingParent(t *testing.T) {
 	f := newEnrichmentExecutionFixture(t)
-	job := f.admit(t)
-	enriching := f.claim(t, job.UUID, 0)
-	ready, err := f.worker.ReserveSource(t.Context(), f.tokens[0], enriching.Lease(), "https://redgifs.com/watch/one")
-	require.NoError(t, err)
-	require.True(t, ready)
 	d := newPacingDownload(t, f, "https://x.com/different")
 	r := d.claim(t)
+	raw := openRawDB(t, f.db.DatabasePath())
+	defer raw.Close()
+	busyUntil := f.now.Add(time.Minute)
+	_, err := raw.Exec("INSERT INTO source_pacing(scope,available_at_ms) VALUES('service:redgifs',?)", busyUntil.UnixMilli())
+	require.NoError(t, err)
 	p, err := d.coordinator.ReserveSource(t.Context(), d.token, r.Lease(), "https://redgifs.com/watch/two")
 	require.NoError(t, err)
 	require.False(t, p.Ready)
@@ -103,9 +105,7 @@ func TestSourceRunServicesBusyDependencyWaitsBeforeRetryingParent(t *testing.T) 
 	require.ErrorIs(t, err, models.ErrSourceRunInvalid, "an unheld service cannot be blamed for network failure")
 	queued, err := d.coordinator.Finish(t.Context(), d.token, r.Lease(), models.SourceRunOutcome{State: "retry", ErrorCode: "source_busy", ErrorScope: p.Scope})
 	require.NoError(t, err)
-	raw := openRawDB(t, f.db.DatabasePath())
-	defer raw.Close()
-	require.Zero(t, queryUint(t, raw, "SELECT available_at_ms FROM source_pacing WHERE scope='service:redgifs'"))
+	require.EqualValues(t, busyUntil.UnixMilli(), queryUint(t, raw, "SELECT available_at_ms FROM source_pacing WHERE scope='service:redgifs'"), "waiting for a service must not extend its cooldown")
 	until := f.now.Add(time.Hour)
 	_, err = raw.Exec("UPDATE source_pacing SET available_at_ms=? WHERE scope='service:redgifs'", until.UnixMilli())
 	require.NoError(t, err)

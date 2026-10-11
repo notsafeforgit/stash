@@ -8,6 +8,38 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Source adapter separation — deployed, 2026-10-11 UTC
+
+Captured website interpretation now lives in the offline `pkg/sourceadapter`
+package: qualified account/post identities, profile URLs, attachment lists,
+thread facts, metadata projection, retention and source-format partitions.
+Archive services still validate manifests, profile references, capture hashes
+and scope; ingestion/database services retain transactional association choices,
+explicit unlinks and producer receipts. A dependency test prevents adapters from
+adding repository, filesystem or network imports. The shared lossless JSON codec
+is in `pkg/jsonutil`. See the
+[implementation boundary](native-ingestion.md#source-interpretation-and-archive-validation).
+
+Comparing 303 existing source fixtures before and after the refactor produced
+identical extracted facts, errors, retained data and capture partitions. Local
+adapter/archive, full ingestion, targeted database and Python HTTP replay checks
+passed, as did lint and the complete
+[GitHub release gate](https://github.com/notsafeforgit/stash/actions/runs/38149131108).
+Source revision `a9e3e6d5ba31ba0be997a8413d8e9ac73b674faa` published image
+`ghcr.io/notsafeforgit/stash@sha256:82948b902872c25b69104c4f730b8f5f2e3e8cb7aa22442f7b843c66c31e4e27`.
+The [wrapper build](https://github.com/notsafeforgit/stash-s6/actions/runs/38150686559)
+at `4f0f0594e95e000a75e4819f2494c3a44ce7f04d` published the running image
+`ghcr.io/notsafeforgit/stash-s6@sha256:4a70c1e5d9c0fa0e99db888c2781105c97e9de508cc605a41cc8704416037c65`.
+Its binary matches the GitHub artifact.
+
+Production restarted at 15:21 UTC with schema `1000113` unchanged. Health and
+source-tracking capability checks passed; new capture/download/file-completion
+receipts were observed afterward, with host and n8n Reddit/Twitter timers active.
+No capture migration, producer upgrade or queue rewrite was needed. The deferred
+restore inventory now points to this binary; the running backup retained its
+original configuration. Private verification is under
+`.local/source-adapter-refactor-20261011/`.
+
 ## Numeric Redgifs links and uv — deployed, 2026-10-11 UTC
 
 Reddit's numeric Redgifs watch URLs are now recognized by both the native

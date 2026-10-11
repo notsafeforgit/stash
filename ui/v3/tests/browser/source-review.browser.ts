@@ -146,6 +146,18 @@ async function archive(
               published_at: "2026-09-29",
             },
           },
+          {
+            uuid: "00000000-0000-4000-8000-000000000019",
+            count: 17,
+            unknown_count: 0,
+            first_seen: "2026-10-02T01:00:00Z",
+            last_seen: "2026-10-03T01:00:00Z",
+            metadata: {
+              title: "Edited post caption",
+              original_text: "A meaningful content change",
+              published_at: "2026-09-29",
+            },
+          },
         ],
       };
     else if (path.endsWith("/history"))
@@ -174,6 +186,12 @@ for (const image of [false, true]) {
     }) => {
       const remote = await archive(page, { image });
       await openReview(page, desktop, image);
+      await expect(
+        page.getByText("Published 2026-09-29", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByText(/^Observed |^First seen |^Last seen /),
+      ).toHaveCount(0);
       expect(remote.bodies).toHaveLength(0);
       expect(remote.paths.some((p) => p.endsWith("/capture-summaries"))).toBe(
         false,
@@ -189,19 +207,26 @@ for (const image of [false, true]) {
         }),
       ).toHaveAttribute("href", "https://www.reddit.com/gallery/example");
       await page
-        .getByRole("button", { name: "Post text and captures", exact: true })
+        .getByRole("button", { name: "Post content and versions", exact: true })
         .click();
       await expect(
         page.getByText("One shared description", { exact: true }),
       ).toHaveCount(1);
       await expect(
-        page.getByText("2 observations", { exact: true }),
+        page.getByText("A meaningful content change", { exact: true }),
       ).toBeVisible();
+      await expect(
+        page.getByText("17 observations", { exact: true }),
+      ).toHaveCount(0);
+      await expect(page.getByText(/^First seen |^Last seen /)).toHaveCount(0);
+      await expect(
+        page.getByText("2 observations", { exact: true }),
+      ).toHaveCount(0);
       await expect(
         page.getByText("Observation time unknown for 1 imported record.", {
           exact: true,
         }),
-      ).toBeVisible();
+      ).toHaveCount(0);
       // Strict Mode can start and abort an initial read. Every read still
       // targets this post, and its shared description is rendered only once.
       expect([

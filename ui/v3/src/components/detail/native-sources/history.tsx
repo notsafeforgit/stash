@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useIntl } from "react-intl";
 import { useMsg } from "@/hooks/message";
 import type {
-  SourceCapture,
   SourceDecision,
   CaptureHistory,
   SourceReviewAPI,
@@ -36,37 +35,22 @@ export function LinkState({
   }
 }
 
-export function CaptureTime({
-  capture,
+export function PostPublishedDate({
+  date,
 }: {
-  capture: Pick<SourceCapture, "captured_at" | "recorded_at">;
+  date: string | null | undefined;
 }) {
+  const msg = useMsg();
   const intl = useIntl();
-  return capture.captured_at
+  return date
     ? intl.formatMessage(
-        { id: "source_review.observed", defaultMessage: "Observed {date}" },
-        {
-          date: intl.formatDate(capture.captured_at, {
-            dateStyle: "medium",
-            timeStyle: "short",
-          }),
-        },
+        { id: "source_review.published", defaultMessage: "Published {date}" },
+        { date },
       )
-    : intl.formatMessage(
-        {
-          id: "source_review.recorded",
-          defaultMessage: "Observation time unknown · stored {date}",
-        },
-        {
-          date: intl.formatDate(capture.recorded_at ?? "", {
-            dateStyle: "medium",
-            timeStyle: "short",
-          }),
-        },
-      );
+    : msg("source_review.published_unknown", "Publication date unknown");
 }
 
-export function SourceCaptures({
+export function PostContentVersions({
   api,
   post,
 }: {
@@ -116,8 +100,8 @@ export function SourceCaptures({
     <div className="flex flex-col gap-3">
       <p className="text-sm text-muted-foreground">
         {msg(
-          "source_review.captures_help",
-          "Each version stores the post content once. Repeat observations share that content; counts can include separate media from the same scrape.",
+          "source_review.content_help",
+          "Saved post content and its versions. Media and album order are linked to the post.",
         )}
       </p>
       {busy && (
@@ -128,10 +112,7 @@ export function SourceCaptures({
       )}
       {!busy && !error && revisions.length === 0 && (
         <p>
-          {msg(
-            "source_review.no_captures",
-            "No retained captures for this post.",
-          )}
+          {msg("source_review.no_content", "No saved content for this post.")}
         </p>
       )}
       {revisions.map((revision) => {
@@ -139,7 +120,7 @@ export function SourceCaptures({
         return (
           <Card key={revision.uuid} size="sm">
             <CardHeader>
-              <CardTitle className="wrap-anywhere">
+              <CardTitle className="wrap-anywhere" data-selectable-text>
                 {metadata.title ||
                   msg("source_review.untitled", "Untitled source post")}
               </CardTitle>
@@ -172,48 +153,6 @@ export function SourceCaptures({
                     "Unverified historical date",
                   )}
                 </Badge>
-              )}
-              <p className="text-sm text-muted-foreground">
-                {intl.formatMessage(
-                  {
-                    id: "source_review.sighting_count",
-                    defaultMessage:
-                      "{count, plural, one {# observation} other {# observations}}",
-                  },
-                  { count: revision.count },
-                )}
-              </p>
-              {revision.first_seen && revision.last_seen && (
-                <p className="text-sm" data-selectable-text>
-                  {intl.formatMessage(
-                    {
-                      id: "source_review.sighting_range",
-                      defaultMessage: "First seen {first} · Last seen {last}",
-                    },
-                    {
-                      first: intl.formatDate(revision.first_seen, {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      }),
-                      last: intl.formatDate(revision.last_seen, {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      }),
-                    },
-                  )}
-                </p>
-              )}
-              {revision.unknown_count > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  {intl.formatMessage(
-                    {
-                      id: "source_review.unknown_sighting_count",
-                      defaultMessage:
-                        "Observation time unknown for {count, plural, one {# imported record} other {# imported records}}.",
-                    },
-                    { count: revision.unknown_count },
-                  )}
-                </p>
               )}
             </CardContent>
           </Card>

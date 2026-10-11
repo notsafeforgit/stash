@@ -12,7 +12,7 @@ import {
 } from "@/core/native-archive/source-post-api";
 import { useListScrollRestoration } from "@/components/list/use-list-scroll-restoration";
 import { AccountService } from "./accounts/shared";
-import { CaptureTime } from "@/components/detail/native-sources/history";
+import { PostPublishedDate } from "@/components/detail/native-sources/history";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
@@ -128,14 +128,9 @@ export function SourcePosts({
                       {post.latest_capture?.title_truncated ? "…" : ""}
                     </CardTitle>
                     <CardDescription>
-                      {post.latest_capture ? (
-                        <CaptureTime capture={post.latest_capture} />
-                      ) : (
-                        msg(
-                          "source_review.no_captures",
-                          "No retained captures for this post.",
-                        )
-                      )}
+                      <PostPublishedDate
+                        date={post.latest_capture?.published_at}
+                      />
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-col gap-3">

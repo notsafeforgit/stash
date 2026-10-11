@@ -13,9 +13,9 @@ import type {
 import type { Account } from "@/core/native-archive/account-review-api";
 import { AccountName, AccountOwner, AccountService } from "../accounts/shared";
 import {
-  CaptureTime,
+  PostPublishedDate,
   LinkState,
-  SourceCaptures,
+  PostContentVersions,
 } from "@/components/detail/native-sources/history";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -405,14 +405,7 @@ export function PostDetail({
                 {post.latest_capture?.title_truncated ? "…" : ""}
               </CardTitle>
               <CardDescription>
-                {post.latest_capture ? (
-                  <CaptureTime capture={post.latest_capture} />
-                ) : (
-                  msg(
-                    "source_review.no_captures",
-                    "No retained captures for this post.",
-                  )
-                )}
+                <PostPublishedDate date={post.latest_capture?.published_at} />
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
@@ -425,9 +418,9 @@ export function PostDetail({
             </CardContent>
           </Card>
           <PostSection
-            title={msg("source_review.captures", "Post text and captures")}
+            title={msg("source_review.content", "Post content and versions")}
           >
-            <SourceCaptures post={id} api={api.review} />
+            <PostContentVersions post={id} api={api.review} />
           </PostSection>
           <PostSection
             title={msg("source_posts.publishers", "Publisher accounts")}

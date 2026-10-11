@@ -193,6 +193,18 @@ async function archive(
               original_text: "One shared description",
             },
           },
+          {
+            uuid: "00000000-0000-4000-8000-000000000019",
+            count: 17,
+            unknown_count: 0,
+            first_seen: "2026-10-02T01:00:00Z",
+            last_seen: "2026-10-03T01:00:00Z",
+            metadata: {
+              title: "Edited post caption",
+              original_text: "A meaningful content change",
+              published_at: "2026-09-29",
+            },
+          },
         ],
         captures: [
           {
@@ -276,6 +288,12 @@ for (const desktop of [false, true]) {
       exact: true,
     });
     await expect(back).toBeVisible();
+    await expect(
+      page.getByText("Published 2026-09-29", { exact: true }),
+    ).toHaveCount(2);
+    await expect(
+      page.getByText(/^Observed |^First seen |^Last seen /),
+    ).toHaveCount(0);
     expect(
       remote.requests.some((u) => u.pathname.endsWith("/capture-summaries")),
     ).toBe(false);
@@ -283,17 +301,32 @@ for (const desktop of [false, true]) {
       remote.requests.some((u) => u.pathname.endsWith("/publishers")),
     ).toBe(false);
     await page
-      .getByRole("button", { name: "Post text and captures", exact: true })
+      .getByRole("button", { name: "Post content and versions", exact: true })
       .click();
     await expect(
       page.getByText("One shared description", { exact: true }),
     ).toHaveCount(1);
     await expect(
-      page.getByText("2 observations", { exact: true }),
+      page.getByText("A meaningful content change", { exact: true }),
     ).toBeVisible();
     await expect(
+      page.getByText("17 observations", { exact: true }),
+    ).toHaveCount(0);
+    await expect(page.getByText(/^First seen |^Last seen /)).toHaveCount(0);
+    await expect(page.getByText("2 observations", { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(
       page.getByText("Observation time unknown for 1 imported record."),
-    ).toBeVisible();
+    ).toHaveCount(0);
+    await page
+      .getByRole("button", { name: "Back to posts", exact: true })
+      .scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: test
+        .info()
+        .outputPath(`post-content-${desktop ? "desktop" : "mobile"}.png`),
+    });
     await page
       .getByRole("button", { name: "Publisher accounts", exact: true })
       .click();
@@ -370,7 +403,7 @@ for (const desktop of [false, true]) {
       page.getByText(postIds.otherPost, { exact: true }),
     ).toBeVisible();
     await page
-      .getByRole("button", { name: "Post text and captures", exact: true })
+      .getByRole("button", { name: "Post content and versions", exact: true })
       .click();
     await expect(
       page.getByText("Full retained caption", { exact: true }),

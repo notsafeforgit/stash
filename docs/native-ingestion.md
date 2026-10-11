@@ -2046,12 +2046,19 @@ review, while uncertain transport failures and mismatched receipts remain saved.
 Post lists return a latest stored capture with a title excerpt of at most 512
 characters, at most three shared URLs and an explicit `more_urls` flag. They
 never fetch raw post/profile bodies. Expandable post text groups captures under
-their shared revision; link history loads separately. Capture pages sort by
+their shared revision under **Post content and versions**; link history loads
+separately. Browsing shows the source publication date, or an unknown-date label,
+instead of the scrape/import timestamp. Sighting counts and first/last scrape
+times are omitted. Discovery routes are processing context and never additional
+post copies. Source identity, meaningful text changes and attachment lists remain
+independent of the profile/search/feed used to find them.
+
+Internal capture pages sort by
 observation time, or by recorded time when the historical observation time is
 unknown, then capture UUID. Continue with `after_uuid`, `after_time` (RFC 3339
 with optional nanoseconds) and `after_clock` (`observed` or `recorded`). All
 three cursor fields are required together. Unknown observation time stays null
-and is labelled separately from the time retained evidence entered the archive.
+and is never presented as the post's publication date.
 Capture summaries carry each revision's metadata once per page; the UI also
 deduplicates revisions across loaded pages. This does not select a caption,
 copy source account ownership into performers, or activate metadata policies.

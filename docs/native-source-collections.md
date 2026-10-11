@@ -39,6 +39,16 @@ Manual downloads and initial imports remain independent. Queued monitored runs
 are cancelled; a running attempt can finish delivering its data. An offline
 snapshot cannot start a new attempt after its subscription has changed.
 
+The route used to find a post is operational context, not another archived item.
+Finding the same Reddit/Twitter post through a profile, search, subreddit or saved
+feed reuses its source identity and unchanged content. Scrape-route fields do not
+distinguish its stored content. Changes to post text or album items remain
+retained, and different posts can share the same deduplicated media. Post browsing
+shows content, publication dates and associated media without sighting counters,
+first/last scrape times or discovery-route history. Collection/capture links and
+delivery receipts remain internal inputs to scoped ingestion, metadata policies
+and safe retries; these links do not copy the post payload.
+
 Subscriptions live in the normal Stash database (`source_subscriptions`, schema
 1000114). New sources default off. Migration does not subscribe observed authors
 or all existing collections: deployments explicitly import their intended target

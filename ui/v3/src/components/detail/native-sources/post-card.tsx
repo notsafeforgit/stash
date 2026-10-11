@@ -38,9 +38,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ReviewError } from "../native-metadata/shared";
 import {
-  CaptureTime,
+  PostPublishedDate,
   LinkState,
-  SourceCaptures,
+  PostContentVersions,
   SourceLinkHistory,
 } from "./history";
 
@@ -122,7 +122,7 @@ function SourceLinkForm({
                 {field.state.value === "linked"
                   ? msg(
                       "source_review.link_help",
-                      "Allow this post's captures as metadata sources for this item. This does not choose an attachment or create an album.",
+                      "Use this post's metadata for this item. This does not choose an attachment or create an album.",
                     )
                   : field.state.value === "unlinked"
                     ? msg(
@@ -235,7 +235,7 @@ export function SourcePostCard({
   const msg = useMsg();
   const intl = useIntl();
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [capturesOpen, setCapturesOpen] = useState(false);
+  const [contentOpen, setContentOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [urls, setURLs] = useState(post.urls);
   const [moreURLs, setMoreURLs] = useState(post.more_urls);
@@ -265,14 +265,7 @@ export function SourcePostCard({
           {post.latest_capture?.title_truncated ? "…" : ""}
         </CardTitle>
         <CardDescription>
-          {post.latest_capture ? (
-            <CaptureTime capture={post.latest_capture} />
-          ) : (
-            msg(
-              "source_review.no_captures",
-              "No retained captures for this post.",
-            )
-          )}
+          <PostPublishedDate date={post.latest_capture?.published_at} />
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -332,17 +325,19 @@ export function SourcePostCard({
         {error !== undefined && (
           <ReviewError error={error} retry={() => void loadURLs()} />
         )}
-        <Collapsible open={capturesOpen} onOpenChange={setCapturesOpen}>
+        <Collapsible open={contentOpen} onOpenChange={setContentOpen}>
           <CollapsibleTrigger
             render={
               <Button variant="ghost" className="w-full justify-between" />
             }
           >
-            {msg("source_review.captures", "Post text and captures")}
+            {msg("source_review.content", "Post content and versions")}
             <ChevronDown data-icon="inline-end" />
           </CollapsibleTrigger>
           <CollapsibleContent className="pt-3">
-            {capturesOpen && <SourceCaptures api={api} post={a.post_uuid} />}
+            {contentOpen && (
+              <PostContentVersions api={api} post={a.post_uuid} />
+            )}
           </CollapsibleContent>
         </Collapsible>
         <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>

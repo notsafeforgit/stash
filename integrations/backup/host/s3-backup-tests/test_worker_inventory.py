@@ -397,7 +397,7 @@ class WorkerInventoryTests(unittest.TestCase):
                          'root': dict(original['root'], path='/container/media'),
                          'locks': dict(original['locks'], path='/container/locks'),
                          'config_files': ['gallery.json', 'n8n-overrides.json'],
-                         'working_directory': '/container', 'source_category': 'twitter'}
+                         'working_directory': '/unmounted-container-home', 'source_category': 'twitter'}
         virtual = dict(self.spec, profile='/container/profile.json', home='/container',
                        working_directory='/container', outboxes=['/container/queue.sqlite'],
                        path_mappings=[{'from': '/container', 'to': str(self.root)}])

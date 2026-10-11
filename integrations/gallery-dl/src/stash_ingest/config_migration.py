@@ -67,7 +67,10 @@ class Converter:
                  read_document=_json_file, local_path=None):
         if not 1 <= len(filenames) <= 16:
             raise InvalidData("Choose one to sixteen ordered gallery-dl JSON files")
-        self.working = Path(working_directory or os.getcwd()).resolve(strict=True)
+        # Inventory may be resolving a container cwd that has no host mount.
+        # Its resolver translates each actual dependency; the logical cwd need
+        # not itself exist on the inventory host. Execution still requires it.
+        self.working = Path(working_directory or os.getcwd()).resolve(strict=local_path is None)
         self.resolve_local_path = local_path
         self.root_uuid, self.root = Configuration._root(root, self.working, media=True)
         _, self.locks = Configuration._root(locks, self.working, media=False)

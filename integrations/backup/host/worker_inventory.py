@@ -8,6 +8,7 @@ profile/private files to the bytes actually retained by ComponentStage.
 import argparse
 import base64
 import copy
+from contextlib import closing
 import glob
 import hashlib
 import os
@@ -131,7 +132,7 @@ class Inventory:
             if saved_document is None:
                 # Frozen policies can still refer to helpers/archives removed
                 # from the current settings. Retain their dependency closure too.
-                with sqlite3.connect(path(outbox).as_uri() + "?mode=ro", uri=True) as db:
+                with closing(sqlite3.connect(path(outbox).as_uri() + "?mode=ro", uri=True)) as db:
                     exists = db.execute("SELECT 1 FROM sqlite_schema WHERE name='worker_configurations'").fetchone()
                     if exists:
                         rows = db.execute("SELECT document,document_sha256 FROM worker_configurations WHERE profile=? LIMIT 1025",

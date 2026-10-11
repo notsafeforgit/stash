@@ -144,3 +144,13 @@ export const playerConfiguration: GQL.ConfigDataFragment = {
     generate: null,
   },
 };
+
+// Source-specific fixtures represent an installation that explicitly opted in.
+export const sourceTrackingConfiguration = {
+  ...playerConfiguration,
+  general: {
+    ...playerConfiguration.general,
+    sourceTrackingEnabled: true,
+    sourceTrackingActive: true,
+  },
+};

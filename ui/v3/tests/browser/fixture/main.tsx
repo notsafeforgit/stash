@@ -86,6 +86,8 @@ import { HomeFixture } from "./home";
 import { TvFixture } from "./tv";
 import { MotionFixture, MotionViewerFixture } from "./motion";
 import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
+import { ConfigurationProvider } from "@/hooks/config";
+import { sourceTrackingConfiguration } from "./player-configuration";
 import { DownloadsFixture } from "./downloads";
 
 const params = new URLSearchParams(location.search);
@@ -315,11 +317,16 @@ function FixtureSettingsPage() {
 
 const rootRoute = createRootRoute({
   component: () => (
-    <MobileNavigationProvider>
-      <div data-route-viewport className="flex h-dvh flex-col overflow-hidden">
-        <Outlet />
-      </div>
-    </MobileNavigationProvider>
+    <ConfigurationProvider configuration={sourceTrackingConfiguration}>
+      <MobileNavigationProvider>
+        <div
+          data-route-viewport
+          className="flex h-dvh flex-col overflow-hidden"
+        >
+          <Outlet />
+        </div>
+      </MobileNavigationProvider>
+    </ConfigurationProvider>
   ),
 });
 const settingsRoute = createRoute({

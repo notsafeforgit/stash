@@ -5,6 +5,7 @@ from pathlib import Path
 import time
 import uuid
 
+from .client import Unavailable
 from .encoding import InvalidData, digest, encode, identifier, utc_now
 from .retention import POLICY, retain
 from .runs import SourceFailure, SourcePaused, SourceTurnComplete
@@ -26,7 +27,7 @@ class Prepared:
 
 class Producer:
     def __init__(self, outbox, lease, root, *, extractor_version, configuration_check=None, source_category=None,
-                 clock=time.monotonic):
+                 clock=time.monotonic, scan_mode='initial'):
         lease.check()
         run = lease.run
         if (outbox.producer != lease.client.producer or outbox.endpoint != lease.client.endpoint
@@ -34,6 +35,9 @@ class Producer:
             raise InvalidData("Producer must own a download run at its permitted media root")
         self.outbox, self.lease, self.root = outbox, lease, root
         self.source_category = source_category
+        self.scan_mode = scan_mode
+        self.routine_post_items = 0
+        self.routine_post_new = False
         if configuration_check is not None and not callable(configuration_check):
             raise InvalidData("Invalid worker configuration check")
         self.configuration_check = configuration_check or (lambda: None)
@@ -59,6 +63,15 @@ class Producer:
         self.items_seen = run["progress"]["items_seen"]
         self.files_completed = run["progress"]["files_completed"]
         self.resume_cursor = run["progress"]["cursor"]
+        self.last_cursor = self.resume_cursor
+        self.pagination = run['progress'].get('pagination')
+        if self.pagination is not None:
+            from .pagination import validate
+            self.pagination = validate(self.pagination)
+            self.resume_cursor = self.pagination['item']
+        self.saved_pagination = self.pagination
+        self.pagination_started = False
+        self.pending_page = None
         self.turn_replay = bool(self.resume_cursor)
         self.clock = clock
         self.resumed_work_deadline = None
@@ -67,7 +80,7 @@ class Producer:
         if type(self.replay_archive) is not bool:
             raise InvalidData("Invalid archive recovery policy")
         self.replay_seen = 0
-        self.replay_limit = max(64, self.items_seen + 64)
+        self.replay_limit = max(4096 if self.saved_pagination else 64, self.items_seen + 64)
 
     def check(self, *, turn=True):
         self.lease.check()
@@ -103,6 +116,22 @@ class Producer:
             return self.lease.reserve_source(url)
         except SourceFailure as exc:
             self.fail_source(exc.code, exc.scope)
+
+    def request_source(self, url):
+        from . import request_budget
+        try:
+            return request_budget.request(self, url)
+        except (Unavailable, InvalidData, SourcePaused):
+            self.lease.failure = 'source_request_unavailable'
+            raise SourcePaused('Cannot confirm shared source request budget') from None
+
+    def report_source(self, permit, response=None):
+        from . import request_budget
+        try:
+            return request_budget.report(self, permit, response)
+        except (Unavailable, InvalidData, SourcePaused):
+            self.lease.failure = 'source_request_report_unavailable'
+            raise SourcePaused('Source request result remains unconfirmed') from None
 
     def relative(self, path):
         relative = self.root.relative(path)
@@ -192,11 +221,53 @@ class Producer:
 
     def checkpoint(self, cursor, replay, completed):
         if replay:
+            if not self.resume_cursor and self.pending_page is not None and self.saved_pagination is None:
+                # Upgrade an old item-only checkpoint only after finding its
+                # anchor. Earlier pages must not replace its useful progress.
+                self.pagination = {**self.pending_page, 'item': self.last_cursor}
+                self.pagination_started = True
+                self._progress()
             return
         self.items_seen += 1
         self.files_completed += int(completed)
-        self.lease.progress(self.items_seen, self.files_completed, cursor)
+        self.last_cursor = cursor
+        if self.pagination is not None:
+            self.pagination = {**self.pagination, 'item': cursor}
+        self._progress()
+
+    def _progress(self):
+        extra = {} if self.pagination is None else {'pagination': dict(self.pagination)}
+        self.lease.progress(self.items_seen, self.files_completed, self.last_cursor, **extra)
+
+    def begin_page(self, page):
+        """Checkpoint a page start before fetching it; never skip a partial page."""
+        from .pagination import validate
+        page = validate(page)
+        self.pending_page = page
+        if self.saved_pagination is None and self.resume_cursor:
+            return
+        if not self.pagination_started and self.saved_pagination is not None:
+            expected = {**self.saved_pagination, 'item': ''}
+            if page != expected:
+                raise InvalidData('Source pagination does not match the saved extractor and page')
+            self.pagination_started = True
+            return
+        if self.pagination is not None and page == {**self.pagination, 'item': ''}:
+            return  # A retry of the same HTTP page has not consumed that page.
+        if self.pagination_started and self.resume_cursor:
+            # The partial page was replayed in full, including any new or moved
+            # items. Its old attachment may have been removed by the source.
+            self.resume_cursor = ''
+        self.pagination_started = True
+        self.pagination = page
+        self._progress()
 
     def traversed(self):
+        if self.saved_pagination is not None and not self.pagination_started:
+            raise SourcePaused('Saved pagination extractor was not reached')
+        if self.saved_pagination is not None and self.pagination_started:
+            # The source may have removed the last checkpointed item from its
+            # final page. The whole page was processed through normal delivery.
+            self.resume_cursor = ''
         if self.resume_cursor:
             raise SourcePaused("Saved source cursor was not encountered; run remains unfinished")

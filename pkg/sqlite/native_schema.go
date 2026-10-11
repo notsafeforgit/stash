@@ -597,6 +597,17 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return err
 			}
 		}
+		if version >= NativeSchemaBaseline+111 {
+			for _, name := range []string{"source_request_budgets", "source_request_permits", "source_request_metrics", "source_request_posts", "source_check_health", "source_request_waiters", "source_request_posts_retention"} {
+				var found bool
+				if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+					return err
+				}
+				if !found {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+		}
 		if version >= NativeSchemaBaseline+55 {
 			if err := validateSourceRunServicesSchema(conn, version >= NativeSchemaBaseline+99, auditData); err != nil {
 				return err

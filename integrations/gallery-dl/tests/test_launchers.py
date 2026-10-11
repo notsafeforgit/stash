@@ -67,7 +67,8 @@ class LauncherTests(unittest.TestCase):
         expected_new = ["https://www.reddit.com/user/Alpha/submitted/?sort=new",
                         "https://www.reddit.com/search?q=author%3AAlpha+nsfw%3Ayes&include_over_18=on&sort=new&t=all",
                         "https://www.reddit.com/r/Pictures/?sort=new", "https://www.reddit.com/user/me/saved/?sort=new"]
-        self.assertEqual(reddit_urls(["Alpha"], subs, saved=True), expected_new)
+        self.assertEqual(reddit_urls(["Alpha"], subs, saved=True), [expected_new[0], *expected_new[2:]])
+        self.assertEqual(reddit_urls(["Alpha"], subs, saved=True, recovery=True), expected_new)
         self.assertEqual(reddit_urls(["Alpha"], [], mode="top"), [
             "https://www.reddit.com/user/Alpha/submitted/?sort=top&t=all",
             "https://www.reddit.com/search?q=author%3AAlpha+nsfw%3Ayes&include_over_18=on&sort=top&t=all",

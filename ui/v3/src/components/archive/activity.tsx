@@ -27,6 +27,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PostEmpty } from "./posts/shared";
+import { ScrapeMetrics } from "./activity/scrape-metrics";
 import { ActivityFilters } from "./activity/filters";
 import { ActivityDetail } from "./activity/detail";
 import {
@@ -119,6 +120,7 @@ export function ArchiveActivity({
           />
         )}
         <div className={cn("flex flex-col gap-6", item && "hidden")}>
+          {view === "runs" && <ScrapeMetrics refresh={refresh} />}
           <ActivityFilters value={search} onChange={onChange} />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">

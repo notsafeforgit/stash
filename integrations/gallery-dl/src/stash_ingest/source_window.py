@@ -88,15 +88,15 @@ class SourceWindow:
         self.until = datetime.fromisoformat(self.window["until"])
         self.traversal = self.window.get('basis') == 'traversal'
 
-    def contains(self, value):
-        return self.traversal or ((self.since is None or value >= self.since) and value < self.until)
+    def contains(self, value, *, overlap=False):
+        return self.traversal or ((overlap or self.since is None or value >= self.since) and value < self.until)
 
     def published(self, metadata, category):
         # None is an explicit absence of a date requirement for a configured
         # scan, never a replacement publication timestamp in source metadata.
         return None if self.traversal else published(metadata, category)
 
-    def configure(self, extractor, *, inherited=False):
+    def configure(self, extractor, *, inherited=False, overlap=False):
         """Override obsolete date limits on this instance, leaving global config alone."""
         original = extractor.config
 
@@ -112,7 +112,7 @@ class SourceWindow:
                 # post. Our predicate handles out-of-order posts without abort.
                 return None
             if key == "date-min":
-                return default if inherited or self.since is None else (self.since - EPOCH).total_seconds()
+                return default if inherited or overlap or self.since is None else (self.since - EPOCH).total_seconds()
             if key == "date-max":
                 # Reddit's API filter is inclusive and may compare fractional
                 # timestamps. The native predicate enforces exclusive `until`.

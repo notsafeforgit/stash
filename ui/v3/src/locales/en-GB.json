@@ -4009,5 +4009,31 @@
   },
   "media": "Media",
   "gallery_media.actions": "Media actions",
-  "gallery_media.cover_failed": "Could not set the gallery cover. Refresh the gallery and try again."
+  "gallery_media.cover_failed": "Could not set the gallery cover. Refresh the gallery and try again.",
+  "scrape_metrics": {
+    "routine": "Routine checks",
+    "initial": "Initial imports",
+    "recovery": "Historical recovery",
+    "listing": "Post listings",
+    "profile": "Profile lookups",
+    "resolution": "External media resolution",
+    "other": "Other source requests",
+    "posts": "Captured posts",
+    "title": "Scrape request budget",
+    "description": "Source requests over the last 24 hours, shared by host and n8n workers. Media transfers are separate. Routine checks have priority; counters are retained for 30 days.",
+    "source": "Source and operation",
+    "requests": "Requests",
+    "limited": "Rate limits",
+    "errors": "Errors",
+    "new": "New posts",
+    "repeated": "Repeated posts",
+    "empty": "No source requests recorded yet.",
+    "count_note": "Requests count granted attempts; a stopped worker may not send its last grant. Posts count once per run, even when they contain multiple files. Errors include rate limits.",
+    "checks": "Account checks, oldest first",
+    "account": "Account source",
+    "last": "Last completed check",
+    "overdue": "Overdue beyond 24 hours",
+    "never": "No completed check",
+    "enrichment": "Normal scrapes retain metadata from their original responses. Older posts change only when a scrape encounters them again."
+  }
 }

@@ -179,14 +179,15 @@ def reddit_list(filename):
     return sorted(users), sorted(subs), ignored
 
 
-def reddit_urls(users, subs, mode="new", saved=False):
+def reddit_urls(users, subs, mode="new", saved=False, *, recovery=False):
     if mode not in ("new", "top"):
         raise InvalidData("Unsupported Reddit scan mode")
     result = []
     for user in users:
         for period in ((None,) if mode == "new" else ("all", "year")):
             result.append(f"https://www.reddit.com/user/{user}/submitted/?sort={mode}" + (f"&t={period}" if period else ""))
-            result.append(f"https://www.reddit.com/search?q=author%3A{user}+nsfw%3Ayes&include_over_18=on&sort={mode}&t={period or 'all'}")
+            if mode == 'top' or recovery:
+                result.append(f"https://www.reddit.com/search?q=author%3A{user}+nsfw%3Ayes&include_over_18=on&sort={mode}&t={period or 'all'}")
     for sub in subs:
         for period in ((None,) if mode == "new" else ("all", "year")):
             result.append(f"https://www.reddit.com/r/{sub}/?sort={mode}" + (f"&t={period}" if period else ""))

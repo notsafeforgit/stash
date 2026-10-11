@@ -129,7 +129,7 @@ def main():
         def factory(*args, **kwargs):
             client = original_factory(*args, **kwargs)
             client.add_info_extractor(NativeVideoFixtureIE())
-            client.urlopen = lambda request: SimpleNamespace(status=200)
+            client.urlopen = lambda request: SimpleNamespace(status=200, headers={})
             return client
 
         downloads = []

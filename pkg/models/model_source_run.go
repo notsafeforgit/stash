@@ -77,9 +77,21 @@ type SourceRunCandidate struct {
 }
 
 type SourceRunProgress struct {
-	ItemsSeen      int64  `json:"items_seen"`
-	FilesCompleted int64  `json:"files_completed"`
-	Cursor         string `json:"cursor"` // source key, not a command or raw log
+	ItemsSeen      int64             `json:"items_seen"`
+	FilesCompleted int64             `json:"files_completed"`
+	Cursor         string            `json:"cursor"` // last completed source item
+	Pagination     *SourcePagination `json:"pagination,omitempty"`
+}
+
+// Pagination identifies the beginning of the current remote page. Item is the
+// last completed attachment within that page; an empty Item means the page has
+// not been processed yet. Persisting the pair prevents advancing past a partial
+// page when the worker restarts.
+type SourcePagination struct {
+	Extractor string `json:"extractor"`
+	URL       string `json:"url"`
+	Cursor    string `json:"cursor"`
+	Item      string `json:"item"`
 }
 
 type SourceRunLease struct {
@@ -148,6 +160,10 @@ type SourceRunReaderWriter interface {
 	Claim(context.Context, string, string, string, string, time.Time, time.Duration) (*SourceRun, error)
 	CheckLease(context.Context, SourceRunLease, time.Time) (*SourceRun, error)
 	ReserveSource(context.Context, SourceRunLease, string, time.Time) (*SourceRunServiceReservation, error)
+	RequestSource(context.Context, SourceRunLease, SourceRequestInput, time.Time) (*SourceRequestPermit, error)
+	ReportSourceRequest(context.Context, SourceRunLease, SourceRequestResult, time.Time) error
+	RecordPostMetric(context.Context, string, string, bool, time.Time) error
+	RequestMetrics(context.Context, time.Time, int) (*SourceRequestSummary, error)
 	Renew(context.Context, SourceRunLease, time.Time, time.Duration) (*SourceRun, error)
 	Progress(context.Context, SourceRunLease, SourceRunProgress, time.Time) (*SourceRun, error)
 	Finish(context.Context, SourceRunLease, SourceRunOutcome, time.Time) (*SourceRun, error)

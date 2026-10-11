@@ -10,6 +10,7 @@ import (
 
 func removeSourceSiteConcurrencySchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSourceRequestSchema(t, raw)
 	_, err := raw.Exec(`DROP INDEX source_runs_running_destination;
  CREATE UNIQUE INDEX source_runs_running_destination ON source_runs(destination) WHERE state='running' AND destination!='';
  DELETE FROM native_migration_history WHERE version=1000110;`)

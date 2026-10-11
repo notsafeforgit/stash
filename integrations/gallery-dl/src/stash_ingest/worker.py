@@ -77,6 +77,8 @@ def execute(box, client, configuration, run_uuid):
     if (capabilities.get("source_runs") is not True or capabilities.get("source_run_protocol") != 1
             or capabilities.get("source_run_recovery_protocol") != 1
             or capabilities.get("source_run_pacing_protocol") != 1
+            or capabilities.get("source_request_budget_protocol") != 1
+            or capabilities.get("source_run_pagination_protocol") != 1
             or capabilities.get("source_run_origins_protocol") != 1
             or capabilities.get("source_run_fairness_protocol") != 1
             or capabilities.get("attachment_download_protocol") != 1
@@ -116,7 +118,8 @@ def execute(box, client, configuration, run_uuid):
                 delivery.check()
 
             producer = Producer(box, lease, configuration.root, extractor_version=SUPPORTED_VERSION,
-                                configuration_check=check_configuration, source_category=configuration.source_category)
+                                configuration_check=check_configuration, source_category=configuration.source_category,
+                                scan_mode=configuration.scan_mode)
             target = lease.run["target_url"]
             if configuration.source_adapter == 'yt-dlp':
                 from gallery_dl.extractor.ytdl import YoutubeDLExtractor

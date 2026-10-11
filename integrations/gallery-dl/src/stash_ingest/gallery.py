@@ -14,7 +14,7 @@ from gallery_dl import config, exception, job, version
 from gallery_dl import path as gallery_path
 from gallery_dl.extractor.common import Message
 
-from . import filename, instagram, mirror, social_media, web_media
+from . import filename, instagram, mirror, recent, social_media, web_media
 from .encoding import InvalidData
 from .filesystem import destination_lock
 from .runs import SourceFailure, SourcePaused, SourceTurnComplete
@@ -46,13 +46,17 @@ class SourceSession:
     def request(self, *args, **kwargs):
         self.producer.check()
         url = args[1] if len(args) >= 2 else kwargs.get("url")
-        scope = self.producer.reserve_source(url)
+        permit = self.producer.request_source(url)
+        scope = permit['source_scope']
         try:
             response = self.session.request(*args, **kwargs)
         except requests.exceptions.Timeout:
+            self.producer.report_source(permit)
             self.producer.fail_source("timeout", scope)
         except requests.exceptions.RequestException:
+            self.producer.report_source(permit)
             self.producer.fail_source("extraction_failed", scope)
+        self.producer.report_source(permit, response)
         if response.status_code == 429:
             response.close()
             self.producer.fail_source("rate_limited", scope)
@@ -230,7 +234,9 @@ class NativeDownloadJob(job.DownloadJob):
                 and not (parent._native_collection_child and extractor.category == parent.extractor.category
                          and extractor.category in ('instagram', 'bluesky', 'tiktok', 'twitter'))):
             raise InvalidData("Child extraction has no approved source-post window")
-        self.producer.window.configure(extractor, inherited=parent is not None)
+        recent.configure(extractor, self.producer)
+        self._native_overlap = recent.chronological(extractor, self.producer) or bool(parent and parent._native_overlap)
+        self.producer.window.configure(extractor, inherited=parent is not None, overlap=self._native_overlap)
         if hasattr(extractor, "_async_items"):
             extractor.items = extractor._async_items
         request = extractor.request
@@ -282,6 +288,10 @@ class NativeDownloadJob(job.DownloadJob):
         elif self.extractor.category in ('ytdl', 'ytdl-generic'):
             from . import ytdl_source
             ytdl_source.install(self.extractor, self.producer)
+        if self.extractor.category in ('reddit', 'twitter'):
+            from . import pagination
+            pagination.install(self.extractor, self.producer)
+            recent.install(self.extractor, self.producer)
 
     def _source_operation(self, call, *args):
         try:
@@ -329,7 +339,7 @@ class NativeDownloadJob(job.DownloadJob):
                         self._native_collection_route = None
                     continue
                 value = self._native_source_date or self.producer.window.published(data, self.extractor.category)
-                if self.producer.window.contains(value):
+                if self.producer.window.contains(value, overlap=self._native_overlap):
                     # Upstream augments/mutates keywords in place. Preserve the
                     # extractor's post for its subsequent attachment messages.
                     yield kind, url, dict(data)
@@ -504,7 +514,7 @@ class NativeDownloadJob(job.DownloadJob):
             finally:
                 self._native_collection_child = False
         value = self._native_source_date or self.producer.window.published(kwdict, self.extractor.category)
-        if not self.producer.window.contains(value):
+        if not self.producer.window.contains(value, overlap=self._native_overlap):
             return
         self._native_queued_date = value
         try:
@@ -523,6 +533,9 @@ class NativeDownloadJob(job.DownloadJob):
         filename.install(self).begin(pathfmt.kwdict)
         kept = dict(pathfmt.kwdict, _url=self._native_url, source_extractor_url=source_url(self.extractor))
         self._native_prepared = self.producer.prepare(kept)
+        self.producer.routine_post_items += 1
+        if self.archive is None or not self.archive.check(pathfmt.kwdict):
+            self.producer.routine_post_new = True
         old_cursor = legacy_cursor(self, pathfmt) if self.producer.legacy_resume else None
         self._native_cursor, self._native_replay = self.producer.cursor(self._native_prepared, legacy_cursor=old_cursor)
         if not self.producer.resume_cursor and not self.producer.replay_archive and self._skipexc is None:

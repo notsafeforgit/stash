@@ -111,7 +111,7 @@ class RunLease:
     def _change(self, **change):
         self.check()
         return self.client._request("POST", "/runs/" + self.run_uuid + "/lease",
-                                    encode({"owner_uuid": self.owner, "fence": self.run["fence"], **change}, 8192), timed=True)
+                                    encode({"owner_uuid": self.owner, "fence": self.run["fence"], **change}, 32768), timed=True)
 
     def renew(self):
         with self.lock:
@@ -121,11 +121,13 @@ class RunLease:
                 self.failure = type(exc).__name__
                 raise SourcePaused("Cannot renew source ownership; further source work is paused") from None
 
-    def progress(self, items_seen, files_completed, cursor):
+    def progress(self, items_seen, files_completed, cursor, *, pagination=None):
         with self.lock:
             try:
-                self._accept(self._change(progress={"items_seen": items_seen,
-                             "files_completed": files_completed, "cursor": cursor}))
+                progress = {"items_seen": items_seen, "files_completed": files_completed, "cursor": cursor}
+                if pagination is not None:
+                    progress['pagination'] = pagination
+                self._accept(self._change(progress=progress))
             except (Unavailable, InvalidData, SourcePaused) as exc:
                 self.failure = type(exc).__name__
                 raise SourcePaused("Cannot checkpoint source progress; evidence remains queued") from None

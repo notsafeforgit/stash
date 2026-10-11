@@ -231,12 +231,20 @@ func (s *Service) Capture(ctx context.Context, token string, raw []byte, digest 
 				return ErrDefinition
 			}
 		}
-		post, err := s.Repo.SourceEvidence.EnsurePost(ctx, models.SourcePostIdentifier{Namespace: event.Post.Namespace, Value: event.Post.Value}, "")
+		postKey := models.SourcePostIdentifier{Namespace: event.Post.Namespace, Value: event.Post.Value}
+		previous, err := s.Repo.SourceEvidence.FindPostByIdentifier(ctx, postKey)
+		if err != nil {
+			return err
+		}
+		post, err := s.Repo.SourceEvidence.EnsurePost(ctx, postKey, "")
 		if err != nil {
 			return err
 		}
 		if post.State != "active" {
 			return models.ErrSourcePostForgotten
+		}
+		if err := s.Repo.SourceRun.RecordPostMetric(ctx, event.RunUUID, post.UUID, previous == nil, time.Now()); err != nil {
+			return err
 		}
 		captureID := uuid.NewSHA1(uuid.MustParse(event.ProducerUUID), []byte("source.capture\x00"+event.EventUUID)).String()
 		capture, result, err := s.recordContentCapture(ctx, models.SourceCaptureInput{UUID: captureID, PostUUID: post.UUID, Origin: "gallery-dl", Platform: archive.CapturedPostPlatform(models.SourcePostIdentifier{Namespace: event.Post.Namespace, Value: event.Post.Value}), CapturedAt: event.ObservedAt, ExtractorVersion: &event.ExtractorVersion, RetentionPolicy: event.RetentionPolicy, Metadata: event.Metadata, Payload: *prepared.payload}, prepared.album, collection, time.Now())

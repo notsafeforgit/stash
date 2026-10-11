@@ -36,6 +36,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/activity/jobs/{job}", rs.activityJob)
 	r.Get("/activity/jobs/{job}/attempts", rs.activityJobAttempts)
 	r.Get("/activity/runs", rs.activityRuns)
+	r.Get("/activity/scrape-metrics", rs.scrapeMetrics)
 	r.Get("/activity/runs/{run}", rs.activityRun)
 	r.Get("/activity/runs/{run}/attempts", rs.activityRunAttempts)
 	r.Get("/manual-intake/capabilities", rs.manualIntakeCapabilities)

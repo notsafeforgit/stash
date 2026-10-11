@@ -77,6 +77,25 @@ class WorkerDispatchTests(unittest.TestCase):
             with closing(self.open()) as box:
                 self.assertEqual(WorkerDispatcher(box, self.transport, self.profiles).once()["profile_id"], "metadata")
 
+    def test_routine_priority_wins_after_rotation_and_recovery_uses_idle_capacity(self):
+        self.document['profiles'][0]['priority'] = 0
+        self.document['profiles'][1]['priority'] = 2
+        self.profile_path.write_bytes(encode(self.document))
+        self.profiles = Profiles(self.profile_path)
+        with (patch('stash_ingest.worker_dispatch.Configuration'),
+              patch('stash_ingest.worker_dispatch.EnrichmentConfiguration'),
+              patch('stash_ingest.worker_dispatch.Dispatcher') as daily,
+              patch('stash_ingest.worker_dispatch.CollectionDispatcher') as recovery,
+              closing(self.open()) as box):
+            worker = WorkerDispatcher(box, self.transport, self.profiles)
+            worker.save(worker.state(), after_entry='download')
+            daily.return_value.once.return_value = {'state': 'completed'}
+            recovery.return_value.once.return_value = {'state': 'completed'}
+            self.assertEqual(worker.once()['profile_id'], 'download')
+            recovery.assert_not_called()
+            daily.return_value.once.return_value = {'state': 'idle'}
+            self.assertEqual(worker.once()['profile_id'], 'metadata')
+
     def test_broken_profile_is_reported_without_paths_or_access_values_and_peers_run(self):
         with (patch("stash_ingest.worker_dispatch.Configuration", side_effect=InvalidData("fixture-private-access /private/path")),
               patch("stash_ingest.worker_dispatch.EnrichmentConfiguration"),

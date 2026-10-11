@@ -37,7 +37,9 @@ class Profiles:
         self.uuid, self.entries = identifier(value["uuid"]), []
         seen = set()
         for entry in value["profiles"]:
-            if (not isinstance(entry, dict) or set(entry) != {"id", "operation", "profile"}
+            if (not isinstance(entry, dict) or not {"id", "operation", "profile"} <= set(entry)
+                    or set(entry) - {"id", "operation", "profile", "priority"}
+                    or type(entry.get('priority', 0)) is not int or not 0 <= entry.get('priority', 0) <= 2
                     or not isinstance(entry["id"], str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", entry["id"])
                     or entry["id"] in seen or entry["operation"] not in ("download", "post.enrich", "account.list_page", "post.verify_candidate")):
                 raise InvalidData("Invalid or repeated worker profile entry")
@@ -100,7 +102,9 @@ class WorkerDispatcher:
         entries = self.profiles.entries
         names = [entry["id"] for entry in entries]
         start = names.index(state["after_entry"]) + 1 if state["after_entry"] in names else 0
-        ordered = entries[start:] + entries[:start]
+        # Rotate fairly within a priority, but do not let queued historical
+        # work take a whole turn before available routine checks.
+        ordered = sorted(entries[start:] + entries[:start], key=lambda entry: entry.get('priority', 0))
         skipped = []
         for entry in ordered:
             if not self.save(state, after_entry=entry["id"]):

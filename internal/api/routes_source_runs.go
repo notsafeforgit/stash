@@ -159,7 +159,7 @@ func (rs *ingestRoutes) changeRunLease(w http.ResponseWriter, r *http.Request) {
 		Progress     *models.SourceRunProgress `json:"progress,omitempty"`
 		Outcome      *models.SourceRunOutcome  `json:"outcome,omitempty"`
 	}
-	if err := readIngestJSON(w, r, 8192, &input); err != nil {
+	if err := readIngestJSON(w, r, 32768, &input); err != nil {
 		ingestError(w, err)
 		return
 	}
@@ -213,4 +213,40 @@ func (rs *ingestRoutes) reviewRun(w http.ResponseWriter, r *http.Request) {
 		return err
 	})
 	sourceRunResponse(w, result, err)
+}
+
+func (rs *ingestRoutes) requestRunSource(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		OwnerUUID string `json:"owner_uuid"`
+		Fence     int64  `json:"fence"`
+		models.SourceRequestInput
+	}
+	if err := readIngestJSON(w, r, 16384, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	lease := models.SourceRunLease{RunUUID: chi.URLParam(r, "run"), OwnerUUID: input.OwnerUUID, Fence: input.Fence}
+	result, err := rs.runCoordinator().RequestSource(r.Context(), ingestToken(r), lease, input.SourceRequestInput)
+	if err != nil {
+		ingestError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, result)
+}
+func (rs *ingestRoutes) reportRunSource(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		OwnerUUID string `json:"owner_uuid"`
+		Fence     int64  `json:"fence"`
+		models.SourceRequestResult
+	}
+	if err := readIngestJSON(w, r, 4096, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	lease := models.SourceRunLease{RunUUID: chi.URLParam(r, "run"), OwnerUUID: input.OwnerUUID, Fence: input.Fence}
+	if err := rs.runCoordinator().ReportSourceRequest(r.Context(), ingestToken(r), lease, input.SourceRequestResult); err != nil {
+		ingestError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, map[string]bool{"recorded": true})
 }

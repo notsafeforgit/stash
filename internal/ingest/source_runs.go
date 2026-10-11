@@ -259,3 +259,25 @@ func (c *RunCoordinator) Finish(ctx context.Context, token string, lease models.
 		return c.Service.Repo.SourceRun.Finish(ctx, lease, outcome, c.Now())
 	})
 }
+
+func (c *RunCoordinator) RequestSource(ctx context.Context, token string, lease models.SourceRunLease, input models.SourceRequestInput) (*models.SourceRequestPermit, error) {
+	var result *models.SourceRequestPermit
+	_, err := c.owned(ctx, token, lease, func(ctx context.Context, lease models.SourceRunLease) (*models.SourceRun, error) {
+		var err error
+		result, err = c.Service.Repo.SourceRun.RequestSource(ctx, lease, input, c.Now())
+		if err != nil {
+			return nil, err
+		}
+		return c.Service.Repo.SourceRun.Find(ctx, lease.RunUUID)
+	})
+	return result, err
+}
+func (c *RunCoordinator) ReportSourceRequest(ctx context.Context, token string, lease models.SourceRunLease, input models.SourceRequestResult) error {
+	_, err := c.owned(ctx, token, lease, func(ctx context.Context, lease models.SourceRunLease) (*models.SourceRun, error) {
+		if err := c.Service.Repo.SourceRun.ReportSourceRequest(ctx, lease, input, c.Now()); err != nil {
+			return nil, err
+		}
+		return c.Service.Repo.SourceRun.Find(ctx, lease.RunUUID)
+	})
+	return err
+}

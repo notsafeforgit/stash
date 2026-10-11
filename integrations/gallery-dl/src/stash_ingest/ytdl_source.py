@@ -8,6 +8,7 @@ before handing each message back to gallery-dl's downloader.
 
 from contextlib import contextmanager
 import functools
+from types import SimpleNamespace
 import threading
 
 from gallery_dl import ytdl
@@ -64,10 +65,14 @@ class SourceExtraction:
                 return request(req)
             self.checked(self.producer.check)
             url = req if isinstance(req, str) else req.url if hasattr(req, 'url') else req.full_url
-            scope = self.checked(self.producer.reserve_source, url)
+            permit = self.checked(self.producer.request_source, url)
+            scope = permit['source_scope']
             try:
-                return request(req)
+                response = request(req)
+                self.checked(self.producer.report_source, permit, SimpleNamespace(status_code=response.status, headers=response.headers))
+                return response
             except HTTPError as error:
+                self.checked(self.producer.report_source, permit, SimpleNamespace(status_code=error.status, headers=error.response.headers))
                 if error.status != 429:
                     # Optional probes and redirects can recover from other
                     # HTTP statuses. A terminal error reaches report_error.
@@ -75,6 +80,7 @@ class SourceExtraction:
                 error.close()
                 self.checked(self.producer.fail_source, 'rate_limited', scope)
             except RequestError as error:
+                self.checked(self.producer.report_source, permit)
                 code = 'timeout' if isinstance(error.cause, TimeoutError) else 'extraction_failed'
                 self.checked(self.producer.fail_source, code, scope)
 

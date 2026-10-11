@@ -1,6 +1,7 @@
 import hashlib
 from pathlib import Path
 import tempfile
+import threading
 from types import SimpleNamespace
 import unittest
 
@@ -25,6 +26,19 @@ class LeaseFixture:
                     "progress": {"items_seen": 0, "files_completed": 0, "cursor": ""}}
         self.active = True
         self.checkpoints = []
+        self.pages = []
+        self.lock = threading.RLock()
+        self.stop = threading.Event()
+        self.run_uuid = RUN
+        self.client._request = self.request
+
+    def request(self, method, path, body):
+        value = decode(body)
+        self.check()
+        if path.endswith('/result'):
+            return {'recorded': True}
+        return {'request_uuid': value['request_uuid'], 'source_scope': self.reserve_source(value['url']),
+                'ready': True, 'wait_ms': 0}
 
     def check(self):
         if not self.active:
@@ -33,9 +47,10 @@ class LeaseFixture:
     def check_turn(self):
         self.check()
 
-    def progress(self, *args):
+    def progress(self, *args, **kwargs):
         self.check()
         self.checkpoints.append(args)
+        self.pages.append(kwargs.get("pagination"))
 
     def reserve_source(self, url):
         self.check()

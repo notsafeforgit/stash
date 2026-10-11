@@ -61,6 +61,8 @@ func (rs *ingestRoutes) router() http.Handler {
 		r.Post("/runs/{run}/claim", rs.claimRun)
 		r.Post("/runs/{run}/lease", rs.changeRunLease)
 		r.Post("/runs/{run}/source", rs.reserveRunSource)
+		r.Post("/runs/{run}/requests", rs.requestRunSource)
+		r.Post("/runs/{run}/requests/result", rs.reportRunSource)
 		rs.enrichmentRoutes(r)
 		rs.discoveryRoutes(r)
 		rs.discoveryDetailRoutes(r)
@@ -179,6 +181,8 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"source_runs": true, "source_run_protocol": 1, "source_run_submission_receipts": true, "source_run_dispatch": true,
 		"source_run_recovery_protocol":            1,
 		"source_run_pacing_protocol":              1,
+		"source_request_budget_protocol":          1,
+		"source_run_pagination_protocol":          1,
 		"source_run_origins_protocol":             1,
 		"source_run_fairness_protocol":            1,
 		"source_run_traversal_protocol":           1,

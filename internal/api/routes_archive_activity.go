@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stashapp/stash/internal/ingest"
@@ -188,4 +189,27 @@ func (rs *nativeArchiveRoutes) activityAttempts(w http.ResponseWriter, r *http.R
 		return
 	}
 	ingestJSON(w, http.StatusOK, rows)
+}
+
+func (rs *nativeArchiveRoutes) scrapeMetrics(w http.ResponseWriter, r *http.Request) {
+	offset := 0
+	if value := r.URL.Query().Get("offset"); value != "" {
+		var err error
+		offset, err = strconv.Atoi(value)
+		if err != nil || offset < 0 || offset > 1000000 {
+			activityError(w, models.ErrArchiveActivityInvalid)
+			return
+		}
+	}
+	var result *models.SourceRequestSummary
+	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		result, err = rs.repo.SourceRun.RequestMetrics(ctx, time.Now(), offset)
+		return err
+	})
+	if err != nil {
+		activityError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, result)
 }

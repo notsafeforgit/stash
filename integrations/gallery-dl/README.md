@@ -1,14 +1,10 @@
 # Native Stash producer
 
 This package implements durable delivery and a gallery-dl download adapter.
-It is development code on `v3-rewrite`; the installed host and n8n download
-helpers still use their existing catalogs. Durable caller URL snapshots now feed
-the native dispatcher. Staged host launchers cover Twitter, Reddit, Instagram,
-Coomer, Kemono, Bluesky and TikTok, preserving saved-list, mode and date inputs.
-The staged n8n adapter preserves stable execution tokens,
-historical backfill decisions and actual source completion. Recovery caller
-conversion, operational-history migration, activation of reviewed worker profiles,
-additional source adapters and production cutover remain unfinished.
+Host and n8n workers scrape directly into the native archive through durable
+source runs and delivery journals. See [scrape requests and checkpoints](../../docs/native-source-runs.md)
+for shared request budgets, routine/initial/recovery modes, pagination and the
+metadata retained without separate per-post enrichment.
 
 Python 3.12 or newer is required. Runtime delivery uses only the standard
 library. Install the local package with `python -I -m pip install ./integrations/gallery-dl`

@@ -38,6 +38,7 @@ def parser_for(service):
         parser.add_argument("--date-min-days", type=int)
     parser.add_argument("--config-file", default=os.environ.get(service.upper() + "_LIST_CONFIG",
                         str(Path.home() / ".config/gallery-dl" / (service + "-list.conf"))))
+    parser.add_argument("--recovery", action="store_true", help="Use the lower-priority historical recovery profile, including alternative Reddit searches")
     parser.add_argument("--full-history", action="store_true", help="Use the reviewed global skip=true profile")
     parser.add_argument("--strict-errors", action="store_true", help="Exit 0 only after this caller's source work is confirmed complete")
     parser.add_argument("--dry-run", action="store_true", help="Preview expanded URLs and date window without creating an outbox")
@@ -53,8 +54,8 @@ def parser_for(service):
 
 
 def options(service, args):
-    full_history = args.full_history or (service == "reddit" and args.mode == "top")
-    profile_env = "STASH_INGEST_" + service.upper() + ("_FULL_HISTORY_PROFILE" if full_history else "_PROFILE")
+    full_history = args.recovery or args.full_history or (service == "reddit" and args.mode == "top")
+    profile_env = "STASH_INGEST_" + service.upper() + ("_RECOVERY_PROFILE" if args.recovery else "_FULL_HISTORY_PROFILE" if full_history else "_PROFILE")
     profile = args.profile or os.environ.get(profile_env)
     if service == "twitter":
         direct = twitter_target(args.username, "user") if args.username else twitter_target(args.user_id, "id") if args.user_id else None
@@ -95,7 +96,7 @@ def expand(service, value, now):
             users, subs = [], [source["subreddit"]]
         else:
             users, subs, ignored = reddit_list(source["list_file"])
-        urls = reddit_urls(users, subs, value["mode"], value["saved"])
+        urls = reddit_urls(users, subs, value["mode"], value["saved"], recovery=value["full_history"])
         since = date_min(value["date_min"], value["date_min_relative"], value["date_min_days"], now)
     until = value["until"] or datetime.fromtimestamp(now, timezone.utc).isoformat(timespec="milliseconds")
     return urls, windows.normalize({"since": since, "until": until}), ignored

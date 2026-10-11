@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/url"
+	"reflect"
 	"strings"
 	"time"
 	"unicode"
@@ -226,6 +228,17 @@ func (s *SourceRunStore) Progress(ctx context.Context, lease models.SourceRunLea
 	if p.ItemsSeen < 0 || p.FilesCompleted < 0 || len(p.Cursor) > 1024 || strings.ContainsFunc(p.Cursor, unicode.IsControl) {
 		return nil, models.ErrSourceRunInvalid
 	}
+	if p.Pagination != nil {
+		page := p.Pagination
+		u, err := url.Parse(page.URL)
+		if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Fragment != "" ||
+			len(page.URL) > 4096 || len(page.Cursor) > 8192 || len(page.Item) > 1024 || len(page.Extractor) > 80 ||
+			(!strings.HasPrefix(page.Extractor, "twitter:") && !strings.HasPrefix(page.Extractor, "reddit:")) ||
+			strings.ContainsFunc(page.URL+page.Cursor+page.Item+page.Extractor, unicode.IsControl) ||
+			(page.Item != "" && page.Item != p.Cursor) {
+			return nil, models.ErrSourceRunInvalid
+		}
+	}
 	r, err := s.CheckLease(ctx, lease, now)
 	if err != nil {
 		return nil, err
@@ -239,12 +252,15 @@ func (s *SourceRunStore) Progress(ctx context.Context, lease models.SourceRunLea
 	if p.ItemsSeen == r.Progress.ItemsSeen && p.Cursor != r.Progress.Cursor {
 		return nil, models.ErrSourceRunConflict
 	}
-	if p == r.Progress {
+	if reflect.DeepEqual(p, r.Progress) {
 		return r, nil
 	}
 	body, err := json.Marshal(p)
 	if err != nil {
 		return nil, err
+	}
+	if len(body) > 4096 {
+		return nil, models.ErrSourceRunInvalid
 	}
 	if _, err := dbWrapper.Exec(ctx, "UPDATE source_runs SET progress=?,revision=revision+1,updated_at_ms=? WHERE uuid=?", string(body), now.UnixMilli(), r.UUID); err != nil {
 		return nil, err
@@ -286,6 +302,12 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 	delay := time.Duration(r.CooldownSeconds) * time.Second
 	if outcome.State == "succeeded" {
 		r.Completed = scrape.Union(r.Completed, []models.SourceWindow{*r.Window})
+		if r.Operation == "download" {
+			if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_check_health(collection_uuid,last_success_ms) VALUES(?,?)
+ ON CONFLICT(collection_uuid) DO UPDATE SET last_success_ms=max(last_success_ms,excluded.last_success_ms)`, r.CollectionUUID, min(now.UnixMilli(), r.Window.Until.UnixMilli())); err != nil {
+				return nil, err
+			}
+		}
 		r.Failures = 0
 		if len(r.Pending) == 0 {
 			state = "succeeded"

@@ -8,6 +8,39 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Pagination totals — deployed, 2026-10-11 UTC
+
+Previous/Next archive views now show a localized page position, total pages and
+filtered item count. The shared footer covers account review, review queues,
+media roots, collections, source posts, activity, import and settings histories,
+and shares. Manual intake and browser action lists also expose their totals.
+Counts load independently of rows, can be retried, and refresh after relevant
+edits. A full final page disables Next; empty results show zero pages and items.
+
+The authenticated page-info API reuses each list's filters. Media review now
+pages actual unresolved entries rather than batches of candidates that might
+all be settled. Retained merge redirects and attachment choices participate in
+the same selection for list rows and counts. No schema migration is required.
+
+The local `make validate-fork` gate and final UI validation passed, including
+807 unit tests. Focused Chromium/WebKit regressions cover mobile and desktop
+layout, filtering, empty results, exact final pages, count retries and direct
+links to later review pages. GitHub's complete selected release checks passed.
+
+The [source release](https://github.com/notsafeforgit/stash/actions/runs/38101455168)
+and [wrapper release](https://github.com/notsafeforgit/stash-s6/actions/runs/38102477282)
+published source `cd02edaea5e485a2562106ca6d3d9dbaa5229bfb`. Production uses
+wrapper digest `sha256:e2cd8769a5071af588ea97539ad5070aca1919fc220f9a78e1b3f6804559d66e`.
+The schema remained 1000110 and the restart was healthy in 1.093 seconds.
+n8n was not restarted, worker timers were not paused and scrapes were not
+drained. Future backups select the matching registry-built Stash reader.
+
+Live read checks passed for all 14 probed count/filter combinations. Browser
+checks verified the deployed footer against API totals on desktop and mobile:
+media roots showed one item and one page; both account review and its queue
+showed 91 undecided tracked accounts across four pages. Browser errors were
+empty. Evidence and screenshots are under `.local/pagination-20261010/`.
+
 ## Legacy GIF backlog — repaired and deployed, 2026-10-10
 
 A complete filename inventory of the media root and Stash's file records found

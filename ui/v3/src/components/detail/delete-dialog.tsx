@@ -1,4 +1,12 @@
 import { Label } from "@/components/ui/label";
+import {
+  Progress,
+  ProgressIndicator,
+  ProgressLabel,
+  ProgressTrack,
+} from "@/components/ui/progress";
+import { BulkDeleteError, type DeleteProgress } from "@/core/bulk-delete";
+import { errorToString } from "@/utils/errors";
 import { useToast } from "@/hooks/toast";
 import type React from "react";
 import { useId, useState } from "react";
@@ -53,7 +61,10 @@ interface DeleteDialogProps {
   /** Label for the disclosure toggle. Defaults to "Show details" / "Hide details". */
   detailsLabel?: string;
   /** Called with chosen options when the user confirms. Should throw on error. */
-  onConfirm: (opts: DeleteOptions) => Promise<void>;
+  onConfirm: (
+    opts: DeleteOptions,
+    onProgress: (progress: DeleteProgress) => void,
+  ) => Promise<void>;
 }
 
 // ── File list helper ──────────────────────────────────────────────────────────
@@ -135,16 +146,35 @@ export function DeleteDialog({
   const [deleteFile, setDeleteFile] = useState(false);
   const [deleteGenerated, setDeleteGenerated] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [progress, setProgress] = useState<DeleteProgress | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const report = useToast().error;
 
   async function handleConfirm() {
     setIsDeleting(true);
+    setProgress(null);
     try {
-      await onConfirm({ deleteFile, deleteGenerated });
+      await onConfirm({ deleteFile, deleteGenerated }, setProgress);
       onOpenChange(false);
     } catch (error) {
-      report(error);
+      if (error instanceof BulkDeleteError) {
+        report(
+          intl.formatMessage(
+            {
+              id: "dialogs.delete_partial_failure",
+              defaultMessage:
+                "Deletion stopped: {completed} of {total} confirmed. Refresh the list before retrying.",
+            },
+            { completed: error.completedIds.length, total: error.total },
+          ),
+          { description: errorToString(error.cause) },
+        );
+        // A failed response can be ambiguous. Close the old selection instead
+        // of letting a retry blindly submit already-deleted IDs again.
+        onOpenChange(false);
+      } else {
+        report(error);
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -258,6 +288,24 @@ export function DeleteDialog({
               </div>
             )}
           </div>
+        )}
+
+        {isDeleting && progress && progress.total > 0 && (
+          <Progress value={progress.completed} max={progress.total}>
+            <ProgressLabel aria-live="polite">
+              <FormattedMessage
+                id="dialogs.delete_progress"
+                defaultMessage="Deleted {completed} of {total}"
+                values={{
+                  completed: progress.completed,
+                  total: progress.total,
+                }}
+              />
+            </ProgressLabel>
+            <ProgressTrack>
+              <ProgressIndicator />
+            </ProgressTrack>
+          </Progress>
         )}
 
         <DialogFooter>

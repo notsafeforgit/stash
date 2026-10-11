@@ -71,6 +71,8 @@ type Deleter struct {
 	journal        *DeletionJournal
 	stagingErr     error
 	registered     bool
+	batch          bool
+	queued         []queuedDeletion
 }
 
 func newDeletionRenamerRemover() renamerRemoverImpl {
@@ -90,6 +92,15 @@ func NewDeleterWithTrash(trashPath string) *Deleter {
 	return ret
 }
 
+// NewBatchDeleterWithTrash defers ordinary file moves until the transaction's
+// pre-commit hook. The database and filesystem still commit as one recoverable
+// operation; callers must not rely on Files removing a path immediately.
+func NewBatchDeleterWithTrash(trashPath string) *Deleter {
+	ret := NewDeleterWithTrash(trashPath)
+	ret.batch = true
+	return ret
+}
+
 // RegisterHooks registers recovery after either transaction outcome. It must
 // be called inside the transaction before staging any files.
 func (d *Deleter) RegisterHooks(ctx context.Context) {
@@ -98,7 +109,7 @@ func (d *Deleter) RegisterHooks(ctx context.Context) {
 	}
 	d.registered = true
 	d.journal, _ = ctx.Value(deletionJournalKey{}).(*DeletionJournal)
-	txn.AddPreCommitHook(ctx, func(context.Context) error { return d.stagingErr })
+	txn.AddPreCommitHook(ctx, d.Flush)
 	txn.AddPostCommitHook(ctx, func(context.Context) { d.Commit() })
 	txn.AddPostRollbackHook(ctx, func(context.Context) { d.Rollback() })
 }
@@ -116,6 +127,9 @@ func (d *Deleter) FileWithValidation(path string, validate func(staged string) e
 	if !d.registered || d.journal == nil || validate == nil {
 		d.stagingErr = errors.New("validated deletion requires a managed journal and validator")
 		return d.stagingErr
+	}
+	if err := d.Flush(context.Background()); err != nil {
+		return err
 	}
 	if err := d.stage(path, false, false); err != nil {
 		d.stagingErr = err

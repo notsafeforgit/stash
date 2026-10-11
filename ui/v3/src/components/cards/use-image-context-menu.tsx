@@ -6,6 +6,9 @@ import { useNavigate, useRouter } from "@tanstack/react-router";
 import * as GQL from "src/core/generated-graphql";
 import { imageTitle } from "src/core/files";
 import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
+import { useBulkMediaDelete } from "@/components/detail/use-bulk-media-delete";
+import type { DeleteOptions } from "@/components/detail/delete-dialog";
+import type { DeleteProgress } from "@/core/bulk-delete";
 import {
   ContextMenu,
   ContextMenuItem,
@@ -84,7 +87,7 @@ export function useImageContextMenu({
       });
     },
   });
-  const [destroyImages] = useEntityMutation(GQL.ImagesDestroyDocument);
+  const deleteImages = useBulkMediaDelete("Image");
 
   const {
     selectedItems,
@@ -119,30 +122,15 @@ export function useImageContextMenu({
     });
   }
 
-  async function handleConfirmedBulkDelete({
-    deleteFile,
-    deleteGenerated,
-  }: {
-    deleteFile: boolean;
-    deleteGenerated: boolean;
-  }) {
-    const ids = selectedItems.map((i) => i.id);
-    await destroyImages({
-      variables: {
-        ids,
-        delete_file: deleteFile,
-        delete_generated: deleteGenerated,
-      },
-      update(cache) {
-        removeEntitiesFromCache({
-          cache,
-          typename: "Image",
-          listFieldName: "findImages",
-          itemsField: "images",
-          ids,
-        });
-      },
-    });
+  async function handleConfirmedBulkDelete(
+    options: DeleteOptions,
+    onProgress: (progress: DeleteProgress) => void,
+  ) {
+    await deleteImages(
+      selectedItems.map((i) => i.id),
+      options,
+      onProgress,
+    );
   }
 
   const hasCoverSetters =

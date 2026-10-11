@@ -420,7 +420,7 @@ func (r *mutationResolver) ScenesDestroy(ctx context.Context, input models.Scene
 	trashPath := manager.GetInstance().Config.GetDeleteTrashPath()
 
 	fileDeleter := &scene.FileDeleter{
-		Deleter:        file.NewDeleterWithTrash(trashPath),
+		Deleter:        file.NewBatchDeleterWithTrash(trashPath),
 		FileNamingAlgo: fileNamingAlgo,
 		Paths:          manager.GetInstance().Paths,
 	}

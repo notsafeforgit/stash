@@ -21,7 +21,11 @@ func (d *Deleter) stagePaths(paths []string, directory, bypassTrash bool) error 
 			d.stagingErr = fmt.Errorf("checking path %q for deletion: %w", path, err)
 			return d.stagingErr
 		}
-		if err := d.stage(path, directory, bypassTrash); err != nil {
+		stage := d.stage
+		if d.batch && d.journal != nil {
+			stage = d.queue
+		}
+		if err := stage(path, directory, bypassTrash); err != nil {
 			d.stagingErr = fmt.Errorf("staging path %q for deletion: %w", path, err)
 			return d.stagingErr
 		}
@@ -29,63 +33,70 @@ func (d *Deleter) stagePaths(paths []string, directory, bypassTrash bool) error 
 	return nil
 }
 
-func (d *Deleter) stage(path string, directory, bypassTrash bool) error {
+func (d *Deleter) plan(path string, directory, bypassTrash bool) (*deletionRecord, error) {
 	original, err := filepath.Abs(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	parent, err := filepath.EvalSymlinks(filepath.Dir(original))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Resolve directory aliases, but preserve the final entry if it is a
 	// symlink. Nested operations must agree on the same physical parent path.
 	original = filepath.Join(parent, filepath.Base(original))
 	sourceID, err := fsutil.FileIdentity(original)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	parentID, err := fsutil.DirectoryIdentity(filepath.Dir(original))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	trashRoot := ""
 	if d.TrashPath != "" && !bypassTrash {
 		trashRoot, err = filepath.Abs(d.TrashPath)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	dir, err := d.RenamerRemover.MkdirTemp(filepath.Dir(original), deleteDirPrefix)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	dirID, err := fsutil.FileIdentity(dir)
 	if err != nil {
 		_ = d.RenamerRemover.Remove(dir)
-		return err
+		return nil, err
 	}
-	r := &deletionRecord{
+	return &deletionRecord{
 		Version: 1, ID: uuid.NewString(), Original: original,
 		StageDir: dir, Staged: filepath.Join(dir, filepath.Base(original)),
 		SourceID: sourceID, ParentID: parentID, StageDirID: dirID,
 		Directory: directory, TrashRoot: trashRoot,
+	}, nil
+}
+
+func (d *Deleter) stage(path string, directory, bypassTrash bool) error {
+	r, err := d.plan(path, directory, bypassTrash)
+	if err != nil {
+		return err
 	}
 	if d.journal != nil {
 		if err := d.journal.prepare(r); err != nil {
-			_ = d.RenamerRemover.Remove(dir)
+			_ = d.RenamerRemover.Remove(r.StageDir)
 			return err
 		}
 	}
 	d.pending = append(d.pending, r)
-	if err := d.RenamerRemover.Rename(original, r.Staged); err != nil {
-		_ = d.RenamerRemover.Remove(dir)
+	if err := d.RenamerRemover.Rename(r.Original, r.Staged); err != nil {
+		_ = d.RenamerRemover.Remove(r.StageDir)
 		return err
 	}
 	if !identityMatches(r.Staged, r.SourceID) {
 		return errors.New("source was replaced during deletion staging")
 	}
-	return errors.Join(fsutil.SyncDir(dir), fsutil.SyncDir(filepath.Dir(original)))
+	return errors.Join(fsutil.SyncDir(r.StageDir), fsutil.SyncDir(filepath.Dir(r.Original)))
 }
 
 func (d *Deleter) complete(committed bool) {
@@ -125,4 +136,5 @@ func (d *Deleter) complete(committed bool) {
 	}
 	d.stagingErr = nil
 	d.registered = false
+	d.queued = nil
 }

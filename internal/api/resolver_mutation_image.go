@@ -253,7 +253,7 @@ func (r *mutationResolver) ImagesDestroy(ctx context.Context, input models.Image
 
 	var images []*models.Image
 	fileDeleter := &image.FileDeleter{
-		Deleter: file.NewDeleterWithTrash(trashPath),
+		Deleter: file.NewBatchDeleterWithTrash(trashPath),
 		Paths:   manager.GetInstance().Paths,
 	}
 	if err := r.withTxn(ctx, func(ctx context.Context) error {

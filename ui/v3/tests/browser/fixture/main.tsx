@@ -76,6 +76,7 @@ import { SceneDeletionFixture } from "./scene-deletion";
 import { MarkerEditorFixture } from "./marker-editor";
 import { MergeDialogsFixture } from "./merge-dialogs";
 import { BulkUpdateFixture } from "./bulk-update";
+import { BulkDeletionFixture } from "./bulk-deletion";
 import { DialogDismissalFixture } from "./dialog-dismissal";
 import { EntityCardsFixture } from "./entity-cards";
 import { EmbeddedListFixture } from "./embedded-list";
@@ -499,6 +500,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/bulk-update",
       component: BulkUpdateFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/bulk-deletion",
+      component: BulkDeletionFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

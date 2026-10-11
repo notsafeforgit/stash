@@ -72,6 +72,16 @@ type deletionRecord struct {
 }
 
 func writeDeletionRecord(root string, r *deletionRecord) error {
+	if err := prepareDeletionJournalDirectory(root); err != nil {
+		return err
+	}
+	if err := writeDeletionRecordFile(root, r); err != nil {
+		return err
+	}
+	return fsutil.SyncDir(root)
+}
+
+func prepareDeletionJournalDirectory(root string) error {
 	if err := os.Mkdir(root, 0700); err == nil {
 		if err := fsutil.SyncDir(filepath.Dir(root)); err != nil {
 			return err
@@ -86,6 +96,11 @@ func writeDeletionRecord(root string, r *deletionRecord) error {
 	if !info.IsDir() {
 		return fmt.Errorf("deletion journal %q is not a directory", root)
 	}
+	return nil
+}
+
+// The caller must flush root before moving any of the recorded paths.
+func writeDeletionRecordFile(root string, r *deletionRecord) error {
 	f, err := os.CreateTemp(root, ".prepare-")
 	if err != nil {
 		return err
@@ -103,7 +118,7 @@ func writeDeletionRecord(root string, r *deletionRecord) error {
 	if err := os.Rename(name, filepath.Join(root, r.ID+".journal")); err != nil {
 		return err
 	}
-	return fsutil.SyncDir(root)
+	return nil
 }
 
 func readDeletionRecord(path string) (*deletionRecord, error) {
@@ -213,6 +228,8 @@ func RecoverDeletionJournal(root string, committed map[string]bool) (map[string]
 		}
 		return len(a.Original) < len(b.Original)
 	})
+	groupResults := recoverDeletionGroups(records, committed, unknownPaths)
+	var pruned []string
 	for _, r := range records {
 		if committed[r.ID] && r.Directory && unknownPaths {
 			// A damaged intent may describe a staged child inside this directory.
@@ -223,12 +240,17 @@ func RecoverDeletionJournal(root string, committed map[string]bool) (map[string]
 			errs = append(errs, fmt.Errorf("deletion of %q is waiting for a child operation", r.Original))
 			continue
 		}
-		err := completeDeletion(r, records, committed[r.ID], newDeletionRenamerRemover(), func() error {
-			return writeDeletionRecord(root, r)
-		})
+		err, grouped := groupResults[r.ID]
+		if !grouped {
+			err = completeDeletion(r, records, committed[r.ID], newDeletionRenamerRemover(), func() error {
+				return writeDeletionRecord(root, r)
+			})
+		}
 		if err == nil {
 			err = os.Remove(filepath.Join(root, r.ID+".journal"))
-			if err == nil {
+			if err == nil && !grouped {
+				// A nested parent may remove a child's former location next.
+				// Its journal must already be durably absent at that point.
 				err = fsutil.SyncDir(root)
 			}
 		}
@@ -236,10 +258,17 @@ func RecoverDeletionJournal(root string, committed map[string]bool) (map[string]
 			errs = append(errs, fmt.Errorf("recovering deletion of %q (staged at %q): %w", r.Original, r.Staged, err))
 			continue
 		}
+		pruned = append(pruned, r.ID)
+		// Nested parents may now proceed, but do not discard these markers if
+		// the shared journal-directory flush below fails.
 		delete(remaining, r.ID)
 	}
 	if err := fsutil.SyncDir(root); err != nil {
 		errs = append(errs, err)
+		for _, id := range pruned {
+			remaining[id] = true
+		}
+		return remaining, errors.Join(errs...)
 	}
 	if entries, err := os.ReadDir(root); err == nil && len(entries) == 0 {
 		if err := os.Remove(root); err != nil {

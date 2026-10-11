@@ -12,6 +12,7 @@ import (
 
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/file"
+	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stashapp/stash/pkg/txn"
@@ -45,18 +46,88 @@ func TestDeletionCrashHelper(t *testing.T) {
 	}
 	require.NoError(t, txn.WithTxn(context.Background(), m, func(ctx context.Context) error {
 		d := file.NewDeleterWithTrash(os.Getenv("STASH_TEST_DELETION_TRASH"))
+		batch := os.Getenv("STASH_TEST_DELETION_BATCH") != ""
+		if batch {
+			d = file.NewBatchDeleterWithTrash(os.Getenv("STASH_TEST_DELETION_TRASH"))
+			if phase == "mid_stage" {
+				d.RenamerRemover = &crashDuringDeletionStaging{}
+			}
+		}
 		d.RegisterHooks(ctx)
 		path := os.Getenv("STASH_TEST_DELETION_SOURCE")
-		f, err := r.File.FindByPath(ctx, path, true)
-		require.NoError(t, err)
-		require.NotNil(t, f)
-		require.NoError(t, file.Destroy(ctx, r.File, f, d, true))
+		paths := []string{path}
+		if batch {
+			paths = append(paths, filepath.Join(filepath.Dir(path), "second.mp4"))
+		}
+		for _, source := range paths {
+			f, err := r.File.FindByPath(ctx, source, true)
+			require.NoError(t, err)
+			require.NotNil(t, f)
+			require.NoError(t, file.Destroy(ctx, r.File, f, d, true))
+		}
+		if phase == "before_flush" {
+			os.Exit(deletionCrashExit)
+		}
 		if phase == "before_commit" {
+			require.NoError(t, d.Flush(ctx))
 			os.Exit(deletionCrashExit) // Leave an open transaction and staged file.
 		}
 		return nil
 	}))
 	t.Fatal("crash helper did not exit")
+}
+
+type crashDuringDeletionStaging struct {
+	file.OsFS
+	moved int
+}
+
+func (r *crashDuringDeletionStaging) Rename(from, to string) error {
+	if r.moved == 1 {
+		os.Exit(deletionCrashExit)
+	}
+	err := fsutil.RenameNoReplace(from, to)
+	r.moved++
+	return err
+}
+
+func TestBatchFileDeletionRecoversAfterProcessCrash(t *testing.T) {
+	for _, phase := range []string{"before_flush", "mid_stage", "before_commit", "after_commit"} {
+		t.Run(phase, func(t *testing.T) {
+			db, source, id := newDeletionDatabase(t)
+			r := db.Repository()
+			secondPath := filepath.Join(filepath.Dir(source), "second.mp4")
+			require.NoError(t, os.WriteFile(secondPath, []byte("original"), 0644))
+			second := &models.VideoFile{BaseFile: &models.BaseFile{Basename: filepath.Base(secondPath)}}
+			require.NoError(t, r.WithTxn(context.Background(), func(ctx context.Context) error {
+				first, err := r.File.FindByPath(ctx, source, true)
+				if err != nil {
+					return err
+				}
+				second.ParentFolderID = first.Base().ParentFolderID
+				return r.File.Create(ctx, second)
+			}))
+			dbPath := db.DatabasePath()
+			require.NoError(t, db.Close())
+			cmd := exec.Command(os.Args[0], "-test.run=^TestDeletionCrashHelper$")
+			cmd.Env = append(os.Environ(),
+				"STASH_TEST_DELETION_CRASH="+phase,
+				"STASH_TEST_DELETION_DATABASE="+dbPath,
+				"STASH_TEST_DELETION_SOURCE="+source,
+				"STASH_TEST_DELETION_BATCH=1",
+				"STASH_TEST_DELETION_TRASH=")
+			output, err := cmd.CombinedOutput()
+			var exitErr *exec.ExitError
+			require.ErrorAs(t, err, &exitErr, "%s", output)
+			require.Equal(t, deletionCrashExit, exitErr.ExitCode(), "%s", output)
+			db = sqlite.NewDatabase()
+			require.NoError(t, db.Open(dbPath))
+			defer db.Close()
+			deleted := phase == "after_commit"
+			requireDeletionState(t, db, source, id, deleted)
+			requireDeletionState(t, db, secondPath, second.ID, deleted)
+		})
+	}
 }
 
 func newDeletionDatabase(t *testing.T) (*sqlite.Database, string, models.FileID) {

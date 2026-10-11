@@ -82,13 +82,43 @@ does not provide the same power-loss guarantees as the POSIX implementation.
 Fork migration 9 adds the pending-marker table without changing upstream's
 schema version or tables. It normally contains no rows.
 
+## Bulk scene and image deletion
+
+Bulk API mutations queue file paths while removing their database records, then
+stage the paths in the transaction's pre-commit hook. All recovery records are
+written and flushed before the first rename. Independent journal writes and
+staging-directory flushes use at most eight filesystem workers; each shared
+source parent is flushed once after its moves. Independent parent flushes also
+share the bounded pool, including during recovery, so selections spread across
+folders benefit as well. SQLite writes remain sequential
+inside the same transaction. Any preparation or staging failure aborts that
+transaction and restores its files through the existing recovery protocol.
+
+Committed independent permanent deletions also share their parent and journal
+directory flushes during cleanup. Nested directories and trash transfers retain
+their ordered recovery protocol. Journal version, commit markers and portable
+backup format are unchanged; an interrupted operation remains recoverable by
+the same reader. Staging is durable before commit, and cleanup is durable before
+its recovery markers are discarded. Failed cleanup remains pending as above;
+the speedup removes repeated flushes rather than weakening their guarantees.
+
+The scene and image selection dialogs submit up to 50 entities per request and
+show the number of confirmed deletions. Batches run sequentially, each with its
+own transaction, so earlier completed batches remain deleted if a later one
+fails. The UI refreshes affected lists once at the end, including after failure,
+and never automatically retries a request whose response could have been lost.
+The dialog's host card stays mounted until completion; intermediate batches do
+not trigger repeated list refetches.
+
 ## Validation
 
 The deletion tests cover 255-byte ASCII and UTF-8 basenames, directories,
 trash collisions, rollback conflicts, nested deletions, changed filesystem
 identities, damaged records and journal pruning. SQLite tests terminate a
 separate process before and after commit, then verify startup recovery agrees
-with the database. Copy protocol tests exercise interrupted publication and
+with the database. Batch tests also interrupt before staging and after only one
+rename, and exercise cancellation, partial preparation failures and replaced
+sources. Copy protocol tests exercise interrupted publication and
 retention of the original until the copy is complete.
 
 ```sh
@@ -98,3 +128,11 @@ go test -tags 'integration sqlite_stat4 sqlite_math_functions sqlite_fts5' ./pkg
 Set `STASH_TEST_TRASH_ROOT` to a writable directory on a different filesystem
 from the system temporary directory to also exercise real cross-device trash
 transfers. The test creates and removes its own temporary directory there.
+
+`go test ./pkg/file -run '^$' -bench '^BenchmarkDeletion120$' -benchtime=3x`
+compares serial and batch staging with the current recovery implementation.
+`STASH_TEST_DELETION_BENCH_ROOT` optionally selects the filesystem for disposable
+benchmark fixtures; no pre-existing media is read or deleted. These timings do
+not include database queries, generated previews, plugin hooks or HTTP latency.
+Set `STASH_TEST_DELETION_BENCH_LAYOUT=scattered` to put every fixture in a
+different folder instead of sharing one parent.

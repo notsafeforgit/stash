@@ -1,3 +1,7 @@
+import {
+  ArchivePagination,
+  ArchiveNextPage,
+} from "@/components/archive/pagination";
 import { useEffect, useState } from "react";
 import { useIntl } from "react-intl";
 import { ChevronDown } from "lucide-react";
@@ -104,7 +108,13 @@ export function MetadataPolicyHistory({
               </Expandable>
             </div>
           ))}
-        <div className="flex gap-2">
+        <ArchivePagination
+          page={previous.length + 1}
+          query={{ resource: "policy-history", subject: id, cursor: after }}
+          loaded={rows.length}
+          refresh={refresh}
+          pageSize={api.pageLimit}
+        >
           <Button
             type="button"
             variant="outline"
@@ -116,7 +126,7 @@ export function MetadataPolicyHistory({
           >
             {msg("actions.previous", "Previous")}
           </Button>
-          <Button
+          <ArchiveNextPage
             type="button"
             variant="outline"
             disabled={
@@ -128,8 +138,8 @@ export function MetadataPolicyHistory({
             }}
           >
             {msg("actions.next", "Next")}
-          </Button>
-        </div>
+          </ArchiveNextPage>
+        </ArchivePagination>
       </CollapsibleContent>
     </Collapsible>
   );

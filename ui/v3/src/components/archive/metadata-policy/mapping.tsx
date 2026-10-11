@@ -1,3 +1,4 @@
+import { PageSummary } from "@/components/list/page-summary";
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { Plus, X } from "lucide-react";
@@ -172,25 +173,32 @@ function ReferenceValues({
         );
       })}
       {values.length > 25 && (
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={currentPage === 0}
-            onClick={() => setPage(currentPage - 1)}
-          >
-            {msg("actions.previous", "Previous")}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-fit"
-            onClick={() => setPage(currentPage + 1)}
-            disabled={(currentPage + 1) * 25 >= values.length}
-          >
-            {msg("actions.next", "Next")}
-          </Button>
-        </div>
+        <>
+          <PageSummary
+            total={values.length}
+            page={currentPage + 1}
+            pageSize={25}
+          />
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={currentPage === 0}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              {msg("actions.previous", "Previous")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-fit"
+              onClick={() => setPage(currentPage + 1)}
+              disabled={(currentPage + 1) * 25 >= values.length}
+            >
+              {msg("actions.next", "Next")}
+            </Button>
+          </div>
+        </>
       )}
     </FieldGroup>
   );

@@ -1,3 +1,7 @@
+import {
+  ArchivePagination,
+  ArchiveNextPage,
+} from "@/components/archive/pagination";
 import { useCallback, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMsg } from "@/hooks/message";
@@ -281,7 +285,12 @@ export function ReviewQueue({
               : undefined}
           </PostEmpty>
         )}
-        <div className="flex flex-wrap gap-2">
+        <ArchivePagination
+          query={{ resource: `review-${kind}`, cursor: after }}
+          loaded={read.current?.items.length}
+          refresh={refresh}
+          pageSize={api.pageLimit}
+        >
           <Button
             variant="outline"
             disabled={read.busy || !after}
@@ -293,7 +302,7 @@ export function ReviewQueue({
               ? msg("review_queue.previous", "Previous page")
               : msg("review_queue.first", "First page")}
           </Button>
-          <Button
+          <ArchiveNextPage
             variant="outline"
             disabled={read.busy || !read.current?.next}
             onClick={() => {
@@ -305,8 +314,8 @@ export function ReviewQueue({
             {read.current?.items.length === 0 && read.current.next
               ? msg("review_queue.continue", "Continue checking")
               : msg("review_queue.next", "Next page")}
-          </Button>
-        </div>
+          </ArchiveNextPage>
+        </ArchivePagination>
       </div>
     </div>
   );

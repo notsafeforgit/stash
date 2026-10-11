@@ -1,3 +1,7 @@
+import {
+  ArchivePagination,
+  ArchiveNextPage,
+} from "@/components/archive/pagination";
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useIntl } from "react-intl";
@@ -126,7 +130,13 @@ export function CollectionHistory({
               {row.reason && <p>{row.reason}</p>}
             </div>
           ))}
-        <div className="flex gap-2">
+        <ArchivePagination
+          page={previous.length + 1}
+          query={{ resource: "collection-history", subject: id, cursor: after }}
+          loaded={rows.length}
+          refresh={refresh}
+          pageSize={api.pageLimit}
+        >
           <Button
             type="button"
             variant="outline"
@@ -138,7 +148,7 @@ export function CollectionHistory({
           >
             {msg("actions.previous", "Previous")}
           </Button>
-          <Button
+          <ArchiveNextPage
             type="button"
             variant="outline"
             disabled={
@@ -150,8 +160,8 @@ export function CollectionHistory({
             }}
           >
             {msg("actions.next", "Next")}
-          </Button>
-        </div>
+          </ArchiveNextPage>
+        </ArchivePagination>
       </CollapsibleContent>
     </Collapsible>
   );

@@ -19,18 +19,18 @@ const accountReviewTracked = `(EXISTS(SELECT 1 FROM account_performer_links o WH
  WHERE x.canonical_uuid=a.uuid
  AND NOT EXISTS(SELECT 1 FROM source_collection_aliases z WHERE z.alias_uuid=c.uuid)))`
 
-func (s *SourceAccountStore) ReviewAccounts(ctx context.Context, input models.AccountReviewFilter) ([]models.AccountReviewState, error) {
+func accountReviewQuery(input models.AccountReviewFilter) (string, []any, error) {
 	if input.Limit == 0 {
 		input.Limit = 25
 	}
 	if input.Limit < 1 || input.Limit > 100 || !validAccountText(input.Query, 256, true) ||
 		(input.Namespace != "" && !archive.ValidAccountNamespace(input.Namespace)) {
-		return nil, models.ErrAccountReviewInvalid
+		return "", nil, models.ErrAccountReviewInvalid
 	}
 	if input.After != "" {
 		id, err := archiveUUID(input.After)
 		if err != nil || id != input.After {
-			return nil, models.ErrAccountReviewInvalid
+			return "", nil, models.ErrAccountReviewInvalid
 		}
 	}
 	query := `SELECT a.uuid FROM source_accounts a WHERE a.canonical_uuid=a.uuid AND a.uuid>?`
@@ -40,7 +40,7 @@ func (s *SourceAccountStore) ReviewAccounts(ctx context.Context, input models.Ac
 		query += " AND " + accountReviewTracked
 	case "all":
 	default:
-		return nil, models.ErrAccountReviewInvalid
+		return "", nil, models.ErrAccountReviewInvalid
 	}
 	if input.Namespace != "" {
 		query += " AND a.namespace=?"
@@ -50,7 +50,7 @@ func (s *SourceAccountStore) ReviewAccounts(ctx context.Context, input models.Ac
 		switch input.Ownership {
 		case models.AccountOwnershipLinked, models.AccountOwnershipUnlinked, models.AccountOwnershipUndecided:
 		default:
-			return nil, models.ErrAccountReviewInvalid
+			return "", nil, models.ErrAccountReviewInvalid
 		}
 		query += ` AND coalesce((SELECT d.state FROM account_performer_links h
  JOIN account_performer_decisions d ON d.uuid=h.decision_uuid WHERE h.account_uuid=a.uuid),'undecided')=?`
@@ -64,6 +64,14 @@ func (s *SourceAccountStore) ReviewAccounts(ctx context.Context, input models.Ac
 	}
 	query += " ORDER BY a.uuid LIMIT ?"
 	args = append(args, input.Limit)
+	return query, args, nil
+}
+
+func (s *SourceAccountStore) ReviewAccounts(ctx context.Context, input models.AccountReviewFilter) ([]models.AccountReviewState, error) {
+	query, args, err := accountReviewQuery(input)
+	if err != nil {
+		return nil, err
+	}
 	var ids []string
 	if err := dbWrapper.Select(ctx, &ids, query, args...); err != nil {
 		return nil, err

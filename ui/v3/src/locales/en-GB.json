@@ -2042,6 +2042,9 @@
     "delete_source": "Delete source"
   },
   "pagination": {
+    "summary": "Page {page, number} of {pages, number} · {total, plural, one {# item} other {# items}}",
+    "counting": "Counting items…",
+    "count_failed": "Could not load item count",
     "current_total": "{current} of {total}",
     "first": "First",
     "last": "Last",

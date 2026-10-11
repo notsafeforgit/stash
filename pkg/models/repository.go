@@ -42,6 +42,7 @@ type Repository struct {
 	ArchiveJob                  ArchiveJobReaderWriter
 	ArchiveActivity             ArchiveActivityReader
 	ArchiveReview               ArchiveReviewReader
+	ArchivePagination           ArchivePaginationReader
 	ArchiveImport               ArchiveImportReader
 	SourceRun                   SourceRunReaderWriter
 	WorkerPolicy                WorkerPolicyReaderWriter

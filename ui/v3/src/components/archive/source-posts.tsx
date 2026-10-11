@@ -1,3 +1,7 @@
+import {
+  ArchivePagination,
+  ArchiveNextPage,
+} from "@/components/archive/pagination";
 import { useEffect, useState } from "react";
 import { useMsg } from "@/hooks/message";
 import { cn } from "@/lib/utils";
@@ -170,35 +174,53 @@ export function SourcePosts({
                 )}
               </PostEmpty>
             ))}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              disabled={busy || !previous.length}
-              onClick={() => {
-                setCursor(previous.at(-1) ?? "");
-                setPrevious((values) => values.slice(0, -1));
+          {!selected && (
+            <ArchivePagination
+              page={previous.length + 1}
+              query={{
+                resource: "posts",
+                cursor,
+                ...(mode === "uuid"
+                  ? { uuid: value }
+                  : mode === "url"
+                    ? { url: value }
+                    : mode === "source_id"
+                      ? { namespace, value }
+                      : {}),
               }}
+              loaded={current?.rows.length}
+              refresh={refresh}
+              pageSize={api.pageLimit}
             >
-              {msg("actions.previous", "Previous")}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={
-                busy ||
-                error !== undefined ||
-                current?.rows.length !== api.pageLimit
-              }
-              onClick={() => {
-                const last = current?.rows.at(-1);
-                if (last) {
-                  setPrevious((values) => [...values, cursor]);
-                  setCursor(last.uuid);
+              <Button
+                variant="outline"
+                disabled={busy || !previous.length}
+                onClick={() => {
+                  setCursor(previous.at(-1) ?? "");
+                  setPrevious((values) => values.slice(0, -1));
+                }}
+              >
+                {msg("actions.previous", "Previous")}
+              </Button>
+              <ArchiveNextPage
+                variant="outline"
+                disabled={
+                  busy ||
+                  error !== undefined ||
+                  current?.rows.length !== api.pageLimit
                 }
-              }}
-            >
-              {msg("actions.next", "Next")}
-            </Button>
-          </div>
+                onClick={() => {
+                  const last = current?.rows.at(-1);
+                  if (last) {
+                    setPrevious((values) => [...values, cursor]);
+                    setCursor(last.uuid);
+                  }
+                }}
+              >
+                {msg("actions.next", "Next")}
+              </ArchiveNextPage>
+            </ArchivePagination>
+          )}
         </div>
       </div>
     </div>

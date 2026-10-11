@@ -54,6 +54,18 @@ async function archive(
   let refreshFails = false;
   await page.route("**/api/v3/archive/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/page-info")) {
+      const total =
+        url.searchParams.get("resource") === "policy-history"
+          ? history.length
+          : 1;
+      return route.fulfill({
+        json: {
+          total,
+          offset: Math.min(Number(url.searchParams.get("cursor")) || 0, total),
+        },
+      });
+    }
     requests.push(url);
     const path = url.pathname.replace(/^.*\/api\/v3\/archive\//, "");
     if (path === "source-accounts") return route.fulfill({ json: [] });

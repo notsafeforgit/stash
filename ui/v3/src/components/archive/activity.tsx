@@ -1,3 +1,7 @@
+import {
+  ArchivePagination,
+  ArchiveNextPage,
+} from "@/components/archive/pagination";
 import { useCallback, useState } from "react";
 import { useMsg } from "@/hooks/message";
 import { cn } from "@/lib/utils";
@@ -192,35 +196,49 @@ export function ArchiveActivity({
                 )}
               </PostEmpty>
             )}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              disabled={read.busy || !previous.length}
-              onClick={() => {
-                setBefore(previous.at(-1) ?? 0);
-                setPrevious((values) => values.slice(0, -1));
+          {!item && (
+            <ArchivePagination
+              page={previous.length + 1}
+              query={{
+                resource: view,
+                kind,
+                state,
+                collection,
+                cursor: before,
               }}
+              loaded={read.current?.length}
+              refresh={refresh}
+              pageSize={api.pageLimit}
             >
-              {msg("archive_activity.newer", "Newer")}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={
-                read.busy ||
-                read.error !== undefined ||
-                read.current?.length !== api.pageLimit
-              }
-              onClick={() => {
-                const row = read.current?.at(-1);
-                if (row) {
-                  setPrevious((values) => [...values, before]);
-                  setBefore(row.sequence);
+              <Button
+                variant="outline"
+                disabled={read.busy || !previous.length}
+                onClick={() => {
+                  setBefore(previous.at(-1) ?? 0);
+                  setPrevious((values) => values.slice(0, -1));
+                }}
+              >
+                {msg("archive_activity.newer", "Newer")}
+              </Button>
+              <ArchiveNextPage
+                variant="outline"
+                disabled={
+                  read.busy ||
+                  read.error !== undefined ||
+                  read.current?.length !== api.pageLimit
                 }
-              }}
-            >
-              {msg("archive_activity.older", "Older")}
-            </Button>
-          </div>
+                onClick={() => {
+                  const row = read.current?.at(-1);
+                  if (row) {
+                    setPrevious((values) => [...values, before]);
+                    setBefore(row.sequence);
+                  }
+                }}
+              >
+                {msg("archive_activity.older", "Older")}
+              </ArchiveNextPage>
+            </ArchivePagination>
+          )}
         </div>
       </div>
     </div>

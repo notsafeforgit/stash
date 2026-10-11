@@ -111,6 +111,8 @@ export const manualDirectoryEntrySchema = z
       (entry.kind === "directory" ? entry.size === 0 : !!entry.modified_at),
   );
 const directoryPageSchema = z.object({
+  total: count,
+  offset: count,
   collection_uuid: uuid,
   collection_revision: revision,
   root_uuid: uuid,

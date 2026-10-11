@@ -21,8 +21,8 @@ type ArchiveReviewItem struct {
 	Media   *SourcePostLibraryItem `json:"media,omitempty"`
 }
 
-// Next advances through inspected candidate identities, including settled
-// candidates. An empty Items with Next set is not an empty queue.
+// Next advances through unresolved identities. Settled candidates are filtered
+// before pagination, so every non-final page contains Limit review items.
 type ArchiveReviewPage struct {
 	Kind    string              `json:"kind"`
 	Items   []ArchiveReviewItem `json:"items"`

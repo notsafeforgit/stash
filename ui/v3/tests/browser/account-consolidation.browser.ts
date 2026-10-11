@@ -77,6 +77,10 @@ async function archive(
   const reads: URL[] = [];
   await page.route("**/api/v3/archive/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/page-info"))
+      return route.fulfill({
+        json: { total: source.redirect_to ? 1 : 2, offset: 0 },
+      });
     const path = url.pathname;
     reads.push(url);
     let result: unknown;

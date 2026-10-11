@@ -1,3 +1,4 @@
+import { PageSummary } from "@/components/list/page-summary";
 import { useEffect, useId, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
@@ -247,6 +248,11 @@ export function ManualFilePicker({
               </FieldGroup>
             </FieldSet>
           )}
+          <PageSummary
+            total={page.total}
+            page={Math.floor(page.offset / 50) + 1}
+            pageSize={50}
+          />
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"

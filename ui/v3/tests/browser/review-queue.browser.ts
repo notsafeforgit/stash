@@ -20,6 +20,18 @@ async function archive(page: Page) {
   const accountDelay = new Promise<void>((resolve) => {
     release = resolve;
   });
+  await page.route("**/api/v3/archive/page-info?**", async (route) => {
+    const url = new URL(route.request().url());
+    const continued =
+      control.emptyContinuation &&
+      url.searchParams.get("resource") === "review-media";
+    return route.fulfill({
+      json: {
+        total: control.empty ? 0 : continued ? 101 : 1,
+        offset: continued && url.searchParams.get("cursor") ? 100 : 0,
+      },
+    });
+  });
   await page.route("**/api/v3/archive/review-queue/**", async (route) => {
     const request = route.request(),
       url = new URL(request.url());

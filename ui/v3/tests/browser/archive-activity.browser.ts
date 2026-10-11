@@ -27,6 +27,20 @@ async function archive(page: Page, many = false) {
   await page.route("**/api/v3/archive/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
+    if (url.pathname.endsWith("/page-info")) {
+      const resource = url.searchParams.get("resource");
+      const total =
+        resource === "job-attempts" ? 26 : resource === "jobs" && many ? 26 : 1;
+      return route.fulfill({
+        json: {
+          total,
+          offset:
+            Number(url.searchParams.get("cursor")) > 0
+              ? Math.min(25, total)
+              : 0,
+        },
+      });
+    }
     requests.push(url);
     if (request.method() !== "GET") writes.push(request.method());
     const path = url.pathname.replace(/^.*\/api\/v3\/archive\//, "");
@@ -44,7 +58,13 @@ async function archive(page: Page, many = false) {
       };
       result = many
         ? Number(url.searchParams.get("before")) > 0
-          ? []
+          ? [
+              {
+                ...job,
+                sequence: 75,
+                uuid: "10000000-0000-4000-8000-000000000026",
+              },
+            ]
           : Array.from({ length: 25 }, (_, index) => ({
               ...job,
               sequence: 100 - index,
@@ -200,7 +220,7 @@ test("filters use readable labels and reset paging without leaking a previous re
   await page.getByRole("button", { name: "Older", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Inspect activity", exact: true }),
-  ).toHaveCount(0);
+  ).toHaveCount(1);
   expect(remote.requests.at(-1)?.searchParams.get("before")).toBe("76");
   await page.getByRole("button", { name: "Newer", exact: true }).click();
   await expect(

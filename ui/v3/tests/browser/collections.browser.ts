@@ -52,6 +52,29 @@ async function archive(
   let refreshFails = false;
   await page.route("**/api/v3/archive/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/page-info")) {
+      const resource = url.searchParams.get("resource");
+      const entries =
+        resource === "collection-history"
+          ? (history.get(url.searchParams.get("subject") ?? "") ?? [])
+          : [...rows.values()].filter(
+              (row) =>
+                (!url.searchParams.get("q") ||
+                  row.label.includes(url.searchParams.get("q")!)) &&
+                (!url.searchParams.get("state") ||
+                  row.state === url.searchParams.get("state")) &&
+                (!url.searchParams.get("kind") ||
+                  row.kind === url.searchParams.get("kind")),
+            );
+      const total =
+        options.many && resource === "collections" ? 26 : entries.length;
+      return route.fulfill({
+        json: {
+          total,
+          offset: url.searchParams.get("cursor") ? Math.min(25, total) : 0,
+        },
+      });
+    }
     requests.push(url);
     const path = url.pathname.replace(/^.*\/api\/v3\/archive\//, "");
     if (path === "collections") {

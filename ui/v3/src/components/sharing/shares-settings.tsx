@@ -1,3 +1,7 @@
+import {
+  ArchivePagination,
+  ArchiveNextPage,
+} from "@/components/archive/pagination";
 import { useEffect, useId, useState } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useForm } from "@tanstack/react-form";
@@ -390,6 +394,7 @@ export function SharesSettings() {
     GQL.MediaShareStatus.Active,
   );
   const [creating, setCreating] = useState(false);
+  const [countRefresh, setCountRefresh] = useState(0);
   const { data, error, loading, refetch } = useQuery(GQL.MediaSharesDocument, {
     variables: { limit: 50, offset, status },
     fetchPolicy: "cache-and-network",
@@ -397,6 +402,7 @@ export function SharesSettings() {
   });
   async function refresh() {
     const result = await refetch();
+    setCountRefresh((value) => value + 1);
     if (offset > 0 && result.data?.mediaShares.length === 0)
       setOffset((value) => Math.max(0, value - 50));
   }
@@ -471,24 +477,27 @@ export function SharesSettings() {
             <ShareCard key={share.id} share={share} refresh={refresh} />
           ))}
         </div>
-        {(offset > 0 || data?.mediaShares.length === 50) && (
-          <div className="flex justify-between gap-2">
-            <Button
-              variant="outline"
-              disabled={offset === 0 || loading}
-              onClick={() => setOffset((value) => Math.max(0, value - 50))}
-            >
-              {msg("actions.previous", "Previous")}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={data?.mediaShares.length !== 50 || loading}
-              onClick={() => setOffset((value) => value + 50)}
-            >
-              {msg("actions.next", "Next")}
-            </Button>
-          </div>
-        )}
+        <ArchivePagination
+          query={{ resource: "shares", state: status, cursor: offset }}
+          pageSize={50}
+          loaded={data?.mediaShares.length}
+          refresh={countRefresh}
+        >
+          <Button
+            variant="outline"
+            disabled={offset === 0 || loading}
+            onClick={() => setOffset((value) => Math.max(0, value - 50))}
+          >
+            {msg("actions.previous", "Previous")}
+          </Button>
+          <ArchiveNextPage
+            variant="outline"
+            disabled={data?.mediaShares.length !== 50 || loading}
+            onClick={() => setOffset((value) => value + 50)}
+          >
+            {msg("actions.next", "Next")}
+          </ArchiveNextPage>
+        </ArchivePagination>
       </SettingsSection>
       {data && (
         <SettingsSection title={msg("sharing.delivery", "Share delivery")}>

@@ -67,6 +67,8 @@ async function archive(
   };
   await page.route("**/api/v3/archive/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/page-info"))
+      return route.fulfill({ json: { total: 1, offset: 0 } });
     const path = url.pathname.replace(/^.*\/api\/v3\/archive\//, "");
     const body = route.request().postData();
     if (path === "posts") return route.fulfill({ json: [summary(target)] });

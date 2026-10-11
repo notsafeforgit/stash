@@ -1,3 +1,7 @@
+import {
+  ArchivePagination,
+  ArchiveNextPage,
+} from "@/components/archive/pagination";
 import { useCallback, useEffect, useId, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { Plus } from "lucide-react";
@@ -205,6 +209,7 @@ export function Collections({
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<unknown>();
   const [refresh, setRefresh] = useState(0);
+  const [countRevision, setCountRevision] = useState(0);
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const { q, state, kind } = filter;
   const queryKey = JSON.stringify([q, state, kind, cursor]);
@@ -241,6 +246,7 @@ export function Collections({
   );
   const changed = useCallback(
     (collection: Collection) => {
+      setCountRevision((value) => value + 1);
       if (create) {
         setCursor("");
         setPrevious([]);
@@ -371,32 +377,40 @@ export function Collections({
                 </EmptyHeader>
               </Empty>
             ))}
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy || !previous.length}
-              onClick={() => {
-                setCursor(previous.at(-1) ?? "");
-                setPrevious((values) => values.slice(0, -1));
-              }}
+          {!selected && !create && (
+            <ArchivePagination
+              page={previous.length + 1}
+              query={{ resource: "collections", ...filter, cursor }}
+              loaded={current?.rows.length}
+              refresh={refresh + countRevision}
+              pageSize={api.pageLimit}
             >
-              {msg("actions.previous", "Previous")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy || error !== undefined || !current?.more}
-              onClick={() => {
-                if (current) {
-                  setPrevious((values) => [...values, cursor]);
-                  setCursor(current.next);
-                }
-              }}
-            >
-              {msg("actions.next", "Next")}
-            </Button>
-          </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy || !previous.length}
+                onClick={() => {
+                  setCursor(previous.at(-1) ?? "");
+                  setPrevious((values) => values.slice(0, -1));
+                }}
+              >
+                {msg("actions.previous", "Previous")}
+              </Button>
+              <ArchiveNextPage
+                type="button"
+                variant="outline"
+                disabled={busy || error !== undefined || !current?.more}
+                onClick={() => {
+                  if (current) {
+                    setPrevious((values) => [...values, cursor]);
+                    setCursor(current.next);
+                  }
+                }}
+              >
+                {msg("actions.next", "Next")}
+              </ArchiveNextPage>
+            </ArchivePagination>
+          )}
         </div>
       </div>
     </div>

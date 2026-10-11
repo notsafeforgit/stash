@@ -17,6 +17,12 @@ async function archive(page: Page, many = false) {
   await page.route("**/api/v3/archive/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
+    if (url.pathname.endsWith("/page-info")) {
+      const total = many && url.searchParams.get("kind") === "catalog" ? 26 : 1;
+      return route.fulfill({
+        json: { total, offset: url.searchParams.get("cursor") ? 25 : 0 },
+      });
+    }
     requests.push(url);
     if (request.method() !== "GET") writes.push(request.method());
     const path = url.pathname.replace(/^.*\/api\/v3\/archive\//, "");
@@ -28,7 +34,12 @@ async function archive(page: Page, many = false) {
         json:
           many && kind === "catalog"
             ? url.searchParams.has("after")
-              ? []
+              ? [
+                  {
+                    ...importSnapshot(),
+                    uuid: "10000000-0000-4000-8000-000000000026",
+                  },
+                ]
               : Array.from({ length: 25 }, (_, index) => ({
                   ...importSnapshot(),
                   uuid: `10000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
@@ -143,7 +154,9 @@ test("keeps an existing page through a failed refresh and retains its cursor aft
     page.getByRole("button", { name: "Inspect import" }),
   ).toHaveCount(25);
   await page.getByRole("button", { name: "Next page" }).click();
-  await expect(page.getByText("No snapshots on this page")).toBeVisible();
+  await expect(
+    page.getByText("Page 2 of 2 · 26 items", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Next page" })).toBeDisabled();
   await page.getByRole("button", { name: "Previous page" }).click();
   await expect(

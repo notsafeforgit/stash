@@ -119,6 +119,12 @@ test("history reads only expanded current or retired identities and pages by seq
   const requests: string[] = [];
   await page.route("**/api/v3/archive/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/page-info")) {
+      const total = url.searchParams.get("subject") === retired ? 1 : 26;
+      return route.fulfill({
+        json: { total, offset: Number(url.searchParams.get("cursor")) || 0 },
+      });
+    }
     requests.push(url.pathname + url.search);
     if (url.pathname.includes("entity-identities")) {
       await route.fulfill({

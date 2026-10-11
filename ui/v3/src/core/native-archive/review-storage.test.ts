@@ -26,10 +26,14 @@ it("pages only keys and retains the original requests without loading their bodi
   expect(await reviewKeys("one", "", 2)).toEqual({
     keys: ["a", "b"],
     next: "b",
+    total: 3,
+    offset: 0,
   });
   expect(await reviewKeys("one", "b", 2)).toEqual({
     keys: ["c"],
     next: null,
+    total: 3,
+    offset: 2,
   });
   expect(get).not.toHaveBeenCalled();
   expect(getAll).not.toHaveBeenCalled();
@@ -45,12 +49,21 @@ it("does not invent another page for an exact full page or mix deployment stores
   expect(await reviewKeys("deployment-one", "", 2)).toEqual({
     keys: ["a", "b"],
     next: null,
+    total: 2,
+    offset: 0,
   });
   expect(await reviewKeys("deployment-two")).toEqual({
     keys: ["other"],
     next: null,
+    total: 1,
+    offset: 0,
   });
-  expect(await reviewKeys("unused")).toEqual({ keys: [], next: null });
+  expect(await reviewKeys("unused")).toEqual({
+    keys: [],
+    next: null,
+    total: 0,
+    offset: 0,
+  });
 });
 
 it("keeps paging after the cursor's request was completed in another tab", async () => {
@@ -62,6 +75,8 @@ it("keeps paging after the cursor's request was completed in another tab", async
   expect(await reviewKeys("one", first.next ?? "", 1)).toEqual({
     keys: ["b"],
     next: "b",
+    total: 2,
+    offset: 0,
   });
 });
 

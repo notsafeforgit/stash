@@ -1,3 +1,7 @@
+import {
+  ArchivePagination,
+  ArchiveNextPage,
+} from "@/components/archive/pagination";
 import { useCallback, useState } from "react";
 import { useIntl } from "react-intl";
 import { useMsg } from "@/hooks/message";
@@ -80,7 +84,17 @@ export function AttemptHistory({
           title={msg("archive_activity.no_attempts", "No attempts yet")}
         />
       )}
-      <div className="flex flex-wrap gap-2">
+      <ArchivePagination
+        page={previous.length + 1}
+        query={{
+          resource: type === "jobs" ? "job-attempts" : "run-attempts",
+          subject: id,
+          cursor: before,
+        }}
+        loaded={read.current?.length}
+        refresh={refresh + revision}
+        pageSize={api.pageLimit}
+      >
         <Button
           variant="outline"
           disabled={read.busy || !previous.length}
@@ -91,7 +105,7 @@ export function AttemptHistory({
         >
           {msg("archive_activity.newer", "Newer")}
         </Button>
-        <Button
+        <ArchiveNextPage
           variant="outline"
           disabled={
             read.busy ||
@@ -107,8 +121,8 @@ export function AttemptHistory({
           }}
         >
           {msg("archive_activity.older", "Older")}
-        </Button>
-      </div>
+        </ArchiveNextPage>
+      </ArchivePagination>
     </div>
   );
 }

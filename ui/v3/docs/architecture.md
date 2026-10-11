@@ -347,6 +347,16 @@ wait for it. Both queries participate in refresh/error handling. Ordinary list
 and Home queries omit unused duration/filesize aggregates; the backend retains
 those fields for other callers. See [read performance](../../../docs/read-performance.md).
 
+Every previous/next list footer shows the filtered item total and current/total
+page numbers at mobile and desktop sizes. Native cursor lists use
+`ArchivePagination` and `ArchiveNextPage`; their independent `/archive/page-info`
+read counts matching identities and the rows preceding the cursor. Do not fetch
+all pages in the browser, infer totals from cursor values, or treat a full batch
+as proof of another page. Counts share the list predicates, exclude settled
+review candidates, and participate in refresh and retry. File-picker and local
+saved-action pages return their counts with the batch. Already loaded arrays use
+`PageSummary`. Zero results show zero pages, and unavailable counts remain unknown.
+
 `extractResult` receives complete generated operation data or `undefined`;
 it must handle the initial empty state. Partial Apollo results are not asserted
 to be complete. Local sources skip both GraphQL queries. SearchInput debounces

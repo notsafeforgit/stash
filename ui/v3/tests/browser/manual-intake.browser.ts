@@ -36,6 +36,8 @@ async function archive(
   await page.route("**/api/v3/archive/**", async (route) => {
     const url = new URL(route.request().url()),
       path = url.pathname.replace(/^.*\/api\/v3\/archive\//, "");
+    if (path === "page-info")
+      return route.fulfill({ json: { total: 1, offset: 0 } });
     if (path === "source-accounts") return route.fulfill({ json: [] });
     if (path === "media-roots") return route.fulfill({ json: [mediaRoot()] });
     if (path === "collections") return route.fulfill({ json: [collection()] });
@@ -66,6 +68,7 @@ async function archive(
       result.entries = result.entries.filter((row) =>
         row.name.toLowerCase().includes(q.toLowerCase()),
       );
+      result.total = result.entries.length;
       return route.fulfill({ json: result });
     }
     if (path === "manual-intake/preview") {

@@ -1,3 +1,7 @@
+import {
+  ArchivePagination,
+  ArchiveNextPage,
+} from "@/components/archive/pagination";
 import { useCallback, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
@@ -396,31 +400,39 @@ export function ImportHistory({
               title={msg("import_history.empty", "No snapshots on this page")}
             />
           )}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              disabled={read.busy || previous.length === 0}
-              onClick={() => {
-                setAfter(previous.at(-1) ?? "");
-                setPrevious((pages) => pages.slice(0, -1));
-              }}
+          {!search.snapshot && (
+            <ArchivePagination
+              page={previous.length + 1}
+              query={{ resource: "imports", kind: search.kind, cursor: after }}
+              loaded={read.current?.length}
+              refresh={refresh}
+              pageSize={api.pageLimit}
             >
-              {msg("import_history.previous", "Previous page")}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={read.busy || read.current?.length !== api.pageLimit}
-              onClick={() => {
-                const last = read.current?.at(-1);
-                if (last) {
-                  setPrevious((pages) => [...pages, after]);
-                  setAfter(last.uuid);
-                }
-              }}
-            >
-              {msg("import_history.next", "Next page")}
-            </Button>
-          </div>
+              <Button
+                variant="outline"
+                disabled={read.busy || previous.length === 0}
+                onClick={() => {
+                  setAfter(previous.at(-1) ?? "");
+                  setPrevious((pages) => pages.slice(0, -1));
+                }}
+              >
+                {msg("import_history.previous", "Previous page")}
+              </Button>
+              <ArchiveNextPage
+                variant="outline"
+                disabled={read.busy || read.current?.length !== api.pageLimit}
+                onClick={() => {
+                  const last = read.current?.at(-1);
+                  if (last) {
+                    setPrevious((pages) => [...pages, after]);
+                    setAfter(last.uuid);
+                  }
+                }}
+              >
+                {msg("import_history.next", "Next page")}
+              </ArchiveNextPage>
+            </ArchivePagination>
+          )}
         </div>
       </div>
     </div>

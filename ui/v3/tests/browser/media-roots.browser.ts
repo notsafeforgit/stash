@@ -51,6 +51,32 @@ async function archive(
   let refreshFails = false;
   await page.route("**/api/v3/archive/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/page-info")) {
+      const rows =
+        url.searchParams.get("resource") === "root-history"
+          ? (history.get(url.searchParams.get("subject") ?? "") ?? [])
+          : [...roots.values()].filter(
+              (root) =>
+                (!url.searchParams.get("q") ||
+                  root.label.includes(url.searchParams.get("q")!) ||
+                  root.binding?.path.includes(url.searchParams.get("q")!)) &&
+                (!url.searchParams.get("state") ||
+                  root.state === url.searchParams.get("state")),
+            );
+      const cursor = url.searchParams.get("cursor");
+      return route.fulfill({
+        json: {
+          total: rows.length,
+          offset: cursor
+            ? rows.filter((row) =>
+                url.searchParams.get("resource") === "root-history"
+                  ? row.revision <= Number(cursor)
+                  : row.uuid <= cursor,
+              ).length
+            : 0,
+        },
+      });
+    }
     const path = url.pathname.replace(/^.*\/api\/v3\/archive\//, "");
     requests.push(url);
     if (path === "media-roots/probe") {

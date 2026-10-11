@@ -106,7 +106,7 @@ func TestArchiveReviewQueueAttachmentDefaultAndExplicitUndecided(t *testing.T) {
 	require.Empty(t, archiveQueue(t, repo, "media", "", 25).Items)
 }
 
-func TestArchiveReviewQueueEmptyCandidatePageDoesNotClaimCompletion(t *testing.T) {
+func TestArchiveReviewQueuePaginatesUnresolvedItems(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	media := archiveFind(t, repo, models.ArchiveImage, 41)
 	ids := []string{}
@@ -118,13 +118,13 @@ func TestArchiveReviewQueueEmptyCandidatePageDoesNotClaimCompletion(t *testing.T
 	slices.Sort(ids)
 	attachmentSQL(t, db, "UPDATE source_posts SET state='forgotten' WHERE uuid!=?", ids[100])
 	first := archiveQueue(t, repo, "media", "", 25)
-	require.Empty(t, first.Items)
-	require.Equal(t, 100, first.Checked)
-	require.Equal(t, ids[99], first.Next)
-	last := archiveQueue(t, repo, "media", first.Next, 25)
-	require.Len(t, last.Items, 1)
-	require.Equal(t, ids[100], last.Items[0].UUID)
-	require.Empty(t, last.Next)
+	require.Len(t, first.Items, 1)
+	require.Equal(t, 1, first.Checked)
+	require.Equal(t, ids[100], first.Items[0].UUID)
+	require.Empty(t, first.Next)
+	info := archivePageInfo(t, repo, models.ArchivePageFilter{Resource: "review-media"})
+	require.EqualValues(t, 1, info.Total)
+	require.Zero(t, info.Offset)
 }
 
 func TestArchiveReviewQueueMetadataTracksEachRetainedFieldAndOriginalReceipt(t *testing.T) {

@@ -62,6 +62,8 @@ export function completedManual(input: ManualFileStatus): ManualFileStatus {
 }
 export function manualDirectory(): ManualDirectoryPage {
   return {
+    total: 3,
+    offset: 0,
     collection_uuid: collectionID,
     collection_revision: 1,
     root_uuid: rootID,

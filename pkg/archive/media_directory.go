@@ -46,6 +46,8 @@ type MediaDirectoryEntry struct {
 }
 
 type MediaDirectoryPage struct {
+	Total     int                   `json:"total"`
+	Offset    int                   `json:"offset"`
 	Directory string                `json:"directory"`
 	Signature string                `json:"signature"`
 	Entries   []MediaDirectoryEntry `json:"entries"`
@@ -168,7 +170,11 @@ func ReadMediaDirectory(ctx context.Context, root models.MediaRoot, input MediaD
 			default:
 				continue
 			}
+			page.Total++
 			key := directoryEntryKey(candidate)
+			if key <= input.After {
+				page.Offset++
+			}
 			if key <= input.After || (len(page.Entries) == input.Limit+1 && key >= directoryEntryKey(page.Entries[len(page.Entries)-1])) {
 				continue
 			}

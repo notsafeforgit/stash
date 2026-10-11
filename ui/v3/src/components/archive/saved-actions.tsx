@@ -1,3 +1,4 @@
+import { PageSummary } from "@/components/list/page-summary";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
@@ -341,6 +342,13 @@ export function SavedActions({
           />
         ))}
       </div>
+      {read.current && (
+        <PageSummary
+          total={read.current.total}
+          page={Math.floor(read.current.offset / 25) + 1}
+          pageSize={25}
+        />
+      )}
       <div className="flex flex-wrap gap-2">
         <Button
           variant="outline"

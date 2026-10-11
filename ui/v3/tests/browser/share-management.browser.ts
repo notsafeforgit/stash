@@ -4,6 +4,11 @@ import { z } from "zod";
 import type { Locator } from "@playwright/test";
 
 test.use({ timezoneId: "America/Los_Angeles" });
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/v3/archive/page-info?**", (route) =>
+    route.fulfill({ json: { total: 0, offset: 0 } }),
+  );
+});
 
 test("share target search uses library titles, filenames and gallery folders", async ({
   page,
@@ -154,6 +159,15 @@ for (const viewport of [
     await page.clock.setFixedTime(now);
     const sceneTitle = `First scene ${"UnbrokenTitle".repeat(30)}`;
     let shares: GQL.MediaShareFieldsFragment[] = [];
+    await page.route("**/api/v3/archive/page-info?**", (route) => {
+      const status = new URL(route.request().url()).searchParams.get("state");
+      const total = shares.filter(
+        (share) =>
+          (share.revoked_at === null && new Date(share.expires_at) > now) ===
+          (status === "ACTIVE"),
+      ).length;
+      return route.fulfill({ json: { total, offset: 0 } });
+    });
     const inputLog: GQL.MediaShareCreateInput[] = [];
     await page.route("**/graphql", async (route) => {
       const body: unknown = route.request().postDataJSON();

@@ -76,6 +76,8 @@ export async function withReviewRecord<T>(
 }
 
 export interface ReviewKeyPage {
+  total: number;
+  offset: number;
   keys: string[];
   next: string | null;
 }
@@ -95,6 +97,10 @@ export async function reviewKeys(
     return await new Promise<ReviewKeyPage>((resolve, reject) => {
       const tx = database.transaction("requests", "readonly");
       const keys: string[] = [];
+      const total = tx.objectStore("requests").count();
+      const offset = after
+        ? tx.objectStore("requests").count(IDBKeyRange.upperBound(after))
+        : undefined;
       let next: string | null = null;
       let failure: unknown;
       const request = tx
@@ -115,7 +121,13 @@ export async function reviewKeys(
         keys.push(cursor.key);
         cursor.continue();
       };
-      tx.oncomplete = () => resolve({ keys, next });
+      tx.oncomplete = () =>
+        resolve({
+          keys,
+          next,
+          total: total.result,
+          offset: offset?.result ?? 0,
+        });
       tx.onabort = () =>
         reject(
           failure ?? tx.error ?? new NativeArchiveError(0, "storage_aborted"),

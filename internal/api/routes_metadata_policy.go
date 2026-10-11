@@ -143,6 +143,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/metadata-policy/draft-preview", rs.previewPolicyDraft)
 	r.Post("/metadata-policy/references", rs.policyReferences)
 	r.Post("/metadata-policy/apply", rs.apply)
+	r.Get("/page-info", rs.archivePageInfo)
 	r.Get("/media-roots", rs.roots)
 	r.Post("/media-roots/probe", rs.probeRoot)
 	r.Post("/media-roots", rs.putRoot)

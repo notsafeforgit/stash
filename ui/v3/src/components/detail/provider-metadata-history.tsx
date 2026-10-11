@@ -1,3 +1,7 @@
+import {
+  ArchivePagination,
+  ArchiveNextPage,
+} from "@/components/archive/pagination";
 import { useEffect, useState } from "react";
 import { useIntl } from "react-intl";
 import { ChevronDown } from "lucide-react";
@@ -39,6 +43,7 @@ function History({ kind, localId, entityUUID }: HistoryTarget) {
   const [api] = useState(() => createProviderMetadataAPI());
   const [open, setOpen] = useState(false);
   const [after, setAfter] = useState(0);
+  const [resolvedID, setResolvedID] = useState(entityUUID);
   const [previous, setPrevious] = useState<number[]>([]);
   const [rows, setRows] = useState<ProviderMetadataImport[]>([]);
   const [busy, setBusy] = useState(false);
@@ -56,7 +61,10 @@ function History({ kind, localId, entityUUID }: HistoryTarget) {
         const id =
           entityUUID ?? (await api.identity(kind, localId ?? "", signal)).uuid;
         const page = await api.history(id, kind, after, signal);
-        if (!signal.aborted) setRows(page);
+        if (!signal.aborted) {
+          setRows(page);
+          setResolvedID(id);
+        }
       } catch {
         if (!signal.aborted) setFailed(true);
       } finally {
@@ -187,38 +195,50 @@ function History({ kind, localId, entityUUID }: HistoryTarget) {
               </dl>
             </Expandable>
           ))}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={busy || !previous.length}
-            onClick={() => {
-              setAfter(previous.at(-1) ?? 0);
-              setPrevious((values) => values.slice(0, -1));
+        {resolvedID && (
+          <ArchivePagination
+            page={previous.length + 1}
+            query={{
+              resource: "provider-history",
+              subject: resolvedID,
+              cursor: after,
             }}
+            loaded={rows.length}
+            pageSize={api.pageLimit}
+            refresh={refresh}
           >
-            {msg("actions.previous", "Previous")}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={busy || failed || rows.length < api.pageLimit}
-            onClick={() => {
-              setPrevious((values) => [...values, after]);
-              setAfter(rows.at(-1)?.sequence ?? after);
-            }}
-          >
-            {msg("actions.next", "Next")}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={busy}
-            onClick={() => setRefresh((value) => value + 1)}
-          >
-            {msg("provider_metadata.refresh", "Refresh imports")}
-          </Button>
-        </div>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy || !previous.length}
+              onClick={() => {
+                setAfter(previous.at(-1) ?? 0);
+                setPrevious((values) => values.slice(0, -1));
+              }}
+            >
+              {msg("actions.previous", "Previous")}
+            </Button>
+            <ArchiveNextPage
+              type="button"
+              variant="outline"
+              disabled={busy || failed || rows.length < api.pageLimit}
+              onClick={() => {
+                setPrevious((values) => [...values, after]);
+                setAfter(rows.at(-1)?.sequence ?? after);
+              }}
+            >
+              {msg("actions.next", "Next")}
+            </ArchiveNextPage>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => setRefresh((value) => value + 1)}
+            >
+              {msg("provider_metadata.refresh", "Refresh imports")}
+            </Button>
+          </ArchivePagination>
+        )}
       </CollapsibleContent>
     </Collapsible>
   );

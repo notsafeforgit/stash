@@ -38,6 +38,19 @@ async function archive(
         json: emptyDownloadStatus(route.request().postDataJSON().attachments),
       });
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/page-info")) {
+      const total = options.many
+        ? 26
+        : url.searchParams.get("url") === "https://example.test/missing"
+          ? 0
+          : 1;
+      return route.fulfill({
+        json: {
+          total,
+          offset: url.searchParams.get("cursor") ? Math.min(25, total) : 0,
+        },
+      });
+    }
     requests.push(url);
     if (route.request().method() !== "GET")
       writes.push(route.request().method());
@@ -55,7 +68,13 @@ async function archive(
       const after = url.searchParams.get("after");
       result = options.many
         ? after
-          ? []
+          ? [
+              {
+                ...post,
+                uuid: "20000000-0000-4000-8000-000000000026",
+                requested_uuid: "20000000-0000-4000-8000-000000000026",
+              },
+            ]
           : Array.from({ length: 25 }, (_, index) => {
               const uuid = `20000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
               return {
@@ -421,7 +440,7 @@ test("post pages use bounded cursors and allow returning to the previous page", 
   ).toHaveCount(25);
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(
-    page.getByText("No matching posts", { exact: true }),
+    page.getByText("Page 2 of 2 · 26 items", { exact: true }),
   ).toBeVisible();
   expect(remote.requests.at(-1)?.searchParams.get("after")).toBe(
     "20000000-0000-4000-8000-000000000025",

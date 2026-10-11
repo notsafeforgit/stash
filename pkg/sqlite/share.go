@@ -21,6 +21,14 @@ func (*ShareStore) Find(ctx context.Context, id string) (*models.ShareRecord, er
 
 func (*ShareStore) List(ctx context.Context, options models.ShareListOptions) ([]*models.ShareRecord, error) {
 	ret := []*models.ShareRecord{}
+	query, args := shareListPredicate(options)
+	query += ` ORDER BY created_at DESC, id LIMIT ? OFFSET ?`
+	args = append(args, options.Limit, options.Offset)
+	err := dbWrapper.Select(ctx, &ret, query, args...)
+	return ret, err
+}
+
+func shareListPredicate(options models.ShareListOptions) (string, []any) {
 	query := `SELECT * FROM shares`
 	args := []any{}
 	if options.Active != nil {
@@ -31,10 +39,7 @@ func (*ShareStore) List(ctx context.Context, options models.ShareListOptions) ([
 		}
 		args = append(args, options.Now)
 	}
-	query += ` ORDER BY created_at DESC, id LIMIT ? OFFSET ?`
-	args = append(args, options.Limit, options.Offset)
-	err := dbWrapper.Select(ctx, &ret, query, args...)
-	return ret, err
+	return query, args
 }
 
 func (*ShareStore) Delete(ctx context.Context, id string) error {

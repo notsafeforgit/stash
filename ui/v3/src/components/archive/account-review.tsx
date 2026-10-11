@@ -1,3 +1,7 @@
+import {
+  ArchivePagination,
+  ArchiveNextPage,
+} from "@/components/archive/pagination";
 import { useEffect, useId, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useMsg } from "@/hooks/message";
@@ -185,6 +189,7 @@ export function AccountReview({
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<unknown>();
   const [refresh, setRefresh] = useState(0);
+  const [countRevision, setCountRevision] = useState(0);
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const { q, namespace, ownership, scope } = filter;
   const queryKey = JSON.stringify([q, namespace, ownership, scope, cursor]);
@@ -220,6 +225,7 @@ export function AccountReview({
     queryKey,
   );
   function changed(account: Account) {
+    setCountRevision((value) => value + 1);
     setPage((page) =>
       page
         ? {
@@ -345,32 +351,40 @@ export function AccountReview({
               </EmptyHeader>
             </Empty>
           )}
-          <div className="flex justify-between gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy || previous.length === 0}
-              onClick={() => {
-                setCursor(previous.at(-1) ?? "");
-                setPrevious((items) => items.slice(0, -1));
-              }}
+          {!selected && (
+            <ArchivePagination
+              page={previous.length + 1}
+              query={{ resource: "accounts", ...filter, cursor }}
+              loaded={current?.rows.length}
+              refresh={refresh + countRevision}
+              pageSize={api.pageLimit}
             >
-              {msg("account_review.previous", "Previous accounts")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy || !current?.more}
-              onClick={() => {
-                if (current) {
-                  setPrevious((items) => [...items, cursor]);
-                  setCursor(current.next);
-                }
-              }}
-            >
-              {msg("account_review.next", "Next accounts")}
-            </Button>
-          </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy || previous.length === 0}
+                onClick={() => {
+                  setCursor(previous.at(-1) ?? "");
+                  setPrevious((items) => items.slice(0, -1));
+                }}
+              >
+                {msg("account_review.previous", "Previous accounts")}
+              </Button>
+              <ArchiveNextPage
+                type="button"
+                variant="outline"
+                disabled={busy || !current?.more}
+                onClick={() => {
+                  if (current) {
+                    setPrevious((items) => [...items, cursor]);
+                    setCursor(current.next);
+                  }
+                }}
+              >
+                {msg("account_review.next", "Next accounts")}
+              </ArchiveNextPage>
+            </ArchivePagination>
+          )}
         </div>
       </div>
     </div>

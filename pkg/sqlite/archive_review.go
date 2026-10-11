@@ -83,49 +83,43 @@ func archiveReviewMediaQuery(after string, limit int) (string, []any) {
 }
 
 func (s *ArchiveReviewStore) media(ctx context.Context, filter models.ArchiveReviewFilter, page *models.ArchiveReviewPage) (*models.ArchiveReviewPage, error) {
-	const candidateLimit = 100
-	query, args := archiveReviewMediaQuery(filter.After, candidateLimit+1)
+	query, args := archiveReviewMediaItemsQuery(filter.After, filter.Limit+1)
 	var ids []string
 	if err := dbWrapper.Select(ctx, &ids, query, args...); err != nil {
 		return nil, err
 	}
-	for index, id := range ids[:min(len(ids), candidateLimit)] {
+	if len(ids) > filter.Limit {
+		ids = ids[:filter.Limit]
+		page.Next = ids[len(ids)-1]
+	}
+	for _, id := range ids {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		page.Checked++
 		post, err := currentSourcePost(ctx, id)
 		if err != nil {
 			return nil, err
 		}
-		if post == nil || post.UUID != id {
+		if post == nil || post.UUID != id || post.State != "active" {
 			return nil, models.ErrSourcePayloadCorrupt
 		}
-		if post.State == "active" {
-			reasons, err := archiveReviewMediaReasons(ctx, post.UUID)
-			if errors.Is(err, models.ErrSourceAlbumLimit) || errors.Is(err, models.ErrSourcePostIdentityLimit) {
-				reasons, err = []string{"review_limit"}, nil
-			}
-			if err != nil {
-				return nil, err
-			}
-			if len(reasons) != 0 {
-				summary, err := (&SourceEvidenceStore{}).postSummary(ctx, post)
-				if err != nil {
-					return nil, err
-				}
-				page.Items = append(page.Items, models.ArchiveReviewItem{UUID: id, Reasons: reasons, Post: summary})
-			}
+		reasons, err := archiveReviewMediaReasons(ctx, id)
+		if errors.Is(err, models.ErrSourceAlbumLimit) || errors.Is(err, models.ErrSourcePostIdentityLimit) {
+			reasons, err = []string{"review_limit"}, nil
 		}
-		if index+1 < len(ids) {
-			page.Next = id
-		} else {
-			page.Next = ""
+		if err != nil {
+			return nil, err
 		}
-		if len(page.Items) == filter.Limit {
-			break
+		if len(reasons) == 0 {
+			return nil, models.ErrSourcePayloadCorrupt
 		}
+		summary, err := (&SourceEvidenceStore{}).postSummary(ctx, post)
+		if err != nil {
+			return nil, err
+		}
+		page.Items = append(page.Items, models.ArchiveReviewItem{UUID: id, Reasons: reasons, Post: summary})
 	}
+	page.Checked = len(page.Items)
 	return page, nil
 }
 

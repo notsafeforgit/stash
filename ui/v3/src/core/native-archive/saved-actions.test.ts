@@ -76,16 +76,20 @@ it("discovers saved actions without sending requests or exposing their bodies", 
   expect(await remote.api.page("account_ownership")).toEqual({
     items: [{ key: ids.account, state: "pending" }],
     next: null,
+    total: 1,
+    offset: 0,
   });
   expect(await remote.api.page("account_merge")).toEqual({
     items: [],
     next: null,
+    total: 0,
+    offset: 0,
   });
   expect(
     await createSavedActionsAPI(`${endpoint}another/`, remote.transport).page(
       "account_ownership",
     ),
-  ).toEqual({ items: [], next: null });
+  ).toEqual({ items: [], next: null, total: 0, offset: 0 });
   expect(remote.transport).not.toHaveBeenCalled();
   expect(await remote.box.read(ids.account)).toEqual(saved);
 });
@@ -107,6 +111,8 @@ it("uses the original protocol to recover a lost reply without applying the acti
   expect(await remote.api.page("account_ownership")).toEqual({
     items: [],
     next: null,
+    total: 0,
+    offset: 0,
   });
 });
 
@@ -180,6 +186,8 @@ it("bounds the page and advances past a request removed in another tab", async (
   expect(await remote.api.page("account_ownership", first.next ?? "")).toEqual({
     items: [{ key: keys[25], state: "unreadable" }],
     next: null,
+    total: 25,
+    offset: 24,
   });
   expect(remote.transport).not.toHaveBeenCalled();
 });
@@ -203,6 +211,8 @@ it("preserves a new collection's label and opens its original creation request",
   expect(await remote.api.page("collection")).toEqual({
     items: [{ key: collectionID, state: "pending", label: "Purchased videos" }],
     next: null,
+    total: 1,
+    offset: 0,
   });
   expect(await remote.api.location("collection", collectionID)).toEqual({
     kind: "collection",
@@ -230,6 +240,8 @@ it("shows retained batches without claiming file jobs are completed", async () =
       },
     ],
     next: null,
+    total: 1,
+    offset: 0,
   });
   expect(
     await remote.api.location("manual_intake", preview.collection_uuid),

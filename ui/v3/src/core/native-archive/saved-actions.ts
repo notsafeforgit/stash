@@ -76,6 +76,8 @@ export type SavedActionLocation =
       tab: "metadata-review" | "source-review";
     };
 export interface SavedActionPage {
+  total: number;
+  offset: number;
   items: SavedActionSummary[];
   next: string | null;
 }
@@ -255,7 +257,12 @@ export function createSavedActionsAPI(
         page.keys.map((key) => summary(selected, key)),
       );
       signal?.throwIfAborted();
-      return { items: rows.filter((row) => row !== null), next: page.next };
+      return {
+        items: rows.filter((row) => row !== null),
+        next: page.next,
+        total: page.total,
+        offset: page.offset,
+      };
     },
     async recover(family: SavedActionFamily, key: string) {
       const selected = adapters[savedActionFamilySchema.parse(family)];

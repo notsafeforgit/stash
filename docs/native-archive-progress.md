@@ -8,6 +8,35 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Optional source tracking — deployed, 2026-10-11 UTC
+
+Fresh installations default to `source_tracking_enabled: false`. Settings →
+Services provides the opt-in, with a restart notice; saved and running settings
+are distinct. Source pages, desktop/mobile navigation, detail tabs, ingestion
+APIs and source workers follow the running setting. Ordinary library folders,
+scanning, metadata providers and deletion recovery remain available. Disabling
+preserves existing data. S3 backup remains an independent host integration;
+see [optional integrations](optional-integrations.md).
+
+Production explicitly enables source tracking and reports it active. The
+[source release](https://github.com/notsafeforgit/stash/actions/runs/38132978292)
+and [wrapper release](https://github.com/notsafeforgit/stash-s6/actions/runs/38134285720)
+published `a165fdf40027e441dbc2b223abbdd3f97258906d`. The source digest is
+`sha256:603c7a037f2aa83dd9b8383684a47ae970cf9c64b8f23fd1c8f1ffa649a02465`;
+the verified running wrapper digest is
+`sha256:3e5deab2e4a8cc8cfe9e28607daa4b53f23bedfc39c10a239a37ed0bc6998c0a`.
+Schema remains 1000113, with no migration. The backup reader matches the
+published binary. Stash restarted without draining scrapes, pausing worker
+timers or restarting n8n.
+
+The full local validation and GitHub release gates passed, as did the
+[Chromium/WebKit workflow](https://github.com/notsafeforgit/stash/actions/runs/38132978403).
+The exact Actions binary was exercised in an isolated fresh installation:
+default-off APIs, UI enable/disable, restart behavior, retained library data,
+ordinary scanning and deletion all passed. A read-only browser check verified
+the deployed opt-in and navigation without submitting mutations. Private release
+and verification evidence is under `.local/source-tracking-opt-in-20261011/`.
+
 ## Bulk deletion — deployed, 2026-10-11 UTC
 
 Scene and image selection deletion now batches durable journal preparation and

@@ -101,7 +101,7 @@ jobs:
         STASH_TAG: ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:${{ steps.repository_owner.outputs.branch }}
       run: |
         docker buildx imagetools create --tag "$STASH_TAG" "$STASH_IMAGE"
-        printf 'Verified native runtime: `%s`\n' "$STASH_IMAGE" >> "$GITHUB_STEP_SUMMARY"
+        printf 'Verified native runtime: %s\n' "$STASH_IMAGE" >> "$GITHUB_STEP_SUMMARY"
 
   # Preserve develop's downloadable release using the same validated artifacts;
   # the former Build workflow no longer rebuilds this push independently.

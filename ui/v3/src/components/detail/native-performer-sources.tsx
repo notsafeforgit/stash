@@ -174,17 +174,6 @@ function IdentityRow({ row }: { row: PerformerIdentity }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2 text-sm">
-        {row.original_id !== null && (
-          <p>
-            {intl.formatMessage(
-              {
-                id: "performer_sources.original_id",
-                defaultMessage: "Original library ID: {id}",
-              },
-              { id: row.original_id },
-            )}
-          </p>
-        )}
         {row.redirect_to && (
           <div className="flex flex-col gap-1">
             <span>
@@ -249,7 +238,7 @@ function IdentityHistory({ id, api }: { id: string; api: PerformerSourceAPI }) {
       <p className="text-sm text-muted-foreground">
         {msg(
           "performer_sources.history_help",
-          "Retained UUIDs keep older links working after merges or identity migration. Historical library IDs are evidence and do not link to current records.",
+          "Retained UUIDs keep account links and metadata attached to this performer after a merge.",
         )}
       </p>
       {state.busy && (
@@ -279,17 +268,23 @@ function IdentityHistory({ id, api }: { id: string; api: PerformerSourceAPI }) {
   );
 }
 
-export function NativePerformerSources({ localId }: { localId: string }) {
+export function NativePerformerSources({
+  localId,
+  entityUUID,
+}: {
+  localId: string;
+  entityUUID?: string;
+}) {
   const msg = useMsg();
   const [api] = useState(() => createPerformerSourceAPI());
   const [historyOpen, setHistoryOpen] = useState(false);
   const load = useCallback(
     async (after: string | undefined, signal: AbortSignal) => {
-      const identity = await api.identity(localId, signal);
-      const page = await api.accounts(identity.uuid, after, signal);
+      const uuid = entityUUID ?? (await api.identity(localId, signal)).uuid;
+      const page = await api.accounts(uuid, after, signal);
       return { ...page, items: page.accounts };
     },
-    [api, localId],
+    [api, localId, entityUUID],
   );
   const state = useSourcePage(load, api.pageLimit);
   const data = state.data;

@@ -96,7 +96,7 @@ func (s *SourceAccountStore) PerformerIdentities(ctx context.Context, id, after 
 	for _, row := range rows {
 		entity := row.resolve()
 		ret.Identities = append(ret.Identities, models.PerformerSourceIdentity{UUID: entity.UUID, Revision: entity.Revision, State: entity.State,
-			OriginalID: entity.OriginalID, RedirectTo: entity.RedirectTo, CreatedAt: entity.CreatedAt, RetiredAt: entity.RetiredAt})
+			RedirectTo: entity.RedirectTo, CreatedAt: entity.CreatedAt, RetiredAt: entity.RetiredAt})
 	}
 	return ret, nil
 }

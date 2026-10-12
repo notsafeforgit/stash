@@ -40,7 +40,6 @@ export const performerIdentitySchema = z
     uuid,
     revision: integer,
     state: z.enum(["active", "redirected", "deleted"]),
-    original_id: integer.nullable(),
     redirect_to: uuid.nullable(),
     created_at: timestamp,
     retired_at: timestamp.nullable(),

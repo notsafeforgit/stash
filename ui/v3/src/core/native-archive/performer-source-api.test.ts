@@ -116,7 +116,7 @@ it("retains deletion without a live local ID", async () => {
   ).rejects.toThrow();
 });
 
-it("validates redirect history independently and retains historical local IDs as evidence", async () => {
+it("validates redirect history using UUIDs without historical database keys", async () => {
   const valid = fixture();
   const page = {
     requested_uuid: former,
@@ -126,7 +126,6 @@ it("validates redirect history independently and retains historical local IDs as
         uuid: former,
         revision: 2,
         state: "redirected",
-        original_id: 72,
         redirect_to: valid.performer.uuid,
         created_at: "2026-09-01T00:00:00Z",
         retired_at: "2026-10-01T00:00:00Z",
@@ -134,7 +133,9 @@ it("validates redirect history independently and retains historical local IDs as
     ],
   };
   const { api, transport } = client(page);
-  expect((await api.identities(former)).identities[0]?.original_id).toBe(72);
+  expect((await api.identities(former)).identities[0]?.redirect_to).toBe(
+    valid.performer.uuid,
+  );
   expect(String(transport.mock.calls[0]?.[0])).toContain(
     "/performer-identities?limit=25",
   );

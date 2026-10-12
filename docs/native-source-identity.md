@@ -117,6 +117,22 @@ ingestion receipts, native review UI, account-profile presentation, and catalog
 import remain required integration work. The migration does not invent publisher
 choices from old paths, names, or existing account ownership.
 
+## Performer page identities
+
+Performer pages use the canonical archive UUID in their URL. Numeric bookmarks
+resolve through the current local record and redirect to that UUID; a merged
+UUID redirects to the surviving performer. Tabs, filters and the browsing origin
+are preserved. Deleted identities remain unavailable even if a database key is
+reused. Resolution works with source tracking disabled.
+
+`GET /api/v3/archive/entity-identities/{kind}/{identifier}` accepts a UUID or a
+current numeric key and returns the active canonical identity. It checks the
+entity kind before and after following redirects. Local keys remain internal to
+library queries and relationships. Performer identity history exposes UUIDs and
+merge redirects, without the redundant “Original library ID” field. Internal
+`archive_entities.original_id` values are not URL aliases and are still used by
+media-conversion integrity checks; this change requires no database migration.
+
 ## Importing the performer registry
 
 Schema 1000028 adds a reviewed import of a frozen registry's five performer

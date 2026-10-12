@@ -50,6 +50,7 @@ import {
 import { Lightbox } from "src/components/lightbox";
 import { useDocumentTitle } from "src/hooks/title";
 import { getClient } from "@/core/client";
+import { resolvePerformerRoute } from "@/core/performer-route";
 import { detailRouteState } from "@/components/detail/detail-route-state";
 
 // ── Route search params ────────────────────────────────────────────────────────
@@ -181,6 +182,7 @@ function PerformerToolbar({
 
 function PerformerDetailPage() {
   const sourceTracking = useSourceTracking();
+  const { localId } = Route.useLoaderData();
   const { performerId } = Route.useParams();
   const { tab } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -195,13 +197,14 @@ function PerformerDetailPage() {
   );
 
   const { data, loading, error } = useQuery(GQL.FindPerformerDocument, {
-    variables: { id: performerId },
+    variables: { id: localId ?? "" },
+    skip: localId === null,
     fetchPolicy: "cache-first",
   });
 
   const [updatePerformer] = useMutation(GQL.PerformerUpdateDocument);
 
-  const performer = data?.findPerformer;
+  const performer = localId === null ? null : data?.findPerformer;
   useDocumentTitle(performer?.name);
 
   function handleToggleFavorite() {
@@ -282,7 +285,11 @@ function PerformerDetailPage() {
             defaultMessage: "Source accounts",
           }),
           content: (
-            <NativePerformerSources key={performer.id} localId={performer.id} />
+            <NativePerformerSources
+              key={performer.id}
+              localId={performer.id}
+              entityUUID={performerId}
+            />
           ),
         },
         {
@@ -296,7 +303,7 @@ function PerformerDetailPage() {
             <div className="p-4">
               <ProviderMetadataHistory
                 kind="performer"
-                localId={performer.id}
+                entityUUID={performerId}
               />
             </div>
           ),
@@ -419,13 +426,19 @@ function PerformerDetailPage() {
 export const Route = createFileRoute("/performers/$performerId")({
   validateSearch: searchSchema,
   ...detailRouteState,
-  loader: ({ params }) =>
-    getClient()
-      .query({
+  loader: async ({ params, location, abortController }) => {
+    const localId = await resolvePerformerRoute(
+      params.performerId,
+      location,
+      abortController.signal,
+    );
+    if (localId !== null)
+      await getClient().query({
         query: GQL.FindPerformerDocument,
-        variables: { id: params.performerId },
+        variables: { id: localId },
         fetchPolicy: "cache-first",
-      })
-      .then(() => undefined),
+      });
+    return { localId };
+  },
   component: PerformerDetailPage,
 });

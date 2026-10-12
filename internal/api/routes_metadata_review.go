@@ -24,27 +24,40 @@ func metadataIdentity(entity *models.ArchiveEntity) metadataEntityIdentity {
 	return metadataEntityIdentity{entity.UUID, entity.Kind, entity.Revision, entity.LocalID}
 }
 
-// Existing library URLs retain their integer IDs. Resolve them once at the
-// application boundary, then use native identities for review and mutation.
+// Resolve UUIDs (including merge redirects) or current local keys at the
+// application boundary. Historical original_id values never identify a record.
 func (rs *nativeArchiveRoutes) metadataEntity(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(chi.URLParam(r, "localID"))
+	value := chi.URLParam(r, "identifier")
+	id, idErr := strconv.Atoi(value)
+	isUUID := ingest.ValidUUID(value)
 	kind := models.ArchiveEntityKind(chi.URLParam(r, "kind"))
 	validKind := false
 	switch kind {
 	case models.ArchiveScene, models.ArchiveImage, models.ArchiveGallery, models.ArchivePerformer, models.ArchiveStudio, models.ArchiveTag, models.ArchiveGroup, models.ArchiveFile:
 		validKind = true
 	}
-	if err != nil || id < 1 || !validKind {
+	if (!isUUID && (idErr != nil || id < 1)) || !validKind {
 		ingestError(w, ingest.ErrInvalid)
 		return
 	}
 	var entity *models.ArchiveEntity
-	err = rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
+	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
 		var err error
+		if isUUID {
+			entity, err = rs.repo.ArchiveEntity.Find(ctx, value)
+			if err != nil || entity == nil {
+				return err
+			}
+			if entity.Kind != kind {
+				return ingest.ErrNotFound
+			}
+			entity, err = rs.repo.ArchiveEntity.Resolve(ctx, value)
+			return err
+		}
 		entity, err = rs.repo.ArchiveEntity.FindByLocalID(ctx, kind, id)
 		return err
 	})
-	if err == nil && (entity == nil || entity.State != models.ArchiveEntityActive) {
+	if err == nil && (entity == nil || entity.State != models.ArchiveEntityActive || entity.Kind != kind || entity.LocalID == nil) {
 		err = ingest.ErrNotFound
 	}
 	if err != nil {

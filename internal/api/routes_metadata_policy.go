@@ -39,7 +39,7 @@ func (rs *nativeArchiveRoutes) routerWithSourceTracking(enabled bool) http.Handl
 	r.Post("/file-deduplication/apply", rs.applyFileDeduplication)
 	r.Get("/file-deduplication/requests/{request}", rs.fileDeduplicationRequest)
 	r.Get("/metadata-fields/{kind}", rs.fields)
-	r.Get("/entity-identities/{kind}/{localID}", rs.metadataEntity)
+	r.Get("/entity-identities/{kind}/{identifier}", rs.metadataEntity)
 	r.Get("/entities/{entity}/metadata-fields", rs.entityMetadataFields)
 	r.Get("/entities/{entity}/metadata-fields/{field}/history", rs.entityMetadataHistory)
 	r.Get("/entities/{entity}/provider-metadata-history", rs.entityProviderMetadataHistory)

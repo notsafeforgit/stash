@@ -13,13 +13,11 @@ type PerformerSourceAccounts struct {
 	Accounts      []AccountReviewState   `json:"accounts"`
 }
 
-// PerformerSourceIdentity retains the identity redirect evidence. OriginalID
-// is historical only; it must never become a link to a current local record.
+// PerformerSourceIdentity retains stable identities and their merge redirects.
 type PerformerSourceIdentity struct {
 	UUID       string             `json:"uuid"`
 	Revision   int                `json:"revision"`
 	State      ArchiveEntityState `json:"state"`
-	OriginalID *int               `json:"original_id"`
 	RedirectTo *string            `json:"redirect_to"`
 	CreatedAt  time.Time          `json:"created_at"`
 	RetiredAt  *time.Time         `json:"retired_at"`

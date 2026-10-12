@@ -3385,7 +3385,7 @@
     "redirected": "Redirected identity",
     "deleted": "Deleted identity",
     "redirect_to": "Redirects to archive identity",
-    "history_help": "Retained UUIDs keep older links working after merges or identity migration. Historical library IDs are evidence and do not link to current records.",
+    "history_help": "Retained UUIDs keep account links and metadata attached to this performer after a merge.",
     "loading_history": "Loading identity history",
     "more_history": "Load more identities",
     "help": "These source accounts have a recorded ownership link to this performer, including links retained through merges. Account ownership does not assign performers to media.",
@@ -3399,7 +3399,6 @@
     "manage": "Manage account link",
     "more_accounts": "Load more accounts",
     "history": "Identity history",
-    "original_id": "Original library ID: {id}",
     "created_at": "Identity created: {date}",
     "retired_at": "Identity retired: {date}",
     "title": "Source accounts"

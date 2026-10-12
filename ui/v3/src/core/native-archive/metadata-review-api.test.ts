@@ -37,6 +37,19 @@ it("uses the application mount with same-origin session requests and passes canc
   ).toThrow();
 });
 
+it.each([
+  { uuid: ids.entity, kind: "scene", local_id: 7, revision: 2 },
+  { uuid: ids.entity, kind: "performer", revision: 2 },
+])("rejects invalid resolved performer identities: %j", async (response) => {
+  const api = createMetadataReviewAPI(
+    "https://example.test/api/v3/archive/",
+    async () => Response.json(response),
+  );
+  await expect(api.identity("performer", ids.entity)).rejects.toMatchObject({
+    code: "identity_mismatch",
+  });
+});
+
 it("binds previews to their request and compares canonical selections independently of key order", async () => {
   const body = {
     ...preview().input,

@@ -232,20 +232,28 @@ export function createMetadataReviewAPI(
   return {
     endpoint,
     pageLimit,
-    identity(
+    async identity(
       entityKind: NativeIdentity["kind"],
-      localId: string,
+      id: string,
       signal?: AbortSignal,
     ) {
       kind.parse(entityKind);
-      if (!/^[1-9]\d*$/.test(localId))
+      const local = /^[1-9]\d*$/.test(id);
+      if (!local && !uuid.safeParse(id).success)
         throw new NativeArchiveError(0, "invalid_identity");
-      return request(
-        `entity-identities/${entityKind}/${localId}`,
+      const identity = await request(
+        `entity-identities/${entityKind}/${id}`,
         identitySchema,
         undefined,
         signal,
       );
+      if (
+        identity.kind !== entityKind ||
+        identity.local_id === undefined ||
+        (local && String(identity.local_id) !== id)
+      )
+        throw new NativeArchiveError(0, "identity_mismatch");
+      return identity;
     },
     fields(entity: string, signal?: AbortSignal) {
       return request(

@@ -64,7 +64,7 @@ export function PerformerName({ performer }: { performer: AccountPerformer }) {
     <Link
       className="underline underline-offset-4"
       to="/performers/$performerId"
-      params={{ performerId: String(performer.local_id) }}
+      params={{ performerId: performer.uuid }}
     >
       {performer.name}
       {performer.disambiguation ? ` (${performer.disambiguation})` : ""} (#

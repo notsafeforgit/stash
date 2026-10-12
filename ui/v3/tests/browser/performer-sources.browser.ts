@@ -112,7 +112,6 @@ async function archive(
             uuid: oldIdentity,
             state: "redirected",
             revision: 2,
-            original_id: 72,
             redirect_to: ids.performer,
             created_at: "2026-09-01T00:00:00Z",
             retired_at: "2026-10-01T00:00:00Z",
@@ -121,7 +120,6 @@ async function archive(
             uuid: ids.performer,
             state: "active",
             revision,
-            original_id: 7,
             redirect_to: null,
             created_at: "2026-09-01T00:00:00Z",
             retired_at: null,
@@ -183,15 +181,16 @@ for (const desktop of [false, true]) {
     await expect(
       page.getByText("Current identity", { exact: true }),
     ).toBeVisible();
-    await expect(
-      page.getByText("Original library ID: 72", { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText(/Original library ID/)).toHaveCount(0);
     await expect(page.locator('a[href="/performers/72"]')).toHaveCount(0);
     await expect
       .poll(() =>
         page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
       )
       .toBe(true);
+    await page
+      .getByText("Current identity", { exact: true })
+      .scrollIntoViewIfNeeded();
     await page.screenshot({
       path: test
         .info()

@@ -14,6 +14,20 @@ from test_receipts import ORIGIN, ReceiptFixture
 
 
 class CheckpointTests(ReceiptFixture):
+    def test_deleted_media_cache_survives_archive_restore(self):
+        from stash_ingest.deleted_media import remember
+
+        remember(self.box, {'item': 'deletedclip', 'observed_at': '2026-10-12T00:00:00Z', 'http_status': 404})
+        before = tuple(self.box.db.execute('SELECT * FROM deleted_media').fetchone())
+        archive, restored = self.root / 'bundle', self.root / 'restored'
+        manifest = export_archive(self.library, archive,
+                                  components=[self.component('producer_outbox', self.outbox)],
+                                  producer_origin=ORIGIN, reserve=0)
+        import_archive(archive, restored, reserve=0)
+        with closing(sqlite3.connect(restored / 'components/producer_outbox' / self.outbox.name)) as db:
+            self.assertEqual(db.execute('SELECT * FROM deleted_media').fetchall(), [before])
+        verify_restored_receipts(archive, restored, manifest, ORIGIN)
+
     def downloads(self, name):
         path = self.root / name
         with closing(sqlite3.connect(path)) as db:

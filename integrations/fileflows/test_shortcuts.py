@@ -6,16 +6,16 @@ import re
 import unittest
 from uuid import uuid4
 
-from build_shortcuts import build, choose_clip_order, token, validate
+from build_shortcuts import build, choose_clip_order, find_ready_uploads, token, validate
 
 
 class OrderWorkflow:
     """Evaluate the small, side-effect-free picker action subset with mock Photos."""
 
-    def __init__(self, photos, selections):
+    def __init__(self, photos, selections, generate=choose_clip_order):
         self.photos, self.selections = photos, iter(selections)
         self.actions, self.outputs, self.variables, self.menus = [], {}, {}, []
-        self.result = choose_clip_order(self.add)
+        self.result = generate(self.add)
         validate({"WFWorkflowActions": self.actions})
 
     def add(self, kind, **parameters):
@@ -65,7 +65,12 @@ class OrderWorkflow:
                 finish = ends[-1]
                 if kind == "conditional":
                     value = self.value(p["WFInput"])
-                    condition = value > p["WFNumberValue"] if p["WFCondition"] == 2 else value == self.value(p["WFConditionalActionString"])
+                    if p["WFCondition"] == 100:
+                        condition = bool(self.as_list(value))
+                    elif p["WFCondition"] == 2:
+                        condition = value > p["WFNumberValue"]
+                    else:
+                        condition = value == self.value(p["WFConditionalActionString"])
                     middle = ends[0]
                     result = self.run(i+1, middle, depth) if condition else self.run(middle+1, finish, depth)
                 else:
@@ -98,6 +103,7 @@ class OrderWorkflow:
                 result = next(item for item in self.as_list(incoming)
                               if item == selected or isinstance(item, dict) and item["name"].startswith(str(selected) + " - "))
             elif kind == "getitemname": result = incoming["name"]
+            elif kind == "file.getfoldercontents": result = self.value(p["WFFolder"])["children"]
             elif kind == "properties.images": result = incoming["recorded_at"]
             elif kind == "format.date": result = self.value(p["WFDate"])
             elif kind == "setitemname": result = {**incoming, "name": self.value(p["WFName"])}
@@ -151,10 +157,14 @@ class ShortcutEncodingTests(unittest.TestCase):
 
     def setUp(self):
         # No private Photos or file-provider bookmarks in the test fixture.
-        self.wrapper = {"WFWorkflowActions": [{
-            "WFWorkflowActionIdentifier": "is.workflow.actions.runworkflow",
-            "WFWorkflowActionParameters": {"WFWorkflow": {"workflowIdentifier": "old-local-id"}},
-        }]}
+        self.wrapper = {"WFWorkflowActions": [
+            {"WFWorkflowActionIdentifier": "is.workflow.actions.comment",
+             "WFWorkflowActionParameters": {}} for _ in range(14)
+        ]}
+        self.wrapper["WFWorkflowActions"][3]["WFWorkflowActionParameters"]["WFFolder"] = {"bookmark": "workspace"}
+        self.wrapper["WFWorkflowActions"][6]["WFWorkflowActionParameters"]["WFFolder"] = {"bookmark": "upload"}
+        self.wrapper["WFWorkflowActions"][9]["WFWorkflowActionParameters"] = {
+            "WFSelectMultiplePhotos": True, "WFPhotoPickerTypes": "Videos"}
         self.processor = {"WFWorkflowActions": [
             {"WFWorkflowActionIdentifier": "is.workflow.actions.comment",
              "WFWorkflowActionParameters": {}} for _ in range(26)
@@ -207,10 +217,35 @@ class ShortcutEncodingTests(unittest.TestCase):
     def test_keeps_original_names_and_resolves_helper_by_name(self):
         self.assertEqual(self.wrapper["WFWorkflowName"], "Upload Jess Videos")
         self.assertEqual(self.processor["WFWorkflowName"], "Process and Organize Videos")
-        helper = self.wrapper["WFWorkflowActions"][0]["WFWorkflowActionParameters"]
+        helper = next(a["WFWorkflowActionParameters"] for a in self.wrapper["WFWorkflowActions"]
+                      if a["WFWorkflowActionIdentifier"] == "is.workflow.actions.runworkflow")
         self.assertEqual(helper["WFWorkflowName"], "Process and Organize Videos")
         self.assertEqual(helper["WFWorkflow"], {"workflowName": "Process and Organize Videos", "isSelf": False})
         validate(self.wrapper)
+
+
+class UploadRetryTests(unittest.TestCase):
+    def test_only_manifest_batches_are_offered_for_retry(self):
+        finished = {"name": "stash-upload-" + "a"*64 + ".part",
+                    "children": [{"name": "clip-1.mov"}, {"name": "stash-clips.json"}]}
+        unfinished = {"name": "stash-upload-" + "b"*64 + ".part",
+                      "children": [{"name": "clip-1.mov"}]}
+        empty = {"name": "stash-upload-" + "c"*64 + ".part", "children": []}
+        # Unrelated entries deliberately have no children field: they must
+        # never be opened as a folder, moved, or deleted by recovery.
+        unrelated = [{"name": "old movie"}, {"name": "notes.txt"}]
+        entries = [unfinished, finished, empty, *unrelated]
+        before = copy.deepcopy(entries)
+        flow = OrderWorkflow(entries, [], lambda add: find_ready_uploads(add, {"Type": "ExtensionInput"}))
+        self.assertEqual(flow.run(), [finished])
+        self.assertEqual(flow.variables["Unfinished Uploads"], [unfinished, empty])
+        self.assertEqual(entries, before)
+        self.assertEqual(flow.menus, [])
+
+    def test_empty_workspace_has_nothing_to_retry(self):
+        flow = OrderWorkflow([], [], lambda add: find_ready_uploads(add, {"Type": "ExtensionInput"}))
+        self.assertEqual(flow.as_list(flow.run()), [])
+        self.assertEqual(flow.as_list(flow.variables["Unfinished Uploads"]), [])
 
 
 if __name__ == "__main__":

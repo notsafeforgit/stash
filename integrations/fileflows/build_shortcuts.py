@@ -34,6 +34,106 @@ def dictionary(items):
     return {"Value": {"WFDictionaryFieldValueItems": values}, "WFSerializationType": "WFDictionaryFieldValue"}
 
 
+def action_builder(actions):
+    def add(identifier, **params):
+        uid = str(uuid4()).upper()
+        params["UUID"] = uid
+        actions.append({"WFWorkflowActionIdentifier": "is.workflow.actions." + identifier,
+                        "WFWorkflowActionParameters": params})
+        return {"Type": "ActionOutput", "OutputUUID": uid, "OutputName": "Result"}
+    return add
+
+
+def find_ready_uploads(add, contents):
+    """Keep unfinished local drafts out of the wrapper's upload retry path."""
+    empty = add("nothing")
+    for name in ("Ready Uploads", "Unfinished Uploads"):
+        add("setvariable", WFInput=token(empty), WFVariableName=name)
+    folders, ours, files, manifest, ready = (str(uuid4()).upper() for _ in range(5))
+    add("repeat.each", WFInput=token(contents), GroupingIdentifier=folders, WFControlFlowMode=0)
+    folder = variable("Repeat Item")
+    name = add("getitemname", WFInput=token(folder))
+    match = add("text.match", text=text(name), WFMatchTextPattern=r"^stash-upload-[a-f0-9]{64}\.part$")
+    add("conditional", GroupingIdentifier=ours, WFControlFlowMode=0,
+        WFInput={"Type": "Variable", "Variable": token(match)}, WFCondition=100)
+    children = add("file.getfoldercontents", WFFolder=token(folder), Recursive=False)
+    add("repeat.each", WFInput=token(children), GroupingIdentifier=files, WFControlFlowMode=0)
+    name = add("getitemname", WFInput=token(variable("Repeat Item 2")))
+    add("conditional", GroupingIdentifier=manifest, WFControlFlowMode=0,
+        WFInput={"Type": "Variable", "Variable": token(name)}, WFCondition=4,
+        WFConditionalActionString="stash-clips.json")
+    add("getvariable", WFVariable=token(variable("Repeat Item 2")))
+    add("conditional", GroupingIdentifier=manifest, WFControlFlowMode=1)
+    add("nothing")
+    add("conditional", GroupingIdentifier=manifest, WFControlFlowMode=2)
+    manifests = add("repeat.each", GroupingIdentifier=files, WFControlFlowMode=2)
+    add("conditional", GroupingIdentifier=ready, WFControlFlowMode=0,
+        WFInput={"Type": "Variable", "Variable": token(manifests)}, WFCondition=100)
+    add("appendvariable", WFInput=token(folder), WFVariableName="Ready Uploads")
+    add("conditional", GroupingIdentifier=ready, WFControlFlowMode=1)
+    add("appendvariable", WFInput=token(folder), WFVariableName="Unfinished Uploads")
+    add("conditional", GroupingIdentifier=ready, WFControlFlowMode=2)
+    add("conditional", GroupingIdentifier=ours, WFControlFlowMode=1)
+    add("nothing")
+    add("conditional", GroupingIdentifier=ours, WFControlFlowMode=2)
+    add("repeat.each", GroupingIdentifier=folders, WFControlFlowMode=2)
+    return add("getvariable", WFVariable=token(variable("Ready Uploads")))
+
+
+def rebuild_wrapper(wrapper, processor_name):
+    old = wrapper["WFWorkflowActions"]
+    # Preserve the original Workspace, Blink destination, and Photos picker.
+    workspace = copy.deepcopy(old[3]["WFWorkflowActionParameters"]["WFFolder"])
+    destination = copy.deepcopy(old[6]["WFWorkflowActionParameters"]["WFFolder"])
+    picker = copy.deepcopy(old[9]["WFWorkflowActionParameters"])
+    picker.pop("UUID", None)
+    actions = []
+    add = action_builder(actions)
+    shared, pending, retry, unfinished, transfers = (str(uuid4()).upper() for _ in range(5))
+
+    def has_value(group, value):
+        add("conditional", GroupingIdentifier=group, WFControlFlowMode=0,
+            WFInput={"Type": "Variable", "Variable": token(value)}, WFCondition=100)
+
+    original = {"Type": "ExtensionInput"}
+    has_value(shared, original)
+    add("setvariable", WFInput=token(original), WFVariableName="InputMedia")
+    add("conditional", GroupingIdentifier=shared, WFControlFlowMode=1)
+    contents = add("file.getfoldercontents", WFFolder=workspace, Recursive=False)
+    ready = find_ready_uploads(add, contents)
+    has_value(pending, ready)
+    options = add("list", WFItems=["Retry saved uploads", "Choose new clips"])
+    choice = add("choosefromlist", WFInput=token(options), WFChooseFromListActionSelectMultiple=False,
+                 WFChooseFromListActionPrompt="There are saved uploads in Workspace. Retry them or choose new clips?")
+    add("conditional", GroupingIdentifier=retry, WFControlFlowMode=0,
+        WFInput={"Type": "Variable", "Variable": token(choice)}, WFCondition=4,
+        WFConditionalActionString="Retry saved uploads")
+    add("repeat.each", WFInput=token(ready), GroupingIdentifier=transfers, WFControlFlowMode=0)
+    add("file.move", WFFolder=destination, WFFile=token(variable("Repeat Item")))
+    add("repeat.each", GroupingIdentifier=transfers, WFControlFlowMode=2)
+    add("alert", WFAlertActionTitle="Uploads retried", WFAlertActionCancelButtonShown=False,
+        WFAlertActionMessage="The server will check the clips before processing them. Originals in Photos have been kept.")
+    add("exit")
+    add("conditional", GroupingIdentifier=retry, WFControlFlowMode=1)
+    add("nothing")
+    add("conditional", GroupingIdentifier=retry, WFControlFlowMode=2)
+    add("conditional", GroupingIdentifier=pending, WFControlFlowMode=1)
+    add("nothing")
+    add("conditional", GroupingIdentifier=pending, WFControlFlowMode=2)
+    has_value(unfinished, variable("Unfinished Uploads"))
+    add("alert", WFAlertActionTitle="An earlier upload was unfinished", WFAlertActionCancelButtonShown=True,
+        WFAlertActionMessage="Choose the original clips again to start over. The unfinished copies remain in Shortcuts Workspace and will not be uploaded. You can remove those copies in Files after the new upload succeeds.")
+    add("conditional", GroupingIdentifier=unfinished, WFControlFlowMode=1)
+    add("nothing")
+    add("conditional", GroupingIdentifier=unfinished, WFControlFlowMode=2)
+    photos = add("selectphoto", **picker)
+    add("setvariable", WFInput=token(photos), WFVariableName="InputMedia")
+    add("conditional", GroupingIdentifier=shared, WFControlFlowMode=2)
+    add("runworkflow", WFInput=token(variable("InputMedia")), WFWorkflowName=processor_name,
+        WFWorkflow={"workflowName": processor_name, "isSelf": False})
+    wrapper["WFWorkflowActions"] = actions
+
+
 def choose_clip_order(add):
     """Pick original Photos in order, before exporting files or creating a batch."""
     original = {"Type": "ExtensionInput"}
@@ -111,12 +211,7 @@ def build(wrapper, processor):
     local_folder = copy.deepcopy(old[3]["WFWorkflowActionParameters"]["WFFolder"])
     destination = copy.deepcopy(old[24]["WFWorkflowActionParameters"]["WFFolder"])
     actions = []
-
-    def add(identifier, **params):
-        uid = str(uuid4()).upper()
-        params["UUID"] = uid
-        actions.append({"WFWorkflowActionIdentifier": "is.workflow.actions." + identifier, "WFWorkflowActionParameters": params})
-        return {"Type": "ActionOutput", "OutputUUID": uid, "OutputName": "Result"}
+    add = action_builder(actions)
 
     add("comment", WFCommentActionText="Upload ordered clips to Stash through FileFlows. Choose recording date (oldest first) or pick clips in your own order. The earliest recording still supplies the scene date. Title and description are JSON-escaped automatically. No NFO is created.")
     title = add("ask", WFAskActionPrompt="Video title?", WFAllowsMultilineText=False)
@@ -159,14 +254,7 @@ def build(wrapper, processor):
     processor["WFWorkflowActions"] = actions
     processor["WFWorkflowName"] = "Process and Organize Videos"
     wrapper["WFWorkflowName"] = "Upload Jess Videos"
-    for action in wrapper["WFWorkflowActions"]:
-        params = action["WFWorkflowActionParameters"]
-        if action["WFWorkflowActionIdentifier"] == "is.workflow.actions.runworkflow":
-            params["WFWorkflowName"] = processor["WFWorkflowName"]
-            # Cross-device imports must resolve by name, not the old local UUID.
-            params["WFWorkflow"] = {"workflowName": processor["WFWorkflowName"], "isSelf": False}
-        if action["WFWorkflowActionIdentifier"] == "is.workflow.actions.setvariable":
-            params.get("WFInput", {}).get("Value", {}).pop("Aggrandizements", None)
+    rebuild_wrapper(wrapper, processor["WFWorkflowName"])
     return wrapper, processor
 
 

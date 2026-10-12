@@ -26,6 +26,17 @@ retried after five minutes. Invalid or unexpected files fail without deleting
 originals. Uploading through a phone file provider still needs a successful
 connection; retries must finish the same batch folder.
 
+Cancelling before export creates no batch. An interrupted export can leave a
+local folder without its final manifest; the wrapper leaves that draft in
+Workspace and lets the user select the original clips again. It does not send
+unfinished drafts to FileFlows or erase them. Once the manifest has been saved,
+opening the wrapper without share-sheet input offers **Retry saved uploads**
+or **Choose new clips**. Retrying moves only those saved batches, preserving
+their batch IDs, metadata and clip order, and does not delete anything in Photos.
+FileFlows checks every hash and waits if a transfer is incomplete. This does not
+resume a cancelled picker or export halfway through, and a file-provider move
+completing is not an acknowledgement that server-side encoding has finished.
+
 After its existing output validation, FileFlows publishes a small
 `stash-import-<batch_id>.json` beside the final MKV, then cleans up the exact
 unchanged source snapshot. The delivery timer submits the file and metadata

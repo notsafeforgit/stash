@@ -11,6 +11,7 @@ import (
 )
 
 var capturedRedgifsWatch = regexp.MustCompile(`^/(?:watch|ifr)/([A-Za-z0-9]{1,256})/?$`)
+var capturedImgurItem = regexp.MustCompile(`^/([A-Za-z0-9]{5,12})/?$`)
 
 // A linked clip has an explicit identity even when its external gallery's
 // membership is unavailable. Only direct file links establish a single item.
@@ -29,6 +30,16 @@ func redditExternalReference(raw interface{}) (*models.SourcePostIdentifier, str
 		return nil, "", false
 	}
 	switch strings.ToLower(u.Hostname()) {
+	case "imgur.com", "www.imgur.com", "m.imgur.com":
+		match := capturedImgurItem.FindStringSubmatch(u.EscapedPath())
+		if match == nil {
+			return nil, "", false
+		}
+		switch strings.ToLower(match[1]) {
+		case "gallery", "search", "upload", "signin", "register", "account", "settings":
+			return nil, "", false
+		}
+		return &models.SourcePostIdentifier{Namespace: "native:imgur", Value: match[1]}, "unknown", false
 	case "redgifs.com", "www.redgifs.com", "m.redgifs.com", "v3.redgifs.com":
 		if match := capturedRedgifsWatch.FindStringSubmatch(u.EscapedPath()); match != nil {
 			return &models.SourcePostIdentifier{Namespace: "native:redgifs", Value: strings.ToLower(match[1])}, "unknown", false

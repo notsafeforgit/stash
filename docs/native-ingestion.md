@@ -2617,7 +2617,16 @@ files before archive acknowledgement. It preserves original Twitter attachment
 membership through gallery-dl's transformation and supports single-media Reddit
 evidence without inventing albums. The claimed date window is enforced with
 source timestamp precision, including out-of-order posts and parent dates for
-linked child work. The
+linked child work. Reddit inline images use their captured `media_metadata`
+identities; multiple embedded items use their first references in the post body
+as album order. Object key order and download counters do not establish order.
+Captured Imgur single-item responses and Reddit preview evidence can resolve
+the same linked Imgur item. Native Reddit videos handed to yt-dlp through the
+exact post permalink still use the video ID already present in the listing.
+These cases require no separate metadata fetch. Rendered filenames replace
+backslashes and control characters while retaining the original post text;
+existing files under unsafe names require relocation before retry, rather than
+silently abandoning their bytes. The
 [package guide](../integrations/gallery-dl/README.md) describes supported runtime
 paths and remaining caller responsibilities.
 

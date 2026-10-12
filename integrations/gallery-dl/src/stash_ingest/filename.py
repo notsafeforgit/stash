@@ -25,6 +25,12 @@ def clipped(value, budget):
     return value.encode('utf-8')[:budget-size(marker)].decode('utf-8', 'ignore') + marker
 
 
+def portable(value):
+    # Linux allows literal backslashes, while native relative-path receipts
+    # deliberately reject them. Sanitize the rendered filename, not post text.
+    return ''.join('_' if c == '\\' or ord(c) < 32 else c for c in value)
+
+
 def name_max(directory):
     path = Path(directory)
     while True:
@@ -108,7 +114,7 @@ class Budget:
         self.playlist_index = None
 
     def clean(self, parts):
-        return self.pathfmt.clean_path(self.pathfmt.clean_segment(''.join(parts)))
+        return portable(self.pathfmt.clean_path(self.pathfmt.clean_segment(''.join(parts))))
 
     def _variants(self, template, values, replacements):
         def render(fields):
@@ -166,6 +172,21 @@ class Budget:
         return pf.filename_formatter
 
     def build(self, metadata):
+        result = portable(self._build(metadata))
+        raw = self.original(metadata)
+        if raw != portable(raw) and size(raw) <= 255:
+            old = Path(self.pathfmt.realdirectory) / raw
+            candidates = [old]
+            if size(raw) + 5 <= 255:
+                candidates.append(Path(str(old) + '.part'))
+            if self.gif and old.suffix.lower() == '.gif':
+                candidates.append(old.with_suffix('.mkv'))
+            if any(path.is_file() for path in candidates):
+                raise exception.FilenameFormatError(ValueError(
+                    'An existing file uses a non-portable filename; retain it for explicit migration'))
+        return result
+
+    def _build(self, metadata):
         try:
             pf = self.pathfmt
             if self.directory != pf.realdirectory:

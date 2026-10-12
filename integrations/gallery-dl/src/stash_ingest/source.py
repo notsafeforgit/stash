@@ -4,7 +4,7 @@ import re
 from urllib.parse import urlsplit
 
 from .encoding import InvalidData
-from . import instagram, mirror, social_media, ytdl_media, web_media, reddit_external
+from . import instagram, mirror, social_media, ytdl_media, web_media, reddit_external, reddit_embeds
 
 
 class UnsupportedSource(InvalidData):
@@ -220,6 +220,10 @@ def attachment(source):
             if selected in known:
                 return {"namespace": ref["namespace"], "value": selected}
         elif not data.get("is_gallery") and gallery is None:
+            if data.get('media_metadata') and not reddit_media(data.get('url')):
+                embedded = reddit_embeds.attachment(data, download_url)
+                if embedded is not None:
+                    return embedded
             values = [reddit_media(data.get(k)) for k in ("url", "url_overridden_by_dest")]
             for key in ("media", "secure_media"):
                 video = (data.get(key) or {}).get("reddit_video") or {}
@@ -229,6 +233,13 @@ def attachment(source):
                 raise InvalidData("Reddit post media identifiers disagree")
             if selected is not None and known == {selected}:
                 return {"namespace": ref["namespace"], "value": selected}
+            # gallery-dl's videos=ytdl passes this exact post permalink to
+            # yt-dlp. The captured native video fields establish the media ID.
+            if (len(known) == 1 and data.get('is_video') is True and not data.get('comment')
+                    and isinstance(download_url, str) and download_url.startswith('ytdl:')
+                    and isinstance(data.get('permalink'), str) and data['permalink'].startswith('/')
+                    and reddit_external.same_url('https://www.reddit.com' + data['permalink'], download_url[5:])):
+                return {'namespace': ref['namespace'], 'value': next(iter(known))}
             external = reddit_external.attachment(data, source, download_url)
             if external is not None:
                 return external

@@ -14,6 +14,8 @@ from .web_media import reference
 
 IMAGE = {'.jpg', '.jpeg', '.png', '.webp', '.avif', '.jxl', '.bmp'}
 VIDEO = {'.mp4', '.webm', '.mov', '.m4v', '.mkv'}
+IMGUR_ITEM = re.compile(r'/([A-Za-z0-9]{5,12})/?')
+IMGUR_PAGES = {'gallery', 'search', 'upload', 'signin', 'register', 'account', 'settings'}
 
 
 def linked(value):
@@ -25,6 +27,11 @@ def linked(value):
     except InvalidData:
         return None
     parsed = urlsplit(value)
+    if parsed.hostname in ('imgur.com', 'www.imgur.com', 'm.imgur.com'):
+        match = IMGUR_ITEM.fullmatch(parsed.path)
+        if match and match[1].lower() not in IMGUR_PAGES:
+            return {'namespace': 'native:imgur', 'value': match[1]}, 'unknown'
+        return None
     if parsed.hostname in ('redgifs.com', 'www.redgifs.com', 'm.redgifs.com', 'v3.redgifs.com'):
         match = re.fullmatch(r'/(?:watch|ifr)/([A-Za-z0-9]{1,256})/?', parsed.path)
         if match:
@@ -107,6 +114,12 @@ def attachment(data, source, download):
     ref = target(data)
     if ref is None or data.get('comment'):
         return None
+    if ref['namespace'] == 'native:imgur' and source.get('category') == 'imgur':
+        # A captured single-item API response ties the permalink to its CDN
+        # rendition. Never substitute another album item or guess from a name.
+        if (source.get('id') == ref['value'] and source.get('is_album') is False
+                and source.get('image_count') == 1 and same_url(source.get('url'), download)):
+            return ref
     # Keep the direct image URL's existing attachment identity, including its
     # query. Only the exact Redgifs API item and one of its observed renditions
     # may resolve that permalink; output filenames are not source evidence.

@@ -1,0 +1,399 @@
+{
+  "cases": [
+    {
+      "name": "inline media follows body order not metadata key order",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://www.reddit.com/r/example/comments/post/title/",
+        "selftext": "https://preview.redd.it/zzzzz.jpg?width=2000\n![img](aaaaa)\n![img](zzzzz)",
+        "media_metadata": {
+          "aaaaa": {
+            "id": "aaaaa",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/aaaaa.jpg?width=2000"
+            }
+          },
+          "zzzzz": {
+            "id": "zzzzz",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/zzzzz.jpg?width=2000"
+            }
+          }
+        },
+        "_url": "https://i.redd.it/aaaaa.jpg"
+      },
+      "entries": [
+        {
+          "position": 0,
+          "reference": {
+            "namespace": "native:reddit",
+            "value": "zzzzz"
+          },
+          "mediaKind": "image"
+        },
+        {
+          "position": 1,
+          "reference": {
+            "namespace": "native:reddit",
+            "value": "aaaaa"
+          },
+          "mediaKind": "image"
+        }
+      ],
+      "attachment": {
+        "namespace": "native:reddit",
+        "value": "aaaaa"
+      },
+      "manifest_error": false
+    },
+    {
+      "name": "one embedded attachment needs no ordering inference",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://www.reddit.com/r/example/comments/post/title/",
+        "selftext": "",
+        "media_metadata": {
+          "aaaaa": {
+            "id": "aaaaa",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/aaaaa.jpg?width=2000"
+            }
+          }
+        },
+        "_url": "https://i.redd.it/aaaaa.jpg"
+      },
+      "entries": [
+        {
+          "position": 0,
+          "reference": {
+            "namespace": "native:reddit",
+            "value": "aaaaa"
+          },
+          "mediaKind": "image"
+        }
+      ],
+      "attachment": {
+        "namespace": "native:reddit",
+        "value": "aaaaa"
+      },
+      "manifest_error": false
+    },
+    {
+      "name": "linked post may contain its own inline media",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://www.instagram.com/p/example/",
+        "selftext": "",
+        "media_metadata": {
+          "aaaaa": {
+            "id": "aaaaa",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/aaaaa.jpg?width=2000"
+            }
+          }
+        },
+        "_url": "https://i.redd.it/aaaaa.jpg"
+      },
+      "entries": [
+        {
+          "position": 0,
+          "reference": {
+            "namespace": "native:reddit",
+            "value": "aaaaa"
+          },
+          "mediaKind": "image"
+        }
+      ],
+      "attachment": {
+        "namespace": "native:reddit",
+        "value": "aaaaa"
+      },
+      "manifest_error": false
+    },
+    {
+      "name": "unknown inline attachment is rejected",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://www.reddit.com/r/example/comments/post/title/",
+        "selftext": "https://preview.redd.it/zzzzz.jpg?width=2000\n![img](aaaaa)\n![img](zzzzz)",
+        "media_metadata": {
+          "aaaaa": {
+            "id": "aaaaa",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/aaaaa.jpg?width=2000"
+            }
+          },
+          "zzzzz": {
+            "id": "zzzzz",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/zzzzz.jpg?width=2000"
+            }
+          }
+        },
+        "_url": "https://i.redd.it/wrong.jpg"
+      },
+      "entries": [
+        {
+          "position": 0,
+          "reference": {
+            "namespace": "native:reddit",
+            "value": "zzzzz"
+          },
+          "mediaKind": "image"
+        },
+        {
+          "position": 1,
+          "reference": {
+            "namespace": "native:reddit",
+            "value": "aaaaa"
+          },
+          "mediaKind": "image"
+        }
+      ],
+      "attachment": null,
+      "manifest_error": false
+    },
+    {
+      "name": "inline declared ID must agree",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://www.reddit.com/r/example/comments/post/title/",
+        "selftext": "https://preview.redd.it/zzzzz.jpg?width=2000\n![img](aaaaa)\n![img](zzzzz)",
+        "media_metadata": {
+          "aaaaa": {
+            "id": "other",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/aaaaa.jpg?width=2000"
+            }
+          },
+          "zzzzz": {
+            "id": "zzzzz",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/zzzzz.jpg?width=2000"
+            }
+          }
+        },
+        "_url": "https://i.redd.it/aaaaa.jpg"
+      },
+      "entries": null,
+      "attachment": null,
+      "manifest_error": true
+    },
+    {
+      "name": "inline rendition ID must agree",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://www.reddit.com/r/example/comments/post/title/",
+        "selftext": "https://preview.redd.it/zzzzz.jpg?width=2000\n![img](aaaaa)\n![img](zzzzz)",
+        "media_metadata": {
+          "aaaaa": {
+            "id": "aaaaa",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/other.jpg"
+            }
+          },
+          "zzzzz": {
+            "id": "zzzzz",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/zzzzz.jpg?width=2000"
+            }
+          }
+        },
+        "_url": "https://i.redd.it/aaaaa.jpg"
+      },
+      "entries": null,
+      "attachment": null,
+      "manifest_error": true
+    },
+    {
+      "name": "multiple items with unknown order require review",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://www.reddit.com/r/example/comments/post/title/",
+        "selftext": "No references here",
+        "media_metadata": {
+          "aaaaa": {
+            "id": "aaaaa",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/aaaaa.jpg?width=2000"
+            }
+          },
+          "zzzzz": {
+            "id": "zzzzz",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/zzzzz.jpg?width=2000"
+            }
+          }
+        },
+        "_url": "https://i.redd.it/aaaaa.jpg"
+      },
+      "entries": null,
+      "attachment": null,
+      "manifest_error": false
+    },
+    {
+      "name": "comment media is not post media",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://www.reddit.com/r/example/comments/post/title/",
+        "selftext": "https://preview.redd.it/zzzzz.jpg?width=2000\n![img](aaaaa)\n![img](zzzzz)",
+        "media_metadata": {
+          "aaaaa": {
+            "id": "aaaaa",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/aaaaa.jpg?width=2000"
+            }
+          },
+          "zzzzz": {
+            "id": "zzzzz",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/zzzzz.jpg?width=2000"
+            }
+          }
+        },
+        "_url": "https://i.redd.it/aaaaa.jpg",
+        "comment": {
+          "id": "comment"
+        }
+      },
+      "entries": null,
+      "attachment": null,
+      "manifest_error": false
+    },
+    {
+      "name": "unavailable inline item retains its original slot",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://www.reddit.com/r/example/comments/post/title/",
+        "selftext": "https://preview.redd.it/zzzzz.jpg?width=2000\n![img](aaaaa)\n![img](zzzzz)",
+        "media_metadata": {
+          "aaaaa": {
+            "id": "aaaaa",
+            "status": "failed",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/aaaaa.jpg?width=2000"
+            }
+          },
+          "zzzzz": {
+            "id": "zzzzz",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/zzzzz.jpg?width=2000"
+            }
+          }
+        },
+        "_url": "https://i.redd.it/aaaaa.jpg"
+      },
+      "entries": [
+        {
+          "position": 0,
+          "reference": {
+            "namespace": "native:reddit",
+            "value": "zzzzz"
+          },
+          "mediaKind": "image"
+        },
+        {
+          "position": 1,
+          "reference": {
+            "namespace": "native:reddit",
+            "value": "aaaaa"
+          },
+          "mediaKind": "image"
+        }
+      ],
+      "attachment": null,
+      "manifest_error": false
+    },
+    {
+      "name": "unavailable first item does not shift later slots",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://www.reddit.com/r/example/comments/post/title/",
+        "selftext": "https://preview.redd.it/zzzzz.jpg?width=2000\n![img](aaaaa)\n![img](zzzzz)",
+        "media_metadata": {
+          "aaaaa": {
+            "id": "aaaaa",
+            "status": "valid",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/aaaaa.jpg?width=2000"
+            }
+          },
+          "zzzzz": {
+            "id": "zzzzz",
+            "status": "failed",
+            "e": "Image",
+            "s": {
+              "u": "https://preview.redd.it/zzzzz.jpg?width=2000"
+            }
+          }
+        },
+        "_url": "https://i.redd.it/aaaaa.jpg"
+      },
+      "entries": [
+        {
+          "position": 0,
+          "reference": {
+            "namespace": "native:reddit",
+            "value": "zzzzz"
+          },
+          "mediaKind": "image"
+        },
+        {
+          "position": 1,
+          "reference": {
+            "namespace": "native:reddit",
+            "value": "aaaaa"
+          },
+          "mediaKind": "image"
+        }
+      ],
+      "attachment": {
+        "namespace": "native:reddit",
+        "value": "aaaaa"
+      },
+      "manifest_error": false
+    }
+  ]
+}

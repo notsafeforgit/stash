@@ -48,6 +48,25 @@ class FilenameBudgetTests(unittest.TestCase):
             job,data,original,_=self.make(template)
             self.assertEqual(job.pathfmt.build_filename(data),original)
 
+    def test_native_filename_sanitizes_backslashes_without_changing_post_text(self):
+        title = 'A title with a shrug ¯\\_(ツ)_/¯'
+        job, data, _, _ = self.make('{id}_{num}_{title}.{extension}', {'title': title})
+        filename = self.assertFits(job)
+        self.assertNotIn('\\', filename)
+        self.assertEqual(data['title'], title)
+        self.assertTrue(filename.startswith('post123_12_'))
+
+    def test_nonportable_existing_file_is_preserved_for_migration(self):
+        for suffix in ('', '.part'):
+            with self.subTest(suffix=suffix):
+                job, data, old, _ = self.make('{id}_{title}.{extension}', {'title': 'contains\\backslash'})
+                legacy = self.root / (old + suffix)
+                legacy.write_bytes(b'existing bytes')
+                with self.assertRaises(exception.FilenameFormatError):
+                    job.pathfmt.build_filename(data)
+                self.assertEqual(legacy.read_bytes(), b'existing bytes')
+                legacy.unlink()
+
     def test_multibyte_title_reserves_suffix_identifiers_and_extension(self):
         original='漢字🙂é'*200
         job,data,old,_=self.make('{title}_{id}_{num}.{extension}',{'title':original,'id':'12345678901234567890','num':123456789,'extension':'webm'})

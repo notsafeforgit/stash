@@ -1085,6 +1085,281 @@
       "complete": false,
       "kind": "unknown",
       "manifest_error": false
+    },
+    {
+      "name": "Imgur item resolves its captured CDN rendition",
+      "source": {
+        "category": "imgur",
+        "id": "AbcD123",
+        "is_album": false,
+        "image_count": 1,
+        "url": "https://i.imgur.com/AbcD123.mp4",
+        "_url": "https://i.imgur.com/AbcD123.mp4",
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/AbcD123",
+          "url_overridden_by_dest": "https://imgur.com/AbcD123"
+        }
+      },
+      "attachment": {
+        "namespace": "native:imgur",
+        "value": "AbcD123"
+      },
+      "manifest": {
+        "namespace": "native:imgur",
+        "value": "AbcD123"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "unrelated Imgur item",
+      "source": {
+        "category": "imgur",
+        "id": "Another",
+        "is_album": false,
+        "image_count": 1,
+        "url": "https://i.imgur.com/AbcD123.mp4",
+        "_url": "https://i.imgur.com/AbcD123.mp4",
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/AbcD123",
+          "url_overridden_by_dest": "https://imgur.com/AbcD123"
+        }
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:imgur",
+        "value": "AbcD123"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "unobserved Imgur rendition",
+      "source": {
+        "category": "imgur",
+        "id": "AbcD123",
+        "is_album": false,
+        "image_count": 1,
+        "url": "https://i.imgur.com/AbcD123.mp4",
+        "_url": "https://i.imgur.com/Other12.mp4",
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/AbcD123",
+          "url_overridden_by_dest": "https://imgur.com/AbcD123"
+        }
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:imgur",
+        "value": "AbcD123"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "Imgur album expansion",
+      "source": {
+        "category": "imgur",
+        "id": "AbcD123",
+        "is_album": true,
+        "image_count": 2,
+        "url": "https://i.imgur.com/AbcD123.mp4",
+        "_url": "https://i.imgur.com/AbcD123.mp4",
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/AbcD123",
+          "url_overridden_by_dest": "https://imgur.com/AbcD123"
+        }
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:imgur",
+        "value": "AbcD123"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "Imgur fallback keeps linked item identity",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://imgur.com/AbcD123",
+        "url_overridden_by_dest": "https://imgur.com/AbcD123",
+        "_url": "https://v.redd.it/fallback/CMAF_480.mp4",
+        "preview": {
+          "reddit_video_preview": {
+            "fallback_url": "https://v.redd.it/fallback/CMAF_480.mp4",
+            "dash_url": "https://v.redd.it/fallback/DASHPlaylist.mpd"
+          }
+        }
+      },
+      "attachment": {
+        "namespace": "native:imgur",
+        "value": "AbcD123"
+      },
+      "manifest": {
+        "namespace": "native:imgur",
+        "value": "AbcD123"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "Imgur fallback rejects unrelated Reddit video",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://imgur.com/AbcD123",
+        "url_overridden_by_dest": "https://imgur.com/AbcD123",
+        "_url": "https://v.redd.it/unrelated/CMAF_480.mp4",
+        "preview": {
+          "reddit_video_preview": {
+            "fallback_url": "https://v.redd.it/fallback/CMAF_480.mp4",
+            "dash_url": "https://v.redd.it/fallback/DASHPlaylist.mpd"
+          }
+        }
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:imgur",
+        "value": "AbcD123"
+      },
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "Imgur album URL is not a single item",
+      "source": {
+        "category": "imgur",
+        "id": "AbcD123",
+        "is_album": false,
+        "image_count": 1,
+        "url": "https://i.imgur.com/AbcD123.mp4",
+        "_url": "https://i.imgur.com/AbcD123.mp4",
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/AbcD123",
+          "url_overridden_by_dest": "https://imgur.com/a/AbcD123"
+        }
+      },
+      "attachment": null,
+      "manifest": null,
+      "complete": false,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "yt-dlp Reddit permalink resolves captured native video",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://v.redd.it/video123",
+        "is_video": true,
+        "permalink": "/r/example/comments/post/title/",
+        "_url": "ytdl:https://www.reddit.com/r/example/comments/post/title/",
+        "secure_media": {
+          "reddit_video": {
+            "dash_url": "https://v.redd.it/video123/DASHPlaylist.mpd"
+          }
+        }
+      },
+      "attachment": {
+        "namespace": "native:reddit",
+        "value": "video123"
+      },
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "video123"
+      },
+      "complete": true,
+      "kind": "video",
+      "manifest_error": false
+    },
+    {
+      "name": "yt-dlp rejects another Reddit post",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://v.redd.it/video123",
+        "is_video": true,
+        "permalink": "/r/example/comments/post/title/",
+        "_url": "ytdl:https://www.reddit.com/r/example/comments/other/title/",
+        "secure_media": {
+          "reddit_video": {
+            "dash_url": "https://v.redd.it/video123/DASHPlaylist.mpd"
+          }
+        }
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "video123"
+      },
+      "complete": true,
+      "kind": "video",
+      "manifest_error": false
+    },
+    {
+      "name": "yt-dlp rejects lookalike Reddit host",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://v.redd.it/video123",
+        "is_video": true,
+        "permalink": "/r/example/comments/post/title/",
+        "_url": "ytdl:https://www.reddit.com.example/r/example/comments/post/title/",
+        "secure_media": {
+          "reddit_video": {
+            "dash_url": "https://v.redd.it/video123/DASHPlaylist.mpd"
+          }
+        }
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "video123"
+      },
+      "complete": true,
+      "kind": "video",
+      "manifest_error": false
+    },
+    {
+      "name": "yt-dlp requires explicit video evidence",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://v.redd.it/video123",
+        "is_video": false,
+        "permalink": "/r/example/comments/post/title/",
+        "_url": "ytdl:https://www.reddit.com/r/example/comments/post/title/",
+        "secure_media": {
+          "reddit_video": {
+            "dash_url": "https://v.redd.it/video123/DASHPlaylist.mpd"
+          }
+        }
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "video123"
+      },
+      "complete": true,
+      "kind": "video",
+      "manifest_error": false
     }
   ]
 }

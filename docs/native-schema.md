@@ -116,7 +116,12 @@ the saved filter. `native_migration_history` records each native conversion.
 
 Current saved-filter imports accept only `filter_ast`. Flat `object_filter`
 files are rejected. Historical conversion lives in `pkg/filtermigration` and
-is used only by one-time database/configuration upgrades.
+is restricted to database promotion and checkpointed configuration promotion.
+The `LEGACY-UPGRADE-ONLY` markers, package documentation and caller-boundary test
+keep these historical codecs separate from native runtime behavior. Their input
+semantics are frozen; new UI/API features must not change historical conversion.
+The [legacy upgrade policy](../FORK.md#legacy-upgrade-code) defines permitted fixes
+and removal prerequisites, including the fresh-database bootstrap dependency.
 The source/provenance services and catalog import remain separate work; the
 implemented native migrations are described below.
 The full [transition plan](native-archive-transition-plan.md) remains the

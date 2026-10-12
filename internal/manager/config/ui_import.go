@@ -1,3 +1,6 @@
+// LEGACY-UPGRADE-ONLY: publish and retire historical default-filter YAML after
+// its database checkpoint commits. This is not a native settings write path.
+// Keep the publication marker stable for interrupted upgrades. See FORK.md.
 package config
 
 import (

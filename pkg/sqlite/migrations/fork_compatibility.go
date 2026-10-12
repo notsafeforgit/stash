@@ -1,3 +1,6 @@
+// LEGACY-UPGRADE-ONLY: frozen pre-native fork sidecar preparation/reconciliation.
+// This runs before native promotion, including the empty bootstrap chain. Do not
+// add runtime compatibility behavior or new fork migrations. See README.md.
 package migrations
 
 import (

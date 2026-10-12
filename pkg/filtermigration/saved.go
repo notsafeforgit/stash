@@ -1,5 +1,4 @@
-// Package filtermigration reads historical filter representations only during
-// database and configuration upgrades. Application APIs use models.FilterAST.
+// LEGACY-UPGRADE-ONLY: frozen historical filter codecs. See doc.go.
 package filtermigration
 
 import (
@@ -9,11 +8,10 @@ import (
 	"slices"
 )
 
-// Historical saved-filter import and compact URL codecs for models.FilterAST:
+// Historical saved-filter import codecs producing models.FilterAST:
 //
-//   - decoding the v3 UI's compact AST encoding (used in URLs and, in the
-//     transitional format, under the __filter_ast key of a saved filter's
-//     object_filter map);
+//   - decoding the old fork's compact AST encoding, stored under __filter_ast
+//     in a saved filter's object_filter map;
 //   - converting a legacy v2.5 saved-filter criteria map into a models.FilterAST;
 //   - reconstructing historical flat criteria for migration reconciliation.
 //
@@ -24,9 +22,8 @@ import (
 // to embed the compact-encoded AST alongside legacy criteria entries.
 const LegacyFilterASTKey = "__filter_ast"
 
-// Compact node kinds and index tables. These mirror COMPACT_OPERATORS /
-// COMPACT_MODIFIERS in ui/v3/src/models/list-filter/filter-ast.ts; both
-// lists are append-only.
+// Historical compact node kinds and index tables. These indices are frozen for
+// already-written upgrade inputs; do not synchronize them with the current UI.
 const (
 	compactKindGroup     = 0
 	compactKindCondition = 1
@@ -53,8 +50,7 @@ var compactModifiers = []models.CriterionModifier{
 	models.CriterionModifierNotBetween,
 }
 
-// DecodeCompactFilterAST decodes a compact-encoded AST node tree into a
-// models.FilterAST.
+// DecodeCompactFilterAST decodes a historical compact AST for upgrade input.
 func DecodeCompactFilterAST(raw interface{}) (*models.FilterAST, error) {
 	root, err := decodeCompactNode(raw)
 	if err != nil {
@@ -267,9 +263,8 @@ func mergeIntoANDRoot(root *models.FilterASTNode, conditions []*models.FilterAST
 	}
 }
 
-// hierarchicalOrMultiFields lists criterion types whose legacy value carries
-// `items` + `excluded`. Mirrors HIERARCHICAL_OR_MULTI_FIELDS in
-// ui/v3/src/models/list-filter/migrate-legacy-excludes.ts.
+// hierarchicalOrMultiFields is the historical set of criteria whose values
+// carried `items` + `excluded`. New native criteria do not belong in this table.
 var hierarchicalOrMultiFields = map[string]struct{}{
 	"tags":              {},
 	"scene_tags":        {},

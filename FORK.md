@@ -82,6 +82,36 @@ migration must leave enough state for deterministic retry. Resolve or preserve
 conflicting saved/default filters before dropping either representation. Do not
 use an old binary to roll back a native database after native writes begin.
 
+## Legacy upgrade code
+
+Code that interprets supported upstream/official database or configuration
+formats, and the frozen pre-native fork formats, is **legacy upgrade only**.
+Mark dedicated files with `LEGACY-UPGRADE-ONLY` and identify their historical
+input, upgrade entry point, and retirement dependencies. Keep native runtime
+helpers separate from these readers. Versioned native-to-native migrations are
+a separate responsibility; do not label the entire migration system disposable.
+
+Historical input semantics are frozen. Do not adjust old codecs, ordinal tables,
+field mappings, or reconciliation rules to follow current UI/API features.
+Changes need a specific historical-input, interrupted-upgrade, or security fix,
+with historical fixtures proving that existing supported inputs still convert
+correctly. New native behavior belongs in native code and, when needed, a new
+native migration. Do not turn upgrade helpers into runtime fallback paths.
+
+`pkg/filtermigration` documents the filter conversion boundary. Its import guard
+permits only the database promotion and checkpointed default-filter promotion;
+normal APIs, native imports/exports and query execution use `models.FilterAST`.
+Configuration promotion can resume at startup after a database upgrade; its
+durable checkpoint must prevent reimporting over later native edits.
+
+Removal requires retiring the corresponding supported upgrade inputs (or
+providing a separate importer), preserving promised interrupted-upgrade recovery,
+and removing all bootstrap dependencies. Fresh databases currently traverse
+the historical SQL/fork chain before native promotion, so removing upgrade
+support alone does not make those migrations safe to delete. Establish a tested
+native bootstrap baseline first. See the
+[migration maintenance notes](pkg/sqlite/migrations/README.md).
+
 ## API, UI, and plugin contracts
 
 Source tracking is an installation opt-in (`source_tracking_enabled`, default

@@ -1,3 +1,6 @@
+// LEGACY-UPGRADE-ONLY: checkpointed import of historical default-filter config.
+// Startup may resume publication; native edits must never call this converter.
+// Preserve historical semantics and interruption recovery. See FORK.md.
 package manager
 
 import (

@@ -6,6 +6,31 @@ code. Do not add new fork migrations or runtime reconcilers. Read
 [native schema promotion](../../../docs/native-schema.md) and
 [FORK.md](../../../FORK.md) before changing this boundary.
 
+## Historical code maintenance
+
+`LEGACY-UPGRADE-ONLY` marks code that interprets historical inputs, including
+`../fork_migrate.go`, `fork_compatibility.go`, and
+`1000001_saved_filter_ast.go`. The filter codecs live in
+[`pkg/filtermigration`](../../filtermigration/doc.go); their boundary test
+rejects new runtime importers. Default-filter YAML conversion and its durable
+publication checkpoint live in `internal/manager/default_filter_migration.go`
+and `internal/manager/config/ui_import.go`.
+
+These readers support upstream databases and frozen pre-native fork formats.
+Their historical semantics must not follow new native UI/API behavior. Keep
+input-specific fixes and recovery fixes covered by historical fixtures; implement
+new behavior in native code and new numbered migrations. Follow the
+[legacy upgrade policy](../../../FORK.md#legacy-upgrade-code).
+
+Fresh database creation still starts at the historical SQL sequence and runs
+the fork preparation before native promotion. The old readers therefore also
+see empty input during bootstrap. Removing them requires a native bootstrap
+baseline as well as retiring the corresponding upgrade inputs. Preserve
+unfinished configuration publication checkpoints for supported upgrades. Do not
+delete numbered migrations just because the production instance has passed them.
+
+## New native migrations
+
 1. Create a migration with the format `NN_description.up.sql`, where `NN` is the
    next native version. The migration driver runs its SQL in one transaction.
 

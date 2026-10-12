@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# Native-only adaptation of feederbox826/stash-s6's runtime setup.
+# AGPL-3.0-or-later; see /usr/share/doc/stash-container/NOTICE.
+set -euo pipefail
+
+info() { printf 'stash: %s\n' "$*" >&2; }
+error() { info "$*"; }
+fail() { error "$*"; exit 1; }
+boolean() {
+  case "$1" in
+    true|TRUE|1) return 0 ;;
+    false|FALSE|0|'') return 1 ;;
+    *) fail "$2 must be true or false" ;;
+  esac
+}
+
+# No implicit directory migration, root fallback or upstream compatibility mode.
+CONFIG_ROOT=$(dirname "${STASH_CONFIG_FILE:-/config/config.yml}")
+[[ "$CONFIG_ROOT" != /root/.stash* ]] || fail 'Mount your configuration at /config and update its paths first.'
+[[ ! -f /root/.stash/config.yml ]] || fail 'The old /root/.stash mount must be replaced with /config.'
+PYTHON_REQS="$CONFIG_ROOT/requirements.txt"
+run_as=()
+if [[ $(id -u) == 0 ]]; then
+  PUID=${PUID:-911}
+  PGID=${PGID:-911}
+  [[ "$PUID" =~ ^[0-9]+$ && "$PGID" =~ ^[0-9]+$ ]] || fail 'PUID and PGID must be numeric.'
+  [[ $(id -g stash) == "$PGID" ]] || groupmod -o -g "$PGID" stash >&2
+  [[ $(id -u stash) == "$PUID" ]] || usermod -o -u "$PUID" stash >&2
+  groups=$(id -G stash | tr ' ' ',')
+  if [[ -n ${AVGID:-} ]]; then
+    [[ "$AVGID" =~ ^[0-9]+(,[0-9]+)*$ ]] || fail 'AVGID must contain numeric group IDs, separated by commas.'
+    groups+=",$AVGID"
+  fi
+  if boolean "${AUTO_AVGID:-true}" AUTO_AVGID; then
+    for device in /dev/dri/renderD*; do
+      [[ -c "$device" ]] || continue
+      groups+=",$(stat -c '%g' "$device")"
+    done
+  fi
+  run_as=(setpriv --reuid="$PUID" --regid="$PGID" --groups="$groups")
+else
+  # Docker --user / Podman keep-id already establishes the correct host identity.
+  # Preserve supplementary groups, including Podman's keep-groups device access.
+  PUID=$(id -u)
+  PGID=$(id -g)
+fi
+runas() { "${run_as[@]}" "$@"; }
+
+# Only initialize directory roots. Never recursively chmod/chown a library or
+# silently run as root when an existing database is inaccessible.
+try_reown_r() {
+  local directory=$1
+  if [[ $(id -u) == 0 ]]; then
+    mkdir -p "$directory"
+    if ! runas test -w "$directory"; then
+      chown "$PUID:$PGID" "$directory"
+    fi
+  else
+    mkdir -p "$directory"
+  fi
+  runas test -w "$directory" && runas test -x "$directory" || {
+    error "$directory must be writable by $PUID:$PGID. Fix the mount's permissions on the host."
+    return 1
+  }
+}
+for directory in "$CONFIG_ROOT" "${STASH_GENERATED:-}" "${STASH_CACHE:-}" "${STASH_BLOBS:-}" "${STASH_METADATA:-}"; do
+  [[ -z "$directory" ]] || try_reown_r "$directory"
+done
+if [[ -f ${STASH_CONFIG_FILE:-/config/config.yml} ]]; then
+  runas test -r "$STASH_CONFIG_FILE" && runas test -w "$STASH_CONFIG_FILE" \
+    || fail "$STASH_CONFIG_FILE must be readable and writable by $PUID:$PGID."
+fi
+for tool in ffmpeg ffprobe; do
+  [[ ! -e "$CONFIG_ROOT/$tool" ]] || fail "Remove $CONFIG_ROOT/$tool so Stash uses the bundled Jellyfin tools."
+done
+
+# Explicit extension dependencies only; ordinary restarts require no downloads.
+if boolean "${INSTALL_PY_DEPS:-false}" INSTALL_PY_DEPS; then
+  [[ $(id -u) == 0 ]] || fail 'INSTALL_PY_DEPS requires container root during setup.'
+  apt-get update
+  apt-get install -y --no-install-recommends build-essential git pkg-config
+  rm -rf /var/lib/apt/lists/*
+fi
+source /opt/python-requirements.sh
+install_python_deps
+
+cert_path=${CUSTOM_CERT_PATH:-$CONFIG_ROOT/certs}
+if [[ -d "$cert_path" ]]; then
+  shopt -s nullglob
+  certs=("$cert_path"/*.crt)
+  if (( ${#certs[@]} )); then
+    [[ $(id -u) == 0 ]] || fail 'Custom certificate installation requires container root; otherwise mount a trust bundle and set SSL_CERT_FILE.'
+    cp "${certs[@]}" /usr/local/share/ca-certificates/
+    update-ca-certificates
+  fi
+fi
+
+if (( $# == 0 )); then set -- stash --nobrowser; fi
+if [[ "$1" == -* ]]; then set -- stash "$@"; fi
+info "Native runtime; config=$CONFIG_ROOT; uid=$PUID gid=$PGID"
+# Stash receives stop/restart signals directly as PID 1.
+exec "${run_as[@]}" "$@"

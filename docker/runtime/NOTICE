@@ -1,0 +1,8 @@
+The native container incorporates and adapts runtime setup and uv helpers from
+feederbox826/stash-s6 (https://github.com/feederbox826/stash-s6), via the
+notsafeforgit fork at 4f0f0594e95e000a75e4819f2494c3a44ce7f04d.
+Copyright feederbox826 and contributors, AGPL-3.0-or-later.
+The repository's LICENSE contains the license text.
+
+The native runtime removes upstream layout migration and compatibility mode.
+Jellyfin FFmpeg and its bundled libraries retain their respective licenses.

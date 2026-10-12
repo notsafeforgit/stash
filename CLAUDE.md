@@ -11,7 +11,9 @@ This repository is now an **independent fork** of upstream stashapp/stash. Work 
 The owner requires GitHub Actions-built, GHCR-published production images. Do not
 deploy another local-image fallback or treat a Git push as publication. Follow
 the [deployment runbook](docs/v3-deployment.md), retain the actual run URLs and
-source/wrapper digests, and report any GitHub-side execution block explicitly.
+image digest, and report any GitHub-side execution block explicitly. The main
+image includes the native runtime and hardware support; do not dispatch a second
+`stash-s6` build. Its sole default configuration layout is `/config`.
 
 Fresh installations have source tracking off. The saved
 `source_tracking_enabled` option in Settings → Services takes effect on restart;

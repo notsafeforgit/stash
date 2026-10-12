@@ -461,6 +461,9 @@ ACTIONLINT_VERSION ?= v1.7.12
 .PHONY: validate-ci
 validate-ci:
 	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_ci_*.py'
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s docker/runtime/tests
+	bash -n docker/runtime/root/usr/local/bin/stash-entrypoint docker/runtime/root/opt/python-requirements.sh
+	sh -n docker/runtime/root/usr/local/bin/uv-pip docker/runtime/root/usr/local/bin/uv-py
 	go run github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 
 export BACKUP_PYTHON ?= $(abspath .local/native-backup/bin/python)

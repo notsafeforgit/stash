@@ -50,8 +50,10 @@ provides the frozen fallback for users who do not migrate.
 
 ## Operations
 
-- [v3 deployment](v3-deployment.md): publish the Stash image, bake the matching
-  `stash-s6` wrapper, and verify a local rootless Quadlet restart.
+- [v3 deployment](v3-deployment.md): publish and verify the unified native image,
+  then verify a local rootless Quadlet restart.
+- [Container setup](container.md): storage, process identity, GPU access and moving
+  an existing installation to the native `/config` layout.
 - [Video duration mismatch repair](video-duration-mismatch-repair.md): manual
   diagnosis and repair for affected media files.
 - [Recoverable file deletion](file-deletion.md): staging, crash recovery,

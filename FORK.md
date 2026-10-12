@@ -20,8 +20,9 @@ maintenance continue separately.
   [Its release manifest](docs/releases/v2.5-compatible-final.json) pins the exact
   existing images. Never rebuild or move these final and dated release tags.
 - Publish development Stash images to `native-preview` and revision tags. The
-  wrapper explicitly selects a full source-image digest and publishes separate
-  native preview variants. Never select the newest source image implicitly.
+  image includes the native runtime, Jellyfin FFmpeg, GPU drivers and `uv`.
+  Verify the published digest and container checks before deployment; no second
+  `stash-s6` build is required. Frozen compatible images remain unchanged.
 - Production delivery must use images built and published by the repository's
   GitHub Actions workflows, then deployed from GHCR by verified digest. The owner
   explicitly rejected continued local-image deployments on October 9. Do not use

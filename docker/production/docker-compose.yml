@@ -1,45 +1,33 @@
-# APPNICENAME=Stash
-# APPDESCRIPTION=An organizer for your porn, written in Go
 services:
   stash:
-    image: stashapp/stash:latest
+    # For production, replace the moving tag with the verified release digest.
+    image: ghcr.io/notsafeforgit/stash:native-preview
     container_name: stash
     restart: unless-stopped
-    ## the container's port must be the same with the STASH_PORT in the environment section
     ports:
       - "9999:9999"
-    ## If you intend to use stash's DLNA functionality uncomment the below network mode and comment out the above ports section
-    # network_mode: host
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-file: "10"
         max-size: "2m"
     environment:
-      - STASH_STASH=/data/
-      - STASH_GENERATED=/generated/
-      - STASH_METADATA=/metadata/
-      - STASH_CACHE=/cache/
-      ## Adjust below to change default port (9999)
-      - STASH_PORT=9999
-      ## Set your timezone, e.g. America/New_York or Europe/Berlin
-      ## see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-      - TZ=Etc/UTC
+      PUID: "1000"
+      PGID: "1000"
+      STASH_PORT: "9999"
+      TZ: Etc/UTC
     volumes:
-      ## Adjust below paths (the left part) to your liking.
-      ## E.g. you can change ./config:/root/.stash to ./stash:/root/.stash
-      ## The left part is the path on your host, the right part is the path in the stash container.
-
-      ## Keep configs, scrapers, and plugins here.
-      - ./config:/root/.stash
-      ## Point this at your collection.
-      ## The left side is where your collection is on your host, the right side is where it will be in stash.
+      - ./config:/config
       - ./data:/data
-      ## This is where your stash's metadata lives
       - ./metadata:/metadata
-      ## Any other cache content.
       - ./cache:/cache
-      ## Where to store binary blob data (scene covers, images)
       - ./blobs:/blobs
-      ## Where to store generated content (screenshots,previews,transcodes,sprites)
       - ./generated:/generated
+      # Only needed with INSTALL_PYTHON_REQUIREMENTS=true:
+      # - ./pip-install:/pip-install
+    # Intel/AMD: uncomment the render device appropriate for your host.
+    # devices:
+    #   - /dev/dri/renderD128:/dev/dri/renderD128
+    # NVIDIA: configure GPU reservations using the NVIDIA Container Toolkit.
+    # Register /data in Settings → Library after setup.
+    # Rootless Podman identity/GPU setup: see docs/container.md.

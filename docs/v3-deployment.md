@@ -7,10 +7,11 @@ Keep build/rehearsal databases separate from the live library. The original
 compatible source and image digests remain preserved in the
 [release manifest](releases/v2.5-compatible-final.json).
 
-There are two images: `notsafeforgit/stash` publishes the binary, and
-`notsafeforgit/stash-s6` packages that binary with its runtime. Native builds
-publish separate `native-preview` tags. Verify the exact source digest in the
-wrapper before deploying an update or starting an isolated rehearsal.
+The main `notsafeforgit/stash` image contains the application and complete native
+runtime, including Jellyfin FFmpeg, GPU drivers, image codecs and `uv`. A single
+publisher builds and smoke-tests it. No `stash-s6` dispatch is needed. The image
+uses `/config` directly, without upstream layout migration or compatibility mode;
+see [container setup](container.md) for the one-time mount/path conversion.
 Production images must be built and published by GitHub Actions and pulled from
 GHCR. A local build, or uploading a locally built image to GHCR, does not satisfy
 the owner's delivery requirement. Report push, publication and deployment as
@@ -37,7 +38,7 @@ that the publishing workflow ran. Do not substitute a local image.
 The restriction cleared later on October 9: source revision `48cdadac2a`
 [published successfully](https://github.com/notsafeforgit/stash/actions/runs/37994520342),
 and the [wrapper build](https://github.com/notsafeforgit/stash-s6/actions/runs/37997504208)
-consumed that exact source digest. The production unit now uses its verified
+consumed that exact source digest. That historical deployment used the wrapper
 GHCR digest; [the progress record](native-archive-progress.md#current-release-position--2026-10-10-utc)
 retains the current identities. The earlier restriction does not describe the
 current Actions state.
@@ -114,64 +115,28 @@ Require the full intended source revision in the label. Record the digest;
 revision tags may be removed by normal cleanup. Frozen compatible tags and their
 content manifests are excluded from that cleanup.
 
-## 2. Build the wrapper from that digest
+## 2. Deploy the verified native image
 
-The wrapper's `develop.yml` workflow on `v3-rewrite` is named
-`native-preview-bake`. Dispatch it with the required full source digest:
+The publisher tests the pushed revision digest before promoting `native-preview`.
+Tests compare the included binary with the validated Actions artifact and exercise
+non-root startup, UID/GID overrides, supplementary groups, command arguments,
+offline operation, image/video tools, health and direct shutdown signals. A
+failed smoke test prevents promotion and leaves the workflow unsuccessful.
 
-```bash
-gh workflow run develop.yml --repo notsafeforgit/stash-s6 --ref v3-rewrite \
-  -f stash_digest="$stash_digest"
-gh run list --repo notsafeforgit/stash-s6 --workflow develop.yml \
-  --branch v3-rewrite --event workflow_dispatch --limit 5 \
-  --json databaseId,createdAt,headSha,status,conclusion,url
-```
+For an existing native Quadlet, pin `Image=ghcr.io/notsafeforgit/stash@sha256:...`
+to that successful run's verified digest. Use the `/config` mount and process
+identity described in [container setup](container.md). There is one source
+revision, Actions run and image digest to record. Update the backup's application
+runtime and deployment inventory to the same release; worker runtimes do not
+change when only the application container changes.
 
-Choose this dispatch's run and require success. Its source validation rejects
-floating tags. The bake publishes Linux amd64 `alpine-native-preview`,
-`hwaccel-alpine-native-preview`, and `hwaccel-native-preview`, with revision
-suffixes containing the wrapper commit and selected source digest prefix.
-Use the exact wrapper digest from the bake receipt:
+Pull the image before restarting Stash. Keep unattended image switching disabled
+when using explicitly reviewed digests. A routine image update does not repeat
+the original catalog migration or restore rehearsal. New isolated rehearsals
+still need distinct config, database, generated directory and local port; never
+point an older incompatible binary at the native database.
 
-```bash
-read -r -p "Wrapper image digest from the verified bake: " stash_s6_digest
-stash_s6_image=ghcr.io/notsafeforgit/stash-s6
-skopeo inspect --no-creds "docker://$stash_s6_image@$stash_s6_digest" \
-  --format '{{.Digest}} {{index .Labels "io.stash.source.image"}}'
-```
-
-Require `io.stash.source.image` to equal
-`ghcr.io/notsafeforgit/stash@$stash_digest`. The wrapper revision label refers
-to the wrapper source, not the Stash binary. Keep both Actions run URLs, both
-source revisions and both image digests in the deployment record.
-
-## 3. Prepare an isolated native unit
-
-Use a separate unit, container, config, generated directory and native database.
-Bind production media read-only for read-only rehearsals, or use copied fixtures
-for write tests. Follow the transition plan for writer quiescence, common-boundary
-backups, semantic reconciliation, restore validation and eventual production
-cutover; publishing an image does not satisfy those gates.
-
-For a native Quadlet:
-
-- Pin `Image=ghcr.io/notsafeforgit/stash-s6@sha256:...` to the verified wrapper.
-- Remove `Environment=STASH_ENABLE_V3_UI=true` and any `--enable-v3-ui` command
-  argument. V3 is the sole application; the removed CLI flag is rejected.
-- Remove obsolete `enable-v3-ui`/`enable_v3_ui` config keys from the native copy.
-- Set the intended distinct native config/database paths and an unused local
-  port. Do not enable source workers until the reviewed grants and source
-  activation receipts are ready.
-- Keep unattended image switching disabled through the migration and observation
-  period. The frozen production unit retains its original configuration until
-  the approved cutover.
-
-The wrapper entrypoint starts `/app/stash --nobrowser` and does not inject the
-retired UI flag. The live compatible `stash.container` still uses the opt-in
-variable; remove it when preparing the native replacement, without modifying
-the compatible deployment during development.
-
-## 4. Verify the running native instance
+## 3. Verify the running native instance
 
 After starting the isolated unit (or completing the approved cutover), verify
 its actual running image rather than assuming the pull selected it:
@@ -184,11 +149,11 @@ systemctl --user show "$stash_native_unit" \
   --property=ActiveState,SubState,ExecMainStartTimestamp,MainPID
 podman container inspect "$stash_native_container" \
   --format '{{.State.Status}} {{.State.Health.Status}} image={{.Image}} digest={{.ImageDigest}}'
-podman exec "$stash_native_container" /app/stash --version
+podman exec "$stash_native_container" /usr/bin/stash --version
 curl --fail --silent --show-error "$stash_native_health"
 ```
 
-Confirm the wrapper digest and binary revision match the deployment record.
+Confirm the main-image digest and binary revision match the deployment record.
 Exercise login, the main app, media previews/playback/downloads, standalone
 shares and offline assets without a UI flag. Verify native schema lineage,
 import/reconciliation receipts and worker health separately; an HTTP health

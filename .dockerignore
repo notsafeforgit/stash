@@ -55,6 +55,13 @@ docker
 !docker/native/
 !docker/native/build-libheif.sh
 !docker/native/build-vips.sh
+!docker/runtime/
+
+.git
+.local
+.agents
+.codex
+.aws
 
 ui/v3/node_modules
 ui/v3/build

@@ -68,6 +68,7 @@ jobs:
       uses: docker/setup-buildx-action@v4
 
     - name: Build and push Docker image
+      id: image
       uses: docker/build-push-action@v7
       with:
         context: .
@@ -78,13 +79,29 @@ jobs:
         cache-from: type=gha,scope=stash-native-amd64
         cache-to: type=gha,mode=max,scope=stash-native-amd64
         platforms: linux/amd64
+        provenance: mode=max
+        sbom: true
         labels: |
           org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           org.opencontainers.image.revision=${{ github.sha }}
           org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
         tags: |
-          ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:${{ steps.repository_owner.outputs.branch }}
           ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:${{ steps.repository_owner.outputs.branch }}-${{ steps.repository_owner.outputs.short_sha }}
+
+    - name: Verify published native runtime
+      env:
+        STASH_IMAGE: ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash@${{ steps.image.outputs.digest }}
+      run: |
+        docker pull "$STASH_IMAGE"
+        python3 docker/runtime/smoke.py --image "$STASH_IMAGE" --binary dist/stash-linux
+
+    - name: Promote verified image
+      env:
+        STASH_IMAGE: ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash@${{ steps.image.outputs.digest }}
+        STASH_TAG: ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:${{ steps.repository_owner.outputs.branch }}
+      run: |
+        docker buildx imagetools create --tag "$STASH_TAG" "$STASH_IMAGE"
+        printf 'Verified native runtime: `%s`\n' "$STASH_IMAGE" >> "$GITHUB_STEP_SUMMARY"
 
   # Preserve develop's downloadable release using the same validated artifacts;
   # the former Build workflow no longer rebuilds this push independently.

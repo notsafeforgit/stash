@@ -1,0 +1,57 @@
+#!/bin/sh
+set -e
+
+# uv-py: 'python' to 'uv run' shim
+# AGPL-3.0-or-later	© feederbox826
+
+VERSION="0.1.1"
+_HELP="uv-py: A wrapper for uv run to act like python
+
+Usage:
+  uv-py <script> [args...]
+    Specify a script and arguments to run with uv run.
+
+  uv-py -m pip [install/uninstall] <package>
+    (Un)Installs a package using uv pip install."
+
+# if no arguments, print usage
+[ $# -eq 0 ] && { echo "$_HELP"; exit 1; }
+
+# exit early if no uv
+command -v uv >/dev/null 2>&1 || { echo "Error: uv not found." >&2; exit 1; }
+
+# stash logger
+log() { level="$1"; shift; printf >&2 "\001%s\002uv-py: %s\n" "$level" "$*"; }
+
+### log beta version
+log "d" "uv-py $VERSION"
+
+# Pass on -m pip to uv-pip
+if [ "$1 $2" = "-m pip" ]; then
+  shift 2
+  exec /usr/local/bin/uv-pip "$@"
+fi
+
+if [ ! -f pyproject.toml ]; then
+  log "d" "No pyproject.toml found, initializing project"
+  uv init --bare
+  # Install from requirements.txt
+  if [ -f requirements.txt ]; then
+    log "d" "Installing dependencies from requirements.txt"
+    uv add -r requirements.txt
+  # parse ensure_requirements(...)
+  else
+    log "d" "Parsing ensure_requirements from $1"
+    deps=$(grep -Eo 'ensure_requirements\(([^)]*)\)' "$1" | \
+      grep -oE '"[^"]+"' | \
+      sed -E 's/"([^":]*:)?([^"]+)"/\2/')
+    if [ -n "$deps" ]; then
+      echo "$deps" | while IFS= read -r dep; do
+        uv add "$dep"
+      done
+    else
+      log "e" "No ensure_requirements found in script"
+    fi
+  fi
+fi
+exec uv run "$@"

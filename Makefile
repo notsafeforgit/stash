@@ -485,6 +485,7 @@ validate-archive:
 .PHONY: validate-library
 validate-library:
 	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s integrations/library -p 'test_*.py' -v
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s integrations/fileflows -p 'test_*.py' -v
 
 .PHONY: validate-producer
 export PRODUCER_PYTHON ?= $(abspath .local/native-producer/bin/python)

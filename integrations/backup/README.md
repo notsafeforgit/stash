@@ -16,6 +16,13 @@ daily cadence, storage classes, missing-mount/empty-source guards, upload retry
 ledger, pending/last-copy protections, restore behavior and publication-before-
 cleanup ordering. S3 credentials and remote operations remain host-owned.
 
+For a single scheduled `s3-backup.service`, add `--wait-for-lock` to its
+`stash-s3-backup` command. The existing library lock also protects local media
+intake, so a held lock does not necessarily mean another backup is running.
+This option waits before creating a run or checkpoint and preserves the lock
+through capture and upload. Systemd already prevents overlapping starts of that
+unit. Manual commands without the option still return immediately when busy.
+
 ## Native publication
 
 The tracked publisher now replaces the catalog upload with a native archive.

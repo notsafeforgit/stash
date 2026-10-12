@@ -895,15 +895,24 @@ def handle_shutdown(signal_num, frame):
     raise SystemExit(1)
 
 @contextmanager
-def exclusive_run_lock(lock_path: str):
+def exclusive_run_lock(lock_path: str, *, wait=False):
     """
-    Prevent overlapping runs (systemd timer + manual run).
+    Exclude other backups and media intake before creating any run state.
+
+    Scheduled services can wait for intake's short critical section. Manual
+    invocations remain nonblocking unless explicitly asked to wait.
     """
     global RUN_LOCK_FD
     previous = RUN_LOCK_FD
     fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            if not wait:
+                raise
+            log("Waiting for the shared backup/media-intake lock.", 1)
+            fcntl.flock(fd, fcntl.LOCK_EX)
         RUN_LOCK_FD = fd
         yield fd
     finally:
@@ -3201,6 +3210,7 @@ def main(argv=None):
     parser.add_argument("--defer-cleanup", action="store_true", help="Publish the backup and keep obsolete tagging queued; returning videos still have obsolete tags cleared.")
     parser.add_argument("--aws-region")
     parser.add_argument("--native-config", help="Private host checkpoint/worker inventory JSON (or STASH_NATIVE_BACKUP_CONFIG). Required except for dry runs.")
+    parser.add_argument("--wait-for-lock", action="store_true", help="Wait for the shared backup/media-intake lock before starting; useful for a single systemd service.")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--trace", action="store_true")
     parser.add_argument("--log-file")
@@ -3209,7 +3219,7 @@ def main(argv=None):
     LOG_LEVEL = 3 if args.trace else 2 if args.verbose else 1
     os.makedirs(LEDGER_DIR, exist_ok=True)
     try:
-        with exclusive_run_lock(RUN_LOCK_PATH):
+        with exclusive_run_lock(RUN_LOCK_PATH, wait=args.wait_for_lock):
             try:
                 initialize_runtime()
                 configure_logging(LOG_LEVEL, RUN_ID, log_file=args.log_file)
@@ -3229,7 +3239,7 @@ def main(argv=None):
                 cleanup_tmp()
     except BlockingIOError:
         configure_logging(LOG_LEVEL, RUN_ID, log_file=args.log_file)
-        log("Another backup run is already in progress.", 1)
+        log("The shared backup/media-intake lock is busy.", 1)
         return 2
     log("Simulation completed." if args.dry_run else "Process completed.", 1)
     return 0

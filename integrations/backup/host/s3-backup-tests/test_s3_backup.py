@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 import unittest
 import uuid
 from types import SimpleNamespace
@@ -316,6 +317,40 @@ class BackupTests(unittest.TestCase):
         run.assert_not_called()
         self.assertEqual(marker.read_bytes(), b'active snapshot')
         self.assertEqual(list(Path(self.m.TMP_BASE_DIR).iterdir()), [active])
+
+    def test_scheduled_backup_waits_for_intake_before_creating_run_state(self):
+        holder = os.open(self.m.RUN_LOCK_PATH, os.O_CREAT | os.O_RDWR, 0o600)
+        fcntl.flock(holder, fcntl.LOCK_EX)
+        waiting = threading.Event()
+        result = []
+        failures = []
+
+        def execute():
+            try:
+                result.append(self.m.main(['--wait-for-lock']))
+            except BaseException as error:
+                failures.append(error)
+
+        with patch.object(self.m, 'log', side_effect=lambda *args: waiting.set()), \
+             patch.object(self.m, 'configure_logging'), patch.object(self.m.signal, 'signal'), \
+             patch.object(self.m, 'initialize_runtime', wraps=self.m.initialize_runtime) as initialize, \
+             patch.object(self.m, 'run_backup') as run:
+            worker = threading.Thread(target=execute, daemon=True)
+            worker.start()
+            try:
+                self.assertTrue(waiting.wait(5), 'backup never waited for the intake lock')
+                initialize.assert_not_called()
+                run.assert_not_called()
+                self.assertTrue(worker.is_alive())
+            finally:
+                os.close(holder)
+                worker.join(5)
+            self.assertFalse(worker.is_alive())
+            self.assertEqual(failures, [])
+            self.assertEqual(result, [0])
+            initialize.assert_called_once()
+            run.assert_called_once()
+        self.assertIsNone(self.m.RUN_LOCK_FD)
 
     def test_stale_cleanup_ignores_symlinks_and_unrecognized_entries(self):
         self.m.initialize_runtime()

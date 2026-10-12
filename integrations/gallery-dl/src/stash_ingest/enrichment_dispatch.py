@@ -1,6 +1,7 @@
 """Bounded enrichment admission and execution with restart-safe discovery."""
 
 from .client import Unavailable
+from .dispatch_retention import DISPATCH_LIMIT, DispatchCapacity, initial_revision, reclaim_idle
 from .encoding import InvalidData, decode, encode, identifier
 from .enrichment_client import EnrichmentClient
 from .enrichment_journal import EnrichmentJournal
@@ -47,9 +48,13 @@ class EnrichmentDispatcher:
         self.key = identifier(collection), policy
         with box.transaction():
             if self.state() is None:
-                if box.db.execute(f"SELECT count(*) FROM {self.table}").fetchone()[0] >= 10000:
-                    raise Capacity("Enrichment discovery capacity exhausted")
-                box.db.execute(f"INSERT INTO {self.table}(collection_uuid,policy_sha256) VALUES(?,?)", self.key)
+                count = box.db.execute(f"SELECT count(*) FROM {self.table}").fetchone()[0]
+                if count >= DISPATCH_LIMIT:
+                    count -= reclaim_idle(box, self.table, self.journal.table, policy)
+                if count >= DISPATCH_LIMIT:
+                    raise DispatchCapacity(self.table, count, DISPATCH_LIMIT)
+                box.db.execute(f"INSERT INTO {self.table}(collection_uuid,policy_sha256,revision) VALUES(?,?,?)",
+                               (*self.key, initial_revision()))
 
     def state(self):
         row = self.box.db.execute(f"SELECT * FROM {self.table} WHERE collection_uuid=? AND policy_sha256=?", self.key).fetchone()
@@ -82,12 +87,16 @@ class EnrichmentDispatcher:
         return bool(changed)
 
     def unavailable(self, state, error):
-        code = error.code if isinstance(error, Unavailable) else "invalid_enrichment_dispatch"
+        code = ("dispatch_capacity_exhausted" if isinstance(error, DispatchCapacity)
+                else "worker_capacity_exhausted" if isinstance(error, Capacity)
+                else error.code if isinstance(error, Unavailable) else "invalid_enrichment_dispatch")
         failures = state["failures"] + 1
         delay = min(86400, max(5 * 2 ** min(failures - 1, 6), error.retry_after if isinstance(error, Unavailable) else 0))
         if not self.save(state, failures=failures, available_at=self.box.clock() + delay, error_code=code):
             return {"state": "contended"}
-        return {"state": "unavailable", "error_code": code, "next_attempt_at": state["available_at"]}
+        return {"state": "unavailable", "error_code": code,
+                **(error.result() if isinstance(error, DispatchCapacity) else {}),
+                "next_attempt_at": state["available_at"]}
 
     def _execute(self, state, job, configuration):
         result = self.execute_job(self.box, self.transport, configuration, job)
@@ -139,6 +148,8 @@ class EnrichmentDispatcher:
 
     def once(self):
         state = self.state()
+        if state is None:
+            return {"state": "contended"}
         if state["available_at"] > self.box.clock():
             return {"state": "backoff", "error_code": state["error_code"], "next_attempt_at": state["available_at"]}
         try:
@@ -174,7 +185,7 @@ class EnrichmentDispatcher:
                 # cause successive polls to fill the queue with fresh work.
                 return {"state": "waiting"}
             return self.admit_next(state, capabilities)
-        except (Unavailable, InvalidData) as error:
+        except (Unavailable, InvalidData, Capacity) as error:
             return self.unavailable(state, error)
 
     def admit_next(self, state, capabilities):

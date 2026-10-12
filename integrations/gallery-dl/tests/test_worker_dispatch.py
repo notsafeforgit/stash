@@ -9,6 +9,7 @@ import uuid
 
 from stash_ingest.client import Unavailable
 from stash_ingest.collection_dispatch import CollectionDispatcher
+from stash_ingest.dispatch_retention import DispatchCapacity
 from stash_ingest.encoding import InvalidData, encode
 from stash_ingest.enrichment_client import EnrichmentClient
 from stash_ingest.enrichment_dispatch import EnrichmentDispatcher
@@ -105,6 +106,17 @@ class WorkerDispatchTests(unittest.TestCase):
                 self.assertNotIn("fixture-private-access", encode(result).decode())
                 self.assertNotIn("/private/path", "\n".join(box.db.iterdump()))
 
+    def test_capacity_is_reported_as_capacity_and_other_profiles_still_run(self):
+        with (patch("stash_ingest.worker_dispatch.ProfileDispatcher", side_effect=DispatchCapacity('enrichment_dispatch', 10000)),
+              patch("stash_ingest.worker_dispatch.EnrichmentConfiguration"),
+              patch("stash_ingest.worker_dispatch.CollectionDispatcher") as metadata,
+              closing(self.open()) as box):
+            metadata.return_value.once.return_value = {"state": "completed"}
+            result = WorkerDispatcher(box, self.transport, self.profiles).once()
+            self.assertEqual(result['profile_id'], 'metadata')
+            self.assertEqual(result['profiles'], [{'profile_id': 'download', 'state': 'unavailable',
+                'error_code': 'dispatch_capacity_exhausted', 'resource': 'enrichment_dispatch', 'records': 10000, 'limit': 10000}])
+
     def test_saved_delivery_runs_without_loading_original_profile(self):
         with closing(self.open()) as box:
             value = dispatch_fixtures.EnrichmentDispatchTests.stage(self, box, policy="b" * 64)
@@ -196,6 +208,18 @@ class CollectionDispatchTests(unittest.TestCase):
             self.assertEqual(worker.once()["state"], "backoff")
             self.assertEqual(worker.state()["after_collection"], self.ids[1])
         self.selected.assert_not_called()
+
+    def test_capacity_failure_backs_off_with_accurate_details(self):
+        self.selected.side_effect = DispatchCapacity('enrichment_dispatch', 10000)
+        with closing(self.open()) as box:
+            worker = self.dispatcher(box, self.transport, self.profile)
+            result = worker.once()
+            self.assertEqual(result['error_code'], 'dispatch_capacity_exhausted')
+            self.assertEqual(result['resource'], 'enrichment_dispatch')
+            self.assertEqual(result['records'], result['limit'])
+            self.assertEqual(result['next_attempt_at'], 1005)
+        with closing(self.open()) as box:
+            self.assertEqual(self.dispatcher(box, self.transport, self.profile).once()['state'], 'backoff')
 
     def test_competing_cursor_cannot_execute_an_outdated_selection(self):
         with closing(self.open()) as box, closing(self.open()) as peer:

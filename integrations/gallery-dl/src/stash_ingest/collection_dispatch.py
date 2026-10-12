@@ -1,6 +1,7 @@
 """Round-robin metadata discovery across the producer's permitted collections."""
 
 from .client import Unavailable
+from .dispatch_retention import DISPATCH_LIMIT, DispatchCapacity, initial_revision
 from .encoding import InvalidData, identifier
 from .enrichment_client import EnrichmentClient
 from .enrichment_dispatch import EnrichmentDispatcher, PAGE_SIZE
@@ -45,9 +46,11 @@ class CollectionDispatcher:
             raise InvalidData("Collection discovery requires a reviewed policy")
         with box.transaction():
             if self.state() is None:
-                if box.db.execute(f"SELECT count(*) FROM {self.table}").fetchone()[0] >= 10000:
-                    raise Capacity("Collection discovery capacity exhausted")
-                box.db.execute(f"INSERT INTO {self.table}(policy_sha256) VALUES(?)", (self.policy,))
+                count = box.db.execute(f"SELECT count(*) FROM {self.table}").fetchone()[0]
+                if count >= DISPATCH_LIMIT:
+                    raise DispatchCapacity(self.table, count, DISPATCH_LIMIT)
+                box.db.execute(f"INSERT INTO {self.table}(policy_sha256,revision) VALUES(?,?)",
+                               (self.policy, initial_revision()))
 
     def state(self):
         row = self.box.db.execute(f"SELECT * FROM {self.table} WHERE policy_sha256=?", (self.policy,)).fetchone()
@@ -65,6 +68,8 @@ class CollectionDispatcher:
 
     def once(self):
         state = self.state()
+        if state is None:
+            return {"state": "contended"}
         if state["after_collection"]:
             identifier(state["after_collection"])
         if state["available_at"] > self.box.clock():
@@ -95,10 +100,14 @@ class CollectionDispatcher:
                              available_at=0 if waiting and not self.pause_after_traversal else self.box.clock() + 30):
                 return {"state": "contended"}
             return {"state": "waiting" if waiting else "idle"}
-        except (Unavailable, InvalidData) as error:
+        except (Unavailable, InvalidData, Capacity) as error:
             failures = state["failures"] + 1
             delay = min(86400, max(5 * 2 ** min(failures - 1, 6), error.retry_after if isinstance(error, Unavailable) else 0))
-            code = error.code if isinstance(error, Unavailable) else "invalid_collection_dispatch"
+            code = ("dispatch_capacity_exhausted" if isinstance(error, DispatchCapacity)
+                    else "worker_capacity_exhausted" if isinstance(error, Capacity)
+                    else error.code if isinstance(error, Unavailable) else "invalid_collection_dispatch")
             if not self.save(state, failures=failures, available_at=self.box.clock() + delay, error_code=code):
                 return {"state": "contended"}
-            return {"state": "unavailable", "error_code": code, "next_attempt_at": state["available_at"]}
+            return {"state": "unavailable", "error_code": code,
+                    **(error.result() if isinstance(error, DispatchCapacity) else {}),
+                    "next_attempt_at": state["available_at"]}

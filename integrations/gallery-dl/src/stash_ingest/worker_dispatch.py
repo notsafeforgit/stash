@@ -21,6 +21,7 @@ from .enrichment_configuration import EnrichmentConfiguration
 from .enrichment_journal import EnrichmentJournal
 from .enrichment_worker import execute as deliver_enrichment
 from .outbox import Capacity, Conflict
+from .dispatch_retention import DispatchCapacity
 from .run_queue import RunQueue, submit_once
 from .source_calls import SourceCalls, resolve_once
 
@@ -118,7 +119,11 @@ class WorkerDispatcher:
                     result = DiscoveryCollectionDispatcher(self.box, self.transport, DiscoveryConfiguration(entry["profile"])).once()
                 else:
                     result = DiscoveryDetailCollectionDispatcher(self.box, self.transport, DiscoveryDetailConfiguration(entry["profile"])).once()
-            except (OSError, InvalidData, Capacity, Unavailable):
+            except DispatchCapacity as error:
+                result = error.result()
+            except Capacity:
+                result = {"state": "unavailable", "error_code": "worker_capacity_exhausted"}
+            except (OSError, InvalidData, Unavailable):
                 # An unavailable local profile cannot hold every other source.
                 # Do not return paths, access values or raw exception strings.
                 result = {"state": "unavailable", "error_code": "worker_profile_unavailable"}

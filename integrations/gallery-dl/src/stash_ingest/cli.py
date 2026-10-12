@@ -115,6 +115,9 @@ def main(argv=None):
     enrichment_deliver.add_argument("job_uuid")
     enrichment_status = commands.add_parser("enrichment-status", help="Inspect local enrichment delivery and retained evidence")
     enrichment_status.add_argument("--job")
+    retire = commands.add_parser("retire-enrichment-progress", help="Retire obsolete policy cursors; preserve unfinished jobs")
+    retire.add_argument("--retired-policy", action="append", required=True, help="Reviewed policy no worker uses anymore; repeat per policy")
+    retire.add_argument("--apply", action="store_true", help="Delete the previewed cursors; stop affected dispatchers first")
     enrichment_dispatch = commands.add_parser("dispatch-enrichment", help="Recover saved metadata and optionally admit/execute source work")
     enrichment_dispatch.add_argument("--collection", required=True)
     enrichment_dispatch.add_argument("--profile", help="Enable new lookups using this reviewed profile; otherwise only deliver saved results")
@@ -153,6 +156,10 @@ def main(argv=None):
     box = None
     try:
         box = Outbox(args.outbox, args.endpoint, args.producer)
+        if args.command == "retire-enrichment-progress":
+            from .dispatch_retention import retire_enrichment_policies
+            print(json.dumps(retire_enrichment_policies(box, args.retired_policy, apply=args.apply), sort_keys=True))
+            return 0
         client = Client(args.endpoint, args.producer, token_env=args.token_env)
         requests = RunQueue(box)
         from .source_calls import SourceCalls, resolve_once

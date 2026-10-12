@@ -461,6 +461,22 @@ A producer/helper code upgrade still requires the existing explicit policy
 upgrade procedure; changing config does not authorize replacing executable code
 for an already admitted run.
 
+When retiring enrichment policies after a worker upgrade, stop their dispatchers
+and preview `stash-ingest --outbox FILE --endpoint STASH_ORIGIN --producer UUID
+retire-enrichment-progress --retired-policy SHA256` (repeat `--retired-policy` for
+each reviewed, no-longer-configured policy). Add `--apply` to remove those progress
+cursors. Include all workers sharing the outbox in the review. Policies with
+active or review jobs are protected; jobs, saved metadata, queued deliveries and
+server records are never removed. This is a local operation with no website or
+Stash API requests. Repeat after retained jobs finish if protected cursors remain.
+
+At the 10,000-cursor limit, metadata dispatch also reclaims up to 1,000 expired,
+empty cursors from other policies. Partial pages, backoff, the selected policy
+and collections with unfinished local jobs remain protected. Recreated cursors
+reject stale updates from an earlier dispatcher. If reclamation cannot free a
+slot, the worker reports `dispatch_capacity_exhausted` with the table, count and
+limit, and backs off; this does not mean posts or media were discarded.
+
 Keep the producer outbox, profiles, shared files and override files in backups.
 The worker inventory resolves their dependencies, including those still needed
 by saved configurations. When upgrading an existing deployment, register its

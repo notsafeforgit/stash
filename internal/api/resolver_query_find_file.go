@@ -47,7 +47,7 @@ func (r *queryResolver) FindFile(ctx context.Context, id *string, path *string) 
 
 func (r *queryResolver) FindFiles(
 	ctx context.Context,
-	fileFilter *models.FileFilterType,
+	fileFilterAst *models.FilterAST,
 	filter *models.FindFilterType,
 	ids []string,
 ) (ret *FindFilesResultType, err error) {
@@ -89,7 +89,7 @@ func (r *queryResolver) FindFiles(
 					FindFilter: filter,
 					Count:      fields.Has("count"),
 				},
-				FileFilter:    fileFilter,
+				FileFilterAST: fileFilterAst,
 				TotalDuration: fields.Has("duration"),
 				Megapixels:    fields.Has("megapixels"),
 				TotalSize:     fields.Has("size"),

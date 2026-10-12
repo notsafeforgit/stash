@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"encoding/json"
+	"github.com/stashapp/stash/pkg/filtermigration"
 	"os"
 	"path/filepath"
 	"testing"
@@ -156,7 +157,7 @@ func TestHistoricalDefaultFilterConversion(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, string(encoded), `"object_filter"`)
 	require.Len(t, conflicts, 1)
-	projection, valid := conflicts[0].Alternative.FlatObjectFilter()
+	projection, valid := filtermigration.FlatObjectFilter(conflicts[0].Alternative)
 	require.True(t, valid)
 	require.Equal(t, map[string]interface{}{"organized": true}, projection)
 
@@ -164,7 +165,7 @@ func TestHistoricalDefaultFilterConversion(t *testing.T) {
 	defaults, conflicts, err = importDefaultFilterConfig(flat)
 	require.NoError(t, err)
 	require.Empty(t, conflicts)
-	projection, valid = defaults["scenes"].FilterAST.FlatObjectFilter()
+	projection, valid = filtermigration.FlatObjectFilter(defaults["scenes"].FilterAST)
 	require.True(t, valid)
 	require.Equal(t, map[string]interface{}{"organized": true}, projection)
 	defaults, conflicts, err = importDefaultFilterConfig(`{"defaultFilters":{"scenes":null},"forkDefaultFilterState":{"scenes":{"filter_ast":{}}}}`)

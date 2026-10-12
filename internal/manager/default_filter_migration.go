@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/stashapp/stash/pkg/filtermigration"
 	"maps"
 	"reflect"
 	"sort"
@@ -151,7 +152,7 @@ func importDefaultFilterConfig(source string) (map[string]*models.SavedFilter, [
 			return nil, nil, fmt.Errorf("default filter %q: object_filter must be an object", view)
 		}
 		if canonical == nil {
-			canonical, err = models.FilterASTFromLegacySavedFilter(legacy)
+			canonical, err = filtermigration.FilterASTFromLegacySavedFilter(legacy)
 			if err != nil {
 				return nil, nil, fmt.Errorf("importing default filter %q: %w", view, err)
 			}
@@ -159,8 +160,8 @@ func importDefaultFilterConfig(source string) (map[string]*models.SavedFilter, [
 		pending, hasPending := state["pending_legacy_object_filter"]
 		shadow, hasShadow := stringMap(state["legacy_object_filter"])
 		if hasShadow && !sameLegacyCriteria(legacy, shadow) {
-			imported, importErr := models.FilterASTFromLegacySavedFilter(legacy)
-			if canonical == nil || (canonical.IsFlatRepresentable() && importErr == nil) {
+			imported, importErr := filtermigration.FilterASTFromLegacySavedFilter(legacy)
+			if canonical == nil || (filtermigration.IsFlatRepresentable(canonical) && importErr == nil) {
 				canonical, hasPending = imported, false
 			} else {
 				pending, hasPending = legacy, true
@@ -184,7 +185,7 @@ func importDefaultFilterConfig(source string) (map[string]*models.SavedFilter, [
 			if !valid && pending != nil {
 				c.ImportError = "imported criteria must be an object"
 			} else {
-				c.Alternative, err = models.FilterASTFromLegacySavedFilter(alternative)
+				c.Alternative, err = filtermigration.FilterASTFromLegacySavedFilter(alternative)
 				if err != nil {
 					c.ImportError = err.Error()
 					c.Alternative = nil

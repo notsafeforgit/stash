@@ -104,7 +104,7 @@ INSERT INTO files(id,parent_folder_id,basename,size,mod_time,created_at,updated_
 	fileID := libraryTestUUID(t, repo, models.ArchiveFile, 902)
 	result = call(`query($id:ID!){ findFile(id:$id){ id parent_folder_id parent_folder { id } } }`, map[string]any{"id": fileID})
 	require.JSONEq(t, `{"data":{"findFile":{"id":"`+fileID+`","parent_folder_id":"`+folderID+`","parent_folder":{"id":"`+folderID+`"}}}}`, result)
-	result = call(`query($input:FileFilterType!){findFiles(file_filter:$input){count files{id}}}`, map[string]any{"input": map[string]any{"parent_folder": map[string]any{"value": []string{folderID}, "modifier": "INCLUDES"}}})
+	result = call(`query($input:FilterASTInput!){findFiles(file_filter_ast:$input){count files{id}}}`, map[string]any{"input": map[string]any{"root": map[string]any{"condition": map[string]any{"field": "parent_folder", "value": map[string]any{"value": []string{folderID}, "modifier": "INCLUDES"}}}}})
 	require.NotContains(t, result, `"errors"`, result)
 	require.Contains(t, result, fileID)
 	marker := call(`mutation($scene:ID!,$tag:ID!){sceneMarkerCreate(input:{scene_id:$scene,primary_tag_id:$tag,title:"Marker",seconds:1}){id scene{id} primary_tag{id}}}`, map[string]any{"scene": public[models.ArchiveScene], "tag": public[models.ArchiveTag]})

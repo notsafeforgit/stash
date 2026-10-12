@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/stashapp/stash/pkg/filtermigration"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/stashapp/stash/pkg/logger"
@@ -148,7 +149,7 @@ func migrateSavedFilterSidecar(ctx context.Context, db *sqlx.DB) error {
 			if err := json.Unmarshal([]byte(encodedAST), &ast); err != nil {
 				return fmt.Errorf("decoding saved-filter %d AST: %w", id, err)
 			}
-			flat, _ := ast.FlatObjectFilter()
+			flat, _ := filtermigration.FlatObjectFilter(&ast)
 			encodedFlat, err := json.Marshal(flat)
 			if err != nil {
 				return fmt.Errorf("encoding saved-filter %d compatibility filter: %w", id, err)
@@ -324,7 +325,7 @@ LEFT JOIN fork_saved_filter_state ON fork_saved_filter_state.saved_filter_id = s
 			if err := json.Unmarshal([]byte(state.filterAST.String), &existing); err != nil {
 				return fmt.Errorf("decoding saved-filter %d sidecar AST: %w", state.id, err)
 			}
-			if !existing.IsFlatRepresentable() {
+			if !filtermigration.IsFlatRepresentable(&existing) {
 				if !state.pending.Valid || state.pending.String != state.objectFilter {
 					if _, err := db.ExecContext(ctx, "UPDATE fork_saved_filter_state SET pending_legacy_object_filter = ? WHERE saved_filter_id = ?", state.objectFilter, state.id); err != nil {
 						return fmt.Errorf("preserving upstream saved-filter %d edit: %w", state.id, err)
@@ -341,7 +342,7 @@ LEFT JOIN fork_saved_filter_state ON fork_saved_filter_state.saved_filter_id = s
 			if err := json.Unmarshal([]byte(state.objectFilter), &legacy); err != nil {
 				logger.Warnf("saved filter %d: upstream compatibility filter is invalid JSON: %v", state.id, err)
 			} else {
-				ast, err := models.FilterASTFromLegacySavedFilter(legacy)
+				ast, err := filtermigration.FilterASTFromLegacySavedFilter(legacy)
 				if err != nil {
 					logger.Warnf("saved filter %d: cannot import upstream compatibility filter: %v", state.id, err)
 				} else if ast != nil {

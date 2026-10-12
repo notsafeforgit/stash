@@ -62,6 +62,13 @@ export class StudioTagsCriterion extends TagsCriterion {
     });
   }
 
+  public override toCriterionInputValue() {
+    return {
+      ...this.toCriterionInput(),
+      hierarchy_mode: this.value.hierarchyMode ?? defaultStudioTagHierarchyMode,
+    };
+  }
+
   public override cloneValues() {
     super.cloneValues();
     this.value.hierarchyMode ??= defaultStudioTagHierarchyMode;
@@ -87,58 +94,6 @@ export class StudioTagsCriterion extends TagsCriterion {
     super.setFromSavedCriterion(criterion);
     this.value.hierarchyMode =
       criterion.value?.hierarchyMode ?? defaultStudioTagHierarchyMode;
-  }
-
-  public override applyToCriterionInput(input: Record<string, unknown>) {
-    const criterionInput = this.toCriterionInput();
-    const hierarchyMode =
-      this.value.hierarchyMode ?? defaultStudioTagHierarchyMode;
-
-    if (
-      hierarchyMode === defaultStudioTagHierarchyMode ||
-      this.modifier === CriterionModifier.IsNull ||
-      this.modifier === CriterionModifier.NotNull
-    ) {
-      input.studios_filter = {
-        ...(input.studios_filter as Record<string, unknown> | undefined),
-        tags: criterionInput,
-      };
-      return;
-    }
-
-    const hasExcludes = (criterionInput.excludes?.length ?? 0) > 0;
-    const hasIncludes = (criterionInput.value?.length ?? 0) > 0;
-    const operatorKey = hasExcludes && !hasIncludes ? "AND" : "OR";
-
-    if (hierarchyMode === "ancestors") {
-      input.studios_filter = {
-        tags: criterionInput,
-        [operatorKey]: {
-          ancestor_tags: criterionInput,
-        },
-      };
-      return;
-    }
-
-    if (hierarchyMode === "descendants") {
-      input.studios_filter = {
-        tags: criterionInput,
-        [operatorKey]: {
-          descendant_tags: criterionInput,
-        },
-      };
-      return;
-    }
-
-    input.studios_filter = {
-      tags: criterionInput,
-      [operatorKey]: {
-        ancestor_tags: criterionInput,
-        [operatorKey]: {
-          descendant_tags: criterionInput,
-        },
-      },
-    };
   }
 }
 

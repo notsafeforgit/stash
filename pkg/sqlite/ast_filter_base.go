@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -170,12 +171,14 @@ func compileASTCondition(ctx context.Context, condition *models.FilterASTConditi
 func decodeASTValue[T any](value interface{}) (T, error) {
 	var ret T
 
-	bytes, err := json.Marshal(value)
+	encoded, err := json.Marshal(value)
 	if err != nil {
 		return ret, err
 	}
 
-	if err := json.Unmarshal(bytes, &ret); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(encoded))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&ret); err != nil {
 		return ret, err
 	}
 

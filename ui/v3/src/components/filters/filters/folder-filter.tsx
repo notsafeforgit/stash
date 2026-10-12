@@ -3,6 +3,7 @@ import { useQuery } from "@apollo/client/react";
 import {
   CriterionModifier,
   FilterMode,
+  FilterGroupOperator,
   type FolderDataFragment,
   type MultiCriterionInput,
   FindFolderHierarchyForIDsDocument,
@@ -203,7 +204,10 @@ export function useFolderMap(props: {
   );
 
   const folderFilterForQuery = useMemo(
-    () => (zipFileFilter ? { zip_file: zipFileFilter } : undefined),
+    () =>
+      zipFileFilter
+        ? { root: { condition: { field: "zip_file", value: zipFileFilter } } }
+        : undefined,
     [zipFileFilter],
   );
 
@@ -213,7 +217,22 @@ export function useFolderMap(props: {
   >(FindRootFoldersForSelectDocument, {
     skip,
     variables: {
-      zip_file_filter: zipFileFilter,
+      folder_filter_ast: {
+        root: {
+          group: {
+            operator: FilterGroupOperator.And,
+            children: [
+              {
+                condition: {
+                  field: "parent_folder",
+                  value: { modifier: CriterionModifier.IsNull },
+                },
+              },
+              ...(folderFilterForQuery ? [folderFilterForQuery.root] : []),
+            ],
+          },
+        },
+      },
     },
   });
 
@@ -224,7 +243,7 @@ export function useFolderMap(props: {
     skip: !query,
     variables: {
       filter: { q: query, per_page: 200 },
-      folder_filter: folderFilterForQuery,
+      folder_filter_ast: folderFilterForQuery,
     },
   });
 

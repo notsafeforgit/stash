@@ -17,7 +17,7 @@ export interface IPlaySceneOptions {
 
 export class SceneQueue {
   public query?: ListFilterModel;
-  public sceneIDs?: number[];
+  public sceneIDs?: string[];
   private originalQueryPage?: number;
   private originalQueryPageSize?: number;
 
@@ -36,7 +36,7 @@ export class SceneQueue {
 
   public static fromSceneIDList(sceneIDs: string[]) {
     const ret = new SceneQueue();
-    ret.sceneIDs = sceneIDs.map((v) => Number(v));
+    ret.sceneIDs = [...sceneIDs];
     return ret;
   }
 
@@ -55,8 +55,8 @@ export class SceneQueue {
       if (queryParams.q) {
         ret.push(`qfq=${queryParams.q}`);
       }
-      for (const c of queryParams.c ?? []) {
-        ret.push(`qfc=${c}`);
+      if (queryParams.fa) {
+        ret.push(`qfa=${queryParams.fa}`);
       }
 
       let qfp = queryParams.p ?? "1";
@@ -86,6 +86,11 @@ export class SceneQueue {
 
   public static fromQueryParameters(params: URLSearchParams) {
     const ret = new SceneQueue();
+    if (params.has("qfc")) {
+      throw new Error(
+        "Flat playback filters are no longer supported. Start playback from a v3 filtered list.",
+      );
+    }
 
     if (params.has("qfp")) {
       const translated = {
@@ -93,7 +98,7 @@ export class SceneQueue {
         sortdir: params.get("qsortd"),
         q: params.get("qfq"),
         p: params.get("qfp"),
-        c: params.getAll("qfc"),
+        fa: params.get("qfa"),
       };
       const decoded = ListFilterModel.decodeParams(translated);
       const query = new ListFilterModel(FilterMode.Scenes);
@@ -101,7 +106,7 @@ export class SceneQueue {
       ret.query = query;
     } else if (params.has("qs")) {
       // must be scene list
-      ret.sceneIDs = params.getAll("qs").map((v) => Number(v));
+      ret.sceneIDs = params.getAll("qs");
     }
 
     return ret;

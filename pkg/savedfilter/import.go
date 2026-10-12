@@ -29,15 +29,6 @@ func (i *Importer) PreImport(ctx context.Context) error {
 		UIOptions:  i.Input.UIOptions,
 	}
 
-	// older export files carry only the legacy criteria map
-	if i.savedFilter.FilterAST == nil && len(i.Input.ObjectFilter) > 0 {
-		ast, err := models.FilterASTFromLegacySavedFilter(i.Input.ObjectFilter)
-		if err != nil {
-			return fmt.Errorf("converting legacy object filter: %w", err)
-		}
-		i.savedFilter.FilterAST = ast
-	}
-
 	return nil
 }
 

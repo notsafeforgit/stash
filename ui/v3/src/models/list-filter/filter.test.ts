@@ -111,3 +111,80 @@ it("preserves nested alternatives and repeated fields in native saved filters", 
   expect(restored.makeFilterAst()).toBeUndefined();
   expect(restored.count()).toBe(0);
 });
+
+it("rejects retired flat URL and saved-filter formats", () => {
+  const filter = new ListFilterModel(FilterMode.Scenes);
+  expect(() =>
+    filter.configureFromQueryString("?c=%7B%22type%22%3A%22title%22%7D"),
+  ).toThrow(/Flat filter URLs/);
+  const legacy = { find_filter: null, object_filter: { title: "old" } };
+  expect(() => filter.configureFromSavedFilter(legacy)).toThrow(
+    /object_filter/,
+  );
+});
+
+it("serializes custom-field conditions in the AST URL without a flat side channel", () => {
+  const filter = new ListFilterModel(FilterMode.Scenes);
+  filter.configureFromSavedFilter({
+    filter_ast: {
+      root: {
+        condition: {
+          field: "custom_fields",
+          value: {
+            value: [{ field: "note", modifier: "EQUALS", value: "café" }],
+          },
+        },
+      },
+    },
+  });
+  const params = new URLSearchParams(filter.makeQueryParameters());
+  expect(params.has("c")).toBe(false);
+  expect(params.has("fa")).toBe(true);
+  const restored = titleFilter(
+    FilterMode.Scenes,
+    "replace this previous filter",
+  );
+  restored.configureFromQueryString(params.toString());
+  expect(restored.makeFilterAST()).toEqual(filter.makeFilterAST());
+  expect(restored.count()).toBe(1);
+});
+
+it("preserves studio-tag hierarchy and labelled UUID selections in ASTs", () => {
+  const filter = new ListFilterModel(FilterMode.Scenes);
+  const id = "00a0cf9d-4659-4e18-891e-2fc13ee26af0";
+  filter.configureFromSavedFilter({
+    filter_ast: {
+      root: {
+        condition: {
+          field: "studio_tags",
+          value: {
+            modifier: "INCLUDES",
+            value: {
+              items: [{ id, label: "Studio tag" }],
+              excluded: [],
+              depth: 2,
+              hierarchyMode: "ancestors",
+            },
+          },
+        },
+      },
+    },
+  });
+  expect(filter.makeFilterAST()).toEqual({
+    root: {
+      condition: {
+        field: "studio_tags",
+        value: {
+          value: [id],
+          excludes: [],
+          modifier: "INCLUDES",
+          depth: 2,
+          hierarchy_mode: "ancestors",
+        },
+      },
+    },
+  });
+  const restored = new ListFilterModel(FilterMode.Scenes);
+  restored.configureFromQueryString(filter.makeQueryParameters());
+  expect(restored.makeFilterAST()).toEqual(filter.makeFilterAST());
+});

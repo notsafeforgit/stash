@@ -24,7 +24,6 @@ import {
   type FilterASTGroupNode,
   cloneFilterASTNode,
   countFilterASTConditions,
-  createASTConditionFromCriterion,
   createConditionNode,
   createASTGroup,
   decodeFilterASTNode,
@@ -42,7 +41,6 @@ interface DecodedParams {
   sortdir?: string;
   q?: string;
   p?: number;
-  c?: string[];
   fa?: string;
 }
 
@@ -52,7 +50,6 @@ interface EncodedParams {
   sortdir?: string | null;
   q?: string | null;
   p?: string | null;
-  c?: string[];
   fa?: string | null;
 }
 
@@ -208,78 +205,13 @@ export class ListFilterModel {
     this.currentPage = params.p ?? 1;
 
     this.criteria = [];
-    if (params.c !== undefined) {
-      for (const jsonString of params.c) {
-        try {
-          const { type: criterionType, ...savedCriterion } =
-            JSON.parse(jsonString);
-
-          const criterion = this.makeCriterion(criterionType);
-          criterion.fromDecodedParams(savedCriterion);
-
-          this.criteria.push(criterion);
-        } catch (err) {
-          console.error("Failed to parse encoded criterion:", err);
-        }
-      }
-    }
-
+    this.filterAst = undefined;
     if (params.fa !== undefined) {
       // Invalid criteria must fail before a query or bulk action can run.
-      this.filterAst = decodeFilterASTNode(this.mode, decodeURLJSON(params.fa));
-    } else {
-      this.filterAst = undefined;
-    }
-
-    this.promoteLegacyCriteria();
-  }
-
-  // Pull AST-supported criteria out of `this.criteria` and into `this.filterAst`
-  // so v2.5-shaped URLs and saved filters end up in the AST without round-trip
-  // re-emitting the legacy criterion-by-criterion form. Anything the AST can't
-  // represent (custom_fields, hidden-only compatibility criteria) stays in
-  // `this.criteria` and keeps its dedicated saved-filter slot.
-  private promoteLegacyCriteria() {
-    if (this.criteria.length === 0) return;
-
-    const astable: Criterion[] = [];
-    const remainder: Criterion[] = [];
-    for (const c of this.criteria) {
-      if (astSupportsCriterionType(this.mode, c.criterionOption.type)) {
-        astable.push(c);
-      } else {
-        remainder.push(c);
-      }
-    }
-
-    if (astable.length > 0) {
-      const conditions = astable.map((c) =>
-        createASTConditionFromCriterion(this.mode, c),
+      this.splitNonBuilderConditions(
+        decodeFilterASTNode(this.mode, decodeURLJSON(params.fa)),
       );
-      if (
-        this.filterAst &&
-        this.filterAst.kind === "group" &&
-        this.filterAst.operator === FilterGroupOperator.And
-      ) {
-        this.filterAst = {
-          ...this.filterAst,
-          children: [...this.filterAst.children, ...conditions],
-        };
-      } else if (this.filterAst) {
-        this.filterAst = createASTGroup(this.mode, FilterGroupOperator.And, [
-          this.filterAst,
-          ...conditions,
-        ]);
-      } else {
-        this.filterAst = createASTGroup(
-          this.mode,
-          FilterGroupOperator.And,
-          conditions,
-        );
-      }
     }
-
-    this.criteria = remainder;
   }
 
   // Does not decode any URL-encoding, only type conversions
@@ -301,12 +233,6 @@ export class ListFilterModel {
     if (params.p) {
       ret.p = Number.parseInt(params.p, 10);
     }
-    if (params.c && params.c.length !== 0) {
-      ret.c = params.c.map((jsonString) =>
-        ListFilterModel.translateJSON(jsonString, true),
-      );
-    }
-
     if (params.fa) {
       ret.fa = params.fa;
     }
@@ -314,68 +240,19 @@ export class ListFilterModel {
     return ret;
   }
 
-  private static translateJSON(jsonString: string, decoding: boolean) {
-    let inString = false;
-    let escaped = false;
-    return [...jsonString]
-      .map((c) => {
-        if (escaped) {
-          // this character has been escaped, skip
-          escaped = false;
-          return c;
-        }
-
-        switch (c) {
-          case "\\":
-            // escape the next character if in a string
-            if (inString) {
-              escaped = true;
-            }
-            break;
-          case '"':
-            // unescaped quote, toggle inString
-            inString = !inString;
-            break;
-          case "(":
-            // decode only: restore ( to { if not in a string
-            if (decoding && !inString) {
-              return "{";
-            }
-            break;
-          case ")":
-            // decode only: restore ) to } if not in a string
-            if (decoding && !inString) {
-              return "}";
-            }
-            break;
-          case "{":
-            // encode only: replace { with ( if not in a string
-            if (!decoding && !inString) {
-              return "(";
-            }
-            break;
-          case "}":
-            // encode only: replace } with ) if not in a string
-            if (!decoding && !inString) {
-              return ")";
-            }
-            break;
-        }
-
-        return c;
-      })
-      .join("");
-  }
-
   public configureFromQueryString(queryString: string) {
     const query = new URLSearchParams(queryString);
+    if (query.has("c")) {
+      throw new Error(
+        "Flat filter URLs are no longer supported. Rebuild this filter using the v3 filter builder.",
+      );
+    }
     const params = {
       perPage: query.get("perPage"),
       sortby: query.get("sortby"),
       sortdir: query.get("sortdir"),
       q: query.get("q"),
       p: query.get("p"),
-      c: query.getAll("c"),
       fa: query.get("fa"),
     };
     const decoded = ListFilterModel.decodeParams(params);
@@ -383,6 +260,11 @@ export class ListFilterModel {
   }
 
   public configureFromSavedFilter(savedFilter: SavedFilterLike) {
+    if ("object_filter" in savedFilter) {
+      throw new Error(
+        "Saved filters must use filter_ast; object_filter is no longer supported.",
+      );
+    }
     const { find_filter: findFilter } = savedFilter;
 
     this.itemsPerPage =
@@ -417,12 +299,10 @@ export class ListFilterModel {
       );
       this.splitNonBuilderConditions(decoded);
     }
-
-    this.promoteLegacyCriteria();
   }
 
   // Inverse of the fold in `makeFilterAst`: non-builder conditions
-  // (custom_fields, hidden compatibility criteria) at the root AND level
+  // (custom_fields, non-builder criteria) at the root AND level
   // move back into `this.criteria`; everything else stays in the AST.
   private splitNonBuilderConditions(root: FilterASTNode) {
     const isBuilderCondition = (node: FilterASTNode) =>
@@ -482,30 +362,9 @@ export class ListFilterModel {
 
   // Returns query parameters with necessary parts URL-encoded
   public getEncodedParams(): EncodedParams {
-    const encodedCriteria: string[] = this.criteria.map((criterion) => {
-      const queryParams = criterion.toQueryParams();
-      let str = ListFilterModel.translateJSON(
-        JSON.stringify(queryParams),
-        false,
-      );
-
-      // URL-encode other characters
-      str = encodeURI(str);
-
-      // only the reserved characters ?#&;=+ need to be URL-encoded
-      // as they have special meaning in query strings
-      str = str.replaceAll("?", encodeURIComponent("?"));
-      str = str.replaceAll("#", encodeURIComponent("#"));
-      str = str.replaceAll("&", encodeURIComponent("&"));
-      str = str.replaceAll(";", encodeURIComponent(";"));
-      str = str.replaceAll("=", encodeURIComponent("="));
-      str = str.replaceAll("+", encodeURIComponent("+"));
-
-      return str;
-    });
-
-    const encodedFilterAST = this.filterAst
-      ? encodeURLJSON(encodeFilterASTNode(this.filterAst))
+    const root = this.makeFilterASTNode(false);
+    const encodedFilterAST = root
+      ? encodeURLJSON(encodeFilterASTNode(root))
       : undefined;
 
     return {
@@ -527,7 +386,6 @@ export class ListFilterModel {
         this.currentPage !== DEFAULT_PARAMS.currentPage
           ? String(this.currentPage)
           : undefined,
-      c: encodedCriteria,
       fa: encodedFilterAST,
     };
   }
@@ -538,11 +396,6 @@ export class ListFilterModel {
 
     if (params.q) {
       query.push(`q=${params.q}`);
-    }
-    if (params.c) {
-      for (const c of params.c) {
-        query.push(`c=${c}`);
-      }
     }
     if (params.fa) {
       query.push(`fa=${params.fa}`);
@@ -583,20 +436,6 @@ export class ListFilterModel {
       sort: this.getSortBy(),
       direction: this.sortDirection,
     };
-  }
-
-  public makeFilter() {
-    // When any AST filter is active (user or locked), filter conditions are
-    // sent exclusively via makeFilterAST(); the legacy object filter is unused.
-    if (this.filterAst || this.lockedFilterAst) {
-      return {};
-    }
-
-    const output: Record<string, unknown> = {};
-    for (const c of this.criteria) {
-      c.applyToCriterionInput(output);
-    }
-    return output;
   }
 
   private makeFilterASTNode(includeLocked: boolean) {

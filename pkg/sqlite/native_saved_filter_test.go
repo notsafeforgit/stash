@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNativeSavedFilterExportAndHistoricalImport(t *testing.T) {
+func TestNativeSavedFilterExportAndASTImport(t *testing.T) {
 	config.InitializeEmpty()
 	t.Cleanup(func() { config.InitializeEmpty() })
 	db := sqlite.NewDatabase()
@@ -31,14 +31,11 @@ func TestNativeSavedFilterExportAndHistoricalImport(t *testing.T) {
 		{"condition":{"field":"title","value":{"modifier":"INCLUDES","value":"café"}}},
 		{"group":{"operator":"AND","children":[
 			{"condition":{"field":"title","value":{"modifier":"EXCLUDES","value":"other"}}},
-			{"condition":{"field":"performers","value":{"modifier":"INCLUDES","value":[{"id":"42","label":"Name at save time"}]}}}
+			{"condition":{"field":"performers","value":{"modifier":"INCLUDES","value":[{"id":"00a0cf9d-4659-4e18-891e-2fc13ee26af0","label":"Name at save time"}]}}}
 		]}}
 	]}}}`
 	for _, tt := range []struct{ name, criteria string }{
 		{"canonical", `"filter_ast":` + canonical},
-		{"legacy", `"object_filter":{"title":{"modifier":"INCLUDES","value":"café"},"performers":{"modifier":"INCLUDES","value":{"items":[{"id":"42","label":"Name at save time"}],"excluded":[{"id":"43","label":"Excluded name"}]}}}`},
-		{"transitional", `"object_filter":{"__filter_ast":{"k":0,"o":1,"c":[{"k":1,"f":"title","m":6,"v":"café"},{"k":1,"f":"title","m":8,"v":"other"}]}}`},
-		{"canonical_precedence", `"filter_ast":` + canonical + `,"object_filter":{"title":{"modifier":"INCLUDES","value":"outdated"}}`},
 		{"empty", `"filter_ast":null`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -68,7 +65,7 @@ func TestNativeSavedFilterExportAndHistoricalImport(t *testing.T) {
 				require.Nil(t, original.FilterAST)
 			} else {
 				require.NotNil(t, original.FilterAST)
-				if tt.name == "canonical" || tt.name == "canonical_precedence" {
+				if tt.name == "canonical" {
 					encoded, err := json.Marshal(original.FilterAST)
 					require.NoError(t, err)
 					require.JSONEq(t, canonical, string(encoded))
@@ -81,11 +78,7 @@ func TestNativeSavedFilterExportAndHistoricalImport(t *testing.T) {
 			var properties map[string]json.RawMessage
 			require.NoError(t, json.Unmarshal(encoded, &properties))
 			require.NotContains(t, properties, "object_filter")
-			if tt.name == "legacy" {
-				require.Contains(t, string(encoded), "Name at save time")
-				require.Contains(t, string(encoded), "Excluded name")
-				require.Contains(t, string(encoded), "EXCLUDES")
-			}
+
 			var restoredInput jsonschema.SavedFilter
 			require.NoError(t, json.Unmarshal(encoded, &restoredInput))
 			restored := importOne(restoredRepo, restoredInput)
@@ -94,8 +87,16 @@ func TestNativeSavedFilterExportAndHistoricalImport(t *testing.T) {
 		})
 	}
 
+	for _, raw := range []string{
+		`{"object_filter":{"title":{"value":"old","modifier":"INCLUDES"}}}`,
+		`{"object_filter":{"__filter_ast":{"k":1,"f":"title","v":"old"}}}`,
+		`{"object_filter":{},"filter_ast":null}`,
+	} {
+		var input jsonschema.SavedFilter
+		require.ErrorContains(t, json.Unmarshal([]byte(raw), &input), "unknown field")
+	}
+
 	for _, criteria := range []string{
-		`"object_filter":{"__filter_ast":{"k":99}}`,
 		`"filter_ast":{"root":{}}`,
 	} {
 		var input jsonschema.SavedFilter
@@ -113,7 +114,7 @@ func TestNativeSavedFilterExportAndHistoricalImport(t *testing.T) {
 	require.NoError(t, repo.WithReadTxn(ctx, func(ctx context.Context) error {
 		all, err := repo.SavedFilter.All(ctx)
 		require.NoError(t, err)
-		require.Len(t, all, 5, "rejected imports must not leave partial records")
+		require.Len(t, all, 2, "rejected imports must not leave partial records")
 		return nil
 	}))
 }

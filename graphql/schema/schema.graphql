@@ -16,7 +16,7 @@ type Query {
 
   "Queries for Files"
   findFiles(
-    file_filter: FileFilterType
+    file_filter_ast: FilterASTInput
     filter: FindFilterType
     ids: [ID!] @libraryID(kind: "file")
   ): FindFilesResultType! @libraryScope(kind: "file")
@@ -26,7 +26,7 @@ type Query {
 
   "Queries for Files"
   findFolders(
-    folder_filter: FolderFilterType
+    folder_filter_ast: FilterASTInput
     filter: FindFilterType
     ids: [ID!] @libraryID(kind: "folder")
   ): FindFoldersResultType! @libraryScope(kind: "folder")

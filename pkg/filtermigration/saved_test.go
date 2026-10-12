@@ -1,7 +1,8 @@
-package models
+package filtermigration
 
 import (
 	"encoding/json"
+	"github.com/stashapp/stash/pkg/models"
 	"reflect"
 	"testing"
 )
@@ -33,7 +34,7 @@ func TestDecodeCompactFilterAST(t *testing.T) {
 	}
 
 	root := ast.Root
-	if root.Group == nil || root.Group.Operator != FilterGroupOperatorAnd {
+	if root.Group == nil || root.Group.Operator != models.FilterGroupOperatorAnd {
 		t.Fatalf("expected AND root group, got %+v", root)
 	}
 	if len(root.Group.Children) != 2 {
@@ -53,7 +54,7 @@ func TestDecodeCompactFilterAST(t *testing.T) {
 	}
 
 	or := root.Group.Children[1].Group
-	if or == nil || or.Operator != FilterGroupOperatorOr {
+	if or == nil || or.Operator != models.FilterGroupOperatorOr {
 		t.Fatalf("expected OR subgroup, got %+v", root.Group.Children[1])
 	}
 	perf := or.Children[0].Condition
@@ -99,7 +100,7 @@ func TestFilterASTFromLegacySavedFilterFlat(t *testing.T) {
 		t.Fatalf("FilterASTFromLegacySavedFilter: %v", err)
 	}
 
-	flat, lossless := ast.FlatObjectFilter()
+	flat, lossless := FlatObjectFilter(ast)
 	if !lossless {
 		t.Error("expected lossless flatten")
 	}
@@ -122,7 +123,7 @@ func TestFilterASTFromLegacySavedFilterEmbeddedAST(t *testing.T) {
 		t.Fatalf("FilterASTFromLegacySavedFilter: %v", err)
 	}
 
-	flat, lossless := ast.FlatObjectFilter()
+	flat, lossless := FlatObjectFilter(ast)
 	if !lossless {
 		t.Error("expected lossless flatten")
 	}
@@ -155,7 +156,7 @@ func TestFilterASTFromLegacySavedFilterExcludedSplit(t *testing.T) {
 	}
 
 	root := ast.Root
-	if root.Group == nil || root.Group.Operator != FilterGroupOperatorAnd {
+	if root.Group == nil || root.Group.Operator != models.FilterGroupOperatorAnd {
 		t.Fatalf("expected AND root, got %+v", root)
 	}
 	if len(root.Group.Children) != 2 {
@@ -176,7 +177,7 @@ func TestFilterASTFromLegacySavedFilterExcludedSplit(t *testing.T) {
 	}
 
 	// duplicate `tags` fields means this is no longer flat-representable
-	if ast.IsFlatRepresentable() {
+	if IsFlatRepresentable(ast) {
 		t.Error("expected split result to be non-flat")
 	}
 }
@@ -230,7 +231,7 @@ func TestFilterASTFromLegacySavedFilterCustomFields(t *testing.T) {
 	}
 
 	// flattening unwraps back to the bare v2.5 shape
-	flat, lossless := ast.FlatObjectFilter()
+	flat, lossless := FlatObjectFilter(ast)
 	if !lossless {
 		t.Error("expected lossless flatten")
 	}
@@ -251,38 +252,38 @@ func TestFilterASTFromLegacySavedFilterEmpty(t *testing.T) {
 
 func TestFlatObjectFilterLossy(t *testing.T) {
 	// OR root flattens to nothing
-	orAST := &FilterAST{
-		Root: &FilterASTNode{
-			Group: &FilterASTGroup{
-				Operator: FilterGroupOperatorOr,
-				Children: []*FilterASTNode{
-					{Condition: &FilterASTCondition{Field: "a", Value: map[string]interface{}{"value": 1}}},
-					{Condition: &FilterASTCondition{Field: "b", Value: map[string]interface{}{"value": 2}}},
+	orAST := &models.FilterAST{
+		Root: &models.FilterASTNode{
+			Group: &models.FilterASTGroup{
+				Operator: models.FilterGroupOperatorOr,
+				Children: []*models.FilterASTNode{
+					{Condition: &models.FilterASTCondition{Field: "a", Value: map[string]interface{}{"value": 1}}},
+					{Condition: &models.FilterASTCondition{Field: "b", Value: map[string]interface{}{"value": 2}}},
 				},
 			},
 		},
 	}
-	flat, lossless := orAST.FlatObjectFilter()
+	flat, lossless := FlatObjectFilter(orAST)
 	if lossless || len(flat) != 0 {
 		t.Errorf("expected lossy empty flatten of OR root, got %v (lossless=%v)", flat, lossless)
 	}
-	if orAST.IsFlatRepresentable() {
+	if IsFlatRepresentable(orAST) {
 		t.Error("expected OR root to be non-flat")
 	}
 
 	// AND root with a nested group keeps the plain conditions only
-	nestedAST := &FilterAST{
-		Root: &FilterASTNode{
-			Group: &FilterASTGroup{
-				Operator: FilterGroupOperatorAnd,
-				Children: []*FilterASTNode{
-					{Condition: &FilterASTCondition{Field: "a", Value: map[string]interface{}{"value": 1}}},
+	nestedAST := &models.FilterAST{
+		Root: &models.FilterASTNode{
+			Group: &models.FilterASTGroup{
+				Operator: models.FilterGroupOperatorAnd,
+				Children: []*models.FilterASTNode{
+					{Condition: &models.FilterASTCondition{Field: "a", Value: map[string]interface{}{"value": 1}}},
 					{Group: orAST.Root.Group},
 				},
 			},
 		},
 	}
-	flat, lossless = nestedAST.FlatObjectFilter()
+	flat, lossless = FlatObjectFilter(nestedAST)
 	if lossless {
 		t.Error("expected lossy flatten with nested group")
 	}
@@ -291,15 +292,15 @@ func TestFlatObjectFilterLossy(t *testing.T) {
 	}
 
 	// nil AST flattens losslessly to nothing
-	var nilAST *FilterAST
-	flat, lossless = nilAST.FlatObjectFilter()
+	var nilAST *models.FilterAST
+	flat, lossless = FlatObjectFilter(nilAST)
 	if !lossless || flat != nil {
 		t.Errorf("expected nil/lossless for nil AST, got %v (lossless=%v)", flat, lossless)
 	}
 }
 
 func TestFlatObjectFilterOmitsV3AllNamesCriterion(t *testing.T) {
-	ast := &FilterAST{Root: &FilterASTNode{Condition: &FilterASTCondition{
+	ast := &models.FilterAST{Root: &models.FilterASTNode{Condition: &models.FilterASTCondition{
 		Field: "names",
 		Value: map[string]interface{}{
 			"value":    "Jane",
@@ -307,7 +308,7 @@ func TestFlatObjectFilterOmitsV3AllNamesCriterion(t *testing.T) {
 		},
 	}}}
 
-	flat, lossless := ast.FlatObjectFilter()
+	flat, lossless := FlatObjectFilter(ast)
 	if lossless {
 		t.Fatal("all-names criterion was incorrectly marked v2.5-compatible")
 	}
@@ -317,12 +318,12 @@ func TestFlatObjectFilterOmitsV3AllNamesCriterion(t *testing.T) {
 }
 
 func TestFlatObjectFilterPreservesForkCoverFrameCriterion(t *testing.T) {
-	condition := &FilterASTNode{Condition: &FilterASTCondition{Field: "cover_frame", Value: map[string]interface{}{
+	condition := &models.FilterASTNode{Condition: &models.FilterASTCondition{Field: "cover_frame", Value: map[string]interface{}{
 		"value": "SPECIFIC", "modifier": "EQUALS",
 	}}}
-	for _, root := range []*FilterASTNode{condition, {Group: &FilterASTGroup{Operator: FilterGroupOperatorAnd, Children: []*FilterASTNode{condition}}}} {
-		ast := &FilterAST{Root: root}
-		flat, lossless := ast.FlatObjectFilter()
+	for _, root := range []*models.FilterASTNode{condition, {Group: &models.FilterASTGroup{Operator: models.FilterGroupOperatorAnd, Children: []*models.FilterASTNode{condition}}}} {
+		ast := &models.FilterAST{Root: root}
+		flat, lossless := FlatObjectFilter(ast)
 		if lossless || len(flat) != 0 {
 			t.Fatalf("cover frame must stay in the canonical fork AST, got %v (lossless=%v)", flat, lossless)
 		}

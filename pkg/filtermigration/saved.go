@@ -1,17 +1,20 @@
-package models
+// Package filtermigration reads historical filter representations only during
+// database and configuration upgrades. Application APIs use models.FilterAST.
+package filtermigration
 
 import (
 	"errors"
 	"fmt"
+	"github.com/stashapp/stash/pkg/models"
 	"slices"
 )
 
-// Historical saved-filter import and compact URL codecs for FilterAST:
+// Historical saved-filter import and compact URL codecs for models.FilterAST:
 //
 //   - decoding the v3 UI's compact AST encoding (used in URLs and, in the
 //     transitional format, under the __filter_ast key of a saved filter's
 //     object_filter map);
-//   - converting a legacy v2.5 saved-filter criteria map into a FilterAST;
+//   - converting a legacy v2.5 saved-filter criteria map into a models.FilterAST;
 //   - reconstructing historical flat criteria for migration reconciliation.
 //
 // Condition values throughout use the labeled saved-criterion shape
@@ -29,36 +32,36 @@ const (
 	compactKindCondition = 1
 )
 
-var compactOperators = []FilterGroupOperator{
-	FilterGroupOperatorAnd,
-	FilterGroupOperatorOr,
+var compactOperators = []models.FilterGroupOperator{
+	models.FilterGroupOperatorAnd,
+	models.FilterGroupOperatorOr,
 }
 
-var compactModifiers = []CriterionModifier{
-	CriterionModifierEquals,
-	CriterionModifierNotEquals,
-	CriterionModifierGreaterThan,
-	CriterionModifierLessThan,
-	CriterionModifierIsNull,
-	CriterionModifierNotNull,
-	CriterionModifierIncludes,
-	CriterionModifierIncludesAll,
-	CriterionModifierExcludes,
-	CriterionModifierMatchesRegex,
-	CriterionModifierNotMatchesRegex,
-	CriterionModifierBetween,
-	CriterionModifierNotBetween,
+var compactModifiers = []models.CriterionModifier{
+	models.CriterionModifierEquals,
+	models.CriterionModifierNotEquals,
+	models.CriterionModifierGreaterThan,
+	models.CriterionModifierLessThan,
+	models.CriterionModifierIsNull,
+	models.CriterionModifierNotNull,
+	models.CriterionModifierIncludes,
+	models.CriterionModifierIncludesAll,
+	models.CriterionModifierExcludes,
+	models.CriterionModifierMatchesRegex,
+	models.CriterionModifierNotMatchesRegex,
+	models.CriterionModifierBetween,
+	models.CriterionModifierNotBetween,
 }
 
 // DecodeCompactFilterAST decodes a compact-encoded AST node tree into a
-// FilterAST.
-func DecodeCompactFilterAST(raw interface{}) (*FilterAST, error) {
+// models.FilterAST.
+func DecodeCompactFilterAST(raw interface{}) (*models.FilterAST, error) {
 	root, err := decodeCompactNode(raw)
 	if err != nil {
 		return nil, err
 	}
 
-	ret := &FilterAST{Root: root}
+	ret := &models.FilterAST{Root: root}
 	if err := ret.Validate(); err != nil {
 		return nil, err
 	}
@@ -66,7 +69,7 @@ func DecodeCompactFilterAST(raw interface{}) (*FilterAST, error) {
 	return ret, nil
 }
 
-func decodeCompactNode(raw interface{}) (*FilterASTNode, error) {
+func decodeCompactNode(raw interface{}) (*models.FilterASTNode, error) {
 	m, ok := raw.(map[string]interface{})
 	if !ok {
 		return nil, errors.New("compact AST node must be an object")
@@ -92,7 +95,7 @@ func decodeCompactNode(raw interface{}) (*FilterASTNode, error) {
 			return nil, errors.New("compact AST group children must be an array")
 		}
 
-		children := make([]*FilterASTNode, 0, len(rawChildren))
+		children := make([]*models.FilterASTNode, 0, len(rawChildren))
 		for i, rawChild := range rawChildren {
 			child, err := decodeCompactNode(rawChild)
 			if err != nil {
@@ -101,8 +104,8 @@ func decodeCompactNode(raw interface{}) (*FilterASTNode, error) {
 			children = append(children, child)
 		}
 
-		return &FilterASTNode{
-			Group: &FilterASTGroup{
+		return &models.FilterASTNode{
+			Group: &models.FilterASTGroup{
 				Operator: compactOperators[opIdx],
 				Children: children,
 			},
@@ -132,8 +135,8 @@ func decodeCompactNode(raw interface{}) (*FilterASTNode, error) {
 			value["field"] = cf
 		}
 
-		return &FilterASTNode{
-			Condition: &FilterASTCondition{
+		return &models.FilterASTNode{
+			Condition: &models.FilterASTCondition{
 				Field: field,
 				Value: value,
 			},
@@ -158,18 +161,18 @@ func compactInt(raw interface{}) (int, error) {
 }
 
 // FilterASTFromLegacySavedFilter converts a v2.5-style saved-filter criteria
-// map into a FilterAST. It understands the transitional v3 form where a
+// map into a models.FilterAST. It understands the transitional v3 form where a
 // compact-encoded AST is embedded under the __filter_ast key alongside
 // legacy entries, and splits hierarchical/multi values carrying legacy
 // `excluded` entries into separate EXCLUDES conditions. Returns nil for a
 // map with no criteria.
-func FilterASTFromLegacySavedFilter(objectFilter map[string]interface{}) (*FilterAST, error) {
+func FilterASTFromLegacySavedFilter(objectFilter map[string]interface{}) (*models.FilterAST, error) {
 	if len(objectFilter) == 0 {
 		return nil, nil
 	}
 
-	var astRoot *FilterASTNode
-	var conditions []*FilterASTNode
+	var astRoot *models.FilterASTNode
+	var conditions []*models.FilterASTNode
 
 	keys := make([]string, 0, len(objectFilter))
 	for k := range objectFilter {
@@ -192,8 +195,8 @@ func FilterASTFromLegacySavedFilter(objectFilter map[string]interface{}) (*Filte
 			// modifier-less legacy entries (custom_fields stores a bare
 			// array) normalize into the {value} wrapper inside the AST;
 			// FlatObjectFilter unwraps them again
-			conditions = append(conditions, &FilterASTNode{
-				Condition: &FilterASTCondition{
+			conditions = append(conditions, &models.FilterASTNode{
+				Condition: &models.FilterASTCondition{
 					Field: key,
 					Value: map[string]interface{}{
 						"value": cloneASTValue(objectFilter[key]),
@@ -215,7 +218,7 @@ func FilterASTFromLegacySavedFilter(objectFilter map[string]interface{}) (*Filte
 		return nil, nil
 	}
 
-	ret := &FilterAST{Root: root}
+	ret := &models.FilterAST{Root: root}
 	ret, err := ret.Normalize()
 	if err != nil {
 		return nil, err
@@ -226,7 +229,7 @@ func FilterASTFromLegacySavedFilter(objectFilter map[string]interface{}) (*Filte
 
 // mergeIntoANDRoot combines an optional existing AST root with additional
 // condition nodes, AND-ing everything together.
-func mergeIntoANDRoot(root *FilterASTNode, conditions []*FilterASTNode) *FilterASTNode {
+func mergeIntoANDRoot(root *models.FilterASTNode, conditions []*models.FilterASTNode) *models.FilterASTNode {
 	if root == nil && len(conditions) == 0 {
 		return nil
 	}
@@ -235,9 +238,9 @@ func mergeIntoANDRoot(root *FilterASTNode, conditions []*FilterASTNode) *FilterA
 		if len(conditions) == 1 {
 			return conditions[0]
 		}
-		return &FilterASTNode{
-			Group: &FilterASTGroup{
-				Operator: FilterGroupOperatorAnd,
+		return &models.FilterASTNode{
+			Group: &models.FilterASTGroup{
+				Operator: models.FilterGroupOperatorAnd,
 				Children: conditions,
 			},
 		}
@@ -247,19 +250,19 @@ func mergeIntoANDRoot(root *FilterASTNode, conditions []*FilterASTNode) *FilterA
 		return root
 	}
 
-	if root.Group != nil && root.Group.Operator == FilterGroupOperatorAnd {
-		return &FilterASTNode{
-			Group: &FilterASTGroup{
-				Operator: FilterGroupOperatorAnd,
+	if root.Group != nil && root.Group.Operator == models.FilterGroupOperatorAnd {
+		return &models.FilterASTNode{
+			Group: &models.FilterASTGroup{
+				Operator: models.FilterGroupOperatorAnd,
 				Children: append(slices.Clone(root.Group.Children), conditions...),
 			},
 		}
 	}
 
-	return &FilterASTNode{
-		Group: &FilterASTGroup{
-			Operator: FilterGroupOperatorAnd,
-			Children: append([]*FilterASTNode{root}, conditions...),
+	return &models.FilterASTNode{
+		Group: &models.FilterASTGroup{
+			Operator: models.FilterGroupOperatorAnd,
+			Children: append([]*models.FilterASTNode{root}, conditions...),
 		},
 	}
 }
@@ -287,10 +290,10 @@ var hierarchicalOrMultiFields = map[string]struct{}{
 // splitLegacyExcluded converts one saved criterion entry ({value, modifier})
 // into condition nodes, splitting non-empty legacy `excluded` values into a
 // separate EXCLUDES condition so the v3 builder can edit them.
-func splitLegacyExcluded(field string, entry map[string]interface{}) []*FilterASTNode {
-	single := func() []*FilterASTNode {
-		return []*FilterASTNode{{
-			Condition: &FilterASTCondition{
+func splitLegacyExcluded(field string, entry map[string]interface{}) []*models.FilterASTNode {
+	single := func() []*models.FilterASTNode {
+		return []*models.FilterASTNode{{
+			Condition: &models.FilterASTCondition{
 				Field: field,
 				Value: cloneASTValue(entry),
 			},
@@ -331,27 +334,27 @@ func splitLegacyExcluded(field string, entry map[string]interface{}) []*FilterAS
 		return v
 	}
 
-	excludesNode := &FilterASTNode{
-		Condition: &FilterASTCondition{
+	excludesNode := &models.FilterASTNode{
+		Condition: &models.FilterASTCondition{
 			Field: field,
 			Value: map[string]interface{}{
-				"modifier": string(CriterionModifierExcludes),
+				"modifier": string(models.CriterionModifierExcludes),
 				"value":    buildValue(excluded),
 			},
 		},
 	}
 
 	if len(items) == 0 {
-		return []*FilterASTNode{excludesNode}
+		return []*models.FilterASTNode{excludesNode}
 	}
 
 	modifier, _ := entry["modifier"].(string)
 	if modifier == "" {
-		modifier = string(CriterionModifierIncludesAll)
+		modifier = string(models.CriterionModifierIncludesAll)
 	}
 
-	includesNode := &FilterASTNode{
-		Condition: &FilterASTCondition{
+	includesNode := &models.FilterASTNode{
+		Condition: &models.FilterASTCondition{
 			Field: field,
 			Value: map[string]interface{}{
 				"modifier": modifier,
@@ -360,13 +363,13 @@ func splitLegacyExcluded(field string, entry map[string]interface{}) []*FilterAS
 		},
 	}
 
-	return []*FilterASTNode{includesNode, excludesNode}
+	return []*models.FilterASTNode{includesNode, excludesNode}
 }
 
 // splitExcludedInAST applies the legacy `excluded` split to every condition
 // in the tree. A condition that splits into two nodes is replaced by an AND
 // group at its position; Normalize flattens it into a same-operator parent.
-func splitExcludedInAST(node *FilterASTNode) *FilterASTNode {
+func splitExcludedInAST(node *models.FilterASTNode) *models.FilterASTNode {
 	if node == nil {
 		return nil
 	}
@@ -381,9 +384,9 @@ func splitExcludedInAST(node *FilterASTNode) *FilterASTNode {
 		if len(split) == 1 {
 			return split[0]
 		}
-		return &FilterASTNode{
-			Group: &FilterASTGroup{
-				Operator: FilterGroupOperatorAnd,
+		return &models.FilterASTNode{
+			Group: &models.FilterASTGroup{
+				Operator: models.FilterGroupOperatorAnd,
 				Children: split,
 			},
 		}
@@ -393,13 +396,13 @@ func splitExcludedInAST(node *FilterASTNode) *FilterASTNode {
 		return node
 	}
 
-	children := make([]*FilterASTNode, 0, len(node.Group.Children))
+	children := make([]*models.FilterASTNode, 0, len(node.Group.Children))
 	for _, child := range node.Group.Children {
 		children = append(children, splitExcludedInAST(child))
 	}
 
-	return &FilterASTNode{
-		Group: &FilterASTGroup{
+	return &models.FilterASTNode{
+		Group: &models.FilterASTGroup{
 			Operator: node.Group.Operator,
 			Children: children,
 		},
@@ -411,7 +414,7 @@ func splitExcludedInAST(node *FilterASTNode) *FilterASTNode {
 // an implicit AND of at most one criterion per type: nested groups and
 // duplicate fields are dropped, and an OR root yields an empty map. The
 // second return value reports whether the result is lossless.
-func (a *FilterAST) FlatObjectFilter() (map[string]interface{}, bool) {
+func FlatObjectFilter(a *models.FilterAST) (map[string]interface{}, bool) {
 	if a == nil || a.Root == nil {
 		return nil, true
 	}
@@ -430,7 +433,7 @@ func (a *FilterAST) FlatObjectFilter() (map[string]interface{}, bool) {
 		return ret, true
 	}
 
-	if a.Root.Group.Operator != FilterGroupOperatorAnd {
+	if a.Root.Group.Operator != models.FilterGroupOperatorAnd {
 		// flattening an OR would change semantics; emit nothing
 		return ret, false
 	}
@@ -473,7 +476,36 @@ func flatConditionValue(value interface{}) interface{} {
 
 // IsFlatRepresentable reports whether the AST round-trips losslessly through
 // the flat v2.5 saved-filter shape.
-func (a *FilterAST) IsFlatRepresentable() bool {
-	_, lossless := a.FlatObjectFilter()
+func IsFlatRepresentable(a *models.FilterAST) bool {
+	_, lossless := FlatObjectFilter(a)
 	return lossless
+}
+
+func cloneASTMap(input map[string]interface{}) map[string]interface{} {
+	ret := make(map[string]interface{}, len(input))
+	for k, v := range input {
+		ret[k] = cloneASTValue(v)
+	}
+
+	return ret
+}
+
+func cloneASTSlice(input []interface{}) []interface{} {
+	ret := make([]interface{}, 0, len(input))
+	for _, value := range input {
+		ret = append(ret, cloneASTValue(value))
+	}
+
+	return ret
+}
+
+func cloneASTValue(value interface{}) interface{} {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		return cloneASTMap(typed)
+	case []interface{}:
+		return cloneASTSlice(typed)
+	default:
+		return typed
+	}
 }

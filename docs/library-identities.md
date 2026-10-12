@@ -59,3 +59,31 @@ Media files are not rewritten.
 Rehearse this upgrade on a database copy. Update the UI and external callers
 together, including installed `stash-gallery` source-management helpers. Once
 the new writer commits, do not run the previous binary against that database.
+
+## AST-only filters
+
+All library predicate APIs accept `FilterASTInput`. File and folder queries use
+`file_filter_ast` and `folder_filter_ast`, just like `scene_filter_ast` and the
+other library queries. `FindFilterType` still controls search text, sorting and
+pagination; it is not a second predicate format. Old `*_filter` arguments and
+entity `*FilterType` GraphQL inputs have been removed.
+
+A predicate is a `root` node containing either a `condition: {field, value}` or
+a `group: {operator: AND | OR, children}`. Repeated fields and nested alternatives
+stay in the tree. UUID references in condition values use the referenced entity's
+kind. Saved/default filters store that tree in `filter_ast`; labelled selections
+are part of this AST, not an old flat filter. Existing database/configuration
+upgrades convert historical selections once. New JSON imports reject
+`object_filter`, including files that mix it with `filter_ast`.
+
+List URLs use `fa` and playback URLs use `qfa`. Flat `c`/`qfc` links report an
+unsupported-format error; they are not silently treated as unfiltered lists.
+The UI writes no flat criteria alongside the AST.
+
+File conditions include `path`, `basename`, `dir`, `parent_folder`, `zip_file`,
+`hashes`, `duplicated`, `scene_count`, `image_count`, `gallery_count` and timestamps.
+Video properties use `video.<field>` (for example `video.duration` or
+`video.video_codec`); image properties use `image.<field>`. Folder conditions
+include `path`, `basename`, `parent_folder`, `zip_file`, `gallery_count` and
+timestamps. Related file `scenes`/`images`/`galleries` and folder `files`/`galleries`
+conditions take another `{root: ...}` AST in `value`, not a flat related filter.

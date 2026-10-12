@@ -35,9 +35,9 @@ func CriterionKind(scope, field string) string {
 		return "gallery"
 	case "scenes":
 		return "scene"
-	case "tags", "scene_tags", "performer_tags", "ancestor_tags", "descendant_tags":
+	case "tags", "scene_tags", "performer_tags", "studio_tags", "ancestor_tags", "descendant_tags":
 		return "tag"
-	case "parent_folder":
+	case "parent_folder", "folder":
 		return "folder"
 	case "zip_file":
 		return "file"
@@ -49,6 +49,15 @@ func CriterionKind(scope, field string) string {
 // MapCriterionIDs preserves user labels and operators while translating only
 // known library reference slots. Site/provider identifiers remain untouched.
 func MapCriterionIDs(scope, field string, value any, convert func(string, any) (any, error)) (any, error) {
+	// File/folder relationships carry another AST, never an object filter.
+	if (scope == "file" && (field == "scenes" || field == "images" || field == "galleries")) ||
+		(scope == "folder" && (field == "files" || field == "galleries")) {
+		ast, ok := value.(map[string]any)
+		if !ok {
+			return nil, errors.New("related filter must be an AST")
+		}
+		return MapFilterAST(ModeKind(field), ast, convert)
+	}
 	kind := CriterionKind(scope, field)
 	if kind == "" || value == nil {
 		return value, nil
@@ -88,6 +97,22 @@ func mapChoiceIDs(kind string, raw any, convert func(string, any) (any, error)) 
 		ret := make(map[string]any, len(value))
 		for k, v := range value {
 			ret[k] = v
+		}
+		// Saved UI criteria retain labelled choices and hierarchy depth. Query
+		// criteria flatten these into ID arrays; both represent the same IDs.
+		if _, labelled := value["items"]; labelled {
+			for _, key := range []string{"items", "excluded"} {
+				items, exists := value[key]
+				if !exists || items == nil {
+					continue
+				}
+				mapped, err := mapChoiceIDs(kind, items, convert)
+				if err != nil {
+					return nil, err
+				}
+				ret[key] = mapped
+			}
+			return ret, nil
 		}
 		key := "id"
 		if _, ok := value[key]; !ok {

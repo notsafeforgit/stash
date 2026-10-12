@@ -33,20 +33,10 @@ export class FolderCriterion extends IHierarchicalLabeledIdCriterion {
   constructor() {
     super(FolderCriterionOption);
   }
-
-  public applyToCriterionInput(input: Record<string, unknown>) {
-    input.files_filter = {
-      parent_folder: this.toCriterionInput(),
-    };
-  }
 }
 
 export class ParentFolderCriterion extends IHierarchicalLabeledIdCriterion {
   constructor() {
     super(ParentFolderCriterionOption);
-  }
-
-  public applyToCriterionInput(input: Record<string, unknown>) {
-    input.parent_folder = this.toCriterionInput();
   }
 }

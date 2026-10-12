@@ -974,7 +974,7 @@ func (qb *FileStore) Query(ctx context.Context, options models.FileQueryOptions)
 	fileFilter := options.FileFilter
 	findFilter := options.FindFilter
 
-	if fileFilter == nil {
+	if fileFilter == nil && options.FileFilterAST == nil {
 		fileFilter = &models.FileFilterType{}
 	}
 	if findFilter == nil {
@@ -992,12 +992,18 @@ func (qb *FileStore) Query(ctx context.Context, options models.FileQueryOptions)
 		query.parseQueryString(searchColumns, *q)
 	}
 
-	if err := qb.validateFilter(fileFilter); err != nil {
-		return nil, err
+	var filter *filterBuilder
+	if options.FileFilterAST != nil {
+		if fileFilter != nil {
+			return nil, fmt.Errorf("cannot combine AST and internal file predicates")
+		}
+		filter = filterBuilderFromHandler(ctx, &fileASTFilterHandler{ast: options.FileFilterAST})
+	} else {
+		if err := qb.validateFilter(fileFilter); err != nil {
+			return nil, err
+		}
+		filter = filterBuilderFromHandler(ctx, &fileFilterHandler{fileFilter: fileFilter})
 	}
-	filter := filterBuilderFromHandler(ctx, &fileFilterHandler{
-		fileFilter: fileFilter,
-	})
 
 	if err := query.addFilter(filter); err != nil {
 		return nil, err

@@ -12,10 +12,9 @@ func TestConfigureDefaultFilterPreservesOtherViewsAndSettings(t *testing.T) {
 	ctx := context.Background()
 	m := defaultFilterTestManager(t, "")
 	require.NoError(t, m.PromoteDefaultFilterConfig(ctx))
-	ast, err := models.FilterASTFromLegacySavedFilter(map[string]interface{}{"favorite": map[string]interface{}{"value": true}})
-	require.NoError(t, err)
+	ast := &models.FilterAST{Root: &models.FilterASTNode{Condition: &models.FilterASTCondition{Field: "favorite", Value: map[string]interface{}{"value": true}}}}
 	filter := &models.SavedFilter{Mode: models.FilterModeScenes, FilterAST: ast}
-	_, err = m.ConfigureDefaultFilter(ctx, "scenes", "SET", filter, nil)
+	_, err := m.ConfigureDefaultFilter(ctx, "scenes", "SET", filter, nil)
 	require.NoError(t, err)
 	ui, err := m.ConfigureDefaultFilter(ctx, "performer_scenes", "SET", filter, nil)
 	require.NoError(t, err)
@@ -73,9 +72,8 @@ func TestNativeDefaultFilterConflictResolutionChecksRevision(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, 2, filter.Revision)
 				if action == "USE_IMPORTED" {
-					projection, valid := filter.Filter.FilterAST.FlatObjectFilter()
-					require.True(t, valid)
-					require.Equal(t, map[string]interface{}{"organized": true}, projection)
+					require.Equal(t, "organized", filter.Filter.FilterAST.Root.Condition.Field)
+					require.Equal(t, map[string]interface{}{"value": true}, filter.Filter.FilterAST.Root.Condition.Value)
 				} else {
 					require.Equal(t, models.FilterGroupOperatorOr, filter.Filter.FilterAST.Root.Group.Operator)
 				}

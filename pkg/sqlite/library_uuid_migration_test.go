@@ -31,6 +31,9 @@ func TestLibraryUUIDMigrationPreservesKeysAndUserReferences(t *testing.T) {
  INSERT INTO scene_markers(id,title,seconds,scene_id,primary_tag_id,created_at,updated_at) VALUES(81,'Marker',1,31,51,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
  INSERT INTO galleries_chapters(id,title,image_index,gallery_id,created_at,updated_at) VALUES(91,'Chapter',0,61,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
  INSERT INTO saved_filters(id,mode,name,filter_ast) VALUES(101,'SCENES','Saved selection','{"root":{"condition":{"field":"performers","value":{"modifier":"INCLUDES","value":["71"],"excludes":["999999"]}}}}');
+ INSERT INTO saved_filters(id,mode,name,filter_ast) VALUES(102,'PERFORMERS','Labelled selection','{"root":{"condition":{"field":"tags","value":{"modifier":"INCLUDES","value":{"depth":"0","items":[{"id":"51","label":"Keep this label"}],"excluded":[{"id":"999999","label":"Deleted tag"}]}}}}}');
+ INSERT INTO saved_filters(id,mode,name,filter_ast) VALUES(103,'SCENES','Studio selection','{"root":{"condition":{"field":"studio_tags","value":{"modifier":"INCLUDES","value":{"items":[{"id":"51","label":"Studio tag"}],"excluded":[],"depth":0,"hierarchyMode":"ancestors"}}}}}');
+ INSERT INTO saved_filters(id,mode,name,filter_ast) VALUES(104,'SCENES','Folder selection','{"root":{"condition":{"field":"folder","value":{"modifier":"INCLUDES","value":{"items":[{"id":"1","label":"Folder"}],"excluded":[],"depth":0}}}}}');
  INSERT INTO default_filters(view,mode,filter_ast) SELECT 'scenes',mode,filter_ast FROM saved_filters WHERE id=101;
  DELETE FROM metadata_field_pending;
  INSERT INTO shares(id,token_hash,label,created_by,created_at,expires_at,snapshot) VALUES('share',X'01','Frozen','owner',1,2,'{"entries":[{"kind":"SCENE","id":31,"title":"Kept title","media_keys":["scene-31"],"extra":"kept"}],"media":[],"extra":9007199254740993}');
@@ -73,6 +76,18 @@ func TestLibraryUUIDMigrationPreservesKeysAndUserReferences(t *testing.T) {
 	require.Len(t, missing, 36)
 	require.NoError(t, raw.QueryRow(`SELECT json_extract(filter_ast,'$.root.condition.value.value[0]') FROM default_filters WHERE view='scenes'`).Scan(&defaultID))
 	require.Equal(t, performer.UUID, defaultID)
+	var labelledID, excludedID, label, depth string
+	require.NoError(t, raw.QueryRow(`SELECT json_extract(filter_ast,'$.root.condition.value.value.items[0].id'),json_extract(filter_ast,'$.root.condition.value.value.excluded[0].id'),json_extract(filter_ast,'$.root.condition.value.value.items[0].label'),json_extract(filter_ast,'$.root.condition.value.value.depth') FROM saved_filters WHERE id=102`).Scan(&labelledID, &excludedID, &label, &depth))
+	require.Equal(t, archiveFind(t, repo, models.ArchiveTag, 51).UUID, labelledID)
+	require.Len(t, excludedID, 36)
+	require.Equal(t, "Keep this label", label)
+	require.Equal(t, "0", depth)
+	var studioTagID, folderID string
+	require.NoError(t, raw.QueryRow(`SELECT json_extract(filter_ast,'$.root.condition.value.value.items[0].id') FROM saved_filters WHERE id=103`).Scan(&studioTagID))
+	require.Equal(t, archiveFind(t, repo, models.ArchiveTag, 51).UUID, studioTagID)
+	require.NoError(t, raw.QueryRow(`SELECT json_extract(filter_ast,'$.root.condition.value.value.items[0].id') FROM saved_filters WHERE id=104`).Scan(&folderID))
+	require.Equal(t, archiveFind(t, repo, models.ArchiveFolder, 1).UUID, folderID)
+
 	require.NoError(t, raw.QueryRow(`SELECT json_extract(snapshot,'$.entries[0].uuid'),json_extract(snapshot,'$.entries[0].media_keys[0]') FROM shares WHERE id='share'`).Scan(&shareID, &capability))
 	require.Equal(t, oldScene, shareID)
 	require.Equal(t, "scene-31", capability)

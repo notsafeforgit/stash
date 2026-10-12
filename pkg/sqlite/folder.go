@@ -550,7 +550,7 @@ func (qb *FolderStore) Query(ctx context.Context, options models.FolderQueryOpti
 	folderFilter := options.FolderFilter
 	findFilter := options.FindFilter
 
-	if folderFilter == nil {
+	if folderFilter == nil && options.FolderFilterAST == nil {
 		folderFilter = &models.FolderFilterType{}
 	}
 	if findFilter == nil {
@@ -566,13 +566,18 @@ func (qb *FolderStore) Query(ctx context.Context, options models.FolderQueryOpti
 		query.parseQueryString(searchColumns, *q)
 	}
 
-	if err := qb.validateFilter(folderFilter); err != nil {
-		return nil, err
+	var filter *filterBuilder
+	if options.FolderFilterAST != nil {
+		if folderFilter != nil {
+			return nil, fmt.Errorf("cannot combine AST and internal folder predicates")
+		}
+		filter = filterBuilderFromHandler(ctx, &folderASTFilterHandler{ast: options.FolderFilterAST})
+	} else {
+		if err := qb.validateFilter(folderFilter); err != nil {
+			return nil, err
+		}
+		filter = filterBuilderFromHandler(ctx, &folderFilterHandler{folderFilter: folderFilter})
 	}
-
-	filter := filterBuilderFromHandler(ctx, &folderFilterHandler{
-		folderFilter: folderFilter,
-	})
 
 	if err := query.addFilter(filter); err != nil {
 		return nil, err

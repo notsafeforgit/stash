@@ -1,10 +1,7 @@
-query FindRootFoldersForSelect($zip_file_filter: MultiCriterionInput) {
+query FindRootFoldersForSelect($folder_filter_ast: FilterASTInput!) {
   findFolders(
     filter: { per_page: -1, sort: "path", direction: ASC }
-    folder_filter: {
-      parent_folder: { modifier: IS_NULL }
-      zip_file: $zip_file_filter
-    }
+    folder_filter_ast: $folder_filter_ast
   ) {
     count
     folders {
@@ -15,10 +12,14 @@ query FindRootFoldersForSelect($zip_file_filter: MultiCriterionInput) {
 
 query FindFoldersForQuery(
   $filter: FindFilterType
-  $folder_filter: FolderFilterType
+  $folder_filter_ast: FilterASTInput
   $ids: [ID!]
 ) {
-  findFolders(filter: $filter, folder_filter: $folder_filter, ids: $ids) {
+  findFolders(
+    filter: $filter
+    folder_filter_ast: $folder_filter_ast
+    ids: $ids
+  ) {
     count
     folders {
       ...RecursiveFolderData

@@ -13,11 +13,8 @@ function valueToString(value: unknown[] | undefined | null) {
   return value.map((v) => v as string).join(", ");
 }
 
-// Legacy multi-condition custom_fields criterion. Kept as `hidden` so that
-// saved filters / URLs encoded against v2.5 (or early v3) decode without
-// error, but it's no longer offered in any picker — the v3 UI uses
-// SingleCustomFieldCriterion (one field per AST condition, combined via the
-// AST's standard AND/OR groups).
+// A compound custom-field AST condition is retained for saved selections with
+// multiple fields. New builder selections use one custom_field per condition.
 export const CustomFieldsCriterionOption = new CriterionOption({
   type: "custom_fields",
   messageID: "custom_fields.title",
@@ -25,13 +22,8 @@ export const CustomFieldsCriterionOption = new CriterionOption({
   hidden: true,
 });
 
-// Single-field custom_fields criterion. One AST condition holds exactly one
-// (field, modifier, value) triple. Server-side it serializes into the same
-// `custom_fields` filter slot as the legacy form (via serverField below) —
-// when multiple of these appear at the same AST level, the merger
-// (pkg/models/filter_ast.go:groupChildrenToObjectFilter) splits them into
-// `{custom_fields: [...], AND/OR: {custom_fields: [...]}}` so the server
-// applies each independently.
+// One field per AST condition; the server evaluates the custom_fields value
+// directly, while the enclosing AST supplies AND/OR composition.
 export const SingleCustomFieldCriterionOption = new CriterionOption({
   type: "custom_field",
   messageID: "custom_fields.title",
@@ -54,18 +46,9 @@ export class CustomFieldsCriterion extends Criterion {
     return this.value.length > 0;
   }
 
-  public applyToCriterionInput(input: Record<string, unknown>): void {
-    input.custom_fields = cloneDeep(this.value);
-  }
-
-  public applyToSavedCriterion(input: Record<string, unknown>): void {
-    input.custom_fields = cloneDeep(this.value);
-  }
-
   // AST → GraphQL serialization. The server's FilterAST condition shape is
   // `{field, value: Any}`; for a custom_fields condition the value is the
-  // full array of CustomFieldCriterionInput, which the server unwraps into
-  // `custom_fields` on the underlying object filter.
+  // full array of CustomFieldCriterionInput evaluated by this one condition.
   public toCriterionInputValue(): unknown {
     return cloneDeep(this.value);
   }
@@ -177,18 +160,6 @@ export class SingleCustomFieldCriterion extends Criterion {
       return true;
     }
     return this.value.length > 0;
-  }
-
-  public applyToCriterionInput(input: Record<string, unknown>): void {
-    const entry = this.toCustomFieldInput();
-    const existing = input.custom_fields as
-      | CustomFieldCriterionInput[]
-      | undefined;
-    input.custom_fields = existing ? [...existing, entry] : [entry];
-  }
-
-  public applyToSavedCriterion(input: Record<string, unknown>): void {
-    this.applyToCriterionInput(input);
   }
 
   // AST → GraphQL: serialize to a single-element array under custom_fields

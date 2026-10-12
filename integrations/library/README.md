@@ -18,10 +18,10 @@ application access, rather than a source producer's ingestion token.
 python3 integrations/library/tag_stash_collections.py gallery 1387 "example" --dry-run
 
 # Inspect path matches for one performer, including their aliases.
-python3 integrations/library/stash_autotag_with_aliases.py --performer-id 871 --dry-run
+python3 integrations/library/stash_autotag_with_aliases.py --performer-id 40497b95-1304-469c-8d29-79649e655a77 --dry-run
 
 # Review filename titles for one performer's images, keeping existing titles.
-python3 integrations/library/update_image_titles_stash_performer.py --performer-id 871 --only-empty --dry-run
+python3 integrations/library/update_image_titles_stash_performer.py --performer-id 40497b95-1304-469c-8d29-79649e655a77 --only-empty --dry-run
 
 # Queue the ordinary scanner explicitly, including ZIP-gallery support.
 python3 integrations/library/stash_scan_and_generate.py /media/porn/new-album.zip

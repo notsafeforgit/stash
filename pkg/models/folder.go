@@ -8,7 +8,8 @@ import (
 
 type FolderQueryOptions struct {
 	QueryOptions
-	FolderFilter *FolderFilterType
+	FolderFilter    *FolderFilterType
+	FolderFilterAST *FilterAST
 
 	TotalDuration bool
 	Megapixels    bool

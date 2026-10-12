@@ -26,8 +26,8 @@ export type FilterASTConditionNode = {
 
 // ── Compact encoded shape ─────────────────────────────────────────────────
 //
-// Used both in URLs (`fa=` is base64 of this JSON) and saved filters
-// (`__filter_ast` key).
+// Used in URLs (`fa=` is base64 of this JSON). Saved filters use the
+// canonical tree below.
 //
 //   Group:     { k: 0, o: <op-int>, c: [child, ...] }
 //   Condition: { k: 1, f: <field>, m: <mod-int>, v?: <value> }
@@ -273,7 +273,9 @@ export function decodeFilterASTNode(
 
   const compact = input as CompactASTNode;
   if (compact.k === COMPACT_CONDITION) {
-    const option = astCriterionOptions(mode).find((o) => o.type === compact.f);
+    const option = getFilterOptions(mode).criterionOptions.find(
+      (o) => o.type === compact.f,
+    );
     if (!option) {
       throw new Error(
         `unsupported AST criterion type ${compact.f} for mode ${mode}`,

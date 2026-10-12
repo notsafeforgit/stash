@@ -2330,9 +2330,12 @@ stash-n8n-sources --action add --platform reddit --identity Example \
   --workflow WORKFLOW_ID --execution 123 --node NODE_UUID --item 0
 stash-n8n-sources --action remove --platform twitter --identity 123456789 \
   --workflow WORKFLOW_ID --execution 124 --node NODE_UUID --item 0
-stash-n8n-sources --action remove-performer --platform reddit --identity 42 \
+stash-n8n-sources --action remove-performer --platform reddit --identity 40497b95-1304-469c-8d29-79649e655a77 \
   --workflow WORKFLOW_ID --execution 125 --node NODE_UUID --item 0
 ```
+
+`remove-performer` takes the Stash performer's UUID, available in its page URL
+or GraphQL `id`. Site account handles and IDs keep their service-specific format.
 
 The stable workflow/execution/node/item tuple identifies one operation. Changed
 arguments conflict with its saved request. Registration initializes metadata

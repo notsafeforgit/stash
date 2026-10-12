@@ -8,7 +8,8 @@ import (
 
 type FileQueryOptions struct {
 	QueryOptions
-	FileFilter *FileFilterType
+	FileFilter    *FileFilterType
+	FileFilterAST *FilterAST
 
 	TotalDuration bool
 	Megapixels    bool

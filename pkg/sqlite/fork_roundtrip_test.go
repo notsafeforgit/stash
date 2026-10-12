@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/stashapp/stash/pkg/filtermigration"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,7 +31,7 @@ func TestNativeImportPreservesLegacySavedFilterConflicts(t *testing.T) {
 	for name, ast := range map[string]*models.FilterAST{"Flat": flat, "Complex": complexAST, "Removed": flat} {
 		encodedAST, err := json.Marshal(ast)
 		require.NoError(t, err)
-		projection, _ := ast.FlatObjectFilter()
+		projection, _ := filtermigration.FlatObjectFilter(ast)
 		encodedFlat, err := json.Marshal(projection)
 		require.NoError(t, err)
 		result, err := raw.Exec("INSERT INTO saved_filters(name, mode, object_filter) VALUES (?, 'SCENES', ?)", name, string(encodedFlat))
@@ -67,13 +68,13 @@ func TestNativeImportPreservesLegacySavedFilterConflicts(t *testing.T) {
 			for _, filter := range filters {
 				switch filter.Name {
 				case "Flat edited in v2.5":
-					projection, lossless := filter.FilterAST.FlatObjectFilter()
+					projection, lossless := filtermigration.FlatObjectFilter(filter.FilterAST)
 					require.True(t, lossless)
 					require.Equal(t, float64(90), projection["rating100"].(map[string]interface{})["value"])
 				case "Complex":
 					require.Equal(t, complexAST, filter.FilterAST)
 				case "Created in v2.5":
-					projection, lossless := filter.FilterAST.FlatObjectFilter()
+					projection, lossless := filtermigration.FlatObjectFilter(filter.FilterAST)
 					require.True(t, lossless)
 					require.Equal(t, map[string]interface{}{"organized": true}, projection)
 				default:

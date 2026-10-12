@@ -3,7 +3,6 @@ package models
 import (
 	"errors"
 	"fmt"
-	"slices"
 )
 
 const maxFilterASTDepth = 4
@@ -65,28 +64,6 @@ func (a *FilterAST) Normalize() (*FilterAST, error) {
 	}, nil
 }
 
-func (a *FilterAST) ToObjectFilter() (map[string]interface{}, error) {
-	if err := a.Validate(); err != nil {
-		return nil, err
-	}
-
-	return a.Root.ToObjectFilter()
-}
-
-func FilterASTFromObjectFilter(input map[string]interface{}) (*FilterAST, error) {
-	root, err := filterASTNodeFromObjectFilter(input)
-	if err != nil {
-		return nil, err
-	}
-
-	ret := &FilterAST{Root: root}
-	if err := ret.Validate(); err != nil {
-		return nil, err
-	}
-
-	return ret, nil
-}
-
 type FilterASTNode struct {
 	Group     *FilterASTGroup     `json:"group,omitempty"`
 	Condition *FilterASTCondition `json:"condition,omitempty"`
@@ -127,20 +104,6 @@ func (n *FilterASTNode) Normalize() *FilterASTNode {
 	return &FilterASTNode{
 		Group: n.Group.Normalize(),
 	}
-}
-
-func (n *FilterASTNode) ToObjectFilter() (map[string]interface{}, error) {
-	if err := n.Validate(); err != nil {
-		return nil, err
-	}
-
-	if n.Condition != nil {
-		return map[string]interface{}{
-			n.Condition.Field: cloneASTValue(n.Condition.Value),
-		}, nil
-	}
-
-	return n.Group.ToObjectFilter()
 }
 
 type FilterASTGroup struct {
@@ -204,14 +167,6 @@ func (g *FilterASTGroup) Normalize() *FilterASTGroup {
 	}
 }
 
-func (g *FilterASTGroup) ToObjectFilter() (map[string]interface{}, error) {
-	if err := g.Validate(); err != nil {
-		return nil, err
-	}
-
-	return groupChildrenToObjectFilter(g.Operator, g.Children)
-}
-
 type FilterASTCondition struct {
 	Field string      `json:"field"`
 	Value interface{} `json:"value"`
@@ -227,177 +182,6 @@ func (c *FilterASTCondition) Validate() error {
 	}
 
 	return nil
-}
-
-func groupChildrenToObjectFilter(operator FilterGroupOperator, children []*FilterASTNode) (map[string]interface{}, error) {
-	if len(children) == 0 {
-		return nil, errors.New("cannot compile group with no children")
-	}
-
-	current, err := children[len(children)-1].ToObjectFilter()
-	if err != nil {
-		return nil, err
-	}
-
-	for i := len(children) - 2; i >= 0; i-- {
-		left, err := children[i].ToObjectFilter()
-		if err != nil {
-			return nil, err
-		}
-
-		if canMergeObjectFilterNodes(left, current, operator) {
-			current = mergeObjectFilterNodes(left, current, operator)
-			continue
-		}
-
-		current = mergeObjectFilterNodes(left, map[string]interface{}{
-			string(operator): current,
-		}, operator)
-	}
-
-	return current, nil
-}
-
-func canMergeObjectFilterNodes(left map[string]interface{}, right map[string]interface{}, operator FilterGroupOperator) bool {
-	// OR never merges sibling conditions at the same level because that would
-	// change semantics from a branch to a leaf-level field union.
-	if operator == FilterGroupOperatorOr {
-		return false
-	}
-
-	return !mapsOverlap(left, right)
-}
-
-func mergeObjectFilterNodes(left map[string]interface{}, right map[string]interface{}, operator FilterGroupOperator) map[string]interface{} {
-	ret := cloneASTMap(left)
-	for k, v := range right {
-		if existing, ok := ret[k]; ok {
-			if k == string(operator) {
-				ret[k] = mergeOperatorValues(existing, v)
-				continue
-			}
-		}
-
-		ret[k] = cloneASTValue(v)
-	}
-
-	return ret
-}
-
-func mergeOperatorValues(existing interface{}, incoming interface{}) interface{} {
-	existingMap, existingOK := existing.(map[string]interface{})
-	incomingMap, incomingOK := incoming.(map[string]interface{})
-	if existingOK && incomingOK {
-		return mergeObjectFilterNodes(existingMap, incomingMap, FilterGroupOperatorAnd)
-	}
-
-	return cloneASTValue(incoming)
-}
-
-func mapsOverlap(left map[string]interface{}, right map[string]interface{}) bool {
-	for k := range left {
-		if _, ok := right[k]; ok {
-			return true
-		}
-	}
-
-	return false
-}
-
-func filterASTNodeFromObjectFilter(input map[string]interface{}) (*FilterASTNode, error) {
-	if len(input) == 0 {
-		return nil, errors.New("object filter cannot be empty")
-	}
-
-	leafMap := make(map[string]interface{})
-	var operatorKey string
-	var operatorValue interface{}
-	keys := make([]string, 0, len(input))
-	for k := range input {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-
-	for _, key := range keys {
-		value := input[key]
-		switch key {
-		case string(FilterGroupOperatorAnd), string(FilterGroupOperatorOr):
-			if operatorKey != "" {
-				return nil, errors.New("object filter cannot contain more than one boolean operator at the same level")
-			}
-			operatorKey = key
-			operatorValue = value
-		case "NOT":
-			return nil, errors.New("NOT filters are not yet supported by FilterAST")
-		default:
-			leafMap[key] = cloneASTValue(value)
-		}
-	}
-
-	leftNode, err := filterASTLeafNode(leafMap)
-	if err != nil {
-		return nil, err
-	}
-
-	if operatorKey == "" {
-		return leftNode, nil
-	}
-
-	subMap, ok := operatorValue.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("%s filter node must be an object", operatorKey)
-	}
-
-	rightNode, err := filterASTNodeFromObjectFilter(subMap)
-	if err != nil {
-		return nil, err
-	}
-
-	children := make([]*FilterASTNode, 0, 2)
-	if leftNode != nil {
-		children = append(children, leftNode)
-	}
-	children = append(children, rightNode)
-
-	return &FilterASTNode{
-		Group: &FilterASTGroup{
-			Operator: FilterGroupOperator(operatorKey),
-			Children: children,
-		},
-	}, nil
-}
-
-func filterASTLeafNode(input map[string]interface{}) (*FilterASTNode, error) {
-	if len(input) == 0 {
-		return nil, nil
-	}
-
-	keys := make([]string, 0, len(input))
-	for k := range input {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-
-	children := make([]*FilterASTNode, 0, len(keys))
-	for _, key := range keys {
-		children = append(children, &FilterASTNode{
-			Condition: &FilterASTCondition{
-				Field: key,
-				Value: cloneASTValue(input[key]),
-			},
-		})
-	}
-
-	if len(children) == 1 {
-		return children[0], nil
-	}
-
-	return &FilterASTNode{
-		Group: &FilterASTGroup{
-			Operator: FilterGroupOperatorAnd,
-			Children: children,
-		},
-	}, nil
 }
 
 func cloneASTMap(input map[string]interface{}) map[string]interface{} {

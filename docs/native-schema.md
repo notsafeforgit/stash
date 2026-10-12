@@ -114,8 +114,9 @@ legacy conflicts retain their exact input strings in `saved_filter_import_confli
 for review; the canonical AST stays selected. This evidence survives deletion of
 the saved filter. `native_migration_history` records each native conversion.
 
-Legacy filter files can still be converted at the import boundary while their
-remaining callers are retired. They do not create live projection/shadow data.
+Current saved-filter imports accept only `filter_ast`. Flat `object_filter`
+files are rejected. Historical conversion lives in `pkg/filtermigration` and
+is used only by one-time database/configuration upgrades.
 The source/provenance services and catalog import remain separate work; the
 implemented native migrations are described below.
 The full [transition plan](native-archive-transition-plan.md) remains the

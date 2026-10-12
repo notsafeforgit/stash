@@ -140,10 +140,7 @@ func TestBulkCustomFieldSummary(t *testing.T) {
 			if mode == models.FilterModeScenes || mode == models.FilterModeImages || mode == models.FilterModeGalleries {
 				field = "title"
 			}
-			ast, err := models.FilterASTFromObjectFilter(map[string]interface{}{
-				field: map[string]interface{}{"value": "target", "modifier": "INCLUDES"},
-			})
-			require.NoError(t, err)
+			ast := &models.FilterAST{Root: &models.FilterASTNode{Condition: &models.FilterASTCondition{Field: field, Value: map[string]interface{}{"value": "target", "modifier": "INCLUDES"}}}}
 			for _, tt := range []struct {
 				name  string
 				input map[string]interface{}

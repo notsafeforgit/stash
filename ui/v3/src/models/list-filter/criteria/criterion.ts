@@ -104,9 +104,6 @@ export abstract class Criterion {
   // i is the decoded parameter object
   public abstract fromDecodedParams(i: Record<string, unknown>): void;
 
-  public abstract applyToCriterionInput(input: Record<string, unknown>): void;
-
-  public abstract applyToSavedCriterion(input: Record<string, unknown>): void;
   public abstract setFromSavedCriterion(criterion: unknown): void;
 }
 
@@ -259,18 +256,8 @@ export abstract class ModifierCriterion<
     this.modifier = c.modifier;
   }
 
-  public applyToCriterionInput(input: Record<string, unknown>) {
-    input[this.criterionOption.type] = this.toCriterionInput();
-  }
-
   // TODO - saved criterion _should_ be criterion input
   // kicking this can down the road a little further
-  public applyToSavedCriterion(input: Record<string, unknown>): void {
-    input[this.criterionOption.type] = {
-      value: this.value,
-      modifier: this.modifier,
-    };
-  }
 
   protected toCriterionInput(): unknown {
     return {
@@ -1484,14 +1471,6 @@ export class UnsupportedCriterion extends StringCriterion {
         valueString,
       },
     );
-  }
-
-  public applyToCriterionInput(): void {
-    // do nothing
-  }
-
-  public applyToSavedCriterion(): void {
-    // do nothing
   }
 
   public setFromSavedCriterion(): void {

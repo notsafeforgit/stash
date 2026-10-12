@@ -42,7 +42,7 @@ func (r *queryResolver) FindFolder(ctx context.Context, id *string, path *string
 
 func (r *queryResolver) FindFolders(
 	ctx context.Context,
-	folderFilter *models.FolderFilterType,
+	folderFilterAst *models.FilterAST,
 	filter *models.FindFilterType,
 	ids []string,
 ) (ret *FindFoldersResultType, err error) {
@@ -74,7 +74,7 @@ func (r *queryResolver) FindFolders(
 					FindFilter: filter,
 					Count:      fields.Has("count"),
 				},
-				FolderFilter: folderFilter,
+				FolderFilterAST: folderFilterAst,
 			})
 			if err == nil {
 				folders, err = result.Resolve(ctx)

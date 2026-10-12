@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/stashapp/stash/pkg/filtermigration"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/stashapp/stash/pkg/models"
@@ -50,7 +51,7 @@ ORDER BY saved_filters.id`); err != nil {
 			if err := json.Unmarshal([]byte(row.Legacy), &legacy); err != nil {
 				return fmt.Errorf("saved filter %d has invalid legacy JSON: %w", row.ID, err)
 			}
-			ast, err = models.FilterASTFromLegacySavedFilter(legacy)
+			ast, err = filtermigration.FilterASTFromLegacySavedFilter(legacy)
 			if err != nil {
 				return fmt.Errorf("converting saved filter %d: %w", row.ID, err)
 			}

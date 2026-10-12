@@ -8,6 +8,50 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Continuous source retries and deleted media — deployed, 2026-10-12 UTC
+
+Schema 1000116 removes the eight-failure limit on download runs. Recoverable
+failures retain their window and progress and retry with exponential backoff
+from five minutes to 24 hours, honoring longer provider deadlines. Explicit
+configuration/authentication deferrals still require review. The migration
+rebuilds only the small source-run table; a rehearsal preserved all row values,
+indexes, triggers and foreign keys.
+
+The application release `0ff9cfb33fcef6e56b4e1f55f7a76ce4f9e7029a` passed
+[Actions publication](https://github.com/notsafeforgit/stash/actions/runs/38240153375)
+and runs as
+`ghcr.io/notsafeforgit/stash@sha256:44c8c39dd1770e5c7443726b4564b857d5b0d2848d9e13bd1abeebc6b6979f8b`.
+Migration finished and schema-aware health passed. There is no local-image fallback.
+
+The external host/n8n workers use `74e9da6e2e41a967ef41ed30e00728c8925a9171`.
+They recognize item-specific Redgifs 404/410 deletion responses, including the
+live API's nested `error.description`, retain an unsuccessful transfer record,
+continue the profile, and cache the result for 30 days. A cache hit does not
+extend that deadline or enter the successful-download archive. Ordinary 404s,
+access failures and transient errors remain distinct. Routine chronological
+checks stop after a fully archived, unpinned post, after checking every declared
+attachment; incomplete albums, deletions and checkpoint replay do not establish
+that boundary.
+
+All five reviewed download failures were requeued with their progress preserved.
+The stale reordered-search cursor received a replacement covering its original
+unfinished window, and the old run was cancelled only after durable admission.
+A formerly blocked live run advanced from 6 items/2 files to 138 items/32 files
+after a confirmed deletion was cached. At verification, four of the five were
+still queued and one was running; this does not claim all historical work finished.
+Exact installed host/n8n module identities and all 18 previously active timers
+passed verification. The application did not need another restart for the
+external parser correction.
+
+Backup tools at `8c33faca952ce10d46a25789f4ccc9de72ebec2d` now accept the current
+Stash-managed subscription configuration while retaining its local operation
+journal. The previous failed preflight never captured or uploaded data and was
+retired through the existing fenced abandonment protocol. The updated real
+inventory resolves 362 components; backup and dedupe schedules resumed. Producer
+tests (736), backup tests (321), and their Python CI suites passed. Restore tools
+also support the schema-18 deletion cache. Receipts are under
+`.local/deferred-scrapes-20261012/` and `.local/deleted-media-live-20261012/`.
+
 ## Stored caption cleanup — deployed, 2026-10-12 UTC
 
 Caption retention now includes an explicit storage cleanup, rather than only

@@ -17,18 +17,19 @@ import (
 func main() {
 	path := flag.String("database", "", "existing native Stash database (Stash must be stopped)")
 	apply := flag.Bool("apply", false, "share unchanged post content and discard redundant payloads in one transaction")
+	postText := flag.Bool("discard-caption-history", false, "replace obsolete caption copies with saved post content and remove unreferenced revisions")
 	flag.Parse()
 	if !*apply || *path == "" {
 		flag.Usage()
 		os.Exit(2)
 	}
-	if err := run(*path); err != nil {
+	if err := run(*path, *postText); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(path string) error {
+func run(path string, postText bool) error {
 	if _, err := os.Stat(path); err != nil {
 		return err
 	}
@@ -49,7 +50,11 @@ func run(path string) error {
 	defer db.Close()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-	result, err := db.CompactCaptureContent(ctx, func(phase string, n int) { fmt.Fprintf(os.Stderr, "%s: %d\n", phase, n) })
+	cleanup := db.CompactCaptureContent
+	if postText {
+		cleanup = db.CompactPostText
+	}
+	result, err := cleanup(ctx, func(phase string, n int) { fmt.Fprintf(os.Stderr, "%s: %d\n", phase, n) })
 	if err != nil {
 		return err
 	}

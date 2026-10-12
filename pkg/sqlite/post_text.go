@@ -65,7 +65,7 @@ func (s *SourceEvidenceStore) PostContent(ctx context.Context, post string) (*mo
 func (s *SourceEvidenceStore) preservePostText(ctx context.Context, input *models.SourceCaptureInput) error {
 	var id string
 	err := dbWrapper.Get(ctx, &id, `SELECT uuid FROM source_captures INDEXED BY source_captures_order
- WHERE post_uuid=? AND origin='gallery-dl' AND platform=?
+ WHERE post_uuid=? AND origin IN ('gallery-dl','gallery-dl-enrichment') AND platform=?
  ORDER BY coalesce(captured_at,recorded_at) DESC,uuid DESC LIMIT 1`, input.PostUUID, input.Platform)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil

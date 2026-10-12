@@ -3131,9 +3131,7 @@ not create additional captures. The UI reads `/posts/<post>/content` rather than
 presenting extraction snapshots as post versions; the former `capture-history`
 UI route is removed. The content projection fills missing fields from earlier
 records, so date-only evidence does not hide a saved caption or description.
-Existing internal snapshots referenced by attachments,
-translation choices and published import receipts are not rewritten. New
-attachment/profile evidence can still require a snapshot. Counts remain internal
+Attachment/profile evidence can still require a snapshot. Counts remain internal
 and include per-media observations; unknown historical observation times remain
 explicitly unknown.
 
@@ -3144,3 +3142,15 @@ unreferenced payloads. Existing capture IDs referenced by media, translations
 and saved field choices remain valid. Inputs bound to published enrichment or
 checkpoint proofs keep their original byte representation and are reported as
 protected; these internal proof workflows retain their existing policy.
+
+To discard obsolete captions already stored before that policy, run the same
+command with `--discard-caption-history`. It consolidates metadata copies into
+the saved post content and replaces old text in retained source bodies, then
+deletes superseded revisions and unreferenced payloads. Capture IDs, file and
+album evidence, profile references, observation times and explicit library edits
+stay attached. Original service text takes precedence over translated NFO display
+text; translation results remain separate. Publication dates still fill gaps.
+The operation runs in one transaction and is safe to repeat. It reports captures
+still bound to exact-byte import/context proofs or translation inputs, and HTML
+captions carrying different inline media, rather than invalidating their links.
+Those are retained for their active references, not to provide caption history.

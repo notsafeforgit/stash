@@ -68,3 +68,18 @@ func TestPostContentFillsFieldsFromEarlierRecords(t *testing.T) {
 		return nil
 	}))
 }
+
+func TestPostTextPreservesTextAlreadyObtainedByEnrichment(t *testing.T) {
+	_, repo := archiveTestDatabase(t)
+	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "p"}, "")
+	input := contentTestCapture(t, post.UUID, 0, "Saved source text")
+	input.Origin = "gallery-dl-enrichment"
+	recordSourceTestCapture(t, repo, input)
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		capture, err := repo.SourceEvidence.RecordContentCapture(ctx, contentTestCapture(t, post.UUID, 2, "Edited source text"))
+		require.NoError(t, err)
+		require.Equal(t, "Saved source text", *capture.Metadata.OriginalText)
+		require.NotContains(t, string(capture.Payload.Shared), "Edited source text")
+		return nil
+	}))
+}

@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/google/uuid"
-	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/txn"
 )
@@ -69,108 +67,69 @@ func (db *Database) CompactCaptureContent(ctx context.Context, progress func(str
 				if err := compactCaptureInput(&input); err != nil {
 					return err
 				}
-				metadata, revisionSig, err := canonicalCaptureInput(&input)
-				if err != nil {
-					return err
-				}
-				// Profile retention and references are independent of the post noise policy.
 				if !reflect.DeepEqual(input.Payload.Refs, capture.Payload.Refs) {
 					return fmt.Errorf("capture %s profile references changed", id)
 				}
-				bodyDigest, err := putSourcePayload(ctx, input.Payload.Shared)
-				if err != nil {
+				if err := replaceCaptureContent(ctx, capture, input, result); err != nil {
 					return err
 				}
-				patchDigest, err := putSourcePayload(ctx, input.Payload.Patch)
-				if err != nil {
-					return err
-				}
-				signature, err := captureSignature(input, revisionSig, patchDigest, input.Payload.Refs)
-				if err != nil {
-					return err
-				}
-				contentDigest, err := captureContentDigest(input, revisionSig)
-				if err != nil {
-					return err
-				}
-				if _, err := dbWrapper.Exec(ctx, `INSERT OR IGNORE INTO compact_old_revisions VALUES(?)`, capture.RevisionUUID); err != nil {
-					return err
-				}
-				for _, digest := range []string{sourceDigest(capture.Payload.Shared), sourceDigest(capture.Payload.Patch)} {
-					if _, err := dbWrapper.Exec(ctx, `INSERT OR IGNORE INTO compact_old_payloads VALUES(?)`, digest); err != nil {
-						return err
-					}
-				}
-				if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_post_revisions(uuid,post_uuid,signature,body_digest,metadata,structure_version) VALUES(?,?,?,?,?,?) ON CONFLICT(post_uuid,signature) DO NOTHING`, uuid.NewString(), capture.PostUUID, revisionSig, bodyDigest, metadata, archive.CaptureStructureVersion); err != nil {
-					return err
-				}
-				var revision string
-				if err := dbWrapper.Get(ctx, &revision, `SELECT uuid FROM source_post_revisions WHERE post_uuid=? AND signature=?`, capture.PostUUID, revisionSig); err != nil {
-					return err
-				}
-				if _, err := dbWrapper.Exec(ctx, `UPDATE source_captures SET revision_uuid=?,retention_policy=?,patch_digest=?,signature=? WHERE uuid=?`, revision, archive.PostContentRetentionVersion, patchDigest, signature, id); err != nil {
-					return err
-				}
-				if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_capture_content(capture_uuid,post_uuid,digest) VALUES(?,?,?)`, id, capture.PostUUID, contentDigest); err != nil {
-					return err
-				}
-				if _, err := dbWrapper.Exec(ctx, `INSERT OR IGNORE INTO compact_posts VALUES(?)`, capture.PostUUID); err != nil {
-					return err
-				}
-				result.Captures++
 			}
 			after = ids[len(ids)-1]
 			if progress != nil {
 				progress("captures", result.Captures)
 			}
 		}
-		r, err := dbWrapper.Exec(ctx, `UPDATE source_posts SET revision=revision+1 WHERE uuid IN (SELECT uuid FROM compact_posts)`)
-		if err != nil {
-			return err
-		}
-		n, err := r.RowsAffected()
-		if err != nil {
-			return err
-		}
-		result.Posts = int(n)
-		r, err = dbWrapper.Exec(ctx, `DELETE FROM source_post_revisions WHERE uuid IN (SELECT uuid FROM compact_old_revisions) AND NOT EXISTS(SELECT 1 FROM source_captures c WHERE c.revision_uuid=source_post_revisions.uuid)`)
-		if err != nil {
-			return err
-		}
-		n, err = r.RowsAffected()
-		if err != nil {
-			return err
-		}
-		result.RevisionsRemoved = int(n)
-		// Restrict collection to replaced bodies and patches. Profiles or other
-		// revisions that still refer to a blob keep it alive.
-		if _, err := dbWrapper.Exec(ctx, `DELETE FROM compact_old_payloads WHERE EXISTS(SELECT 1 FROM source_captures c WHERE c.patch_digest=compact_old_payloads.digest) OR EXISTS(SELECT 1 FROM source_post_revisions r WHERE r.body_digest=compact_old_payloads.digest) OR EXISTS(SELECT 1 FROM source_profile_bodies p WHERE p.payload_digest=compact_old_payloads.digest)`); err != nil {
-			return err
-		}
-		if err := dbWrapper.Get(ctx, &result.StoredBytesRemoved, `SELECT coalesce(sum(length(data)),0) FROM source_payloads WHERE digest IN (SELECT digest FROM compact_old_payloads)`); err != nil {
-			return err
-		}
-		r, err = dbWrapper.Exec(ctx, `DELETE FROM source_payloads WHERE digest IN (SELECT digest FROM compact_old_payloads)`)
-		if err != nil {
-			return err
-		}
-		n, err = r.RowsAffected()
-		if err != nil {
-			return err
-		}
-		result.PayloadsRemoved = int(n)
-		if _, err := dbWrapper.Exec(ctx, guard); err != nil {
-			return err
-		}
-		for _, table := range []string{"compact_protected", "compact_old_revisions", "compact_old_payloads", "compact_posts"} {
-			if _, err := dbWrapper.Exec(ctx, "DROP TABLE temp."+table); err != nil {
-				return err
-			}
-		}
-		return nil
+		return finishCaptureContentCleanup(ctx, guard, result)
 	})
 	if err != nil {
 		return nil, err
 	}
 	return result, nil
+}
+
+func finishCaptureContentCleanup(ctx context.Context, guard string, result *CaptureContentCleanupResult) error {
+	r, err := dbWrapper.Exec(ctx, `UPDATE source_posts SET revision=revision+1 WHERE uuid IN (SELECT uuid FROM compact_posts)`)
+	if err != nil {
+		return err
+	}
+	n, err := r.RowsAffected()
+	if err != nil {
+		return err
+	}
+	result.Posts = int(n)
+	r, err = dbWrapper.Exec(ctx, `DELETE FROM source_post_revisions WHERE uuid IN (SELECT uuid FROM compact_old_revisions) AND NOT EXISTS(SELECT 1 FROM source_captures c WHERE c.revision_uuid=source_post_revisions.uuid)`)
+	if err != nil {
+		return err
+	}
+	n, err = r.RowsAffected()
+	if err != nil {
+		return err
+	}
+	result.RevisionsRemoved = int(n)
+	// Restrict collection to replaced bodies and patches. Profiles or other
+	// revisions that still refer to a blob keep it alive.
+	if _, err := dbWrapper.Exec(ctx, `DELETE FROM compact_old_payloads WHERE EXISTS(SELECT 1 FROM source_captures c WHERE c.patch_digest=compact_old_payloads.digest) OR EXISTS(SELECT 1 FROM source_post_revisions r WHERE r.body_digest=compact_old_payloads.digest) OR EXISTS(SELECT 1 FROM source_profile_bodies p WHERE p.payload_digest=compact_old_payloads.digest)`); err != nil {
+		return err
+	}
+	if err := dbWrapper.Get(ctx, &result.StoredBytesRemoved, `SELECT coalesce(sum(length(data)),0) FROM source_payloads WHERE digest IN (SELECT digest FROM compact_old_payloads)`); err != nil {
+		return err
+	}
+	r, err = dbWrapper.Exec(ctx, `DELETE FROM source_payloads WHERE digest IN (SELECT digest FROM compact_old_payloads)`)
+	if err != nil {
+		return err
+	}
+	n, err = r.RowsAffected()
+	if err != nil {
+		return err
+	}
+	result.PayloadsRemoved = int(n)
+	if _, err := dbWrapper.Exec(ctx, guard); err != nil {
+		return err
+	}
+	for _, table := range []string{"compact_protected", "compact_old_revisions", "compact_old_payloads", "compact_posts"} {
+		if _, err := dbWrapper.Exec(ctx, "DROP TABLE temp."+table); err != nil {
+			return err
+		}
+	}
+	return nil
 }

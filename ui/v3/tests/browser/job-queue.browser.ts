@@ -98,7 +98,9 @@ test("resumes the actual task list and restores live progress after a missed com
     );
     window.dispatchEvent(new Event("focus"));
   });
-  await expect(page.getByText("No tasks are currently running.")).toBeVisible();
+  await expect(
+    page.getByText("No library tasks are currently running."),
+  ).toBeVisible();
   await expect.poll(() => connections).toBeGreaterThan(initialConnections);
   await expect.poll(() => streams.size).toBe(2);
 
@@ -115,5 +117,7 @@ test("resumes the actual task list and restores live progress after a missed com
   send(JobStatusUpdateType.Remove, { ...next, status: JobStatus.Finished });
   await expect(page.getByRole("button", { name: "Stop job" })).toBeDisabled();
   await page.clock.fastForward(10_100);
-  await expect(page.getByText("No tasks are currently running.")).toBeVisible();
+  await expect(
+    page.getByText("No library tasks are currently running."),
+  ).toBeVisible();
 });

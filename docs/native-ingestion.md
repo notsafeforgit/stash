@@ -2958,6 +2958,19 @@ arguments and work keys are omitted. History pages default to 25 rows, with a
 
 ## Archive activity
 
+Settings → Tasks includes a **Scrape runs** section when source tracking is
+enabled. It shows running, queued and deferred totals, links to current runs,
+and a link to the complete activity list, including finished runs. Host
+gallery-dl launchers and n8n submit to this durable source queue; the library
+task queue covers scans, generation and other in-process library tasks.
+
+The activity page opens **Scrape runs** by default. Use its source collection
+filter to follow one profile, or open a run for item/file progress, pending
+work and attempt errors. The Tasks summary and first page of scrape runs
+refresh every ten seconds while visible; older pages remain stable. Request
+budget statistics follow the run list. These read-only views do not start,
+cancel or retry scraping.
+
 `/archive-activity` in the desktop utility menu and mobile drawer shows native
 background jobs and scrape runs. These application-session GET routes under
 `/api/v3/archive` inspect existing work without claiming, recovering or retrying it:
@@ -2987,8 +3000,8 @@ mount. Existing domain review screens remain responsible for guarded changes.
 
 A successful scrape attempt can leave other windows pending; its run remains
 queued until its complete window set has finished. Source-run completion is
-separate from verified library media intake. Only the selected queued/running
-item polls; attempts load on expansion. Failed refreshes retain the last
+separate from verified library media intake. Selected queued/running details
+also poll; attempts load on expansion. Failed refreshes retain the last
 successful view with an error and Retry, while changed filters discard old data.
 
 ## Import history

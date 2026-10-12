@@ -30,6 +30,7 @@ import { PostEmpty } from "./posts/shared";
 import { ScrapeMetrics } from "./activity/scrape-metrics";
 import { ActivityFilters } from "./activity/filters";
 import { ActivityDetail } from "./activity/detail";
+import { useActivityPolling } from "./activity/use-activity-polling";
 import {
   ActivityError,
   ActivityState,
@@ -70,6 +71,13 @@ export function ArchiveActivity({
     [api, view, kind, state, collection, before],
   );
   const read = useActivityRead(key, load, refresh);
+  const reload = useCallback(() => setRefresh((n) => n + 1), []);
+  useActivityPolling(
+    view === "runs" && !item && before === 0,
+    read.busy,
+    read.error !== undefined,
+    reload,
+  );
   useListScrollRestoration(
     "archive-activity",
     scroller,
@@ -120,7 +128,6 @@ export function ArchiveActivity({
           />
         )}
         <div className={cn("flex flex-col gap-6", item && "hidden")}>
-          {view === "runs" && <ScrapeMetrics refresh={refresh} />}
           <ActivityFilters value={search} onChange={onChange} />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
@@ -241,6 +248,7 @@ export function ArchiveActivity({
               </ArchiveNextPage>
             </ArchivePagination>
           )}
+          {view === "runs" && <ScrapeMetrics refresh={refresh} />}
         </div>
       </div>
     </div>

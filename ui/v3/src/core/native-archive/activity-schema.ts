@@ -176,7 +176,7 @@ export const jobActivityDetailSchema = z.object({
 });
 export const activitySearchSchema = z
   .object({
-    view: z.enum(["jobs", "runs"]).default("jobs"),
+    view: z.enum(["jobs", "runs"]).default("runs"),
     kind: z.union([jobKindSchema, z.literal("")]).default(""),
     state: z
       .union([jobStateSchema, z.literal("deferred"), z.literal("")])

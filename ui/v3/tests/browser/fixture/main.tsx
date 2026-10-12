@@ -8,6 +8,7 @@ import { GalleryMediaFixture } from "./gallery-media";
 import { PerformerSourcesFixture } from "./performer-sources";
 import { SourcePostsFixture } from "./source-posts";
 import { ArchiveActivityFixture } from "./archive-activity";
+import { ScrapeTasksFixture } from "./scrape-tasks";
 import { ImportHistoryFixture } from "./import-history";
 import { importHistorySearchSchema } from "@/core/native-archive/import-history-api";
 import { activitySearchSchema } from "@/core/native-archive/activity-schema";
@@ -458,6 +459,11 @@ const router = createRouter({
       path: "/archive-activity",
       validateSearch: activitySearchSchema,
       component: ArchiveActivityFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/scrape-tasks",
+      component: ScrapeTasksFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

@@ -206,7 +206,7 @@ for (const desktop of [false, true]) {
   }, testInfo) => {
     if (desktop) await page.setViewportSize({ width: 1280, height: 900 });
     const remote = await archive(page);
-    await page.goto(`/archive-activity?item=${activityIds.job}`);
+    await page.goto(`/archive-activity?view=jobs&item=${activityIds.job}`);
     await expect(
       page.getByText("Example clip.mp4", { exact: true }),
     ).toBeVisible();
@@ -280,7 +280,7 @@ test("filters use readable labels and reset paging without leaking a previous re
   page,
 }) => {
   const remote = await archive(page, true);
-  await page.goto("/archive-activity");
+  await page.goto("/archive-activity?view=jobs");
   await expect(
     page.getByRole("button", { name: "Inspect activity", exact: true }),
   ).toHaveCount(25);
@@ -320,7 +320,7 @@ test("failed reads recover and a failed refresh preserves the last successful vi
 }) => {
   const remote = await archive(page);
   remote.control.failList = true;
-  await page.goto("/archive-activity");
+  await page.goto("/archive-activity?view=jobs");
   await expect(page.getByRole("alert")).toContainText(
     "Could not load activity",
   );
@@ -348,7 +348,7 @@ test("a mismatched detail cannot display another job and retry recovers", async 
 }) => {
   const remote = await archive(page);
   remote.control.malformed = true;
-  await page.goto(`/archive-activity?item=${activityIds.job}`);
+  await page.goto(`/archive-activity?view=jobs&item=${activityIds.job}`);
   await expect(page.getByRole("alert")).toContainText(
     "Could not load activity",
   );

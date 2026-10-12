@@ -190,7 +190,7 @@ export function JobTable() {
         <div className="px-4 py-6 text-center text-sm text-muted-foreground">
           {intl.formatMessage({
             id: "config.tasks.empty_queue",
-            defaultMessage: "No tasks are currently running.",
+            defaultMessage: "No library tasks are currently running.",
           })}
         </div>
       ) : (

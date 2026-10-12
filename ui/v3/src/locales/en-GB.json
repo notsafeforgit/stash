@@ -825,7 +825,7 @@
       "data_management": "Data management",
       "defaults_set": "Defaults have been set and will be used when clicking the {action} button on the Tasks page.",
       "dont_include_file_extension_as_part_of_the_title": "Don't include file extension as part of the title",
-      "empty_queue": "No tasks are currently running.",
+      "empty_queue": "No library tasks are currently running.",
       "export_to_json": "Exports the database content into JSON format in the metadata directory.",
       "generate": {
         "generating_from_paths": "Generating for scenes from the following paths",
@@ -879,7 +879,7 @@
       },
       "import_from_exported_json": "Import from exported JSON in the metadata directory. Wipes the existing database.",
       "incremental_import": "Incremental import from a supplied export zip file.",
-      "job_queue": "Task Queue",
+      "job_queue": "Library task queue",
       "maintenance": "Maintenance",
       "migrate_blobs": {
         "delete_old": "Delete old data",
@@ -4066,5 +4066,12 @@
     "failed_help": "Refresh to check the current setting before trying again.",
     "empty": "No configured scrape sources",
     "stop_performer": "Stop monitoring all linked accounts"
+  },
+  "scrape_tasks": {
+    "description": "Follow gallery-dl work submitted by scripts and scheduled scrapes. Open a run to see its progress and any errors.",
+    "count": "{state}: {count, number}",
+    "showing": "Showing {shown, number} of {total, number} running scrapes.",
+    "idle": "No scrape is currently running. Open all scrape runs for queued work and completed runs.",
+    "open": "View all scrape runs"
   }
 }

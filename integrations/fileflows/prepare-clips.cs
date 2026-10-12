@@ -22,6 +22,9 @@ try
     var root = json.RootElement;
     if (root.GetProperty("format").GetString() != "stash-clip-batch-v1")
         throw new System.Exception("Unsupported upload manifest.");
+    string order = root.TryGetProperty("order", out var orderValue) ? orderValue.GetString() : "recorded_at";
+    if (order != "recorded_at" && order != "input")
+        throw new System.Exception("Unsupported clip order; expected recorded_at or input.");
     string batch = root.GetProperty("batch_id").GetString();
     if (!System.Text.RegularExpressions.Regex.IsMatch(batch ?? "", @"^[A-Za-z0-9-]{16,80}$") ||
         dir.Name != "stash-upload-" + batch + ".part")
@@ -87,8 +90,11 @@ try
         (manifestInfo.Attributes & System.IO.FileAttributes.ReparsePoint) != 0)
         throw new System.Exception("Manifest changed while checking the clips.");
     snapshots.Add("stash-clips.json", System.Tuple.Create(manifestLength, manifestTicks));
-    clips.Sort((a,b) => { int c = a.Item2.CompareTo(b.Item2); return c != 0 ? c : a.Item3.CompareTo(b.Item3); });
-    string dateText = clips[0].Item2.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+    var earliest = clips[0].Item2;
+    foreach (var clip in clips) if (clip.Item2 < earliest) earliest = clip.Item2;
+    if (order == "recorded_at")
+        clips.Sort((a,b) => { int c = a.Item2.CompareTo(b.Item2); return c != 0 ? c : a.Item3.CompareTo(b.Item3); });
+    string dateText = earliest.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
     if (root.TryGetProperty("date", out var customDate) && !string.IsNullOrEmpty(customDate.GetString()))
     {
         dateText = customDate.GetString();
@@ -130,7 +136,7 @@ try
         Variables["sourceFile." + n + ".LastWriteUtcTicks"] = item.Value.Item2.ToString();
         n++;
     }
-    Logger.ILog("Complete phone upload verified. Scene date: " + dateText);
+    Logger.ILog("Complete phone upload verified. Clip order: " + order + ". Scene date: " + dateText);
     return 1;
 }
 catch (System.Text.Json.JsonException) { Logger.ILog("The manifest is still incomplete; retrying in five minutes."); return 2; }

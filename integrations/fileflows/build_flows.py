@@ -34,7 +34,7 @@ def build(entry, pipeline):
             if connection["InputNode"] == prepare["Uid"]:
                 connection["InputNode"] = gate_id
     native = copy.deepcopy(prepare)
-    native.update(Uid=native_id, Name="Verify phone upload and order clips by recording date", xPos=440, Outputs=2)
+    native.update(Uid=native_id, Name="Verify phone upload and apply chosen clip order", xPos=440, Outputs=2)
     native["Model"]["Code"] = (BASE / "prepare-clips.cs").read_text()
     native["Model"]["Outputs"] = 2
     native["OutputConnections"].append({"Input": 1, "Output": 2, "InputNode": retry_id})
@@ -105,7 +105,7 @@ bool workingMovedToStage = false;''')
 }
 Logger.ILog("Deleting only the exact unchanged source snapshot after validated publication.");''')
     publish["Code"] = code
-    entry["Description"] = entry.get("Description", "") + "\nPhone manifests join clips by recording date, oldest first, and publish native Stash metadata."
+    entry["Description"] = entry.get("Description", "") + "\nPhone manifests join clips by recording date or the order chosen in Shortcuts, and publish native Stash metadata."
     return entry, pipeline
 
 

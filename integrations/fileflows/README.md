@@ -6,9 +6,17 @@ native local-file API. It does not create source posts or retain NFO files.
 
 The shortcut reads each selected video's recording date before exporting it,
 assigns a unique clip name, and hashes the exported file. A JSON manifest carries
-the title, description, and ordered-input timestamps. FileFlows orders clips by
-recording time, oldest first; equal timestamps retain the selection order. The
-scene date defaults to the oldest clip's local calendar date. Set `date` in the
+the title, description, and clip timestamps. For multiple clips, the shortcut
+offers **Recording date (oldest first)** or **Choose clip order**. The latter
+shows clips with their recording date, filename and available preview; choose
+the first clip, then each next clip from those remaining. This happens before
+any upload files are created, so cancelling leaves Photos untouched.
+
+The manifest's `order` is `recorded_at` for chronological order or `input` to
+follow the `clips` array exactly. Older manifests without `order` retain
+chronological ordering; equal timestamps retain input order. Unknown modes fail
+without encoding or deleting clips. The scene date always defaults to the
+oldest clip's local calendar date, independently of playback order. Set `date` in the
 manifest to a different ISO calendar date when another uploader supplies it.
 
 Uploads use a unique `stash-upload-<batch_id>.part` folder. Stash's automatic

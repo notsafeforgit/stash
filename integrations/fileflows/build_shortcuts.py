@@ -32,6 +32,77 @@ def dictionary(items):
     return {"Value": {"WFDictionaryFieldValueItems": values}, "WFSerializationType": "WFDictionaryFieldValue"}
 
 
+def choose_clip_order(add):
+    """Pick original Photos in order, before exporting files or creating a batch."""
+    original = {"Type": "ExtensionInput"}
+    order = add("gettext", WFTextActionText="recorded_at")
+    add("setvariable", WFInput=token(order), WFVariableName="Clip Order")
+    count = add("count", Input=token(original))
+    multiple, custom = str(uuid4()).upper(), str(uuid4()).upper()
+
+    def condition(group, value, comparison, **params):
+        add("conditional", GroupingIdentifier=group, WFControlFlowMode=0,
+            WFInput={"Type": "Variable", "Variable": token(value)}, WFCondition=comparison, **params)
+
+    def otherwise(group):
+        add("conditional", GroupingIdentifier=group, WFControlFlowMode=1)
+
+    def end(group):
+        return add("conditional", GroupingIdentifier=group, WFControlFlowMode=2)
+
+    condition(multiple, count, 2, WFNumberValue=1)
+    options = add("list", WFItems=["Recording date (oldest first)", "Choose clip order"])
+    choice = add("choosefromlist", WFInput=token(options), WFChooseFromListActionPrompt="How should the clips be joined?",
+                 WFChooseFromListActionSelectMultiple=False)
+    condition(custom, choice, 4, WFConditionalActionString="Choose clip order")
+    order = add("gettext", WFTextActionText="input")
+    add("setvariable", WFInput=token(order), WFVariableName="Clip Order")
+    # Names are only for the picker. Resolve the selected index back to the
+    # original Photo so renaming/coercion cannot discard its recording date.
+    labels = str(uuid4()).upper()
+    add("repeat.each", WFInput=token(original), GroupingIdentifier=labels, WFControlFlowMode=0)
+    clip = variable("Repeat Item")
+    name = add("getitemname", WFInput=token(clip))
+    date = add("properties.images", WFInput=token(clip), WFContentItemPropertyName="Date Taken")
+    date = add("format.date", WFDate=token(date), WFDateFormatStyle="Medium", WFTimeFormatStyle="Short")
+    add("setitemname", WFInput=token(clip), WFName=text(variable("Repeat Index"), " - ", date, " - ", name),
+        WFDontIncludeFileExtension=False)
+    choices = add("repeat.each", GroupingIdentifier=labels, WFControlFlowMode=2)
+    add("setvariable", WFInput=token(choices), WFVariableName="Remaining Clips")
+    empty = add("nothing")
+    add("setvariable", WFInput=token(empty), WFVariableName="Ordered Clips")
+    ordering = str(uuid4()).upper()
+    add("repeat.each", WFInput=token(choices), GroupingIdentifier=ordering, WFControlFlowMode=0)
+    chosen = add("choosefromlist", WFInput=token(variable("Remaining Clips")),
+                 WFChooseFromListActionPrompt=text("Choose clip ", variable("Repeat Index"), " of ", count),
+                 WFChooseFromListActionSelectMultiple=False)
+    chosen_name = add("getitemname", WFInput=token(chosen))
+    index = add("text.match", WFInput=token(chosen_name), WFMatchTextPattern="^[0-9]+")
+    index = add("getitemfromlist", WFInput=token(index), WFItemSpecifier="First Item")
+    chosen_original = add("getitemfromlist", WFInput=token(original), WFItemSpecifier="Item At Index", WFItemIndex=token(index))
+    add("appendvariable", WFInput=token(chosen_original), WFVariableName="Ordered Clips")
+    # Filter by the unique picker name rather than a Photos filename, which
+    # can be repeated across cameras. Each selected clip disappears once.
+    remaining, selected = str(uuid4()).upper(), str(uuid4()).upper()
+    add("repeat.each", WFInput=token(variable("Remaining Clips")), GroupingIdentifier=remaining, WFControlFlowMode=0)
+    candidate_name = add("getitemname", WFInput=token(variable("Repeat Item 2")))
+    condition(selected, candidate_name, 4, WFConditionalActionString=text(chosen_name))
+    add("nothing")
+    otherwise(selected)
+    add("getvariable", WFVariable=token(variable("Repeat Item 2")))
+    end(selected)
+    left = add("repeat.each", GroupingIdentifier=remaining, WFControlFlowMode=2)
+    add("setvariable", WFInput=token(left), WFVariableName="Remaining Clips")
+    add("repeat.each", GroupingIdentifier=ordering, WFControlFlowMode=2)
+    add("getvariable", WFVariable=token(variable("Ordered Clips")))
+    otherwise(custom)
+    add("getvariable", WFVariable=token(original))
+    end(custom)
+    otherwise(multiple)
+    add("getvariable", WFVariable=token(original))
+    return end(multiple)
+
+
 def build(wrapper, processor):
     wrapper, processor = copy.deepcopy(wrapper), copy.deepcopy(processor)
     old = processor["WFWorkflowActions"]
@@ -45,10 +116,11 @@ def build(wrapper, processor):
         actions.append({"WFWorkflowActionIdentifier": "is.workflow.actions." + identifier, "WFWorkflowActionParameters": params})
         return {"Type": "ActionOutput", "OutputUUID": uid, "OutputName": "Result"}
 
-    add("comment", WFCommentActionText="Upload ordered clips to Stash through FileFlows. Clips are joined by recording date, oldest first. The earliest clip supplies the scene date. Title and description are JSON-escaped automatically. No NFO is created.")
+    add("comment", WFCommentActionText="Upload ordered clips to Stash through FileFlows. Choose recording date (oldest first) or pick clips in your own order. The earliest recording still supplies the scene date. Title and description are JSON-escaped automatically. No NFO is created.")
     title = add("ask", WFAskActionPrompt="Video title?", WFAllowsMultilineText=False)
     title = add("text.trimwhitespace", WFInput=token(title))
     details = add("ask", WFAskActionPrompt="What happened in the clip?", WFAllowsMultilineText=True)
+    ordered_input = choose_clip_order(add)
     now = add("date", WFDateActionMode="Current Date")
     now = add("format.date", WFDate=token(now), WFDateFormatStyle="ISO 8601")
     random1 = add("number.random", WFRandomNumberMinimum=100000000, WFRandomNumberMaximum=999999999)
@@ -57,7 +129,7 @@ def build(wrapper, processor):
     batch = add("hash", WFInput=token(entropy), WFHashType="SHA256")
     folder = add("file.createfolder", WFFolder=local_folder, WFFilePath=text("stash-upload-", batch, ".part"))
     group = str(uuid4()).upper()
-    add("repeat.each", WFInput=token({"Type": "ExtensionInput"}), GroupingIdentifier=group, WFControlFlowMode=0)
+    add("repeat.each", WFInput=token(ordered_input), GroupingIdentifier=group, WFControlFlowMode=0)
     clip = variable("Repeat Item")
     recorded = add("properties.images", WFInput=token(clip), WFContentItemPropertyName="Date Taken")
     recorded = add("format.date", WFDate=token(recorded), WFDateFormatStyle="ISO 8601")
@@ -70,7 +142,7 @@ def build(wrapper, processor):
     add("dictionary", WFItems=dictionary({"name": name, "recorded_at": recorded, "sha256": digest}))
     clips = add("repeat.each", GroupingIdentifier=group, WFControlFlowMode=2)
     manifest = add("dictionary", WFItems=dictionary({"format": "stash-clip-batch-v1", "batch_id": batch,
-                   "title": title, "details": details, "date": ""}))
+                   "title": title, "details": details, "date": "", "order": variable("Clip Order")}))
     manifest = add("setvalueforkey", WFDictionary=token(manifest), WFDictionaryKey="clips", WFDictionaryValue=token(clips))
     serialized = add("gettext", WFTextActionText=text(manifest))
     named = add("setitemname", WFInput=token(serialized), WFName="stash-clips.json", WFDontIncludeFileExtension=True)

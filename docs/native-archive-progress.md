@@ -8,6 +8,49 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Daily backup recovery — 2026-10-12 UTC
+
+Both overnight jobs rejected source-management version 2 after monitoring moved
+from text lists into Stash. The shared inventory fix in `8c33faca952c` accepts
+that configuration and retains the remaining local operation state. The live
+inventory resolves 362 components. The home job failed at 03:57 PDT before either
+Google Drive upload; S3 failed at the same inventory boundary. Both had successful
+runs on October 11, and the failed preflights did not replace their cloud copies.
+
+With the owner's explicit approval, the home entrypoint now checks worker
+inventory before capturing and validating the large database. Its recovery run
+reuses the three snapshots fully validated at 03:57:16, checking their preserved
+file identities and schema rather than repeating the scan or creating another
+copy. It restaged the current worker databases and resumed the existing Google
+Drive destination, filters and retention policy. The retry keeps its stage on
+failure. This is a recovery of the ordinary daily backup, not a new destination.
+
+S3 also treated the library lock held by local media intake as another backup
+and failed immediately. `e5f1a7c67a69` adds an explicit `--wait-for-lock` option;
+the scheduled service uses it before creating any run or checkpoint. Manual
+commands retain their nonblocking default. The 159 backup tests passed, including
+real lock contention that prevents any run state until intake releases the lock.
+The versioned runtime, reconstruction wheel and restore inventory were updated
+together; the application image and scrape runtimes did not change.
+
+The next checkpoint exposed a separate 50 GiB source-volume reserve with only
+42.5 GiB free. The configured floor is now 40 GiB, matching the owner's requested
+40–50 GiB headroom. The unsealed failed attempt was retired through the existing
+fenced recovery path before changing that configuration. The replacement S3 run
+is `20261012_054541_3018838`. Only its already completed optional dedupe discovery
+was skipped; the normal service pre-step and both 03:00 daily timers remain.
+
+At 12:47 UTC, the Google Drive snapshot phase had uploaded all 44 changed files
+(21.558 GiB), including the existing morning database snapshot; the general home
+sync was running. S3 passed the repaired boundaries, retained its ZFS media view,
+and was creating the server checkpoint under `46c83f89-04f8-4d50-94e8-545588edf939`.
+The source volume still had 42.4 GiB free. Full job completion and S3 publication
+were not yet claimed.
+
+Recovery scripts, activation receipts and retained source identities are under
+`.local/home-backup-recovery-20261012/`. Publication/upload completion must be
+observed separately; a running service or successful preflight is insufficient.
+
 ## Continuous source retries and deleted media — deployed, 2026-10-12 UTC
 
 Schema 1000116 removes the eight-failure limit on download runs. Recoverable

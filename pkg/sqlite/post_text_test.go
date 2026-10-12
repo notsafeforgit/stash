@@ -43,3 +43,28 @@ func TestPostTextPreservesOriginalFillsGapsAndReplays(t *testing.T) {
 		return nil
 	}))
 }
+
+func TestPostContentFillsFieldsFromEarlierRecords(t *testing.T) {
+	_, repo := archiveTestDatabase(t)
+	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:twitter", Value: "123"}, "")
+	input := contentTestCapture(t, post.UUID, 0, "Saved caption")
+	input.Platform = "twitter"
+	oldDate, oldBasis := "2026-09-01", "legacy-nfo-unverified"
+	input.Metadata.PublishedAt, input.Metadata.DateBasis = &oldDate, &oldBasis
+	recordSourceTestCapture(t, repo, input)
+	date, basis := "2026-09-01T12:34:56Z", "source"
+	input.UUID = uuid.NewString()
+	input.Origin = "derived-twitter-id"
+	input.CapturedAt = input.CapturedAt.Add(time.Hour)
+	input.Metadata = models.SourcePostMetadata{PublishedAt: &date, DateBasis: &basis}
+	recordSourceTestCapture(t, repo, input)
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		metadata, err := repo.SourceEvidence.PostContent(ctx, post.UUID)
+		require.NoError(t, err)
+		require.Equal(t, "Saved caption", *metadata.Title)
+		require.Equal(t, "Saved caption", *metadata.OriginalText)
+		require.Equal(t, date, *metadata.PublishedAt)
+		require.Equal(t, basis, *metadata.DateBasis)
+		return nil
+	}))
+}

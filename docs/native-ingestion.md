@@ -3116,7 +3116,9 @@ first-seen/last-seen range and observation count. The producer event receipt
 still makes delivery retries idempotent. Caption-only edits and reversions do
 not create additional captures. The UI reads `/posts/<post>/content` rather than
 presenting extraction snapshots as post versions; the former `capture-history`
-UI route is removed. Existing internal snapshots referenced by attachments,
+UI route is removed. The content projection fills missing fields from earlier
+records, so date-only evidence does not hide a saved caption or description.
+Existing internal snapshots referenced by attachments,
 translation choices and published import receipts are not rewritten. New
 attachment/profile evidence can still require a snapshot. Counts remain internal
 and include per-media observations; unknown historical observation times remain

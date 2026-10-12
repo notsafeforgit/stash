@@ -15,6 +15,46 @@ def replace_once(code, before, after):
     return code.replace(before, after, 1)
 
 
+def support_phone_audio(pipeline):
+    """Keep the selected stereo rendition consistent through probing and concat."""
+    inspect = next(p["Model"] for p in pipeline["Parts"] if p.get("Name", "").startswith("Inspect compatible"))
+    code = inspect["Code"]
+    code = replace_once(code, "bool? allHaveAudio = null;", """bool? allHaveAudio = null;
+var audioStreamIndices = new System.Collections.Generic.List<int>();
+""" + (BASE / "select-audio.cs").read_text())
+    code = replace_once(code, '''"-v", "error", "-select_streams", "a", "-show_entries", "stream=index",
+        "-of", "default=noprint_wrappers=1:nokey=1", file''', '''"-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_name,codec_tag_string,channels",
+        "-of", "json", file''')
+    code = replace_once(code, '''    int audioCount = System.Text.RegularExpressions.Regex.Matches(
+        audioCountResult.Item2, @"(?m)^\\s*\\d+\\s*\\r?$").Count;
+    if (videoCount != 1 || audioCount > 1)''', '''    using var audioDocument = System.Text.Json.JsonDocument.Parse(audioCountResult.Item2);
+    var audioStreams = audioDocument.RootElement.GetProperty("streams");
+    int audioCount = audioStreams.GetArrayLength();
+    int audioStream = selectPhoneAudio(audioStreams, sourceMediaKind == "ordered-clips");
+    audioStreamIndices.Add(audioStream);
+    if (audioCount > 1)
+        Logger.ILog("Using AAC stereo audio " + audioStream + " for " + System.IO.Path.GetFileName(file) +
+            "; the additional APAC spatial track is not included in the Opus output.");
+    if (videoCount != 1)''')
+    code = replace_once(code, "Each clip must contain exactly one video stream and at most one audio stream.",
+                        "Each clip must contain exactly one video stream.")
+    code = replace_once(code, "bool hasAudio = audioCount == 1;", "bool hasAudio = audioStream >= 0;")
+    code = replace_once(code, '"-select_streams", "a:0", "-show_entries", audioEntries,',
+                        '"-select_streams", "a:" + audioStream, "-show_entries", audioEntries,')
+    code = replace_once(code, "files, durations, videoProbes, hasAudio =", "files, durations, videoProbes, audioStreamIndices, hasAudio =")
+    inspect["Code"] = code
+    timeline = next(p["Model"] for p in pipeline["Parts"] if p.get("Name", "").startswith("Approve crop"))
+    code = replace_once(timeline["Code"], 'bool? allHaveAudio = plan["hasAudio"].GetBoolean();', '''bool? allHaveAudio = plan["hasAudio"].GetBoolean();
+var audioStreamIndices = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<int>>(plan["audioStreamIndices"].GetRawText());
+if (audioStreamIndices == null || audioStreamIndices.Count != files.Count)
+    throw new System.Exception("Missing audio selections for the prepared clips.");
+foreach (int audioStream in audioStreamIndices)
+    if (allHaveAudio.GetValueOrDefault() ? audioStream < 0 : audioStream != -1)
+        throw new System.Exception("Invalid audio selection in the concat plan.");''')
+    timeline["Code"] = replace_once(code, '":a:0]atrim=start=0,asetpts=PTS-STARTPTS,"',
+                                    '":a:" + audioStreamIndices[i] + "]atrim=start=0,asetpts=PTS-STARTPTS,"')
+
+
 def build(entry, pipeline):
     entry, pipeline = copy.deepcopy(entry), copy.deepcopy(pipeline)
     old_pipeline_id = pipeline["Uid"]
@@ -56,6 +96,7 @@ return System.IO.Path.GetFileName(folder).StartsWith("stash-upload-", System.Str
         '''else if (string.Equals(sourceMediaKind, "ordered-clips", System.StringComparison.OrdinalIgnoreCase))
     clipPattern = new System.Text.RegularExpressions.Regex(@"^clip-[0-9]+\\.(mov|mp4|m4v)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 else if (string.Equals(sourceMediaKind, "sequential-mp4",''')
+    support_phone_audio(pipeline)
     publish = next(p["Model"] for p in pipeline["Parts"] if p.get("Name", "").startswith("Publish exact output"))
     code = publish["Code"]
     code = replace_once(code, 'bool workingMovedToStage = false;', '''string importPath = getVariable("stashImportPath");

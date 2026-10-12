@@ -44,6 +44,14 @@ def action_builder(actions):
     return add
 
 
+def file_name(add, item):
+    # Get Name can hide a file's extension (clip-1.mov became clip-1 on iOS).
+    # Use the actual saved path for both manifests and upload recovery.
+    path = add("properties.files", WFFolder=token(item), WFContentItemPropertyName="File Path")
+    name = add("text.match", text=text(path), WFMatchTextPattern=r"[^/]+(?=/?$)")
+    return add("getitemfromlist", WFInput=token(name), WFItemSpecifier="First Item")
+
+
 def find_ready_uploads(add, contents):
     """Keep unfinished local drafts out of the wrapper's upload retry path."""
     empty = add("nothing")
@@ -52,13 +60,13 @@ def find_ready_uploads(add, contents):
     folders, ours, files, manifest, ready = (str(uuid4()).upper() for _ in range(5))
     add("repeat.each", WFInput=token(contents), GroupingIdentifier=folders, WFControlFlowMode=0)
     folder = variable("Repeat Item")
-    name = add("getitemname", WFInput=token(folder))
+    name = file_name(add, folder)
     match = add("text.match", text=text(name), WFMatchTextPattern=r"^stash-upload-[a-f0-9]{64}\.part$")
     add("conditional", GroupingIdentifier=ours, WFControlFlowMode=0,
         WFInput={"Type": "Variable", "Variable": token(match)}, WFCondition=100)
     children = add("file.getfoldercontents", WFFolder=token(folder), Recursive=False)
     add("repeat.each", WFInput=token(children), GroupingIdentifier=files, WFControlFlowMode=0)
-    name = add("getitemname", WFInput=token(variable("Repeat Item 2")))
+    name = file_name(add, variable("Repeat Item 2"))
     add("conditional", GroupingIdentifier=manifest, WFControlFlowMode=0,
         WFInput={"Type": "Variable", "Variable": token(name)}, WFCondition=4,
         WFConditionalActionString="stash-clips.json")
@@ -219,7 +227,7 @@ def build(wrapper, processor):
     details = add("ask", WFAskActionPrompt="What happened in the clip?", WFAllowsMultilineText=True)
     ordered_input = choose_clip_order(add)
     now = add("date", WFDateActionMode="Current Date")
-    now = add("format.date", WFDate=text(now), WFDateFormatStyle="ISO 8601")
+    now = add("format.date", WFDate=text(now), WFDateFormatStyle="ISO 8601", WFISO8601IncludeTime=True)
     random1 = add("number.random", WFRandomNumberMinimum=100000000, WFRandomNumberMaximum=999999999)
     random2 = add("number.random", WFRandomNumberMinimum=100000000, WFRandomNumberMaximum=999999999)
     entropy = add("gettext", WFTextActionText=text(now, "-", random1, "-", random2))
@@ -229,12 +237,12 @@ def build(wrapper, processor):
     add("repeat.each", WFInput=token(ordered_input), GroupingIdentifier=group, WFControlFlowMode=0)
     clip = variable("Repeat Item")
     recorded = add("properties.images", WFInput=token(clip), WFContentItemPropertyName="Date Taken")
-    recorded = add("format.date", WFDate=text(recorded), WFDateFormatStyle="ISO 8601")
+    recorded = add("format.date", WFDate=text(recorded), WFDateFormatStyle="ISO 8601", WFISO8601IncludeTime=True)
     # The recording date is read from the original Photo before exporting it.
     file_clip = dict(clip, Aggrandizements=[{"Type": "WFCoercionVariableAggrandizement", "CoercionItemClass": "WFAVAssetContentItem"}])
     renamed = add("setitemname", WFInput=token(file_clip), WFName=text("clip-", variable("Repeat Index")), WFDontIncludeFileExtension=False)
     saved = add("documentpicker.save", WFFolder=token(folder), WFInput=token(renamed), WFAskWhereToSave=False, WFFileDestinationPath="", WFSaveFileOverwrite=False)
-    name = add("getitemname", WFInput=token(saved))
+    name = file_name(add, saved)
     digest = add("hash", WFInput=token(saved), WFHashType="SHA256")
     add("dictionary", WFItems=dictionary({"name": name, "recorded_at": recorded, "sha256": digest}))
     clips = add("repeat.each", GroupingIdentifier=group, WFControlFlowMode=2)

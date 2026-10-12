@@ -6,7 +6,10 @@ native local-file API. It does not create source posts or retain NFO files.
 
 The shortcut reads each selected video's recording date before exporting it,
 assigns a unique clip name, and hashes the exported file. A JSON manifest carries
-the title, description, and clip timestamps. For multiple clips, the shortcut
+the title, description, and clip timestamps. Filenames come from the saved file
+paths so hidden extensions stay in the manifest. Recording timestamps explicitly
+include ISO 8601 time and timezone, preserving order within the same day.
+For multiple clips, the shortcut
 offers **Recording date (oldest first)** or **Choose clip order**. The latter
 shows clips with their recording date, filename and available preview; choose
 the first clip, then each next clip from those remaining. This happens before
@@ -49,6 +52,11 @@ The small pending JSON is removed only when Stash acknowledges successful media
 registration without conflicts. It remains available during restarts, failed
 imports, and conflicts. API credentials stay on the host, outside the shortcut
 and FileFlows. No additional source history or discovery records are created.
+
+iPhone spatial recordings can include an APAC track alongside an AAC stereo
+rendition, in either stream order. The phone flow selects that stereo rendition
+per clip for the Opus output. Other ambiguous multi-track recordings still stop
+for review; the output does not retain Apple's spatial audio track.
 
 ## Install
 

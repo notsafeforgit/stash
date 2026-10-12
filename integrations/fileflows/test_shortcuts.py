@@ -1,12 +1,13 @@
 """Exercise generated ordering control flow; this is not an Apple runtime test."""
 import copy
 import itertools
+from pathlib import PurePosixPath
 import plistlib
 import re
 import unittest
 from uuid import uuid4
 
-from build_shortcuts import build, choose_clip_order, find_ready_uploads, token, validate
+from build_shortcuts import build, choose_clip_order, file_name, find_ready_uploads, token, validate
 
 
 class OrderWorkflow:
@@ -103,6 +104,10 @@ class OrderWorkflow:
                 result = next(item for item in self.as_list(incoming)
                               if item == selected or isinstance(item, dict) and item["name"].startswith(str(selected) + " - "))
             elif kind == "getitemname": result = incoming["name"]
+            elif kind == "properties.files":
+                assert p["WFContentItemPropertyName"] == "File Path"
+                item = self.value(p["WFFolder"])
+                result = item.get("path", "/Workspace/" + item["name"])
             elif kind == "file.getfoldercontents": result = self.value(p["WFFolder"])["children"]
             elif kind == "properties.images": result = incoming["recorded_at"]
             elif kind == "format.date": result = self.value(p["WFDate"])
@@ -223,6 +228,24 @@ class ShortcutEncodingTests(unittest.TestCase):
         self.assertEqual(helper["WFWorkflow"], {"workflowName": "Process and Organize Videos", "isSelf": False})
         validate(self.wrapper)
 
+    def test_recording_dates_explicitly_include_time_and_timezone(self):
+        # ISO 8601 without this switch emitted only YYYY-MM-DD on the phone,
+        # which loses chronological order and fails FileFlows' timestamp check.
+        dates = [p for p in self.parameters("format.date") if p.get("WFDateFormatStyle") == "ISO 8601"]
+        self.assertEqual(len(dates), 2)
+        self.assertTrue(all(p.get("WFISO8601IncludeTime") is True for p in dates))
+
+
+class FileNameTests(unittest.TestCase):
+    def test_uses_saved_path_when_display_name_hides_extension(self):
+        for name in ("clip-1.mov", "clip-2.MP4", "clip-3.m4v", "stash-clips.json",
+                     "stash-upload-" + "a"*64 + ".part"):
+            for suffix in ("", "/"):
+                with self.subTest(name=name, suffix=suffix):
+                    item = {"name": PurePosixPath(name).stem, "path": "/Workspace/" + name + suffix}
+                    flow = OrderWorkflow(item, [], lambda add: file_name(add, {"Type": "ExtensionInput"}))
+                    self.assertEqual(flow.run(), name)
+
 
 class UploadRetryTests(unittest.TestCase):
     def test_only_manifest_batches_are_offered_for_retry(self):
@@ -245,6 +268,14 @@ class UploadRetryTests(unittest.TestCase):
     def test_empty_workspace_has_nothing_to_retry(self):
         flow = OrderWorkflow([], [], lambda add: find_ready_uploads(add, {"Type": "ExtensionInput"}))
         self.assertEqual(flow.as_list(flow.run()), [])
+        self.assertEqual(flow.as_list(flow.variables["Unfinished Uploads"]), [])
+
+    def test_retry_finds_manifest_with_hidden_extensions(self):
+        folder_name = "stash-upload-" + "a"*64
+        batch = {"name": folder_name, "path": "/Workspace/" + folder_name + ".part/",
+                 "children": [{"name": "stash-clips", "path": "/Workspace/" + folder_name + ".part/stash-clips.json"}]}
+        flow = OrderWorkflow([batch], [], lambda add: find_ready_uploads(add, {"Type": "ExtensionInput"}))
+        self.assertEqual(flow.run(), [batch])
         self.assertEqual(flow.as_list(flow.variables["Unfinished Uploads"]), [])
 
 

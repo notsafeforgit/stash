@@ -147,7 +147,7 @@ func (rs *nativeArchiveRoutes) routerWithSourceTracking(enabled bool) http.Handl
 	r.Get("/entities/{entity}/source-posts", rs.mediaSourcePosts)
 	r.Get("/posts/{post}/urls", rs.reviewPostURLs)
 	r.Get("/posts/{post}/capture-summaries", rs.reviewPostCaptures)
-	r.Get("/posts/{post}/capture-history", rs.reviewCaptureHistory)
+	r.Get("/posts/{post}/content", rs.reviewPostContent)
 	r.Put("/posts/{post}/media/{entity}", rs.decidePostMedia)
 	r.Get("/posts/{post}/media/{entity}/history", rs.postMediaHistory)
 	r.Get("/post-media-decisions/{decision}", rs.postMediaDecision)

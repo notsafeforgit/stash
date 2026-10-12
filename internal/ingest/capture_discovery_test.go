@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCaptureDiscoveryRoutesSharePostContentAndPreserveEdits(t *testing.T) {
+func TestCaptureDiscoveryRoutesIgnoreCaptionEditsAndKeepDistinctPosts(t *testing.T) {
 	f := newCaptureFixture(t)
 	collections := []*models.SourceCollection{f.collection}
 	require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
@@ -78,7 +78,8 @@ func TestCaptureDiscoveryRoutesSharePostContentAndPreserveEdits(t *testing.T) {
 		return nil
 	}))
 
-	// Changed text and album items remain distinct content on the same post.
+	// Changed text alone does not create another capture; new album evidence
+	// remains usable independently of the caption.
 	title := "Edited album caption"
 	event.Metadata.Title = &title
 	source["title"] = title
@@ -93,10 +94,33 @@ func TestCaptureDiscoveryRoutesSharePostContentAndPreserveEdits(t *testing.T) {
 		receipt, err := f.submit(t, event)
 		require.NoError(t, err)
 		require.Equal(t, first.PostUUID, receipt.PostUUID)
-		require.NotEqual(t, first.CaptureUUID, receipt.CaptureUUID)
+		if changeAlbum {
+			require.NotEqual(t, first.CaptureUUID, receipt.CaptureUUID)
+		} else {
+			require.Equal(t, first.CaptureUUID, receipt.CaptureUUID)
+		}
 		var result ingest.CaptureResult
 		require.NoError(t, json.Unmarshal(receipt.Result, &result))
 		require.Equal(t, "committed", result.Status)
 	}
-	require.Len(t, history(), 3)
+	require.Len(t, history(), 2, "only the changed attachment list needs new evidence")
+	// Reusing the same media under another source post ID remains a distinct
+	// post with its own caption and attachment membership.
+	event.Post.Value = "post2"
+	source["id"] = "post2"
+	event.EventUUID = uuid.NewString()
+	event.Source, err = json.Marshal(source)
+	require.NoError(t, err)
+	repost, err := f.submit(t, event)
+	require.NoError(t, err)
+	require.NotEqual(t, first.PostUUID, repost.PostUUID)
+	require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		original, err := f.service.Repo.SourceEvidence.PostContent(ctx, first.PostUUID)
+		require.NoError(t, err)
+		require.Equal(t, "Source album", *original.Title)
+		other, err := f.service.Repo.SourceEvidence.PostContent(ctx, repost.PostUUID)
+		require.NoError(t, err)
+		require.Equal(t, title, *other.Title)
+		return nil
+	}))
 }

@@ -50,6 +50,9 @@ func (s *SourceEvidenceStore) RecordContentCapture(ctx context.Context, input mo
 	if err := compactCaptureInput(&input); err != nil {
 		return nil, err
 	}
+	if err := s.preservePostText(ctx, &input); err != nil {
+		return nil, err
+	}
 	_, revision, err := canonicalCaptureInput(&input)
 	if err != nil {
 		return nil, err

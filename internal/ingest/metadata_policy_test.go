@@ -49,7 +49,7 @@ func TestIntakeMetadataPolicyUsesCaptureAndPreservesSourceAlternatives(t *testin
 	require.Equal(t, f.receipt.CaptureUUID, *state.Decision.CaptureUUID)
 	require.Equal(t, policy.MetadataPolicyRef, *state.Decision.Policy)
 	require.Equal(t, "[]", string(intakeField(t, repo, first.Result.MediaUUID, "performers").Value), "publisher identity must never imply depicted performer attribution")
-	// A later scrape of the same post can update inherited fields.
+	// A later caption edit keeps saved source text and the inherited title.
 	event := f.event(t)
 	event.RootUUID = &f.root.UUID
 	event.ObservedAt = time.Now().UTC().Add(time.Second)
@@ -57,16 +57,17 @@ func TestIntakeMetadataPolicyUsesCaptureAndPreservesSourceAlternatives(t *testin
 	event.Metadata.Title = &title
 	next, err := f.submit(t, event)
 	require.NoError(t, err)
+	require.Equal(t, f.receipt.CaptureUUID, next.CaptureUUID)
 	input := f.input
 	input.UUID = uuid.NewString()
 	input.Source = &ingest.IntakeSource{CaptureUUID: next.CaptureUUID, AttachmentUUID: f.input.Source.AttachmentUUID}
 	updated := f.publishIntake(t, f.prepared, input)
 	require.Equal(t, first.Result.MediaUUID, updated.Result.MediaUUID)
-	require.Equal(t, `"Updated caption"`, string(intakeField(t, repo, first.Result.MediaUUID, "title").Value))
-	// An out-of-order completion with the older capture does not roll it back.
+	require.Equal(t, `"Source album"`, string(intakeField(t, repo, first.Result.MediaUUID, "title").Value))
+	// Replaying the original delivery keeps the same chosen content.
 	older := f.publishIntake(t, f.prepared, f.input)
 	require.Empty(t, older.Result.MetadataFields)
-	require.Equal(t, `"Updated caption"`, string(intakeField(t, repo, first.Result.MediaUUID, "title").Value))
+	require.Equal(t, `"Source album"`, string(intakeField(t, repo, first.Result.MediaUUID, "title").Value))
 	// The same bytes in another post retain another source appearance, without
 	// replacing the chosen caption merely because that download finished last.
 	event.EventUUID = uuid.NewString()
@@ -81,7 +82,7 @@ func TestIntakeMetadataPolicyUsesCaptureAndPreservesSourceAlternatives(t *testin
 	input.Source = &ingest.IntakeSource{CaptureUUID: f.receipt.CaptureUUID, AttachmentUUID: f.attachment(t, 0).UUID}
 	competing := f.publishIntake(t, f.prepared, input)
 	require.Contains(t, competing.Result.Review, "metadata:title")
-	require.Equal(t, `"Updated caption"`, string(intakeField(t, repo, first.Result.MediaUUID, "title").Value))
+	require.Equal(t, `"Source album"`, string(intakeField(t, repo, first.Result.MediaUUID, "title").Value))
 	// Removing the source association prevents using that capture in a preview.
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		attachment, err := repo.SourceAttachment.Find(ctx, input.Source.AttachmentUUID)

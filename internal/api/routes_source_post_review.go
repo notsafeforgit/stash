@@ -134,21 +134,19 @@ func (rs *nativeArchiveRoutes) reviewPostCaptures(w http.ResponseWriter, r *http
 	ingestJSON(w, http.StatusOK, ret)
 }
 
-func (rs *nativeArchiveRoutes) reviewCaptureHistory(w http.ResponseWriter, r *http.Request) {
+func (rs *nativeArchiveRoutes) reviewPostContent(w http.ResponseWriter, r *http.Request) {
 	post := chi.URLParam(r, "post")
-	after := r.URL.Query().Get("after")
-	limit, err := documentLimit(r)
-	if err != nil || !ingest.ValidUUID(post) || (after != "" && !ingest.ValidUUID(after)) {
+	if !ingest.ValidUUID(post) {
 		ingestError(w, ingest.ErrInvalid)
 		return
 	}
 	ret := struct {
-		RequestedUUID string                        `json:"requested_uuid"`
-		Revisions     []models.SourceCaptureHistory `json:"revisions"`
+		RequestedUUID string                     `json:"requested_uuid"`
+		Metadata      *models.SourcePostMetadata `json:"metadata"`
 	}{RequestedUUID: post}
-	err = rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
+	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
 		var err error
-		ret.Revisions, err = rs.repo.SourceEvidence.CaptureHistory(ctx, post, after, limit)
+		ret.Metadata, err = rs.repo.SourceEvidence.PostContent(ctx, post)
 		return err
 	})
 	if err != nil {

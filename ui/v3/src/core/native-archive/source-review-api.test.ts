@@ -127,47 +127,29 @@ it("compares every receipt guard and never treats a malformed success as permiss
   }
 });
 
-it("pages complete version summaries and preserves unknown observation times", async () => {
-  const summary = {
-    uuid: sourceIds.revision,
-    metadata: { title: "Shared title" },
-    count: 200,
-    unknown_count: 2,
-    first_seen: "2026-10-01T01:00:00Z",
-    last_seen: "2026-10-08T01:00:00Z",
+it("loads one post's content without a version list", async () => {
+  const metadata = {
+    title: "Saved title",
+    original_text: "Original source text",
   };
   const transport = vi
     .fn<typeof fetch>()
     .mockResolvedValue(
-      Response.json({ requested_uuid: sourceIds.post, revisions: [summary] }),
+      Response.json({ requested_uuid: sourceIds.post, metadata }),
     );
   const api = createSourceReviewAPI(endpoint, transport);
-  expect(await api.captureHistory(sourceIds.post)).toEqual([summary]);
+  expect(await api.postContent(sourceIds.post)).toEqual(metadata);
   expect(String(transport.mock.calls[0]?.[0])).toContain(
-    "/capture-history?limit=25",
+    `/posts/${sourceIds.post}/content`,
   );
   transport.mockResolvedValue(
-    Response.json({ requested_uuid: sourceIds.post, revisions: [summary] }),
+    Response.json({ requested_uuid: sourceIds.post, metadata: null }),
   );
-  await expect(
-    api.captureHistory(sourceIds.post, summary.uuid),
-  ).rejects.toMatchObject({ code: "invalid_response" });
+  expect(await api.postContent(sourceIds.post)).toBeNull();
   transport.mockResolvedValue(
-    Response.json({
-      requested_uuid: sourceIds.post,
-      revisions: [
-        { ...summary, unknown_count: 200, first_seen: null, last_seen: null },
-      ],
-    }),
+    Response.json({ requested_uuid: sourceIds.media, metadata }),
   );
-  expect((await api.captureHistory(sourceIds.post))[0]?.first_seen).toBeNull();
-  transport.mockResolvedValue(
-    Response.json({
-      requested_uuid: sourceIds.post,
-      revisions: [{ ...summary, unknown_count: 201 }],
-    }),
-  );
-  await expect(api.captureHistory(sourceIds.post)).rejects.toMatchObject({
+  await expect(api.postContent(sourceIds.post)).rejects.toMatchObject({
     code: "invalid_response",
   });
 });

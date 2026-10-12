@@ -15,7 +15,7 @@ import { AccountName, AccountOwner, AccountService } from "../accounts/shared";
 import {
   PostPublishedDate,
   LinkState,
-  PostContentVersions,
+  PostContent,
 } from "@/components/detail/native-sources/history";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -417,10 +417,8 @@ export function PostDetail({
               <PostURLs post={post} api={api} />
             </CardContent>
           </Card>
-          <PostSection
-            title={msg("source_review.content", "Post content and versions")}
-          >
-            <PostContentVersions post={id} api={api.review} />
+          <PostSection title={msg("source_review.content", "Post content")}>
+            <PostContent post={id} api={api.review} />
           </PostSection>
           <PostSection
             title={msg("source_posts.publishers", "Publisher accounts")}

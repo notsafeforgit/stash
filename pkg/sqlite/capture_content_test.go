@@ -102,7 +102,7 @@ func TestCaptureContentRepeatSharesCaptureAndCountsSightings(t *testing.T) {
 		require.Equal(t, time.Date(2026, 10, 1, 1, 4, 0, 0, time.UTC), *history[0].LastSeen)
 		return nil
 	}))
-	// Different media and real edits continue to create distinct retained records.
+	// A different attachment needs evidence; a caption-only edit does not.
 	for _, i := range []int{1, 8} {
 		input := contentTestCapture(t, post.UUID, i, "Same post")
 		if i == 8 {
@@ -114,7 +114,7 @@ func TestCaptureContentRepeatSharesCaptureAndCountsSightings(t *testing.T) {
 			return err
 		}))
 	}
-	require.EqualValues(t, 3, queryUint(t, raw, "SELECT count(*) FROM source_captures WHERE post_uuid='"+post.UUID+"'"))
+	require.EqualValues(t, 2, queryUint(t, raw, "SELECT count(*) FROM source_captures WHERE post_uuid='"+post.UUID+"'"))
 }
 
 func TestCaptureContentUnknownObservationStaysUnknown(t *testing.T) {

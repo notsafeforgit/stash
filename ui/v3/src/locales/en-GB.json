@@ -3282,8 +3282,7 @@
     "attachment_linked": "Linked through attachments",
     "attachments": "Use attachments",
     "attachments_help": "Clear the explicit post choice and use the existing attachment links. Retained file evidence alone does not select a link.",
-    "content": "Post content and versions",
-    "content_help": "Saved post content and its versions. Media and album order are linked to the post.",
+    "content": "Post content",
     "no_content": "No saved content for this post.",
     "published": "Published {date}",
     "published_unknown": "Publication date unknown",
@@ -3321,8 +3320,7 @@
     "unlink_help": "Exclude this post as a source for this item, including its attachment links. Existing source albums may remove automatic membership; manual gallery choices are kept.",
     "unlinked": "Explicitly unlinked",
     "untitled": "Untitled source post",
-    "unverified_date": "Unverified historical date",
-    "more_versions": "Load more versions"
+    "unverified_date": "Unverified historical date"
   },
   "source_posts": {
     "title": "Source posts",

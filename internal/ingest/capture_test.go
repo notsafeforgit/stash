@@ -397,8 +397,8 @@ func TestCaptureContentRepeatDoesNotDuplicateEvidenceOrReplayCount(t *testing.T)
 		require.NotNil(t, publisher.AccountUUID)
 		return nil
 	}))
-	// A text edit, followed by a real reversion, must still advance current
-	// evidence even though the reverted post body already exists.
+	// Caption edits and reversions reuse saved post text rather than creating
+	// a version history. Delivery receipts still acknowledge each event.
 	edited := repeated
 	edited.EventUUID = uuid.NewString()
 	edited.ObservedAt = event.ObservedAt.Add(2 * time.Hour)
@@ -409,21 +409,22 @@ func TestCaptureContentRepeatDoesNotDuplicateEvidenceOrReplayCount(t *testing.T)
 	require.NoError(t, err)
 	third, err := f.submit(t, edited)
 	require.NoError(t, err)
-	require.NotEqual(t, first.CaptureUUID, third.CaptureUUID)
+	require.Equal(t, first.CaptureUUID, third.CaptureUUID)
 	reverted := event
 	reverted.EventUUID = uuid.NewString()
 	reverted.ObservedAt = event.ObservedAt.Add(3 * time.Hour)
 	fourth, err := f.submit(t, reverted)
 	require.NoError(t, err)
-	require.NotEqual(t, first.CaptureUUID, fourth.CaptureUUID)
+	require.Equal(t, first.CaptureUUID, fourth.CaptureUUID)
 	require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		history, err := f.service.Repo.SourceEvidence.CaptureHistory(ctx, first.PostUUID, "", 25)
 		require.NoError(t, err)
-		require.Len(t, history, 2)
+		require.Len(t, history, 1)
+		require.Equal(t, 4, history[0].Count)
 		captures, err := f.service.Repo.SourceEvidence.CurrentCaptures(ctx, first.PostUUID, nil, 25)
 		require.NoError(t, err)
-		require.Len(t, captures, 3)
-		require.Equal(t, fourth.CaptureUUID, captures[2].UUID)
+		require.Len(t, captures, 1)
+		require.Equal(t, fourth.CaptureUUID, captures[0].UUID)
 		return nil
 	}))
 }

@@ -178,56 +178,14 @@ async function archive(
           : album,
         path.split("/")[1],
       );
-    } else if (path.endsWith("/capture-history"))
+    } else if (path.endsWith("/content"))
       result = {
         requested_uuid: path.split("/").at(-2),
-        revisions: [
-          {
-            uuid: postIds.revision,
-            count: 2,
-            unknown_count: 1,
-            first_seen: "2026-10-01T01:00:00Z",
-            last_seen: "2026-10-01T01:00:00Z",
-            metadata: {
-              title: "Full retained caption",
-              original_text: "One shared description",
-            },
-          },
-          {
-            uuid: "00000000-0000-4000-8000-000000000019",
-            count: 17,
-            unknown_count: 0,
-            first_seen: "2026-10-02T01:00:00Z",
-            last_seen: "2026-10-03T01:00:00Z",
-            metadata: {
-              title: "Edited post caption",
-              original_text: "A meaningful content change",
-              published_at: "2026-09-29",
-            },
-          },
-        ],
-        captures: [
-          {
-            uuid: postIds.capture,
-            post_uuid: postIds.post,
-            revision_uuid: postIds.revision,
-            origin: "gallery-dl",
-            platform: "reddit",
-            captured_at: "2026-10-01T01:00:00Z",
-            recorded_at: null,
-            extractor_version: "1.32.15",
-          },
-          {
-            uuid: postIds.secondCapture,
-            post_uuid: postIds.post,
-            revision_uuid: postIds.revision,
-            origin: "legacy-nfo",
-            platform: "reddit",
-            captured_at: null,
-            recorded_at: "2026-10-02T01:00:00Z",
-            extractor_version: null,
-          },
-        ],
+        metadata: {
+          title: "Full retained caption",
+          original_text: "One shared description",
+          published_at: "2026-09-29",
+        },
       };
     else if (path.endsWith("/identifiers")) result = [];
     else if (path.endsWith("/urls"))
@@ -301,14 +259,14 @@ for (const desktop of [false, true]) {
       remote.requests.some((u) => u.pathname.endsWith("/publishers")),
     ).toBe(false);
     await page
-      .getByRole("button", { name: "Post content and versions", exact: true })
+      .getByRole("button", { name: "Post content", exact: true })
       .click();
     await expect(
       page.getByText("One shared description", { exact: true }),
     ).toHaveCount(1);
     await expect(
       page.getByText("A meaningful content change", { exact: true }),
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(
       page.getByText("17 observations", { exact: true }),
     ).toHaveCount(0);
@@ -403,7 +361,7 @@ for (const desktop of [false, true]) {
       page.getByText(postIds.otherPost, { exact: true }),
     ).toBeVisible();
     await page
-      .getByRole("button", { name: "Post content and versions", exact: true })
+      .getByRole("button", { name: "Post content", exact: true })
       .click();
     await expect(
       page.getByText("Full retained caption", { exact: true }),

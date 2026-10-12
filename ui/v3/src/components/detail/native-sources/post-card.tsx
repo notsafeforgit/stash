@@ -40,7 +40,7 @@ import { ReviewError } from "../native-metadata/shared";
 import {
   PostPublishedDate,
   LinkState,
-  PostContentVersions,
+  PostContent,
   SourceLinkHistory,
 } from "./history";
 
@@ -331,13 +331,11 @@ export function SourcePostCard({
               <Button variant="ghost" className="w-full justify-between" />
             }
           >
-            {msg("source_review.content", "Post content and versions")}
+            {msg("source_review.content", "Post content")}
             <ChevronDown data-icon="inline-end" />
           </CollapsibleTrigger>
           <CollapsibleContent className="pt-3">
-            {contentOpen && (
-              <PostContentVersions api={api} post={a.post_uuid} />
-            )}
+            {contentOpen && <PostContent api={api} post={a.post_uuid} />}
           </CollapsibleContent>
         </Collapsible>
         <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>

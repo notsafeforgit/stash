@@ -1998,6 +1998,7 @@ Application-authenticated routes under `/api/v3/archive` expose direct links:
 | `GET /posts/<post>/media/<entity>/review` | Refresh one post card with current guards, latest capture excerpt and independent evidence/link status |
 | `GET /posts/<post>/urls?after=<url-uuid>&limit=N` | `{requested_uuid, urls}` for the current identity group, with one original witness per exact URL in UUID order; limit 1–100 |
 | `GET /posts/<post>/capture-summaries?limit=N` | `{requested_uuid, captures, revisions}` for the current identity group, without raw payloads or profiles; limit 1–100 |
+| `GET /posts/<post>/content` | `{requested_uuid, metadata}` with one saved content projection, including original text; `metadata:null` when unavailable |
 
 Review responses echo `requested_post_uuid`; current association guards use the
 canonical `post_uuid`. URL witnesses and captures retain their original
@@ -3101,13 +3102,25 @@ versions. Post text, publication dates, attachment identity/order, thread
 relationships and meaningful profile data remain retained. Profile bodies
 remain shared separately from post bodies.
 
+Post text is saved content, not an edit-history feature. Normal HTTP captures
+keep already saved source captions and fill missing text fields. A title-only
+capture can later gain its source body, and legacy NFO text does not prevent
+the original source text from being obtained. Text handling is scoped to the
+same service-qualified post ID; another post can reuse the same media with its
+own caption and album membership. Attachment lists, media-host evidence, thread
+links and publisher profiles remain independent. HTML changes that supply new
+inline media remain usable attachment evidence.
+
 Identical content for the same attachment reuses its capture and updates a
 first-seen/last-seen range and observation count. The producer event receipt
-still makes delivery retries idempotent. Text edits, profile edits and actual
-reversions remain distinguishable. The capture-history endpoint pages complete
-version summaries, so a page limit does not truncate a version's observation
-count. Counts include per-media observations from the same scrape; unknown
-historical observation times remain explicitly unknown.
+still makes delivery retries idempotent. Caption-only edits and reversions do
+not create additional captures. The UI reads `/posts/<post>/content` rather than
+presenting extraction snapshots as post versions; the former `capture-history`
+UI route is removed. Existing internal snapshots referenced by attachments,
+translation choices and published import receipts are not rewritten. New
+attachment/profile evidence can still require a snapshot. Counts remain internal
+and include per-media observations; unknown historical observation times remain
+explicitly unknown.
 
 For existing libraries, `go run ./cmd/capture-cleanup --database PATH --apply`
 is an offline, transactional cleanup: stop writers and retain a current backup

@@ -306,6 +306,9 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 	complete := sourcePacingAtomic(ctx)
 	state := "queued"
 	delay := time.Duration(r.CooldownSeconds) * time.Second
+	// An account can return or become accessible without changing its source
+	// definition. Keep checking it without exhausting the technical retry budget.
+	accessRecheck := outcome.State == "retry" && (outcome.ErrorCode == "not_found" || outcome.ErrorCode == "access_denied")
 	if outcome.State == "succeeded" {
 		r.Completed = scrape.Union(r.Completed, []models.SourceWindow{*r.Window})
 		if r.Operation == "download" {
@@ -320,11 +323,14 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 		}
 	} else {
 		r.Pending = scrape.Union(r.Pending, []models.SourceWindow{*r.Window})
-		if outcome.State == "expired" || outcome.ErrorCode == "worker_interrupted" || outcome.ErrorCode == "worker_publication_busy" {
+		switch {
+		case outcome.State == "expired" || outcome.ErrorCode == "worker_interrupted" || outcome.ErrorCode == "worker_publication_busy":
 			// Restarts and local backup/dedupe contention preserve progress and
 			// do not exhaust the source's retry budget.
 			delay = max(delay, 30*time.Second)
-		} else if outcome.ErrorCode != "source_turn_complete" {
+		case accessRecheck:
+			delay = max(delay, 24*time.Hour, time.Duration(outcome.RetryAfterSeconds)*time.Second)
+		case outcome.ErrorCode != "source_turn_complete":
 			r.Failures++
 			if outcome.State == "deferred" || r.Failures >= 8 {
 				state = "deferred"
@@ -367,8 +373,14 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 	if err != nil {
 		return nil, err
 	}
+	targetDelay := delay
+	if accessRecheck {
+		// The failed pass waits a day, but another retrieval for this source
+		// (for example Reddit author search) can still find public posts.
+		targetDelay = time.Duration(r.CooldownSeconds) * time.Second
+	}
 	if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_run_cooldowns(target_key,available_at_ms) SELECT target_key,? FROM source_runs WHERE uuid=?
-ON CONFLICT(target_key) DO UPDATE SET available_at_ms=max(available_at_ms,excluded.available_at_ms)`, now.Add(delay).UnixMilli(), r.UUID); err != nil {
+ON CONFLICT(target_key) DO UPDATE SET available_at_ms=max(available_at_ms,excluded.available_at_ms)`, now.Add(targetDelay).UnixMilli(), r.UUID); err != nil {
 		return nil, err
 	}
 	result, err := s.Find(ctx, r.UUID)

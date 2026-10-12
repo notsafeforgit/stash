@@ -48,6 +48,25 @@ Updating existing work requires native policy upgrades that preserve original
 requests, windows, progress, fences and retry deadlines. File transforms,
 per-output locking, download archives and durable completion events are unchanged.
 
+## Account access and retrieval passes
+
+A Reddit profile is one subscribed source. Its submitted-post and author-search
+passes retain separate runs and checkpoints under that source; the run count is
+not an account count. A completed search updates the same source's last successful
+check even if a profile listing is unavailable. It does not claim that another
+pass's unfinished window was downloaded.
+
+`not_found` and `access_denied` attempts stay queued for an automatic recheck
+after 24 hours (or a longer requested retry delay). They do not exhaust the
+eight-attempt budget for technical failures. Each failed pass keeps its pending
+windows and progress. Its daily delay applies to that run, so other passes for
+the same account can continue after the normal short target cooldown. Shared
+service budgets and routine-check priority still apply. Stopping a subscription
+still stops its work.
+
+Authentication/challenge, invalid configuration and rejected source metadata
+remain explicit attention states. They are not treated as inaccessible accounts.
+
 ## Remote pagination
 
 Reddit and Twitter checkpoints include the extractor, public retrieval URL,

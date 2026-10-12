@@ -136,7 +136,9 @@ def execute(box, client, configuration, run_uuid):
         except SourceTurnComplete:
             outcome, error = "retry", "source_turn_complete"
         except SourceFailure as exc:
-            outcome = "deferred" if exc.code in {"authentication", "access_denied", "challenge", "not_found"} else "retry"
+            # Missing/private accounts can return or grant access later. The
+            # server schedules these checks daily without a terminal retry cap.
+            outcome = "deferred" if exc.code in {"authentication", "challenge"} else "retry"
             error, error_scope = exc.code, exc.scope
         except SourcePaused:
             result = {"state": "paused", "run_uuid": run_uuid, "error_code": "source_ownership_unavailable"}

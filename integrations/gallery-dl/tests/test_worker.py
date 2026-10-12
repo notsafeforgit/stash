@@ -292,6 +292,17 @@ class WorkerTests(unittest.TestCase):
                 self.assertEqual(result["state"], state)
                 self.lease.finish.assert_called_once_with(state, error_code=code)
 
+    def test_account_access_failures_retry_but_credentials_need_attention(self):
+        for code in ('not_found', 'access_denied', 'authentication', 'challenge'):
+            with self.subTest(code=code):
+                state = 'retry' if code in ('not_found', 'access_denied') else 'deferred'
+                task = Mock(run=Mock(side_effect=SourceFailure(code, 'service:reddit')))
+                self.lease.finish.reset_mock()
+                self.lease.finish.return_value = {'state': 'queued' if state == 'retry' else state}
+                result = self.run_worker(lambda *a, **kw: task)
+                self.assertEqual((result['state'], result['error_code']), (state, code))
+                self.lease.finish.assert_called_once_with(state, error_code=code, error_scope='service:reddit')
+
     def test_lost_finish_requires_the_exact_completed_attempt(self):
         attempt = {"run_uuid": RUN, "producer_uuid": PRODUCER, "owner_uuid": self.lease.owner,
                    "fence": 3, "outcome": "succeeded", "ended_at": "2026-10-01T12:00:00Z"}

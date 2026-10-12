@@ -12,10 +12,10 @@ type GalleryURLBuilder struct {
 	UpdatedAt string
 }
 
-func NewGalleryURLBuilder(baseURL string, gallery *models.Gallery) GalleryURLBuilder {
+func NewGalleryURLBuilder(baseURL string, gallery *models.Gallery, publicID string) GalleryURLBuilder {
 	return GalleryURLBuilder{
 		BaseURL:   baseURL,
-		GalleryID: strconv.Itoa(gallery.ID),
+		GalleryID: publicID,
 		UpdatedAt: strconv.FormatInt(gallery.UpdatedAt.Unix(), 10),
 	}
 }

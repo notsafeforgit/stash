@@ -117,7 +117,8 @@ type HookContext struct {
 	// see it again after interruption and should deduplicate its own effects.
 	EventID     string       `json:"eventId,omitempty"`
 	ParentHooks []HookSource `json:"parentHooks,omitempty"`
-	ID          int          `json:"id,omitempty"`
+	ID          int          `json:"-"`
+	UUID        string       `json:"id,omitempty"`
 	Type        string       `json:"type"`
 	Input       interface{}  `json:"input"`
 	InputFields []string     `json:"inputFields,omitempty"`

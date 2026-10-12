@@ -15,15 +15,16 @@ import (
 	"github.com/knadh/koanf/v2"
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
 
 func TestConfigurationJSONNumbersPersistAcrossReload(t *testing.T) {
 	const rows = `[
-		{"__typename":"SavedFilter","savedFilterId":123},
+		{"__typename":"SavedFilter","savedFilterId":"f2901842-4112-4c09-bf6d-3dde2e97d123"},
 		{"__typename":"CustomFilter","mode":"SCENES","sortBy":"date","direction":"DESC"},
-		{"__typename":"SavedFilter","savedFilterId":"456"},
-		{"__typename":"SavedFilter","savedFilterId":789,"extension":[null,[],[1,{"weight":2.5,"tiny":1e-7,"count":1e3}]]}
+		{"__typename":"SavedFilter","savedFilterId":"f2901842-4112-4c09-bf6d-3dde2e97d456"},
+		{"__typename":"SavedFilter","savedFilterId":"f2901842-4112-4c09-bf6d-3dde2e97d789","extension":[null,[],[1,{"weight":2.5,"tiny":1e-7,"count":1e3}]]}
 	]`
 	const ui = `{"frontPageContent":` + rows + `,"unrelated":"keep"}`
 
@@ -88,13 +89,17 @@ func TestConfigurationJSONNumbersPersistAcrossReload(t *testing.T) {
 			// Resolver configuration is process-global; these cases must not run
 			// in parallel. Every write targets a private temporary configuration.
 			cfg := config.InitializeEmpty()
-			manager.SetInstance(&manager.Manager{Config: cfg})
+			db := sqlite.NewDatabase()
+			require.NoError(t, db.Open(filepath.Join(t.TempDir(), "config.sqlite")))
+			t.Cleanup(func() { require.NoError(t, db.Close()) })
+			repo := db.Repository()
+			manager.SetInstance(&manager.Manager{Config: cfg, Repository: repo})
 			t.Cleanup(func() { manager.SetInstance(nil); config.InitializeEmpty() })
 			path := filepath.Join(t.TempDir(), "config.yml")
 			cfg.SetConfigFile(path)
 			cfg.SetUIConfiguration(map[string]interface{}{"unrelated": "keep"})
 
-			server := handler.New(NewExecutableSchema(Config{Resolvers: &Resolver{}}))
+			server := handler.New(newLibrarySchema(Config{Resolvers: &Resolver{repository: repo}}))
 			server.AddTransport(transport.POST{})
 			body, err := json.Marshal(map[string]interface{}{"query": tt.query, "variables": tt.variables})
 			require.NoError(t, err)

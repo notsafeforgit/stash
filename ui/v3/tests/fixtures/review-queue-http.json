@@ -3,14 +3,14 @@
     "kind": "accounts",
     "items": [
       {
-        "uuid": "e7ef8340-fbf1-4a2a-bb07-7c64037f7e5a",
+        "uuid": "142dee2c-b1da-49cb-b5f5-da6833c4cbe3",
         "reasons": ["account_owner_undecided"],
         "account": {
-          "uuid": "e7ef8340-fbf1-4a2a-bb07-7c64037f7e5a",
+          "uuid": "142dee2c-b1da-49cb-b5f5-da6833c4cbe3",
           "namespace": "native:reddit",
           "label": "Review account",
           "revision": 1,
-          "canonical_uuid": "e7ef8340-fbf1-4a2a-bb07-7c64037f7e5a",
+          "canonical_uuid": "142dee2c-b1da-49cb-b5f5-da6833c4cbe3",
           "identifiers": [],
           "more_identifiers": false,
           "tracked": true
@@ -23,14 +23,14 @@
     "kind": "media",
     "items": [
       {
-        "uuid": "708ec65c-ce20-491d-9c4c-f77581c4f532",
+        "uuid": "2d6beb4f-1000-4830-b90a-c2708d503160",
         "reasons": ["media_unselected"],
         "post": {
-          "requested_uuid": "708ec65c-ce20-491d-9c4c-f77581c4f532",
-          "uuid": "708ec65c-ce20-491d-9c4c-f77581c4f532",
+          "requested_uuid": "2d6beb4f-1000-4830-b90a-c2708d503160",
+          "uuid": "2d6beb4f-1000-4830-b90a-c2708d503160",
           "state": "active",
           "revision": 3,
-          "created_at": "2026-10-10T00:33:26Z",
+          "created_at": "2026-10-12T05:01:35Z",
           "identifiers": [
             {
               "namespace": "native:reddit",
@@ -41,12 +41,12 @@
           "urls": [],
           "more_urls": false,
           "latest_capture": {
-            "uuid": "a734129a-cd8e-4611-8461-8befeaffe279",
-            "post_uuid": "708ec65c-ce20-491d-9c4c-f77581c4f532",
-            "revision_uuid": "1118d205-f691-4112-a7dd-19079c0e3d34",
+            "uuid": "0a61ac7f-b315-4a99-99d2-caf57e02b72c",
+            "post_uuid": "2d6beb4f-1000-4830-b90a-c2708d503160",
+            "revision_uuid": "c284ef5c-908e-4d13-acac-509683cc3c0d",
             "origin": "gallery-dl",
             "platform": "reddit",
-            "captured_at": "2026-10-10T00:33:26.448179788Z",
+            "captured_at": "2026-10-12T05:01:35.387792577Z",
             "recorded_at": null,
             "title": "Retained post",
             "title_truncated": false,
@@ -62,14 +62,13 @@
     "kind": "metadata",
     "items": [
       {
-        "uuid": "888aefbd-17d8-4210-acae-70ee9e5328a9",
+        "uuid": "c3242223-a3d2-4fdb-a753-719e53bb24c2",
         "reasons": ["retained_metadata"],
         "media": {
-          "uuid": "888aefbd-17d8-4210-acae-70ee9e5328a9",
+          "uuid": "c3242223-a3d2-4fdb-a753-719e53bb24c2",
           "kind": "scene",
           "state": "active",
           "revision": 1,
-          "local_id": 1,
           "title": "Curated",
           "title_truncated": false
         }

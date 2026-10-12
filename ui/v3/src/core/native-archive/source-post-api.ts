@@ -119,17 +119,15 @@ export const postSummarySchema = z
     (post) =>
       new Set(post.urls.map((url) => url.url)).size === post.urls.length,
   );
-export const postLibraryItemSchema = z
-  .object({
-    uuid,
-    kind: z.enum(["scene", "image", "gallery"]),
-    state: z.enum(["active", "deleted"]),
-    revision,
-    local_id: revision.nullable(),
-    title: z.string(),
-    title_truncated: z.boolean(),
-  })
-  .refine((item) => (item.state === "active") === (item.local_id !== null));
+export const postLibraryItemSchema = z.object({
+  uuid,
+  kind: z.enum(["scene", "image", "gallery"]),
+  state: z.enum(["active", "deleted"]),
+  revision,
+
+  title: z.string(),
+  title_truncated: z.boolean(),
+});
 export const postMediaSchema = z
   .object({
     requested_post_uuid: uuid,

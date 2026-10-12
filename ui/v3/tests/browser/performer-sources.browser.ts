@@ -61,7 +61,7 @@ async function archive(
       result = {
         uuid: ids.performer,
         kind: "performer",
-        local_id: 7,
+
         revision,
       };
     } else if (path.endsWith("/source-accounts")) {
@@ -71,7 +71,7 @@ async function archive(
       }
       const after = url.searchParams.get("after");
       if (after && options.changedOnNext) revision = 4;
-      const owner = { ...performer(), local_id: 7, revision };
+      const owner = { ...performer(), revision };
       const row = {
         ...account(),
         ownership: {
@@ -106,7 +106,7 @@ async function archive(
     } else if (path.endsWith("/performer-identities")) {
       result = {
         requested_uuid: ids.performer,
-        performer: { ...performer(), local_id: 7, revision },
+        performer: { ...performer(), revision },
         identities: [
           {
             uuid: oldIdentity,

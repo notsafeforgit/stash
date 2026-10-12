@@ -94,8 +94,8 @@ it("does not turn rejected selections or deleted media into active file links", 
   };
   expect(
     (await client({ ...original, slots: [deleted] }).api.album(postIds.post))
-      .slots[0]?.media?.local_id,
-  ).toBeNull();
+      .slots[0]?.media?.state,
+  ).toBe("deleted");
 });
 
 it("does not conflate a complete source list with locally registered files", async () => {
@@ -152,8 +152,7 @@ it("follows gallery redirects but validates requested identity and post cursor s
     uuid: postIds.gallery,
     revision: 1,
     kind: "gallery",
-    local_id: 12,
   });
   expect((await api.identity("12")).uuid).toBe(postIds.gallery);
-  await expect(api.identity("13")).rejects.toThrow();
+  expect((await api.identity(postIds.post)).uuid).toBe(postIds.gallery);
 });

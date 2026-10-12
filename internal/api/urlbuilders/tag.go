@@ -11,10 +11,10 @@ type TagURLBuilder struct {
 	UpdatedAt string
 }
 
-func NewTagURLBuilder(baseURL string, tag *models.Tag) TagURLBuilder {
+func NewTagURLBuilder(baseURL string, tag *models.Tag, publicID string) TagURLBuilder {
 	return TagURLBuilder{
 		BaseURL:   baseURL,
-		TagID:     strconv.Itoa(tag.ID),
+		TagID:     publicID,
 		UpdatedAt: strconv.FormatInt(tag.UpdatedAt.Unix(), 10),
 	}
 }

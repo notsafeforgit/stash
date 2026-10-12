@@ -231,11 +231,9 @@ it("preserves suppressed media links and refuses cross-post or mismatched identi
     client([media, media]).api.media(postIds.post),
   ).rejects.toThrow();
   media.media.state = media.association.media_state = "deleted";
-  await expect(client([media]).api.media(postIds.post)).rejects.toThrow();
-  media.media.local_id = null;
-  expect(
-    (await client([media]).api.media(postIds.post))[0]?.media.local_id,
-  ).toBeNull();
+  expect((await client([media]).api.media(postIds.post))[0]?.media.state).toBe(
+    "deleted",
+  );
 });
 
 it("preserves disabled/deleted albums and resolves gallery aliases without inventing an active local ID", async () => {
@@ -266,7 +264,6 @@ it("preserves disabled/deleted albums and resolves gallery aliases without inven
     client(postAlbumContext(album)).api.album(postIds.otherPost),
   ).rejects.toThrow();
   album.gallery!.state = "deleted";
-  album.gallery!.local_id = null;
   expect(
     (await client(postAlbumContext(album)).api.album(postIds.post))?.gallery
       ?.state,

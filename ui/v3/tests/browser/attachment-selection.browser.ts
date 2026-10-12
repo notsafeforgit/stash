@@ -172,7 +172,7 @@ async function archive(page: Page) {
       result = {
         uuid: postIds.gallery,
         kind: "gallery",
-        local_id: 12,
+
         revision: 1,
       };
     } else if (path.endsWith("/album-posts")) {

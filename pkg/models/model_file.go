@@ -60,25 +60,6 @@ func (i FileID) String() string {
 	return strconv.Itoa(int(i))
 }
 
-func (i *FileID) UnmarshalGQL(v interface{}) (err error) {
-	switch v := v.(type) {
-	case string:
-		var id int
-		id, err = strconv.Atoi(v)
-		*i = FileID(id)
-		return err
-	case int:
-		*i = FileID(v)
-		return nil
-	default:
-		return fmt.Errorf("%T is not an int", v)
-	}
-}
-
-func (i FileID) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(i.String()))
-}
-
 func FileIDsFromInts(ids []int) []FileID {
 	ret := make([]FileID, len(ids))
 	for i, id := range ids {

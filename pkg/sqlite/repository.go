@@ -40,6 +40,9 @@ func (r *repository) destroyExisting(ctx context.Context, ids []int) error {
 }
 
 func (r *repository) destroy(ctx context.Context, ids []int) error {
+	if err := retainDeletedLibraryIDs(ctx, r.tableName, ids); err != nil {
+		return err
+	}
 	for _, id := range ids {
 		stmt := fmt.Sprintf("DELETE FROM %s WHERE %s = ?", r.tableName, r.idColumn)
 		if _, err := dbWrapper.Exec(ctx, stmt, id); err != nil {

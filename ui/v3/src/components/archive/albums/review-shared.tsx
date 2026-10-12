@@ -162,7 +162,7 @@ export function AlbumReviewError({
 export function AlbumItemLink({ item }: { item: AlbumIdentity }) {
   const intl = useIntl();
   const msg = useMsg();
-  if (item.state !== "active" || item.local_id === undefined)
+  if (item.state !== "active")
     return (
       <code className="wrap-anywhere text-xs" data-selectable-text>
         {item.uuid}
@@ -179,14 +179,14 @@ export function AlbumItemLink({ item }: { item: AlbumIdentity }) {
       item={{
         ...item,
         state: "active",
-        local_id: item.local_id,
+        uuid: item.uuid,
         title: "",
         title_truncated: false,
       }}
     >
       {intl.formatMessage(
         { id: "album_review.item", defaultMessage: "{kind} #{id}" },
-        { kind, id: item.local_id },
+        { kind, id: item.uuid },
       )}
     </LibraryLink>
   );

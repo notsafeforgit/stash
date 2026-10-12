@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/stashapp/stash/pkg/entityid"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/txn"
 )
@@ -16,27 +17,31 @@ type ArchiveEntityStore struct{}
 const archiveUUIDExpression = `(lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', (random() & 3) + 1, 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))))`
 
 type archiveEntityRow struct {
-	UUID        string                    `db:"uuid"`
-	Kind        models.ArchiveEntityKind  `db:"kind"`
-	State       models.ArchiveEntityState `db:"state"`
-	Revision    int                       `db:"revision"`
-	PerformerID sql.NullInt64             `db:"performer_id"`
-	SceneID     sql.NullInt64             `db:"scene_id"`
-	ImageID     sql.NullInt64             `db:"image_id"`
-	FileID      sql.NullInt64             `db:"file_id"`
-	GalleryID   sql.NullInt64             `db:"gallery_id"`
-	TagID       sql.NullInt64             `db:"tag_id"`
-	StudioID    sql.NullInt64             `db:"studio_id"`
-	GroupID     sql.NullInt64             `db:"group_id"`
-	OriginalID  sql.NullInt64             `db:"original_id"`
-	RedirectTo  sql.NullString            `db:"redirect_to"`
-	CreatedAt   Timestamp                 `db:"created_at"`
-	RetiredAt   sql.NullTime              `db:"retired_at"`
+	UUID             string                    `db:"uuid"`
+	Kind             models.ArchiveEntityKind  `db:"kind"`
+	State            models.ArchiveEntityState `db:"state"`
+	Revision         int                       `db:"revision"`
+	PerformerID      sql.NullInt64             `db:"performer_id"`
+	SceneID          sql.NullInt64             `db:"scene_id"`
+	ImageID          sql.NullInt64             `db:"image_id"`
+	FileID           sql.NullInt64             `db:"file_id"`
+	GalleryID        sql.NullInt64             `db:"gallery_id"`
+	TagID            sql.NullInt64             `db:"tag_id"`
+	StudioID         sql.NullInt64             `db:"studio_id"`
+	GroupID          sql.NullInt64             `db:"group_id"`
+	FolderID         sql.NullInt64             `db:"folder_id"`
+	SceneMarkerID    sql.NullInt64             `db:"scene_marker_id"`
+	GalleryChapterID sql.NullInt64             `db:"gallery_chapter_id"`
+	SavedFilterID    sql.NullInt64             `db:"saved_filter_id"`
+	OriginalID       sql.NullInt64             `db:"original_id"`
+	RedirectTo       sql.NullString            `db:"redirect_to"`
+	CreatedAt        Timestamp                 `db:"created_at"`
+	RetiredAt        sql.NullTime              `db:"retired_at"`
 }
 
 func (r archiveEntityRow) resolve() *models.ArchiveEntity {
 	ret := &models.ArchiveEntity{UUID: r.UUID, Kind: r.Kind, State: r.State, Revision: r.Revision, CreatedAt: r.CreatedAt.Timestamp}
-	for _, local := range []sql.NullInt64{r.PerformerID, r.SceneID, r.ImageID, r.FileID, r.GalleryID, r.TagID, r.StudioID, r.GroupID} {
+	for _, local := range []sql.NullInt64{r.PerformerID, r.SceneID, r.ImageID, r.FileID, r.GalleryID, r.TagID, r.StudioID, r.GroupID, r.FolderID, r.SceneMarkerID, r.GalleryChapterID, r.SavedFilterID} {
 		if local.Valid {
 			id := int(local.Int64)
 			ret.LocalID = &id
@@ -81,6 +86,14 @@ func archiveLocalColumn(kind models.ArchiveEntityKind) (string, error) {
 		return "studio_id", nil
 	case models.ArchiveGroup:
 		return "group_id", nil
+	case models.ArchiveFolder:
+		return "folder_id", nil
+	case models.ArchiveSceneMarker:
+		return "scene_marker_id", nil
+	case models.ArchiveGalleryChapter:
+		return "gallery_chapter_id", nil
+	case models.ArchiveSavedFilter:
+		return "saved_filter_id", nil
 	default:
 		return "", errors.New("invalid archive entity kind")
 	}
@@ -187,13 +200,17 @@ func (s *ArchiveEntityStore) Redirect(ctx context.Context, sourceUUID, destinati
 		return errors.New("merge requires distinct archive entities of the same kind")
 	}
 	if source.Kind == models.ArchivePerformer {
+		// Keep the retired identity available to after-commit hook snapshots.
 		if err := mergePerformerProfileURLSuppressions(ctx, source.UUID, destination.UUID); err != nil {
 			return err
 		}
 	}
+	if source.LocalID != nil {
+		entityid.Remember(ctx, source.Kind, *source.LocalID, source.UUID)
+	}
 	result, err := dbWrapper.Exec(ctx, `UPDATE archive_entities SET state = 'redirected', revision = revision + 1,
 performer_id = NULL, scene_id = NULL, image_id = NULL, file_id = NULL, gallery_id = NULL,
-tag_id = NULL, studio_id = NULL, group_id = NULL, redirect_to = ?, retired_at = CURRENT_TIMESTAMP
+tag_id = NULL, studio_id = NULL, group_id = NULL, folder_id = NULL, scene_marker_id = NULL, gallery_chapter_id = NULL, saved_filter_id = NULL, redirect_to = ?, retired_at = CURRENT_TIMESTAMP
 WHERE uuid = ? AND revision = ? AND state = 'active'`, destination.UUID, source.UUID, expectedRevision)
 	if err := checkArchiveIdentityUpdate(result, err); err != nil {
 		return err
@@ -207,6 +224,10 @@ WHERE uuid = ? AND revision = ? AND state = 'active'`, destination.UUID, source.
 		models.ArchiveImage: "images", models.ArchiveFile: "files",
 		models.ArchiveGallery: "galleries",
 		models.ArchiveTag:     "tags", models.ArchiveStudio: "studios", models.ArchiveGroup: "groups",
+		models.ArchiveFolder:         "folders",
+		models.ArchiveSceneMarker:    "scene_markers",
+		models.ArchiveGalleryChapter: "galleries_chapters",
+		models.ArchiveSavedFilter:    "saved_filters",
 	}[source.Kind]
 	// The merge caller must remove the source record before commit. Refuse a
 	// partial merge that would leave a library row without a current UUID.

@@ -205,7 +205,7 @@ export function MergeGalleryChoice({
       .filter((gallery) => gallery.state === "active")
       .map((gallery) => ({
         value: gallery.uuid,
-        label: `${gallery.title || msg("gallery", "Gallery")} #${gallery.local_id}`,
+        label: `${gallery.title || msg("gallery", "Gallery")} #${gallery.uuid}`,
       })),
   ];
   return (
@@ -351,7 +351,7 @@ export function MergeAttachmentChoices({
           { value: "undecided", label: labels.state.undecided },
           ...media.map((item) => ({
             value: item.uuid,
-            label: `${labels.state.linked} · ${labels.kind[item.kind]} ${item.local_id === null ? msg("post_merge.deleted", "Deleted item") : `#${item.local_id}`}`,
+            label: `${labels.state.linked} · ${labels.kind[item.kind]} ${item.state === "deleted" ? msg("post_merge.deleted", "Deleted item") : item.uuid}`,
           })),
         ];
         return (

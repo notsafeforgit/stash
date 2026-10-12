@@ -137,7 +137,7 @@ async function archive(
         ),
       });
     if (path.startsWith("entity-identities/")) {
-      const [, kind, local] = path.split("/");
+      const [, kind] = path.split("/");
       return route.fulfill({
         json: {
           uuid:
@@ -147,7 +147,7 @@ async function archive(
                 ? policyIDs.image
                 : policyIDs.entity,
           kind,
-          local_id: Number(local),
+
           revision: 1,
         },
       });

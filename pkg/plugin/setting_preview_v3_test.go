@@ -30,6 +30,7 @@ func (previewSessionConfig) GetSessionStoreKey() []byte { return []byte("preview
 func (previewSessionConfig) GetMaxSessionAge() int      { return 60 }
 
 func TestSettingPreviewExecution(t *testing.T) {
+	_, repo, sceneID, imageID := pluginLibraryFixture(t)
 	dir := t.TempDir()
 	manifest := filepath.Join(dir, "fixture.yml")
 	require.NoError(t, os.WriteFile(manifest, []byte(`apiVersion: 3
@@ -46,33 +47,38 @@ settings:
 	require.NoError(t, err)
 	c := NewCache(previewServerConfig{})
 	c.plugins = []Config{*cfg}
+	c.RegisterRepository(repo)
 	c.RegisterSessionStore(session.NewStore(previewSessionConfig{}))
+	_, err = c.SettingPreviewV3(t.Context(), "fixture", "mappings", imageID)
+	require.ErrorContains(t, err, "wrong kind")
+	_, err = c.SettingPreviewV3(t.Context(), "fixture", "mappings", "42")
+	require.ErrorContains(t, err, "UUID")
 	script := filepath.Join(dir, "preview.js")
 	require.NoError(t, os.WriteFile(script, []byte(`({Output: input.Args})`), 0600))
-	result, err := c.SettingPreviewV3(context.Background(), "fixture", "mappings", "42")
+	result, err := c.SettingPreviewV3(context.Background(), "fixture", "mappings", sceneID)
 	require.NoError(t, err)
 	encoded, err := json.Marshal(result)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"mode":"preview","setting":"mappings","entity_type":"scene","entity_id":"42"}`, string(encoded))
+	require.JSONEq(t, `{"mode":"preview","setting":"mappings","entity_type":"scene","entity_id":"`+sceneID+`"}`, string(encoded))
 
-	_, err = c.SettingPreviewV3(context.Background(), "missing", "mappings", "42")
+	_, err = c.SettingPreviewV3(context.Background(), "missing", "mappings", sceneID)
 	require.ErrorContains(t, err, "not found")
 	c.config = previewServerConfig{disabled: []string{"fixture"}}
-	_, err = c.SettingPreviewV3(context.Background(), "fixture", "mappings", "42")
+	_, err = c.SettingPreviewV3(context.Background(), "fixture", "mappings", sceneID)
 	require.ErrorContains(t, err, "disabled")
 	c.config = previewServerConfig{}
 
 	require.NoError(t, os.WriteFile(script, []byte(`({Error: "Catalog unavailable"})`), 0600))
-	_, err = c.SettingPreviewV3(context.Background(), "fixture", "mappings", "42")
+	_, err = c.SettingPreviewV3(context.Background(), "fixture", "mappings", sceneID)
 	require.ErrorContains(t, err, "Catalog unavailable")
 	require.NoError(t, os.WriteFile(script, []byte(`({Output: "x".repeat(1048577)})`), 0600))
-	_, err = c.SettingPreviewV3(context.Background(), "fixture", "mappings", "42")
+	_, err = c.SettingPreviewV3(context.Background(), "fixture", "mappings", sceneID)
 	require.ErrorContains(t, err, "at most")
 
 	require.NoError(t, os.WriteFile(script, []byte(`while (true) {}`), 0600))
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	_, err = c.SettingPreviewV3(ctx, "fixture", "mappings", "42")
+	_, err = c.SettingPreviewV3(ctx, "fixture", "mappings", sceneID)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 }
 

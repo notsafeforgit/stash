@@ -1,8 +1,8 @@
 "Select explicit IDs, or all items matching a filter, for one entity type."
-input BulkCustomFieldTargetInput {
+input BulkCustomFieldTargetInput  @libraryScope(from: "mode") {
   mode: FilterMode!
   "Mutually exclusive with find_filter and filter_ast. An empty list selects nothing."
-  ids: [ID!]
+  ids: [ID!] @libraryID(kind: "scope")
   "Pagination is ignored, as in bulk update jobs."
   find_filter: FindFilterType
   filter_ast: FilterASTInput

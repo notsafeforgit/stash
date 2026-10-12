@@ -259,7 +259,7 @@ func TestSourcePostBrowserHTTPAlbumAndMediaInspectionPreservesChoices(t *testing
 	album := readAlbum()
 	require.Equal(t, "linked", album.State)
 	require.Equal(t, identity.UUID, album.Gallery.UUID)
-	require.Equal(t, gallery.ID, *album.Gallery.LocalID)
+	require.Nil(t, album.Gallery.LocalID)
 	require.True(t, album.Gallery.TitleTruncated)
 	require.Equal(t, strings.Repeat("花", 512), album.Gallery.Title)
 	require.Equal(t, album, readAlbum(), "inspection retains the exact association decision")

@@ -84,12 +84,10 @@ def owner(row, performer_uuid):
             "decision_uuid": identifier(ownership.get("decision_uuid")), "performer_uuid": performer_uuid}
 
 
-def owned_list_accounts(client, platform, local_id, body):
-    if not isinstance(local_id, str) or not local_id.isascii() or not local_id.isdigit() or not 1 <= int(local_id) <= 2147483647:
-        raise InvalidData("Choose a valid Stash performer ID")
-    entity = client.request("GET", f"/entity-identities/performer/{int(local_id)}")
-    if (not isinstance(entity, dict) or entity.get("kind") != "performer"
-            or entity.get("local_id") != int(local_id)):
+def owned_list_accounts(client, platform, performer_id, body):
+    identifier(performer_id)
+    entity = client.request("GET", f"/entity-identities/performer/{performer_id}")
+    if (not isinstance(entity, dict) or entity.get("kind") != "performer"):
         raise Unavailable("invalid_performer_identity")
     requested = identifier(entity.get("uuid"))
     rows, after, performer = [], "", None

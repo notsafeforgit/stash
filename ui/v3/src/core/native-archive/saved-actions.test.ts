@@ -249,16 +249,26 @@ it("shows retained batches without claiming file jobs are completed", async () =
   expect(remote.transport).not.toHaveBeenCalled();
 });
 
-it("routes local media scopes to the correct review without interpreting them as UUIDs", async () => {
+it("routes local media scopes to the correct review using library UUIDs", async () => {
   const remote = server();
-  expect(await remote.api.location("metadata", "scene:123")).toEqual({
+  expect(
+    await remote.api.location(
+      "metadata",
+      "scene:00000000-0000-4000-8000-000000000123",
+    ),
+  ).toEqual({
     kind: "scene",
-    id: "123",
+    id: "00000000-0000-4000-8000-000000000123",
     tab: "metadata-review",
   });
-  expect(await remote.api.location("source_link", "image:456")).toEqual({
+  expect(
+    await remote.api.location(
+      "source_link",
+      "image:00000000-0000-4000-8000-000000000456",
+    ),
+  ).toEqual({
     kind: "image",
-    id: "456",
+    id: "00000000-0000-4000-8000-000000000456",
     tab: "source-review",
   });
   await expect(

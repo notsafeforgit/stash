@@ -94,7 +94,6 @@ async function archive(
         uuid: sourceIds.media,
         kind: options.image ? "image" : "scene",
         revision: 2,
-        local_id: 7,
       };
     else if (path.endsWith("/source-posts"))
       result = options.empty ? [] : [post];

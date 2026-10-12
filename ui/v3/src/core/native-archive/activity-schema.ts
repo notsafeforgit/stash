@@ -164,7 +164,6 @@ const activitySubjectSchema = z.object({
   title_truncated: z.boolean(),
   state: z.enum(["active", "forgotten", "disabled", "retired", "deleted"]),
   revision: positive,
-  local_id: positive.nullable(),
 });
 export const jobActivityDetailSchema = z.object({
   summary: jobActivitySchema,

@@ -100,8 +100,8 @@ function ShareForm({
       targets:
         share?.items.map((item) => ({
           kind: item.kind,
-          id: item.id,
-          name: item.title || item.id,
+          id: item.id ?? "",
+          name: item.title || item.id || "",
         })) ?? targets,
     },
     validators: {

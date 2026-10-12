@@ -12,5 +12,5 @@ type BulkUpdateResult {
   "Number of selected items. A queued result does not claim they were updated."
   selected_count: Int!
   "IDs updated by an inline transaction; empty for QUEUED."
-  updated_ids: [ID!]!
+  updated_ids: [ID!]! @libraryID(kind: "scope")
 }

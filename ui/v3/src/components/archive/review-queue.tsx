@@ -51,7 +51,7 @@ function ReviewLink({ item }: { item: ReviewQueueItem }) {
         {msg("review_queue.review_post", "Review post media")}
       </Link>
     );
-  if (item.media?.local_id) {
+  if (item.media?.uuid) {
     const label = msg(
       "review_queue.review_metadata",
       "Review retained metadata",
@@ -60,7 +60,7 @@ function ReviewLink({ item }: { item: ReviewQueueItem }) {
       <Link
         className={className}
         to="/scenes/$sceneId"
-        params={{ sceneId: String(item.media.local_id) }}
+        params={{ sceneId: item.media.uuid }}
         search={{ tab: "metadata-review" }}
       >
         {label}
@@ -69,7 +69,7 @@ function ReviewLink({ item }: { item: ReviewQueueItem }) {
       <Link
         className={className}
         to="/images/$imageId"
-        params={{ imageId: String(item.media.local_id) }}
+        params={{ imageId: item.media.uuid }}
         search={{ tab: "metadata-review" }}
       >
         {label}

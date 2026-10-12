@@ -153,7 +153,11 @@ func (r *performerResolver) ImagePath(ctx context.Context, obj *models.Performer
 	}
 
 	baseURL, _ := ctx.Value(BaseURLCtxKey).(string)
-	imagePath := urlbuilders.NewPerformerURLBuilder(baseURL, obj).GetPerformerImageURL(hasImage)
+	publicID, identityErr := r.publicID(ctx, models.ArchivePerformer, obj.ID)
+	if identityErr != nil {
+		return nil, identityErr
+	}
+	imagePath := urlbuilders.NewPerformerURLBuilder(baseURL, obj, publicID).GetPerformerImageURL(hasImage)
 	return &imagePath, nil
 }
 

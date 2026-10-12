@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/stashapp/stash/pkg/entityid"
 	"io"
 	"io/fs"
 	"net/http"
@@ -216,6 +217,11 @@ func Initialize() (*Server, error) {
 	}
 
 	r.Use(dataloaders.Middleware)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r.WithContext(entityid.WithRepository(r.Context(), repo)))
+		})
+	})
 
 	pluginCache := mgr.PluginCache
 	sceneService := mgr.SceneService
@@ -236,7 +242,7 @@ func Initialize() (*Server, error) {
 		hookExecutor:         pluginCache,
 	}
 
-	gqlSrv := gqlHandler.New(NewExecutableSchema(Config{Resolvers: resolver}))
+	gqlSrv := gqlHandler.New(newLibrarySchema(Config{Resolvers: resolver}))
 	gqlSrv.SetRecoverFunc(recoverFunc)
 	gqlSrv.AddTransport(graphQLWebsocketTransport())
 	gqlSrv.AddTransport(gqlTransport.Options{})

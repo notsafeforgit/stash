@@ -15,10 +15,10 @@ type ImageURLBuilder struct {
 	UpdatedAt string
 }
 
-func NewImageURLBuilder(baseURL string, image *models.Image) ImageURLBuilder {
+func NewImageURLBuilder(baseURL string, image *models.Image, publicID string) ImageURLBuilder {
 	return ImageURLBuilder{
 		BaseURL:   baseURL,
-		ImageID:   strconv.Itoa(image.ID),
+		ImageID:   publicID,
 		Checksum:  image.Checksum,
 		UpdatedAt: strconv.FormatInt(image.UpdatedAt.Unix(), 10),
 	}

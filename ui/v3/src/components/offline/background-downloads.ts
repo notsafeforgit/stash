@@ -122,7 +122,10 @@ function watchBackgroundProgress(
 }
 
 export async function currentBackgroundEntry(id: string) {
-  const sceneId = /^scene-([1-9]\d*)-/.exec(id)?.[1];
+  const sceneId =
+    /^scene-([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}|[1-9]\d*)-/.exec(
+      id,
+    )?.[1];
   if (!sceneId) return undefined;
   const entry = await getEntry(sceneId);
   return entry?.background_fetch_id === id ? entry : undefined;

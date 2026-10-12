@@ -51,12 +51,12 @@ export function createProviderMetadataAPI(
     pageLimit,
     async identity(
       kind: ProviderEntityKind,
-      localId: string,
+      libraryId: string,
       signal?: AbortSignal,
     ) {
       providerKind.parse(kind);
-      const identity = await review.identity(kind, localId, signal);
-      if (identity.kind !== kind || String(identity.local_id) !== localId)
+      const identity = await review.identity(kind, libraryId, signal);
+      if (identity.kind !== kind)
         throw new NativeArchiveError(0, "identity_mismatch");
       return identity;
     },

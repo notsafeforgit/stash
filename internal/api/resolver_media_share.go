@@ -29,7 +29,11 @@ func shareResult(row *models.ShareRecord) (*MediaShare, error) {
 		ret.LastAccessedAt = &t
 	}
 	for _, entry := range snapshot.Entries {
-		ret.Items = append(ret.Items, &MediaShareEntry{Kind: ShareEntityKind(entry.Kind), ID: strconv.Itoa(entry.ID), Title: entry.Title, MediaCount: len(entry.MediaKeys)})
+		var id *string
+		if entry.UUID != "" {
+			id = &entry.UUID
+		}
+		ret.Items = append(ret.Items, &MediaShareEntry{Kind: ShareEntityKind(entry.Kind), ID: id, Title: entry.Title, MediaCount: len(entry.MediaKeys)})
 	}
 	return ret, nil
 }

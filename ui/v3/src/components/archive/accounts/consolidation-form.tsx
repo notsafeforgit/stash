@@ -1,3 +1,4 @@
+import { libraryIdSchema } from "@/core/library-id";
 import { useId, useState } from "react";
 import { useIntl } from "react-intl";
 import { useForm } from "@tanstack/react-form";
@@ -43,7 +44,7 @@ const formSchema = z
     mode: modeSchema,
     performer: z
       .object({
-        id: z.string().regex(/^[1-9]\d*$/),
+        id: libraryIdSchema,
         name: z.string(),
         disambiguation: z.string().nullish(),
       })

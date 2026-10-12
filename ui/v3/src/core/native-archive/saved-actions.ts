@@ -1,3 +1,4 @@
+import { libraryIdSchema } from "@/core/library-id";
 import { z } from "zod";
 import {
   createAccountReviewAPI,
@@ -91,13 +92,13 @@ interface Adapter {
   read: (key: string) => Promise<SavedActionSummary | null>;
   deliver: (key: string) => Promise<unknown>;
 }
-type MediaTarget = { kind: "scene" | "image"; localId: string };
+type MediaTarget = { kind: "scene" | "image"; libraryId: string };
 
 function mediaKey(key: string): MediaTarget {
-  const [kind, localId] = z
-    .tuple([z.enum(["scene", "image"]), z.string().regex(/^[1-9]\d*$/)])
+  const [kind, libraryId] = z
+    .tuple([z.enum(["scene", "image"]), libraryIdSchema])
     .parse(key.split(":"));
-  return { kind, localId };
+  return { kind, libraryId };
 }
 function mediaBox<Saved>(box: {
   read: (target: MediaTarget) => Promise<Saved | null>;
@@ -282,7 +283,7 @@ export function createSavedActionsAPI(
         const target = mediaKey(key);
         return {
           kind: target.kind,
-          id: target.localId,
+          id: target.libraryId,
           tab: family === "metadata" ? "metadata-review" : "source-review",
         };
       }

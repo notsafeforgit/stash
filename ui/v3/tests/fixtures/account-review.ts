@@ -22,7 +22,6 @@ export function performer(other = false): AccountPerformer {
     uuid: other ? ids.otherPerformer : ids.performer,
     revision: 3,
     state: "active",
-    local_id: other ? 11 : 10,
     name: "River",
     disambiguation: other ? "Photographer" : "Model",
   };

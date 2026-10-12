@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -21,7 +20,7 @@ func TestNativeBulkUpdateContract(t *testing.T) {
 	repo := pluginNotificationRepository(t)
 	hooks := &notificationRecorder{}
 	updater := &customFieldsBulkUpdater{}
-	server := handler.New(NewExecutableSchema(Config{Resolvers: &Resolver{repository: repo, hookExecutor: hooks, bulkUpdater: updater}}))
+	server := handler.New(newLibrarySchema(Config{Resolvers: &Resolver{repository: repo, hookExecutor: hooks, bulkUpdater: updater}}))
 	server.AddTransport(transport.POST{})
 	call := func(query string, input any) string {
 		t.Helper()
@@ -51,7 +50,7 @@ func TestNativeBulkUpdateContract(t *testing.T) {
 	scene := models.NewScene()
 	scene.Title = "Original"
 	require.NoError(t, repo.WithTxn(testCtx, func(ctx context.Context) error { return repo.Scene.Create(ctx, &scene, nil) }))
-	id := strconv.Itoa(scene.ID)
+	id := libraryTestUUID(t, repo, models.ArchiveScene, scene.ID)
 	query := `mutation($input: BulkSceneUpdateInput!) { result: bulkSceneUpdate(input: $input) { status job_id selected_count updated_ids } }`
 	readTitle := func() string {
 		t.Helper()

@@ -84,9 +84,15 @@ func (r *fileHookRepository) Destroy(ctx context.Context, id models.FileID) erro
 	if err := r.FileReaderWriter.Destroy(ctx, id); err != nil {
 		return err
 	}
-	txn.AddPostCommitHook(ctx, func(ctx context.Context) {
-		r.hooks.ExecutePostHooks(ctx, int(id), hook.FileDestroyPost, input, nil)
-	})
+	if registrar, ok := r.hooks.(interface {
+		RegisterPostHooks(context.Context, int, hook.TriggerEnum, interface{}, []string)
+	}); ok {
+		registrar.RegisterPostHooks(ctx, int(id), hook.FileDestroyPost, input, nil)
+	} else {
+		txn.AddPostCommitHook(ctx, func(ctx context.Context) {
+			r.hooks.ExecutePostHooks(ctx, int(id), hook.FileDestroyPost, input, nil)
+		})
+	}
 	return nil
 }
 

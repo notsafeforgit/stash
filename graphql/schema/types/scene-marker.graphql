@@ -1,5 +1,5 @@
 type SceneMarker {
-  id: ID!
+  id: ID! @libraryID(kind: "scene_marker")
   scene: Scene!
   title: String!
   "The required start time of the marker (in seconds). Supports decimals."
@@ -25,31 +25,31 @@ input SceneMarkerCreateInput {
   seconds: Float!
   "The optional end time of the marker (in seconds). Supports decimals."
   end_seconds: Float
-  scene_id: ID!
-  primary_tag_id: ID!
-  tag_ids: [ID!]
+  scene_id: ID! @libraryID(kind: "scene")
+  primary_tag_id: ID! @libraryID(kind: "tag")
+  tag_ids: [ID!] @libraryID(kind: "tag")
 }
 
 input SceneMarkerUpdateInput {
-  id: ID!
+  id: ID! @libraryID(kind: "scene_marker")
   title: String
   "The start time of the marker (in seconds). Supports decimals."
   seconds: Float
   "The end time of the marker (in seconds). Supports decimals."
   end_seconds: Float
-  scene_id: ID
-  primary_tag_id: ID
-  tag_ids: [ID!]
+  scene_id: ID @libraryID(kind: "scene")
+  primary_tag_id: ID @libraryID(kind: "tag")
+  tag_ids: [ID!] @libraryID(kind: "tag")
 }
 
 input BulkSceneMarkerUpdateInput {
-  ids: [ID!]
+  ids: [ID!] @libraryID(kind: "scene_marker")
   apply_to_items_matching_filters: Boolean
   find_filter: FindFilterType
   scene_marker_filter_ast: FilterASTInput
   title: String
-  primary_tag_id: ID
-  tag_ids: BulkUpdateIds
+  primary_tag_id: ID @libraryID(kind: "tag")
+  tag_ids: BulkUpdateIds @libraryScope(kind: "tag")
 }
 
 type FindSceneMarkersResultType {
@@ -59,6 +59,6 @@ type FindSceneMarkersResultType {
 
 type MarkerStringsResultType {
   count: Int!
-  id: ID!
+  id: ID! @libraryID(kind: "scene_marker")
   title: String!
 }

@@ -12,10 +12,10 @@ type StudioURLBuilder struct {
 	UpdatedAt string
 }
 
-func NewStudioURLBuilder(baseURL string, studio *models.Studio) StudioURLBuilder {
+func NewStudioURLBuilder(baseURL string, studio *models.Studio, publicID string) StudioURLBuilder {
 	return StudioURLBuilder{
 		BaseURL:   baseURL,
-		StudioID:  strconv.Itoa(studio.ID),
+		StudioID:  publicID,
 		UpdatedAt: strconv.FormatInt(studio.UpdatedAt.Unix(), 10),
 	}
 }

@@ -18,7 +18,7 @@ type activitySubject struct {
 	TitleTruncated bool   `json:"title_truncated"`
 	State          string `json:"state"`
 	Revision       int    `json:"revision"`
-	LocalID        *int   `json:"local_id"`
+	LocalID        *int   `json:"-"`
 }
 
 type activityJobDetail struct {

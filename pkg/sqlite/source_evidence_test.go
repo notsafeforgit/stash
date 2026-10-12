@@ -88,7 +88,7 @@ func TestSourceEvidenceMigrationPreservesDirectLibraryAndAccounts(t *testing.T) 
 	defer raw.Close()
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM source_posts"), "direct scans do not require invented source posts")
 	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM performers_scenes WHERE performer_id=71 AND scene_id=31"))
-	require.Equal(t, uint(6), queryUint(t, raw, "SELECT count(*) FROM archive_entities"))
+	require.Equal(t, uint(7), queryUint(t, raw, "SELECT count(*) FROM archive_entities"), "six existing identities plus their folder")
 }
 
 func TestSourceEvidencePostIdentifiersPreserveNamespacesAndUUIDs(t *testing.T) {

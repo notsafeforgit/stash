@@ -220,7 +220,7 @@ function SelectedSample({
           choice.id,
           controller.signal,
         );
-        if (identity.kind !== kind || String(identity.local_id) !== choice.id)
+        if (identity.kind !== kind)
           throw new NativeArchiveError(0, "identity_mismatch");
         const [files, sources] = await Promise.all([
           api.files(

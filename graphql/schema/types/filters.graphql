@@ -172,7 +172,7 @@ input PerformerFilterType {
   "Filter to only include performers missing this property"
   is_missing: String
   "Filter to only include performers with these tags"
-  tags: HierarchicalMultiCriterionInput
+  tags: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
   "Filter by tag count"
   tag_count: IntCriterionInput
   "Filter by scene count"
@@ -203,11 +203,11 @@ input PerformerFilterType {
   "Filter by death year"
   death_year: IntCriterionInput
   "Filter by studios where performer appears in scene/image/gallery"
-  studios: HierarchicalMultiCriterionInput
+  studios: HierarchicalMultiCriterionInput @libraryScope(kind: "studio")
   "Filter by groups where performer appears in scene"
-  groups: HierarchicalMultiCriterionInput
+  groups: HierarchicalMultiCriterionInput @libraryScope(kind: "group")
   "Filter by performers where performer appears with another performer in scene/image/gallery"
-  performers: MultiCriterionInput
+  performers: MultiCriterionInput @libraryScope(kind: "performer")
   "Filter by autotag ignore value"
   ignore_auto_tag: Boolean
   "Filter by birthdate"
@@ -234,13 +234,13 @@ input PerformerFilterType {
 
 input SceneMarkerFilterType {
   "Filter to only include scene markers with these tags"
-  tags: HierarchicalMultiCriterionInput
+  tags: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
   "Filter to only include scene markers attached to a scene with these tags"
-  scene_tags: HierarchicalMultiCriterionInput
+  scene_tags: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
   "Filter to only include scene markers with these performers"
-  performers: MultiCriterionInput
+  performers: MultiCriterionInput @libraryScope(kind: "performer")
   "Filter to only include scene markers from these scenes"
-  scenes: MultiCriterionInput
+  scenes: MultiCriterionInput @libraryScope(kind: "scene")
   "Filter by duration (in seconds)"
   duration: FloatCriterionInput
   "Filter by creation time"
@@ -262,7 +262,7 @@ input SceneFilterType {
   OR: SceneFilterType
   NOT: SceneFilterType
 
-  id: IntCriterionInput
+  id: IDCriterionInput @libraryScope(kind: "scene")
   title: StringCriterionInput
   code: StringCriterionInput
   details: StringCriterionInput
@@ -315,23 +315,23 @@ input SceneFilterType {
   "Filter to only include scenes missing this property"
   is_missing: String
   "Filter to only include scenes with this studio"
-  studios: HierarchicalMultiCriterionInput
+  studios: HierarchicalMultiCriterionInput @libraryScope(kind: "studio")
   "Filter to only include scenes with this group"
-  groups: HierarchicalMultiCriterionInput
+  groups: HierarchicalMultiCriterionInput @libraryScope(kind: "group")
   "Filter to only include scenes with this gallery"
-  galleries: MultiCriterionInput
+  galleries: MultiCriterionInput @libraryScope(kind: "gallery")
   "Filter to only include scenes with these tags"
-  tags: HierarchicalMultiCriterionInput
+  tags: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
   "Filter by tag count"
   tag_count: IntCriterionInput
   "Filter to only include scenes with performers with these tags"
-  performer_tags: HierarchicalMultiCriterionInput
+  performer_tags: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
   "Filter scenes that have performers that have been favorited"
   performer_favorite: Boolean
   "Filter scenes by performer age at time of scene"
   performer_age: IntCriterionInput
   "Filter to only include scenes with these performers"
-  performers: MultiCriterionInput
+  performers: MultiCriterionInput @libraryScope(kind: "performer")
   "Filter by performer count"
   performer_count: IntCriterionInput
   "Filter by StashID"
@@ -398,15 +398,15 @@ input GroupFilterType {
   # rating expressed as 1-100
   rating100: IntCriterionInput
   "Filter to only include groups with this studio"
-  studios: HierarchicalMultiCriterionInput
+  studios: HierarchicalMultiCriterionInput @libraryScope(kind: "studio")
   "Filter to only include groups missing this property"
   is_missing: String
   "Filter by url"
   url: StringCriterionInput
   "Filter to only include groups where performer appears in a scene"
-  performers: MultiCriterionInput
+  performers: MultiCriterionInput @libraryScope(kind: "performer")
   "Filter to only include groups with these tags"
-  tags: HierarchicalMultiCriterionInput
+  tags: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
   "Filter by tag count"
   tag_count: IntCriterionInput
   "Filter by date"
@@ -419,9 +419,9 @@ input GroupFilterType {
   o_counter: IntCriterionInput
 
   "Filter by containing groups"
-  containing_groups: HierarchicalMultiCriterionInput
+  containing_groups: HierarchicalMultiCriterionInput @libraryScope(kind: "group")
   "Filter by sub groups"
-  sub_groups: HierarchicalMultiCriterionInput
+  sub_groups: HierarchicalMultiCriterionInput @libraryScope(kind: "group")
   "Filter by number of containing groups the group has"
   containing_group_count: IntCriterionInput
   "Filter by number of sub-groups the group has"
@@ -446,18 +446,18 @@ input StudioFilterType {
   name: StringCriterionInput
   details: StringCriterionInput
   "Filter to only include studios with this parent studio"
-  parents: MultiCriterionInput
+  parents: MultiCriterionInput @libraryScope(kind: "studio")
   "Filter by StashID"
   stash_id_endpoint: StashIDCriterionInput
     @deprecated(reason: "use stash_ids_endpoint instead")
   "Filter by StashIDs"
   stash_ids_endpoint: StashIDsCriterionInput
   "Filter to only include studios with these tags"
-  tags: HierarchicalMultiCriterionInput
+  tags: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
   "Filter to only include studios whose ancestor studios have these tags"
-  ancestor_tags: HierarchicalMultiCriterionInput
+  ancestor_tags: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
   "Filter to only include studios whose descendant studios have these tags"
-  descendant_tags: HierarchicalMultiCriterionInput
+  descendant_tags: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
   "Filter to only include studios missing this property"
   is_missing: String
   # rating expressed as 1-100
@@ -505,7 +505,7 @@ input GalleryFilterType {
   OR: GalleryFilterType
   NOT: GalleryFilterType
 
-  id: IntCriterionInput
+  id: IDCriterionInput @libraryScope(kind: "gallery")
   title: StringCriterionInput
   details: StringCriterionInput
 
@@ -528,17 +528,17 @@ input GalleryFilterType {
   "Filter to only include galleries that have chapters. `true` or `false`"
   has_chapters: String
   "Filter to only include galleries with these scenes"
-  scenes: MultiCriterionInput
+  scenes: MultiCriterionInput @libraryScope(kind: "scene")
   "Filter to only include galleries with this studio"
-  studios: HierarchicalMultiCriterionInput
+  studios: HierarchicalMultiCriterionInput @libraryScope(kind: "studio")
   "Filter to only include galleries with these tags"
-  tags: HierarchicalMultiCriterionInput
+  tags: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
   "Filter by tag count"
   tag_count: IntCriterionInput
   "Filter to only include galleries with performers with these tags"
-  performer_tags: HierarchicalMultiCriterionInput
+  performer_tags: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
   "Filter to only include galleries with these performers"
-  performers: MultiCriterionInput
+  performers: MultiCriterionInput @libraryScope(kind: "performer")
   "Filter by performer count"
   performer_count: IntCriterionInput
   "Filter galleries that have performers that have been favorited"
@@ -575,7 +575,7 @@ input GalleryFilterType {
   "Filter by related folders that meet this criteria"
   folders_filter: FolderFilterType
   "Filter by parent folder of the zip or folder the gallery is in"
-  parent_folder: HierarchicalMultiCriterionInput
+  parent_folder: HierarchicalMultiCriterionInput @libraryScope(kind: "folder")
 
   custom_fields: [CustomFieldCriterionInput!]
 }
@@ -625,10 +625,10 @@ input TagFilterType {
   marker_count: HierarchicalCountInput
 
   "Filter by parent tags"
-  parents: HierarchicalMultiCriterionInput
+  parents: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
 
   "Filter by child tags"
-  children: HierarchicalMultiCriterionInput
+  children: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
 
   "Filter by number of parent tags the tag has"
   parent_count: IntCriterionInput
@@ -679,7 +679,7 @@ input ImageFilterType {
   details: StringCriterionInput
 
   " Filter by image id"
-  id: IntCriterionInput
+  id: IDCriterionInput @libraryScope(kind: "image")
   "Filter by file checksum"
   checksum: StringCriterionInput
   "Filter by file phash distance"
@@ -707,15 +707,15 @@ input ImageFilterType {
   "Filter to only include images missing this property"
   is_missing: String
   "Filter to only include images with this studio"
-  studios: HierarchicalMultiCriterionInput
+  studios: HierarchicalMultiCriterionInput @libraryScope(kind: "studio")
   "Filter to only include images with these tags"
-  tags: HierarchicalMultiCriterionInput
+  tags: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
   "Filter by tag count"
   tag_count: IntCriterionInput
   "Filter to only include images with performers with these tags"
-  performer_tags: HierarchicalMultiCriterionInput
+  performer_tags: HierarchicalMultiCriterionInput @libraryScope(kind: "tag")
   "Filter to only include images with these performers"
-  performers: MultiCriterionInput
+  performers: MultiCriterionInput @libraryScope(kind: "performer")
   "Filter by performer count"
   performer_count: IntCriterionInput
   "Filter images that have performers that have been favorited"
@@ -723,7 +723,7 @@ input ImageFilterType {
   "Filter images by performer age at time of image"
   performer_age: IntCriterionInput
   "Filter to only include images with these galleries"
-  galleries: MultiCriterionInput
+  galleries: MultiCriterionInput @libraryScope(kind: "gallery")
   "Filter by creation time"
   created_at: TimestampCriterionInput
   "Filter by last update time"
@@ -756,8 +756,8 @@ input FileFilterType {
   basename: StringCriterionInput
   dir: StringCriterionInput
 
-  parent_folder: HierarchicalMultiCriterionInput
-  zip_file: MultiCriterionInput
+  parent_folder: HierarchicalMultiCriterionInput @libraryScope(kind: "folder")
+  zip_file: MultiCriterionInput @libraryScope(kind: "file")
 
   "Filter by modification time"
   mod_time: TimestampCriterionInput
@@ -796,8 +796,8 @@ input FolderFilterType {
   path: StringCriterionInput
   basename: StringCriterionInput
 
-  parent_folder: HierarchicalMultiCriterionInput
-  zip_file: MultiCriterionInput
+  parent_folder: HierarchicalMultiCriterionInput @libraryScope(kind: "folder")
+  zip_file: MultiCriterionInput @libraryScope(kind: "file")
 
   "Filter by modification time"
   mod_time: TimestampCriterionInput
@@ -889,6 +889,13 @@ input IntCriterionInput {
   modifier: CriterionModifier!
 }
 
+"A library identity criterion; values are UUIDs rather than repository keys."
+input IDCriterionInput {
+  value: ID! @libraryID(kind: "scope")
+  value2: ID @libraryID(kind: "scope")
+  modifier: CriterionModifier!
+}
+
 input HierarchicalCountInput {
   value: Int!
   value2: Int
@@ -904,9 +911,9 @@ input FloatCriterionInput {
 }
 
 input MultiCriterionInput {
-  value: [ID!]
+  value: [ID!] @libraryID(kind: "scope")
   modifier: CriterionModifier!
-  excludes: [ID!]
+  excludes: [ID!] @libraryID(kind: "scope")
 }
 
 input GenderCriterionInput {
@@ -921,10 +928,10 @@ input CircumcisionCriterionInput {
 }
 
 input HierarchicalMultiCriterionInput {
-  value: [ID!]
+  value: [ID!] @libraryID(kind: "scope")
   modifier: CriterionModifier!
   depth: Int
-  excludes: [ID!]
+  excludes: [ID!] @libraryID(kind: "scope")
 }
 
 input DateCriterionInput {
@@ -963,7 +970,7 @@ enum DuplicateFilterMode {
 }
 
 type SavedFilter {
-  id: ID!
+  id: ID! @libraryID(kind: "saved_filter")
   mode: FilterMode!
   name: String!
   find_filter: SavedFindFilterType
@@ -977,9 +984,9 @@ type SavedFilter {
   ui_options: Map
 }
 
-input SaveFilterInput {
+input SaveFilterInput  @libraryScope(from: "mode") {
   "provide ID to overwrite existing filter"
-  id: ID
+  id: ID @libraryID(kind: "saved_filter")
   mode: FilterMode!
   name: String!
   find_filter: FindFilterType
@@ -990,5 +997,5 @@ input SaveFilterInput {
 }
 
 input DestroyFilterInput {
-  id: ID!
+  id: ID! @libraryID(kind: "saved_filter")
 }

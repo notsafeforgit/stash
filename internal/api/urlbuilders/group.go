@@ -12,10 +12,10 @@ type GroupURLBuilder struct {
 	UpdatedAt string
 }
 
-func NewGroupURLBuilder(baseURL string, group *models.Group) GroupURLBuilder {
+func NewGroupURLBuilder(baseURL string, group *models.Group, publicID string) GroupURLBuilder {
 	return GroupURLBuilder{
 		BaseURL:   baseURL,
-		GroupID:   strconv.Itoa(group.ID),
+		GroupID:   publicID,
 		UpdatedAt: strconv.FormatInt(group.UpdatedAt.Unix(), 10),
 	}
 }

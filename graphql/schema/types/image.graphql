@@ -1,5 +1,5 @@
 type Image {
-  id: ID!
+  id: ID! @libraryID(kind: "image")
   title: String
   code: String
   # rating expressed as 1-100
@@ -39,7 +39,7 @@ type ImagePathsType {
 
 input ImageUpdateInput {
   clientMutationId: String
-  id: ID!
+  id: ID! @libraryID(kind: "image")
   title: String
   code: String
   # rating expressed as 1-100
@@ -51,18 +51,18 @@ input ImageUpdateInput {
   details: String
   photographer: String
 
-  studio_id: ID
-  performer_ids: [ID!]
-  tag_ids: [ID!]
-  gallery_ids: [ID!]
+  studio_id: ID @libraryID(kind: "studio")
+  performer_ids: [ID!] @libraryID(kind: "performer")
+  tag_ids: [ID!] @libraryID(kind: "tag")
+  gallery_ids: [ID!] @libraryID(kind: "gallery")
 
-  primary_file_id: ID
+  primary_file_id: ID @libraryID(kind: "file")
   custom_fields: CustomFieldsInput
 }
 
 input BulkImageUpdateInput {
   clientMutationId: String
-  ids: [ID!]
+  ids: [ID!] @libraryID(kind: "image")
   apply_to_items_matching_filters: Boolean
   find_filter: FindFilterType
   image_filter_ast: FilterASTInput
@@ -77,10 +77,10 @@ input BulkImageUpdateInput {
   details: String
   photographer: String
 
-  studio_id: ID
-  performer_ids: BulkUpdateIds
-  tag_ids: BulkUpdateIds
-  gallery_ids: BulkUpdateIds
+  studio_id: ID @libraryID(kind: "studio")
+  performer_ids: BulkUpdateIds @libraryScope(kind: "performer")
+  tag_ids: BulkUpdateIds @libraryScope(kind: "tag")
+  gallery_ids: BulkUpdateIds @libraryScope(kind: "gallery")
   custom_fields: CustomFieldsInput
 }
 
@@ -92,14 +92,14 @@ contract of BulkImageUpdateInput: pass an explicit `ids` list, or set
 """
 input ImagesSetDateFromFileMTimeInput {
   clientMutationId: String
-  ids: [ID!]
+  ids: [ID!] @libraryID(kind: "file")
   apply_to_items_matching_filters: Boolean
   find_filter: FindFilterType
   image_filter_ast: FilterASTInput
 }
 
 input ImageDestroyInput {
-  id: ID!
+  id: ID! @libraryID(kind: "image")
   delete_file: Boolean
   delete_generated: Boolean
   "If true, delete the file entry from the database if the file is not assigned to any other objects"
@@ -107,7 +107,7 @@ input ImageDestroyInput {
 }
 
 input ImagesDestroyInput {
-  ids: [ID!]!
+  ids: [ID!]! @libraryID(kind: "image")
   delete_file: Boolean
   delete_generated: Boolean
   "If true, delete the file entry from the database if the file is not assigned to any other objects"
@@ -125,7 +125,7 @@ enum ImageRotateDirection {
 }
 
 input ImageRotateInput {
-  id: ID!
+  id: ID! @libraryID(kind: "image")
   direction: ImageRotateDirection!
 }
 

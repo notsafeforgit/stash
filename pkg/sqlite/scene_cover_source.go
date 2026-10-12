@@ -12,12 +12,13 @@ import (
 
 func (qb *SceneStore) GetCoverSource(ctx context.Context, sceneID int) (*models.SceneCoverSource, error) {
 	var row struct {
-		Checksum    string        `db:"cover_checksum"`
-		FileID      models.FileID `db:"source_file_id"`
-		At          float64       `db:"at"`
-		Fingerprint []byte        `db:"source_fingerprint"`
+		Checksum    string         `db:"cover_checksum"`
+		FileID      models.FileID  `db:"source_file_id"`
+		FileUUID    sql.NullString `db:"source_file_uuid"`
+		At          float64        `db:"at"`
+		Fingerprint []byte         `db:"source_fingerprint"`
 	}
-	err := dbWrapper.Get(ctx, &row, `SELECT source.cover_checksum, source.source_file_id, source.at, source.source_fingerprint
+	err := dbWrapper.Get(ctx, &row, `SELECT source.cover_checksum, source.source_file_id, source.source_file_uuid, source.at, source.source_fingerprint
 FROM scene_cover_sources AS source
 JOIN scenes ON scenes.id = source.scene_id AND scenes.cover_blob = source.cover_checksum
 WHERE source.scene_id = ?`, sceneID)
@@ -27,7 +28,7 @@ WHERE source.scene_id = ?`, sceneID)
 	if err != nil {
 		return nil, err
 	}
-	ret := &models.SceneCoverSource{CoverChecksum: row.Checksum, FileID: row.FileID, At: row.At}
+	ret := &models.SceneCoverSource{CoverChecksum: row.Checksum, FileID: row.FileID, FileUUID: row.FileUUID.String, At: row.At}
 	if err := json.Unmarshal(row.Fingerprint, &ret.Fingerprint); err != nil {
 		return nil, fmt.Errorf("reading scene cover source: %w", err)
 	}
@@ -47,14 +48,15 @@ func (qb *SceneStore) SetCoverSource(ctx context.Context, sceneID int, source *m
 		return err
 	}
 	result, err := dbWrapper.Exec(ctx, `INSERT INTO scene_cover_sources
-(scene_id, cover_checksum, source_file_id, at, source_fingerprint)
-SELECT ?, ?, ?, ?, ?
+(scene_id, cover_checksum, source_file_id, source_file_uuid, at, source_fingerprint)
+SELECT ?, ?, ?, (SELECT uuid FROM archive_entities WHERE file_id=?), ?, ?
 WHERE EXISTS (SELECT 1 FROM scenes WHERE id = ? AND cover_blob = ?)
 ON CONFLICT(scene_id) DO UPDATE SET
   cover_checksum = excluded.cover_checksum,
   source_file_id = excluded.source_file_id,
+  source_file_uuid = excluded.source_file_uuid,
   at = excluded.at,
-  source_fingerprint = excluded.source_fingerprint`, sceneID, source.CoverChecksum, source.FileID, source.At, fingerprint, sceneID, source.CoverChecksum)
+  source_fingerprint = excluded.source_fingerprint`, sceneID, source.CoverChecksum, source.FileID, source.FileID, source.At, fingerprint, sceneID, source.CoverChecksum)
 	if err != nil {
 		return err
 	}

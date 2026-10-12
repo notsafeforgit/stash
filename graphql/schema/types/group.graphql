@@ -5,7 +5,7 @@ type GroupDescription {
 }
 
 type Group {
-  id: ID!
+  id: ID! @libraryID(kind: "group")
   name: String!
   aliases: String
   "Duration in seconds"
@@ -35,7 +35,7 @@ type Group {
 }
 
 input GroupDescriptionInput {
-  group_id: ID!
+  group_id: ID! @libraryID(kind: "group")
   description: String
 }
 
@@ -47,11 +47,11 @@ input GroupCreateInput {
   date: String
   # rating expressed as 1-100
   rating100: Int
-  studio_id: ID
+  studio_id: ID @libraryID(kind: "studio")
   director: String
   synopsis: String
   urls: [String!]
-  tag_ids: [ID!]
+  tag_ids: [ID!] @libraryID(kind: "tag")
 
   containing_groups: [GroupDescriptionInput!]
   sub_groups: [GroupDescriptionInput!]
@@ -69,18 +69,18 @@ input GroupCreateInput {
 }
 
 input GroupUpdateInput {
-  id: ID!
+  id: ID! @libraryID(kind: "group")
   name: String
   aliases: String
   duration: Int
   date: String
   # rating expressed as 1-100
   rating100: Int
-  studio_id: ID
+  studio_id: ID @libraryID(kind: "studio")
   director: String
   synopsis: String
   urls: [String!]
-  tag_ids: [ID!]
+  tag_ids: [ID!] @libraryID(kind: "tag")
 
   containing_groups: [GroupDescriptionInput!]
   sub_groups: [GroupDescriptionInput!]
@@ -104,7 +104,7 @@ input BulkUpdateGroupDescriptionsInput {
 
 input BulkGroupUpdateInput {
   clientMutationId: String
-  ids: [ID!]
+  ids: [ID!] @libraryID(kind: "group")
   apply_to_items_matching_filters: Boolean
   find_filter: FindFilterType
   group_filter_ast: FilterASTInput
@@ -112,10 +112,10 @@ input BulkGroupUpdateInput {
   rating100: Int
   date: String
   synopsis: String
-  studio_id: ID
+  studio_id: ID @libraryID(kind: "studio")
   director: String
   urls: BulkUpdateStrings
-  tag_ids: BulkUpdateIds
+  tag_ids: BulkUpdateIds @libraryScope(kind: "tag")
 
   containing_groups: BulkUpdateGroupDescriptionsInput
   sub_groups: BulkUpdateGroupDescriptionsInput
@@ -124,19 +124,19 @@ input BulkGroupUpdateInput {
 }
 
 input GroupDestroyInput {
-  id: ID!
+  id: ID! @libraryID(kind: "group")
 }
 
 input ReorderSubGroupsInput {
   "ID of the group to reorder sub groups for"
-  group_id: ID!
+  group_id: ID! @libraryID(kind: "group")
   """
   IDs of the sub groups to reorder. These must be a subset of the current sub groups.
   Sub groups will be inserted in this order at the insert_index
   """
-  sub_group_ids: [ID!]!
+  sub_group_ids: [ID!]! @libraryID(kind: "group")
   "The sub-group ID at which to insert the sub groups"
-  insert_at_id: ID!
+  insert_at_id: ID! @libraryID(kind: "group")
   "If true, the sub groups will be inserted after the insert_index, otherwise they will be inserted before"
   insert_after: Boolean
 }
@@ -147,13 +147,13 @@ type FindGroupsResultType {
 }
 
 input GroupSubGroupAddInput {
-  containing_group_id: ID!
+  containing_group_id: ID! @libraryID(kind: "group")
   sub_groups: [GroupDescriptionInput!]!
   "The index at which to insert the sub groups. If not provided, the sub groups will be appended to the end"
   insert_index: Int
 }
 
 input GroupSubGroupRemoveInput {
-  containing_group_id: ID!
-  sub_group_ids: [ID!]!
+  containing_group_id: ID! @libraryID(kind: "group")
+  sub_group_ids: [ID!]! @libraryID(kind: "group")
 }

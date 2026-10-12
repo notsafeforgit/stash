@@ -684,7 +684,7 @@ func (r *mutationResolver) ConfigureUI(ctx context.Context, input map[string]int
 		if partial != nil {
 			utils.MergeMaps(existing, partial)
 		}
-		return existing, nil
+		return existing, manager.ValidateLibraryUIReferences(ctx, existing)
 	})
 	if err != nil {
 		return nil, err
@@ -699,7 +699,7 @@ func (r *mutationResolver) ConfigureUISetting(ctx context.Context, key string, v
 	value = convertJSONNumbers(value)
 	_, err := config.GetInstance().UpdateUIConfiguration(func(existing map[string]interface{}) (map[string]interface{}, error) {
 		utils.NestedMap(existing).Set(key, value)
-		return existing, nil
+		return existing, manager.ValidateLibraryUIReferences(ctx, existing)
 	})
 	if err != nil {
 		return nil, err

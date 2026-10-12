@@ -154,7 +154,7 @@ func (rs galleryRoutes) Preview(w http.ResponseWriter, r *http.Request) {
 func (rs galleryRoutes) GalleryCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		galleryIdentifierQueryParam := chi.URLParam(r, "galleryId")
-		galleryID, _ := strconv.Atoi(galleryIdentifierQueryParam)
+		galleryID, _ := mediaLibraryKey(r.Context(), models.ArchiveGallery, galleryIdentifierQueryParam)
 
 		var gallery *models.Gallery
 		_ = rs.withReadTxn(r, func(ctx context.Context) error {

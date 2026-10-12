@@ -120,6 +120,9 @@ func (t *table) destroyExisting(ctx context.Context, ids []int) error {
 }
 
 func (t *table) destroy(ctx context.Context, ids []int) error {
+	if err := retainDeletedLibraryIDs(ctx, t.table.GetTable(), ids); err != nil {
+		return err
+	}
 	q := dialect.Delete(t.table).Where(t.idColumn.In(ids))
 
 	if _, err := exec(ctx, q); err != nil {

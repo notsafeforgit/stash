@@ -15,7 +15,7 @@ function fixture() {
       uuid: ids.performer,
       revision: 2,
       state: "active",
-      local_id: 7,
+
       name: "Canonical performer",
     },
     origin: "review",
@@ -95,9 +95,9 @@ it("validates request scope, page ordering, cursor and size", async () => {
   expect(transport).not.toHaveBeenCalled();
 });
 
-it("retains deletion without a live local ID", async () => {
+it("retains deleted UUIDs without exposing database keys", async () => {
   const valid = fixture();
-  const retired = { ...valid.performer, state: "deleted", local_id: undefined };
+  const retired = { ...valid.performer, state: "deleted", local_id: 7 };
   const page = {
     ...valid,
     performer: retired,
@@ -106,14 +106,10 @@ it("retains deletion without a live local ID", async () => {
       ownership: { ...row.ownership, performer: retired },
     })),
   };
-  expect(
-    (await client(page).api.accounts(former)).performer.local_id,
-  ).toBeUndefined();
-  await expect(
-    client({ ...page, performer: { ...retired, local_id: 7 } }).api.accounts(
-      former,
-    ),
-  ).rejects.toThrow();
+  const result = (await client(page).api.accounts(former)).performer;
+  expect(result.state).toBe("deleted");
+  expect(result.uuid).toBe(valid.performer.uuid);
+  expect(result).not.toHaveProperty("local_id");
 });
 
 it("validates redirect history using UUIDs without historical database keys", async () => {

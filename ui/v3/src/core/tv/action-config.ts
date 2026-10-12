@@ -1,3 +1,4 @@
+import { libraryIdSchema } from "@/core/library-id";
 import { z } from "zod";
 
 export const tvActionKinds = [
@@ -39,7 +40,7 @@ const shared = {
   icon: z.enum(tvIconIds).default("default"),
   label: z.string().max(60).default(""),
 };
-const tagId = z.string().regex(/^[1-9]\d*$/);
+const tagId = libraryIdSchema;
 export const tvActionSchema = z.discriminatedUnion("kind", [
   z.object({
     ...shared,

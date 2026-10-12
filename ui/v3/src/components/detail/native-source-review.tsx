@@ -30,7 +30,7 @@ import { SourcePostCard } from "./native-sources/post-card";
 
 /** Key by kind/local ID to isolate navigation. Only an explicit save or recovery
  * writes; opening a Sources tab never applies retained evidence. */
-export function NativeSourceReview({ kind, localId }: SourceReviewTarget) {
+export function NativeSourceReview({ kind, libraryId }: SourceReviewTarget) {
   const msg = useMsg();
   const client = useApolloClient();
   const [api] = useState(() => createSourceReviewAPI());
@@ -45,7 +45,7 @@ export function NativeSourceReview({ kind, localId }: SourceReviewTarget) {
   const [applied, setApplied] = useState(false);
   const [refreshFailed, setRefreshFailed] = useState(false);
   const [refresh, setRefresh] = useState(0);
-  const target = { kind, localId };
+  const target = { kind, libraryId };
   // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry reloads the list; successful mutations refresh just the affected card.
   useEffect(() => {
     const controller = new AbortController();
@@ -53,9 +53,9 @@ export function NativeSourceReview({ kind, localId }: SourceReviewTarget) {
       setBusy(true);
       setError(undefined);
       try {
-        const pending = await outbox.read({ kind, localId });
+        const pending = await outbox.read({ kind, libraryId });
         if (!controller.signal.aborted) setSaved(pending);
-        const identity = await api.identity(kind, localId, controller.signal);
+        const identity = await api.identity(kind, libraryId, controller.signal);
         const rows = await api.posts(
           identity.uuid,
           undefined,
@@ -75,7 +75,7 @@ export function NativeSourceReview({ kind, localId }: SourceReviewTarget) {
     }
     void load();
     return () => controller.abort();
-  }, [api, outbox, kind, localId, refresh]);
+  }, [api, outbox, kind, libraryId, refresh]);
 
   async function reconcile(post: string, entity: string) {
     setRefreshFailed(false);

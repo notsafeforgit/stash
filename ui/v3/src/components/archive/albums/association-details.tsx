@@ -56,7 +56,6 @@ export function AssociationChoice({
             <p className="wrap-anywhere" data-selectable-text>
               {item.title || msg("metadata_policy.untitled", "Untitled")}
               {item.title_truncated ? "…" : ""}
-              {item.local_id !== null ? ` (#${item.local_id})` : ""}
             </p>
             {item.state === "active" ? (
               <LibraryLink item={item}>

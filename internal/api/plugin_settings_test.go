@@ -38,7 +38,7 @@ settings:
 	cache.ReloadPlugins()
 	manager.SetInstance(&manager.Manager{PluginCache: cache})
 	t.Cleanup(func() { manager.SetInstance(nil); config.InitializeEmpty() })
-	server := handler.New(NewExecutableSchema(Config{Resolvers: &Resolver{}}))
+	server := handler.New(newLibrarySchema(Config{Resolvers: &Resolver{}}))
 	server.AddTransport(transport.POST{})
 	request := func(query string, variables map[string]interface{}) map[string]interface{} {
 		body, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})

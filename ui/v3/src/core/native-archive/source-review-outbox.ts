@@ -1,3 +1,4 @@
+import { libraryIdSchema } from "@/core/library-id";
 import { z } from "zod";
 import { NativeArchiveError } from "./client";
 import { requestUUID, withReviewRecord } from "./review-storage";
@@ -13,7 +14,7 @@ import {
 const targetSchema = z
   .object({
     kind: z.enum(["scene", "image"]),
-    localId: z.string().regex(/^[1-9]\d*$/),
+    libraryId: libraryIdSchema,
   })
   .strict();
 export type SourceReviewTarget = z.infer<typeof targetSchema>;
@@ -27,7 +28,7 @@ const savedSchema = z
 export type SavedSourceReview = z.infer<typeof savedSchema>;
 function key(target: SourceReviewTarget) {
   const value = targetSchema.parse(target);
-  return `${value.kind}:${value.localId}`;
+  return `${value.kind}:${value.libraryId}`;
 }
 function decode(
   value: unknown,

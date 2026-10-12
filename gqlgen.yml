@@ -20,13 +20,17 @@ autobind:
   - github.com/stashapp/stash/pkg/stashbox
 
 models:
+  IDCriterionInput:
+    model: github.com/stashapp/stash/pkg/models.IntCriterionInput
+  Any:
+    model: github.com/stashapp/stash/internal/api.WireAny
   # Scalars
   ID:
     model:
-      - github.com/99designs/gqlgen/graphql.ID
-      - github.com/99designs/gqlgen/graphql.IntID
-      - github.com/stashapp/stash/pkg/models.FileID
-      - github.com/stashapp/stash/pkg/models.FolderID
+      - github.com/stashapp/stash/internal/api.WireID
+      - github.com/stashapp/stash/internal/api.WireIntID
+      - github.com/stashapp/stash/internal/api.WireFileID
+      - github.com/stashapp/stash/internal/api.WireFolderID
   Int64:
     model: github.com/99designs/gqlgen/graphql.Int64
   Timestamp:
@@ -163,3 +167,11 @@ models:
       career_length:
         resolver: true
   
+
+directives:
+  libraryFilter:
+    skip_runtime: true
+  libraryID:
+    skip_runtime: true
+  libraryScope:
+    skip_runtime: true

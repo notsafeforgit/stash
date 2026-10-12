@@ -1,3 +1,4 @@
+import { resolveLibraryRoute } from "@/core/library-route";
 import { useSourceTracking } from "@/hooks/use-source-tracking";
 import { sourceTrackingTabs } from "@/core/source-tracking";
 import { NativeMetadataReview } from "@/components/detail/native-metadata-review";
@@ -452,7 +453,7 @@ function SceneDetailPage() {
         <NativeSourceReview
           key={`scene:${scene.id}`}
           kind="scene"
-          localId={scene.id}
+          libraryId={scene.id}
         />
       ),
     },
@@ -616,6 +617,14 @@ function SceneDetailPage() {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/scenes/$sceneId")({
+  beforeLoad: async ({ params, location, abortController }) => {
+    await resolveLibraryRoute(
+      "scene",
+      params.sceneId,
+      location,
+      abortController.signal,
+    );
+  },
   validateSearch: searchSchema,
   ...detailRouteState,
   pendingComponent: SceneRoutePending,

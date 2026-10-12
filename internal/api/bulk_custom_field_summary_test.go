@@ -74,7 +74,7 @@ func TestBulkCustomFieldSummary(t *testing.T) {
 			t.Cleanup(func() { require.NoError(t, db.Close()) })
 			repository := db.Repository()
 			resolver := &Resolver{repository: repository}
-			server := handler.New(NewExecutableSchema(Config{Resolvers: resolver}))
+			server := handler.New(newLibrarySchema(Config{Resolvers: resolver}))
 			server.AddTransport(transport.POST{})
 
 			// Exceed the default query page; tags also cross the field-read batch boundary.
@@ -111,6 +111,11 @@ func TestBulkCustomFieldSummary(t *testing.T) {
 				return nil
 			}))
 
+			for i, value := range ids {
+				local, err := strconv.Atoi(value)
+				require.NoError(t, err)
+				ids[i] = libraryTestUUID(t, repository, models.ArchiveEntityKind(libraryModeKind(string(mode))), local)
+			}
 			query := func(input map[string]interface{}) (*BulkCustomFieldSummary, json.RawMessage) {
 				t.Helper()
 				input["mode"] = mode

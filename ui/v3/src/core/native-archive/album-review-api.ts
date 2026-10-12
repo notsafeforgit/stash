@@ -17,15 +17,12 @@ export const albumPolicySchema = z.enum([
   "legacy-twitter-filename-v1",
 ]);
 const action = z.enum(["create", "sync", "disabled", "ineligible"]);
-export const albumIdentitySchema = z
-  .object({
-    uuid,
-    kind: z.enum(["scene", "image", "gallery"]),
-    state: z.enum(["active", "deleted", "redirected"]),
-    revision,
-    local_id: revision.optional(),
-  })
-  .refine((row) => (row.state === "active") === (row.local_id !== undefined));
+export const albumIdentitySchema = z.object({
+  uuid,
+  kind: z.enum(["scene", "image", "gallery"]),
+  state: z.enum(["active", "deleted", "redirected"]),
+  revision,
+});
 const mediaIdentity = albumIdentitySchema.refine(
   (row) => row.kind !== "gallery",
 );

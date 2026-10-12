@@ -1,3 +1,4 @@
+import { libraryIdSchema } from "@/core/library-id";
 import { useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import { useIntl } from "react-intl";
@@ -15,7 +16,7 @@ import { QueryError } from "@/components/query-error";
 
 export const shareSelectionSchema = z.object({
   kind: z.enum(GQL.ShareEntityKind),
-  id: z.string().regex(/^[1-9]\d*$/),
+  id: libraryIdSchema,
   name: z.string(),
 });
 export type ShareSelection = z.infer<typeof shareSelectionSchema>;

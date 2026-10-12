@@ -80,7 +80,7 @@ func TestSourceAccountMigrationPreservesExistingIdentities(t *testing.T) {
 	raw = openRawDB(t, path)
 	defer raw.Close()
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM source_accounts"), "migration must not infer scrape accounts from library performers")
-	require.Equal(t, uint(6), queryUint(t, raw, "SELECT count(*) FROM archive_entities"))
+	require.Equal(t, uint(7), queryUint(t, raw, "SELECT count(*) FROM archive_entities"), "six existing identities plus their folder")
 }
 
 func TestSourceAccountIdentifiersPreserveAmbiguityAndQualifiedScopes(t *testing.T) {

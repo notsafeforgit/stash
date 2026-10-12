@@ -1,3 +1,4 @@
+import { resolveLibraryRoute } from "@/core/library-route";
 import { useSourceTracking } from "@/hooks/use-source-tracking";
 import { sourceTrackingTabs } from "@/core/source-tracking";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
@@ -339,6 +340,14 @@ function GalleryDetailPage() {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/galleries/$galleryId")({
+  beforeLoad: async ({ params, location, abortController }) => {
+    await resolveLibraryRoute(
+      "gallery",
+      params.galleryId,
+      location,
+      abortController.signal,
+    );
+  },
   validateSearch: searchSchema,
   component: GalleryDetailRoute,
 });

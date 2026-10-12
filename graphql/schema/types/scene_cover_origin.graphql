@@ -10,7 +10,7 @@ type SceneCoverOrigin {
   "Exact seconds in the original source video; null for untracked artwork."
   at: Float
   "Historical file ID, retained even if the file has been removed."
-  source_file_id: ID
+  source_file_id: ID @libraryID(kind: "file")
   status: SceneCoverOriginStatus!
 }
 
@@ -20,7 +20,7 @@ extend type Scene {
 
 extend type Mutation {
   "Regenerate the saved cover frame, or the default frame when no timestamp is known. Keeps existing artwork if a recorded source is invalid."
-  sceneRegenerateCover(id: ID!): ID!
+  sceneRegenerateCover(id: ID! @libraryID(kind: "scene")): ID!
 }
 
 extend input GenerateMetadataInput {

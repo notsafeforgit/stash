@@ -25,7 +25,7 @@ func TestGraphQLWebsocketProtocols(t *testing.T) {
 		{"graphql-transport-ws", "subscribe", "next"},
 	} {
 		t.Run(protocol.name, func(t *testing.T) {
-			gql := handler.New(NewExecutableSchema(Config{Resolvers: &Resolver{}}))
+			gql := handler.New(newLibrarySchema(Config{Resolvers: &Resolver{}}))
 			gql.AddTransport(graphQLWebsocketTransport())
 			server := httptest.NewServer(gql)
 			defer server.Close()

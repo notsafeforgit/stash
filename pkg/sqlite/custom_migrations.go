@@ -8,6 +8,17 @@ import (
 
 type customMigrationFunc func(ctx context.Context, db *sqlx.DB) error
 
+type transactionalMigrationFunc func(ctx context.Context, tx *sqlx.Tx) error
+
+// RegisterTransactionalMigration runs a data conversion after its SQL script
+// in the same transaction, including the schema version update. A failure or
+// interruption rolls the entire upgrade back so it can be retried normally.
+func RegisterTransactionalMigration(schemaVersion uint, fn transactionalMigrationFunc) {
+	transactionalMigrations[schemaVersion] = fn
+}
+
+var transactionalMigrations = make(map[uint]transactionalMigrationFunc)
+
 type newDatabaseMigrationKey struct{}
 
 // IsNewDatabaseMigration distinguishes schema creation from importing an old

@@ -115,7 +115,7 @@ extend type Query {
   pluginTasksV3: [PluginTaskV3!]!
   pluginSettingsV3(plugin_id: ID!): PluginSettingsV3!
   "Loads expression input using the setting's declared read-only preview handler."
-  pluginSettingPreviewV3(plugin_id: ID!, setting: String!, entity_id: ID!): Any
+  pluginSettingPreviewV3(plugin_id: ID!, setting: String!, entity_id: ID! @libraryID(kind: "any")): Any
   "Runs a declared read-only operation (60 second deadline, 1 MiB input, 4 MiB output)."
   pluginQueryV3(plugin_id: ID!, operation: String!, input: Map): Any
 }

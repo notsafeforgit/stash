@@ -94,7 +94,7 @@ func (r *queryResolver) FindScenes(
 
 		switch {
 		case len(sceneIDs) > 0:
-			scenes, err = r.repository.Scene.FindMany(ctx, sceneIDs)
+			scenes, err = r.repository.Scene.FindMany(ctx, availableLibraryKeys(sceneIDs))
 			if err == nil {
 				result.Count = len(scenes)
 				for _, s := range scenes {

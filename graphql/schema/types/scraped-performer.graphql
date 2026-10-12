@@ -1,7 +1,7 @@
 "A performer from a scraping operation..."
 type ScrapedPerformer {
   "Set if performer matched"
-  stored_id: ID
+  stored_id: ID @libraryID(kind: "performer")
   name: String
   disambiguation: String
   gender: String
@@ -39,7 +39,7 @@ type ScrapedPerformer {
 
 input ScrapedPerformerInput {
   "Set if performer matched"
-  stored_id: ID
+  stored_id: ID @libraryID(kind: "performer")
   name: String
   disambiguation: String
   gender: String

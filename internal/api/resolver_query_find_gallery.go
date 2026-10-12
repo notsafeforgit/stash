@@ -36,7 +36,7 @@ func (r *queryResolver) FindGalleries(ctx context.Context, galleryFilterAST *mod
 
 		switch {
 		case len(idInts) > 0:
-			galleries, err = r.repository.Gallery.FindMany(ctx, idInts)
+			galleries, err = r.repository.Gallery.FindMany(ctx, availableLibraryKeys(idInts))
 			total = len(galleries)
 		default:
 			galleries, total, err = r.repository.Gallery.QueryAST(ctx, galleryFilterAST, filter)

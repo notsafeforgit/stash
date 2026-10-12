@@ -69,12 +69,12 @@ it("rejects identity mixups, malformed evidence and repeated or reversed pages",
 });
 
 it("verifies the library identity before reading its history", async () => {
-  const identity = { uuid: id, kind: "scene", revision: 1, local_id: 7 };
+  const identity = { uuid: id, kind: "scene", revision: 1 };
   expect(await client(identity).api.identity("scene", "7")).toEqual(identity);
   await expect(
     client({ ...identity, kind: "performer" }).api.identity("scene", "7"),
   ).rejects.toThrow();
   await expect(
-    client({ ...identity, local_id: 8 }).api.identity("scene", "7"),
+    client({ ...identity, uuid: "invalid" }).api.identity("scene", "7"),
   ).rejects.toThrow();
 });

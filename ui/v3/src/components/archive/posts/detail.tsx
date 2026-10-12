@@ -226,7 +226,6 @@ function PostMediaList({ id, api }: { id: string; api: SourcePostAPI }) {
                 {row.media.kind === "scene"
                   ? msg("scene", "Scene")
                   : msg("image", "Image")}
-                {row.media.local_id !== null ? ` #${row.media.local_id}` : ""}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">

@@ -14,10 +14,10 @@ type SceneURLBuilder struct {
 	UpdatedAt string
 }
 
-func NewSceneURLBuilder(baseURL string, scene *models.Scene) SceneURLBuilder {
+func NewSceneURLBuilder(baseURL string, scene *models.Scene, publicID string) SceneURLBuilder {
 	return SceneURLBuilder{
 		BaseURL:   baseURL,
-		SceneID:   strconv.Itoa(scene.ID),
+		SceneID:   publicID,
 		UpdatedAt: strconv.FormatInt(scene.UpdatedAt.Unix(), 10),
 	}
 }

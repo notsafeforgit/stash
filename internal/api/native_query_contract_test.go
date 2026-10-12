@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
-	"strconv"
 	"testing"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
+	"github.com/stashapp/stash/internal/api/loaders"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
@@ -26,8 +26,10 @@ func nativeQueryCaller(t *testing.T, repo models.Repository) func(string, map[st
 
 func nativeResolverCaller(t *testing.T, resolver *Resolver) func(string, map[string]any) string {
 	t.Helper()
-	server := handler.New(NewExecutableSchema(Config{Resolvers: resolver}))
+	server := handler.New(newLibrarySchema(Config{Resolvers: resolver}))
 	server.AddTransport(transport.POST{})
+	middleware := loaders.Middleware{Repository: resolver.repository}
+	endpoint := middleware.Middleware(server)
 	return func(query string, variables map[string]any) string {
 		t.Helper()
 		body, err := json.Marshal(map[string]any{"query": query, "variables": variables})
@@ -35,7 +37,7 @@ func nativeResolverCaller(t *testing.T, resolver *Resolver) func(string, map[str
 		request := httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(body))
 		request.Header.Set("Content-Type", "application/json")
 		response := httptest.NewRecorder()
-		server.ServeHTTP(response, request)
+		endpoint.ServeHTTP(response, request)
 		return response.Body.String()
 	}
 }
@@ -115,10 +117,10 @@ func TestNativeEntityQueryContract(t *testing.T) {
 				"operator": "OR", "children": []any{condition("first"), condition("second")},
 			}}}
 			variables := map[string]any{"ast": ast, "filter": map[string]any{"sort": "id", "direction": "ASC", "page": 2, "per_page": 1}}
-			require.JSONEq(t, fmt.Sprintf(`{"data":{"result":{"count":2,"rows":[{"id":%q}]}}}`, strconv.Itoa(ids[1])), call(query, variables))
+			require.JSONEq(t, fmt.Sprintf(`{"data":{"result":{"count":2,"rows":[{"id":%q}]}}}`, libraryTestUUID(t, repo, models.ArchiveEntityKind(tc.argument), ids[1])), call(query, variables))
 			variables["filter"] = map[string]any{"q": "first"}
-			require.JSONEq(t, fmt.Sprintf(`{"data":{"result":{"count":1,"rows":[{"id":%q}]}}}`, strconv.Itoa(ids[0])), call(query, variables))
-			require.JSONEq(t, fmt.Sprintf(`{"data":{"result":{"count":1,"rows":[{"id":%q}]}}}`, strconv.Itoa(ids[2])), call(query, map[string]any{"ids": []string{strconv.Itoa(ids[2])}}))
+			require.JSONEq(t, fmt.Sprintf(`{"data":{"result":{"count":1,"rows":[{"id":%q}]}}}`, libraryTestUUID(t, repo, models.ArchiveEntityKind(tc.argument), ids[0])), call(query, variables))
+			require.JSONEq(t, fmt.Sprintf(`{"data":{"result":{"count":1,"rows":[{"id":%q}]}}}`, libraryTestUUID(t, repo, models.ArchiveEntityKind(tc.argument), ids[2])), call(query, map[string]any{"ids": []string{libraryTestUUID(t, repo, models.ArchiveEntityKind(tc.argument), ids[2])}}))
 			require.Contains(t, call(query, map[string]any{"ids": []string{"invalid"}}), `"errors"`)
 			require.JSONEq(t, `{"data":{"result":{"count":3}}}`, call(fmt.Sprintf(`{ result: find%s { count } }`, tc.entity), nil))
 			require.Contains(t, call(fmt.Sprintf(`{ find%s(%s_filter: {}) { count } }`, tc.entity, tc.argument), nil), `Unknown argument`)
@@ -181,10 +183,10 @@ func TestNativeMediaQueryAggregatesAndDuplicates(t *testing.T) {
 	}))
 	// The gallery viewer uses this relationship criterion rather than a flat
 	// image filter. It must not admit an image outside the chosen gallery.
-	require.JSONEq(t, fmt.Sprintf(`{"data":{"findImages":{"count":2,"images":[{"id":%q},{"id":%q}]}}}`, strconv.Itoa(imageIDs[0]), strconv.Itoa(imageIDs[1])), call(
+	require.JSONEq(t, fmt.Sprintf(`{"data":{"findImages":{"count":2,"images":[{"id":%q},{"id":%q}]}}}`, libraryTestUUID(t, repo, models.ArchiveImage, imageIDs[0]), libraryTestUUID(t, repo, models.ArchiveImage, imageIDs[1])), call(
 		`query($ast: FilterASTInput!) { findImages(image_filter_ast: $ast, filter: {sort:"id",direction:ASC}) { count images { id } } }`,
 		map[string]any{"ast": map[string]any{"root": map[string]any{"condition": map[string]any{
-			"field": "galleries", "value": map[string]any{"modifier": "INCLUDES", "value": []string{strconv.Itoa(gallery.ID)}},
+			"field": "galleries", "value": map[string]any{"modifier": "INCLUDES", "value": []string{libraryTestUUID(t, repo, models.ArchiveGallery, gallery.ID)}},
 		}}}},
 	))
 	for _, tc := range []struct {
@@ -201,7 +203,7 @@ func TestNativeMediaQueryAggregatesAndDuplicates(t *testing.T) {
 				rowsQuery, rowsJSON := "", ""
 				if withRows {
 					rowsQuery = fmt.Sprintf("rows: %s { id }", tc.plural)
-					rowsJSON = fmt.Sprintf(`,"rows":[{"id":%q}]`, strconv.Itoa(tc.ids[0]))
+					rowsJSON = fmt.Sprintf(`,"rows":[{"id":%q}]`, libraryTestUUID(t, repo, models.ArchiveEntityKind(tc.plural[:len(tc.plural)-1]), tc.ids[0]))
 				}
 				// Totals describe every match, even when rows are omitted or paginated.
 				query := fmt.Sprintf(`query($ast: FilterASTInput!) { result: find%ss(%s_filter_ast: $ast, filter: {sort:"id",direction:ASC,per_page:1}) { count filesize %s %s } }`, tc.entity, tc.plural[:len(tc.plural)-1], tc.aggregate, rowsQuery)
@@ -221,7 +223,7 @@ func TestNativeMediaQueryAggregatesAndDuplicates(t *testing.T) {
 						limit = 3
 					}
 					for _, id := range tc.ids[:limit] {
-						ids = append(ids, map[string]string{"id": strconv.Itoa(id)})
+						ids = append(ids, map[string]string{"id": libraryTestUUID(t, repo, models.ArchiveEntityKind(tc.plural[:len(tc.plural)-1]), id)})
 					}
 					var expected any = [][]map[string]string{ids}
 					if groupQuery {

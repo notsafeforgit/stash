@@ -56,7 +56,7 @@ type SourcePostLibraryItem struct {
 	Kind           ArchiveEntityKind  `json:"kind"`
 	State          ArchiveEntityState `json:"state"`
 	Revision       int                `json:"revision"`
-	LocalID        *int               `json:"local_id"`
+	LocalID        *int               `json:"-"`
 	Title          string             `json:"title"`
 	TitleTruncated bool               `json:"title_truncated"`
 }

@@ -1,3 +1,4 @@
+import { resolveLibraryRoute } from "@/core/library-route";
 import { useSourceTracking } from "@/hooks/use-source-tracking";
 import { sourceTrackingTabs } from "@/core/source-tracking";
 import { NativeMetadataReview } from "@/components/detail/native-metadata-review";
@@ -303,7 +304,7 @@ function ImageDetailPage() {
         <NativeSourceReview
           key={`image:${image.id}`}
           kind="image"
-          localId={image.id}
+          libraryId={image.id}
         />
       ),
     },
@@ -364,6 +365,14 @@ function ImageDetailPage() {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/images/$imageId")({
+  beforeLoad: async ({ params, location, abortController }) => {
+    await resolveLibraryRoute(
+      "image",
+      params.imageId,
+      location,
+      abortController.signal,
+    );
+  },
   validateSearch: searchSchema,
   component: ImageDetailPage,
 });

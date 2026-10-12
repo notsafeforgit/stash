@@ -9,17 +9,30 @@ import (
 type ArchiveEntityKind string
 
 const (
-	ArchivePerformer ArchiveEntityKind = "performer"
-	ArchiveScene     ArchiveEntityKind = "scene"
-	ArchiveImage     ArchiveEntityKind = "image"
-	ArchiveFile      ArchiveEntityKind = "file"
-	ArchiveGallery   ArchiveEntityKind = "gallery"
-	ArchiveTag       ArchiveEntityKind = "tag"
-	ArchiveStudio    ArchiveEntityKind = "studio"
-	ArchiveGroup     ArchiveEntityKind = "group"
+	ArchivePerformer      ArchiveEntityKind = "performer"
+	ArchiveScene          ArchiveEntityKind = "scene"
+	ArchiveImage          ArchiveEntityKind = "image"
+	ArchiveFile           ArchiveEntityKind = "file"
+	ArchiveGallery        ArchiveEntityKind = "gallery"
+	ArchiveTag            ArchiveEntityKind = "tag"
+	ArchiveStudio         ArchiveEntityKind = "studio"
+	ArchiveGroup          ArchiveEntityKind = "group"
+	ArchiveFolder         ArchiveEntityKind = "folder"
+	ArchiveSceneMarker    ArchiveEntityKind = "scene_marker"
+	ArchiveGalleryChapter ArchiveEntityKind = "gallery_chapter"
+	ArchiveSavedFilter    ArchiveEntityKind = "saved_filter"
 )
 
 type ArchiveEntityState string
+
+func (k ArchiveEntityKind) IsValid() bool {
+	switch k {
+	case ArchivePerformer, ArchiveScene, ArchiveImage, ArchiveFile, ArchiveGallery, ArchiveTag, ArchiveStudio, ArchiveGroup, ArchiveFolder, ArchiveSceneMarker, ArchiveGalleryChapter, ArchiveSavedFilter:
+		return true
+	default:
+		return false
+	}
+}
 
 const (
 	ArchiveEntityActive     ArchiveEntityState = "active"

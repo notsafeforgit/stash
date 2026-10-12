@@ -15,8 +15,10 @@ func (r *sceneResolver) CoverOrigin(ctx context.Context, obj *models.Scene) (*Sc
 	}
 	ret := &SceneCoverOrigin{Status: SceneCoverOriginStatus(origin.Status)}
 	if origin.Source != nil {
-		id := strconv.Itoa(int(origin.Source.FileID))
-		ret.At, ret.SourceFileID = &origin.Source.At, &id
+		ret.At = &origin.Source.At
+		if origin.Source.FileUUID != "" {
+			ret.SourceFileID = &origin.Source.FileUUID
+		}
 	}
 	return ret, nil
 }

@@ -11,13 +11,21 @@ import (
 
 func (r *sceneResolver) PreviewImage(ctx context.Context, obj *models.Scene) (*PreviewImage, error) {
 	baseURL, _ := ctx.Value(BaseURLCtxKey).(string)
-	base := fmt.Sprintf("%s/scene/%d/preview-image", baseURL, obj.ID)
+	publicID, err := r.publicID(ctx, models.ArchiveScene, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+	base := fmt.Sprintf("%s/scene/%s/preview-image", baseURL, publicID)
 	return previewImageModel(base, manager.GetInstance().ScenePreviewImage(obj)), nil
 }
 
 func (r *imageResolver) PreviewImage(ctx context.Context, obj *models.Image) (*PreviewImage, error) {
 	baseURL, _ := ctx.Value(BaseURLCtxKey).(string)
-	base := fmt.Sprintf("%s/image/%d/preview-image", baseURL, obj.ID)
+	publicID, err := r.publicID(ctx, models.ArchiveImage, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+	base := fmt.Sprintf("%s/image/%s/preview-image", baseURL, publicID)
 	return previewImageModel(base, manager.GetInstance().ImagePreviewImage(obj)), nil
 }
 
@@ -31,7 +39,15 @@ func (r *sceneMarkerResolver) PreviewImage(ctx context.Context, obj *models.Scen
 		return nil, err
 	}
 	baseURL, _ := ctx.Value(BaseURLCtxKey).(string)
-	base := fmt.Sprintf("%s/scene/%d/scene_marker/%d/preview-image", baseURL, scene.ID, obj.ID)
+	sceneID, err := r.publicID(ctx, models.ArchiveScene, scene.ID)
+	if err != nil {
+		return nil, err
+	}
+	markerID, err := r.publicID(ctx, models.ArchiveSceneMarker, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+	base := fmt.Sprintf("%s/scene/%s/scene_marker/%s/preview-image", baseURL, sceneID, markerID)
 	return previewImageModel(base, manager.GetInstance().MarkerPreviewImage(scene, obj)), nil
 }
 

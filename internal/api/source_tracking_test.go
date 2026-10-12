@@ -28,7 +28,7 @@ func TestSourceTrackingSavedSettingRequiresRestart(t *testing.T) {
 		// Starting another server captures the saved setting as its capability.
 		require.Equal(t, active, cfg.GetSourceTrackingEnabled())
 		r := &Resolver{sourceTrackingActive: cfg.GetSourceTrackingEnabled()}
-		server := handler.New(NewExecutableSchema(Config{Resolvers: r}))
+		server := handler.New(newLibrarySchema(Config{Resolvers: r}))
 		server.AddTransport(transport.POST{})
 		body, err := json.Marshal(map[string]any{
 			"query":     `mutation($enabled: Boolean!) { configureGeneral(input:{sourceTrackingEnabled:$enabled}) { sourceTrackingEnabled sourceTrackingActive } }`,

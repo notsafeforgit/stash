@@ -25,19 +25,17 @@ async function archive(
   await page.route("**/api/v3/archive/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     let result: unknown;
-    if (path.endsWith("/entity-identities/performer/12"))
+    if (path.endsWith(`/entity-identities/performer/${ids.thirdPerformer}`))
       result = {
         uuid: ids.thirdPerformer,
         kind: "performer",
         revision: 3,
-        local_id: 12,
       };
     else if (path.includes("/entity-identities/"))
       result = {
         uuid: ids.entity,
         kind: options.image ? "image" : "scene",
         revision: 2,
-        local_id: 7,
       };
     else if (path.endsWith("/metadata-fields"))
       result = {
@@ -45,7 +43,6 @@ async function archive(
           uuid: ids.entity,
           kind: options.image ? "image" : "scene",
           revision: 2,
-          local_id: 7,
         },
         fields: [
           {
@@ -74,7 +71,6 @@ async function archive(
                 uuid: ids.performer,
                 kind: "performer",
                 revision: 1,
-                local_id: 10,
               },
             ],
           },
@@ -128,13 +124,13 @@ async function archive(
                     : [
                         {
                           uuid: ids.performer,
-                          local_id: 10,
+
                           revision: 1,
                           name: "River",
                         },
                         {
                           uuid: ids.otherPerformer,
-                          local_id: 11,
+
                           revision: 1,
                           name: "River",
                         },
@@ -143,12 +139,6 @@ async function archive(
                     ? {
                         selected: {
                           ...chosen,
-                          local_id:
-                            chosen.uuid === ids.thirdPerformer
-                              ? 12
-                              : chosen.uuid === ids.performer
-                                ? 10
-                                : 11,
                           name:
                             chosen.uuid === ids.thirdPerformer
                               ? "Cloud"
@@ -280,7 +270,12 @@ test("ambiguous canonical/alias candidates must be resolved before Apply appears
     page.getByRole("button", { name: "Apply this choice" }),
   ).toHaveCount(0);
   await page.getByRole("combobox", { name: "River", exact: true }).click();
-  await page.getByRole("option", { name: "River (#11)", exact: true }).click();
+  await page
+    .getByRole("option", {
+      name: `River (#${ids.otherPerformer})`,
+      exact: true,
+    })
+    .click();
   await expect(
     page.getByRole("button", { name: "Apply this choice" }),
   ).toBeVisible();
@@ -477,7 +472,12 @@ test("an unmatched source name can be explicitly associated with a differently n
       exact: true,
     })
     .fill("Cloud");
-  await page.getByRole("option", { name: "Cloud (#12)", exact: true }).click();
+  await page
+    .getByRole("option", {
+      name: `Cloud (#${ids.thirdPerformer})`,
+      exact: true,
+    })
+    .click();
   await expect(page.getByText("Cloud", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Apply this choice" }).click();
   await expect(page.getByText("Choice applied", { exact: true })).toBeVisible();

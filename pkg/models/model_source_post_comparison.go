@@ -64,7 +64,7 @@ type SourcePostComparisonEntity struct {
 	Kind     ArchiveEntityKind  `json:"kind"`
 	State    ArchiveEntityState `json:"state"`
 	Revision int                `json:"revision"`
-	LocalID  *int               `json:"local_id"`
+	LocalID  *int               `json:"-"`
 }
 
 type SourcePostComparisonConflict struct {

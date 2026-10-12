@@ -62,7 +62,7 @@ export function sortStoredIdObjects<T extends IHasStoredID>(
 
   // sort by id numerically
   ret.sort((a, b) => {
-    return parseInt(a.stored_id!, 10) - parseInt(b.stored_id!, 10);
+    return a.stored_id!.localeCompare(b.stored_id!);
   });
 
   return ret;

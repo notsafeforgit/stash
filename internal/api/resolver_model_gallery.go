@@ -234,7 +234,11 @@ func (r *galleryResolver) Urls(ctx context.Context, obj *models.Gallery) ([]stri
 
 func (r *galleryResolver) Paths(ctx context.Context, obj *models.Gallery) (*GalleryPathsType, error) {
 	baseURL, _ := ctx.Value(BaseURLCtxKey).(string)
-	builder := urlbuilders.NewGalleryURLBuilder(baseURL, obj)
+	publicID, identityErr := r.publicID(ctx, models.ArchiveGallery, obj.ID)
+	if identityErr != nil {
+		return nil, identityErr
+	}
+	builder := urlbuilders.NewGalleryURLBuilder(baseURL, obj, publicID)
 
 	return &GalleryPathsType{
 		Cover:   builder.GetCoverURL(),

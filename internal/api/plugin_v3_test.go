@@ -50,7 +50,7 @@ settings:
 	manager.SetInstance(&manager.Manager{PluginCache: cache})
 	t.Cleanup(func() { manager.SetInstance(nil); config.InitializeEmpty() })
 	require.True(t, cache.HasHooks(hook.FileDestroyPost), "v3-only hooks remain available to every backend caller")
-	server := handler.New(NewExecutableSchema(Config{Resolvers: &Resolver{}}))
+	server := handler.New(newLibrarySchema(Config{Resolvers: &Resolver{}}))
 	server.AddTransport(transport.POST{})
 	request := func(query string, variables map[string]interface{}) map[string]interface{} {
 		body, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})

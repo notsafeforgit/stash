@@ -23,7 +23,7 @@ export function MetadataReviewFixture() {
                 performers: [
                   {
                     __typename: "Performer",
-                    id: "12",
+                    id: ids.thirdPerformer,
                     name: "Cloud",
                     disambiguation: "",
                     aliases: [],
@@ -62,8 +62,8 @@ export function MetadataReviewFixture() {
                   key={kind}
                   kind={kind}
                   entity={{
-                    id: "7",
-                    performers: [{ id: "10", name: "River" }],
+                    id: ids.entity,
+                    performers: [{ id: ids.performer, name: "River" }],
                     tags: [],
                   }}
                 />
@@ -83,7 +83,7 @@ import {
   createMetadataReviewOutbox,
   type SavedReview,
 } from "@/core/native-archive/metadata-review-outbox";
-import { preview } from "../../fixtures/metadata-review";
+import { preview, ids } from "../../fixtures/metadata-review";
 
 declare global {
   interface Window {
@@ -93,7 +93,7 @@ declare global {
     };
   }
 }
-const storageTarget = { kind: "scene" as const, localId: "7" };
+const storageTarget = { kind: "scene" as const, libraryId: ids.entity };
 function journal(prefix: string) {
   return createMetadataReviewOutbox(
     createMetadataReviewAPI(

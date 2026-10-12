@@ -152,7 +152,11 @@ func (r *tagResolver) ImagePath(ctx context.Context, obj *models.Tag) (*string, 
 	}
 
 	baseURL, _ := ctx.Value(BaseURLCtxKey).(string)
-	imagePath := urlbuilders.NewTagURLBuilder(baseURL, obj).GetTagImageURL(hasImage)
+	publicID, identityErr := r.publicID(ctx, models.ArchiveTag, obj.ID)
+	if identityErr != nil {
+		return nil, identityErr
+	}
+	imagePath := urlbuilders.NewTagURLBuilder(baseURL, obj, publicID).GetTagImageURL(hasImage)
 	return &imagePath, nil
 }
 

@@ -96,7 +96,7 @@ func TestArchiveIdentityMigrationPreservesLibraryRows(t *testing.T) {
 	}
 	raw = openRawDB(t, path)
 	defer raw.Close()
-	require.Equal(t, uint(6), queryUint(t, raw, "SELECT count(*) FROM archive_entities"))
+	require.Equal(t, uint(7), queryUint(t, raw, "SELECT count(*) FROM archive_entities"))
 	require.Equal(t, uint(2), queryUint(t, raw, "SELECT count(*) FROM scenes WHERE title='Kept title'"))
 	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM performers_scenes WHERE performer_id=71 AND scene_id=31"))
 	for _, column := range []string{"performer_id", "scene_id", "image_id", "file_id"} {

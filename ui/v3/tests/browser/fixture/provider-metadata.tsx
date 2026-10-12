@@ -205,7 +205,7 @@ export function ProviderMetadataFixture() {
     return (
       <div className="p-4">
         <section aria-label="Scene import history">
-          <ProviderMetadataHistory kind="scene" localId="1" />
+          <ProviderMetadataHistory kind="scene" libraryId="1" />
         </section>
         <section aria-label="Retired performer import history">
           <ProviderMetadataHistory

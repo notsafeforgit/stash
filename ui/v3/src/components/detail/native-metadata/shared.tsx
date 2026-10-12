@@ -134,9 +134,7 @@ export function Value({
             : ref?.kind === "studio" && entity.studio
               ? [entity.studio]
               : [];
-    return (
-      options.find((item) => item.id === String(ref?.local_id))?.name ?? id
-    );
+    return options.find((item) => item.id === ref?.uuid)?.name ?? id;
   }
   let text: string;
   if (

@@ -5,7 +5,7 @@ type GalleryPathsType {
 
 "Gallery type"
 type Gallery {
-  id: ID!
+  id: ID! @libraryID(kind: "gallery")
   title: String
   code: String
   url: String @deprecated(reason: "Use urls")
@@ -68,17 +68,17 @@ input GalleryCreateInput {
   # rating expressed as 1-100
   rating100: Int
   organized: Boolean
-  scene_ids: [ID!]
-  studio_id: ID
-  tag_ids: [ID!]
-  performer_ids: [ID!]
+  scene_ids: [ID!] @libraryID(kind: "scene")
+  studio_id: ID @libraryID(kind: "studio")
+  tag_ids: [ID!] @libraryID(kind: "tag")
+  performer_ids: [ID!] @libraryID(kind: "performer")
 
   custom_fields: Map
 }
 
 input GalleryUpdateInput {
   clientMutationId: String
-  id: ID!
+  id: ID! @libraryID(kind: "gallery")
   title: String
   code: String
   url: String @deprecated(reason: "Use urls")
@@ -89,19 +89,19 @@ input GalleryUpdateInput {
   # rating expressed as 1-100
   rating100: Int
   organized: Boolean
-  scene_ids: [ID!]
-  studio_id: ID
-  tag_ids: [ID!]
-  performer_ids: [ID!]
+  scene_ids: [ID!] @libraryID(kind: "scene")
+  studio_id: ID @libraryID(kind: "studio")
+  tag_ids: [ID!] @libraryID(kind: "tag")
+  performer_ids: [ID!] @libraryID(kind: "performer")
 
-  primary_file_id: ID
+  primary_file_id: ID @libraryID(kind: "file")
 
   custom_fields: CustomFieldsInput
 }
 
 input BulkGalleryUpdateInput {
   clientMutationId: String
-  ids: [ID!]
+  ids: [ID!] @libraryID(kind: "gallery")
   apply_to_items_matching_filters: Boolean
   find_filter: FindFilterType
   gallery_filter_ast: FilterASTInput
@@ -114,16 +114,16 @@ input BulkGalleryUpdateInput {
   # rating expressed as 1-100
   rating100: Int
   organized: Boolean
-  scene_ids: BulkUpdateIds
-  studio_id: ID
-  tag_ids: BulkUpdateIds
-  performer_ids: BulkUpdateIds
+  scene_ids: BulkUpdateIds @libraryScope(kind: "scene")
+  studio_id: ID @libraryID(kind: "studio")
+  tag_ids: BulkUpdateIds @libraryScope(kind: "tag")
+  performer_ids: BulkUpdateIds @libraryScope(kind: "performer")
 
   custom_fields: CustomFieldsInput
 }
 
 input GalleryDestroyInput {
-  ids: [ID!]!
+  ids: [ID!]! @libraryID(kind: "gallery")
   """
   If true, then the zip file will be deleted if the gallery is zip-file-based.
   If gallery is folder-based, then any files not associated with other
@@ -141,22 +141,22 @@ type FindGalleriesResultType {
 }
 
 input GalleryAddInput {
-  gallery_id: ID!
-  image_ids: [ID!]!
+  gallery_id: ID! @libraryID(kind: "gallery")
+  image_ids: [ID!]! @libraryID(kind: "image")
 }
 
 input GalleryRemoveInput {
-  gallery_id: ID!
-  image_ids: [ID!]!
+  gallery_id: ID! @libraryID(kind: "gallery")
+  image_ids: [ID!]! @libraryID(kind: "image")
 }
 
 input GallerySetCoverInput {
-  gallery_id: ID!
+  gallery_id: ID! @libraryID(kind: "gallery")
   "Select exactly one existing gallery member."
-  image_id: ID
-  scene_id: ID
+  image_id: ID @libraryID(kind: "image")
+  scene_id: ID @libraryID(kind: "scene")
 }
 
 input GalleryResetCoverInput {
-  gallery_id: ID!
+  gallery_id: ID! @libraryID(kind: "gallery")
 }

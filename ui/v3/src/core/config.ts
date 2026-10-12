@@ -14,7 +14,7 @@ import type { ITaggerConfig } from "src/components/tagger/constants";
 export interface ISavedFilterRow extends ITypename {
   __typename: "SavedFilter";
   // Both representations occur in existing persisted UI configurations.
-  savedFilterId: number | string;
+  savedFilterId: string;
 }
 
 export interface IMessage {

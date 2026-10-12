@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"testing"
 
 	"github.com/stashapp/stash/pkg/group"
@@ -48,8 +47,7 @@ func TestNativeGroupMutationsAndNotifications(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(created), &result))
 	id := result.Data.GroupCreate.ID
 	require.NotEmpty(t, id)
-	groupID, err := strconv.Atoi(id)
-	require.NoError(t, err)
+	groupID := libraryTestLocal(t, repo, models.ArchiveGroup, id)
 	require.Len(t, hooks.calls, 1)
 	require.NoError(t, repo.WithReadTxn(testCtx, func(ctx context.Context) error {
 		urls, err := repo.Group.GetURLs(ctx, groupID)
@@ -111,7 +109,7 @@ func TestNativeSceneGroupRelationshipAndRetiredAliases(t *testing.T) {
 		}
 		return repo.Scene.Create(ctx, &scene, nil)
 	}))
-	input := map[string]any{"id": strconv.Itoa(scene.ID), "groups": []any{map[string]any{"group_id": strconv.Itoa(g.ID), "scene_index": 3}}}
+	input := map[string]any{"id": libraryTestUUID(t, repo, models.ArchiveScene, scene.ID), "groups": []any{map[string]any{"group_id": libraryTestUUID(t, repo, models.ArchiveGroup, g.ID), "scene_index": 3}}}
 	require.NotContains(t, call(`mutation($input:SceneUpdateInput!){sceneUpdate(input:$input){id}}`, map[string]any{"input": input}), `"errors"`)
 	require.Len(t, hooks.calls, 1)
 	require.Contains(t, hooks.calls[0].fields, "groups")

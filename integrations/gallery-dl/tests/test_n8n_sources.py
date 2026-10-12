@@ -207,12 +207,12 @@ class NativeSourceWorkflowsTests(unittest.TestCase):
     def test_unknown_performer_links_stop_without_using_names(self):
         identity = str(uuid.uuid4())
         self.remote.app.request = Mock(side_effect=[
-            {"uuid": identity, "kind": "performer", "local_id": 10, "revision": 1},
+            {"uuid": identity, "kind": "performer", "revision": 1},
             {"requested_uuid": identity, "performer": {"uuid": identity, "revision": 1, "state": "active", "name": "Example"}, "accounts": []},
         ])
         before = self.reddit.read_bytes()
         with self.assertRaisesRegex(Unavailable, "performer_has_no_linked"):
-            self.run_request(*self.request("remove-performer", "reddit", "10"))
+            self.run_request(*self.request("remove-performer", "reddit", identity))
         self.assertEqual(self.reddit.read_bytes(), before)
         self.assertEqual(self.remote.puts, [])
 

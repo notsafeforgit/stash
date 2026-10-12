@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -64,7 +63,7 @@ func (rs studioRoutes) Image(w http.ResponseWriter, r *http.Request) {
 
 func (rs studioRoutes) StudioCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		studioID, err := strconv.Atoi(chi.URLParam(r, "studioId"))
+		studioID, err := mediaLibraryKey(r.Context(), models.ArchiveStudio, chi.URLParam(r, "studioId"))
 		if err != nil {
 			http.Error(w, http.StatusText(404), 404)
 			return

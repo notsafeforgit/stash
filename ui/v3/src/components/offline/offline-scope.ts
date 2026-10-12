@@ -1,3 +1,4 @@
+import { retainedLibraryIdSchema } from "@/core/library-id";
 import { getPlatformURL } from "@/core/platform-url";
 
 export const LEGACY_OFFLINE_DATABASE = "stash-offline";
@@ -79,6 +80,7 @@ export function deploymentFromDatabase(name: string): string | undefined {
 }
 
 export function sceneFilename(sceneId: string): string {
-  if (!/^[1-9]\d*$/.test(sceneId)) throw new Error("Invalid offline scene ID");
+  if (!retainedLibraryIdSchema.safeParse(sceneId).success)
+    throw new Error("Invalid offline scene ID");
   return `${sceneId}.mp4`;
 }

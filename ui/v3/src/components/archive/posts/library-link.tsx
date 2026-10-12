@@ -9,19 +9,19 @@ export function LibraryLink({
   children,
   sources = false,
 }: {
-  item: Pick<PostLibraryItem, "kind" | "state" | "local_id"> &
+  item: Pick<PostLibraryItem, "kind" | "state" | "uuid"> &
     Partial<PostLibraryItem>;
   children: ReactNode;
   sources?: boolean;
 }) {
-  if (item.state !== "active" || item.local_id === null) return null;
+  if (item.state !== "active") return null;
   const className = cn(buttonVariants({ variant: "outline" }));
   if (item.kind === "scene")
     return (
       <Link
         className={className}
         to="/scenes/$sceneId"
-        params={{ sceneId: String(item.local_id) }}
+        params={{ sceneId: item.uuid }}
         search={sources ? { tab: "source-review" } : {}}
       >
         {children}
@@ -32,7 +32,7 @@ export function LibraryLink({
       <Link
         className={className}
         to="/images/$imageId"
-        params={{ imageId: String(item.local_id) }}
+        params={{ imageId: item.uuid }}
         search={sources ? { tab: "source-review" } : {}}
       >
         {children}
@@ -42,7 +42,7 @@ export function LibraryLink({
     <Link
       className={className}
       to="/galleries/$galleryId"
-      params={{ galleryId: String(item.local_id) }}
+      params={{ galleryId: item.uuid }}
     >
       {children}
     </Link>

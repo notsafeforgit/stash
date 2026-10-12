@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
-	"strconv"
 	"testing"
 
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -30,7 +29,7 @@ func TestBulkSceneProductionDate(t *testing.T) {
 			repository := db.Repository()
 			updater := &customFieldsBulkUpdater{}
 			resolver := &Resolver{repository: repository, hookExecutor: &mockHookExecutor{}, bulkUpdater: updater}
-			server := handler.New(NewExecutableSchema(Config{Resolvers: resolver}))
+			server := handler.New(newLibrarySchema(Config{Resolvers: resolver}))
 			server.AddTransport(transport.POST{})
 			var ids []int
 			initial, err := models.ParseDate("2010-06-15")
@@ -59,7 +58,7 @@ func TestBulkSceneProductionDate(t *testing.T) {
 			} {
 				t.Run(change.name, func(t *testing.T) {
 					*updater = customFieldsBulkUpdater{}
-					input := map[string]interface{}{"ids": []string{strconv.Itoa(ids[0]), strconv.Itoa(ids[1])}}
+					input := map[string]interface{}{"ids": []string{libraryTestUUID(t, repository, models.ArchiveScene, ids[0]), libraryTestUUID(t, repository, models.ArchiveScene, ids[1])}}
 					if change.include {
 						input["production_date"] = change.value
 						if change.clear {

@@ -95,6 +95,7 @@ type Cache struct {
 	loadErrors   []PluginLoadErrorV3
 	sessionStore *session.Store
 	gqlHandler   http.Handler
+	repository   models.Repository
 }
 
 // PluginLoadErrorV3 identifies a rejected manifest without making it executable.
@@ -123,6 +124,8 @@ func NewCache(config ServerConfig) *Cache {
 func (c *Cache) RegisterGQLHandler(handler http.Handler) {
 	c.gqlHandler = handler
 }
+
+func (c *Cache) RegisterRepository(repo models.Repository) { c.repository = repo }
 
 func (c *Cache) RegisterSessionStore(sessionStore *session.Store) {
 	c.sessionStore = sessionStore
@@ -179,6 +182,9 @@ func (c *Cache) ReloadPlugins() {
 }
 
 func (c Cache) enabledPlugins() []Config {
+	if len(c.plugins) == 0 {
+		return nil
+	}
 	disabledPlugins := c.config.GetDisabledPlugins()
 
 	var ret []Config
@@ -446,8 +452,18 @@ func (c Cache) ExecuteDurablePostHooks(ctx context.Context, eventID string, id i
 }
 
 func (c Cache) RegisterPostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) {
+	if !c.HasHooks(hookType) {
+		return
+	}
+	notice, err := c.publicHookContext(ctx, hookType, common.HookContext{ParentHooks: parentHookSources(ctx), ID: id, Type: string(hookType), Input: input, InputFields: inputFields})
+	if err != nil {
+		logger.Errorf("preparing post hook: %v", err)
+		return
+	}
 	txn.AddPostCommitHook(ctx, func(ctx context.Context) {
-		c.ExecutePostHooks(ctx, id, hookType, input, inputFields)
+		if err := c.executePostHooks(ctx, hookType, notice); err != nil {
+			logger.Errorf("executing post hook: %v", err)
+		}
 	})
 }
 
@@ -470,6 +486,14 @@ func (c Cache) executePostHooks(ctx context.Context, hookType hook.TriggerEnum, 
 }
 
 func (c Cache) deliverPostHooks(ctx context.Context, hookType hook.TriggerEnum, hookContext common.HookContext, reportFailure bool) error {
+	if !c.HasHooks(hookType) {
+		return nil
+	}
+	var err error
+	hookContext, err = c.publicHookContext(ctx, hookType, hookContext)
+	if err != nil {
+		return err
+	}
 	visitedPluginHookCounts := getVisitedPluginHookCounts(ctx)
 
 	for _, p := range c.enabledPluginsForHook(hookType) {

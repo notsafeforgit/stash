@@ -45,7 +45,7 @@ export const accountPerformerSchema = z.object({
   uuid,
   revision,
   state: z.enum(["active", "redirected", "deleted"]),
-  local_id: revision.optional(),
+
   name: z.string(),
   disambiguation: z.string().optional(),
 });
@@ -229,7 +229,7 @@ export function createAccountReviewAPI(
       );
     },
     async performer(localID: string, signal?: AbortSignal) {
-      if (!/^[1-9]\d*$/.test(localID))
+      if (!uuid.safeParse(localID).success && !/^[1-9]\d*$/.test(localID))
         throw new NativeArchiveError(0, "invalid_identity");
       const identity = await request(
         `entity-identities/performer/${localID}`,
@@ -237,10 +237,7 @@ export function createAccountReviewAPI(
         undefined,
         signal,
       );
-      if (
-        identity.kind !== "performer" ||
-        String(identity.local_id) !== localID
-      )
+      if (identity.kind !== "performer")
         throw new NativeArchiveError(0, "identity_mismatch");
       return identity;
     },

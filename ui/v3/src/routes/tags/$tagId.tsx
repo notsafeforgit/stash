@@ -1,3 +1,4 @@
+import { resolveLibraryRoute } from "@/core/library-route";
 import { ProviderMetadataHistory } from "@/components/detail/provider-metadata-history";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useState } from "react";
@@ -270,7 +271,7 @@ function TagDetailPage() {
           }),
           content: (
             <div className="p-4">
-              <ProviderMetadataHistory kind="tag" localId={tag.id} />
+              <ProviderMetadataHistory kind="tag" libraryId={tag.id} />
             </div>
           ),
         },
@@ -363,6 +364,14 @@ function TagDetailPage() {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/tags/$tagId")({
+  beforeLoad: async ({ params, location, abortController }) => {
+    await resolveLibraryRoute(
+      "tag",
+      params.tagId,
+      location,
+      abortController.signal,
+    );
+  },
   validateSearch: searchSchema,
   component: TagDetailPage,
 });

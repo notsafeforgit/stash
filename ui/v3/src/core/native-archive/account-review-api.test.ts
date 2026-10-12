@@ -82,7 +82,7 @@ it("binds selected accounts and performer identities to the requested target", a
   const api = createAccountReviewAPI(endpoint, async (url) =>
     Response.json(
       String(url).includes("entity-identities")
-        ? { uuid: ids.performer, kind: "performer", revision: 3, local_id: 11 }
+        ? { uuid: ids.performer, kind: "scene", revision: 3 }
         : { ...account(), uuid: ids.otherAccount },
     ),
   );

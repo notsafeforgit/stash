@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/stashapp/stash/pkg/entityid"
+	"github.com/stashapp/stash/pkg/models"
 	"io"
 	"strconv"
 	"strings"
@@ -62,6 +64,12 @@ func (c *Cache) SettingPreviewV3(ctx context.Context, pluginID, settingName, ent
 	}
 	args, err := p.settingPreviewArgs(settingName, entityID)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := entityid.From(ctx); err != nil {
+		ctx = entityid.WithRepository(ctx, c.repository)
+	}
+	if _, err := entityid.Local(ctx, models.ArchiveEntityKind(args["entity_type"].(string)), entityID); err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)

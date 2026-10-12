@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -91,7 +90,7 @@ func (rs groupRoutes) BackImage(w http.ResponseWriter, r *http.Request) {
 
 func (rs groupRoutes) GroupCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		groupID, err := strconv.Atoi(chi.URLParam(r, "groupId"))
+		groupID, err := mediaLibraryKey(r.Context(), models.ArchiveGroup, chi.URLParam(r, "groupId"))
 		if err != nil {
 			http.Error(w, http.StatusText(404), 404)
 			return

@@ -23,21 +23,21 @@ import {
 import { Expandable, fieldMessages } from "./native-metadata/shared";
 
 type HistoryTarget = { kind: ProviderEntityKind } & (
-  | { localId: string; entityUUID?: never }
-  | { entityUUID: string; localId?: never }
+  | { libraryId: string; entityUUID?: never }
+  | { entityUUID: string; libraryId?: never }
 );
 
 /** The keyed child prevents navigation from retaining another entity's page. */
 export function ProviderMetadataHistory(props: HistoryTarget) {
   return (
     <History
-      key={`${props.kind}:${props.entityUUID ?? props.localId}`}
+      key={`${props.kind}:${props.entityUUID ?? props.libraryId}`}
       {...props}
     />
   );
 }
 
-function History({ kind, localId, entityUUID }: HistoryTarget) {
+function History({ kind, libraryId, entityUUID }: HistoryTarget) {
   const msg = useMsg();
   const intl = useIntl();
   const [api] = useState(() => createProviderMetadataAPI());
@@ -59,7 +59,8 @@ function History({ kind, localId, entityUUID }: HistoryTarget) {
     async function load() {
       try {
         const id =
-          entityUUID ?? (await api.identity(kind, localId ?? "", signal)).uuid;
+          entityUUID ??
+          (await api.identity(kind, libraryId ?? "", signal)).uuid;
         const page = await api.history(id, kind, after, signal);
         if (!signal.aborted) {
           setRows(page);
@@ -73,7 +74,7 @@ function History({ kind, localId, entityUUID }: HistoryTarget) {
     }
     void load();
     return () => controller.abort();
-  }, [api, open, kind, localId, entityUUID, after, refresh]);
+  }, [api, open, kind, libraryId, entityUUID, after, refresh]);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -88,7 +89,7 @@ function History({ kind, localId, entityUUID }: HistoryTarget) {
             "These are the values saved when an import was accepted, including merged local values. Later edits may differ. This history does not identify the source of every current field.",
           )}
         </p>
-        {kind === "performer" && localId && (
+        {kind === "performer" && libraryId && (
           <p className="text-sm text-muted-foreground">
             {msg(
               "provider_metadata.merged_help",

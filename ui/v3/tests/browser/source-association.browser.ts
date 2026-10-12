@@ -246,18 +246,18 @@ async function archive(page: Page) {
       result = {
         uuid: postIds.gallery,
         kind: "gallery",
-        local_id: 12,
+
         revision: 1,
       };
-    else if (path === "entity-identities/gallery/42")
+    else if (path === `entity-identities/gallery/${ids.gallery}`)
       result = {
         uuid: ids.gallery,
         kind: "gallery",
-        local_id: 42,
+
         revision: 2,
       };
-    else if (path === "entity-identities/scene/31")
-      result = { uuid: ids.media, kind: "scene", local_id: 31, revision: 4 };
+    else if (path === `entity-identities/scene/${ids.media}`)
+      result = { uuid: ids.media, kind: "scene", revision: 4 };
     else if (path.endsWith("/album-posts"))
       result = {
         requested_uuid: postIds.gallery,
@@ -314,7 +314,7 @@ async function archive(page: Page) {
               count: 1,
               galleries: [
                 {
-                  id: "42",
+                  id: ids.gallery,
                   title: "Existing album",
                   folder: null,
                   files: [],
@@ -334,7 +334,7 @@ async function archive(page: Page) {
               count: 1,
               scenes: [
                 {
-                  id: "31",
+                  id: ids.media,
                   title: "Converted animation",
                   files: [
                     { path: "/library/converted.mp4", __typename: "VideoFile" },
@@ -450,8 +450,8 @@ async function choose(page: Page, family: Family) {
     .getByRole("option", {
       name:
         family === "gallery"
-          ? "Existing album (#42)"
-          : "Converted animation (#31)",
+          ? `Existing album (#${ids.gallery})`
+          : `Converted animation (#${ids.media})`,
       exact: true,
     })
     .click();

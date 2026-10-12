@@ -340,11 +340,24 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			for _, name := range objects {
 				existingObjects[name] = true
 			}
-			for kind, tables := range map[string][]string{
+			kinds := map[string][]string{
 				"tag":    {"tag_aliases", "tag_stash_ids", "tag_custom_fields", "tags_relations"},
 				"studio": {"studio_aliases", "studio_urls", "studio_stash_ids", "studio_custom_fields", "studios_tags"},
 				"group":  {"group_urls", "group_custom_fields", "groups_tags", "groups_relations"},
-			} {
+			}
+			if version >= NativeSchemaBaseline+115 {
+				for _, kind := range []string{"folder", "scene_marker", "gallery_chapter", "saved_filter"} {
+					kinds[kind] = nil
+				}
+				var coverColumn bool
+				if err := conn.Get(&coverColumn, "SELECT EXISTS(SELECT 1 FROM pragma_table_info('scene_cover_sources') WHERE name='source_file_uuid')"); err != nil {
+					return err
+				}
+				if !coverColumn {
+					return errors.New("native database schema is incomplete: missing scene_cover_sources.source_file_uuid")
+				}
+			}
+			for kind, tables := range kinds {
 				if !existingColumns[kind+"_id"] {
 					return fmt.Errorf("native database schema is incomplete: missing archive_entities.%s_id", kind)
 				}

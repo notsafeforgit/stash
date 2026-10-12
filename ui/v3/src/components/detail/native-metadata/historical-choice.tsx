@@ -218,7 +218,7 @@ function PreviewChoice({
                     },
                     ...items.map((item) => ({
                       value: item.uuid,
-                      label: `${item.name}${item.disambiguation ? ` (${item.disambiguation})` : ""} (#${item.local_id})`,
+                      label: `${item.name}${item.disambiguation ? ` (${item.disambiguation})` : ""} (#${item.uuid})`,
                     })),
                   ];
                   const referenceKind = fields.fields.find(

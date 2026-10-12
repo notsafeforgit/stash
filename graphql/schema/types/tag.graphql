@@ -1,5 +1,5 @@
 type Tag {
-  id: ID!
+  id: ID! @libraryID(kind: "tag")
   name: String!
   "Value that does not appear in the UI but overrides name for sorting"
   sort_name: String
@@ -42,15 +42,15 @@ input TagCreateInput {
   image_input: EntityImageInput
   stash_ids: [StashIDInput!]
 
-  parent_ids: [ID!]
-  child_ids: [ID!]
+  parent_ids: [ID!] @libraryID(kind: "tag")
+  child_ids: [ID!] @libraryID(kind: "tag")
 
   custom_fields: Map
 }
 
 input TagUpdateInput {
   provider_metadata: [ProviderMetadataSelectionInput!]
-  id: ID!
+  id: ID! @libraryID(kind: "tag")
   name: String
   "Value that does not appear in the UI but overrides name for sorting"
   sort_name: String
@@ -65,14 +65,14 @@ input TagUpdateInput {
   image_input: EntityImageInput
   stash_ids: [StashIDInput!]
 
-  parent_ids: [ID!]
-  child_ids: [ID!]
+  parent_ids: [ID!] @libraryID(kind: "tag")
+  child_ids: [ID!] @libraryID(kind: "tag")
 
   custom_fields: CustomFieldsInput
 }
 
 input TagDestroyInput {
-  id: ID!
+  id: ID! @libraryID(kind: "tag")
 }
 
 type FindTagsResultType {
@@ -81,14 +81,14 @@ type FindTagsResultType {
 }
 
 input TagsMergeInput {
-  source: [ID!]!
-  destination: ID!
+  source: [ID!]! @libraryID(kind: "tag")
+  destination: ID! @libraryID(kind: "tag")
   # values defined here will override values in the destination
   values: TagUpdateInput
 }
 
 input BulkTagUpdateInput {
-  ids: [ID!]
+  ids: [ID!] @libraryID(kind: "tag")
   apply_to_items_matching_filters: Boolean
   find_filter: FindFilterType
   tag_filter_ast: FilterASTInput
@@ -98,7 +98,7 @@ input BulkTagUpdateInput {
   ignore_auto_tag: Boolean
   favorite: Boolean
 
-  parent_ids: BulkUpdateIds
-  child_ids: BulkUpdateIds
+  parent_ids: BulkUpdateIds @libraryScope(kind: "tag")
+  child_ids: BulkUpdateIds @libraryScope(kind: "tag")
   custom_fields: CustomFieldsInput
 }

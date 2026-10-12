@@ -88,7 +88,8 @@ func TestArchiveActivityHTTPAlbumContextIncludesCommittedGallery(t *testing.T) {
 	require.Equal(t, "succeeded", after.Summary.State)
 	require.Len(t, after.Subjects, 2)
 	require.Equal(t, "gallery", after.Subjects[1].Kind)
-	require.NotNil(t, after.Subjects[1].LocalID)
+	require.Nil(t, after.Subjects[1].LocalID)
+	require.NotEmpty(t, after.Subjects[1].UUID)
 	require.True(t, after.ContextAvailable)
 }
 

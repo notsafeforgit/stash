@@ -171,7 +171,8 @@ func TestNativeAccountReviewHTTPExplicitSelectionRecoveryAndDiscovery(t *testing
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var preview models.AccountOwnershipPreview
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &preview))
-	require.Equal(t, 2, *preview.Performer.LocalID)
+	require.Nil(t, preview.Performer.LocalID)
+	require.NotEmpty(t, preview.Performer.UUID)
 	require.Nil(t, getAccount().Ownership, "preview cannot create ownership")
 	apply := models.AccountOwnershipReviewApplyInput{AccountOwnershipReviewInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest}
 	var receipt models.AccountOwnershipReview
@@ -191,7 +192,7 @@ func TestNativeAccountReviewHTTPExplicitSelectionRecoveryAndDiscovery(t *testing
 	var saved models.AccountOwnershipReview
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &saved))
 	require.Equal(t, receipt, saved)
-	require.Equal(t, 2, *getAccount().Ownership.Performer.LocalID)
+	require.Nil(t, getAccount().Ownership.Performer.LocalID)
 	require.True(t, getAccount().Tracked)
 	w = request(http.MethodGet, "/source-accounts?ownership=linked&q=shared&namespace=native%3Areddit", nil)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())

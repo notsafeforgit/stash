@@ -152,7 +152,7 @@ async function archive(
           ...row.media,
           uuid: postIds.otherPost,
           state: "deleted",
-          local_id: null,
+
           title: "Retired library item",
         },
         association: {

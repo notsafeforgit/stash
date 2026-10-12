@@ -117,7 +117,11 @@ func (r *sceneResolver) Rating100(ctx context.Context, obj *models.Scene) (*int,
 func (r *sceneResolver) Paths(ctx context.Context, obj *models.Scene) (*ScenePathsType, error) {
 	baseURL, _ := ctx.Value(BaseURLCtxKey).(string)
 	config := manager.GetInstance().Config
-	builder := urlbuilders.NewSceneURLBuilder(baseURL, obj)
+	publicID, identityErr := r.publicID(ctx, models.ArchiveScene, obj.ID)
+	if identityErr != nil {
+		return nil, identityErr
+	}
+	builder := urlbuilders.NewSceneURLBuilder(baseURL, obj, publicID)
 
 	var streamPath string
 	var captionBasePath string
@@ -328,7 +332,11 @@ func (r *sceneResolver) SceneStreams(ctx context.Context, obj *models.Scene) ([]
 	config := manager.GetInstance().Config
 
 	baseURL, _ := ctx.Value(BaseURLCtxKey).(string)
-	builder := urlbuilders.NewSceneURLBuilder(baseURL, obj)
+	publicID, identityErr := r.publicID(ctx, models.ArchiveScene, obj.ID)
+	if identityErr != nil {
+		return nil, identityErr
+	}
+	builder := urlbuilders.NewSceneURLBuilder(baseURL, obj, publicID)
 
 	// Build the base stream URL with signing params or apikey
 	streamURL := builder.GetStreamURL("")

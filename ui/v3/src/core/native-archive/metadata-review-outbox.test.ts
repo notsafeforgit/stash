@@ -9,7 +9,10 @@ import {
 import { createMetadataReviewOutbox } from "./metadata-review-outbox";
 import { ids, preview, receipt } from "../../../tests/fixtures/metadata-review";
 
-const target = { kind: "scene" as const, localId: "7" };
+const target = {
+  kind: "scene" as const,
+  libraryId: "00000000-0000-4000-8000-000000000007",
+};
 const endpoint = "https://example.test/library/api/v3/archive/";
 beforeEach(() => vi.stubGlobal("indexedDB", new IDBFactory()));
 afterEach(() => {
@@ -206,7 +209,7 @@ it("only a definitive stale-preview refusal enables discarding a saved request",
   expect(await box.read(target)).toBeNull();
 });
 
-it("isolates installations, entities and image/scene local IDs", async () => {
+it("isolates installations, entities and image/scene UUIDs", async () => {
   const remote = server();
   const box = createMetadataReviewOutbox(remote.api);
   await box.prepare(target, preview());
@@ -214,8 +217,18 @@ it("isolates installations, entities and image/scene local IDs", async () => {
     createMetadataReviewAPI("https://example.test/another/api/v3/archive/"),
   );
   expect(await elsewhere.read(target)).toBeNull();
-  expect(await box.read({ kind: "image", localId: "7" })).toBeNull();
-  expect(await box.read({ kind: "scene", localId: "8" })).toBeNull();
+  expect(
+    await box.read({
+      kind: "image",
+      libraryId: "00000000-0000-4000-8000-000000000007",
+    }),
+  ).toBeNull();
+  expect(
+    await box.read({
+      kind: "scene",
+      libraryId: "00000000-0000-4000-8000-000000000008",
+    }),
+  ).toBeNull();
   expect(remote.requests).toHaveLength(0);
 });
 

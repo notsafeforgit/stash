@@ -130,7 +130,11 @@ func (r *groupResolver) FrontImagePath(ctx context.Context, obj *models.Group) (
 	}
 
 	baseURL, _ := ctx.Value(BaseURLCtxKey).(string)
-	imagePath := urlbuilders.NewGroupURLBuilder(baseURL, obj).GetGroupFrontImageURL(hasImage)
+	publicID, identityErr := r.publicID(ctx, models.ArchiveGroup, obj.ID)
+	if identityErr != nil {
+		return nil, identityErr
+	}
+	imagePath := urlbuilders.NewGroupURLBuilder(baseURL, obj, publicID).GetGroupFrontImageURL(hasImage)
 	return &imagePath, nil
 }
 
@@ -150,7 +154,11 @@ func (r *groupResolver) BackImagePath(ctx context.Context, obj *models.Group) (*
 	}
 
 	baseURL, _ := ctx.Value(BaseURLCtxKey).(string)
-	imagePath := urlbuilders.NewGroupURLBuilder(baseURL, obj).GetGroupBackImageURL()
+	publicID, identityErr := r.publicID(ctx, models.ArchiveGroup, obj.ID)
+	if identityErr != nil {
+		return nil, identityErr
+	}
+	imagePath := urlbuilders.NewGroupURLBuilder(baseURL, obj, publicID).GetGroupBackImageURL()
 	return &imagePath, nil
 }
 

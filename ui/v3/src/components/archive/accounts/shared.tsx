@@ -51,7 +51,7 @@ export function AccountName({ account }: { account: Account }) {
 }
 export function PerformerName({ performer }: { performer: AccountPerformer }) {
   const msg = useMsg();
-  if (performer.state !== "active" || !performer.local_id)
+  if (performer.state !== "active")
     return (
       <span>
         {msg(
@@ -67,8 +67,7 @@ export function PerformerName({ performer }: { performer: AccountPerformer }) {
       params={{ performerId: performer.uuid }}
     >
       {performer.name}
-      {performer.disambiguation ? ` (${performer.disambiguation})` : ""} (#
-      {performer.local_id})
+      {performer.disambiguation ? ` (${performer.disambiguation})` : ""}
     </Link>
   );
 }

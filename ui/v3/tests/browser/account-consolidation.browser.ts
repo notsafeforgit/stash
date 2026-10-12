@@ -103,12 +103,11 @@ async function archive(
         return route.fulfill({ status: 503, json: { error: "unavailable" } });
       result = path.endsWith(ids.account) ? source : target;
     } else if (path.includes("/entity-identities/performer/")) {
-      const owner = performer(path.endsWith("/11"));
+      const owner = performer(path.endsWith(ids.otherPerformer));
       result = {
         uuid: owner.uuid,
         revision: owner.revision,
         kind: "performer",
-        local_id: owner.local_id,
       };
     } else if (path.endsWith("/account-consolidation/preview")) {
       const input: ConsolidationInput = route.request().postDataJSON();
@@ -337,7 +336,10 @@ test("requires explicit ownership and stable-ID acknowledgement when they confli
     .getByRole("combobox", { name: "Resulting performer", exact: true })
     .fill("River");
   await page
-    .getByRole("option", { name: "River (Photographer) (#11)", exact: true })
+    .getByRole("option", {
+      name: `River (Photographer) (#${ids.otherPerformer})`,
+      exact: true,
+    })
     .click();
   await preview(page);
   await expect(

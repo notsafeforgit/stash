@@ -14,6 +14,7 @@ import (
 	"github.com/stashapp/stash/internal/dlna"
 	"github.com/stashapp/stash/internal/log"
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/pkg/entityid"
 	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/gallery"
@@ -42,6 +43,8 @@ func Initialize(cfg *config.Config, l *log.Logger) (*Manager, error) {
 	mgrPaths := &paths.Paths{}
 
 	pluginCache := plugin.NewCache(cfg)
+	pluginCache.RegisterRepository(repo)
+	repo = entityid.WithTransactions(repo)
 	repo.File = plugin.WithFileHooks(repo.File, pluginCache)
 	repo = plugin.WithEntityUpdateHooks(repo, pluginCache)
 

@@ -45,6 +45,7 @@ INSERT INTO performer_names(performer_id,name,position) VALUES(1,'Before merge',
 		var identity metadataEntityIdentity
 		if status == http.StatusOK {
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &identity))
+			require.NotContains(t, w.Body.String(), "local_id")
 		}
 		return identity
 	}
@@ -60,7 +61,7 @@ INSERT INTO performer_names(performer_id,name,position) VALUES(1,'Before merge',
 	}))
 	merged := get("performer", source.UUID, http.StatusOK)
 	require.Equal(t, target.UUID, merged.UUID)
-	require.Equal(t, 2, *merged.LocalID)
+	require.Nil(t, merged.LocalID)
 	get("performer", "1", http.StatusNotFound)
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		if err := repo.Performer.Destroy(ctx, 2); err != nil {

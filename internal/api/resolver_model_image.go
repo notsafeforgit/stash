@@ -68,7 +68,11 @@ func (r *imageResolver) Files(ctx context.Context, obj *models.Image) ([]*ImageF
 
 func (r *imageResolver) Paths(ctx context.Context, obj *models.Image) (*ImagePathsType, error) {
 	baseURL, _ := ctx.Value(BaseURLCtxKey).(string)
-	builder := urlbuilders.NewImageURLBuilder(baseURL, obj)
+	publicID, identityErr := r.publicID(ctx, models.ArchiveImage, obj.ID)
+	if identityErr != nil {
+		return nil, identityErr
+	}
+	builder := urlbuilders.NewImageURLBuilder(baseURL, obj, publicID)
 	thumbnailPath := builder.GetThumbnailURL()
 	previewPath := builder.GetPreviewURL()
 	imagePath := builder.GetImageURL()

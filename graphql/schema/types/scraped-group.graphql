@@ -1,6 +1,6 @@
 "A group from a scraping operation..."
 type ScrapedGroup {
-  stored_id: ID
+  stored_id: ID @libraryID(kind: "group")
   name: String
   aliases: String
   duration: String

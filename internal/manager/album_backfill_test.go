@@ -54,6 +54,7 @@ hooks:
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "hook.js"), []byte(`({Error: JSON.stringify(input.Args.hookContext)})`), 0600))
 	cache := plugin.NewCache(albumHookConfig{Config: cfg, directory: dir})
 	cache.RegisterSessionStore(session.NewStore(cfg))
+	cache.RegisterRepository(repo)
 	cache.ReloadPlugins()
 	require.Len(t, cache.ListPlugins(), 1)
 	mgr := &Manager{Repository: repo, PluginCache: cache}
@@ -71,7 +72,7 @@ hooks:
 	require.NotEqual(t, -1, start, first)
 	var data map[string]any
 	require.NoError(t, json.Unmarshal([]byte(first[start:]), &data))
-	require.Equal(t, float64(7), data["id"])
+	require.Equal(t, entity.UUID, data["id"])
 	require.Equal(t, "Gallery.Create.Post", data["type"])
 	require.Empty(t, data["inputFields"])
 	mergeWorker := mgr.NewPostMergeNotificationWorker(gallery.NewPostMergeNotifications(repo))

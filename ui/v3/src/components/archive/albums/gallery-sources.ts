@@ -3,11 +3,11 @@ import { createSourceAlbumAPI } from "@/core/native-archive/source-album-api";
 import { useAlbumPages } from "./read";
 
 // The summary and Source albums tab share one bounded, paginated lookup.
-export function useGallerySources(localId: string, enabled = true) {
+export function useGallerySources(libraryId: string, enabled = true) {
   const api = useMemo(() => createSourceAlbumAPI(), []);
   const load = useCallback(
     async (after: string | undefined, signal: AbortSignal) => {
-      const identity = await api.identity(localId, signal);
+      const identity = await api.identity(libraryId, signal);
       const page = await api.posts(identity.uuid, after, signal);
       return {
         signature: JSON.stringify(page.gallery),
@@ -19,7 +19,7 @@ export function useGallerySources(localId: string, enabled = true) {
         header: page,
       };
     },
-    [api, localId],
+    [api, libraryId],
   );
   return { ...useAlbumPages(load, enabled), endpoint: api.endpoint };
 }

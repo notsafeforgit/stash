@@ -38,6 +38,12 @@ func shareHTTPMediaFixture(t *testing.T, video bool) (*shareRoutes, http.Handler
 	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "share.sqlite")))
 	t.Cleanup(func() { _ = db.Close() })
 	repo := db.Repository()
+	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error {
+		_, _, err := db.ExecSQL(ctx, `INSERT INTO images(id,title,created_at,updated_at) VALUES(1,'Share fixture',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO scenes(id,title,created_at,updated_at) VALUES(1,'Share fixture',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),(3,'Share preview',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO galleries(id,title,created_at,updated_at) VALUES(4,'Share gallery',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);`, nil)
+		return err
+	}))
 	m := mocks.NewDatabase()
 	repo.Image = m.Image
 	filePath := filepath.Join(t.TempDir(), "secret-image-name.jpg")

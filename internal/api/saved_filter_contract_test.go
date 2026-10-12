@@ -22,7 +22,7 @@ func TestSavedFilterNativeAPIContract(t *testing.T) {
 	db := sqlite.NewDatabase()
 	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "filters.sqlite")))
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	server := handler.New(NewExecutableSchema(Config{Resolvers: &Resolver{repository: db.Repository()}}))
+	server := handler.New(newLibrarySchema(Config{Resolvers: &Resolver{repository: db.Repository()}}))
 	server.AddTransport(transport.POST{})
 
 	type response struct {
@@ -51,7 +51,7 @@ func TestSavedFilterNativeAPIContract(t *testing.T) {
 		{"condition":{"field":"title","value":{"modifier":"INCLUDES","value":"alpha"}}},
 		{"group":{"operator":"AND","children":[
 			{"condition":{"field":"title","value":{"modifier":"EXCLUDES","value":"beta"}}},
-			{"condition":{"field":"performers","value":{"modifier":"INCLUDES","value":[{"id":"42","label":"Retained performer label"}]}}}
+			{"condition":{"field":"performers","value":{"modifier":"INCLUDES","value":[{"id":"a44d7913-3fa8-45f0-87c5-3dfcc7396142","label":"Retained performer label"}]}}}
 		]}}
 	]}}}`
 	input := map[string]any{

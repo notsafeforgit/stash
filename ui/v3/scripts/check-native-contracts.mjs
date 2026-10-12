@@ -31,6 +31,7 @@ const pluginSchema = (source) =>
     scalar Map
     type Query { _contract: Boolean }
     type Mutation { _contract: Boolean }
+    ${read("graphql/schema/types/library-id.graphql")}
     ${source}
   `);
 const previousPlugin = pluginSchema(

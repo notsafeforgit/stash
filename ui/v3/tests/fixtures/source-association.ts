@@ -32,7 +32,7 @@ export function galleryPreview(): GalleryAssociationPreview {
       revision: 2,
       kind: "gallery",
       state: "active",
-      local_id: 42,
+
       title: "Existing album",
       title_truncated: false,
     },
@@ -71,7 +71,7 @@ export function mediaPreview(): AttachmentMediaPreview {
       revision: 4,
       kind: "scene",
       state: "active",
-      local_id: 31,
+
       title: "Converted animation",
       title_truncated: false,
     },

@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stashapp/stash/internal/manager"
@@ -24,7 +23,11 @@ func (rs imageRoutes) PreviewImage(w http.ResponseWriter, r *http.Request) {
 
 func (rs sceneRoutes) MarkerPreviewImage(w http.ResponseWriter, r *http.Request) {
 	scene := r.Context().Value(sceneKey).(*models.Scene)
-	id, _ := strconv.Atoi(chi.URLParam(r, "sceneMarkerId"))
+	id, err := mediaLibraryKey(r.Context(), models.ArchiveSceneMarker, chi.URLParam(r, "sceneMarkerId"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	var marker *models.SceneMarker
 	if err := rs.withReadTxn(r, func(ctx context.Context) error {
 		var err error

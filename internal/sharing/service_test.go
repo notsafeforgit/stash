@@ -31,6 +31,12 @@ func testService(t *testing.T) (*Service, *mocks.Database, *models.VideoFile, *s
 	db := testShareDatabase(t)
 	m := mocks.NewDatabase()
 	repo := db.Repository()
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, _, err := db.ExecSQL(ctx, `INSERT INTO scenes(id,title,created_at,updated_at) VALUES(1,'Private title',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO images(id,title,created_at,updated_at) VALUES(2,'Shared image',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO galleries(id,title,created_at,updated_at) VALUES(7,'Gallery',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);`, nil)
+		return err
+	}))
 	repo.Scene, repo.Image, repo.Gallery = m.Scene, m.Image, m.Gallery
 	filePath := filepath.Join(t.TempDir(), "private-filename.mp4")
 	require.NoError(t, os.WriteFile(filePath, []byte("original video"), 0o600))

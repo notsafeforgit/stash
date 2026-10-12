@@ -58,7 +58,6 @@ export function mergeConflictPreview() {
     revision: 1,
     kind: "scene" as const,
     state: "active" as const,
-    local_id: 7,
   };
   source.selection = { ...target.selection!, decision_uuid: id(102) };
   source.attachments = structuredClone(target.attachments);

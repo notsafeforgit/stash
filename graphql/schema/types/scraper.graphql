@@ -49,7 +49,7 @@ type Scraper {
 
 type ScrapedStudio {
   "Set if studio matched"
-  stored_id: ID
+  stored_id: ID @libraryID(kind: "studio")
   name: String!
   url: String @deprecated(reason: "use urls")
   urls: [String!]
@@ -65,7 +65,7 @@ type ScrapedStudio {
 
 type ScrapedTag {
   "Set if tag matched"
-  stored_id: ID
+  stored_id: ID @libraryID(kind: "tag")
   name: String!
   description: String
   alias_list: [String!]
@@ -181,14 +181,14 @@ input ScrapeSingleSceneInput {
   "Instructs to query by string"
   query: String
   "Instructs to query by scene fingerprints"
-  scene_id: ID
+  scene_id: ID @libraryID(kind: "scene")
   "Instructs to query by scene fragment"
   scene_input: ScrapedSceneInput
 }
 
 input ScrapeMultiScenesInput {
   "Instructs to query by scene fingerprints"
-  scene_ids: [ID!]
+  scene_ids: [ID!] @libraryID(kind: "scene")
 }
 
 input ScrapeSingleStudioInput {
@@ -209,21 +209,21 @@ input ScrapeSinglePerformerInput {
   "Instructs to query by string"
   query: String
   "Instructs to query by performer id"
-  performer_id: ID
+  performer_id: ID @libraryID(kind: "performer")
   "Instructs to query by performer fragment"
   performer_input: ScrapedPerformerInput
 }
 
 input ScrapeMultiPerformersInput {
   "Instructs to query by scene fingerprints"
-  performer_ids: [ID!]
+  performer_ids: [ID!] @libraryID(kind: "performer")
 }
 
 input ScrapeSingleGalleryInput {
   "Instructs to query by string"
   query: String
   "Instructs to query by gallery id"
-  gallery_id: ID
+  gallery_id: ID @libraryID(kind: "gallery")
   "Instructs to query by gallery fragment"
   gallery_input: ScrapedGalleryInput
 }
@@ -232,7 +232,7 @@ input ScrapeSingleImageInput {
   "Instructs to query by string"
   query: String
   "Instructs to query by image id"
-  image_id: ID
+  image_id: ID @libraryID(kind: "image")
   "Instructs to query by image fragment"
   image_input: ScrapedImageInput
 }
@@ -241,7 +241,7 @@ input ScrapeSingleGroupInput {
   "Instructs to query by string"
   query: String
   "Instructs to query by group id"
-  group_id: ID
+  group_id: ID @libraryID(kind: "group")
   "Instructs to query by group fragment"
   group_input: ScrapedGroupInput
 }
@@ -252,7 +252,7 @@ input StashBoxSceneQueryInput {
   "Endpoint of the stash-box instance to use"
   stash_box_endpoint: String
   "Instructs query by scene fingerprints"
-  scene_ids: [ID!]
+  scene_ids: [ID!] @libraryID(kind: "scene")
   "Query by query string"
   q: String
 }
@@ -263,7 +263,7 @@ input StashBoxPerformerQueryInput {
   "Endpoint of the stash-box instance to use"
   stash_box_endpoint: String
   "Instructs query by scene fingerprints"
-  performer_ids: [ID!]
+  performer_ids: [ID!] @libraryID(kind: "performer")
   "Query by query string"
   q: String
 }
@@ -301,13 +301,13 @@ input StashBoxBatchTagInput {
   IDs in stash of the items to update.
   If set, names and stash_ids fields will be ignored.
   """
-  ids: [ID!]
+  ids: [ID!] @libraryID(kind: "scope")
   "Names of the items in the stash-box instance to search for and create"
   names: [String!]
   "Stash IDs of the items in the stash-box instance to search for and create"
   stash_ids: [String!]
   "IDs in stash of the performers to update"
-  performer_ids: [ID!] @deprecated(reason: "use ids")
+  performer_ids: [ID!] @libraryID(kind: "performer") @deprecated(reason: "use ids")
   "Names of the performers in the stash-box instance to search for and create"
   performer_names: [String!] @deprecated(reason: "use names")
 }

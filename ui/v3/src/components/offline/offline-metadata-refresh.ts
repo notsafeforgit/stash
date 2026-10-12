@@ -26,6 +26,9 @@ import {
 } from "src/core/generated-graphql";
 import { patchEntry, type OfflineEntry } from "./offline-db";
 import { snapshotFileMetadata } from "./offline-file-metadata";
+import { isLibraryId, retainedLibraryIdSchema } from "@/core/library-id";
+import { createMetadataReviewAPI } from "@/core/native-archive/metadata-review-api";
+import { NativeArchiveError } from "@/core/native-archive/client";
 
 interface RefreshDeps {
   entries: OfflineEntry[];
@@ -42,7 +45,7 @@ export function useOfflineMetadataRefresh({ entries }: RefreshDeps): void {
   useEffect(() => {
     const sceneIds = membership
       .split(",")
-      .filter((id) => /^[1-9]\d*$/.test(id));
+      .filter((id) => retainedLibraryIdSchema.safeParse(id).success);
     if (sceneIds.length === 0) return;
     const requested = new Set(sceneIds);
     let disposed = false;
@@ -50,19 +53,48 @@ export function useOfflineMetadataRefresh({ entries }: RefreshDeps): void {
     async function refresh() {
       const request = ++generation;
       try {
-        const { data } = await client.query({
-          query: FindScenesDocument,
-          variables: { ids: sceneIds },
-          fetchPolicy: "network-only",
-        });
-        if (disposed || request !== generation || !data?.findScenes) return;
-        const fresh = new Map(
-          data.findScenes.scenes.map((scene) => [scene.id, scene]),
-        );
+        const identities = new Map<string, string>();
+        for (const id of requested) {
+          if (disposed || request !== generation) return;
+          try {
+            identities.set(
+              id,
+              isLibraryId(id)
+                ? id
+                : (await createMetadataReviewAPI().identity("scene", id)).uuid,
+            );
+          } catch (error) {
+            if (!(error instanceof NativeArchiveError && error.status === 404))
+              throw error;
+          }
+        }
+        let scenes: SlimSceneDataFragment[] = [];
+        if (identities.size) {
+          const { data } = await client.query({
+            query: FindScenesDocument,
+            variables: { ids: [...identities.values()] },
+            fetchPolicy: "network-only",
+          });
+          if (!data?.findScenes) return;
+          scenes = data.findScenes.scenes;
+        }
+        if (disposed || request !== generation) return;
+        const fresh = new Map(scenes.map((scene) => [scene.id, scene]));
         for (const entry of currentEntries.current) {
           if (disposed || request !== generation) return;
           if (!requested.has(entry.scene_id)) continue;
-          const live = fresh.get(entry.scene_id);
+          let live = fresh.get(identities.get(entry.scene_id) ?? "");
+          if (
+            !isLibraryId(entry.scene_id) &&
+            !live?.files.some(
+              (file) =>
+                file.path === entry.source_file_path &&
+                file.width === entry.width &&
+                file.height === entry.height &&
+                file.duration === entry.duration,
+            )
+          )
+            live = undefined;
           if (!live) {
             if (entry.server_status !== "missing")
               await patchEntry(entry.scene_id, { server_status: "missing" });

@@ -64,7 +64,7 @@ func (r *queryResolver) FindFolders(
 		result := &models.FolderQueryResult{}
 
 		if len(folderIDs) > 0 {
-			folders, err = r.repository.Folder.FindMany(ctx, folderIDs)
+			folders, err = r.repository.Folder.FindMany(ctx, availableLibraryKeys(folderIDs))
 			if err == nil {
 				result.Count = len(folders)
 			}

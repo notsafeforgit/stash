@@ -36,7 +36,7 @@ func (r *queryResolver) FindTags(ctx context.Context, tagFilterAST *models.Filte
 
 		switch {
 		case len(idInts) > 0:
-			tags, err = r.repository.Tag.FindMany(ctx, idInts)
+			tags, err = r.repository.Tag.FindMany(ctx, availableLibraryKeys(idInts))
 			total = len(tags)
 		default:
 			tags, total, err = r.repository.Tag.QueryAST(ctx, tagFilterAST, filter)

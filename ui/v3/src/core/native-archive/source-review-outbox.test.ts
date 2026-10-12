@@ -13,7 +13,10 @@ import {
 } from "../../../tests/fixtures/source-review";
 
 const endpoint = "https://example.test/library/api/v3/archive/";
-const target = { kind: "scene" as const, localId: "7" };
+const target = {
+  kind: "scene" as const,
+  libraryId: "00000000-0000-4000-8000-000000000007",
+};
 beforeEach(() => vi.stubGlobal("indexedDB", new IDBFactory()));
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -200,7 +203,7 @@ it("does not discard a mismatched receipt or write if durable storage is unavail
   });
   await expect(
     box.prepare(
-      { ...target, localId: "8" },
+      { ...target, libraryId: "00000000-0000-4000-8000-000000000008" },
       sourcePost().association,
       "linked",
       "",

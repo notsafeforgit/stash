@@ -57,7 +57,7 @@ export function ActivitySubjectLink({ subject }: { subject: ActivitySubject }) {
       : subject.kind === "image"
         ? msg("archive_activity.open_image", "Open image")
         : msg("archive_activity.open_gallery", "Open gallery");
-  if (subject.state !== "active" || subject.local_id === null)
+  if (subject.state !== "active")
     return (
       <p className="text-sm text-muted-foreground">
         {msg(
@@ -68,7 +68,7 @@ export function ActivitySubjectLink({ subject }: { subject: ActivitySubject }) {
     );
   return (
     <LibraryLink
-      item={{ kind: subject.kind, state: "active", local_id: subject.local_id }}
+      item={{ kind: subject.kind, state: "active", uuid: subject.uuid }}
     >
       {label}
     </LibraryLink>

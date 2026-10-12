@@ -19,13 +19,13 @@ input GenerateMetadataInput {
   clipPreviews: Boolean
 
   "scene ids to generate for"
-  sceneIDs: [ID!]
+  sceneIDs: [ID!] @libraryID(kind: "scene")
   "marker ids to generate for"
-  markerIDs: [ID!]
+  markerIDs: [ID!] @libraryID(kind: "scene_marker")
   "image ids to generate for"
-  imageIDs: [ID!]
+  imageIDs: [ID!] @libraryID(kind: "image")
   "gallery ids to generate for"
-  galleryIDs: [ID!]
+  galleryIDs: [ID!] @libraryID(kind: "gallery")
   "paths to run generate on, in addition to the other ID lists"
   paths: [String!]
 
@@ -251,7 +251,7 @@ input IdentifyMetadataInput {
   options: IdentifyMetadataOptionsInput
 
   "scene ids to identify"
-  sceneIDs: [ID!]
+  sceneIDs: [ID!] @libraryID(kind: "scene")
 
   "paths of scenes to identify - ignored if scene ids are set"
   paths: [String!]
@@ -299,18 +299,18 @@ type IdentifyMetadataTaskOptions {
 }
 
 input ExportObjectTypeInput {
-  ids: [String!]
+  ids: [ID!] @libraryID(kind: "scope")
   all: Boolean
 }
 
 input ExportObjectsInput {
-  scenes: ExportObjectTypeInput
-  images: ExportObjectTypeInput
-  studios: ExportObjectTypeInput
-  performers: ExportObjectTypeInput
-  tags: ExportObjectTypeInput
-  groups: ExportObjectTypeInput
-  galleries: ExportObjectTypeInput
+  scenes: ExportObjectTypeInput @libraryScope(kind: "scene")
+  images: ExportObjectTypeInput @libraryScope(kind: "image")
+  studios: ExportObjectTypeInput @libraryScope(kind: "studio")
+  performers: ExportObjectTypeInput @libraryScope(kind: "performer")
+  tags: ExportObjectTypeInput @libraryScope(kind: "tag")
+  groups: ExportObjectTypeInput @libraryScope(kind: "group")
+  galleries: ExportObjectTypeInput @libraryScope(kind: "gallery")
   includeDependencies: Boolean
 }
 

@@ -36,7 +36,7 @@ func (r *queryResolver) FindGroups(ctx context.Context, groupFilterAST *models.F
 
 		switch {
 		case len(idInts) > 0:
-			groups, err = r.repository.Group.FindMany(ctx, idInts)
+			groups, err = r.repository.Group.FindMany(ctx, availableLibraryKeys(idInts))
 			total = len(groups)
 		default:
 			groups, total, err = r.repository.Group.QueryAST(ctx, groupFilterAST, filter)

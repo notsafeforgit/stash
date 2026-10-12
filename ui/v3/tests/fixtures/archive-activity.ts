@@ -60,7 +60,6 @@ export function activityJobDetail(): JobActivityDetail {
         title_truncated: false,
         state: "active",
         revision: 1,
-        local_id: null,
       },
     ],
     context_available: true,

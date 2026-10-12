@@ -36,7 +36,7 @@ func (r *queryResolver) FindPerformers(ctx context.Context, performerFilterAST *
 
 		switch {
 		case len(performerIDs) > 0:
-			performers, err = r.repository.Performer.FindMany(ctx, performerIDs)
+			performers, err = r.repository.Performer.FindMany(ctx, availableLibraryKeys(performerIDs))
 			total = len(performers)
 		default:
 			performers, total, err = r.repository.Performer.QueryAST(ctx, performerFilterAST, filter)

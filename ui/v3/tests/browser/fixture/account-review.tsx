@@ -24,7 +24,7 @@ export function AccountReviewFixture() {
                 count: 2,
                 performers: [10, 11].map((id) => ({
                   __typename: "Performer",
-                  id: String(id),
+                  id: `20000000-0000-4000-8000-0000000000${id}`,
                   name: "River",
                   disambiguation: id === 10 ? "Model" : "Photographer",
                   aliases: ["river"],

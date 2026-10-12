@@ -18,6 +18,7 @@ type durableHookConfig struct{ previewServerConfig }
 func (durableHookConfig) GetPluginHookOrder() map[string][]string { return nil }
 
 func TestDurableHooksKeepIdentityReportFailureAndStop(t *testing.T) {
+	_, repo, _, imageID := pluginLibraryFixture(t)
 	dir := t.TempDir()
 	manifest := filepath.Join(dir, "fixture.yml")
 	require.NoError(t, os.WriteFile(manifest, []byte(`apiVersion: 3
@@ -32,6 +33,7 @@ hooks:
 	require.NoError(t, err)
 	c := NewCache(durableHookConfig{})
 	c.plugins = []Config{*cfg}
+	c.RegisterRepository(repo)
 	c.RegisterSessionStore(session.NewStore(previewSessionConfig{}))
 	script := filepath.Join(dir, "hook.js")
 	event := uuid.NewString()
@@ -40,7 +42,7 @@ hooks:
 		err := c.ExecuteDurablePostHooks(t.Context(), event, 7, hook.ImageCreatePost, nil, nil)
 		require.ErrorContains(t, err, event)
 	}
-	require.NoError(t, os.WriteFile(script, []byte(`({Output: "handled"})`), 0600))
+	require.NoError(t, os.WriteFile(script, []byte(`({Error: input.Args.hookContext.id === "`+imageID+`" ? null : "wrong public ID"})`), 0600))
 	require.NoError(t, c.ExecuteDurablePostHooks(t.Context(), event, 7, hook.ImageCreatePost, nil, nil))
 	require.NoError(t, os.WriteFile(script, []byte(`while (true) {}`), 0600))
 	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)

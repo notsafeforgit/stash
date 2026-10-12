@@ -23,7 +23,7 @@ export function PerformerSourcesFixture() {
                 {
                   id: "source-accounts",
                   label: "Source accounts",
-                  content: <NativePerformerSources localId="7" />,
+                  content: <NativePerformerSources performerId="7" />,
                 },
               ]}
               activeTab={tab}

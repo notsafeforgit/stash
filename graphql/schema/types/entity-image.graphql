@@ -2,13 +2,13 @@ input EntityImageInput {
   "URL or base64 encoded data URL. Empty string clears the stored entity image."
   data: String
   "Existing image ID to copy into the stored entity image."
-  image_id: ID
+  image_id: ID @libraryID(kind: "image")
   "Copy a scene cover or generate a frame without changing the scene."
   scene: SceneImageInput
 }
 
 input SceneImageInput {
-  id: ID!
+  id: ID! @libraryID(kind: "scene")
   "Scene time in seconds. Omit to copy the existing scene cover."
   at: Float
 }

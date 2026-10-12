@@ -85,6 +85,14 @@ func (s *Service) snapshot(ctx context.Context, targets []Target) (*models.Share
 		}
 		seenEntries[target] = true
 		entry := models.ShareEntry{Kind: target.Kind, ID: target.ID, MediaKeys: []string{}}
+		identity, err := s.Repo.ArchiveEntity.FindByLocalID(ctx, models.ArchiveEntityKind(strings.ToLower(target.Kind)), target.ID)
+		if err != nil {
+			return nil, err
+		}
+		if identity == nil {
+			return nil, fmt.Errorf("share item has no library identity")
+		}
+		entry.UUID = identity.UUID
 		if target.Kind == "GALLERY" {
 			g, err := s.Repo.Gallery.Find(ctx, target.ID)
 			if err != nil {

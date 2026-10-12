@@ -66,6 +66,13 @@ Plugin asset URLs continue to serve ESM modules and associated files; the
 `/plugin/{id}/javascript` and `/plugin/{id}/css` concatenation endpoints are gone.
 Use `ui.csp` to declare any additional browser resource origins.
 
+Library IDs in GraphQL, entity-preview inputs, `hookContext.id` and relationship
+fields in hook inputs are canonical UUID strings. This includes deletion
+notifications, whose identity is captured before the row is removed. Pass these
+IDs unchanged back to the API; do not parse them as integers. Plugin IDs, job
+tokens, external provider IDs and user-defined fields retain their own formats.
+See [library identities](library-identities.md) for migration and link behavior.
+
 `type: JSON` settings persist native objects, arrays, scalars or null.
 `editor: JQ_MAP` restricts them to field/expression objects. Existing mapping
 overrides saved as JSON text are read as objects after a plugin upgrades;

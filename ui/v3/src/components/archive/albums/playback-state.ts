@@ -31,14 +31,14 @@ export function albumPlaybackState(slot: AlbumSlot): AlbumPlaybackState {
   if (slot.media?.state === "deleted") return unavailable("deleted");
   if (
     slot.selection_state !== "linked" ||
-    !slot.media?.local_id ||
+    !slot.media?.uuid ||
     slot.media.kind === "gallery"
   )
     return unavailable("unselected");
   if (!slot.registered_files) return unavailable("no_files");
   return {
     kind: slot.media.kind,
-    id: String(slot.media.local_id),
+    id: slot.media.uuid,
     uuid: slot.media.uuid,
   };
 }

@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"net/http"
 	"os/exec"
-	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -179,7 +178,7 @@ func (rs imageRoutes) serveImage(w http.ResponseWriter, r *http.Request, i *mode
 func (rs imageRoutes) ImageCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		imageIdentifierQueryParam := chi.URLParam(r, "imageId")
-		imageID, _ := strconv.Atoi(imageIdentifierQueryParam)
+		imageID, _ := mediaLibraryKey(r.Context(), models.ArchiveImage, imageIdentifierQueryParam)
 
 		var image *models.Image
 		_ = rs.withReadTxn(r, func(ctx context.Context) error {

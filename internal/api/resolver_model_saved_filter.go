@@ -24,5 +24,5 @@ func (r *savedFilterResolver) FilterAst(ctx context.Context, obj *models.SavedFi
 		return nil, fmt.Errorf("decoding filter AST: %w", err)
 	}
 
-	return ret, nil
+	return publicFilterAST(ctx, obj.Mode, ret)
 }

@@ -1,5 +1,5 @@
 type GalleryChapter {
-  id: ID!
+  id: ID! @libraryID(kind: "gallery_chapter")
   gallery: Gallery!
   title: String!
   image_index: Int!
@@ -8,14 +8,14 @@ type GalleryChapter {
 }
 
 input GalleryChapterCreateInput {
-  gallery_id: ID!
+  gallery_id: ID! @libraryID(kind: "gallery")
   title: String!
   image_index: Int!
 }
 
 input GalleryChapterUpdateInput {
-  id: ID!
-  gallery_id: ID
+  id: ID! @libraryID(kind: "gallery_chapter")
+  gallery_id: ID @libraryID(kind: "gallery")
   title: String
   image_index: Int
 }

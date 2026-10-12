@@ -24,7 +24,11 @@ func (r *studioResolver) ImagePath(ctx context.Context, obj *models.Studio) (*st
 	}
 
 	baseURL, _ := ctx.Value(BaseURLCtxKey).(string)
-	imagePath := urlbuilders.NewStudioURLBuilder(baseURL, obj).GetStudioImageURL(hasImage)
+	publicID, identityErr := r.publicID(ctx, models.ArchiveStudio, obj.ID)
+	if identityErr != nil {
+		return nil, identityErr
+	}
+	imagePath := urlbuilders.NewStudioURLBuilder(baseURL, obj, publicID).GetStudioImageURL(hasImage)
 	return &imagePath, nil
 }
 

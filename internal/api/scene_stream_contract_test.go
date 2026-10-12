@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
-	"strconv"
 	"testing"
 
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -54,7 +53,7 @@ func TestSceneStreamNativeAPIContract(t *testing.T) {
 		}
 		return repo.Scene.Create(ctx, &empty, nil)
 	}))
-	server := handler.New(NewExecutableSchema(Config{Resolvers: &Resolver{repository: repo}}))
+	server := handler.New(newLibrarySchema(Config{Resolvers: &Resolver{repository: repo}}))
 	server.AddTransport(transport.POST{})
 	middleware := loaders.Middleware{Repository: repo}
 	api := middleware.Middleware(server)
@@ -83,7 +82,7 @@ func TestSceneStreamNativeAPIContract(t *testing.T) {
 	}
 	const query = `query($id: ID!) { findScene(id: $id) { sceneStreams { url mime_type label } } }`
 	ctx := context.WithValue(testCtx, BaseURLCtxKey, "https://stash.example/prefix")
-	id := strconv.Itoa(scene.ID)
+	id := libraryTestUUID(t, repo, models.ArchiveScene, scene.ID)
 	base := "/prefix/scene/" + id + "/stream"
 	for _, auth := range []string{"anonymous", "api key", "signed user"} {
 		t.Run(auth, func(t *testing.T) {
@@ -138,7 +137,7 @@ func TestSceneStreamNativeAPIContract(t *testing.T) {
 	}
 	require.NotEmpty(t, request(ctx, query, id).Errors, "configured authentication requires a user context")
 	userCtx := session.SetCurrentUserID(ctx, "owner")
-	result := request(userCtx, query, strconv.Itoa(empty.ID))
+	result := request(userCtx, query, libraryTestUUID(t, repo, models.ArchiveScene, empty.ID))
 	require.Empty(t, result.Errors)
 	require.NotNil(t, result.Data.Scene)
 	require.Empty(t, result.Data.Scene.Streams)

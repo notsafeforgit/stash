@@ -1,3 +1,4 @@
+import { resolveLibraryRoute } from "@/core/library-route";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useState } from "react";
 import { cn } from "src/lib/utils";
@@ -219,6 +220,14 @@ function GroupDetailPage() {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/groups/$groupId")({
+  beforeLoad: async ({ params, location, abortController }) => {
+    await resolveLibraryRoute(
+      "group",
+      params.groupId,
+      location,
+      abortController.signal,
+    );
+  },
   validateSearch: searchSchema,
   component: GroupDetailPage,
 });

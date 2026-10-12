@@ -140,5 +140,8 @@ func (s *Manager) PromoteConfiguration(ctx context.Context) error {
 	if err := s.PromoteDefaultFilterConfig(ctx); err != nil {
 		return err
 	}
-	return s.PromoteLibraryFolderConfig(ctx)
+	if err := s.PromoteLibraryFolderConfig(ctx); err != nil {
+		return err
+	}
+	return s.PromoteLibraryUUIDConfig(ctx)
 }

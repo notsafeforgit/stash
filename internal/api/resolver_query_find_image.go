@@ -66,7 +66,7 @@ func (r *queryResolver) FindImages(
 
 		switch {
 		case len(imageIds) > 0:
-			images, err = r.repository.Image.FindMany(ctx, imageIds)
+			images, err = r.repository.Image.FindMany(ctx, availableLibraryKeys(imageIds))
 			if err == nil {
 				result.Count = len(images)
 				for _, s := range images {

@@ -265,12 +265,18 @@ describe("TV settings validation", () => {
         shuffle: false,
         startMuted: undefined,
         autoplay: false,
-        sceneFilter: { kind: "saved", id: "12" },
+        sceneFilter: {
+          kind: "saved",
+          id: "00000000-0000-4000-8000-000000000012",
+        },
       };
       const expected = {
         ...defaultTvSettings,
         autoplay: false,
-        sceneFilter: { kind: "saved", id: "12" },
+        sceneFilter: {
+          kind: "saved",
+          id: "00000000-0000-4000-8000-000000000012",
+        },
       };
       expect(decodeTvSettings(previous)).toEqual({
         kind: "ready",
@@ -316,8 +322,14 @@ describe("TV settings validation", () => {
   it("removes legacy rules while preserving saved filters and playback preferences", () => {
     const settings = {
       ...defaultTvSettings,
-      sceneFilter: { kind: "saved", id: "12" },
-      markerFilter: { kind: "saved", id: "34" },
+      sceneFilter: {
+        kind: "saved",
+        id: "00000000-0000-4000-8000-000000000012",
+      },
+      markerFilter: {
+        kind: "saved",
+        id: "00000000-0000-4000-8000-000000000034",
+      },
       sort: "random",
       autoplay: false,
     };
@@ -338,8 +350,14 @@ describe("TV settings validation", () => {
     (version) => {
       const settings = {
         ...defaultTvSettings,
-        sceneFilter: { kind: "saved", id: "12" },
-        markerFilter: { kind: "saved", id: "34" },
+        sceneFilter: {
+          kind: "saved",
+          id: "00000000-0000-4000-8000-000000000012",
+        },
+        markerFilter: {
+          kind: "saved",
+          id: "00000000-0000-4000-8000-000000000034",
+        },
         startMuted: false,
         autoplay: false,
         sort: "random",

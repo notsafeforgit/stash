@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
-	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -49,7 +49,7 @@ func TestBulkCustomFieldsPersistence(t *testing.T) {
 				repository := db.Repository()
 				updater := &customFieldsBulkUpdater{}
 				resolver := &Resolver{repository: repository, hookExecutor: &mockHookExecutor{}, bulkUpdater: updater}
-				server := handler.New(NewExecutableSchema(Config{Resolvers: resolver}))
+				server := handler.New(newLibrarySchema(Config{Resolvers: resolver}))
 				server.AddTransport(transport.POST{})
 
 				var store interface {
@@ -112,7 +112,7 @@ func TestBulkCustomFieldsPersistence(t *testing.T) {
 							return nil
 						}))
 
-						input := map[string]interface{}{"ids": []string{strconv.Itoa(ids[0]), strconv.Itoa(ids[1])}, "favorite": true}
+						input := map[string]interface{}{"ids": []string{libraryTestUUID(t, repository, models.ArchiveEntityKind(strings.ToLower(entity)), ids[0]), libraryTestUUID(t, repository, models.ArchiveEntityKind(strings.ToLower(entity)), ids[1])}, "favorite": true}
 						if tt.input != "" {
 							input["custom_fields"] = json.RawMessage(tt.input)
 						}
@@ -145,7 +145,7 @@ func TestBulkCustomFieldsPersistence(t *testing.T) {
 								}))
 							}
 						} else {
-							require.JSONEq(t, fmt.Sprintf(`{"data":{"result":{"status":"COMPLETED","job_id":null,"selected_count":2,"updated_ids":["%d","%d"]}}}`, ids[0], ids[1]), response.Body.String())
+							require.JSONEq(t, fmt.Sprintf(`{"data":{"result":{"status":"COMPLETED","job_id":null,"selected_count":2,"updated_ids":[%q,%q]}}}`, libraryTestUUID(t, repository, models.ArchiveEntityKind(strings.ToLower(entity)), ids[0]), libraryTestUUID(t, repository, models.ArchiveEntityKind(strings.ToLower(entity)), ids[1])), response.Body.String())
 							require.Nil(t, updater.operation)
 						}
 

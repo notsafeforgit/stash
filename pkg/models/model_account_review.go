@@ -20,7 +20,7 @@ type AccountReviewPerformer struct {
 	UUID           string             `json:"uuid"`
 	Revision       int                `json:"revision"`
 	State          ArchiveEntityState `json:"state"`
-	LocalID        *int               `json:"local_id,omitempty"`
+	LocalID        *int               `json:"-"`
 	Name           string             `json:"name"`
 	Disambiguation string             `json:"disambiguation,omitempty"`
 }

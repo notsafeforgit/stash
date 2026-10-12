@@ -23,11 +23,11 @@ function clientWithFilter(
   });
   client.writeQuery({
     query: GQL.FindSavedFilterDocument,
-    variables: { id: "1" },
+    variables: { id: "00000000-0000-4000-8000-000000000001" },
     data: {
       findSavedFilter: {
         __typename: "SavedFilter",
-        id: "1",
+        id: "00000000-0000-4000-8000-000000000001",
         name: "Example",
         mode,
         filter_ast,
@@ -74,7 +74,7 @@ describe("TV query construction", () => {
       playerConfiguration,
       { ...defaultTvSettings, orientation: "match" },
       "scenes",
-      { kind: "saved", id: "1" },
+      { kind: "saved", id: "00000000-0000-4000-8000-000000000001" },
       37,
       "portrait",
     );
@@ -168,7 +168,7 @@ describe("TV query construction", () => {
         playerConfiguration,
         settings,
         "scenes",
-        { kind: "saved", id: "1" },
+        { kind: "saved", id: "00000000-0000-4000-8000-000000000001" },
         1,
         "portrait",
       ),
@@ -184,7 +184,7 @@ describe("TV query construction", () => {
         playerConfiguration,
         settings,
         "scenes",
-        { kind: "saved", id: "1" },
+        { kind: "saved", id: "00000000-0000-4000-8000-000000000001" },
         1,
         "portrait",
       ),
@@ -215,7 +215,10 @@ describe("TV query construction", () => {
     const decoded = decodeTvSettings({
       ...defaultTvSettings,
       version: 2,
-      sceneFilter: { kind: "saved", id: "1" },
+      sceneFilter: {
+        kind: "saved",
+        id: "00000000-0000-4000-8000-000000000001",
+      },
       rules: [{ kind: "filter", mode: "scenes", filterId: "999" }],
     });
     if (decoded.kind !== "ready") throw new Error(decoded.message);

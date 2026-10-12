@@ -24,7 +24,7 @@ export function albumSlot(position: number): AlbumSlot {
       kind: "image",
       state: "active",
       revision: 2,
-      local_id: 7,
+
       title: "First image",
       title_truncated: false,
     },
@@ -41,7 +41,7 @@ export function albumPage(): AlbumPage {
     ...video.media!,
     uuid: albumUUID(2),
     kind: "scene",
-    local_id: 8,
+
     title: "Second video",
   };
   const repeated = { ...image, position: 2, through: 2 };

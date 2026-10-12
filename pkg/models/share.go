@@ -48,6 +48,7 @@ type ShareSnapshot struct {
 type ShareEntry struct {
 	Kind      string   `json:"kind"`
 	ID        int      `json:"id"`
+	UUID      string   `json:"uuid,omitempty"`
 	Title     string   `json:"title"`
 	MediaKeys []string `json:"media_keys"`
 }

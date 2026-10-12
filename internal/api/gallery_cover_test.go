@@ -83,8 +83,8 @@ func TestGalleryCoverAcceptsOneMemberAndNotifiesAfterCommit(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, scene.ID, cover.Scene.ID, "rejected writes retain the last successful selection")
 	call := nativeResolverCaller(t, resolver)
-	require.JSONEq(t, `{"data":{"findGallery":{"cover":{"image":null,"scene":{"id":"`+sceneID+`"}}}}}`,
-		call(`query($id:ID!){findGallery(id:$id){cover{image{id} scene{id}}}}`, map[string]any{"id": galleryID}))
+	require.JSONEq(t, `{"data":{"findGallery":{"cover":{"image":null,"scene":{"id":"`+libraryTestUUID(t, repo, models.ArchiveScene, scene.ID)+`"}}}}}`,
+		call(`query($id:ID!){findGallery(id:$id){cover{image{id} scene{id}}}}`, map[string]any{"id": libraryTestUUID(t, repo, models.ArchiveGallery, g.ID)}))
 	ok, err := mutation.ResetGalleryCover(t.Context(), GalleryResetCoverInput{GalleryID: galleryID})
 	require.NoError(t, err)
 	require.True(t, ok)

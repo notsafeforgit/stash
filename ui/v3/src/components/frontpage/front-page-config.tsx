@@ -283,7 +283,7 @@ function AddRowMenu({
               onClick={() => {
                 onAdd({
                   __typename: "SavedFilter",
-                  savedFilterId: Number(sf.id),
+                  savedFilterId: sf.id,
                 });
                 onClose();
               }}

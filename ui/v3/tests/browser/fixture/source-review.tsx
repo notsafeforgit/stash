@@ -6,7 +6,7 @@ import {
   createSourceReviewOutbox,
   type SavedSourceReview,
 } from "@/core/native-archive/source-review-outbox";
-import { sourcePost } from "../../fixtures/source-review";
+import { sourcePost, sourceIds } from "../../fixtures/source-review";
 
 export function SourceReviewFixture() {
   const kind = new URLSearchParams(location.search).has("image")
@@ -34,7 +34,11 @@ export function SourceReviewFixture() {
               id: "source-review",
               label: "Sources",
               content: (
-                <NativeSourceReview key={kind} kind={kind} localId="7" />
+                <NativeSourceReview
+                  key={kind}
+                  kind={kind}
+                  libraryId={sourceIds.media}
+                />
               ),
             },
           ]}
@@ -53,7 +57,7 @@ declare global {
     };
   }
 }
-const storageTarget = { kind: "scene" as const, localId: "7" };
+const storageTarget = { kind: "scene" as const, libraryId: sourceIds.media };
 function journal(prefix: string) {
   return createSourceReviewOutbox(
     createSourceReviewAPI(

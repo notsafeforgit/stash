@@ -5,7 +5,7 @@ enum FilterGroupOperator {
 
 input FilterASTConditionInput {
   field: String!
-  value: Any
+  value: Any @libraryFilter
 }
 
 input FilterASTGroupInput {

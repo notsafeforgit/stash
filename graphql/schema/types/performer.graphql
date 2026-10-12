@@ -13,7 +13,7 @@ enum CircumcisedEnum {
 }
 
 type Performer {
-  id: ID!
+  id: ID! @libraryID(kind: "performer")
   name: String!
   disambiguation: String
   url: String @deprecated(reason: "Use urls")
@@ -92,7 +92,7 @@ input PerformerCreateInput {
   twitter: String @deprecated(reason: "Use urls")
   instagram: String @deprecated(reason: "Use urls")
   favorite: Boolean
-  tag_ids: [ID!]
+  tag_ids: [ID!] @libraryID(kind: "tag")
   "This should be a URL or a base64 encoded data URL"
   image: String
   "Normalized entity image input. Rejects HEIC/HEIF and stores as WebP."
@@ -112,7 +112,7 @@ input PerformerCreateInput {
 
 input PerformerUpdateInput {
   provider_metadata: [ProviderMetadataSelectionInput!]
-  id: ID!
+  id: ID! @libraryID(kind: "performer")
   name: String
   disambiguation: String
   url: String @deprecated(reason: "Use urls")
@@ -138,7 +138,7 @@ input PerformerUpdateInput {
   twitter: String @deprecated(reason: "Use urls")
   instagram: String @deprecated(reason: "Use urls")
   favorite: Boolean
-  tag_ids: [ID!]
+  tag_ids: [ID!] @libraryID(kind: "tag")
   "This should be a URL or a base64 encoded data URL"
   image: String
   "Normalized entity image input. Rejects HEIC/HEIF and stores as WebP."
@@ -163,7 +163,7 @@ input BulkUpdateStrings {
 
 input BulkPerformerUpdateInput {
   clientMutationId: String
-  ids: [ID!]
+  ids: [ID!] @libraryID(kind: "performer")
   apply_to_items_matching_filters: Boolean
   find_filter: FindFilterType
   performer_filter_ast: FilterASTInput
@@ -191,7 +191,7 @@ input BulkPerformerUpdateInput {
   twitter: String @deprecated(reason: "Use urls")
   instagram: String @deprecated(reason: "Use urls")
   favorite: Boolean
-  tag_ids: BulkUpdateIds
+  tag_ids: BulkUpdateIds @libraryScope(kind: "tag")
   # rating expressed as 1-100
   rating100: Int
   details: String
@@ -205,7 +205,7 @@ input BulkPerformerUpdateInput {
 }
 
 input PerformerDestroyInput {
-  id: ID!
+  id: ID! @libraryID(kind: "performer")
 }
 
 type FindPerformersResultType {
@@ -214,8 +214,8 @@ type FindPerformersResultType {
 }
 
 input PerformerMergeInput {
-  source: [ID!]!
-  destination: ID!
+  source: [ID!]! @libraryID(kind: "performer")
+  destination: ID! @libraryID(kind: "performer")
   # values defined here will override values in the destination
   values: PerformerUpdateInput
   """

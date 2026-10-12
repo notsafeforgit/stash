@@ -29,7 +29,7 @@ it.each(["807", former, canonical])(
       Response.json({
         uuid: canonical,
         kind: "performer",
-        local_id: 807,
+
         revision: 2,
       }),
     );
@@ -61,7 +61,7 @@ it.each(["807", former, canonical])(
       expect(history.location.href).toBe(
         `/stash/performers/${canonical}?tab=images&p=3#list`,
       );
-      expect(router.state.matches.at(-1)?.loaderData).toBe("807");
+      expect(router.state.matches.at(-1)?.loaderData).toBe(canonical);
     });
     expect(router.state.location.state.returnTo).toBe(returnTo);
     expect(

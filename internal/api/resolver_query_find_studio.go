@@ -37,7 +37,7 @@ func (r *queryResolver) FindStudios(ctx context.Context, studioFilterAST *models
 
 		switch {
 		case len(idInts) > 0:
-			studios, err = r.repository.Studio.FindMany(ctx, idInts)
+			studios, err = r.repository.Studio.FindMany(ctx, availableLibraryKeys(idInts))
 			total = len(studios)
 		default:
 			studios, total, err = r.repository.Studio.QueryAST(ctx, studioFilterAST, filter)

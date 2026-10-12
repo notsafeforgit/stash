@@ -52,11 +52,11 @@ export function NativeMetadataReview({
   const [outcome, setOutcome] = useState<"applied" | "kept">();
   const [refreshFailed, setRefreshFailed] = useState(false);
   const [refresh, setRefresh] = useState(0);
-  const target = { kind, localId: entity.id };
+  const target = { kind, libraryId: entity.id };
   // biome-ignore lint/correctness/useExhaustiveDependencies: The refresh counter explicitly reloads after a committed edit or a requested retry.
   useEffect(() => {
     const controller = new AbortController();
-    const target = { kind, localId: entity.id };
+    const target = { kind, libraryId: entity.id };
     async function load() {
       setBusy(true);
       setError(undefined);
@@ -143,7 +143,7 @@ export function NativeMetadataReview({
       className="flex flex-col gap-4"
     >
       {kind === "scene" && (
-        <ProviderMetadataHistory kind="scene" localId={entity.id} />
+        <ProviderMetadataHistory kind="scene" libraryId={entity.id} />
       )}
       <p className="text-sm text-muted-foreground">
         {msg(

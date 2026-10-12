@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -64,7 +63,7 @@ func (rs tagRoutes) Image(w http.ResponseWriter, r *http.Request) {
 
 func (rs tagRoutes) TagCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tagID, err := strconv.Atoi(chi.URLParam(r, "tagId"))
+		tagID, err := mediaLibraryKey(r.Context(), models.ArchiveTag, chi.URLParam(r, "tagId"))
 		if err != nil {
 			http.Error(w, http.StatusText(404), 404)
 			return

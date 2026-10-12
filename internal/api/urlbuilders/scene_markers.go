@@ -1,22 +1,16 @@
 package urlbuilders
 
-import (
-	"strconv"
-
-	"github.com/stashapp/stash/pkg/models"
-)
-
 type SceneMarkerURLBuilder struct {
 	BaseURL  string
 	SceneID  string
 	MarkerID string
 }
 
-func NewSceneMarkerURLBuilder(baseURL string, sceneMarker *models.SceneMarker) SceneMarkerURLBuilder {
+func NewSceneMarkerURLBuilder(baseURL, sceneID, markerID string) SceneMarkerURLBuilder {
 	return SceneMarkerURLBuilder{
 		BaseURL:  baseURL,
-		SceneID:  strconv.Itoa(sceneMarker.SceneID),
-		MarkerID: strconv.Itoa(sceneMarker.ID),
+		SceneID:  sceneID,
+		MarkerID: markerID,
 	}
 }
 

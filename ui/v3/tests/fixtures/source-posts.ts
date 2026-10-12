@@ -57,7 +57,7 @@ export function postMedia(): PostMedia {
       kind: "scene",
       state: "active",
       revision: 2,
-      local_id: 7,
+
       title: "Associated library video",
       title_truncated: false,
     },
@@ -82,7 +82,7 @@ export function postAlbum(): PostAlbum {
       kind: "gallery",
       state: "active",
       revision: 1,
-      local_id: 12,
+
       title: "Shared post album",
       title_truncated: false,
     },

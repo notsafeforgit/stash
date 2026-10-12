@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
-	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/internal/ingest"
@@ -96,7 +95,7 @@ func (s *Manager) finishFileIngestion(ctx context.Context, work ingest.FileWork,
 		original := work.Publication.Transformation.Original.PathFence.Path
 		removedEntry := true
 		input := plugin.ImageDestroyInput{
-			ImageDestroyInput: models.ImageDestroyInput{ID: strconv.Itoa(conversion.ImageID), DestroyFileEntry: &removedEntry},
+			ImageDestroyInput: models.ImageDestroyInput{ID: conversion.ImageUUID, DestroyFileEntry: &removedEntry},
 			Checksum:          conversion.Checksum, Path: original,
 		}
 		if err := s.PluginCache.ExecuteDurablePostHooks(ctx, intakeHookEventID(work, conversion.ImageUUID, hook.ImageDestroyPost), conversion.ImageID, hook.ImageDestroyPost, input, nil); err != nil {
@@ -105,7 +104,7 @@ func (s *Manager) finishFileIngestion(ctx context.Context, work ingest.FileWork,
 		if err := guard(ctx); err != nil {
 			return err
 		}
-		fileInput := plugin.FileDestroyInput{ID: strconv.Itoa(conversion.FileID), Path: original, Basename: filepath.Base(original), Fingerprints: conversion.Fingerprints}
+		fileInput := plugin.FileDestroyInput{ID: conversion.FileUUID, Path: original, Basename: filepath.Base(original), Fingerprints: conversion.Fingerprints}
 		if err := s.PluginCache.ExecuteDurablePostHooks(ctx, intakeHookEventID(work, conversion.FileUUID, hook.FileDestroyPost), conversion.FileID, hook.FileDestroyPost, fileInput, nil); err != nil {
 			return err
 		}

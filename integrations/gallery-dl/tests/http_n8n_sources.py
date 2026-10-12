@@ -43,12 +43,12 @@ elif setup["phase"] == "resume":
     assert result["scrape_completion"] == "not_checked"
     assert reddit.read_bytes() == original + b"https://reddit.com/user/example/submitted/\r\n"
 elif setup["phase"] == "linked_removal":
-    result = run("remove-performer", "1", "101")
+    result = run("remove-performer", setup["performer"], "101")
     assert result["complete"] and result["status"] == "removed" and result["removedCount"] == 1
     assert result["performerName"] == "A different display name"
     assert result["removedUsernames"] == ["example"]
     assert reddit.read_bytes() == original
-    assert run("remove-performer", "1", "101") == result
+    assert run("remove-performer", setup["performer"], "101") == result
     assert run("add", "example", "100")["complete"]
     assert reddit.read_bytes() == original, "Completed older registration cannot undo the later removal"
 else:

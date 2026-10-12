@@ -4,12 +4,12 @@ type Fingerprint {
 }
 
 type Folder {
-  id: ID!
+  id: ID! @libraryID(kind: "folder")
   path: String!
   basename: String!
 
-  parent_folder_id: ID @deprecated(reason: "Use parent_folder instead")
-  zip_file_id: ID @deprecated(reason: "Use zip_file instead")
+  parent_folder_id: ID @libraryID(kind: "folder") @deprecated(reason: "Use parent_folder instead")
+  zip_file_id: ID @libraryID(kind: "file") @deprecated(reason: "Use zip_file instead")
 
   parent_folder: Folder
   "Returns all parent folders in order from immediate parent to top-level"
@@ -26,12 +26,12 @@ type Folder {
 }
 
 interface BaseFile {
-  id: ID!
+  id: ID! @libraryID(kind: "file")
   path: String!
   basename: String!
 
-  parent_folder_id: ID! @deprecated(reason: "Use parent_folder instead")
-  zip_file_id: ID @deprecated(reason: "Use zip_file instead")
+  parent_folder_id: ID! @libraryID(kind: "folder") @deprecated(reason: "Use parent_folder instead")
+  zip_file_id: ID @libraryID(kind: "file") @deprecated(reason: "Use zip_file instead")
 
   parent_folder: Folder!
   zip_file: BasicFile
@@ -47,12 +47,12 @@ interface BaseFile {
 }
 
 type BasicFile implements BaseFile {
-  id: ID!
+  id: ID! @libraryID(kind: "file")
   path: String!
   basename: String!
 
-  parent_folder_id: ID! @deprecated(reason: "Use parent_folder instead")
-  zip_file_id: ID @deprecated(reason: "Use zip_file instead")
+  parent_folder_id: ID! @libraryID(kind: "folder") @deprecated(reason: "Use parent_folder instead")
+  zip_file_id: ID @libraryID(kind: "file") @deprecated(reason: "Use zip_file instead")
 
   parent_folder: Folder!
   zip_file: BasicFile
@@ -68,12 +68,12 @@ type BasicFile implements BaseFile {
 }
 
 type VideoFile implements BaseFile {
-  id: ID!
+  id: ID! @libraryID(kind: "file")
   path: String!
   basename: String!
 
-  parent_folder_id: ID! @deprecated(reason: "Use parent_folder instead")
-  zip_file_id: ID @deprecated(reason: "Use zip_file instead")
+  parent_folder_id: ID! @libraryID(kind: "folder") @deprecated(reason: "Use parent_folder instead")
+  zip_file_id: ID @libraryID(kind: "file") @deprecated(reason: "Use zip_file instead")
 
   parent_folder: Folder!
   zip_file: BasicFile
@@ -108,12 +108,12 @@ type VideoFile implements BaseFile {
 }
 
 type ImageFile implements BaseFile {
-  id: ID!
+  id: ID! @libraryID(kind: "file")
   path: String!
   basename: String!
 
-  parent_folder_id: ID! @deprecated(reason: "Use parent_folder instead")
-  zip_file_id: ID @deprecated(reason: "Use zip_file instead")
+  parent_folder_id: ID! @libraryID(kind: "folder") @deprecated(reason: "Use parent_folder instead")
+  zip_file_id: ID @libraryID(kind: "file") @deprecated(reason: "Use zip_file instead")
 
   parent_folder: Folder!
   zip_file: BasicFile
@@ -142,12 +142,12 @@ type ImageFile implements BaseFile {
 union VisualFile = VideoFile | ImageFile
 
 type GalleryFile implements BaseFile {
-  id: ID!
+  id: ID! @libraryID(kind: "file")
   path: String!
   basename: String!
 
-  parent_folder_id: ID! @deprecated(reason: "Use parent_folder instead")
-  zip_file_id: ID @deprecated(reason: "Use zip_file instead")
+  parent_folder_id: ID! @libraryID(kind: "folder") @deprecated(reason: "Use parent_folder instead")
+  zip_file_id: ID @libraryID(kind: "file") @deprecated(reason: "Use zip_file instead")
 
   parent_folder: Folder!
   zip_file: BasicFile
@@ -165,12 +165,12 @@ type GalleryFile implements BaseFile {
 }
 
 input MoveFilesInput {
-  ids: [ID!]!
+  ids: [ID!]! @libraryID(kind: "file")
   "valid for single or multiple file ids"
   destination_folder: String
 
   "valid for single or multiple file ids"
-  destination_folder_id: ID
+  destination_folder_id: ID @libraryID(kind: "folder")
 
   "valid only for single file id. If empty, existing basename is used"
   destination_basename: String
@@ -183,7 +183,7 @@ input SetFingerprintsInput {
 }
 
 input FileSetFingerprintsInput {
-  id: ID!
+  id: ID! @libraryID(kind: "file")
   "only supplied fingerprint types will be modified"
   fingerprints: [SetFingerprintsInput!]!
 }

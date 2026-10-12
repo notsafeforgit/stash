@@ -17,7 +17,7 @@ type metadataEntityIdentity struct {
 	UUID     string                   `json:"uuid"`
 	Kind     models.ArchiveEntityKind `json:"kind"`
 	Revision int                      `json:"revision"`
-	LocalID  *int                     `json:"local_id,omitempty"`
+	LocalID  *int                     `json:"-"`
 }
 
 func metadataIdentity(entity *models.ArchiveEntity) metadataEntityIdentity {
@@ -33,7 +33,7 @@ func (rs *nativeArchiveRoutes) metadataEntity(w http.ResponseWriter, r *http.Req
 	kind := models.ArchiveEntityKind(chi.URLParam(r, "kind"))
 	validKind := false
 	switch kind {
-	case models.ArchiveScene, models.ArchiveImage, models.ArchiveGallery, models.ArchivePerformer, models.ArchiveStudio, models.ArchiveTag, models.ArchiveGroup, models.ArchiveFile:
+	case models.ArchiveScene, models.ArchiveImage, models.ArchiveGallery, models.ArchivePerformer, models.ArchiveStudio, models.ArchiveTag, models.ArchiveGroup, models.ArchiveFile, models.ArchiveFolder, models.ArchiveSceneMarker, models.ArchiveGalleryChapter, models.ArchiveSavedFilter:
 		validKind = true
 	}
 	if (!isUUID && (idErr != nil || id < 1)) || !validKind {

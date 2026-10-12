@@ -1,3 +1,4 @@
+import { retainedLibraryIdSchema } from "@/core/library-id";
 import { z } from "zod";
 import { accountUUIDSchema as uuid } from "./account-review-api";
 import { identitySchema } from "./metadata-review-api";
@@ -140,17 +141,15 @@ export function createSourceAlbumAPI(
   return {
     endpoint,
     pageLimit,
-    async identity(localId: string, signal?: AbortSignal) {
-      z.string()
-        .regex(/^[1-9]\d*$/)
-        .parse(localId);
+    async identity(libraryId: string, signal?: AbortSignal) {
+      retainedLibraryIdSchema.parse(libraryId);
       const identity = await request(
-        `entity-identities/gallery/${localId}`,
+        `entity-identities/gallery/${libraryId}`,
         identitySchema,
         undefined,
         signal,
       );
-      if (identity.kind !== "gallery" || String(identity.local_id) !== localId)
+      if (identity.kind !== "gallery")
         throw new NativeArchiveError(0, "invalid_response");
       return identity;
     },

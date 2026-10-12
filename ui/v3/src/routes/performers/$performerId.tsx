@@ -182,7 +182,7 @@ function PerformerToolbar({
 
 function PerformerDetailPage() {
   const sourceTracking = useSourceTracking();
-  const { localId } = Route.useLoaderData();
+  const { performerId: canonicalId } = Route.useLoaderData();
   const { performerId } = Route.useParams();
   const { tab } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -197,14 +197,14 @@ function PerformerDetailPage() {
   );
 
   const { data, loading, error } = useQuery(GQL.FindPerformerDocument, {
-    variables: { id: localId ?? "" },
-    skip: localId === null,
+    variables: { id: canonicalId ?? "" },
+    skip: canonicalId === null,
     fetchPolicy: "cache-first",
   });
 
   const [updatePerformer] = useMutation(GQL.PerformerUpdateDocument);
 
-  const performer = localId === null ? null : data?.findPerformer;
+  const performer = canonicalId === null ? null : data?.findPerformer;
   useDocumentTitle(performer?.name);
 
   function handleToggleFavorite() {
@@ -287,7 +287,7 @@ function PerformerDetailPage() {
           content: (
             <NativePerformerSources
               key={performer.id}
-              localId={performer.id}
+              performerId={performer.id}
               entityUUID={performerId}
             />
           ),
@@ -427,18 +427,18 @@ export const Route = createFileRoute("/performers/$performerId")({
   validateSearch: searchSchema,
   ...detailRouteState,
   loader: async ({ params, location, abortController }) => {
-    const localId = await resolvePerformerRoute(
+    const performerId = await resolvePerformerRoute(
       params.performerId,
       location,
       abortController.signal,
     );
-    if (localId !== null)
+    if (performerId !== null)
       await getClient().query({
         query: GQL.FindPerformerDocument,
-        variables: { id: localId },
+        variables: { id: performerId },
         fetchPolicy: "cache-first",
       });
-    return { localId };
+    return { performerId };
   },
   component: PerformerDetailPage,
 });

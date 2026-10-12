@@ -1,3 +1,4 @@
+import { retainedLibraryIdSchema } from "@/core/library-id";
 import { z } from "zod";
 import {
   createArchiveRequest,
@@ -182,19 +183,17 @@ export function createSourceReviewAPI(
     pageLimit,
     async identity(
       kind: "scene" | "image",
-      localId: string,
+      libraryId: string,
       signal?: AbortSignal,
     ) {
-      z.string()
-        .regex(/^[1-9]\d*$/)
-        .parse(localId);
+      retainedLibraryIdSchema.parse(libraryId);
       const result = await request(
-        `entity-identities/${kind}/${localId}`,
+        `entity-identities/${kind}/${libraryId}`,
         identitySchema,
         undefined,
         signal,
       );
-      if (result.kind !== kind || String(result.local_id) !== localId)
+      if (result.kind !== kind)
         throw new NativeArchiveError(0, "invalid_response");
       return result;
     },

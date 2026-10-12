@@ -24,7 +24,10 @@ describe("source album playback eligibility", () => {
   it("uses the actual selected library kind after conversion", () => {
     const slot = albumPage().slots[1]!;
     slot.media_kind = "image";
-    expect(albumPlaybackState(slot)).toMatchObject({ kind: "scene", id: "8" });
+    expect(albumPlaybackState(slot)).toMatchObject({
+      kind: "scene",
+      id: slot.media!.uuid,
+    });
   });
   it.each([
     ["attachment rejection", { selection_state: "unlinked" }, "rejected"],
@@ -40,7 +43,7 @@ describe("source album playback eligibility", () => {
   });
   it("does not use a deleted entity's previous local ID", () => {
     const slot = albumSlot(0);
-    slot.media = { ...slot.media!, state: "deleted", local_id: null };
+    slot.media = { ...slot.media!, state: "deleted" };
     expect(albumPlaybackState(slot)).toEqual({
       kind: "unavailable",
       reason: "deleted",

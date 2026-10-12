@@ -1,3 +1,4 @@
+import { resolveLibraryRoute } from "@/core/library-route";
 import { ProviderMetadataHistory } from "@/components/detail/provider-metadata-history";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useState } from "react";
@@ -280,7 +281,7 @@ function StudioDetailPage() {
           }),
           content: (
             <div className="p-4">
-              <ProviderMetadataHistory kind="studio" localId={studio.id} />
+              <ProviderMetadataHistory kind="studio" libraryId={studio.id} />
             </div>
           ),
         },
@@ -376,6 +377,14 @@ function StudioDetailPage() {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/studios/$studioId")({
+  beforeLoad: async ({ params, location, abortController }) => {
+    await resolveLibraryRoute(
+      "studio",
+      params.studioId,
+      location,
+      abortController.signal,
+    );
+  },
   validateSearch: searchSchema,
   component: StudioDetailPage,
 });

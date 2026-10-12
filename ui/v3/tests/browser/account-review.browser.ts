@@ -125,12 +125,11 @@ async function archive(
           ? { ...current, uuid: selected, canonical_uuid: selected }
           : current;
     } else if (path.includes("/entity-identities/performer/")) {
-      const owner = performer(path.endsWith("/11"));
+      const owner = performer(path.endsWith(ids.otherPerformer));
       result = {
         uuid: owner.uuid,
         kind: "performer",
         revision: owner.revision,
-        local_id: owner.local_id,
       };
     } else if (path.endsWith("/preview")) {
       const input = route.request().postDataJSON();
@@ -195,17 +194,22 @@ async function choosePerformer(page: Page, other = false) {
     .getByRole("combobox", { name: "Performer", exact: true })
     .fill("River");
   await expect(
-    page.getByRole("option", { name: "River (Model) (#10)", exact: true }),
+    page.getByRole("option", {
+      name: `River (Model) (#${ids.performer})`,
+      exact: true,
+    }),
   ).toBeVisible();
   await expect(
     page.getByRole("option", {
-      name: "River (Photographer) (#11)",
+      name: `River (Photographer) (#${ids.otherPerformer})`,
       exact: true,
     }),
   ).toBeVisible();
   await page
     .getByRole("option", {
-      name: other ? "River (Photographer) (#11)" : "River (Model) (#10)",
+      name: other
+        ? `River (Photographer) (#${ids.otherPerformer})`
+        : `River (Model) (#${ids.performer})`,
       exact: true,
     })
     .click();
@@ -299,7 +303,7 @@ test("previews an explicit performer choice and refreshes only the affected acco
   expect(remote.writes).toHaveLength(1);
   expect(remote.lists).toHaveLength(initialPages);
   await expect(
-    page.getByRole("link", { name: "River (Photographer) (#11)", exact: true }),
+    page.getByRole("link", { name: "River (Photographer)", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Back to accounts", exact: true })
@@ -550,7 +554,7 @@ test("preserves confirmed success when refreshing the account fails", async ({
   remote.restoreAccountRead();
   await page.getByRole("button", { name: "Retry", exact: true }).click();
   await expect(
-    page.getByRole("link", { name: "River (Model) (#10)", exact: true }),
+    page.getByRole("link", { name: "River (Model)", exact: true }),
   ).toBeVisible();
   expect(remote.writes).toHaveLength(1);
 });

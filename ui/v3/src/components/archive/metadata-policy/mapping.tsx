@@ -120,7 +120,7 @@ function ReferenceValues({
                   if (controller.signal.aborted) return;
                   if (
                     identity.kind !== field.reference_kind ||
-                    String(identity.local_id) !== choice.id
+                    identity.uuid !== choice.id
                   )
                     throw new NativeArchiveError(0, "identity_mismatch");
                   update([...new Set([...values, identity.uuid])]);
@@ -153,7 +153,7 @@ function ReferenceValues({
           >
             <span data-selectable-text className="min-w-0 wrap-anywhere">
               {ref?.entity
-                ? `${ref.name}${ref.disambiguation ? ` (${ref.disambiguation})` : ""} (#${ref.entity.local_id})`
+                ? `${ref.name}${ref.disambiguation ? ` (${ref.disambiguation})` : ""}`
                 : uuid}
             </span>
             <Button

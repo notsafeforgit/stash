@@ -11,7 +11,7 @@ def prepare(app, policies, producer, runtime, value, directory, call):
     guards, source_plan, policy_entries = [], None, []
     if action == 'remove-performer':
         entity = app.request('GET', '/entity-identities/performer/' + value['identity'])
-        if entity.get('kind') != 'performer' or entity.get('local_id') != int(value['identity']):
+        if entity.get('kind') != 'performer':
             raise InvalidData('Performer identity changed')
         performer = identifier(entity['uuid'])
         items = subscriptions.listing(app, root=runtime.root, namespace='native:' + platform, performer=performer)

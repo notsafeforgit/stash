@@ -40,7 +40,7 @@ async function archive(
         json: {
           uuid: postIds.gallery,
           kind: "gallery",
-          local_id: 12,
+
           revision: 1,
         },
       });
@@ -208,7 +208,6 @@ test("rejected, conflicting, excluded and deleted positions never fetch media", 
   first.slots[3]!.media = {
     ...first.slots[3]!.media!,
     state: "deleted",
-    local_id: null,
   };
   first.slots[3]!.registered_files = 0;
   first.selection = {
@@ -340,7 +339,7 @@ test("adjacent videos keep one player and closing releases playback", async ({
       ...video,
       position: 1,
       through: 1,
-      media: { ...video.media!, local_id: 9, uuid: postIds.media },
+      media: { ...video.media!, uuid: postIds.media },
     },
   ];
   first.selection = {
@@ -360,7 +359,7 @@ test("adjacent videos keep one player and closing releases playback", async ({
   await next(page, 1);
   await expect
     .poll(() => player.evaluate((node: HTMLVideoElement) => node.currentSrc))
-    .toContain("/scene/9/stream");
+    .toContain(`/scene/${postIds.media}/stream`);
   expect(await player.evaluate((node, prior) => node === prior, original)).toBe(
     true,
   );

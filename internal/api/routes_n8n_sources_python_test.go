@@ -80,9 +80,10 @@ func TestPythonNativeSourceWorkflowsRecoverPoliciesAndUseLinkedAccounts(t *testi
 		_, _ = w.Write(recorder.Body.Bytes())
 	}))
 	t.Cleanup(server.Close)
+	var performerUUID string
 	run := func(phase string) {
 		t.Helper()
-		setup, err := json.Marshal(map[string]any{"directory": directory, "root": root.UUID, "producer": producer.UUID, "endpoint": server.URL, "phase": phase})
+		setup, err := json.Marshal(map[string]any{"directory": directory, "root": root.UUID, "producer": producer.UUID, "endpoint": server.URL, "phase": phase, "performer": performerUUID})
 		require.NoError(t, err)
 		ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 		defer cancel()
@@ -114,6 +115,9 @@ func TestPythonNativeSourceWorkflowsRecoverPoliciesAndUseLinkedAccounts(t *testi
 INSERT INTO performer_names(performer_id,name,position) VALUES(1,'A different display name',0),(2,'example',0);`, nil)
 		require.NoError(t, err)
 		owner, err := repo.ArchiveEntity.FindByLocalID(ctx, models.ArchivePerformer, 1)
+		if err == nil && owner != nil {
+			performerUUID = owner.UUID
+		}
 		require.NoError(t, err)
 		account, err := repo.SourceAccount.Create(ctx, "native:reddit", "Linked account")
 		require.NoError(t, err)

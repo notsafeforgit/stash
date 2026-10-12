@@ -1,3 +1,4 @@
+import { libraryIdSchema } from "./library-id";
 import { taskDefaultsSchema } from "./task-defaults";
 import { z } from "zod";
 import { FilterMode, GenderEnum, SortDirectionEnum } from "./generated-graphql";
@@ -14,12 +15,7 @@ export const frontPageContentSchema = z.array(
   z.discriminatedUnion("__typename", [
     z.looseObject({
       __typename: z.literal("SavedFilter"),
-      // Existing v2.5/v3 configurations persist IDs as numbers or decimal
-      // strings. Retain their representation so reading never rewrites them.
-      savedFilterId: z.union([
-        z.number().int().positive(),
-        z.string().regex(/^[1-9]\d*$/),
-      ]),
+      savedFilterId: libraryIdSchema,
     }),
     z.looseObject({
       __typename: z.literal("CustomFilter"),

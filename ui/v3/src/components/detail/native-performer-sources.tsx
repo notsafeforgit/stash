@@ -97,7 +97,7 @@ function useSourcePage<T extends { uuid: string }>(
         page.performer.uuid !== data.performer.uuid ||
         page.performer.revision !== data.performer.revision ||
         page.performer.state !== data.performer.state ||
-        page.performer.local_id !== data.performer.local_id
+        page.performer.uuid !== data.performer.uuid
       )
         throw new NativeArchiveError(409, "performer_changed");
       setData({ ...page, items: [...data.items, ...page.items] });
@@ -269,10 +269,10 @@ function IdentityHistory({ id, api }: { id: string; api: PerformerSourceAPI }) {
 }
 
 export function NativePerformerSources({
-  localId,
+  performerId,
   entityUUID,
 }: {
-  localId: string;
+  performerId: string;
   entityUUID?: string;
 }) {
   const msg = useMsg();
@@ -280,11 +280,11 @@ export function NativePerformerSources({
   const [historyOpen, setHistoryOpen] = useState(false);
   const load = useCallback(
     async (after: string | undefined, signal: AbortSignal) => {
-      const uuid = entityUUID ?? (await api.identity(localId, signal)).uuid;
+      const uuid = entityUUID ?? (await api.identity(performerId, signal)).uuid;
       const page = await api.accounts(uuid, after, signal);
       return { ...page, items: page.accounts };
     },
-    [api, localId, entityUUID],
+    [api, performerId, entityUUID],
   );
   const state = useSourcePage(load, api.pageLimit);
   const data = state.data;
@@ -315,7 +315,7 @@ export function NativePerformerSources({
       {data && (
         <>
           <SourceMonitoring scope="performer" id={data.performer.uuid} />
-          {String(data.performer.local_id) !== localId && (
+          {data.performer.uuid !== performerId && (
             <Alert>
               <AlertTitle>
                 {msg(

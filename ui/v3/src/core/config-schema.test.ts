@@ -4,7 +4,22 @@ import { getFrontPageContent } from "./config";
 import { interfacePreferencesSchema } from "@/hooks/interface-preferences";
 import { lightboxSettingsSchema } from "@/components/lightbox/settings";
 
-it.each(["", " ", "0", "-1", "1.5", "1e2", "12junk", 0, -1, 1.5, true, null])(
+it.each([
+  "",
+  " ",
+  "0",
+  "-1",
+  "1.5",
+  "1e2",
+  "12junk",
+  0,
+  -1,
+  1.5,
+  true,
+  null,
+  1,
+  "1",
+])(
   "rejects malformed saved-filter IDs without coercing %j",
   (savedFilterId) => {
     expect(

@@ -104,15 +104,12 @@ const receiptRequestSchema = inputShape
 export type PostMergeInput = z.infer<typeof postMergeInputSchema>;
 export type PostMergeApply = z.infer<typeof postMergeApplySchema>;
 
-export const postMergeEntitySchema = z
-  .object({
-    uuid,
-    kind: z.enum(["scene", "image", "gallery"]),
-    state: z.enum(["active", "deleted"]),
-    revision,
-    local_id: revision.nullable(),
-  })
-  .refine((value) => (value.state === "active") === (value.local_id !== null));
+export const postMergeEntitySchema = z.object({
+  uuid,
+  kind: z.enum(["scene", "image", "gallery"]),
+  state: z.enum(["active", "deleted"]),
+  revision,
+});
 const media = postMergeEntitySchema.refine((value) => value.kind !== "gallery");
 const selection = z.object({
   decision_uuid: uuid,

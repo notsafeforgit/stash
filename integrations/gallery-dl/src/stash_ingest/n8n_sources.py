@@ -57,7 +57,7 @@ def request(producer, endpoint, root, action, platform, identity, workflow, exec
     if action not in {"add", "remove", "remove-performer"} or platform not in {"reddit", "twitter"}:
         raise InvalidData("Choose a supported source operation and service")
     if action == "remove-performer":
-        if not isinstance(identity, str) or not re.fullmatch(r"[1-9][0-9]{0,9}", identity) or int(identity) > 2147483647:
+        if not isinstance(identity, str) or not re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", identity):
             raise InvalidData("Choose a valid Stash performer ID")
     else:
         backfills.subject(root, platform, identity)

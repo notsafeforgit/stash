@@ -1,3 +1,4 @@
+import { libraryIdSchema } from "@/core/library-id";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
@@ -49,9 +50,7 @@ const formSchema = z
   .object({
     state: z.enum(["linked", "disabled", "unlinked", "undecided"]),
     kind: z.enum(["gallery", "scene", "image"]),
-    target: z
-      .object({ id: z.string().regex(/^[1-9]\d*$/), label: z.string() })
-      .nullable(),
+    target: z.object({ id: libraryIdSchema, label: z.string() }).nullable(),
     reason: ownershipReasonSchema,
   })
   .refine((value) => value.state !== "linked" || value.target !== null);
@@ -88,10 +87,10 @@ export function AssociationForm(props: Props) {
         : currentItem?.kind === "image"
           ? "image"
           : "scene",
-    target: currentItem?.local_id
+    target: currentItem?.uuid
       ? {
-          id: String(currentItem.local_id),
-          label: `${currentItem.title || msg("metadata_policy.untitled", "Untitled")} (#${currentItem.local_id})`,
+          id: currentItem.uuid,
+          label: `${currentItem.title || msg("metadata_policy.untitled", "Untitled")}`,
         }
       : null,
     reason:
@@ -123,10 +122,7 @@ export function AssociationForm(props: Props) {
             value.target.id,
             controller.signal,
           );
-          if (
-            target.kind !== value.kind ||
-            String(target.local_id) !== value.target.id
-          )
+          if (target.kind !== value.kind || target.uuid !== value.target.id)
             throw new NativeArchiveError(0, "invalid_response");
         }
         if (props.family === "gallery") {

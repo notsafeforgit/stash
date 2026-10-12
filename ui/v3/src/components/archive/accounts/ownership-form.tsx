@@ -1,3 +1,4 @@
+import { libraryIdSchema } from "@/core/library-id";
 import { useId, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
@@ -34,7 +35,7 @@ const formSchema = z
     state: ownershipStateSchema,
     choice: z
       .object({
-        id: z.string().regex(/^[1-9]\d*$/),
+        id: libraryIdSchema,
         name: z.string(),
         disambiguation: z.string().nullish(),
       })

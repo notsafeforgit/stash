@@ -52,7 +52,6 @@ async function archive(page: Page, create = false) {
         kind: "gallery",
         revision: 1,
         state: "active",
-        local_id: 12,
       };
     if (action !== "create" && action !== "sync") {
       result.entries = [];
@@ -195,7 +194,7 @@ async function archive(page: Page, create = false) {
       result = {
         uuid: postIds.gallery,
         kind: "gallery",
-        local_id: 12,
+
         revision: 1,
       };
     else if (path.endsWith("/album-posts"))

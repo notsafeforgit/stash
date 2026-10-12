@@ -1,3 +1,4 @@
+import { libraryIdSchema } from "@/core/library-id";
 import { z } from "zod";
 import { playerQualitySchema } from "../player-quality";
 import { defaultTvRail, tvRailSchema } from "./action-config";
@@ -7,7 +8,7 @@ export type TvMode = z.infer<typeof tvModeSchema>;
 export const tvFilterSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("default") }),
   z.object({ kind: z.literal("all") }),
-  z.object({ kind: z.literal("saved"), id: z.string().regex(/^[1-9]\d*$/) }),
+  z.object({ kind: z.literal("saved"), id: libraryIdSchema }),
 ]);
 export type TvFilterChoice = z.infer<typeof tvFilterSchema>;
 export const tvWindowSchema = z.discriminatedUnion("kind", [
@@ -135,14 +136,17 @@ export const tvRotationSchema = z.enum([
 export type TvRotation = z.infer<typeof tvRotationSchema>;
 export const tvSearchSchema = z.object({
   mode: tvModeSchema.optional(),
-  filter: z
-    .string()
-    .regex(/^(default|all|[1-9]\d*)$/)
-    .optional(),
+  filter: z.union([z.enum(["default", "all"]), libraryIdSchema]).optional(),
   seed: z.coerce.number().int().min(0).max(2147483646).optional(),
   item: z
     .string()
-    .regex(/^(scene|marker):[1-9]\d*$/)
+    .refine((value) => {
+      const [kind, id] = value.split(":");
+      return (
+        (kind === "scene" || kind === "marker") &&
+        libraryIdSchema.safeParse(id).success
+      );
+    })
     .optional(),
 });
 export type TvSearch = z.infer<typeof tvSearchSchema>;

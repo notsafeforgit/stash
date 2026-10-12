@@ -802,7 +802,7 @@ func (rs sceneRoutes) CaptionLang(w http.ResponseWriter, r *http.Request) {
 func (rs sceneRoutes) SceneMarkerStream(w http.ResponseWriter, r *http.Request) {
 	scene := r.Context().Value(sceneKey).(*models.Scene)
 	sceneHash := scene.GetHash(config.GetInstance().GetVideoFileNamingAlgorithm())
-	sceneMarkerID, _ := strconv.Atoi(chi.URLParam(r, "sceneMarkerId"))
+	sceneMarkerID, _ := mediaLibraryKey(r.Context(), models.ArchiveSceneMarker, chi.URLParam(r, "sceneMarkerId"))
 	var sceneMarker *models.SceneMarker
 	readTxnErr := rs.withReadTxn(r, func(ctx context.Context) error {
 		var err error
@@ -830,7 +830,7 @@ func (rs sceneRoutes) SceneMarkerStream(w http.ResponseWriter, r *http.Request) 
 func (rs sceneRoutes) SceneMarkerPreview(w http.ResponseWriter, r *http.Request) {
 	scene := r.Context().Value(sceneKey).(*models.Scene)
 	sceneHash := scene.GetHash(config.GetInstance().GetVideoFileNamingAlgorithm())
-	sceneMarkerID, _ := strconv.Atoi(chi.URLParam(r, "sceneMarkerId"))
+	sceneMarkerID, _ := mediaLibraryKey(r.Context(), models.ArchiveSceneMarker, chi.URLParam(r, "sceneMarkerId"))
 	var sceneMarker *models.SceneMarker
 	readTxnErr := rs.withReadTxn(r, func(ctx context.Context) error {
 		var err error
@@ -866,7 +866,7 @@ func (rs sceneRoutes) SceneMarkerPreview(w http.ResponseWriter, r *http.Request)
 func (rs sceneRoutes) SceneMarkerScreenshot(w http.ResponseWriter, r *http.Request) {
 	scene := r.Context().Value(sceneKey).(*models.Scene)
 	sceneHash := scene.GetHash(config.GetInstance().GetVideoFileNamingAlgorithm())
-	sceneMarkerID, _ := strconv.Atoi(chi.URLParam(r, "sceneMarkerId"))
+	sceneMarkerID, _ := mediaLibraryKey(r.Context(), models.ArchiveSceneMarker, chi.URLParam(r, "sceneMarkerId"))
 	var sceneMarker *models.SceneMarker
 	readTxnErr := rs.withReadTxn(r, func(ctx context.Context) error {
 		var err error
@@ -901,7 +901,7 @@ func (rs sceneRoutes) SceneMarkerScreenshot(w http.ResponseWriter, r *http.Reque
 
 func (rs sceneRoutes) SceneCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sceneID, err := strconv.Atoi(chi.URLParam(r, "sceneId"))
+		sceneID, err := mediaLibraryKey(r.Context(), models.ArchiveScene, chi.URLParam(r, "sceneId"))
 		if err != nil {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return

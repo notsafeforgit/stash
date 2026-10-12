@@ -136,10 +136,7 @@ export function MergeEntity({ item }: { item: PostMergeEntity }) {
   const labels = useMergeLabels();
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span>
-        {labels.kind[item.kind]}
-        {item.local_id !== null && ` #${item.local_id}`}
-      </span>
+      <span>{labels.kind[item.kind]}</span>
       {item.state === "deleted" ? (
         <span>
           {msg(

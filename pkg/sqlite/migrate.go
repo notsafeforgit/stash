@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"sort"
 	"strconv"
 	"strings"
@@ -162,9 +163,15 @@ func (m *Migrator) RunMigration(ctx context.Context, newVersion uint) error {
 		return fmt.Errorf("running pre migrations for schema version %d: %w", newVersion, err)
 	}
 
-	if err := m.m.Steps(1); err != nil {
+	var migrateErr error
+	if convert := transactionalMigrations[newVersion]; convert != nil {
+		migrateErr = m.runTransactionalMigration(ctx, newVersion, convert)
+	} else {
+		migrateErr = m.m.Steps(1)
+	}
+	if migrateErr != nil {
 		// migration failed
-		return err
+		return migrateErr
 	}
 
 	// run post migrations as needed
@@ -179,6 +186,35 @@ func (m *Migrator) RunMigration(ctx context.Context, newVersion uint) error {
 	}
 
 	return nil
+}
+
+func (m *Migrator) runTransactionalMigration(ctx context.Context, version uint, convert transactionalMigrationFunc) error {
+	names, err := fs.Glob(migrationsBox, fmt.Sprintf("migrations/%d_*.up.sql", version))
+	if err != nil {
+		return err
+	}
+	if len(names) != 1 {
+		return fmt.Errorf("expected one SQL migration for version %d", version)
+	}
+	script, err := migrationsBox.ReadFile(names[0])
+	if err != nil {
+		return err
+	}
+	tx, err := m.conn.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err = tx.ExecContext(ctx, string(script)); err != nil {
+		return err
+	}
+	if err = convert(ctx, tx); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM schema_migrations; INSERT INTO schema_migrations(version,dirty) VALUES (?,false)", version); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (m *Migrator) runCustomMigrations(ctx context.Context, fns []customMigrationFunc) error {

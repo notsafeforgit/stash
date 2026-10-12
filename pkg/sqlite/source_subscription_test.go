@@ -13,6 +13,7 @@ import (
 
 func removeSourceSubscriptionSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeLibraryUUIDSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE source_run_subscriptions; DROP TABLE source_subscriptions;
 DELETE FROM native_migration_history WHERE version=1000114`)
 	require.NoError(t, err)

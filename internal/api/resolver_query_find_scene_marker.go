@@ -19,7 +19,7 @@ func (r *queryResolver) FindSceneMarkers(ctx context.Context, sceneMarkerFilterA
 
 		switch {
 		case len(idInts) > 0:
-			sceneMarkers, err = r.repository.SceneMarker.FindMany(ctx, idInts)
+			sceneMarkers, err = r.repository.SceneMarker.FindMany(ctx, availableLibraryKeys(idInts))
 			total = len(sceneMarkers)
 		default:
 			sceneMarkers, total, err = r.repository.SceneMarker.QueryAST(ctx, sceneMarkerFilterAST, filter)

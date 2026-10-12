@@ -1,8 +1,8 @@
 "The query root for this schema"
 type Query {
   # Filters
-  findSavedFilter(id: ID!): SavedFilter
-  findSavedFilters(mode: FilterMode): [SavedFilter!]!
+  findSavedFilter(id: ID! @libraryID(kind: "saved_filter")): SavedFilter @libraryScope(kind: "saved_filter")
+  findSavedFilters(mode: FilterMode): [SavedFilter!]! @libraryScope(kind: "saved_filter")
 
   """
   Returns the distinct custom-field names that exist on at least one row of
@@ -12,37 +12,37 @@ type Query {
   customFieldNames(mode: FilterMode!): [String!]!
 
   "Find a file by its id or path"
-  findFile(id: ID, path: String): BaseFile!
+  findFile(id: ID @libraryID(kind: "file"), path: String): BaseFile! @libraryScope(kind: "file")
 
   "Queries for Files"
   findFiles(
     file_filter: FileFilterType
     filter: FindFilterType
-    ids: [ID!]
-  ): FindFilesResultType!
+    ids: [ID!] @libraryID(kind: "file")
+  ): FindFilesResultType! @libraryScope(kind: "file")
 
   "Find a file by its id or path"
-  findFolder(id: ID, path: String): Folder!
+  findFolder(id: ID @libraryID(kind: "folder"), path: String): Folder! @libraryScope(kind: "folder")
 
   "Queries for Files"
   findFolders(
     folder_filter: FolderFilterType
     filter: FindFilterType
-    ids: [ID!]
-  ): FindFoldersResultType!
+    ids: [ID!] @libraryID(kind: "folder")
+  ): FindFoldersResultType! @libraryScope(kind: "folder")
 
   "Find a scene by ID or Checksum"
-  findScene(id: ID, checksum: String): Scene
-  findSceneByHash(input: SceneHashInput!): Scene
+  findScene(id: ID @libraryID(kind: "scene"), checksum: String): Scene @libraryScope(kind: "scene")
+  findSceneByHash(input: SceneHashInput!): Scene @libraryScope(kind: "scene")
 
   "A function which queries Scene objects"
   findScenes(
     scene_filter_ast: FilterASTInput
-    ids: [ID!]
+    ids: [ID!] @libraryID(kind: "scene")
     filter: FindFilterType
-  ): FindScenesResultType!
+  ): FindScenesResultType! @libraryScope(kind: "scene")
 
-  findScenesByPathRegex(filter: FindFilterType): FindScenesResultType!
+  findScenesByPathRegex(filter: FindFilterType): FindScenesResultType! @libraryScope(kind: "scene")
 
   """
   Returns any groups of scenes that are perceptual duplicates within the queried distance
@@ -88,76 +88,76 @@ type Query {
   parseSceneFilenames(
     filter: FindFilterType
     config: SceneParserInput!
-  ): SceneParserResultType!
+  ): SceneParserResultType! @libraryScope(kind: "file")
 
   "A function which queries SceneMarker objects"
   findSceneMarkers(
     scene_marker_filter_ast: FilterASTInput
     filter: FindFilterType
-    ids: [ID!]
-  ): FindSceneMarkersResultType!
+    ids: [ID!] @libraryID(kind: "scene_marker")
+  ): FindSceneMarkersResultType! @libraryScope(kind: "scene_marker")
 
-  findImage(id: ID, checksum: String): Image
+  findImage(id: ID @libraryID(kind: "image"), checksum: String): Image @libraryScope(kind: "image")
 
   "A function which queries Scene objects"
   findImages(
     image_filter_ast: FilterASTInput
-    ids: [ID!]
+    ids: [ID!] @libraryID(kind: "image")
     filter: FindFilterType
-  ): FindImagesResultType!
+  ): FindImagesResultType! @libraryScope(kind: "image")
 
   "Find a performer by ID"
-  findPerformer(id: ID!): Performer
+  findPerformer(id: ID! @libraryID(kind: "performer")): Performer @libraryScope(kind: "performer")
   "A function which queries Performer objects"
   findPerformers(
     performer_filter_ast: FilterASTInput
     filter: FindFilterType
-    ids: [ID!]
-  ): FindPerformersResultType!
+    ids: [ID!] @libraryID(kind: "performer")
+  ): FindPerformersResultType! @libraryScope(kind: "performer")
 
   "Find a studio by ID"
-  findStudio(id: ID!): Studio
+  findStudio(id: ID! @libraryID(kind: "studio")): Studio @libraryScope(kind: "studio")
   "A function which queries Studio objects"
   findStudios(
     studio_filter_ast: FilterASTInput
     filter: FindFilterType
-    ids: [ID!]
-  ): FindStudiosResultType!
+    ids: [ID!] @libraryID(kind: "studio")
+  ): FindStudiosResultType! @libraryScope(kind: "studio")
 
   "Find a group by ID"
-  findGroup(id: ID!): Group
+  findGroup(id: ID! @libraryID(kind: "group")): Group @libraryScope(kind: "group")
   "A function which queries Group objects"
   findGroups(
     group_filter_ast: FilterASTInput
     filter: FindFilterType
-    ids: [ID!]
-  ): FindGroupsResultType!
+    ids: [ID!] @libraryID(kind: "group")
+  ): FindGroupsResultType! @libraryScope(kind: "group")
 
-  findGallery(id: ID!): Gallery
+  findGallery(id: ID! @libraryID(kind: "gallery")): Gallery @libraryScope(kind: "gallery")
   findGalleries(
     gallery_filter_ast: FilterASTInput
     filter: FindFilterType
-    ids: [ID!]
-  ): FindGalleriesResultType!
+    ids: [ID!] @libraryID(kind: "gallery")
+  ): FindGalleriesResultType! @libraryScope(kind: "gallery")
 
-  findTag(id: ID!): Tag
+  findTag(id: ID! @libraryID(kind: "tag")): Tag @libraryScope(kind: "tag")
   findTags(
     tag_filter_ast: FilterASTInput
     filter: FindFilterType
-    ids: [ID!]
-  ): FindTagsResultType!
+    ids: [ID!] @libraryID(kind: "tag")
+  ): FindTagsResultType! @libraryScope(kind: "tag")
 
   "Retrieve random scene markers for the wall"
   markerWall(q: String): [SceneMarker!]!
   "Retrieve random scenes for the wall"
-  sceneWall(q: String): [Scene!]!
+  sceneWall(q: String): [Scene!]! @libraryScope(kind: "scene")
 
   "Get marker strings"
   markerStrings(q: String, sort: String): [MarkerStringsResultType]!
   "Get stats"
   stats: StatsResultType!
   "Organize scene markers by tag for a given scene ID"
-  sceneMarkerTags(scene_id: ID!): [SceneMarkerTag!]!
+  sceneMarkerTags(scene_id: ID! @libraryID(kind: "scene")): [SceneMarkerTag!]! @libraryScope(kind: "scene_marker")
 
   logs: [LogEntry!]!
 
@@ -222,15 +222,15 @@ type Query {
   scrapeURL(url: String!, ty: ScrapeContentType!): ScrapedContent
 
   "Scrapes a complete performer record based on a URL"
-  scrapePerformerURL(url: String!): ScrapedPerformer
+  scrapePerformerURL(url: String!): ScrapedPerformer @libraryScope(kind: "performer")
   "Scrapes a complete scene record based on a URL"
-  scrapeSceneURL(url: String!): ScrapedScene
+  scrapeSceneURL(url: String!): ScrapedScene @libraryScope(kind: "scene")
   "Scrapes a complete gallery record based on a URL"
-  scrapeGalleryURL(url: String!): ScrapedGallery
+  scrapeGalleryURL(url: String!): ScrapedGallery @libraryScope(kind: "gallery")
   "Scrapes a complete image record based on a URL"
-  scrapeImageURL(url: String!): ScrapedImage
+  scrapeImageURL(url: String!): ScrapedImage @libraryScope(kind: "image")
   "Scrapes a complete group record based on a URL"
-  scrapeGroupURL(url: String!): ScrapedGroup
+  scrapeGroupURL(url: String!): ScrapedGroup @libraryScope(kind: "group")
 
   # Plugins
   "User-configured invocation order for plugins per hook event"
@@ -266,15 +266,15 @@ type Query {
 
   # Get everything
 
-  allScenes: [Scene!]! @deprecated(reason: "Use findScenes instead")
-  allSceneMarkers: [SceneMarker!]!
+  allScenes: [Scene!]! @libraryScope(kind: "scene") @deprecated(reason: "Use findScenes instead")
+  allSceneMarkers: [SceneMarker!]! @libraryScope(kind: "scene_marker")
     @deprecated(reason: "Use findSceneMarkers instead")
-  allImages: [Image!]! @deprecated(reason: "Use findImages instead")
-  allGalleries: [Gallery!]! @deprecated(reason: "Use findGalleries instead")
+  allImages: [Image!]! @libraryScope(kind: "image") @deprecated(reason: "Use findImages instead")
+  allGalleries: [Gallery!]! @libraryScope(kind: "gallery") @deprecated(reason: "Use findGalleries instead")
 
-  allPerformers: [Performer!]!
-  allTags: [Tag!]! @deprecated(reason: "Use findTags instead")
-  allStudios: [Studio!]! @deprecated(reason: "Use findStudios instead")
+  allPerformers: [Performer!]! @libraryScope(kind: "performer")
+  allTags: [Tag!]! @libraryScope(kind: "tag") @deprecated(reason: "Use findTags instead")
+  allStudios: [Studio!]! @libraryScope(kind: "studio") @deprecated(reason: "Use findStudios instead")
 
   # Get everything with minimal metadata
 
@@ -294,56 +294,56 @@ type Mutation {
   "Downloads and installs ffmpeg and ffprobe binaries into the configuration directory. Returns the job ID."
   downloadFFMpeg: ID!
 
-  sceneCreate(input: SceneCreateInput!): Scene
-  sceneUpdate(input: SceneUpdateInput!): Scene
-  sceneMerge(input: SceneMergeInput!): Scene
+  sceneCreate(input: SceneCreateInput!): Scene @libraryScope(kind: "scene")
+  sceneUpdate(input: SceneUpdateInput!): Scene @libraryScope(kind: "scene")
+  sceneMerge(input: SceneMergeInput!): Scene @libraryScope(kind: "scene")
   "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
-  bulkSceneUpdate(input: BulkSceneUpdateInput!): BulkUpdateResult!
+  bulkSceneUpdate(input: BulkSceneUpdateInput!): BulkUpdateResult! @libraryScope(kind: "scene")
   """
   Sets each scene's date to the mtime of its primary file. Returns "sync"
   for an inline run or a job ID when running in the background.
   """
-  scenesSetDateFromFileMTime(input: ScenesSetDateFromFileMTimeInput!): String!
-  sceneDestroy(input: SceneDestroyInput!): Boolean!
-  scenesDestroy(input: ScenesDestroyInput!): Boolean!
-  scenesUpdate(input: [SceneUpdateInput!]!): [Scene]
+  scenesSetDateFromFileMTime(input: ScenesSetDateFromFileMTimeInput!): String! @libraryScope(kind: "scene")
+  sceneDestroy(input: SceneDestroyInput!): Boolean! @libraryScope(kind: "scene")
+  scenesDestroy(input: ScenesDestroyInput!): Boolean! @libraryScope(kind: "scene")
+  scenesUpdate(input: [SceneUpdateInput!]!): [Scene] @libraryScope(kind: "scene")
 
   "Increments the o-counter for a scene. Returns the new value"
-  sceneIncrementO(id: ID!): Int! @deprecated(reason: "Use sceneAddO instead")
+  sceneIncrementO(id: ID! @libraryID(kind: "scene")): Int! @libraryScope(kind: "scene") @deprecated(reason: "Use sceneAddO instead")
   "Decrements the o-counter for a scene. Returns the new value"
-  sceneDecrementO(id: ID!): Int! @deprecated(reason: "Use sceneRemoveO instead")
+  sceneDecrementO(id: ID! @libraryID(kind: "scene")): Int! @libraryScope(kind: "scene") @deprecated(reason: "Use sceneRemoveO instead")
 
   "Increments the o-counter for a scene. Uses the current time if none provided."
-  sceneAddO(id: ID!, times: [Timestamp!]): HistoryMutationResult!
+  sceneAddO(id: ID! @libraryID(kind: "scene"), times: [Timestamp!]): HistoryMutationResult! @libraryScope(kind: "scene")
   "Decrements the o-counter for a scene, removing the last recorded time if specific time not provided. Returns the new value"
-  sceneDeleteO(id: ID!, times: [Timestamp!]): HistoryMutationResult!
+  sceneDeleteO(id: ID! @libraryID(kind: "scene"), times: [Timestamp!]): HistoryMutationResult! @libraryScope(kind: "scene")
 
   "Resets the o-counter for a scene to 0. Returns the new value"
-  sceneResetO(id: ID!): Int!
+  sceneResetO(id: ID! @libraryID(kind: "scene")): Int! @libraryScope(kind: "scene")
 
   "Sets the resume time point (if provided) and adds the provided duration to the scene's play duration"
-  sceneSaveActivity(id: ID!, resume_time: Float, playDuration: Float): Boolean!
+  sceneSaveActivity(id: ID! @libraryID(kind: "scene"), resume_time: Float, playDuration: Float): Boolean! @libraryScope(kind: "scene")
 
   "Resets the resume time point and play duration"
   sceneResetActivity(
-    id: ID!
+    id: ID! @libraryID(kind: "scene")
     reset_resume: Boolean
     reset_duration: Boolean
-  ): Boolean!
+  ): Boolean! @libraryScope(kind: "scene")
 
   "Increments the play count for the scene. Returns the new play count value."
-  sceneIncrementPlayCount(id: ID!): Int!
+  sceneIncrementPlayCount(id: ID! @libraryID(kind: "scene")): Int! @libraryScope(kind: "scene")
     @deprecated(reason: "Use sceneAddPlay instead")
 
   "Increments the play count for the scene. Uses the current time if none provided."
-  sceneAddPlay(id: ID!, times: [Timestamp!]): HistoryMutationResult!
+  sceneAddPlay(id: ID! @libraryID(kind: "scene"), times: [Timestamp!]): HistoryMutationResult! @libraryScope(kind: "scene")
   "Decrements the play count for the scene, removing the specific times or the last recorded time if not provided."
-  sceneDeletePlay(id: ID!, times: [Timestamp!]): HistoryMutationResult!
+  sceneDeletePlay(id: ID! @libraryID(kind: "scene"), times: [Timestamp!]): HistoryMutationResult! @libraryScope(kind: "scene")
   "Resets the play count for a scene to 0. Returns the new play count value."
-  sceneResetPlayCount(id: ID!): Int!
+  sceneResetPlayCount(id: ID! @libraryID(kind: "scene")): Int! @libraryScope(kind: "scene")
 
   "Generates screenshot at specified time in seconds. Leave empty to generate default screenshot"
-  sceneGenerateScreenshot(id: ID!, at: Float): ID!
+  sceneGenerateScreenshot(id: ID! @libraryID(kind: "scene"), at: Float): ID!
 
   """
   Updates the primary MKV, MP4, M4V, or MOV video-stream rotation metadata
@@ -351,35 +351,35 @@ type Mutation {
   existing rotation; CLEAR removes the transform. The scene file is
   re-fingerprinted afterwards.
   """
-  sceneVideoRotate(input: SceneVideoRotateInput!): Scene
+  sceneVideoRotate(input: SceneVideoRotateInput!): Scene @libraryScope(kind: "scene")
 
-  sceneMarkerCreate(input: SceneMarkerCreateInput!): SceneMarker
-  sceneMarkerUpdate(input: SceneMarkerUpdateInput!): SceneMarker
+  sceneMarkerCreate(input: SceneMarkerCreateInput!): SceneMarker @libraryScope(kind: "scene_marker")
+  sceneMarkerUpdate(input: SceneMarkerUpdateInput!): SceneMarker @libraryScope(kind: "scene_marker")
   "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
-  bulkSceneMarkerUpdate(input: BulkSceneMarkerUpdateInput!): BulkUpdateResult!
-  sceneMarkerDestroy(id: ID!): Boolean!
-  sceneMarkersDestroy(ids: [ID!]!): Boolean!
+  bulkSceneMarkerUpdate(input: BulkSceneMarkerUpdateInput!): BulkUpdateResult! @libraryScope(kind: "scene_marker")
+  sceneMarkerDestroy(id: ID! @libraryID(kind: "scene_marker")): Boolean! @libraryScope(kind: "scene_marker")
+  sceneMarkersDestroy(ids: [ID!]! @libraryID(kind: "scene_marker")): Boolean! @libraryScope(kind: "scene_marker")
 
-  sceneAssignFile(input: AssignSceneFileInput!): Boolean!
+  sceneAssignFile(input: AssignSceneFileInput!): Boolean! @libraryScope(kind: "file")
 
-  imageUpdate(input: ImageUpdateInput!): Image
+  imageUpdate(input: ImageUpdateInput!): Image @libraryScope(kind: "image")
   "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
-  bulkImageUpdate(input: BulkImageUpdateInput!): BulkUpdateResult!
+  bulkImageUpdate(input: BulkImageUpdateInput!): BulkUpdateResult! @libraryScope(kind: "image")
   """
   Sets each image's date to the mtime of its primary file. Returns "sync"
   for an inline run or a job ID when running in the background.
   """
-  imagesSetDateFromFileMTime(input: ImagesSetDateFromFileMTimeInput!): String!
-  imageDestroy(input: ImageDestroyInput!): Boolean!
-  imagesDestroy(input: ImagesDestroyInput!): Boolean!
-  imagesUpdate(input: [ImageUpdateInput!]!): [Image]
+  imagesSetDateFromFileMTime(input: ImagesSetDateFromFileMTimeInput!): String! @libraryScope(kind: "image")
+  imageDestroy(input: ImageDestroyInput!): Boolean! @libraryScope(kind: "image")
+  imagesDestroy(input: ImagesDestroyInput!): Boolean! @libraryScope(kind: "image")
+  imagesUpdate(input: [ImageUpdateInput!]!): [Image] @libraryScope(kind: "image")
 
   "Increments the o-counter for an image. Returns the new value"
-  imageIncrementO(id: ID!): Int!
+  imageIncrementO(id: ID! @libraryID(kind: "image")): Int! @libraryScope(kind: "image")
   "Decrements the o-counter for an image. Returns the new value"
-  imageDecrementO(id: ID!): Int!
+  imageDecrementO(id: ID! @libraryID(kind: "image")): Int! @libraryScope(kind: "image")
   "Resets the o-counter for a image to 0. Returns the new value"
-  imageResetO(id: ID!): Int!
+  imageResetO(id: ID! @libraryID(kind: "image")): Int! @libraryScope(kind: "image")
 
   """
   Rotates the image in-place by rewriting its EXIF Orientation tag.
@@ -388,45 +388,45 @@ type Mutation {
   this is a metadata-only update. The file is re-fingerprinted afterwards
   and the database row is updated with the new fingerprints / dimensions.
   """
-  imageRotate(input: ImageRotateInput!): Image
+  imageRotate(input: ImageRotateInput!): Image @libraryScope(kind: "image")
 
-  galleryCreate(input: GalleryCreateInput!): Gallery
-  galleryUpdate(input: GalleryUpdateInput!): Gallery
+  galleryCreate(input: GalleryCreateInput!): Gallery @libraryScope(kind: "gallery")
+  galleryUpdate(input: GalleryUpdateInput!): Gallery @libraryScope(kind: "gallery")
   "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
-  bulkGalleryUpdate(input: BulkGalleryUpdateInput!): BulkUpdateResult!
-  galleryDestroy(input: GalleryDestroyInput!): Boolean!
-  galleriesUpdate(input: [GalleryUpdateInput!]!): [Gallery]
+  bulkGalleryUpdate(input: BulkGalleryUpdateInput!): BulkUpdateResult! @libraryScope(kind: "gallery")
+  galleryDestroy(input: GalleryDestroyInput!): Boolean! @libraryScope(kind: "gallery")
+  galleriesUpdate(input: [GalleryUpdateInput!]!): [Gallery] @libraryScope(kind: "gallery")
 
   addGalleryImages(input: GalleryAddInput!): Boolean!
   removeGalleryImages(input: GalleryRemoveInput!): Boolean!
   setGalleryCover(input: GallerySetCoverInput!): Boolean!
   resetGalleryCover(input: GalleryResetCoverInput!): Boolean!
 
-  galleryChapterCreate(input: GalleryChapterCreateInput!): GalleryChapter
-  galleryChapterUpdate(input: GalleryChapterUpdateInput!): GalleryChapter
-  galleryChapterDestroy(id: ID!): Boolean!
+  galleryChapterCreate(input: GalleryChapterCreateInput!): GalleryChapter @libraryScope(kind: "gallery_chapter")
+  galleryChapterUpdate(input: GalleryChapterUpdateInput!): GalleryChapter @libraryScope(kind: "gallery_chapter")
+  galleryChapterDestroy(id: ID! @libraryID(kind: "gallery_chapter")): Boolean! @libraryScope(kind: "gallery_chapter")
 
-  performerCreate(input: PerformerCreateInput!): Performer
-  performerUpdate(input: PerformerUpdateInput!): Performer
-  performerDestroy(input: PerformerDestroyInput!): Boolean!
-  performersDestroy(ids: [ID!]!): Boolean!
+  performerCreate(input: PerformerCreateInput!): Performer @libraryScope(kind: "performer")
+  performerUpdate(input: PerformerUpdateInput!): Performer @libraryScope(kind: "performer")
+  performerDestroy(input: PerformerDestroyInput!): Boolean! @libraryScope(kind: "performer")
+  performersDestroy(ids: [ID!]! @libraryID(kind: "performer")): Boolean! @libraryScope(kind: "performer")
   "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
-  bulkPerformerUpdate(input: BulkPerformerUpdateInput!): BulkUpdateResult!
-  performerMerge(input: PerformerMergeInput!): Performer!
+  bulkPerformerUpdate(input: BulkPerformerUpdateInput!): BulkUpdateResult! @libraryScope(kind: "performer")
+  performerMerge(input: PerformerMergeInput!): Performer! @libraryScope(kind: "performer")
 
-  studioCreate(input: StudioCreateInput!): Studio
-  studioUpdate(input: StudioUpdateInput!): Studio
-  studioDestroy(input: StudioDestroyInput!): Boolean!
-  studiosDestroy(ids: [ID!]!): Boolean!
+  studioCreate(input: StudioCreateInput!): Studio @libraryScope(kind: "studio")
+  studioUpdate(input: StudioUpdateInput!): Studio @libraryScope(kind: "studio")
+  studioDestroy(input: StudioDestroyInput!): Boolean! @libraryScope(kind: "studio")
+  studiosDestroy(ids: [ID!]! @libraryID(kind: "studio")): Boolean! @libraryScope(kind: "studio")
   "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
-  bulkStudioUpdate(input: BulkStudioUpdateInput!): BulkUpdateResult!
+  bulkStudioUpdate(input: BulkStudioUpdateInput!): BulkUpdateResult! @libraryScope(kind: "studio")
 
-  groupCreate(input: GroupCreateInput!): Group
-  groupUpdate(input: GroupUpdateInput!): Group
-  groupDestroy(input: GroupDestroyInput!): Boolean!
-  groupsDestroy(ids: [ID!]!): Boolean!
+  groupCreate(input: GroupCreateInput!): Group @libraryScope(kind: "group")
+  groupUpdate(input: GroupUpdateInput!): Group @libraryScope(kind: "group")
+  groupDestroy(input: GroupDestroyInput!): Boolean! @libraryScope(kind: "group")
+  groupsDestroy(ids: [ID!]! @libraryID(kind: "group")): Boolean! @libraryScope(kind: "group")
   "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
-  bulkGroupUpdate(input: BulkGroupUpdateInput!): BulkUpdateResult!
+  bulkGroupUpdate(input: BulkGroupUpdateInput!): BulkUpdateResult! @libraryScope(kind: "group")
 
   addGroupSubGroups(input: GroupSubGroupAddInput!): Boolean!
   removeGroupSubGroups(input: GroupSubGroupRemoveInput!): Boolean!
@@ -434,13 +434,13 @@ type Mutation {
   "Reorder sub groups within a group. Returns true if successful."
   reorderSubGroups(input: ReorderSubGroupsInput!): Boolean!
 
-  tagCreate(input: TagCreateInput!): Tag
-  tagUpdate(input: TagUpdateInput!): Tag
-  tagDestroy(input: TagDestroyInput!): Boolean!
-  tagsDestroy(ids: [ID!]!): Boolean!
-  tagsMerge(input: TagsMergeInput!): Tag
+  tagCreate(input: TagCreateInput!): Tag @libraryScope(kind: "tag")
+  tagUpdate(input: TagUpdateInput!): Tag @libraryScope(kind: "tag")
+  tagDestroy(input: TagDestroyInput!): Boolean! @libraryScope(kind: "tag")
+  tagsDestroy(ids: [ID!]! @libraryID(kind: "tag")): Boolean! @libraryScope(kind: "tag")
+  tagsMerge(input: TagsMergeInput!): Tag @libraryScope(kind: "tag")
   "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
-  bulkTagUpdate(input: BulkTagUpdateInput!): BulkUpdateResult!
+  bulkTagUpdate(input: BulkTagUpdateInput!): BulkUpdateResult! @libraryScope(kind: "tag")
 
   """
   Moves the given files to the given destination. Returns true if successful.
@@ -451,20 +451,20 @@ type Mutation {
   matches one of the media extensions.
   Creates folder hierarchy if needed.
   """
-  moveFiles(input: MoveFilesInput!): Boolean!
-  deleteFiles(ids: [ID!]!): Boolean!
+  moveFiles(input: MoveFilesInput!): Boolean! @libraryScope(kind: "file")
+  deleteFiles(ids: [ID!]! @libraryID(kind: "file")): Boolean! @libraryScope(kind: "file")
   "Deletes file entries from the database without deleting the files from the filesystem"
-  destroyFiles(ids: [ID!]!): Boolean!
+  destroyFiles(ids: [ID!]! @libraryID(kind: "file")): Boolean! @libraryScope(kind: "file")
 
-  fileSetFingerprints(input: FileSetFingerprintsInput!): Boolean!
+  fileSetFingerprints(input: FileSetFingerprintsInput!): Boolean! @libraryScope(kind: "file")
   "Reveal the file in the system file manager"
-  revealFileInFileManager(id: ID!): Boolean!
+  revealFileInFileManager(id: ID! @libraryID(kind: "file")): Boolean! @libraryScope(kind: "file")
   "Reveal the folder in the system file manager"
-  revealFolderInFileManager(id: ID!): Boolean!
+  revealFolderInFileManager(id: ID! @libraryID(kind: "folder")): Boolean! @libraryScope(kind: "folder")
 
   # Saved filters
-  saveFilter(input: SaveFilterInput!): SavedFilter!
-  destroySavedFilter(input: DestroyFilterInput!): Boolean!
+  saveFilter(input: SaveFilterInput!): SavedFilter! @libraryScope(kind: "saved_filter")
+  destroySavedFilter(input: DestroyFilterInput!): Boolean! @libraryScope(kind: "saved_filter")
 
   "Change general configuration options"
   configureGeneral(input: ConfigGeneralInput!): ConfigGeneralResult!
@@ -604,9 +604,9 @@ type Mutation {
   ): Boolean!
 
   "Submit scene as draft to stash-box instance"
-  submitStashBoxSceneDraft(input: StashBoxDraftSubmissionInput!): ID
+  submitStashBoxSceneDraft(input: StashBoxDraftSubmissionInput!): ID @libraryScope(kind: "scene")
   "Submit performer as draft to stash-box instance"
-  submitStashBoxPerformerDraft(input: StashBoxDraftSubmissionInput!): ID
+  submitStashBoxPerformerDraft(input: StashBoxDraftSubmissionInput!): ID @libraryScope(kind: "performer")
 
   "Backup the database. Optionally returns a link to download the database file"
   backupDatabase(input: BackupDatabaseInput!): String
@@ -618,11 +618,11 @@ type Mutation {
   execSQL(sql: String!, args: [Any]): SQLExecResult!
 
   "Run batch performer tag task. Returns the job ID."
-  stashBoxBatchPerformerTag(input: StashBoxBatchTagInput!): String!
+  stashBoxBatchPerformerTag(input: StashBoxBatchTagInput!): String! @libraryScope(kind: "performer")
   "Run batch studio tag task. Returns the job ID."
-  stashBoxBatchStudioTag(input: StashBoxBatchTagInput!): String!
+  stashBoxBatchStudioTag(input: StashBoxBatchTagInput!): String! @libraryScope(kind: "studio")
   "Run batch tag tag task. Returns the job ID."
-  stashBoxBatchTagTag(input: StashBoxBatchTagInput!): String!
+  stashBoxBatchTagTag(input: StashBoxBatchTagInput!): String! @libraryScope(kind: "tag")
 
   "Enables DLNA for an optional duration. Has no effect if DLNA is enabled by default"
   enableDLNA(input: EnableDLNAInput!): Boolean!

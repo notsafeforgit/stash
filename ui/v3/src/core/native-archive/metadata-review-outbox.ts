@@ -1,3 +1,4 @@
+import { libraryIdSchema } from "@/core/library-id";
 import { z } from "zod";
 import { requestUUID, withReviewRecord } from "./review-storage";
 import {
@@ -14,7 +15,7 @@ import {
 const targetSchema = z
   .object({
     kind: z.enum(["scene", "image"]),
-    localId: z.string().regex(/^[1-9]\d*$/),
+    libraryId: libraryIdSchema,
   })
   .strict();
 export type ReviewTarget = z.infer<typeof targetSchema>;
@@ -28,7 +29,7 @@ const savedSchema = z
 export type SavedReview = z.infer<typeof savedSchema>;
 function key(target: ReviewTarget): string {
   const checked = targetSchema.parse(target);
-  return `${checked.kind}:${checked.localId}`;
+  return `${checked.kind}:${checked.libraryId}`;
 }
 
 function decode(value: unknown, target: ReviewTarget): SavedReview | null {

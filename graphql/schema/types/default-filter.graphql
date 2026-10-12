@@ -5,7 +5,7 @@ enum DefaultFilterAction {
   KEEP_CURRENT
 }
 
-input DefaultFilterInput {
+input DefaultFilterInput @libraryScope(from: "mode") {
   mode: FilterMode!
   find_filter: FindFilterType
   filter_ast: FilterASTInput

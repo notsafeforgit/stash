@@ -13,6 +13,7 @@ import (
 type SceneCoverSource struct {
 	CoverChecksum string
 	FileID        FileID
+	FileUUID      string
 	At            float64
 	Fingerprint   SceneCoverFingerprint
 }

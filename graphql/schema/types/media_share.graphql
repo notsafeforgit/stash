@@ -11,9 +11,9 @@ enum MediaShareStatus {
   INACTIVE
 }
 
-input MediaShareTargetInput {
+input MediaShareTargetInput  @libraryScope(from: "kind") {
   kind: ShareEntityKind!
-  id: ID!
+  id: ID! @libraryID(kind: "scope")
 }
 
 input MediaShareCreateInput {
@@ -34,7 +34,8 @@ input MediaShareUpdateInput {
 
 type MediaShareEntry {
   kind: ShareEntityKind!
-  id: ID!
+  "Library UUID; absent when an old frozen share cannot identify its original entity."
+  id: ID @libraryID(kind: "any")
   title: String!
   media_count: Int!
 }

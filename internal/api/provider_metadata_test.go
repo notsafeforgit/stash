@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -33,7 +32,7 @@ func TestProviderMetadataInteractiveMutations(t *testing.T) {
 			db, repo, _ := nativeMetadataReviewFixture(t)
 			hooks := &providerReviewHooks{}
 			resolver := &Resolver{repository: repo, hookExecutor: hooks, sceneService: &scene.Service{Repository: repo.Scene, PluginCache: plugin.NewCache(config.GetInstance())}}
-			server := handler.New(NewExecutableSchema(Config{Resolvers: resolver}))
+			server := handler.New(newLibrarySchema(Config{Resolvers: resolver}))
 			server.AddTransport(transport.POST{})
 			field := "name"
 			if kind == models.ArchiveScene {
@@ -69,8 +68,7 @@ func TestProviderMetadataInteractiveMutations(t *testing.T) {
 				return result.Data.Result["id"]
 			}
 			id := request("Create", map[string]any{field: "  Imported name  ", "provider_metadata": []any{selection(endpoint, field)}}, false)
-			localID, err := strconv.Atoi(id)
-			require.NoError(t, err)
+			localID := libraryTestLocal(t, repo, kind, id)
 			var entity *models.ArchiveEntity
 			history := func() []models.ProviderMetadataImport {
 				t.Helper()

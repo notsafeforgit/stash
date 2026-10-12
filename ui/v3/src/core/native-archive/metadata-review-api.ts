@@ -18,12 +18,15 @@ const kind = z.enum([
   "tag",
   "group",
   "file",
+  "folder",
+  "scene_marker",
+  "gallery_chapter",
+  "saved_filter",
 ]);
 export const identitySchema = z.object({
   uuid,
   kind,
   revision,
-  local_id: revision.optional(),
 });
 export const nameSelectionSchema = z.object({ uuid, revision }).strict();
 export const editInputSchema = z
@@ -60,7 +63,7 @@ export const editReceiptSchema = z
   );
 const nameCandidateSchema = z.object({
   uuid,
-  local_id: revision,
+
   revision,
   name: z.string(),
   disambiguation: z.string().optional(),
@@ -247,11 +250,7 @@ export function createMetadataReviewAPI(
         undefined,
         signal,
       );
-      if (
-        identity.kind !== entityKind ||
-        identity.local_id === undefined ||
-        (local && String(identity.local_id) !== id)
-      )
+      if (identity.kind !== entityKind)
         throw new NativeArchiveError(0, "identity_mismatch");
       return identity;
     },

@@ -14,9 +14,7 @@ import {
 const integer = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 const timestamp = z.string().datetime({ offset: true });
 const performer = accountPerformerSchema.refine(
-  (value) =>
-    value.state !== "redirected" &&
-    (value.state === "active") === (value.local_id !== undefined),
+  (value) => value.state !== "redirected",
 );
 const scope = z.object({ requested_uuid: uuid, performer });
 export const performerAccountsSchema = scope
@@ -30,8 +28,7 @@ export const performerAccountsSchema = scope
         account.ownership?.state === "linked" &&
         owner?.uuid === page.performer.uuid &&
         owner.revision === page.performer.revision &&
-        owner.state === page.performer.state &&
-        owner.local_id === page.performer.local_id
+        owner.state === page.performer.state
       );
     }),
   );

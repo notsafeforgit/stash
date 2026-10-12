@@ -12,10 +12,10 @@ type PerformerURLBuilder struct {
 	UpdatedAt   string
 }
 
-func NewPerformerURLBuilder(baseURL string, performer *models.Performer) PerformerURLBuilder {
+func NewPerformerURLBuilder(baseURL string, performer *models.Performer, publicID string) PerformerURLBuilder {
 	return PerformerURLBuilder{
 		BaseURL:     baseURL,
-		PerformerID: strconv.Itoa(performer.ID),
+		PerformerID: publicID,
 		UpdatedAt:   strconv.FormatInt(performer.UpdatedAt.Unix(), 10),
 	}
 }

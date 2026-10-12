@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/pkg/entityid"
 	"github.com/stashapp/stash/pkg/models"
 )
 
@@ -35,6 +36,20 @@ func (s *Manager) PromoteDefaultFilterConfig(ctx context.Context) error {
 		defaults, conflicts, err := importDefaultFilterConfig(source)
 		if err != nil {
 			return err
+		}
+		for _, filter := range defaults {
+			filter.FilterAST, err = entityid.UpgradeFilter(ctx, s.Repository, filter.Mode, filter.FilterAST)
+			if err != nil {
+				return err
+			}
+		}
+		for _, conflict := range conflicts {
+			if filter := defaults[conflict.View]; filter != nil {
+				conflict.Alternative, err = entityid.UpgradeFilter(ctx, s.Repository, filter.Mode, conflict.Alternative)
+				if err != nil {
+					return err
+				}
+			}
 		}
 		target, err := json.Marshal(defaults)
 		if err != nil {

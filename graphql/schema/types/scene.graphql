@@ -32,7 +32,7 @@ type VideoCaption {
 }
 
 type Scene {
-  id: ID!
+  id: ID! @libraryID(kind: "scene")
   title: String
   code: String
   details: String
@@ -81,7 +81,7 @@ type Scene {
 }
 
 input SceneGroupInput {
-  group_id: ID!
+  group_id: ID! @libraryID(kind: "group")
   scene_index: Int
 }
 
@@ -98,11 +98,11 @@ input SceneCreateInput {
   # rating expressed as 1-100
   rating100: Int
   organized: Boolean
-  studio_id: ID
-  gallery_ids: [ID!]
-  performer_ids: [ID!]
+  studio_id: ID @libraryID(kind: "studio")
+  gallery_ids: [ID!] @libraryID(kind: "gallery")
+  performer_ids: [ID!] @libraryID(kind: "performer")
   groups: [SceneGroupInput!]
-  tag_ids: [ID!]
+  tag_ids: [ID!] @libraryID(kind: "tag")
   "This should be a URL or a base64 encoded data URL"
   cover_image: String
   stash_ids: [StashIDInput!]
@@ -112,7 +112,7 @@ input SceneCreateInput {
   Files will be reassigned from existing scenes if applicable.
   Files must not already be primary for another scene.
   """
-  file_ids: [ID!]
+  file_ids: [ID!] @libraryID(kind: "file")
 
   custom_fields: Map
 }
@@ -120,7 +120,7 @@ input SceneCreateInput {
 input SceneUpdateInput {
   provider_metadata: [ProviderMetadataSelectionInput!]
   clientMutationId: String
-  id: ID!
+  id: ID! @libraryID(kind: "scene")
   title: String
   code: String
   details: String
@@ -134,11 +134,11 @@ input SceneUpdateInput {
   o_counter: Int
     @deprecated(reason: "Unsupported - Use sceneIncrementO/sceneDecrementO")
   organized: Boolean
-  studio_id: ID
-  gallery_ids: [ID!]
-  performer_ids: [ID!]
+  studio_id: ID @libraryID(kind: "studio")
+  gallery_ids: [ID!] @libraryID(kind: "gallery")
+  performer_ids: [ID!] @libraryID(kind: "performer")
   groups: [SceneGroupInput!]
-  tag_ids: [ID!]
+  tag_ids: [ID!] @libraryID(kind: "tag")
   "This should be a URL or a base64 encoded data URL"
   cover_image: String
   stash_ids: [StashIDInput!]
@@ -153,7 +153,7 @@ input SceneUpdateInput {
       reason: "Unsupported - Use sceneIncrementPlayCount/sceneDecrementPlayCount"
     )
 
-  primary_file_id: ID
+  primary_file_id: ID @libraryID(kind: "file")
 
   custom_fields: CustomFieldsInput
 }
@@ -165,13 +165,13 @@ enum BulkUpdateIdMode {
 }
 
 input BulkUpdateIds {
-  ids: [ID!]
+  ids: [ID!] @libraryID(kind: "scope")
   mode: BulkUpdateIdMode!
 }
 
 input BulkSceneUpdateInput {
   clientMutationId: String
-  ids: [ID!]
+  ids: [ID!] @libraryID(kind: "scene")
   apply_to_items_matching_filters: Boolean
   find_filter: FindFilterType
   scene_filter_ast: FilterASTInput
@@ -186,11 +186,11 @@ input BulkSceneUpdateInput {
   # rating expressed as 1-100
   rating100: Int
   organized: Boolean
-  studio_id: ID
-  gallery_ids: BulkUpdateIds
-  performer_ids: BulkUpdateIds
-  tag_ids: BulkUpdateIds
-  group_ids: BulkUpdateIds
+  studio_id: ID @libraryID(kind: "studio")
+  gallery_ids: BulkUpdateIds @libraryScope(kind: "gallery")
+  performer_ids: BulkUpdateIds @libraryScope(kind: "performer")
+  tag_ids: BulkUpdateIds @libraryScope(kind: "tag")
+  group_ids: BulkUpdateIds @libraryScope(kind: "group")
 
   custom_fields: CustomFieldsInput
 }
@@ -203,7 +203,7 @@ contract of BulkSceneUpdateInput: pass an explicit `ids` list, or set
 """
 input ScenesSetDateFromFileMTimeInput {
   clientMutationId: String
-  ids: [ID!]
+  ids: [ID!] @libraryID(kind: "file")
   apply_to_items_matching_filters: Boolean
   find_filter: FindFilterType
   scene_filter_ast: FilterASTInput
@@ -220,12 +220,12 @@ enum SceneVideoRotationDirection {
 }
 
 input SceneVideoRotateInput {
-  id: ID!
+  id: ID! @libraryID(kind: "scene")
   direction: SceneVideoRotationDirection!
 }
 
 input SceneDestroyInput {
-  id: ID!
+  id: ID! @libraryID(kind: "scene")
   delete_file: Boolean
   delete_generated: Boolean
   "If true, delete the file entry from the database if the file is not assigned to any other objects"
@@ -233,7 +233,7 @@ input SceneDestroyInput {
 }
 
 input ScenesDestroyInput {
-  ids: [ID!]!
+  ids: [ID!]! @libraryID(kind: "scene")
   delete_file: Boolean
   delete_generated: Boolean
   "If true, delete the file entry from the database if the file is not assigned to any other objects"
@@ -262,7 +262,7 @@ input SceneParserInput {
 }
 
 type SceneGroupID {
-  group_id: ID!
+  group_id: ID! @libraryID(kind: "group")
   scene_index: String
 }
 
@@ -278,11 +278,11 @@ type SceneParserResult {
   rating: Int @deprecated(reason: "Use 1-100 range with rating100")
   # rating expressed as 1-100
   rating100: Int
-  studio_id: ID
-  gallery_ids: [ID!]
-  performer_ids: [ID!]
+  studio_id: ID @libraryID(kind: "studio")
+  gallery_ids: [ID!] @libraryID(kind: "gallery")
+  performer_ids: [ID!] @libraryID(kind: "performer")
   groups: [SceneGroupID!]
-  tag_ids: [ID!]
+  tag_ids: [ID!] @libraryID(kind: "tag")
 }
 
 type SceneParserResultType {
@@ -302,8 +302,8 @@ type SceneStreamEndpoint {
 }
 
 input AssignSceneFileInput {
-  scene_id: ID!
-  file_id: ID!
+  scene_id: ID! @libraryID(kind: "scene")
+  file_id: ID! @libraryID(kind: "file")
 }
 
 input SceneMergeInput {
@@ -311,8 +311,8 @@ input SceneMergeInput {
   If destination scene has no files, then the primary file of the
   first source scene will be assigned as primary
   """
-  source: [ID!]!
-  destination: ID!
+  source: [ID!]! @libraryID(kind: "scene")
+  destination: ID! @libraryID(kind: "scene")
   # values defined here will override values in the destination
   values: SceneUpdateInput
 

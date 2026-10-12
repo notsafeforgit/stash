@@ -8,6 +8,41 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Stored caption cleanup — deployed, 2026-10-12 UTC
+
+Caption retention now includes an explicit storage cleanup, rather than only
+removing the version UI. `capture-cleanup --discard-caption-history` consolidates
+obsolete projected text and raw caption copies, retaining current original
+service text before translation. Existing attachment/profile capture IDs,
+observation times, explicit library field choices and translation records remain
+valid. Subsequent ordinary scrapes also reuse text previously obtained by metadata
+enrichment. This requires no new schema or recurring maintenance job.
+
+The production cleanup consolidated 296,029 capture records across 115,942 posts.
+The 19,642 posts with differing nonempty saved titles/descriptions now have no
+competing text values. Storage has 14,596 fewer revision rows overall (412,363 to
+397,767); 216,804 superseded revisions were deleted while replacement records
+were shared. Exact import/context proofs, referenced translation inputs and
+captions containing distinct inline media were protected (1,863 captures).
+Those retained references do not leave differing saved caption values in this
+library. Capture, scene, image, gallery, file, media-association, profile and
+translation counts were identical before and after the transaction, and the
+changed tables passed foreign-key checks.
+
+Source `9694845215ded26456bfe011938c68a07cfd3d57` passed the
+[GitHub release workflow](https://github.com/notsafeforgit/stash/actions/runs/38200579903)
+and deployed as
+`ghcr.io/notsafeforgit/stash@sha256:68a18339c80d4139649fb7844bfdd86d3e34c4a833502a0b2c5ef259890456f1`.
+The published binary matches its Actions artifact, and the backup restore
+inventory now selects that release. A database-copy rehearsal and tests covered
+raw-only text, translations, partial records, distinct posts, retry reuse,
+cancellation rollback and domain integrity. The fresh rollback copy and live
+cleanup ran during the 04:08–04:14 UTC maintenance window. Stash is healthy on
+schema 1000114; local/public health and three source-post content reads passed.
+The host/n8n Reddit and Twitter worker timers remained active. External workers
+were not restarted. About 50 GiB remained free with the rollback copy retained.
+Receipts are under `.local/post-text-retention-20261012/`.
+
 ## Unified native container — deployed, 2026-10-12 UTC
 
 The main image now includes the Debian runtime formerly supplied by stash-s6:

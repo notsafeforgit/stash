@@ -8,6 +8,40 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Saved post captions — deployed, 2026-10-12 UTC
+
+Normal source captures keep saved captions and fill missing text fields instead
+of creating a caption edit history. Another source post ID retains its own text
+and album membership even when the media is deduplicated. New attachment data,
+publisher profiles, thread relationships and captions containing newly discovered
+inline media remain usable. Existing import, attachment and translation references
+are preserved; this release performs no historical rewrite or database migration.
+
+Post and scene/image Sources now expose one **Post content** projection. The
+caption version list and its public `capture-history` endpoint are removed;
+`/posts/<post>/content` returns saved original text without raw response payloads
+or version counts. Partial records fill gaps from earlier metadata, so a later
+date-only capture keeps the saved caption and description visible. This supersedes the caption-history behavior described in the
+October 11 post-content rollout below.
+
+Application source `3531b6242c9149890ec2bd4860f6aadd946c3b6b` passed the
+[release workflow](https://github.com/notsafeforgit/stash/actions/runs/38191712210) and published
+`ghcr.io/notsafeforgit/stash@sha256:980566aabd76cd2bef5ba084a86959a110baa455b2554e907f8d76f1a93f903c`. The
+[wrapper workflow](https://github.com/notsafeforgit/stash-s6/actions/runs/38193454501) published the deployed image
+`ghcr.io/notsafeforgit/stash-s6@sha256:53f041a376636dba6afee1732fc59883118682525789ec8f3e131d17678c1e02`. Its binary matches the Actions artifact, the service is
+healthy on schema 1000114, and the restore inventory selects the
+same application release. Worker runtimes were not restarted.
+
+Validation covered the full fork checks (including the final backend rerun),
+822 UI unit tests and 23 Chromium cases. Regression cases cover caption edits
+and reversions, missing descriptions, distinct posts sharing media, external
+media hosts, inline attachments, metadata inheritance and delivery replay.
+Mobile and desktop layouts were visually reviewed. A live mobile browser check
+confirmed preserved caption/description/date values in one content projection
+and the absence of version controls. The complete
+[Chromium/WebKit suite](https://github.com/notsafeforgit/stash/actions/runs/38190233101)
+also passed; the follow-up changes only backend content fallback.
+
 ## Performer UUID URLs — deployed, 2026-10-12 UTC
 
 Performer pages now use their canonical UUID in the address bar. Existing

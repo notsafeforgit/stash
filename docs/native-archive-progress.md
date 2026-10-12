@@ -8,6 +8,32 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Performer UUID URLs — deployed, 2026-10-12 UTC
+
+Performer pages now use their canonical UUID in the address bar. Existing
+numeric URLs resolve through the current local record; merged UUIDs resolve to
+the surviving performer. Redirects preserve tabs, filters, anchors and browsing
+origin. Account-review links use UUIDs directly. The redundant **Original library
+ID** field is removed from performer identity cards and their API response.
+Library relationships and GraphQL operations retain their numeric keys. No schema
+migration or worker-runtime change is required.
+
+Application source `f0342f011225ceab48ef5e62972bdd8eb54c2135` passed the
+[release gate](https://github.com/notsafeforgit/stash/actions/runs/38186738109) and published
+`ghcr.io/notsafeforgit/stash@sha256:5654eef4c098a038c0dd8a1c6adee1a98cf98279508615528b1ece65bcd8da84`. The
+[wrapper build](https://github.com/notsafeforgit/stash-s6/actions/runs/38188105663) published the deployed image
+`ghcr.io/notsafeforgit/stash-s6@sha256:74f40b48fb0ac6b94a7e0a520cc5071005eab42345b43f93c92c2e45b41e87d1`. Its binary matches the Actions artifact;
+the running service is healthy on schema 1000114. The backup restore inventory references this same application release.
+
+Validation passed the full fork gate, 822 UI unit tests and eight performer
+source-account Chromium cases. Routing tests cover numeric and UUID URLs,
+merges, deleted identities, reused database keys, public mount prefixes and
+browser Back. Identity resolution also works with source tracking disabled.
+Mobile and desktop cards were visually reviewed. A live browser check confirmed
+the numeric-to-UUID redirect and removal of the redundant ID label. The complete
+[Chromium/WebKit browser run](https://github.com/notsafeforgit/stash/actions/runs/38186738090)
+also passed.
+
 ## Post content browsing — deployed, 2026-10-11 UTC
 
 Post lists, post details and scene/image Sources now show the source publication

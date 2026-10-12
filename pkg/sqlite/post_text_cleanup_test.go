@@ -170,3 +170,20 @@ func TestPostTextCleanupPreservesInputsStillUsedByTranslations(t *testing.T) {
 	require.NoError(t, db.Close())
 	require.NoError(t, db.Open(db.DatabasePath()))
 }
+
+func TestPostTextCleanupAlsoRemovesRawOnlyCaptionVersions(t *testing.T) {
+	db, repo := archiveTestDatabase(t)
+	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "p"}, "")
+	for i, text := range []string{"Obsolete raw caption", "Saved source caption"} {
+		input := contentTestCapture(t, post.UUID, i*2, text)
+		input.Metadata = models.SourcePostMetadata{}
+		recordSourceTestCapture(t, repo, input)
+	}
+	// Missing projected fields do not make the copies in raw source JSON useful.
+	result, err := db.CompactPostText(t.Context(), nil)
+	require.NoError(t, err)
+	require.Equal(t, 2, result.Captures)
+	raw := openRawDB(t, db.DatabasePath())
+	defer raw.Close()
+	require.EqualValues(t, 1, queryUint(t, raw, "SELECT count(*) FROM source_post_revisions"))
+}

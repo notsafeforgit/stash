@@ -32,7 +32,7 @@ func (db *Database) CompactPostText(ctx context.Context, progress func(string, i
 			`CREATE TEMP TABLE compact_old_payloads(digest TEXT PRIMARY KEY) WITHOUT ROWID`,
 			`CREATE TEMP TABLE compact_posts(uuid TEXT PRIMARY KEY) WITHOUT ROWID`,
 			`CREATE TEMP TABLE compact_text_candidates(uuid TEXT PRIMARY KEY) WITHOUT ROWID`,
-			`INSERT INTO compact_text_candidates SELECT post_uuid FROM source_post_revisions GROUP BY post_uuid HAVING count(DISTINCT metadata)>1`,
+			`INSERT INTO compact_text_candidates SELECT post_uuid FROM source_post_revisions GROUP BY post_uuid HAVING count(*)>1`,
 		} {
 			if _, err := dbWrapper.Exec(ctx, query); err != nil {
 				return err
@@ -71,8 +71,11 @@ func (db *Database) CompactPostText(ctx context.Context, progress func(string, i
 
 func compactPostText(ctx context.Context, evidence *SourceEvidenceStore, post string, result *CaptureContentCleanupResult) error {
 	metadata, err := evidence.PostContent(ctx, post)
-	if err != nil || metadata == nil {
+	if err != nil {
 		return err
+	}
+	if metadata == nil {
+		metadata = &models.SourcePostMetadata{}
 	}
 	var ids []string
 	if err := dbWrapper.Select(ctx, &ids, `SELECT uuid FROM source_captures INDEXED BY source_captures_order WHERE post_uuid=? ORDER BY coalesce(captured_at,recorded_at) DESC,uuid DESC`, post); err != nil {

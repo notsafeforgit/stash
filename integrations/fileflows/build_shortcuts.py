@@ -16,6 +16,8 @@ def variable(name):
 
 
 def text(*pieces):
+    # Text parameter slots require this envelope even for a single variable.
+    # WFTextTokenAttachment in such a slot appears empty in Shortcuts.
     string, attachments = "", {}
     for piece in pieces:
         if isinstance(piece, dict):
@@ -64,7 +66,7 @@ def choose_clip_order(add):
     clip = variable("Repeat Item")
     name = add("getitemname", WFInput=token(clip))
     date = add("properties.images", WFInput=token(clip), WFContentItemPropertyName="Date Taken")
-    date = add("format.date", WFDate=token(date), WFDateFormatStyle="Medium", WFTimeFormatStyle="Short")
+    date = add("format.date", WFDate=text(date), WFDateFormatStyle="Medium", WFTimeFormatStyle="Short")
     add("setitemname", WFInput=token(clip), WFName=text(variable("Repeat Index"), " - ", date, " - ", name),
         WFDontIncludeFileExtension=False)
     choices = add("repeat.each", GroupingIdentifier=labels, WFControlFlowMode=2)
@@ -77,7 +79,7 @@ def choose_clip_order(add):
                  WFChooseFromListActionPrompt=text("Choose clip ", variable("Repeat Index"), " of ", count),
                  WFChooseFromListActionSelectMultiple=False)
     chosen_name = add("getitemname", WFInput=token(chosen))
-    index = add("text.match", WFInput=token(chosen_name), WFMatchTextPattern="^[0-9]+")
+    index = add("text.match", text=text(chosen_name), WFMatchTextPattern="^[0-9]+")
     index = add("getitemfromlist", WFInput=token(index), WFItemSpecifier="First Item")
     chosen_original = add("getitemfromlist", WFInput=token(original), WFItemSpecifier="Item At Index", WFItemIndex=token(index))
     add("appendvariable", WFInput=token(chosen_original), WFVariableName="Ordered Clips")
@@ -118,11 +120,11 @@ def build(wrapper, processor):
 
     add("comment", WFCommentActionText="Upload ordered clips to Stash through FileFlows. Choose recording date (oldest first) or pick clips in your own order. The earliest recording still supplies the scene date. Title and description are JSON-escaped automatically. No NFO is created.")
     title = add("ask", WFAskActionPrompt="Video title?", WFAllowsMultilineText=False)
-    title = add("text.trimwhitespace", WFInput=token(title))
+    title = add("text.trimwhitespace", WFInput=text(title))
     details = add("ask", WFAskActionPrompt="What happened in the clip?", WFAllowsMultilineText=True)
     ordered_input = choose_clip_order(add)
     now = add("date", WFDateActionMode="Current Date")
-    now = add("format.date", WFDate=token(now), WFDateFormatStyle="ISO 8601")
+    now = add("format.date", WFDate=text(now), WFDateFormatStyle="ISO 8601")
     random1 = add("number.random", WFRandomNumberMinimum=100000000, WFRandomNumberMaximum=999999999)
     random2 = add("number.random", WFRandomNumberMinimum=100000000, WFRandomNumberMaximum=999999999)
     entropy = add("gettext", WFTextActionText=text(now, "-", random1, "-", random2))
@@ -132,7 +134,7 @@ def build(wrapper, processor):
     add("repeat.each", WFInput=token(ordered_input), GroupingIdentifier=group, WFControlFlowMode=0)
     clip = variable("Repeat Item")
     recorded = add("properties.images", WFInput=token(clip), WFContentItemPropertyName="Date Taken")
-    recorded = add("format.date", WFDate=token(recorded), WFDateFormatStyle="ISO 8601")
+    recorded = add("format.date", WFDate=text(recorded), WFDateFormatStyle="ISO 8601")
     # The recording date is read from the original Photo before exporting it.
     file_clip = dict(clip, Aggrandizements=[{"Type": "WFCoercionVariableAggrandizement", "CoercionItemClass": "WFAVAssetContentItem"}])
     renamed = add("setitemname", WFInput=token(file_clip), WFName=text("clip-", variable("Repeat Index")), WFDontIncludeFileExtension=False)
@@ -143,7 +145,10 @@ def build(wrapper, processor):
     clips = add("repeat.each", GroupingIdentifier=group, WFControlFlowMode=2)
     manifest = add("dictionary", WFItems=dictionary({"format": "stash-clip-batch-v1", "batch_id": batch,
                    "title": title, "details": details, "date": "", "order": variable("Clip Order")}))
-    manifest = add("setvalueforkey", WFDictionary=token(manifest), WFDictionaryKey="clips", WFDictionaryValue=token(clips))
+    # Set Dictionary Value uses a text parameter for its value. A lone token
+    # inside that text preserves the list of dictionaries; token(clips) uses
+    # the wrong envelope and fails with "No value provided for dictionary key clips".
+    manifest = add("setvalueforkey", WFDictionary=token(manifest), WFDictionaryKey="clips", WFDictionaryValue=text(clips))
     serialized = add("gettext", WFTextActionText=text(manifest))
     named = add("setitemname", WFInput=token(serialized), WFName="stash-clips.json", WFDontIncludeFileExtension=True)
     add("documentpicker.save", WFFolder=token(folder), WFInput=token(named), WFAskWhereToSave=False, WFFileDestinationPath="", WFSaveFileOverwrite=False)
@@ -152,8 +157,8 @@ def build(wrapper, processor):
     # reached only after staging, hashing, manifest creation and upload succeed.
     actions.append(copy.deepcopy(old[25]))
     processor["WFWorkflowActions"] = actions
-    processor["WFWorkflowName"] = "Process and Organize Videos - Stash"
-    wrapper["WFWorkflowName"] = "Upload Jess Videos - Stash"
+    processor["WFWorkflowName"] = "Process and Organize Videos"
+    wrapper["WFWorkflowName"] = "Upload Jess Videos"
     for action in wrapper["WFWorkflowActions"]:
         params = action["WFWorkflowActionParameters"]
         if action["WFWorkflowActionIdentifier"] == "is.workflow.actions.runworkflow":
@@ -168,6 +173,15 @@ def build(wrapper, processor):
 def validate(workflow):
     actions = workflow["WFWorkflowActions"]
     seen, stack = set(), []
+    # Action parameter types, not the referred values, determine the envelope.
+    # Format Date / Trim Whitespace match the user's native exports; Set
+    # Dictionary Value uses WFTextInputParameter (docs.scpl.dev/actions/setdictionaryvalue).
+    text_slots = {
+        "format.date": ("WFDate",),
+        "text.trimwhitespace": ("WFInput",),
+        "text.match": ("text", "WFMatchTextPattern"),
+        "setvalueforkey": ("WFDictionaryKey", "WFDictionaryValue"),
+    }
 
     def references(value):
         if isinstance(value, dict):
@@ -181,6 +195,13 @@ def validate(workflow):
 
     for action in actions:
         params = action["WFWorkflowActionParameters"]
+        kind = action["WFWorkflowActionIdentifier"].removeprefix("is.workflow.actions.")
+        if kind == "text.match" and "WFInput" in params:
+            raise ValueError("Match Text takes its input in text, not WFInput")
+        for slot in text_slots.get(kind, ()):
+            value = params.get(slot)
+            if isinstance(value, dict) and value.get("WFSerializationType") != "WFTextTokenString":
+                raise ValueError(f"{kind}.{slot} requires a text-token string")
         references(params)
         uid = params.get("UUID")
         if uid in seen:

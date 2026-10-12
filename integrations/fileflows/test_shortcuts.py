@@ -1,11 +1,12 @@
 """Exercise generated ordering control flow; this is not an Apple runtime test."""
 import copy
 import itertools
+import plistlib
 import re
 import unittest
 from uuid import uuid4
 
-from build_shortcuts import choose_clip_order, validate
+from build_shortcuts import build, choose_clip_order, token, validate
 
 
 class OrderWorkflow:
@@ -100,7 +101,7 @@ class OrderWorkflow:
             elif kind == "properties.images": result = incoming["recorded_at"]
             elif kind == "format.date": result = self.value(p["WFDate"])
             elif kind == "setitemname": result = {**incoming, "name": self.value(p["WFName"])}
-            elif kind == "text.match": result = re.findall(p["WFMatchTextPattern"], incoming)
+            elif kind == "text.match": result = re.findall(p["WFMatchTextPattern"], self.value(p["text"]))
             elif kind == "getitemfromlist":
                 index = 1 if p["WFItemSpecifier"] == "First Item" else int(self.value(p["WFItemIndex"]))
                 result = self.as_list(incoming)[index-1]
@@ -143,6 +144,73 @@ class ClipOrderTests(unittest.TestCase):
         self.assertEqual(flow.run(), self.photos[:1])
         self.assertEqual(flow.variables["Clip Order"], "recorded_at")
         self.assertEqual(flow.menus, [])
+
+
+class ShortcutEncodingTests(unittest.TestCase):
+    """Check the serialized action contract that the picker simulation cannot."""
+
+    def setUp(self):
+        # No private Photos or file-provider bookmarks in the test fixture.
+        self.wrapper = {"WFWorkflowActions": [{
+            "WFWorkflowActionIdentifier": "is.workflow.actions.runworkflow",
+            "WFWorkflowActionParameters": {"WFWorkflow": {"workflowIdentifier": "old-local-id"}},
+        }]}
+        self.processor = {"WFWorkflowActions": [
+            {"WFWorkflowActionIdentifier": "is.workflow.actions.comment",
+             "WFWorkflowActionParameters": {}} for _ in range(26)
+        ]}
+        self.processor["WFWorkflowActions"][3]["WFWorkflowActionParameters"]["WFFolder"] = {"bookmark": "workspace"}
+        self.processor["WFWorkflowActions"][24]["WFWorkflowActionParameters"]["WFFolder"] = {"bookmark": "upload"}
+        self.processor["WFWorkflowActions"][25] = {
+            "WFWorkflowActionIdentifier": "is.workflow.actions.deletephotos",
+            "WFWorkflowActionParameters": {"photos": token({"Type": "ExtensionInput"})},
+        }
+        wrapper, processor = build(self.wrapper, self.processor)
+        self.wrapper, self.processor = [plistlib.loads(plistlib.dumps(w)) for w in (wrapper, processor)]
+
+    def parameters(self, kind):
+        return [a["WFWorkflowActionParameters"] for a in self.processor["WFWorkflowActions"]
+                if a["WFWorkflowActionIdentifier"] == "is.workflow.actions." + kind]
+
+    def test_clips_value_is_a_single_text_token_referencing_repeat_results(self):
+        # WFDictionaryValue is WFTextInputParameter, unlike WFDictionary.
+        # A bare WFTextTokenAttachment here caused the on-device "No value
+        # provided for dictionary key clips" failure. Do not coerce the list
+        # to JSON text or put literal text around its one embedded token.
+        setting, = self.parameters("setvalueforkey")
+        self.assertEqual(setting["WFDictionaryKey"], "clips")
+        self.assertEqual(setting["WFDictionaryValue"]["WFSerializationType"], "WFTextTokenString")
+        value = setting["WFDictionaryValue"]["Value"]
+        self.assertEqual(value["string"], "\ufffc")
+        self.assertEqual(set(value["attachmentsByRange"]), {"{0, 1}"})
+        reference = value["attachmentsByRange"]["{0, 1}"]
+        self.assertEqual(reference["Type"], "ActionOutput")
+        actions = self.processor["WFWorkflowActions"]
+        finish = next(i for i, a in enumerate(actions)
+                      if a["WFWorkflowActionParameters"].get("UUID") == reference["OutputUUID"])
+        self.assertEqual(actions[finish]["WFWorkflowActionIdentifier"], "is.workflow.actions.repeat.each")
+        self.assertEqual(actions[finish]["WFWorkflowActionParameters"]["WFControlFlowMode"], 2)
+        self.assertEqual(actions[finish-1]["WFWorkflowActionIdentifier"], "is.workflow.actions.dictionary")
+        validate(self.processor)
+
+    def test_rejects_disconnected_text_field_references(self):
+        for kind, slot in (("setvalueforkey", "WFDictionaryValue"), ("format.date", "WFDate"),
+                           ("text.trimwhitespace", "WFInput"), ("text.match", "text")):
+            with self.subTest(kind=kind, slot=slot):
+                workflow = copy.deepcopy(self.processor)
+                params = next(a["WFWorkflowActionParameters"] for a in workflow["WFWorkflowActions"]
+                              if a["WFWorkflowActionIdentifier"] == "is.workflow.actions." + kind)
+                params[slot] = token(params[slot]["Value"]["attachmentsByRange"]["{0, 1}"])
+                with self.assertRaisesRegex(ValueError, "requires a text-token string"):
+                    validate(workflow)
+
+    def test_keeps_original_names_and_resolves_helper_by_name(self):
+        self.assertEqual(self.wrapper["WFWorkflowName"], "Upload Jess Videos")
+        self.assertEqual(self.processor["WFWorkflowName"], "Process and Organize Videos")
+        helper = self.wrapper["WFWorkflowActions"][0]["WFWorkflowActionParameters"]
+        self.assertEqual(helper["WFWorkflowName"], "Process and Organize Videos")
+        self.assertEqual(helper["WFWorkflow"], {"workflowName": "Process and Organize Videos", "isSelf": False})
+        validate(self.wrapper)
 
 
 if __name__ == "__main__":

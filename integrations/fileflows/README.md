@@ -57,11 +57,15 @@ and FileFlows. No additional source history or discovery records are created.
    A nonempty error report means the pending handoff needs attention; the video
    and metadata are preserved. Do not edit a manifest after admission to Stash.
 4. `build_shortcuts.py WRAPPER.shortcut PROCESSOR.shortcut OUTPUT_DIR` builds
-   unsigned copies of the original exported shortcuts. The original folder
+   unsigned replacements named **Upload Jess Videos** and **Process and Organize
+   Videos**, matching the original shortcuts and the wrapper's helper reference.
+   The original folder
    bookmarks and post-upload Photos deletion action are preserved. Signing and
    running the resulting files requires macOS/iOS; Linux validates their plist
    structure but cannot execute Apple Shortcuts. Import the processing shortcut
-   before the upload wrapper and check the folder bookmarks on the iPhone.
+   before the upload wrapper, replace the existing shortcuts when prompted, and
+   check the folder bookmarks on the iPhone. `sign-on-mac.sh` signs both files
+   under these original names.
 
 Example host configuration (keep it private):
 

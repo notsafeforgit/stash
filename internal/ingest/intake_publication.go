@@ -25,6 +25,7 @@ type IntakePublication struct {
 	Kind               models.ArchiveEntityKind `json:"media_kind"`
 	Source             *IntakeSource            `json:"source,omitempty"`
 	Transformation     *IntakeTransformation    `json:"transformation,omitempty"`
+	ManualMetadata     *ManualFileMetadata      `json:"manual_metadata,omitempty"`
 }
 
 type IntakeSource struct {
@@ -75,7 +76,7 @@ type PublishedIntake struct {
 // receipt remain caller work.
 // A publisher account never becomes a depicted performer implicitly.
 func (p *PreparedMedia) PublishIntake(ctx context.Context, repo models.Repository, input IntakePublication) (*PublishedIntake, error) {
-	if !ValidUUID(input.UUID) || !validIntakeTransformation(input) {
+	if !ValidUUID(input.UUID) || !validIntakeTransformation(input) || !validManualFileMetadata(input.ManualMetadata) || (input.Source != nil && input.ManualMetadata != nil) {
 		return nil, ErrInvalid
 	}
 	if err := validatePublicationCollection(ctx, repo, input); err != nil {
@@ -143,6 +144,11 @@ func (p *PreparedMedia) PublishIntake(ctx context.Context, repo models.Repositor
 			return nil, err
 		}
 	}
+	manualFields, manualReview, err := applyManualFileMetadata(ctx, repo, input.ManualMetadata, media)
+	if err != nil {
+		return nil, err
+	}
+	ret.Result.Review = append(ret.Result.Review, manualReview...)
 	policyInput := metadata.Input{CollectionUUID: input.CollectionUUID, CollectionRevision: input.CollectionRevision,
 		PolicyRevision: input.PolicyRevision, EntityUUID: media.Media.UUID, RelativePath: input.Target.RelativePath, Created: media.Created}
 	if input.Source != nil && ret.Result.SourceMedia == "linked" {
@@ -153,6 +159,7 @@ func (p *PreparedMedia) PublishIntake(ctx context.Context, repo models.Repositor
 		return nil, err
 	}
 	ret.Result.MetadataState, ret.Result.MetadataFields = policyResult.State, policyResult.AppliedFields()
+	ret.Result.MetadataFields = append(ret.Result.MetadataFields, manualFields...)
 	if len(ret.Result.MetadataFields) == 0 {
 		ret.Result.MetadataFields = nil // Keep the checkpoint identical after JSON replay.
 	}

@@ -53,7 +53,7 @@ func TestManualIntakeHTTPPreviewAdmissionAndSavedRecovery(t *testing.T) {
 	}
 	input := ingest.ManualFileInput{CollectionUUID: collection.UUID, RelativePath: "Purchased.mp4", MediaKind: models.ArchiveScene}
 	w := request(http.MethodGet, "/manual-intake/capabilities", nil)
-	require.JSONEq(t, `{"file_ingestion":true}`, w.Body.String())
+	require.JSONEq(t, `{"file_ingestion":true,"file_metadata":true}`, w.Body.String())
 	w = request(http.MethodPost, "/manual-intake/preview", input)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.Equal(t, "no-store", w.Header().Get("Cache-Control"))

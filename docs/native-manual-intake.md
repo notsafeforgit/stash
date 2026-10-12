@@ -1,5 +1,19 @@
 # Native local-file intake
 
+An application-authenticated upload can include `metadata` with `title`,
+`details`, and a `date` in `YYYY-MM-DD` format in both its preview and apply
+requests. The capability response advertises `file_metadata: true`. Metadata
+is bound to the request signature and applied in the same transaction that
+registers the finished media. It requires no NFO, producer, or source post.
+The title is limited to 4 KiB and details to 16 KiB of UTF-8; empty/omitted
+values leave the field alone. Folder performer policies still apply.
+
+Supplied values take priority over automatic folder defaults for new media.
+For existing media, only empty, unprotected fields or a filename-derived title
+can be filled. A conflicting curated value (including an intentional clear)
+is retained and reported as `metadata:<field>` in the publication's `review`
+list. Replaying the same request cannot overwrite later edits.
+
 Application-authenticated intake can register a purchased video or image under a
 bound native media root. Choose an existing `directory` or `manual_batch`
 collection; its metadata policy supplies any fixed performer UUIDs and filename

@@ -27,6 +27,7 @@ type ManualFileInput struct {
 	RelativePath       string                   `json:"relative_path"`
 	MediaKind          models.ArchiveEntityKind `json:"media_kind"`
 	OriginalGIFPath    string                   `json:"original_gif_path,omitempty"`
+	Metadata           *ManualFileMetadata      `json:"metadata,omitempty"`
 }
 
 type ManualFileRequest struct {
@@ -91,6 +92,9 @@ type manualFilePlan struct {
 }
 
 func validManualFileInput(input ManualFileInput) bool {
+	if !validManualFileMetadata(input.Metadata) {
+		return false
+	}
 	if input.OriginalGIFPath != "" && (input.ScanCollectionUUID != "" || !validFileTransformation(
 		&FileTransformation{Kind: "gif-to-video", OriginalRelativePath: input.OriginalGIFPath}, input.MediaKind, input.RelativePath, true)) {
 		return false
@@ -222,7 +226,7 @@ func validFileWork(work FileWork) bool {
 		return false
 	}
 	if work.Version == 1 {
-		return work.Manual == nil && (work.Publication.Transformation == nil || work.Publication.Transformation.ReviewedImageUUID == "") &&
+		return work.Manual == nil && work.Publication.ManualMetadata == nil && (work.Publication.Transformation == nil || work.Publication.Transformation.ReviewedImageUUID == "") &&
 			ValidUUID(work.ProducerUUID) && ValidUUID(work.EventUUID) && archive.ValidSHA256(work.SHA256)
 	}
 	m := work.Manual
@@ -247,7 +251,7 @@ func validFileWork(work FileWork) bool {
 	} else if p.Transformation != nil {
 		return false
 	}
-	return p.Source == nil && p.UUID == manualIntakeUUID(m.Request.RequestUUID) && p.Kind == m.Request.MediaKind &&
+	return p.Source == nil && reflect.DeepEqual(p.ManualMetadata, m.Request.Metadata) && p.UUID == manualIntakeUUID(m.Request.RequestUUID) && p.Kind == m.Request.MediaKind &&
 		p.CollectionUUID == m.Request.CollectionUUID && p.Target.RelativePath == m.Request.RelativePath
 }
 
@@ -307,7 +311,7 @@ func (s *Service) SubmitManualFile(ctx context.Context, input ManualFileRequest)
 		}
 		if current != nil {
 			work, err := decodeManualFileWork(current)
-			if err != nil || work.Manual.Request != input {
+			if err != nil || !reflect.DeepEqual(work.Manual.Request, input) {
 				return models.ErrArchiveJobConflict
 			}
 			return nil
@@ -322,7 +326,7 @@ func (s *Service) SubmitManualFile(ctx context.Context, input ManualFileRequest)
 		work := FileWork{Version: 2, Size: plan.Inspection.Snapshot.Size, SHA256: plan.Inspection.SHA256,
 			Manual: &ManualFileWork{Request: input, RootRevision: plan.Preview.RootRevision, Inspection: plan.Inspection, ScanCollectionRevision: plan.Preview.ScanCollectionRevision},
 			Publication: IntakePublication{UUID: manualIntakeUUID(input.RequestUUID), CollectionUUID: input.CollectionUUID,
-				CollectionRevision: plan.Preview.CollectionRevision, PolicyRevision: plan.Preview.PolicyRevision, Target: plan.Target, Kind: input.MediaKind, Transformation: plan.Transformation}}
+				CollectionRevision: plan.Preview.CollectionRevision, PolicyRevision: plan.Preview.PolicyRevision, Target: plan.Target, Kind: input.MediaKind, Transformation: plan.Transformation, ManualMetadata: input.Metadata}}
 		args, err := json.Marshal(work)
 		if err != nil {
 			return err

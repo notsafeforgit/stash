@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"reflect"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stashapp/stash/internal/ingest"
@@ -33,12 +34,12 @@ func manualIntakeError(w http.ResponseWriter, err error) {
 }
 
 func (rs *nativeArchiveRoutes) manualIntakeCapabilities(w http.ResponseWriter, _ *http.Request) {
-	ingestJSON(w, http.StatusOK, map[string]bool{"file_ingestion": rs.fileIngestion})
+	ingestJSON(w, http.StatusOK, map[string]bool{"file_ingestion": rs.fileIngestion, "file_metadata": true})
 }
 
 func (rs *nativeArchiveRoutes) previewManualIntake(w http.ResponseWriter, r *http.Request) {
 	var input ingest.ManualFileInput
-	if err := readIngestJSON(w, r, 8192, &input); err != nil {
+	if err := readIngestJSON(w, r, 131072, &input); err != nil {
 		manualIntakeError(w, err)
 		return
 	}
@@ -52,7 +53,7 @@ func (rs *nativeArchiveRoutes) previewManualIntake(w http.ResponseWriter, r *htt
 
 func (rs *nativeArchiveRoutes) applyManualIntake(w http.ResponseWriter, r *http.Request) {
 	var input ingest.ManualFileRequest
-	if err := readIngestJSON(w, r, 8192, &input); err != nil {
+	if err := readIngestJSON(w, r, 131072, &input); err != nil {
 		manualIntakeError(w, err)
 		return
 	}
@@ -69,7 +70,7 @@ func (rs *nativeArchiveRoutes) applyManualIntake(w http.ResponseWriter, r *http.
 			ingestJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "file_ingestion_unavailable"})
 			return
 		}
-		if err == nil && (result.ResumeFromJobUUID != "" || result.ManualFileInput != input.ManualFileInput || result.Signature != input.Signature) {
+		if err == nil && (result.ResumeFromJobUUID != "" || !reflect.DeepEqual(result.ManualFileInput, input.ManualFileInput) || result.Signature != input.Signature) {
 			err = models.ErrArchiveJobConflict
 		}
 	}

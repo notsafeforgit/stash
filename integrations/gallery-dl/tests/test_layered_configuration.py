@@ -84,7 +84,7 @@ class LayeredConfigurationTests(unittest.TestCase):
             self.assertTrue(all(b'private-token' not in row['document'] for row in rows))
             old = next(Configurations.load(r) for r in rows if r['policy_sha256'] == first['definition']['policy_sha256'])
             self.assertIsInstance(old._gallery['extractor']['filename'], dict)
-            self.assertEqual(box.db.execute('PRAGMA user_version').fetchone()[0], 17)
+            self.assertEqual(box.db.execute('PRAGMA user_version').fetchone()[0], 18)
 
     def test_dispatch_rotates_retained_jobs_and_recovers_when_new_layer_is_broken(self):
         with closing(self.open()) as box:

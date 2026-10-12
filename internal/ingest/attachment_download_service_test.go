@@ -61,6 +61,30 @@ func (f downloadFixture) report(t *testing.T, event ingest.AttachmentDownloadEve
 	return f.service.AttachmentDownload(t.Context(), f.token, body, ingest.Digest(body))
 }
 
+func TestDeletedExternalMediaRetainsParentAndFailureWithoutClaimingDownload(t *testing.T) {
+	f := newDownloadFixture(t)
+	capture := f.captureFixture.event(t)
+	capture.RootUUID, capture.RunUUID = &f.root.UUID, f.run.UUID
+	capture.Post = ingest.PostReference{Namespace: "native:reddit", Value: "deleted-post"}
+	capture.Metadata = models.SourcePostMetadata{}
+	capture.Source = json.RawMessage(`{"category":"reddit","id":"deleted-post","url":"https://www.redgifs.com/watch/deletedclip","native_media_status":{"state":"deleted","service":"redgifs","item":"deletedclip","observed_at":"2026-10-12T00:00:00+00:00","http_status":404}}`)
+	_, err := f.submit(t, capture)
+	require.NoError(t, err)
+	event := f.event
+	event.EventUUID = uuid.NewString()
+	event.CaptureEventUUID = capture.EventUUID
+	event.Attachment = ingest.PostReference{Namespace: "native:redgifs", Value: "deletedclip"}
+	event.State, event.ReasonCode = "failed", "source_failure"
+	accepted, err := f.report(t, event)
+	require.NoError(t, err)
+	require.Empty(t, accepted.JobUUID)
+	require.Contains(t, string(accepted.Result), `"media_ingested":false`)
+	event.EventUUID = uuid.NewString()
+	event.Attachment.Value = "unrelated"
+	_, err = f.report(t, event)
+	require.Error(t, err, "deletion reporting cannot attach unrelated media to the parent post")
+}
+
 func (f downloadFixture) history(t *testing.T, after int64, limit int, now time.Time) []models.AttachmentDownloadReport {
 	t.Helper()
 	var ret []models.AttachmentDownloadReport

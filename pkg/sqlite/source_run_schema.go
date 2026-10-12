@@ -3,10 +3,21 @@ package sqlite
 import (
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/jmoiron/sqlx"
 )
 
 func validateSourceRunSchema(conn *sqlx.DB, version uint, auditData bool) error {
+	if version >= NativeSchemaBaseline+116 {
+		var definition string
+		if err := conn.Get(&definition, "SELECT sql FROM sqlite_schema WHERE type='table' AND name='source_runs'"); err != nil {
+			return err
+		}
+		if !strings.Contains(definition, "CHECK(typeof(failures)='integer' AND failures>=0)") {
+			return errors.New("native database still caps source run failures")
+		}
+	}
 	if version >= NativeSchemaBaseline+114 {
 		for _, name := range []string{"source_subscriptions", "source_subscriptions_enabled", "source_subscription_revision", "source_run_subscriptions", "source_run_subscriptions_collection", "source_run_subscription_immutable"} {
 			var exists bool

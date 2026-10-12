@@ -102,15 +102,15 @@ class PaginationTests(unittest.TestCase):
         target.api._call('graphql/hash/UserByScreenName', {'variables': '{}'})
         self.assertEqual(producer.pagination, {**page, 'item': anchor})
 
-    def test_routine_overlap_counts_complete_posts_not_files_and_ignores_pins(self):
+    def test_old_dates_alone_cannot_stop_a_routine_check(self):
         self.producer.window = SourceWindow({'since': '2026-10-02T00:00:00Z', 'until': '2026-10-04T00:00:00Z'})
         rows = [reddit_data(str(i), id=str(i), stickied=(i == 0)) for i in range(8)]
         seen = []
         for data, _ in recent.posts(((data, ()) for data in rows), self.producer, 'reddit'):
             seen.append(data['id'])
-        self.assertEqual(seen, ['0', '1', '2', '3', '4'])
+        self.assertEqual(seen, [str(i) for i in range(8)])
 
-    def test_bootstrap_stops_after_four_whole_archived_posts(self):
+    def test_first_wholly_archived_post_stops_without_fetching_more(self):
         rows = [reddit_data(str(i), id=str(i)) for i in range(10)]
         seen = []
         for data, _ in recent.posts(((data, ()) for data in rows), self.producer, 'reddit'):
@@ -118,5 +118,42 @@ class PaginationTests(unittest.TestCase):
             self.producer.routine_post_items = 8
             # The first four attachments might be archived, but a new fifth
             # attachment makes this post new and resets the old-post overlap.
-            self.producer.routine_post_new = data['id'] == '2'
-        self.assertEqual(seen, ['0', '1', '2', '3', '4', '5', '6'])
+            self.producer.routine_post_new = data['id'] == '0'
+        self.assertEqual(seen, ['0', '1'])
+
+    def test_pinned_and_replayed_known_posts_do_not_end_the_run(self):
+        rows = [reddit_data(str(i), id=str(i), stickied=i == 0) for i in range(5)]
+        seen = []
+        for data, _ in recent.posts(((data, ()) for data in rows), self.producer, 'reddit'):
+            seen.append(data['id'])
+            self.producer.routine_post_items = 1
+            if data['id'] == '0':
+                self.producer.resume_cursor = 'previous-checkpoint'
+            if data['id'] == '1':
+                self.producer.resume_cursor = ''
+        self.assertEqual(seen, ['0', '1', '2'])
+
+    def test_known_twitter_album_is_checked_in_full_before_stopping(self):
+        rows = [{'rest_id': str(i)} for i in range(5)]
+        seen = []
+        for data in recent.posts(iter(rows), self.producer, 'twitter'):
+            seen.append(data['rest_id'])
+            self.producer.routine_post_items = 4
+            self.producer.routine_post_new = data['rest_id'] == '0'
+        self.assertEqual(seen, ['0', '1'])
+
+    def test_known_posts_do_not_stop_explicit_archive_recovery(self):
+        self.producer.replay_archive = True
+        seen = []
+        for data, _ in recent.posts(((reddit_data(str(i)), ()) for i in range(5)), self.producer, 'reddit'):
+            self.producer.routine_post_items = 1
+            seen.append(data['id'])
+        self.assertEqual(len(seen), 5)
+
+    def test_silently_omitted_album_items_do_not_establish_a_boundary(self):
+        for category, data in [('reddit', {'is_gallery': True, 'gallery_data': {'items': [{'media_id': 'a'}, {'media_id': 'b'}]}}),
+                               ('twitter', {'legacy': {'extended_entities': {'media': [{'id_str': 'a'}, {'id_str': 'b'}]}}})]:
+            with self.subTest(category=category):
+                one = {('native:' + category, 'a')}
+                self.assertFalse(recent.complete_manifest(data, category, one))
+                self.assertTrue(recent.complete_manifest(data, category, one | {('native:' + category, 'b')}))

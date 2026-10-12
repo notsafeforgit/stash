@@ -89,6 +89,17 @@ class ChildFixture(Fixture):
         yield Message.Url, data["_url"], data
 
 
+class RoutineRedditFixture(RedditExtractor):
+    subcategory = 'user'
+    pattern = Fixture.pattern
+
+    def submissions(self):
+        for index, item in enumerate(self.records):
+            if index % 2 == 0:
+                self.visited.append('page ' + str(index // 2))
+            yield copy.deepcopy(item), ()
+
+
 class ParentFixture(Fixture):
     def items(self):
         for item in self.records:
@@ -229,6 +240,21 @@ class GalleryTests(unittest.TestCase):
                 self.assertEqual(task.extractor.visited, [r["id"] for r in records])
         self.assertEqual(self.archive_count(), 2)
         self.assertEqual(config.get(("extractor", "reddit", "user"), "date-max"), "2020-01-01T00:00:00")
+
+    def test_routine_archived_post_stops_before_requesting_the_next_listing_page(self):
+        self.assertIsNotNone(gdl_extractors.find('https://www.reddit.com/user/fixture/submitted/'))
+        config.set(('extractor',), 'archive-format', '{id}_{filename}')
+        records = [reddit_data(key, created_utc=1790812800, num_comments=0,
+                               is_video=False, is_self=False, selftext_html=None)
+                   for key in ('new', 'known', 'unnecessary')]
+        self.assertEqual(self.task(records[1]).run(), 0)
+        self.producer.scan_mode = 'routine'
+        task = self.task(*records, fixture=RoutineRedditFixture)
+        self.assertEqual(task.run(), 0)
+        self.assertEqual(task.extractor.visited, ['page 0'])
+        self.assertEqual(self.archive_count(), 2)
+        self.assertEqual([e['post']['value'] for e in self.events(kinds=('source.capture',))],
+                         ['postknown', 'postnew', 'postknown'])
 
     def test_invalid_source_date_stops_before_files_or_capture_are_claimed(self):
         task = self.task(reddit_data(date="unknown"))

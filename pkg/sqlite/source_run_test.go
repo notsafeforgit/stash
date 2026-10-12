@@ -384,15 +384,21 @@ func TestSourceRunPublicationWaitCannotReportSourceFailureOrCompletion(t *testin
 	}
 }
 
-func TestSourceRunRetryLimitsDeferralsAndReviewCannotBeBypassedByTimers(t *testing.T) {
+func TestSourceRunContinuousRetriesBackoffAndExplicitReviewCannotBeBypassed(t *testing.T) {
 	f := newSourceRunFixture(t)
 	input := f.request()
 	r := f.submit(t, input)
-	for attempt := 1; attempt <= 8; attempt++ {
+	for attempt := 1; attempt <= 12; attempt++ {
 		active := f.claim(t, r)
 		require.NotNil(t, active)
 		r = f.finish(t, active, "retry")
 		require.Equal(t, attempt, r.Failures)
+		require.Equal(t, "queued", r.State)
+		require.Empty(t, r.Completed)
+		require.Equal(t, []models.SourceWindow{input.Window}, r.Pending)
+		if attempt >= 10 {
+			require.Equal(t, 24*time.Hour, r.AvailableAt.Sub(f.now))
+		}
 		repeat := input
 		repeat.RequestUUID = uuid.NewString()
 		coalesced := f.submit(t, repeat)
@@ -401,7 +407,11 @@ func TestSourceRunRetryLimitsDeferralsAndReviewCannotBeBypassedByTimers(t *testi
 		require.Nil(t, f.claim(t, r))
 		f.now = r.AvailableAt
 	}
+	active := f.claim(t, r)
+	require.NotNil(t, active)
+	r = f.finish(t, active, "deferred")
 	require.Equal(t, "deferred", r.State)
+	f.now = r.AvailableAt
 	require.Nil(t, f.claim(t, r))
 	input.RequestUUID = uuid.NewString()
 	input.Window.Since = nil
@@ -417,7 +427,7 @@ func TestSourceRunRetryLimitsDeferralsAndReviewCannotBeBypassedByTimers(t *testi
 		_, err := f.repo.SourceRun.Review(ctx, r.UUID, r.Revision, "retry", f.now)
 		return err
 	}))
-	active := f.claim(t, r)
+	active = f.claim(t, r)
 	require.NotNil(t, active)
 	require.Equal(t, 0, active.Failures)
 	require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {

@@ -29,10 +29,12 @@ Reviewed `stash-gallery-worker-v1` profiles have a `scan_mode`:
 
 - `routine`: recent checks. Twitter selects its direct media listing; Reddit
   uses the submitted-post listing without an additional author search. Ordered
-  listings consume four whole posts beyond the requested completed boundary.
-  A first check without a time boundary stops after four whole archived posts.
-  A new attachment anywhere in a post resets that archive overlap. Pinned posts
-  do not establish the stopping boundary.
+  listings stop after the first wholly archived, unpinned post. Every attachment
+  and external child of that post is processed before deciding; the successful
+  download archive must already contain every item. Dates alone, deleted items,
+  empty/unsupported children and partial albums do not establish that boundary.
+  Replayed checkpoint posts cannot end the run before unfinished work resumes.
+  Initial and explicit recovery traversals still inspect the full requested range.
 - `initial` (default): preserve complete initial-import traversal, including the
   profile's explicitly configured historical retrieval strategy.
 - `recovery`: historical traversal at the lowest request priority. Host launchers
@@ -57,8 +59,7 @@ check even if a profile listing is unavailable. It does not claim that another
 pass's unfinished window was downloaded.
 
 `not_found` and `access_denied` attempts stay queued for an automatic recheck
-after 24 hours (or a longer requested retry delay). They do not exhaust the
-eight-attempt budget for technical failures. Each failed pass keeps its pending
+after 24 hours (or a longer requested retry delay). Each failed pass keeps its pending
 windows and progress. Its daily delay applies to that run, so other passes for
 the same account can continue after the normal short target cooldown. Shared
 service budgets and routine-check priority still apply. Stopping a subscription
@@ -66,6 +67,21 @@ still stops its work.
 
 Authentication/challenge, invalid configuration and rejected source metadata
 remain explicit attention states. They are not treated as inaccessible accounts.
+
+Recoverable download-run failures retry continuously, with exponential backoff
+starting at five minutes and capped at 24 hours (a longer provider-requested
+delay wins). Eight failures no longer create an automatic review hold. Schema
+1000116 removes the database counter ceiling while preserving run and attempt
+history, checkpoints and existing explicit holds. Routine request priority and
+shared service budgets continue to apply during retries.
+
+An explicit Redgifs item deletion (HTTP 404/410 with the provider's deletion
+message) is handled individually. Its parent post and a failed source-transfer
+report remain recorded; it is never entered into the successful download archive.
+Reddit's available fallback can still download, and the remaining posts continue.
+Outbox schema 18 caches that specific deleted item for 30 days, across restarts,
+without extending the expiry on cache hits. Generic 404s, authentication errors,
+rate limits, server failures and timeouts are not treated as confirmed deletions.
 
 ## Remote pagination
 

@@ -332,10 +332,12 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 			delay = max(delay, 24*time.Hour, time.Duration(outcome.RetryAfterSeconds)*time.Second)
 		case outcome.ErrorCode != "source_turn_complete":
 			r.Failures++
-			if outcome.State == "deferred" || r.Failures >= 8 {
+			// Continuous subscriptions must not silently stop after a fixed
+			// number of transient failures. Explicit review outcomes still hold.
+			if outcome.State == "deferred" {
 				state = "deferred"
 			}
-			backoff := min(24*time.Hour, 5*time.Minute*time.Duration(1<<min(r.Failures-1, 8)))
+			backoff := min(24*time.Hour, 5*time.Minute*time.Duration(1<<min(r.Failures-1, 9)))
 			delay = max(delay, backoff, time.Duration(outcome.RetryAfterSeconds)*time.Second)
 		}
 	}

@@ -1,10 +1,6 @@
-"""Bound routine chronological checks by whole posts, including a small overlap."""
+"""Stop routine chronological checks at a wholly downloaded, unpinned post."""
 
 from urllib.parse import parse_qs, urlsplit
-
-from .source_window import published
-
-OVERLAP_POSTS = 4
 
 
 def chronological(target, producer):
@@ -19,7 +15,7 @@ def chronological(target, producer):
 
 
 def posts(iterator, producer, category):
-    older, previous = 0, None
+    previous = None
     for entry in iterator:
         data = entry[0] if category == 'reddit' else entry
         if not isinstance(data, dict):
@@ -32,25 +28,58 @@ def posts(iterator, producer, category):
             continue
         previous = key
         pinned = data.get('stickied') or data.get('pinned') or data.get('_pinned')
-        if not pinned and producer.window.since is not None:
-            value = published(data, category)
-            older = older + 1 if producer.window.since is not None and value < producer.window.since else 0
+        replaying = bool(producer.resume_cursor) or producer.replay_archive
         # A yielded post is consumed fully, with all media and external-host
         # children, before deciding to stop. Attachment counts are not posts.
         producer.routine_post_items = 0
         producer.routine_post_new = False
+        producer.routine_post_attachments = set()
         yield entry
-        if producer.window.since is None and not pinned:
-            older = older + 1 if producer.routine_post_items and not producer.routine_post_new else 0
-        if older >= OVERLAP_POSTS and not producer.resume_cursor:
+        if (not pinned and not replaying and not producer.resume_cursor
+                and producer.routine_post_items and not producer.routine_post_new
+                and complete_manifest(data, category, producer.routine_post_attachments)):
             return
+
+
+def complete_manifest(data, category, downloaded):
+    """A silently omitted album item must not turn a partial post into a boundary."""
+    if category == 'reddit':
+        parents = data.get('crosspost_parent_list')
+        if parents:
+            if not isinstance(parents, list) or not isinstance(parents[-1], dict):
+                return False
+            data = parents[-1]
+        if data.get('is_gallery') or 'gallery_data' in data:
+            gallery = data.get('gallery_data')
+            entries = gallery.get('items') if isinstance(gallery, dict) else None
+            key = 'media_id'
+        else:
+            return True
+    else:
+        legacy = data.get('legacy', data)
+        entities = legacy.get('extended_entities')
+        if entities is None:
+            return True
+        entries = entities.get('media') if isinstance(entities, dict) else None
+        key = 'id_str'
+    if not isinstance(entries, list) or not entries:
+        return False
+    for entry in entries:
+        if not isinstance(entry, dict):
+            return False
+        identity = entry.get(key, entry.get('id') if category == 'twitter' else None)
+        if identity is None or ('native:' + category, str(identity)) not in downloaded:
+            return False
+    return True
 
 
 def configure(target, producer):
     original = target.config
 
     def configuration(key, default=None):
-        if key == 'skip' and chronological(target, producer):
+        # A child extractor's skip:N must not abort halfway through an album.
+        # Only the listing's whole-post boundary is allowed to end a routine run.
+        if key == 'skip' and producer.scan_mode == 'routine':
             return True
         if target.category == 'reddit' and key == 'comments':
             return 0

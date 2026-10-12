@@ -38,6 +38,7 @@ class Producer:
         self.scan_mode = scan_mode
         self.routine_post_items = 0
         self.routine_post_new = False
+        self.routine_post_attachments = set()
         if configuration_check is not None and not callable(configuration_check):
             raise InvalidData("Invalid worker configuration check")
         self.configuration_check = configuration_check or (lambda: None)
@@ -141,6 +142,19 @@ class Producer:
         return relative
 
     def prepare(self, metadata):
+        return self._prepare(metadata)
+
+    def deleted(self, metadata, attachment, status):
+        # The parent post identifies the missing external attachment even when
+        # its deleted API item has no downloadable rendition. This is a failed
+        # source transfer, never a download/archive acknowledgement.
+        prepared = self._prepare(dict(metadata, native_media_status=status), attachment=attachment)
+        self.report_download(prepared, 'failed', reason_code='source_failure')
+        self.routine_post_new = True
+        cursor, replay = self.cursor(prepared)
+        self.checkpoint(cursor, replay, False)
+
+    def _prepare(self, metadata, *, attachment=None):
         self.check()
         kept = retain(metadata)
         post = source.post(kept)
@@ -157,7 +171,8 @@ class Producer:
         sequence = self.outbox.db.execute("SELECT seq FROM events WHERE event_uuid=?", (event_id,)).fetchone()[0]
         if not 1 <= sequence <= 2**53 - 1:
             raise InvalidData("Download transfer sequence is outside the supported range")
-        return Prepared(event_id, source.attachment(kept), kept, sequence, self.owner_uuid, self.fence)
+        return Prepared(event_id, source.attachment(kept) if attachment is None else attachment,
+                        kept, sequence, self.owner_uuid, self.fence)
 
     def report_download(self, prepared, state, *, file_event_uuid=None, reason_code=None):
         # Reporting a finished/failed current file does not require a live

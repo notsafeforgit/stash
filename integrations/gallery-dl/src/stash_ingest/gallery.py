@@ -10,11 +10,11 @@ import types
 from contextlib import contextmanager
 import requests
 
-from gallery_dl import config, exception, job, version
+from gallery_dl import config, exception, job, text, version
 from gallery_dl import path as gallery_path
 from gallery_dl.extractor.common import Message
 
-from . import filename, instagram, mirror, recent, social_media, web_media
+from . import deleted_media, filename, instagram, mirror, recent, social_media, web_media
 from .encoding import InvalidData
 from .filesystem import destination_lock
 from .runs import SourceFailure, SourcePaused, SourceTurnComplete
@@ -224,6 +224,8 @@ class NativeDownloadJob(job.DownloadJob):
         self._native_collection_child = False
         self._native_collection_route = None
         self._native_scope = None
+        self._native_deleted_target = None
+        self._native_deleted_result = None
         super().__init__(extractor, parent)
         extractor = self.extractor
         if parent is None and self.producer.source_category is not None and extractor.category != self.producer.source_category:
@@ -252,7 +254,22 @@ class NativeDownloadJob(job.DownloadJob):
                 args[2] = SourceSession(self.producer, args[2] or extractor.session)
             else:
                 kwargs["session"] = SourceSession(self.producer, kwargs.get("session") or extractor.session)
-            return request(*args, **kwargs)
+            previous_status = extractor.status
+            try:
+                return request(*args, **kwargs)
+            except exception.HttpError as exc:
+                parent = self._native_parent
+                bound = parent._native_deleted_target if parent is not None else None
+                if extractor.category == 'redgifs' and extractor.subcategory == 'image' and bound:
+                    url = args[0] if args else kwargs.get('url', '')
+                    status = deleted_media.response(exc, url, bound[0])
+                    if status is not None:
+                        # gallery-dl marks an HTTP failure on the extractor
+                        # before raising it. Clear only this classified item's
+                        # contribution, preserving any earlier error status.
+                        extractor.status = previous_status
+                        raise deleted_media.DeletedMedia(status) from None
+                raise
 
         extractor.request = guarded_request
 
@@ -326,6 +343,9 @@ class NativeDownloadJob(job.DownloadJob):
                 try:
                     kind, url, data = self._source_operation(next, iterator)
                 except StopIteration:
+                    return
+                except deleted_media.DeletedMedia as exc:
+                    self._native_parent._native_deleted_result = exc.status
                     return
                 if kind == Message.Queue and (instagram.collection_queue(self.extractor, url, data)
                                               or social_media.collection_queue(self.extractor, url, data)
@@ -472,6 +492,7 @@ class NativeDownloadJob(job.DownloadJob):
             kept = dict(kwdict, _url=url, source_extractor_url=source_url(self.extractor),
                         native_file_exclusion='unsupported_image_or_video_extension')
             prepared = self.producer.prepare(kept)
+            self.producer.routine_post_new = True
             self.producer.report_download(prepared, "excluded", reason_code="unsupported_media")
             old_cursor = None
             if self.producer.legacy_resume:
@@ -517,10 +538,41 @@ class NativeDownloadJob(job.DownloadJob):
         if not self.producer.window.contains(value, overlap=self._native_overlap):
             return
         self._native_queued_date = value
+        self._native_deleted_target = deleted_media.target(self.extractor.category, url, kwdict)
+        self._native_deleted_result = None
+        before = self.producer.routine_post_items
         try:
-            return super().handle_queue(url, kwdict)
+            bound = self._native_deleted_target
+            status = deleted_media.cached(self.producer.outbox, bound[0]) if bound else None
+            if status is None:
+                super().handle_queue(url, kwdict)
+                status = self._native_deleted_result
+                fresh = status is not None
+            else:
+                fresh = False
+            if status is not None:
+                self.producer.deleted(dict(bound[2], source_extractor_url=source_url(self.extractor)), bound[1], status)
+                if fresh:
+                    deleted_media.remember(self.producer.outbox, status)
+                self.log.info('External media is confirmed deleted; continuing this post and the remaining source')
+                # Keep gallery-dl's normal Reddit preview fallback. Failure of
+                # that transfer still leaves the run retryable.
+                if self.fallback and '_fallback' in kwdict:
+                    fallback = kwdict['_fallback'] = iter(kwdict['_fallback'])
+                    candidate = next(fallback, None)
+                    if candidate is not None:
+                        text.nameext_from_url(candidate, kwdict)
+                        if kwdict['filename'].startswith(('HLS', 'DASH')):
+                            kwdict['filename'] = candidate.rsplit('/', 2)[-2]
+                        if candidate.startswith('ytdl:'):
+                            kwdict['extension'] = 'mp4'
+                        self.handle_url(candidate, kwdict)
         finally:
+            # An empty/unsupported/failed child is not a wholly archived post.
+            if self.producer.routine_post_items == before:
+                self.producer.routine_post_new = True
             self._native_queued_date = None
+            self._native_deleted_target = self._native_deleted_result = None
 
     def _release(self):
         if self._native_lock is not None:
@@ -534,6 +586,8 @@ class NativeDownloadJob(job.DownloadJob):
         kept = dict(pathfmt.kwdict, _url=self._native_url, source_extractor_url=source_url(self.extractor))
         self._native_prepared = self.producer.prepare(kept)
         self.producer.routine_post_items += 1
+        ref = self._native_prepared.attachment
+        self.producer.routine_post_attachments.add((ref['namespace'], ref['value']))
         if self.archive is None or not self.archive.check(pathfmt.kwdict):
             self.producer.routine_post_new = True
         old_cursor = legacy_cursor(self, pathfmt) if self.producer.legacy_resume else None
@@ -570,6 +624,7 @@ class NativeDownloadJob(job.DownloadJob):
         self._native_phase = "postprocess"
 
     def _download_error(self, pathfmt):
+        self.producer.routine_post_new = True
         if self._native_prepared is None:
             raise InvalidData("Failed download has no durable source capture")
         self.producer.report_download(self._native_prepared, "failed", reason_code="download_failed")

@@ -12,6 +12,7 @@ import (
 // migration. Restore the actual eight-kind table, not just its version number.
 func removeLibraryUUIDSchema(t *testing.T, db *sql.DB) {
 	t.Helper()
+	removeContinuousSourceSchema(t, db)
 	if queryUint(t, db, "SELECT count(*) FROM pragma_table_info('archive_entities') WHERE name='folder_id'") == 0 {
 		return
 	}

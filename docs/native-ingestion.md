@@ -1343,6 +1343,12 @@ Only the failing service receives an applicable shared cooldown. Busy sources,
 missing posts, access-denied accounts and local/media failures do not create a
 service-wide outage. Source completion still does not certify media intake.
 
+Recoverable download-run failures use exponential backoff capped at 24 hours,
+honoring longer provider retry deadlines. They continue retrying after eight
+failures; only explicit `deferred` outcomes require review. Schema 1000116 lifts
+the counter ceiling and preserves existing runs and their attempt histories.
+See [routine boundaries and deleted media](native-source-runs.md#worker-modes).
+
 The download executor also requires `source_run_fairness_protocol: 1`. Running
 attempts expose `turn_until`, five minutes after their recorded start, independent
 of lease renewals. On reaching it, the worker finishes its current file/checkpoint
@@ -1359,8 +1365,8 @@ as `yielded`, an incomplete result; it does not assert source completion.
 Capabilities advertise `source_run_dispatch: true` for scoped work discovery.
 It uses the bounded active-run index and the server clock, excluding future
 retry times, live leases and explicitly deferred work. Expired leases can be
-discovered, but only a claim can recover them, applying normal retry delay and
-deferral limits. Pagination never grants ownership or certifies completion.
+discovered, but only a claim can recover them, applying normal retry delay.
+Pagination never grants ownership or certifies completion.
 The producer's `dispatch` command retains its cursor/backoff across restarts,
 continues delivery/admission during discovery outages, and still uses the
 existing claim before downloading. See the producer guide for cycle outcomes.

@@ -399,7 +399,8 @@ digest, root UUID and source mode. `queue-run --profile FILE` uses that digest i
 `--policy`. `execute-run RUN_UUID --profile FILE` first checks server download
 capability, root/operation/policy agreement and live ownership. It starts the
 heartbeat and a drainer with its own SQLite connection, then runs gallery-dl.
-Temporary failures request retry. Missing accounts and access-denied responses
+Temporary failures request retry with exponential backoff capped at 24 hours;
+download runs have no automatic eight-failure hold. Missing accounts and access-denied responses
 request daily automatic rechecks without exhausting the technical retry budget;
 other retrieval passes for the account remain eligible. Authentication,
 challenge, source-validation and configuration failures defer, and loss of

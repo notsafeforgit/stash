@@ -60,7 +60,14 @@ def response(error, request_url, item):
         data = reply.json()
     except ValueError:
         return None
-    if not isinstance(data, dict) or not any(data.get(key) == DELETED_MESSAGE for key in ('message', 'description')):
+    if not isinstance(data, dict):
+        return None
+    # The live API returns {"error": {"code": ..., "description": ...}}.
+    # Some older responses use top-level fields. Inspect only those known
+    # error locations, rather than accepting a matching string anywhere in JSON.
+    errors = (data, data.get('error'))
+    if not any(isinstance(error, dict) and any(error.get(key) == DELETED_MESSAGE
+               for key in ('message', 'description')) for error in errors):
         return None
     return {'state': 'deleted', 'service': 'redgifs', 'item': item,
             'observed_at': utc_now(), 'http_status': reply.status_code}

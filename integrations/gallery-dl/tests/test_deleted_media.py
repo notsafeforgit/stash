@@ -19,7 +19,7 @@ def reply(status=404, message=deleted_media.DELETED_MESSAGE):
     response = Response()
     response.status_code = status
     response.url = 'https://api.redgifs.com/v2/gifs/deletedclip'
-    response._content = json.dumps({'message': message}).encode()
+    response._content = json.dumps({'error': {'description': message}}).encode()
     return response
 
 
@@ -42,6 +42,21 @@ class DeletedMediaTests(unittest.TestCase):
                 self.assertEqual(deleted_media.response(error, response.url, 'deletedclip') is not None, expected)
                 self.assertIsNone(deleted_media.response(error, response.url, 'otherclip'))
                 self.assertIsNone(deleted_media.response(error, 'https://api.redgifs.com/v2/auth/temporary', 'deletedclip'))
+
+    def test_explicit_deletion_message_locations_exclude_unrelated_payload_fields(self):
+        for data, expected in [({'message': deleted_media.DELETED_MESSAGE}, True),
+                               ({'description': deleted_media.DELETED_MESSAGE}, True),
+                               ({'error': {'description': deleted_media.DELETED_MESSAGE}}, True),
+                               ({'error': {'message': deleted_media.DELETED_MESSAGE}}, True),
+                               ({'gif': {'description': deleted_media.DELETED_MESSAGE}}, False),
+                               ({'error': deleted_media.DELETED_MESSAGE}, False),
+                               ({'error': {'description': 'Item unavailable'}}, False),
+                               ([], False)]:
+            with self.subTest(data=data):
+                response = reply(410)
+                response._content = json.dumps(data).encode()
+                error = exception.HttpError(response=response)
+                self.assertEqual(deleted_media.response(error, response.url, 'deletedclip') is not None, expected)
 
     def test_deleted_child_records_failed_source_transfer_and_continues_with_next_post(self):
         dead = reddit_data('dead', url='https://www.redgifs.com/watch/deletedclip')

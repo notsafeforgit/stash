@@ -401,7 +401,7 @@ capability, root/operation/policy agreement and live ownership. It starts the
 heartbeat and a drainer with its own SQLite connection, then runs gallery-dl.
 Temporary failures request retry with exponential backoff capped at 24 hours;
 download runs have no automatic eight-failure hold. Missing accounts and access-denied responses
-request daily automatic rechecks without exhausting the technical retry budget;
+request daily automatic rechecks without increasing the technical failure backoff;
 other retrieval passes for the account remain eligible. Authentication,
 challenge, source-validation and configuration failures defer, and loss of
 ownership pauses further source work. Current-file events remain
@@ -3341,12 +3341,13 @@ and resumes the same native run after service recovery. Listing replay may be
 necessary to find the saved cursor; download archives skip completed files.
 Saved metadata/checkpoint bodies are replayed with their original receipts.
 
-Native schema 1000107 counts actual job failures separately from lease ownership
-generations. Repeated Stash/worker restarts therefore do not exhaust the eight
-failure allowance. Expired metadata jobs are eligible once their old lease and
+Actual job failures are counted separately from lease ownership generations.
+Repeated Stash/worker restarts therefore do not increase the failure backoff.
+Download runs keep retrying recoverable errors without a terminal failure count;
+metadata jobs retain their separate retry policy. Expired metadata jobs are eligible once their old lease and
 existing source pacing permit; source runs retain their configured cooldown
 with a 30-second minimum recovery delay. Transport polling also retains its
-normal backoff. Genuine source errors still consume the failure budget.
+normal backoff. Genuine source errors still increase the retry delay.
 
 An ordinary Stash restart needs no worker drain or n8n shutdown. A producer code
 upgrade can change its policy fingerprint and requires the normal reviewed

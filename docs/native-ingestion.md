@@ -1487,11 +1487,13 @@ or retry delay and certifies traversal of the claimed window under that policy.
 It does not certify that every queued file event has finished ingestion.
 Remaining windows keep the run queued; otherwise it succeeds. A failure restores
 the claimed window, retains its checkpoint, and uses exponential retry delay
-starting at five minutes. Eight consecutive failures cause a durable deferral.
+starting at five minutes and capped at 24 hours, while honoring a longer explicit
+retry deadline. Recoverable download failures keep retrying without a terminal
+failure count. Only an explicit `deferred` outcome requires review.
 Expired leases, `worker_interrupted` and `worker_publication_busy` restore the
 pending window and saved progress without incrementing failures; recovery waits
 at least 30 seconds and respects any configured target cooldown. Repeated Stash
-restarts or backup/dedupe lock waits cannot exhaust the scrape's failure budget.
+restarts or backup/dedupe lock waits do not increase the scrape's failure backoff.
 The two worker codes accept only `retry`, without a source scope or retry-delay
 override. Timers and manual submissions cannot clear a durable deferral or
 shorten an existing delay. Target cooldown also survives changes of scan policy.

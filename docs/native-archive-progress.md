@@ -8,6 +8,32 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Unified native container — deployed, 2026-10-12 UTC
+
+The main image now includes the Debian runtime formerly supplied by stash-s6:
+Jellyfin FFmpeg 8, Intel/Mesa hardware drivers, NVIDIA codec support, patched
+image codecs, Python and `uv`. The publisher checks the pushed revision image
+before promoting its moving tag. The wrapper build is no longer part of native
+deployment; the frozen compatible images remain preserved.
+
+Source `027982ec1ffb875343d7ade689abadbafed9be17` passed the
+[single release workflow](https://github.com/notsafeforgit/stash/actions/runs/38197230682) and deployed directly as
+`ghcr.io/notsafeforgit/stash@sha256:18b8c5538a337a7dc1482a5eb8697672e65f2a928e6bc96395a92b9a20d98403`.
+The pulled binary matches the validated Actions artifact. Production uses the
+native `/config` layout with rootless Podman keep-id, runs Stash as UID/GID 1000
+and PID 1, and has the existing native database open under `/config`. Three
+configuration paths and the mount destination changed in place. No database or
+media was copied, no schema migration ran, and external workers were not restarted.
+The restore inventory now selects this application release and single image.
+
+Validation passed the full local fork gate and GitHub validation, published-image
+checks for identity/groups, arguments, permissions, optional dependencies, media
+tools, startup and graceful shutdown, and actual 30-frame Intel QSV and VA-API
+encodes on the published image. The deployed schema-aware health check and
+protected public health endpoint pass on schema 1000114. No NVIDIA or AMD GPU
+was available for a hardware test. See [container setup](container.md) and the
+[updated deployment procedure](v3-deployment.md).
+
 ## Scrape visibility in Tasks — deployed, 2026-10-12 UTC
 
 Settings → Tasks now shows source scrape activity alongside the library task
@@ -36,7 +62,7 @@ Validation passed the full fork gate (822 UI unit tests) and 17 Chromium browser
 status navigation, live updates, hidden-tab polling, failed refreshes and source
 tracking off. Mobile and desktop layouts were visually reviewed. The live mobile
 check confirmed Tasks counts, navigation and the completed Instagram run.
-All four WebKit groups in the [browser workflow](https://github.com/notsafeforgit/stash/actions/runs/38194655190) passed. The broader Chromium CI groups were still running at deployment; the 17 affected Chromium cases passed locally. WebKit could not launch locally because the host lacks its
+All six groups in the [browser workflow](https://github.com/notsafeforgit/stash/actions/runs/38194655190) subsequently passed, including both Chromium groups that were still running at deployment. WebKit could not launch locally because the host lacks its
 system libraries; CI supplies them.
 
 ## Saved post captions — deployed, 2026-10-12 UTC

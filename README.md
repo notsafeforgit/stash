@@ -1,8 +1,9 @@
 # Stash
 
-> This is the **v3-rewrite tracking fork**. Start with the
-> [project documentation](docs/README.md) for v3 development, compatibility, and
-> deployment. The installation and community links below refer to mainline Stash.
+> This is an **independent native Stash fork**, developed on `v3-rewrite`.
+> Start with [container setup](docs/container.md) and the
+> [project documentation](docs/README.md). The upstream release and community
+> links below refer to mainline Stash.
 
 Source tracking is off by default, and S3 backup requires separate host setup.
 Neither is required for a local library or StashDB. See

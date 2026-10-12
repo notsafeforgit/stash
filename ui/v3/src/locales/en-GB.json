@@ -1991,6 +1991,9 @@
   "organized": "Organised",
   "orientation": "Orientation",
   "package_manager": {
+    "matched_via": "Matches: {value}",
+    "search_packages": "Search packages",
+    "search_scrapers": "Search by name, studio, or URL…",
     "add_source": "Add source",
     "check_for_updates": "Check for updates",
     "confirm_delete_source": "Are you sure you want to delete source {name} ({url})?",
@@ -2183,6 +2186,11 @@
   "scenes_size": "Scene Size",
   "scenes_updated_at": "Scene Updated At",
   "scrape": {
+    "remote_duration": "Remote: {duration}",
+    "local_duration": "Local: {duration}",
+    "closest_duration": "Closest local file: {duration}",
+    "duration_match": "Duration matches (within 5 seconds)",
+    "duration_difference": "Duration differs by {seconds}s",
     "column_current": "Current",
     "column_scraped": "Scraped",
     "create_new_group": "Create new group",

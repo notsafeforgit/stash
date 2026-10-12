@@ -18,6 +18,7 @@ import { Badge } from "src/components/ui/badge";
 import { type ScrapeSource, sourceToInput } from "./use-available-scrapers";
 import { SearchResultRow, SearchResultsList } from "./search-results";
 import { findSceneFingerprintMatches } from "src/utils/fingerprint-matches";
+import { SceneDurationSummary } from "./scene-duration-summary";
 
 type ScrapedScene = GQL.ScrapedSceneDataFragment;
 
@@ -104,6 +105,13 @@ export function SceneSearchDialog({
           results={results}
           renderRow={(s) => {
             const subs: React.ReactNode[] = [];
+            subs.push(
+              <SceneDurationSummary
+                key="duration"
+                source={s}
+                localFiles={localFiles}
+              />,
+            );
             const meta = [s.studio?.name, s.date].filter(Boolean).join(" · ");
             if (meta) subs.push(meta);
             if (s.production_date) {

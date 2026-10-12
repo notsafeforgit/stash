@@ -800,6 +800,7 @@ export function SceneEditForm(props: SceneEditFormProps) {
                   onChange={field.handleChange}
                   disabled={busy}
                   searchType="scene"
+                  sceneFiles={scene?.files}
                   searchQuery={form.state.values.title}
                 />
               </Field>
@@ -890,6 +891,7 @@ export function SceneEditForm(props: SceneEditFormProps) {
         onSelect={handleSearchSelect}
       />
       <SceneScrapeMergeDialog
+        localFiles={scene?.files}
         open={mergeOpen}
         onOpenChange={setMergeOpen}
         current={mergeSnapshot ?? form.state.values}

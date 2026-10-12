@@ -14,6 +14,8 @@ import {
 } from "src/components/ui/dialog";
 import { Input } from "src/components/ui/input";
 import { SearchResultRow, SearchResultsList } from "./search-results";
+import { SceneDurationSummary } from "./scene-duration-summary";
+import type { DurationFile } from "./scene-duration";
 import {
   Select,
   SelectContent,
@@ -24,6 +26,7 @@ import {
 import { useAvailableSceneScrapers } from "./use-available-scrapers";
 
 interface StashBoxSceneSearchDialogProps {
+  localFiles?: readonly DurationFile[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   excludeEndpoints: string[];
@@ -32,6 +35,7 @@ interface StashBoxSceneSearchDialogProps {
 }
 
 export function StashBoxSceneSearchDialog({
+  localFiles,
   open,
   onOpenChange,
   excludeEndpoints,
@@ -147,6 +151,13 @@ export function StashBoxSceneSearchDialog({
               results={results}
               renderRow={(s) => {
                 const subs: React.ReactNode[] = [];
+                subs.push(
+                  <SceneDurationSummary
+                    key="duration"
+                    source={s}
+                    localFiles={localFiles}
+                  />,
+                );
                 const meta = [s.studio?.name, s.date]
                   .filter(Boolean)
                   .join(" · ");

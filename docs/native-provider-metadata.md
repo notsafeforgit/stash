@@ -73,6 +73,33 @@ receipts on retained identities from before a merge. Historical accepted values
 remain separate from current field decisions: matching a current value to an old
 receipt does not establish its current origin.
 
+## Finding providers and comparing scene durations
+
+The available scraper-package list searches names, package IDs, supported
+studios (`scrapes`) and URL fragments (`*_urls`) from the loaded package index.
+Pasting a full media-page URL can therefore find a scraper with an unrelated
+package name. Metadata matches show the studio or URL fragment that matched.
+These are literal search hints; Stash does not execute patterns from the index.
+Indexes without these optional fields continue to support name/ID search.
+
+Scene search, stash-box ID selection and scraped-result review show the remote
+duration. An explicit provider scene duration takes priority over a scraper's
+file duration. When local files exist, the closest valid local duration is
+shown and a difference of at most five seconds receives a duration-match badge.
+This works without fingerprints and never implies a fingerprint match. Missing,
+zero, negative or non-finite durations do not establish a match. Duration is
+read-only comparison context; applying metadata does not overwrite measured file
+duration. Both features reuse already returned data and make no extra provider
+requests.
+
+Adapted for the native UI from upstream revisions
+[`92ea03bd36b7` (#7259)](https://github.com/stashapp/stash/commit/92ea03bd36b7),
+[`b6b09dd5fd9b` (#7193)](https://github.com/stashapp/stash/commit/b6b09dd5fd9b), and
+[`a903b1af3617` (#7267)](https://github.com/stashapp/stash/commit/a903b1af3617).
+Native regression coverage exercises malformed/absent package metadata,
+duration-only responses, unknown/multiple local files, and both browser engines
+at mobile and desktop widths.
+
 ## Integration status
 
 Batch performer, studio and tag creation/refresh record accepted fields,

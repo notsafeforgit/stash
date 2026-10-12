@@ -37,6 +37,8 @@ import { ScrapedTagRow } from "./scraped-tag-row";
 import { ScrapedPerformerRow } from "./scraped-performer-row";
 import { ScrapedStudioRow } from "./scraped-studio-row";
 import { ScrapedGroupRow } from "./scraped-group-row";
+import { SceneDurationSummary } from "./scene-duration-summary";
+import type { DurationFile } from "./scene-duration";
 
 type ScrapedScene = GQL.ScrapedSceneDataFragment;
 
@@ -63,6 +65,7 @@ interface SimpleStringFieldDef<K extends keyof SceneFormValues> {
 // ── Component ────────────────────────────────────────────────────────────────
 
 interface SceneScrapeMergeDialogProps {
+  localFiles?: readonly DurationFile[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   current: SceneFormValues;
@@ -74,6 +77,7 @@ interface SceneScrapeMergeDialogProps {
 }
 
 export function SceneScrapeMergeDialog({
+  localFiles,
   open,
   onOpenChange,
   current,
@@ -589,6 +593,9 @@ export function SceneScrapeMergeDialog({
             })}
           </DialogTitle>
         </DialogHeader>
+        {scraped && (
+          <SceneDurationSummary source={scraped} localFiles={localFiles} />
+        )}
 
         <div className="max-h-[60vh] overflow-y-auto -mx-6 px-6">
           {!hasAnyContent && (

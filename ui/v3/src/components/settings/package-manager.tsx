@@ -67,6 +67,7 @@ import {
   TableRow,
 } from "src/components/ui/table";
 import { DestructiveConfirmDialog } from "src/components/shared/destructive-confirm-dialog";
+import { matchPackage } from "./package-search";
 
 interface SourceEntry {
   name?: string | null;
@@ -81,6 +82,8 @@ interface PackageRow {
   date?: string | null;
   sourceURL: string;
   description?: string | null;
+  metadata?: Record<string, unknown> | null;
+  matchedVia?: string;
   /** package_ids this package depends on (available rows only). */
   requires: string[];
   /** Source counterpart, present once "Check for updates" has run. */
@@ -108,15 +111,6 @@ function hasUpgrade(row: PackageRow) {
   if (row.date && row.latest.date)
     return new Date(row.latest.date) > new Date(row.date);
   return !!row.latest.version && row.latest.version !== row.version;
-}
-
-function matchesFilter(row: PackageRow, filter: string) {
-  if (!filter) return true;
-  const f = filter.toLowerCase();
-  return (
-    row.name.toLowerCase().includes(f) ||
-    row.package_id.toLowerCase().includes(f)
-  );
 }
 
 function formatDate(intl: IntlShape, date: string | null | undefined) {
@@ -276,6 +270,17 @@ function PackageTable({
                   <div className="text-xs text-muted-foreground">
                     {row.package_id}
                   </div>
+                  {row.matchedVia && (
+                    <div className="max-w-xs whitespace-normal break-words text-xs text-muted-foreground">
+                      {intl.formatMessage(
+                        {
+                          id: "package_manager.matched_via",
+                          defaultMessage: "Matches: {value}",
+                        },
+                        { value: row.matchedVia },
+                      )}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell className="align-top whitespace-nowrap">
                   <div>{row.version || "—"}</div>
@@ -755,7 +760,7 @@ export function PackageManager({
     : 0;
 
   const visibleInstalledRows = useMemo(
-    () => installedRows.filter((r) => matchesFilter(r, installedFilter)),
+    () => installedRows.filter((r) => matchPackage(r, installedFilter)),
     [installedRows, installedFilter],
   );
 
@@ -820,6 +825,7 @@ export function PackageManager({
           date: p.date,
           sourceURL: effectiveSourceURL,
           description: packageDescription(p.metadata),
+          metadata: p.metadata,
           requires: p.requires.map((r) => r.package_id),
         }),
       ),
@@ -832,7 +838,11 @@ export function PackageManager({
   );
 
   const visibleAvailableRows = useMemo(
-    () => availableRows.filter((r) => matchesFilter(r, availableFilter)),
+    () =>
+      availableRows.flatMap((row) => {
+        const match = matchPackage(row, availableFilter);
+        return match ? [{ ...row, matchedVia: match.via }] : [];
+      }),
     [availableRows, availableFilter],
   );
 
@@ -1136,8 +1146,19 @@ export function PackageManager({
               <>
                 <div className="flex flex-wrap items-center gap-2">
                   <Input
-                    className="w-56"
-                    placeholder={`${msg("filter", "Filter")}...`}
+                    className="w-full sm:w-80"
+                    aria-label={msg(
+                      "package_manager.search_packages",
+                      "Search packages",
+                    )}
+                    placeholder={
+                      isPlugin
+                        ? `${msg("filter", "Filter")}...`
+                        : msg(
+                            "package_manager.search_scrapers",
+                            "Search by name, studio, or URL…",
+                          )
+                    }
                     value={availableFilter}
                     onChange={(e) => setAvailableFilter(e.currentTarget.value)}
                   />

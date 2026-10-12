@@ -14,6 +14,7 @@ import { StashBoxPerformerSearchDialog } from "src/components/scrape/stash-box-p
 import { StashBoxSceneSearchDialog } from "src/components/scrape/stash-box-scene-search-dialog";
 import { StashBoxStudioSearchDialog } from "src/components/scrape/stash-box-studio-search-dialog";
 import { StashBoxTagSearchDialog } from "src/components/scrape/stash-box-tag-search-dialog";
+import type { DurationFile } from "@/components/scrape/scene-duration";
 
 export interface StashIdEntry {
   endpoint: string;
@@ -21,6 +22,7 @@ export interface StashIdEntry {
 }
 
 interface StashIdsFieldProps {
+  sceneFiles?: readonly DurationFile[];
   value: StashIdEntry[];
   onChange: (ids: StashIdEntry[]) => void;
   disabled?: boolean;
@@ -33,6 +35,7 @@ interface StashIdsFieldProps {
 }
 
 export function StashIdsField({
+  sceneFiles,
   value,
   onChange,
   disabled = false,
@@ -134,6 +137,7 @@ export function StashIdsField({
       )}
       {searchType === "scene" && (
         <StashBoxSceneSearchDialog
+          localFiles={sceneFiles}
           open={searchOpen}
           onOpenChange={setSearchOpen}
           excludeEndpoints={value.map((e) => e.endpoint).filter(Boolean)}

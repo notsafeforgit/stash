@@ -46,6 +46,7 @@ const scrapedScene: GQL.ScrapedSceneDataFragment = {
   code: "PROVIDER-7",
   details: null,
   director: null,
+  duration: 12,
   urls: [],
   date: null,
   production_date: null,
@@ -184,7 +185,12 @@ const mocks = [
   ),
   {
     request: { query: GQL.ScrapeSingleSceneDocument, variables: () => true },
-    result: { data: { scrapeSingleScene: [scrapedScene] } },
+    result: () => {
+      const mode = new URLSearchParams(location.search).get("duration");
+      const duration =
+        mode === "different" ? 120 : mode === "unknown" ? null : 12;
+      return { data: { scrapeSingleScene: [{ ...scrapedScene, duration }] } };
+    },
     maxUsageCount: Infinity,
     delay: 0,
   },

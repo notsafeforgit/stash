@@ -8,6 +8,37 @@ review. The native replacement and its schedules are running. Independent
 restore and native home-copy verification passed. The implementation is ready
 for owner review; ordinary queues and unrelated home-backup maintenance continue.
 
+## Scrape visibility in Tasks — deployed, 2026-10-12 UTC
+
+Settings → Tasks now shows source scrape activity alongside the library task
+queue when source tracking is enabled. Running, queued and deferred totals link
+to their filtered activity lists. Up to five running sources link directly to
+their progress and errors; all completed runs remain accessible through the
+activity list. The Instagram subscription's latest admitted run completed on
+October 11 at 23:26 UTC and was verified in the deployed mobile UI.
+
+Archive activity opens scrape runs by default, with request-budget statistics
+after the runs. The Tasks summary and first page refresh every ten seconds
+while visible, wait for the preceding read, and retain the last result with an
+error on failure. Older pages remain stable. Source tracking off makes no new
+activity requests. No worker configuration, queue state or database schema
+changed for this UI update.
+
+Application source `b64bd68ecb9b6f7c7544320f2112b960a0dedbb3` passed the
+[release workflow](https://github.com/notsafeforgit/stash/actions/runs/38194655127) and published
+`ghcr.io/notsafeforgit/stash@sha256:862a8f12dcad498eda7dff85e3eb053c507463c1d3cf1a15cb9c3df5392ce69b`. The
+[wrapper workflow](https://github.com/notsafeforgit/stash-s6/actions/runs/38195048803) published the deployed image
+`ghcr.io/notsafeforgit/stash-s6@sha256:4d7ba027e5ba16952a5474185c7568f013a714a9f27e9e61a6d64887ccaffd66`. Its binary matches the Actions artifact and the service
+is healthy on schema 1000114. The restore inventory selects the
+same application release; worker runtimes were not restarted.
+
+Validation passed the full fork gate (822 UI unit tests) and 17 Chromium browser cases, including
+status navigation, live updates, hidden-tab polling, failed refreshes and source
+tracking off. Mobile and desktop layouts were visually reviewed. The live mobile
+check confirmed Tasks counts, navigation and the completed Instagram run.
+All four WebKit groups in the [browser workflow](https://github.com/notsafeforgit/stash/actions/runs/38194655190) passed. The broader Chromium CI groups were still running at deployment; the 17 affected Chromium cases passed locally. WebKit could not launch locally because the host lacks its
+system libraries; CI supplies them.
+
 ## Saved post captions — deployed, 2026-10-12 UTC
 
 Normal source captures keep saved captions and fill missing text fields instead

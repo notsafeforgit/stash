@@ -103,9 +103,11 @@ def collect_tree(inventory, state, *, limit=None):
 
 def collect(inventory, filename, resolve, expected_root):
     value = inventory.document(resolve(filename))
-    if (not isinstance(value, dict) or set(value) != {"version", "root_uuid", "locks", "state", "lists", "new_source_policy"}
-            or type(value["version"]) is not int or value["version"] != 1
-            or not isinstance(value["lists"], dict) or set(value["lists"]) != {"reddit", "twitter"}):
+    if (not isinstance(value, dict) or type(value.get("version")) is not int or value["version"] not in (1, 2)
+            or set(value) != {"version", "root_uuid", "locks", "state", "new_source_policy"}
+                | ({"lists"} if value["version"] == 1 else set())
+            or value["version"] == 1 and
+                (not isinstance(value["lists"], dict) or set(value["lists"]) != {"reddit", "twitter"})):
         raise InvalidArchive("Invalid source-management runtime in worker inventory")
     if identifier(value["root_uuid"]) != expected_root:
         raise InvalidArchive("Source-management runtime identifies a different worker root")
@@ -120,8 +122,10 @@ def collect(inventory, filename, resolve, expected_root):
     locks, state = path(value["locks"]), path(value["state"])
     directory(locks)
     inventory.locks.add(str(locks))
-    lists = [path(filename) for filename in value["lists"].values()]
-    if len(set(lists)) != 2:
+    # Version 2 stores subscriptions in Stash; only the local operation journal
+    # remains outside its database. Version 1 also retains the original lists.
+    lists = [path(filename) for filename in value.get("lists", {}).values()]
+    if value["version"] == 1 and len(set(lists)) != 2:
         raise InvalidArchive("Source services require different subscription lists")
     for filename in lists:
         fingerprint(inventory, filename, "config", MAX_LIST_BYTES)

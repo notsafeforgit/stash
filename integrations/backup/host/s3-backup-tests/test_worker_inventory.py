@@ -263,6 +263,25 @@ class WorkerInventoryTests(unittest.TestCase):
         later = collect(str(self.inventory))
         self.assertIn(str(payloads / 'later'), later['state_trees'][str(payloads)]['files'])
 
+    def test_native_source_subscriptions_retain_operation_state_without_legacy_lists(self):
+        self.source_runtime()
+        self.source_runtime_value['version'] = 2
+        del self.source_runtime_value['lists']
+        self.source_runtime_path.write_bytes(json_bytes(self.source_runtime_value))
+        for path in self.source_lists.values():
+            Path(path).unlink()
+        report = collect(str(self.inventory))
+        paths = {c['path']: c['role'] for c in report['components']}
+        self.assertEqual(paths[str(self.source_runtime_path)], 'config')
+        self.assertEqual(paths[str(self.source_plan)], 'operating_state')
+        self.assertTrue(set(self.source_lists.values()).isdisjoint(paths))
+        self.assertEqual(len(report['state_trees'][str(self.source_state)]['directories']), 3)
+        self.assertEqual(validate_report(json.loads(json.dumps(report))), report)
+        self.source_runtime_value['lists'] = self.source_lists
+        self.source_runtime_path.write_bytes(json_bytes(self.source_runtime_value))
+        with self.assertRaisesRegex(InvalidArchive, 'Invalid source-management runtime'):
+            collect(str(self.inventory))
+
     def test_declared_state_directory_rejects_unsafe_paths_and_non_files(self):
         for value in ('not-a-list', [False], ['relative/path'], [str(self.root / '..' / 'escape')]):
             self.spec['state_directories'] = value

@@ -30,6 +30,36 @@ const scene: SceneTiming = {
 };
 
 describe("TV media policies", () => {
+  it("keeps old settings marker-only and plays supplemental scenes in full", () => {
+    const { markerSceneFilter: _, ...old } = defaultTvSettings;
+    expect(decodeTvSettings(old)).toMatchObject({
+      kind: "ready",
+      settings: { markerSceneFilter: null },
+    });
+    const settings = {
+      ...defaultTvSettings,
+      start: "resume" as const,
+      window: { kind: "fixed" as const, seconds: 5 },
+    };
+    expect(
+      tvPlaybackPlan(scene, settings, 1, "scene:1", undefined, true),
+    ).toEqual({ kind: "ready", range: { start: 0, end: 100 } });
+    expect(tvPlaybackPlan(scene, settings, 1, "scene:1")).toEqual({
+      kind: "ready",
+      range: { start: 80, end: 85 },
+    });
+    expect(
+      tvPlaybackPlan(
+        scene,
+        settings,
+        1,
+        "marker:3",
+        scene.scene_markers[2],
+        true,
+      ),
+    ).toEqual({ kind: "ready", range: { start: 40, end: 45 } });
+  });
+
   it("defaults existing settings to five prepared items and accepts only bounded capacities", () => {
     const { preloadCount: _, ...old } = defaultTvSettings;
     expect(decodeTvSettings(old)).toMatchObject({

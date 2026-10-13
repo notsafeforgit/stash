@@ -2692,6 +2692,7 @@
     "loading": "Loading TV…",
     "filter": {
       "default": "App default filter",
+      "none": "None — markers only",
       "all": "All items"
     },
     "title": "TV",
@@ -2706,6 +2707,8 @@
       "mode": "Default feed",
       "scene_filter": "Scene filter",
       "marker_filter": "Marker filter",
+      "marker_scene_filter": "Extra scenes in marker mode",
+      "marker_scene_filter_description": "Add whole scenes from this saved filter. If a scene already has a marker matching the marker filter, play its matching markers instead. Extra scenes play from beginning to end and use the marker feed’s order and orientation.",
       "sort": "Sort order",
       "direction": "Sort direction",
       "orientation": "Media orientation",

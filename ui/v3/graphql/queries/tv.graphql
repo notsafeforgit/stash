@@ -46,3 +46,25 @@ query TvMarkers(
     }
   }
 }
+
+query TvMarkerFeed(
+  $filter: FindFilterType
+  $marker_filter_ast: FilterASTInput
+  $scene_filter: TVSceneFilterInput!
+) {
+  findTVMarkerFeed(
+    filter: $filter
+    marker_filter_ast: $marker_filter_ast
+    scene_filter: $scene_filter
+  ) {
+    count
+    items {
+      scene {
+        ...TvSceneSummary
+      }
+      marker {
+        ...TvMarkerSummary
+      }
+    }
+  }
+}

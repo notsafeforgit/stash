@@ -5,10 +5,15 @@ import { defaultTvRail, tvRailSchema } from "./action-config";
 
 export const tvModeSchema = z.enum(["scenes", "markers"]);
 export type TvMode = z.infer<typeof tvModeSchema>;
+export const tvSavedFilterSchema = z.object({
+  kind: z.literal("saved"),
+  id: libraryIdSchema,
+});
+export type TvSavedFilterChoice = z.infer<typeof tvSavedFilterSchema>;
 export const tvFilterSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("default") }),
   z.object({ kind: z.literal("all") }),
-  z.object({ kind: z.literal("saved"), id: libraryIdSchema }),
+  tvSavedFilterSchema,
 ]);
 export type TvFilterChoice = z.infer<typeof tvFilterSchema>;
 export const tvWindowSchema = z.discriminatedUnion("kind", [
@@ -33,6 +38,8 @@ export const tvSettingsSchema = z.object({
   mode: tvModeSchema,
   sceneFilter: tvFilterSchema,
   markerFilter: tvFilterSchema,
+  // Optional whole scenes supplement marker mode; older documents stay marker-only.
+  markerSceneFilter: tvSavedFilterSchema.nullable().default(null),
   orientation: z.enum(["all", "match", "portrait", "landscape"]),
   sort: z.string().max(60).nullable(),
   direction: z.enum(["ASC", "DESC"]),
@@ -96,6 +103,7 @@ export const defaultTvSettings: TvSettings = {
   mode: "scenes",
   sceneFilter: { kind: "default" },
   markerFilter: { kind: "default" },
+  markerSceneFilter: null,
   orientation: "all",
   sort: null,
   direction: "ASC",

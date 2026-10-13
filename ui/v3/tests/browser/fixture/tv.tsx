@@ -286,6 +286,40 @@ const markerPage: MockedResponse<
     };
   },
 };
+const mixedPage: MockedResponse<
+  GQL.TvMarkerFeedQuery,
+  GQL.TvMarkerFeedQueryVariables
+> = {
+  request: { query: GQL.TvMarkerFeedDocument, variables: () => true },
+  maxUsageCount: Infinity,
+  delay: 0,
+  result: (variables) => {
+    record("TvMarkerFeed", variables);
+    const mixed = [
+      ...markers.slice(0, 2).map((marker) => {
+        const scene = scenes.find((scene) => scene.id === marker.scene.id);
+        if (!scene) throw new Error("Missing marker parent");
+        return { __typename: "TVFeedItem" as const, scene, marker };
+      }),
+      ...scenes.slice(2).map((scene) => ({
+        __typename: "TVFeedItem" as const,
+        scene,
+        marker: null,
+      })),
+    ];
+    const page = variables.filter?.page ?? 1;
+    const size = variables.filter?.per_page ?? 5;
+    return {
+      data: {
+        findTVMarkerFeed: {
+          __typename: "TVMarkerFeedResult",
+          count: mixed.length,
+          items: mixed.slice((page - 1) * size, page * size),
+        },
+      },
+    };
+  },
+};
 const detail: MockedResponse<GQL.FindSceneQuery, GQL.FindSceneQueryVariables> =
   {
     request: { query: GQL.FindSceneDocument, variables: () => true },
@@ -485,6 +519,15 @@ const savedFilters: MockedResponse<
       findSavedFilters: [
         {
           __typename: "SavedFilter" as const,
+          id: "00000000-0000-4000-8000-000000000003",
+          name: "Short clip performers",
+          mode: GQL.FilterMode.Scenes,
+          find_filter: null,
+          filter_ast: null,
+          ui_options: null,
+        },
+        {
+          __typename: "SavedFilter" as const,
           id: "1",
           name: "Scene picks",
           mode: GQL.FilterMode.Scenes,
@@ -538,6 +581,7 @@ const client = new ApolloClient({
   link: new MockLink([
     scenePage,
     markerPage,
+    mixedPage,
     detail,
     activity,
     play,
@@ -573,7 +617,13 @@ function FixtureTvPage() {
   const source = {
     filter: { sort: "title", direction: GQL.SortDirectionEnum.Asc },
   };
-  const query: TvFeedQuery = { ...policy, mode, ...source };
+  const query: TvFeedQuery = {
+    ...policy,
+    mode,
+    ...source,
+    extraScenes:
+      mode === "markers" && result.settings.markerSceneFilter ? {} : undefined,
+  };
   return (
     <TvPage
       query={query}

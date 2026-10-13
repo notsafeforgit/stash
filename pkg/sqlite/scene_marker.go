@@ -113,10 +113,10 @@ var (
 	}
 )
 
-type SceneMarkerStore struct{}
+type SceneMarkerStore struct{ repo *storeRepository }
 
-func NewSceneMarkerStore() *SceneMarkerStore {
-	return &SceneMarkerStore{}
+func NewSceneMarkerStore(repo *storeRepository) *SceneMarkerStore {
+	return &SceneMarkerStore{repo: repo}
 }
 
 func (qb *SceneMarkerStore) table() exp.IdentifierExpression {

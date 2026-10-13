@@ -47,6 +47,81 @@ function clientWithFilter(
 }
 
 describe("TV query construction", () => {
+  it("adds a separately scoped saved scene filter only in marker mode", async () => {
+    const client = clientWithFilter();
+    const settings = {
+      ...defaultTvSettings,
+      markerSceneFilter: {
+        kind: "saved" as const,
+        id: "00000000-0000-4000-8000-000000000001",
+      },
+      orientation: "portrait" as const,
+      sort: "random",
+    };
+    const mixed = await resolveTvQuery(
+      client,
+      playerConfiguration,
+      settings,
+      "markers",
+      { kind: "all" },
+      42,
+      "landscape",
+    );
+    expect(mixed.extraScenes).toMatchObject({
+      search: "example",
+      filter_ast: {
+        root: {
+          group: {
+            operator: "AND",
+            children: [
+              condition,
+              {
+                condition: {
+                  field: "orientation",
+                  value: { value: ["SQUARE", "PORTRAIT"] },
+                },
+              },
+            ],
+          },
+        },
+      },
+    });
+    expect(mixed.filter).toMatchObject({ q: "", sort: "random_42" });
+    expect(mixed.ast?.root.group?.children).toHaveLength(1);
+    const markerOnly = await resolveTvQuery(
+      client,
+      playerConfiguration,
+      { ...settings, markerSceneFilter: null },
+      "markers",
+      { kind: "all" },
+      42,
+      "landscape",
+    );
+    expect(markerOnly.extraScenes).toBeUndefined();
+    expect(tvQueryIdentity(mixed)).not.toBe(tvQueryIdentity(markerOnly));
+    const scenes = await resolveTvQuery(
+      client,
+      playerConfiguration,
+      settings,
+      "scenes",
+      { kind: "all" },
+      42,
+      "landscape",
+    );
+    expect(scenes.extraScenes).toBeUndefined();
+    await expect(
+      resolveTvQuery(
+        clientWithFilter(GQL.FilterMode.SceneMarkers),
+        playerConfiguration,
+        settings,
+        "markers",
+        { kind: "all" },
+        42,
+        "landscape",
+      ),
+    ).rejects.toThrow("another feed");
+  });
+
   it("falls back to the destination order when switching from a source-specific sort", async () => {
     const scenes = tvSortOptions("scenes");
     const markers = tvSortOptions("markers");

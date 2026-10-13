@@ -117,7 +117,7 @@ func NewDatabase() *Database {
 		File:           fileStore,
 		Folder:         folderStore,
 		Scene:          NewSceneStore(r, blobStore),
-		SceneMarker:    NewSceneMarkerStore(),
+		SceneMarker:    NewSceneMarkerStore(r),
 		Image:          NewImageStore(r),
 		Gallery:        galleryStore,
 		GalleryChapter: NewGalleryChapterStore(),

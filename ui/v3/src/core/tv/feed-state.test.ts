@@ -49,6 +49,77 @@ function fixture(repeated = false, delay = 0) {
 }
 
 describe("TV feed lifecycle", () => {
+  it("pages through the combined feed and retains whole-scene playback after a handoff", async () => {
+    const mock: MockedResponse<
+      GQL.TvMarkerFeedQuery,
+      GQL.TvMarkerFeedQueryVariables
+    > = {
+      request: { query: GQL.TvMarkerFeedDocument, variables: () => true },
+      delay: 0,
+      maxUsageCount: Infinity,
+      result: (variables) => ({
+        data: {
+          findTVMarkerFeed: {
+            __typename: "TVMarkerFeedResult",
+            count: 2,
+            items:
+              variables.filter?.page === 1
+                ? [
+                    {
+                      __typename: "TVFeedItem",
+                      scene: scene(1),
+                      marker: {
+                        __typename: "SceneMarker",
+                        id: "10",
+                        title: "Marker",
+                        seconds: 3,
+                        end_seconds: 5,
+                        screenshot: "",
+                        preview_image: null,
+                        scene: scene(1),
+                      },
+                    },
+                  ]
+                : [{ __typename: "TVFeedItem", scene: scene(2), marker: null }],
+          },
+        },
+      }),
+    };
+    const client = new ApolloClient({
+      cache: new InMemoryCache(),
+      link: new MockLink([mock]),
+    });
+    const combined: TvFeedQuery = {
+      ...query,
+      mode: "markers",
+      extraScenes: {},
+      pageSize: 1,
+    };
+    const controller = new TvFeedController(client, combined);
+    controller.selectKey("scene:2");
+    controller.start();
+    await vi.waitFor(() =>
+      expect(controller.getSnapshot().exhausted).toBe(true),
+    );
+    const snapshot = controller.getSnapshot();
+    expect(snapshot.items).toEqual([
+      { kind: "marker", key: "marker:10", id: "10", sceneId: "1" },
+      {
+        kind: "scene",
+        key: "scene:2",
+        id: "2",
+        sceneId: "2",
+        wholeScene: true,
+      },
+    ]);
+    expect(snapshot.selected).toBe(1);
+    expect(snapshot.total).toBe(2);
+    controller.dispose();
+    const restored = new TvFeedController(client, combined, snapshot);
+    expect(restored.getSnapshot().items[1]).toMatchObject({ wholeScene: true });
+    restored.dispose();
+  });
+
   it("starts at an effect boundary, prefetches once, and retains selection", async () => {
     const { controller, result } = fixture();
     expect(result).not.toHaveBeenCalled();

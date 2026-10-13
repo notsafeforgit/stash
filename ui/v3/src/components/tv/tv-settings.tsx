@@ -26,7 +26,7 @@ import {
   SettingsSection,
   SettingSwitch,
 } from "@/components/settings/setting-row";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { DestructiveConfirmDialog } from "@/components/shared/destructive-confirm-dialog";
 
 const TvRailEditor = lazy(() => import("@/components/tv/tv-rail-editor"));
@@ -119,6 +119,30 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
             value={values.markerFilter}
             onChange={(next) => set("markerFilter", next)}
           />
+        </Field>
+        <Field>
+          <FieldLabel>
+            {msg(
+              "tv.settings.marker_scene_filter",
+              "Extra scenes in marker mode",
+            )}
+          </FieldLabel>
+          <TvFilterSelect
+            mode="scenes"
+            optional
+            label={msg(
+              "tv.settings.marker_scene_filter",
+              "Extra scenes in marker mode",
+            )}
+            value={values.markerSceneFilter}
+            onChange={(next) => set("markerSceneFilter", next)}
+          />
+          <FieldDescription>
+            {msg(
+              "tv.settings.marker_scene_filter_description",
+              "Add whole scenes from this saved filter. If a scene already has a marker matching the marker filter, play its matching markers instead. Extra scenes play from beginning to end and use the marker feed’s order and orientation.",
+            )}
+          </FieldDescription>
         </Field>
         <SettingSelect
           label={msg("tv.settings.sort", "Sort order")}

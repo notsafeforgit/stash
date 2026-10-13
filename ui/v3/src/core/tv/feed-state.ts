@@ -4,7 +4,13 @@ import type { TvFeedQuery } from "./feed-query";
 import type { TvPlaybackPlan } from "./playback-policy";
 
 export type TvFeedItem =
-  | { kind: "scene"; key: string; id: string; sceneId: string }
+  | {
+      kind: "scene";
+      key: string;
+      id: string;
+      sceneId: string;
+      wholeScene?: true;
+    }
   | { kind: "marker"; key: string; id: string; sceneId: string };
 
 const sceneItem = (scene: GQL.TvSceneSummaryFragment): TvFeedItem => ({
@@ -171,6 +177,26 @@ export class TvFeedController {
           if (!response.data) throw new Error("No scene page was returned");
           const page = response.data.findScenes;
           items = page.scenes.map(sceneItem);
+          total = page.count;
+        } else if (this.query.extraScenes) {
+          const response = await this.client.query({
+            query: GQL.TvMarkerFeedDocument,
+            variables: {
+              filter: pageFilter(this.query.filter),
+              marker_filter_ast: this.query.ast,
+              scene_filter: this.query.extraScenes,
+            },
+            context,
+            fetchPolicy: "network-only",
+          });
+          if (!response.data)
+            throw new Error("No marker feed page was returned");
+          const page = response.data.findTVMarkerFeed;
+          items = page.items.map(({ scene, marker }) =>
+            marker
+              ? markerItem(marker)
+              : { ...sceneItem(scene), kind: "scene", wholeScene: true },
+          );
           total = page.count;
         } else {
           const response = await this.client.query({

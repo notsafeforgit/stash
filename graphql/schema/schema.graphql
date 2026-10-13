@@ -97,6 +97,14 @@ type Query {
     ids: [ID!] @libraryID(kind: "scene_marker")
   ): FindSceneMarkersResultType! @libraryScope(kind: "scene_marker")
 
+  "Matching markers plus extra scenes with no matching marker, sorted and paginated together."
+  findTVMarkerFeed(
+    marker_filter_ast: FilterASTInput
+    scene_filter: TVSceneFilterInput!
+    "Search applies to markers; ordering and pagination apply to the combined feed."
+    filter: FindFilterType
+  ): TVMarkerFeedResult! @libraryScope(kind: "scene_marker")
+
   findImage(id: ID @libraryID(kind: "image"), checksum: String): Image @libraryScope(kind: "image")
 
   "A function which queries Scene objects"

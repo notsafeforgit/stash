@@ -111,6 +111,7 @@ export class TvPreparedItem {
       this.seed,
       this.item.key,
       marker,
+      this.item.kind === "scene" && this.item.wholeScene,
     );
     if (plan.kind !== "ready") return;
     const file = scene.files[0];

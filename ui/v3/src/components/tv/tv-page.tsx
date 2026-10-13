@@ -226,7 +226,14 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
               kind: "invalid" as const,
               reason: "This marker is no longer available",
             }
-          : tvPlaybackPlan(scene, settings, seed, active.key, marker);
+          : tvPlaybackPlan(
+              scene,
+              settings,
+              seed,
+              active.key,
+              marker,
+              active.kind === "scene" && active.wholeScene,
+            );
     setResolvedPlan({ key: currentKey, plan });
   }
   const plan = resolvedPlan?.key === currentKey ? resolvedPlan.plan : undefined;

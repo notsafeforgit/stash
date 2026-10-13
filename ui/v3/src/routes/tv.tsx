@@ -72,7 +72,12 @@ export const Route = createFileRoute("/tv")({
     const mode = search.mode ?? settings.mode;
     if (
       search.item &&
-      !search.item.startsWith(mode === "scenes" ? "scene:" : "marker:")
+      !(
+        search.item.startsWith(mode === "scenes" ? "scene:" : "marker:") ||
+        (mode === "markers" &&
+          settings.markerSceneFilter &&
+          search.item.startsWith("scene:"))
+      )
     )
       throw new Error("The selected item belongs to another TV feed");
     const choice: TvFilterChoice | undefined =

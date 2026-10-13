@@ -21,6 +21,7 @@ export function tvPlaybackPlan(
   seed: number,
   key: string,
   marker?: { id: string; seconds: number; end_seconds?: number | null },
+  wholeScene = false,
 ): TvPlaybackPlan {
   const duration = scene.files[0]?.duration;
   if (!duration || !Number.isFinite(duration) || duration <= 0)
@@ -31,6 +32,7 @@ export function tvPlaybackPlan(
       ? { kind: "ready", range }
       : { kind: "invalid", reason: "This marker has no playable range" };
   }
+  if (wholeScene) return { kind: "ready", range: { start: 0, end: duration } };
   const random = seededValue(seed, key);
   const starts = scene.scene_markers
     .map((item) => item.seconds)

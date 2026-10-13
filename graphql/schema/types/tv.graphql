@@ -1,0 +1,15 @@
+input TVSceneFilterInput @libraryScope(kind: "scene") {
+  filter_ast: FilterASTInput
+  search: String
+}
+
+type TVFeedItem {
+  scene: Scene!
+  "Null for a whole-scene entry."
+  marker: SceneMarker
+}
+
+type TVMarkerFeedResult {
+  count: Int!
+  items: [TVFeedItem!]!
+}

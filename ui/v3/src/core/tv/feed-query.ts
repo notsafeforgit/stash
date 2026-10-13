@@ -19,6 +19,7 @@ export interface TvFeedQuery {
   mode: TvMode;
   filter: GQL.FindFilterType;
   ast?: GQL.FilterAstInput;
+  extraScenes?: GQL.TvSceneFilterInput;
   pageSize: number;
   prefetch: number;
 }
@@ -106,14 +107,14 @@ export async function resolveTvQuery(
     choice ??
     (mode === "scenes" ? settings.sceneFilter : settings.markerFilter);
   const view = mode === "scenes" ? "scenes" : "scene_markers";
-  const getSaved = async (id: string) => {
+  const getSaved = async (id: string, filterMode: TvMode = mode) => {
     const response = await client.query({
       query: GQL.FindSavedFilterDocument,
       variables: { id },
       fetchPolicy: "cache-first",
     });
     const saved = response.data?.findSavedFilter;
-    if (!saved || saved.mode !== tvFilterMode(mode))
+    if (!saved || saved.mode !== tvFilterMode(filterMode))
       throw new Error(
         "The selected filter is missing or belongs to another feed",
       );
@@ -153,23 +154,52 @@ export async function resolveTvQuery(
   if (base) roots.push(base.root);
   const effectiveOrientation =
     settings.orientation === "match" ? orientation : settings.orientation;
-  if (effectiveOrientation !== "all")
-    roots.push({
-      condition: {
-        field: "orientation",
-        value: {
-          value: [
-            GQL.OrientationEnum.Square,
-            effectiveOrientation === "portrait"
-              ? GQL.OrientationEnum.Portrait
-              : GQL.OrientationEnum.Landscape,
-          ],
-        },
-      },
-    });
+  const orientationNode: GQL.FilterAstNodeInput | undefined =
+    effectiveOrientation === "all"
+      ? undefined
+      : {
+          condition: {
+            field: "orientation",
+            value: {
+              value: [
+                GQL.OrientationEnum.Square,
+                effectiveOrientation === "portrait"
+                  ? GQL.OrientationEnum.Portrait
+                  : GQL.OrientationEnum.Landscape,
+              ],
+            },
+          },
+        };
+  if (orientationNode) roots.push(orientationNode);
+  let extraScenes: GQL.TvSceneFilterInput | undefined;
+  if (mode === "markers" && settings.markerSceneFilter) {
+    const extra = filterModel(
+      "scenes",
+      configuration,
+      await getSaved(settings.markerSceneFilter.id, "scenes"),
+    );
+    const sceneRoots: GQL.FilterAstNodeInput[] = [];
+    const sceneAST = extra.makeFilterAST();
+    if (sceneAST) sceneRoots.push(sceneAST.root);
+    if (orientationNode) sceneRoots.push(orientationNode);
+    extraScenes = {
+      search: extra.makeFindFilter().q,
+      filter_ast: sceneRoots.length
+        ? {
+            root: {
+              group: {
+                operator: GQL.FilterGroupOperator.And,
+                children: sceneRoots,
+              },
+            },
+          }
+        : undefined,
+    };
+  }
   return {
     seed,
     mode,
+    extraScenes,
     filter: model.makeFindFilter(),
     ast: roots.length
       ? {
@@ -189,6 +219,7 @@ export function tvQueryIdentity(query: TvFeedQuery): string {
     query.mode,
     query.filter,
     query.ast,
+    query.extraScenes,
     query.pageSize,
   ]);
 }

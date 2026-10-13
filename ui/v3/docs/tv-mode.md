@@ -15,6 +15,17 @@ that filter in TV. Choose **Random** in **Sort order** for a seeded order
 that stays stable as you keep scrolling. Matching orientation
 uses the viewing surface, including forced rotation, and includes square videos.
 
+**Extra scenes in marker mode** optionally selects a saved scene filter. Marker
+mode includes every matching marker plus whole scenes from that extra filter
+whose scenes have no matching marker. Other, nonmatching markers do not exclude
+a scene. Overlap is resolved on the server across the complete result set before
+sorting, counting and pagination; Random interleaves both kinds in one stable
+order. The marker feed's order and orientation apply to both kinds; the scene
+filter supplies its criteria and search, not its saved order. Additional scenes
+play from beginning to end regardless of the scene-mode start/window settings.
+Choosing **None — markers only** restores the marker-only feed. Scene mode keeps
+its separate scene filter, and existing settings default to no extra scenes.
+
 The feed loads more items automatically as you scroll, until the matching
 library is exhausted. Request sizing and loading thresholds are internal;
 there are no paging controls or item caps for a viewing session.
@@ -145,7 +156,8 @@ Settings version 5 removes the old page-size, loading-threshold and session-limi
 preferences while retaining other settings. Version 4 removed the formerly
 required, unchanged default settings button from older rails; customized shortcuts
 and those deliberately added since version 4 remain intact. TV uses
-the chosen saved/default filter without additional feed rules. Earlier settings
+the chosen saved/default filter, with an optional saved scene filter supplement
+for marker mode. Earlier settings
 retain their selected filters and playback preferences;
 retired rules are removed. Version 1 settings with Shuffle enabled load as Random;
 other saved sort choices remain intact. Saving writes the new format without

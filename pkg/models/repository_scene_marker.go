@@ -19,6 +19,7 @@ type SceneMarkerFinder interface {
 type SceneMarkerQueryer interface {
 	Query(ctx context.Context, sceneMarkerFilter *SceneMarkerFilterType, findFilter *FindFilterType) ([]*SceneMarker, int, error)
 	QueryAST(ctx context.Context, filterAST *FilterAST, findFilter *FindFilterType) ([]*SceneMarker, int, error)
+	QueryTV(ctx context.Context, markerAST, sceneAST *FilterAST, findFilter *FindFilterType, sceneSearch *string) ([]*TVFeedItem, int, error)
 	QueryCount(ctx context.Context, sceneMarkerFilter *SceneMarkerFilterType, findFilter *FindFilterType) (int, error)
 }
 

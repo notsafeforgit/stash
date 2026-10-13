@@ -8,9 +8,11 @@ Uploaders provide a `stash-clips.json` manifest with format
 `stash-clip-batch-v1`, a unique `batch_id`, `title`, `details`, and `clips`.
 Each clip supplies its filename (`clip-N.mov`, `.mp4`, or `.m4v`), SHA-256
 checksum, and ISO 8601 `recorded_at` timestamp including time and timezone.
-Existing uploads with blank clip names or hidden extensions can still be
-processed when the expected `clip-N` resolves to exactly one supported file
-and its checksum matches. Ambiguous files remain untouched for review.
+Uploaders may supply the assigned `clip-N` stem when the file provider hides
+extensions. Existing uploads with blank names or location labels can also be
+processed when their position identifies exactly one supported `clip-N` file
+and its checksum matches. Paths and unsupported extensions are rejected;
+ambiguous files remain untouched for review.
 
 The manifest's `order` is `recorded_at` for chronological order or `input` to
 follow the `clips` array exactly. Older manifests without `order` retain

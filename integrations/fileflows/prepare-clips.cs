@@ -53,11 +53,19 @@ try
         string recorded = item.GetProperty("recorded_at").GetString();
         if (!System.Text.RegularExpressions.Regex.IsMatch(digest ?? "", @"^[a-fA-F0-9]{64}$"))
             throw new System.Exception("Clip " + (index + 1) + " has an invalid checksum.");
-        // Earlier iPhone exports supplied an empty name or hid the extension.
+        // File providers can supply a location label instead of a filename.
+        // Reject paths and unsupported extensions before resolving such labels.
+        if (!string.IsNullOrEmpty(name) &&
+            (name != System.IO.Path.GetFileName(name) || name.Contains('\\') || name.Contains('\0') || name == "." || name == ".."))
+            throw new System.Exception("Clip names must not contain a path.");
+        bool numberedName = System.Text.RegularExpressions.Regex.IsMatch(name ?? "",
+            @"^clip-[0-9]+(?:\.(mov|mp4|m4v))?$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!numberedName && !string.IsNullOrEmpty(System.IO.Path.GetExtension(name ?? "")))
+            throw new System.Exception("Unsupported clip filename.");
         // Only resolve the expected clip number, with one matching media file;
         // the checksum below must still match before encoding or cleanup.
-        if (string.IsNullOrEmpty(name)) name = "clip-" + (index + 1);
-        if (System.Text.RegularExpressions.Regex.IsMatch(name, @"^clip-[0-9]+$"))
+        if (!numberedName) name = "clip-" + (index + 1);
+        if (System.Text.RegularExpressions.Regex.IsMatch(name, @"^clip-[0-9]+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
         {
             var candidates = new System.Collections.Generic.List<string>();
             foreach (var candidate in System.IO.Directory.GetFiles(dir.FullName))

@@ -41,12 +41,13 @@ type LegacyTwitterSlot struct {
 }
 
 type LegacyTwitterRecoveryPreview struct {
-	TweetID   string              `json:"tweet_id"`
-	PostUUID  string              `json:"post_uuid,omitempty"`
-	State     string              `json:"state"`
-	Slots     []LegacyTwitterSlot `json:"slots"`
-	Fragments []models.SourcePost `json:"fragments"`
-	Signature string              `json:"signature"`
+	TweetID              string              `json:"tweet_id"`
+	PostUUID             string              `json:"post_uuid,omitempty"`
+	State                string              `json:"state"`
+	Slots                []LegacyTwitterSlot `json:"slots"`
+	Fragments            []models.SourcePost `json:"fragments"`
+	Signature            string              `json:"signature"`
+	ConflictingPositions []int               `json:"conflicting_positions,omitempty"`
 }
 
 func legacyTwitterPath(value, tweet string) (int, bool) {
@@ -186,25 +187,36 @@ func previewLegacyTwitterRecovery(ctx context.Context, input LegacyTwitterRecove
 		ret.State, ret.PostUUID = "existing", post.UUID
 		return ret, nil
 	}
-	positions, members := make(map[int]string), make(map[string]bool)
+	positions, members := make(map[int]map[string]bool), make(map[string]bool)
 	for _, file := range input.Evidence {
 		slot, err := legacyTwitterFile(ctx, input.TweetID, file)
 		if err != nil {
 			return nil, err
 		}
-		if previous, exists := positions[slot.Position]; exists {
-			if previous != slot.MediaUUID {
-				return nil, models.ErrSourceGalleryConflict
-			}
+		if positions[slot.Position][slot.MediaUUID] {
 			continue
 		}
-		positions[slot.Position], members[slot.MediaUUID] = slot.MediaUUID, true
+		if positions[slot.Position] == nil {
+			positions[slot.Position] = make(map[string]bool)
+		}
+		positions[slot.Position][slot.MediaUUID], members[slot.MediaUUID] = true, true
 		ret.Slots = append(ret.Slots, *slot)
 	}
 	if len(ret.Slots) == 1 && ret.Slots[0].Position == 0 {
 		return nil, models.ErrSourceGalleryConflict
 	}
-	slices.SortFunc(ret.Slots, func(a, b LegacyTwitterSlot) int { return a.Position - b.Position })
+	for position, media := range positions {
+		if len(media) > 1 {
+			ret.ConflictingPositions = append(ret.ConflictingPositions, position)
+		}
+	}
+	slices.Sort(ret.ConflictingPositions)
+	slices.SortFunc(ret.Slots, func(a, b LegacyTwitterSlot) int {
+		if a.Position == b.Position {
+			return strings.Compare(a.MediaUUID, b.MediaUUID)
+		}
+		return a.Position - b.Position
+	})
 	ret.Fragments, err = legacyTwitterFragments(ctx, input.TweetID, members)
 	if err != nil {
 		return nil, err
@@ -299,6 +311,9 @@ func applyLegacyTwitterRecovery(ctx context.Context, preview *LegacyTwitterRecov
 	selection := &models.AttachmentSelection{DeclaredAlbum: true, Decision: models.AttachmentSelectionDecision{
 		PostUUID: post.UUID, Mode: "automatic", Origin: "migration", Reason: twitterFilenameReason, CaptureUUID: &capture}}
 	for _, slot := range preview.Slots {
+		if slices.Contains(preview.ConflictingPositions, slot.Position) {
+			continue // The post ID is certain; the repeated ordinal is not.
+		}
 		ref := models.SourcePostIdentifier{Namespace: twitterFilenameNamespace, Value: path.Base(slot.SourcePath)}
 		ref.Value = strings.TrimSuffix(ref.Value, path.Ext(ref.Value))
 		kind := "image"
@@ -308,20 +323,33 @@ func applyLegacyTwitterRecovery(ctx context.Context, preview *LegacyTwitterRecov
 		selection.Entries = append(selection.Entries, models.SourceAttachmentManifestEntry{Position: slot.Position, MediaKind: kind,
 			Attachment: models.SourceAttachment{UUID: filenameAttachmentID(post.UUID, ref), PostUUID: post.UUID, Reference: ref, Revision: 1}})
 	}
+	if len(selection.Entries) == 0 {
+		selection.Decision.Reason = linkedMediaAlbumReason
+	}
 	if err := (&SourceGalleryStore{}).recoverAlbumSelection(ctx, post.UUID, selection); err != nil {
 		return "", err
 	}
-	for index, slot := range preview.Slots {
-		entry := selection.Entries[index]
+	attachmentIDs := make(map[int]string, len(selection.Entries))
+	for _, entry := range selection.Entries {
+		attachmentIDs[entry.Position] = entry.Attachment.UUID
+	}
+	for _, slot := range preview.Slots {
+		attachmentID := attachmentIDs[slot.Position]
 		details, err := json.Marshal(slot)
 		if err != nil {
 			return "", err
 		}
 		if _, err := attachments.RecordMediaEvidence(ctx, models.SourceMediaEvidence{UUID: uuid.NewString(), PostUUID: post.UUID,
-			AttachmentUUID: entry.Attachment.UUID, MediaUUID: slot.MediaUUID, FileUUID: &slot.FileUUID, Basis: "legacy", Details: details}); err != nil {
+			AttachmentUUID: attachmentID, MediaUUID: slot.MediaUUID, FileUUID: &slot.FileUUID, Basis: "legacy", Details: details}); err != nil {
 			return "", err
 		}
-		current, err := attachments.Find(ctx, entry.Attachment.UUID)
+		if attachmentID == "" {
+			if err := linkLegacyTwitterMember(ctx, post.UUID, slot.MediaUUID, reason); err != nil {
+				return "", err
+			}
+			continue
+		}
+		current, err := attachments.Find(ctx, attachmentID)
 		if err != nil {
 			return "", err
 		}
@@ -332,4 +360,22 @@ func applyLegacyTwitterRecovery(ctx context.Context, preview *LegacyTwitterRecov
 		}
 	}
 	return post.UUID, nil
+}
+
+func linkLegacyTwitterMember(ctx context.Context, post, media, reason string) error {
+	store := &SourcePostMediaStore{}
+	association, err := store.Association(ctx, post, media)
+	if err != nil {
+		return err
+	}
+	if association.State == "linked" {
+		return nil
+	}
+	if association.State != "undecided" || len(association.Decisions) != 0 {
+		return models.ErrSourceGalleryConflict
+	}
+	_, err = store.decide(ctx, models.SourcePostMediaInput{UUID: uuid.NewString(), PostUUID: post, MediaUUID: media,
+		ExpectedPostRevision: association.PostRevision, ExpectedMediaRevision: association.MediaRevision,
+		State: "linked", Origin: "migration", Reason: reason}, false)
+	return err
 }

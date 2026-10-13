@@ -110,7 +110,7 @@ func TestLegacyTwitterRecoveryCollatesOriginalFragmentsAfterDeduplication(t *tes
 }
 
 func TestLegacyTwitterRecoveryRejectsChangedFilesAndAmbiguity(t *testing.T) {
-	for _, scenario := range []string{"generation", "folder", "wrong post", "slot conflict", "single first slot"} {
+	for _, scenario := range []string{"generation", "folder", "wrong post", "single first slot"} {
 		t.Run(scenario, func(t *testing.T) {
 			f, input := legacyRecoveryFixture(t)
 			preview, err := f.db.PreviewLegacyTwitterRecovery(t.Context(), input)
@@ -122,8 +122,6 @@ func TestLegacyTwitterRecoveryRejectsChangedFilesAndAmbiguity(t *testing.T) {
 				attachmentSQL(t, f.db, "UPDATE folders SET path='/unrelated/files' WHERE id=1")
 			case "wrong post":
 				input.TweetID = "1575550205214134279"
-			case "slot conflict":
-				attachmentSQL(t, f.db, "UPDATE files SET basename='1575550205214134278_1.mkv' WHERE id=21")
 			case "single first slot":
 				input.Evidence = input.Evidence[:1]
 			}
@@ -131,6 +129,30 @@ func TestLegacyTwitterRecoveryRejectsChangedFilesAndAmbiguity(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
+}
+
+func TestLegacyTwitterRecoveryRepeatedOrdinalKeepsMixedMembersWithoutInventingOrder(t *testing.T) {
+	f, input := legacyRecoveryFixture(t)
+	attachmentSQL(t, f.db, "UPDATE files SET basename='1575550205214134278_1.mkv' WHERE id=21")
+	input.Evidence[1].Generation = 4
+	preview, err := f.db.PreviewLegacyTwitterRecovery(t.Context(), input)
+	require.NoError(t, err)
+	require.Equal(t, []int{0}, preview.ConflictingPositions)
+	post, err := f.db.ApplyLegacyTwitterRecovery(t.Context(), input, preview.Signature)
+	require.NoError(t, err)
+	selected := filenameSelectionGet(t, f.repo, post)
+	require.Empty(t, selected.Entries)
+	require.True(t, selected.DeclaredAlbum)
+	require.Nil(t, selected.ExpectedCount)
+	require.False(t, selected.Complete)
+	album := applyAlbumBackfill(t, f.repo, albumBackfillPreview(t, f.repo, post, models.SourceAlbumIdentifiersV1))
+	sourceGalleryMemberships(t, f.repo, *album.Gallery.GalleryID, []int{41}, []int{31})
+	for _, file := range input.Evidence {
+		require.Equal(t, "linked", postMediaAssociation(t, f.repo, post, file.MediaUUID).State)
+	}
+	backup := filepath.Join(t.TempDir(), "ambiguous-order.sqlite")
+	require.NoError(t, f.db.Backup(backup))
+	require.NoError(t, f.db.AuditForTesting(backup))
 }
 
 func TestLegacyTwitterRecoveryPreservesExplicitChoicesAndDistinctPosts(t *testing.T) {

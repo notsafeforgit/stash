@@ -172,7 +172,8 @@ the current `file_uuid`, `media_uuid` and `generation`. Original, deduplicated
 locations additionally require their retained `observation_uuid` and `match_uuid`.
 The command rechecks the file owner, generation and actual file size; the name
 must match that tweet's numbered attachment in a historical `, twitter` folder.
-It rejects ambiguous slots and changed files. It only consolidates anonymous
+It rejects changed files. Reused ordinals retain a confirmed post association
+without selecting either file into that ambiguous slot. It only consolidates anonymous
 fragments whose complete retained filename evidence agrees on this same tweet,
 preserving source text and refusing existing selection, gallery or unlink choices.
 

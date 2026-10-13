@@ -160,6 +160,35 @@ selection; previews and durable apply jobs remain separate. Publication, replay,
 manual membership protection and after-success notifications use the existing
 album worker. These records are included in normal database backups.
 
+### One-time recovery of unidentified historical Twitter files
+
+`cmd/recover-twitter-albums` is isolated, offline upgrade tooling for files
+downloaded before native ingestion. It is not part of scanning or scraping and
+can be removed with the legacy import tools. It handles missing Twitter post IDs
+and anonymous catalog fragments that were created separately for each file.
+
+Supply a reviewed JSON array with `tweet_id` and `evidence` entries containing
+the current `file_uuid`, `media_uuid` and `generation`. Original, deduplicated
+locations additionally require their retained `observation_uuid` and `match_uuid`.
+The command rechecks the file owner, generation and actual file size; the name
+must match that tweet's numbered attachment in a historical `, twitter` folder.
+It rejects ambiguous slots and changed files. It only consolidates anonymous
+fragments whose complete retained filename evidence agrees on this same tweet,
+preserving source text and refusing existing selection, gallery or unlink choices.
+
+Stop Stash and retain a current backup first. Run the command with `--database`,
+`--input`, the reviewed input's `--expected-sha256` and
+`--path-map /library/prefix=/host/prefix`. Omit `--apply` for a preview. Applying
+recovers identities and ordered partial lists; it never deletes or renames media.
+When no source text was retained, the only new observation is explicitly labeled
+`filename-recovery`, has an unknown original observation date, and uses the post
+ID as its title. Existing captured descriptions are reused.
+
+After restarting Stash, submit the returned post UUIDs through the ordinary
+album-backfill API. That durable worker creates mixed image/scene galleries and
+delivers the usual notifications. Source position gaps and unknown totals remain
+explicit, and rerunning the identity repair reuses the already identified posts.
+
 The native association repository can retain a post-to-media link even when no
 ordered list survives. Schema 1000036 permits legacy/review evidence without an
 attachment or capture reference, and retains only the references actually known.

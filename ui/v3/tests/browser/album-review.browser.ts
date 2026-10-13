@@ -404,11 +404,17 @@ for (const desktop of [false, true]) {
       .getByRole("button", { name: "Add to gallery (2)", exact: true })
       .click();
     await expect(
-      page.getByRole("link", { name: "Image #21", exact: true }),
-    ).toHaveAttribute("href", "/images/21");
+      page.getByRole("link", {
+        name: `Image #${albumReviewID(4)}`,
+        exact: true,
+      }),
+    ).toHaveAttribute("href", `/images/${albumReviewID(4)}`);
     await expect(
-      page.getByRole("link", { name: "Video #31", exact: true }),
-    ).toHaveAttribute("href", "/scenes/31");
+      page.getByRole("link", {
+        name: `Video #${albumReviewID(7)}`,
+        exact: true,
+      }),
+    ).toHaveAttribute("href", `/scenes/${albumReviewID(7)}`);
     await page
       .getByRole("button", { name: "Attachment choices", exact: true })
       .click();
@@ -833,7 +839,7 @@ test("post-page publication refreshes its gallery association and preserves prev
     .click();
   await expect(
     page.getByRole("link", { name: "Open gallery", exact: true }),
-  ).toHaveAttribute("href", "/galleries/12");
+  ).toHaveAttribute("href", `/galleries/${postIds.gallery}`);
   const refreshed = remote.requests.filter((url) =>
     url.pathname.endsWith("/album"),
   ).length;

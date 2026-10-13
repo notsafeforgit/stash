@@ -1,3 +1,4 @@
+import { libraryID } from "../fixtures/library";
 import type { Page } from "@playwright/test";
 import { test, expect } from "./test";
 import { serveSceneMedia } from "./scene-media";
@@ -1109,8 +1110,8 @@ test("TV settings show the rail editor directly and save reordered actions witho
         key: "tv",
         value: {
           version: 5,
-          sceneFilter: { kind: "saved", id: "1" },
-          markerFilter: { kind: "saved", id: "2" },
+          sceneFilter: { kind: "saved", id: libraryID(1) },
+          markerFilter: { kind: "saved", id: libraryID(2) },
           rail: [
             { action: { id: "info", icon: "heart" } },
             { action: { id: "visibility" } },

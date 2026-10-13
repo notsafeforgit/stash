@@ -306,13 +306,13 @@ for (const desktop of [false, true]) {
     ).toHaveCount(1);
     await expect(
       page.getByRole("link", { name: "Open Sources", exact: true }),
-    ).toHaveAttribute("href", /\/scenes\/7\?tab=source-review/);
+    ).toHaveAttribute("href", `/scenes/${postIds.media}?tab=source-review`);
     await page
       .getByRole("button", { name: "Album gallery", exact: true })
       .click();
     await expect(
       page.getByRole("link", { name: "Open gallery", exact: true }),
-    ).toHaveAttribute("href", "/galleries/12");
+    ).toHaveAttribute("href", `/galleries/${postIds.gallery}`);
     await page
       .getByRole("button", { name: "Identifiers", exact: true })
       .click();

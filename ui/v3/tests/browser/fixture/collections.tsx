@@ -6,6 +6,7 @@ import { UserMenu } from "@/components/layout/user-menu";
 import { createCollectionOutbox } from "@/core/native-archive/collection-outbox";
 import { createCollectionAPI } from "@/core/native-archive/collection-api";
 import { collectionInput, collectionID } from "../../fixtures/collections";
+import { policyIDs } from "../../fixtures/metadata-policy";
 import {
   FindPerformersForSelectDocument,
   FindScenesForSelectDocument,
@@ -28,7 +29,7 @@ const mocks = [
           performers: [
             {
               __typename: "Performer",
-              id: "10",
+              id: policyIDs.performer,
               name: "River",
               disambiguation: "",
               aliases: [],

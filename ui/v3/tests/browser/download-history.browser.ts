@@ -252,7 +252,7 @@ test("empty reporting history does not mean an existing file is unavailable", as
   ).toBeVisible();
   await expect(
     first.getByRole("link", { name: "Open media", exact: true }),
-  ).toHaveAttribute("href", "/images/7");
+  ).toHaveAttribute("href", `/images/${albumUUID(1)}`);
   await first
     .getByRole("button", { name: "Download history", exact: true })
     .click();

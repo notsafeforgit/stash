@@ -185,7 +185,7 @@ for (const desktop of [false, true])
       page
         .locator('[data-source-position="1"]')
         .getByRole("link", { name: "Open media", exact: true }),
-    ).toHaveAttribute("href", "/scenes/8");
+    ).toHaveAttribute("href", `/scenes/${albumUUID(2)}`);
     await expect
       .poll(() =>
         page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),

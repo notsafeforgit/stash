@@ -116,7 +116,10 @@ for (const viewport of [
     await page.getByRole("button", { name: "Metadata", exact: true }).click();
     await expect(
       page.getByRole("link", { name: "Review retained metadata" }),
-    ).toHaveAttribute("href", /scenes\/7\?.*metadata-review/);
+    ).toHaveAttribute(
+      "href",
+      `/scenes/${reviewQueuePage("metadata").items[0]?.media?.uuid}?tab=metadata-review`,
+    );
     await expect(
       page.getByRole("link", { name: "Review post media" }),
     ).toHaveCount(0);

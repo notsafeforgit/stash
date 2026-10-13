@@ -157,7 +157,7 @@ async function archive(
       return route.fulfill({
         json: uuids.map((uuid) => ({
           requested_uuid: uuid,
-          entity: { uuid, kind: "performer", revision: 1, local_id: 10 },
+          entity: { uuid, kind: "performer", revision: 1 },
           name: "River",
           disambiguation: "",
         })),
@@ -387,6 +387,64 @@ test("edits plain jq and tests selected scene and image data without mutations",
   });
 });
 
+test("rejects a mismatched performer identity and allows selecting the verified performer afterward", async ({
+  page,
+}) => {
+  const remote = await archive(page);
+  const identityURL = "**/entity-identities/performer/**";
+  await page.route(identityURL, (route) =>
+    route.fulfill({
+      json: { uuid: policyIDs.entity, kind: "performer", revision: 1 },
+    }),
+  );
+  await open(page);
+  await page
+    .getByRole("button", { name: "Add field mapping", exact: true })
+    .click();
+  const performer = page.getByRole("group", {
+    name: "Performers",
+    exact: true,
+  });
+  await performer
+    .getByRole("button", { name: "Fixed value", exact: true })
+    .click();
+  const search = performer.getByRole("combobox", {
+    name: /Choose a library entry/,
+  });
+  async function selectPerformer() {
+    await search.fill("River");
+    await page
+      .getByRole("option", {
+        name: `River (#${policyIDs.performer})`,
+        exact: true,
+      })
+      .click();
+  }
+  await selectPerformer();
+  await expect(performer.getByRole("alert")).toContainText(
+    "Could not complete this step",
+  );
+  await expect(
+    performer.getByRole("button", { name: "Remove selected entry" }),
+  ).toHaveCount(0);
+  expect(remote.writes).toEqual([]);
+
+  await page.unroute(identityURL);
+  await selectPerformer();
+  await expect(performer.getByRole("alert")).toHaveCount(0);
+  await expect(performer.getByText("River", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Save metadata policy", exact: true })
+    .click();
+  await expect(
+    page.getByText("Metadata policy saved", { exact: true }),
+  ).toBeVisible();
+  expect(remote.writes).toHaveLength(1);
+  expect(
+    remote.writes[0]?.definition.rules?.scene?.mappings?.performers,
+  ).toEqual({ value: [policyIDs.performer] });
+});
+
 test("selects a fixed performer for folder scans and records schema-constrained rules", async ({
   page,
 }) => {
@@ -407,10 +465,13 @@ test("selects a fixed performer for folder scans and records schema-constrained 
   });
   await search.click();
   await search.fill("River");
-  await page.getByRole("option", { name: "River (#10)", exact: true }).click();
-  await expect(
-    performer.getByText("River (#10)", { exact: true }),
-  ).toBeVisible();
+  await page
+    .getByRole("option", {
+      name: `River (#${policyIDs.performer})`,
+      exact: true,
+    })
+    .click();
+  await expect(performer.getByText("River", { exact: true })).toBeVisible();
   await page
     .getByRole("switch", {
       name: "Mark organized after metadata is selected",
@@ -579,10 +640,13 @@ test("uses a selected performer default with jq name matching, dry preview and d
   });
   await picker.click();
   await picker.fill("River");
-  await page.getByRole("option", { name: "River (#10)", exact: true }).click();
-  await expect(
-    performer.getByText("River (#10)", { exact: true }),
-  ).toBeVisible();
+  await page
+    .getByRole("option", {
+      name: `River (#${policyIDs.performer})`,
+      exact: true,
+    })
+    .click();
+  await expect(performer.getByText("River", { exact: true })).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
@@ -655,9 +719,7 @@ test("uses a selected performer default with jq name matching, dry preview and d
       exact: true,
     }),
   ).toBeChecked();
-  await expect(
-    performer.getByText("River (#10)", { exact: true }),
-  ).toBeVisible();
+  await expect(performer.getByText("River", { exact: true })).toBeVisible();
   await performer
     .getByRole("button", { name: "Fixed value", exact: true })
     .click();

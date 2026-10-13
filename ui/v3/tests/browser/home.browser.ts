@@ -1,3 +1,4 @@
+import { libraryID } from "../fixtures/library";
 import { test, expect } from "./test";
 
 test.beforeEach(async ({ page }) => {
@@ -137,7 +138,7 @@ test("the drawer preloads Home and offscreen rows wait until approached", async 
     .toBe(true);
   await expect
     .poll(() => page.evaluate(() => window.homeFixtureDefinitions))
-    .toEqual(["2"]);
+    .toEqual([libraryID(2)]);
   expect(await page.evaluate(() => window.homeFixtureQueries)).toEqual([]);
   await page.getByRole("link", { name: "Home", exact: true }).click();
   const firstRow = page
@@ -320,7 +321,7 @@ test("a Home carousel keeps its full snap range while mounting nearby cards", as
   await expect(strip.locator("article").first()).toBeVisible();
   const width = await strip.evaluate((element) => element.scrollWidth);
   const height = await strip.evaluate((element) => element.clientHeight);
-  const firstCard = strip.locator('article[data-id="0"]');
+  const firstCard = strip.locator(`article[data-id="${libraryID(100)}"]`);
   await expect(firstCard.locator("img")).toHaveCount(1);
   expect(await strip.locator("article").count()).toBeLessThan(10);
   await strip.evaluate((element) => {
@@ -328,7 +329,7 @@ test("a Home carousel keeps its full snap range while mounting nearby cards", as
   });
   await expect
     .poll(() => strip.locator("article").last().getAttribute("data-id"))
-    .toBe("24");
+    .toBe(libraryID(124));
   await expect(strip.locator("article").last()).toBeInViewport();
   await expect(firstCard).toHaveCount(1);
   await expect(firstCard.locator("img")).toHaveCount(0);

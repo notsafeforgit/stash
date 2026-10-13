@@ -1,3 +1,4 @@
+import { libraryID } from "../../fixtures/library";
 import { ApolloClient } from "@apollo/client";
 import { ApolloProvider, useQuery } from "@apollo/client/react";
 import type { ReactNode } from "react";
@@ -221,9 +222,11 @@ const configuration: GQL.ConfigDataFragment = {
             ...settings,
             version: 2,
             rail: legacyRail,
-            sceneFilter: { kind: "saved", id: "1" },
-            markerFilter: { kind: "saved", id: "2" },
-            rules: [{ kind: "filter", mode: "scenes", filterId: "999" }],
+            sceneFilter: { kind: "saved", id: libraryID(1) },
+            markerFilter: { kind: "saved", id: libraryID(2) },
+            rules: [
+              { kind: "filter", mode: "scenes", filterId: libraryID(999) },
+            ],
           }
         : params.has("legacy-gear")
           ? { ...settings, version: 3, rail: legacyRail }
@@ -528,7 +531,7 @@ const savedFilters: MockedResponse<
         },
         {
           __typename: "SavedFilter" as const,
-          id: "1",
+          id: libraryID(1),
           name: "Scene picks",
           mode: GQL.FilterMode.Scenes,
           find_filter: null,
@@ -537,7 +540,7 @@ const savedFilters: MockedResponse<
         },
         {
           __typename: "SavedFilter" as const,
-          id: "2",
+          id: libraryID(2),
           name: "Marker picks",
           mode: GQL.FilterMode.SceneMarkers,
           find_filter: null,

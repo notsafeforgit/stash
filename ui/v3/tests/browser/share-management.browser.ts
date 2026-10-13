@@ -1,3 +1,4 @@
+import { libraryID } from "../fixtures/library";
 import * as GQL from "../../src/core/generated-graphql";
 import { test, expect } from "./test";
 import { z } from "zod";
@@ -35,7 +36,7 @@ test("share target search uses library titles, filenames and gallery folders", a
           scenes: [
             {
               __typename: "Scene",
-              id: "1",
+              id: libraryID(1),
               title: "Saved scene title",
               files: [
                 {
@@ -46,7 +47,7 @@ test("share target search uses library titles, filenames and gallery folders", a
             },
             {
               __typename: "Scene",
-              id: "2",
+              id: libraryID(2),
               title: "",
               files: [
                 {
@@ -62,7 +63,7 @@ test("share target search uses library titles, filenames and gallery folders", a
           images: [
             {
               __typename: "Image",
-              id: "3",
+              id: libraryID(3),
               title: null,
               visual_files: [
                 {
@@ -78,7 +79,7 @@ test("share target search uses library titles, filenames and gallery folders", a
           galleries: [
             {
               __typename: "Gallery",
-              id: "4",
+              id: libraryID(4),
               title: "",
               image_count: 1,
               files: [],
@@ -90,7 +91,7 @@ test("share target search uses library titles, filenames and gallery folders", a
             },
             {
               __typename: "Gallery",
-              id: "5",
+              id: libraryID(5),
               title: null,
               image_count: 1,
               files: [
@@ -210,7 +211,12 @@ for (const viewport of [
           findScenes: {
             __typename: "FindScenesResultType",
             scenes: [
-              { __typename: "Scene", id: "1", title: sceneTitle, files: [] },
+              {
+                __typename: "Scene",
+                id: libraryID(1),
+                title: sceneTitle,
+                files: [],
+              },
             ],
           },
           findImages: {
@@ -218,7 +224,7 @@ for (const viewport of [
             images: [
               {
                 __typename: "Image",
-                id: "2",
+                id: libraryID(2),
                 title: "Second image",
                 visual_files: [],
               },
@@ -267,7 +273,7 @@ for (const viewport of [
           items: input.targets.map((target) => ({
             __typename: "MediaShareEntry",
             ...target,
-            title: target.id === "1" ? sceneTitle : "Second image",
+            title: target.id === libraryID(1) ? sceneTitle : "Second image",
             media_count: 1,
           })),
         };
@@ -373,8 +379,8 @@ for (const viewport of [
       page.getByRole("dialog", { name: "Your share link is ready" }),
     );
     expect(inputLog[0]?.targets).toEqual([
-      { kind: GQL.ShareEntityKind.Scene, id: "1" },
-      { kind: GQL.ShareEntityKind.Image, id: "2" },
+      { kind: GQL.ShareEntityKind.Scene, id: libraryID(1) },
+      { kind: GQL.ShareEntityKind.Image, id: libraryID(2) },
     ]);
     expect(inputLog[0]?.allow_download).toBe(false);
     expect(inputLog[0]?.show_metadata).toBe(false);

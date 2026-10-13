@@ -175,7 +175,9 @@ must match that tweet's numbered attachment in a historical `, twitter` folder.
 It rejects changed files. Reused ordinals retain a confirmed post association
 without selecting either file into that ambiguous slot. It only consolidates anonymous
 fragments whose complete retained filename evidence agrees on this same tweet,
-preserving source text and refusing existing selection, gallery or unlink choices.
+preserving source text and refusing explicit selection, gallery or unlink choices.
+An automatic unordered gallery already made by the confirmed-post-media repair
+is retained as the destination, including its membership choices.
 
 Stop Stash and retain a current backup first. Run the command with `--database`,
 `--input`, the reviewed input's `--expected-sha256` and

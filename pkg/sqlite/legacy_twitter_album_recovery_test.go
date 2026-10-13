@@ -200,3 +200,52 @@ func TestLegacyTwitterRecoveryPreservesExplicitChoicesAndDistinctPosts(t *testin
 		})
 	}
 }
+
+func TestLegacyTwitterRecoveryRetainsPreviouslyRecoveredUnorderedGallery(t *testing.T) {
+	f, input := legacyRecoveryFixture(t)
+	recordContentClaim(t, f.repo, f.claim)
+	parent := sourceTestPost(t, f.repo, models.SourcePostIdentifier{Namespace: "legacy:catalog:fixture", Value: "album"}, "")
+	recordSourceTestCapture(t, f.repo, sourceTestCapture(t, parent.UUID, 1, "profile"))
+	linkAlbumPostMedia(t, f.repo, parent.UUID, models.ArchiveImage, 41)
+	linkAlbumPostMedia(t, f.repo, parent.UUID, models.ArchiveScene, 31)
+	recordPath := func(post, name string) {
+		observation := f.observation
+		observation.UUID, observation.RelativePath = uuid.NewString(), "example, twitter/"+name
+		recordFileObservation(t, f.repo, observation)
+		require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+			_, err := f.repo.SourceFile.RecordPostEvidence(ctx, models.SourcePostFileEvidence{SourcePostEvidence: models.SourcePostEvidence{
+				UUID: uuid.NewString(), PostUUID: post, Origin: "migration", Basis: "catalog-appearance", ObservedAt: observation.ObservedAt}, ObservationUUID: observation.UUID})
+			return err
+		}))
+	}
+	recordPath(parent.UUID, recoveryTweet+"_1.jpg")
+	recordPath(parent.UUID, recoveryTweet+"_3.mkv")
+	initial := applyAlbumBackfill(t, f.repo, albumBackfillPreview(t, f.repo, parent.UUID, models.SourceAlbumLinkedMediaV1))
+	before := filenameSelectionGet(t, f.repo, parent.UUID)
+	attachmentSQL(t, f.db, `INSERT INTO images(id,title,created_at,updated_at) VALUES(42,'extra',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+ INSERT INTO files(id,parent_folder_id,basename,size,mod_time,created_at,updated_at) VALUES(23,1,'1575550205214134278_2.jpg',1000,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+ INSERT INTO images_files(image_id,file_id,"primary") VALUES(42,23,1);`)
+	fragment := sourceTestPost(t, f.repo, models.SourcePostIdentifier{Namespace: "legacy:catalog:fixture", Value: "extra"}, "")
+	recordSourceTestCapture(t, f.repo, sourceTestCapture(t, fragment.UUID, 1, "profile"))
+	linkAlbumPostMedia(t, f.repo, fragment.UUID, models.ArchiveImage, 42)
+	recordPath(fragment.UUID, recoveryTweet+"_2.jpg")
+	input.Evidence = append(input.Evidence, sqlite.LegacyTwitterFile{FileUUID: archiveFind(t, f.repo, models.ArchiveFile, 23).UUID,
+		MediaUUID: archiveFind(t, f.repo, models.ArchiveImage, 42).UUID, Generation: 1})
+	preview, err := f.db.PreviewLegacyTwitterRecovery(t.Context(), input)
+	require.NoError(t, err)
+	require.Equal(t, parent.UUID, preview.PostUUID)
+	post, err := f.db.ApplyLegacyTwitterRecovery(t.Context(), input, preview.Signature)
+	require.NoError(t, err)
+	require.Equal(t, parent.UUID, post)
+	after := filenameSelectionGet(t, f.repo, post)
+	require.Equal(t, before.Decision.Mode, after.Decision.Mode)
+	require.Equal(t, before.Decision.ManifestUUIDs, after.Decision.ManifestUUIDs)
+	require.Equal(t, before.DeclaredAlbum, after.DeclaredAlbum)
+	require.Equal(t, before.Entries, after.Entries)
+	updated := applyAlbumBackfill(t, f.repo, albumBackfillPreview(t, f.repo, post, models.SourceAlbumIdentifiersV1))
+	require.Equal(t, initial.Gallery.GalleryID, updated.Gallery.GalleryID)
+	sourceGalleryMemberships(t, f.repo, *updated.Gallery.GalleryID, []int{41, 42}, []int{31})
+	backup := filepath.Join(t.TempDir(), "existing-gallery.sqlite")
+	require.NoError(t, f.db.Backup(backup))
+	require.NoError(t, f.db.AuditForTesting(backup))
+}

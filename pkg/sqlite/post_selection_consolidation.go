@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"errors"
 	"slices"
 
 	"github.com/stashapp/stash/pkg/archive"
@@ -94,7 +95,7 @@ func prepareConsolidatedPostSelection(ctx context.Context, input models.Attachme
 		}
 		return &models.AttachmentSelection{Decision: decision}, nil
 	}
-	capture, primary, err := selectionCapture(ctx, input.PostUUID, input.CaptureUUID)
+	capture, primary, err := consolidatedSelectionAnchor(ctx, input, heads, manifests)
 	if err != nil {
 		return nil, err
 	}
@@ -134,4 +135,29 @@ func prepareConsolidatedPostSelection(ctx context.Context, input models.Attachme
 	}
 	decision.CaptureUUID, decision.ManifestUUIDs = &capture, manifests
 	return selectionFromMerge(decision, merged.Manifest, sources), nil
+}
+
+func consolidatedSelectionAnchor(ctx context.Context, input models.AttachmentSelectionInput, heads []attachmentSelectionRow, manifests []string) (string, string, error) {
+	capture, primary, err := selectionCapture(ctx, input.PostUUID, input.CaptureUUID)
+	if err == nil || !errors.Is(err, models.ErrAttachmentSelectionConflict) {
+		return capture, primary, err
+	}
+	// A recovered list uses a retained capture as a metadata anchor, without
+	// pretending the remote capture contained that list. Such a list may be
+	// carried through a merge only from an exact current choice in its review.
+	for _, head := range heads {
+		selected, readErr := storedSelection(ctx, &head)
+		if readErr != nil {
+			return "", "", readErr
+		}
+		if selected.Decision.Mode != input.Mode || selected.Decision.CaptureUUID == nil ||
+			*selected.Decision.CaptureUUID != input.CaptureUUID || len(selected.Decision.ManifestUUIDs) == 0 {
+			continue
+		}
+		primary = selected.Decision.ManifestUUIDs[0]
+		if slices.Contains(manifests, primary) {
+			return input.CaptureUUID, primary, nil
+		}
+	}
+	return "", "", err
 }

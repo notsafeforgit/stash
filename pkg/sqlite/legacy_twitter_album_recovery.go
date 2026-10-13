@@ -161,8 +161,25 @@ func legacyTwitterFragments(ctx context.Context, tweet string, members map[strin
 		if err != nil {
 			return nil, err
 		}
-		if post == nil || post.State != "active" || chosen {
+		if post == nil || post.State != "active" {
 			return nil, models.ErrSourceGalleryConflict
+		}
+		if chosen {
+			// The broad linked-media repair may already have created this same
+			// album before its Twitter ID was recovered. Preserve that choice;
+			// explicit choices and independently ordered lists still require review.
+			selection, err := (&SourceAttachmentStore{}).Selection(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			gallery, err := (&SourceGalleryStore{}).Association(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			if !linkedMediaSelection(selection) || selection.Decision.Mode != "automatic" || selection.Decision.Origin != "migration" ||
+				gallery == nil || gallery.State != "linked" || gallery.Origin != "source" {
+				return nil, models.ErrSourceGalleryConflict
+			}
 		}
 		for media, state := range states {
 			if !members[media] || state != "linked" {
@@ -221,6 +238,21 @@ func previewLegacyTwitterRecovery(ctx context.Context, input LegacyTwitterRecove
 	if err != nil {
 		return nil, err
 	}
+	for index, fragment := range ret.Fragments {
+		selection, err := (&SourceAttachmentStore{}).Selection(ctx, fragment.UUID)
+		if err != nil {
+			return nil, err
+		}
+		if selection == nil {
+			continue
+		}
+		if ret.PostUUID != "" {
+			return nil, models.ErrSourceGalleryConflict
+		}
+		ret.PostUUID = fragment.UUID
+		// Consolidate into the existing gallery's owner, never a new owner.
+		ret.Fragments[0], ret.Fragments[index] = ret.Fragments[index], ret.Fragments[0]
+	}
 	ret.Signature, err = sourceSignature("legacy-twitter-library-recovery-v1", ret)
 	return ret, err
 }
@@ -251,14 +283,14 @@ func (db *Database) ApplyLegacyTwitterRecovery(ctx context.Context, input Legacy
 		if signature == "" || signature != preview.Signature {
 			return models.ErrSourceGalleryConflict
 		}
-		postID, err = applyLegacyTwitterRecovery(ctx, preview)
+		postID, err = applyLegacyTwitterRecovery(ctx, preview, repo.SourceEvidence)
 		return err
 	})
 	return postID, err
 }
 
-func applyLegacyTwitterRecovery(ctx context.Context, preview *LegacyTwitterRecoveryPreview) (string, error) {
-	store, attachments := &SourceEvidenceStore{}, &SourceAttachmentStore{}
+func applyLegacyTwitterRecovery(ctx context.Context, preview *LegacyTwitterRecoveryPreview, store models.SourceEvidenceReaderWriter) (string, error) {
+	attachments := &SourceAttachmentStore{}
 	reference := models.SourcePostIdentifier{Namespace: "native:twitter", Value: preview.TweetID}
 	reason := "Recover Twitter post and attachment order from original gallery-dl filenames"
 	var post *models.SourcePost
@@ -287,6 +319,10 @@ func applyLegacyTwitterRecovery(ctx context.Context, preview *LegacyTwitterRecov
 		if _, _, err := store.ApplyConsolidationReview(ctx, models.PostConsolidationReviewApplyInput{PostConsolidationReviewInput: input, RequestUUID: uuid.NewString(), Digest: plan.Digest}, time.Now().UTC()); err != nil {
 			return "", err
 		}
+	}
+	if preview.PostUUID != "" {
+		// Its existing unordered selection and gallery stay authoritative.
+		return post.UUID, nil
 	}
 	capture, err := sourceAlbumMetadataAnchor(ctx, post.UUID)
 	if err != nil {

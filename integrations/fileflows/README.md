@@ -9,6 +9,10 @@ assigns a unique clip name, and hashes the exported file. A JSON manifest carrie
 the title, description, and clip timestamps. Filenames come from the saved file
 paths so hidden extensions stay in the manifest. Recording timestamps explicitly
 include ISO 8601 time and timezone, preserving order within the same day.
+File details read the saved file through Shortcuts' `WFInput` parameter. Existing
+uploads with blank clip names or hidden extensions can still be processed when
+the expected `clip-N` resolves to exactly one supported file and its checksum
+matches. Ambiguous files remain untouched for review.
 For multiple clips, the shortcut
 offers **Recording date (oldest first)** or **Choose clip order**. The latter
 shows clips with their recording date, filename and available preview; choose
@@ -47,6 +51,12 @@ using one durable Stash request. Stash applies the supplied metadata and the
 folder's performer policy in the media registration transaction. Retrying a
 request after an interrupted response does not duplicate the import. Previously
 curated conflicting fields are retained and reported for review.
+
+Finished filenames use the readable title and an eight-character batch suffix,
+with the title limited to 180 UTF-8 bytes to leave room for publication staging
+names. The full batch identity remains in the handoff metadata. A filename
+collision stops without overwriting an existing video. Stash's title contains
+only the text supplied by the shortcut.
 
 The small pending JSON is removed only when Stash acknowledges successful media
 registration without conflicts. It remains available during restarts, failed
@@ -110,3 +120,10 @@ web console.
 Run `python3 -m unittest discover -s integrations/fileflows -v` for the transport
 recovery tests. The actual FileFlows pipeline should also be exercised with
 synthetic clips when its preparation or publication nodes change.
+
+For preparation checks, use a temporary FileFlows C# test node: set `testRoot`
+to an empty, dedicated directory, wrap `prepare-clips.cs` in a `Func<int>` named
+`prepare`, then append `test-prepare.cs`. It creates tiny fixtures and checks
+missing names, hidden extensions, checksum failures, ambiguous files, ordering,
+existing output collisions, and Unicode filename limits without encoding.
+Remove that test flow and its directory after the checks.

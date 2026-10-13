@@ -51,10 +51,33 @@ try
         string name = item.GetProperty("name").GetString();
         string digest = item.GetProperty("sha256").GetString();
         string recorded = item.GetProperty("recorded_at").GetString();
-        if (string.IsNullOrEmpty(name) || name != System.IO.Path.GetFileName(name) || name.Contains('\\') ||
+        if (!System.Text.RegularExpressions.Regex.IsMatch(digest ?? "", @"^[a-fA-F0-9]{64}$"))
+            throw new System.Exception("Clip " + (index + 1) + " has an invalid checksum.");
+        // Earlier iPhone exports supplied an empty name or hid the extension.
+        // Only resolve the expected clip number, with one matching media file;
+        // the checksum below must still match before encoding or cleanup.
+        if (string.IsNullOrEmpty(name)) name = "clip-" + (index + 1);
+        if (System.Text.RegularExpressions.Regex.IsMatch(name, @"^clip-[0-9]+$"))
+        {
+            var candidates = new System.Collections.Generic.List<string>();
+            foreach (var candidate in System.IO.Directory.GetFiles(dir.FullName))
+                if (System.Text.RegularExpressions.Regex.IsMatch(System.IO.Path.GetFileName(candidate),
+                    "^" + name + @"\.(mov|mp4|m4v)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    candidates.Add(System.IO.Path.GetFileName(candidate));
+            if (candidates.Count == 0)
+            {
+                Logger.ILog("Clip " + (index + 1) + " has not arrived; retrying in five minutes.");
+                return 2;
+            }
+            if (candidates.Count != 1)
+                throw new System.Exception("More than one file matches " + name + "; cannot resolve the upload safely.");
+            name = candidates[0];
+            Logger.ILog("Resolved clip " + (index + 1) + " as " + name + "; verifying its uploaded checksum.");
+        }
+        if (name != System.IO.Path.GetFileName(name) || name.Contains('\\') ||
             !System.Text.RegularExpressions.Regex.IsMatch(name, @"^clip-[0-9]+\.(mov|mp4|m4v)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
-            !names.Add(name) || !System.Text.RegularExpressions.Regex.IsMatch(digest ?? "", @"^[a-fA-F0-9]{64}$"))
-            throw new System.Exception("Invalid or repeated clip name/hash.");
+            !names.Add(name))
+            throw new System.Exception("Invalid or repeated clip name.");
         System.DateTimeOffset date;
         if (!System.Text.RegularExpressions.Regex.IsMatch(recorded ?? "", @"(Z|[+-][0-9]{2}:[0-9]{2})$") ||
             !System.DateTimeOffset.TryParse(recorded, System.Globalization.CultureInfo.InvariantCulture,
@@ -102,10 +125,11 @@ try
             System.Globalization.DateTimeStyles.None, out var ignored)) throw new System.Exception("Invalid scene date.");
     }
     string safeTitle = System.Text.RegularExpressions.Regex.Replace(title, @"[\x00-\x1f/\\:*?""<>|]", "_").Trim().TrimEnd('.');
-    while (System.Text.Encoding.UTF8.GetByteCount(safeTitle) > 120) safeTitle = safeTitle.Substring(0, safeTitle.Length-1);
+    // Reserve room for the suffix, extension, and atomic publication filenames.
+    while (System.Text.Encoding.UTF8.GetByteCount(safeTitle) > 180) safeTitle = safeTitle.Substring(0, safeTitle.Length-1);
     if (safeTitle.Length > 0 && char.IsHighSurrogate(safeTitle[safeTitle.Length-1])) safeTitle = safeTitle.Substring(0, safeTitle.Length-1);
     if (safeTitle.Length == 0) safeTitle = "Phone video";
-    string basename = safeTitle + " [" + batch + "]";
+    string basename = safeTitle + " [" + batch.Substring(0, 8) + "]";
     string target = System.IO.Path.Combine(dir.Parent.FullName, basename + ".mkv");
     string handoff = System.IO.Path.Combine(dir.Parent.FullName, "stash-import-" + batch + ".json");
     if (System.IO.File.Exists(target) || System.IO.File.Exists(handoff))

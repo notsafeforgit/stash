@@ -47,7 +47,7 @@ def action_builder(actions):
 def file_name(add, item):
     # Get Name can hide a file's extension (clip-1.mov became clip-1 on iOS).
     # Use the actual saved path for both manifests and upload recovery.
-    path = add("properties.files", WFFolder=token(item), WFContentItemPropertyName="File Path")
+    path = add("properties.files", WFInput=token(item), WFContentItemPropertyName="File Path")
     name = add("text.match", text=text(path), WFMatchTextPattern=r"[^/]+(?=/?$)")
     return add("getitemfromlist", WFInput=token(name), WFItemSpecifier="First Item")
 
@@ -294,6 +294,8 @@ def validate(workflow):
         kind = action["WFWorkflowActionIdentifier"].removeprefix("is.workflow.actions.")
         if kind == "text.match" and "WFInput" in params:
             raise ValueError("Match Text takes its input in text, not WFInput")
+        if kind == "properties.files" and ("WFInput" not in params or "WFFolder" in params):
+            raise ValueError("Get Details of Files requires WFInput")
         for slot in text_slots.get(kind, ()):
             value = params.get(slot)
             if isinstance(value, dict) and value.get("WFSerializationType") != "WFTextTokenString":

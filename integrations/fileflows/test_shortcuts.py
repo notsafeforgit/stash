@@ -106,7 +106,7 @@ class OrderWorkflow:
             elif kind == "getitemname": result = incoming["name"]
             elif kind == "properties.files":
                 assert p["WFContentItemPropertyName"] == "File Path"
-                item = self.value(p["WFFolder"])
+                item = incoming
                 result = item.get("path", "/Workspace/" + item["name"])
             elif kind == "file.getfoldercontents": result = self.value(p["WFFolder"])["children"]
             elif kind == "properties.images": result = incoming["recorded_at"]
@@ -237,6 +237,15 @@ class ShortcutEncodingTests(unittest.TestCase):
 
 
 class FileNameTests(unittest.TestCase):
+    def test_rejects_folder_parameter_in_file_details(self):
+        # Get Details of Files takes WFInput. WFFolder belongs to folder
+        # actions; the phone silently returned no path with that parameter.
+        flow = OrderWorkflow({}, [], lambda add: file_name(add, {"Type": "ExtensionInput"}))
+        params = flow.actions[0]["WFWorkflowActionParameters"]
+        params['WFFolder'] = params.pop('WFInput')
+        with self.assertRaisesRegex(ValueError, 'requires WFInput'):
+            validate({'WFWorkflowActions': flow.actions})
+
     def test_uses_saved_path_when_display_name_hides_extension(self):
         for name in ("clip-1.mov", "clip-2.MP4", "clip-3.m4v", "stash-clips.json",
                      "stash-upload-" + "a"*64 + ".part"):

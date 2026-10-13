@@ -126,8 +126,6 @@ does not leave a stale local ID in the source result.
 The storage contract, API, batches, identification paths, interactive selection
 and history UI are implemented. SQLite/HTTP tests verify transactional receipts;
 form tests and Chromium/WebKit checks cover selection, manual edits, discard,
-related-item creation and history pagination. See
-[the interactive verification report](native-provider-review-verification.json).
-Populated schema-96 migration, final-image startup/performance and owner
-acceptance remain cutover requirements. Production remains on the compatible
-release until the full cutover gates pass.
+related-item creation and history pagination. Installation-specific populated
+database rehearsals and production acceptance records are maintained separately
+from the application contract.

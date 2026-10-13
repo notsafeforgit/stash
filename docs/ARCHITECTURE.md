@@ -3,10 +3,10 @@
 This is the system overview for the `v3-rewrite` independent fork. Stash runs one
 Go backend with a shared GraphQL API, a SQLite library, filesystem media, and
 the embedded v3 application, including standalone share and offline entries.
-The v2.5 frontend and selector are removed. Remaining storage/API bridges are
-tracked under the [native archive transition](native-archive-transition-plan.md);
-they are not constraints on new development. The
-[progress record](native-archive-progress.md) tracks the migration and cutover.
+The v2.5 frontend and selector are removed. The
+[native architecture and upgrade boundaries](native-archive-transition-plan.md)
+describe the shared application contract. Personal automation and production
+records have a separate repository and release lifecycle.
 
 Start here for runtime and storage boundaries. The [v3 frontend guide](../ui/v3/docs/architecture.md)
 maps UI modules and state ownership; the [development guide](../ui/v3/docs/development.md)

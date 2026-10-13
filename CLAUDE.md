@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Stash is a self-hosted media organizer written in Go (backend) + React/TypeScript (frontend). It exposes a GraphQL API, manages a SQLite database, and wraps FFmpeg for video processing.
 
-This repository is now an **independent fork** of upstream stashapp/stash. Work continues on `v3-rewrite` under the [native archive transition plan](docs/native-archive-transition-plan.md); merge into `develop` follows migration verification and the owner's success review. Read [FORK.md](FORK.md) for migration, release, and upstream-import policy. V2.5 compatibility is frozen at `v2.5-compatible-final`, not a constraint on new code. The native application and scraper queues are running in production, and independent cloud restore verification passed. [Transition progress](docs/native-archive-progress.md) and the [cutover record](docs/native-production-cutover-verification.json) track current deployment and outstanding acceptance checks. The [documentation index](docs/README.md) links current guides.
+This repository is an **independent fork** of upstream stashapp/stash. Work continues on `v3-rewrite`; read [FORK.md](FORK.md) for release and upstream-import policy. V2.5 compatibility is frozen at `v2.5-compatible-final`, not a constraint on new code. A fresh installation is a local media library with source tracking off. Personal FileFlows workflows, host backup orchestration and production records are maintained separately in `notsafeforgit/stash-ops`, not as application build dependencies. The [documentation index](docs/README.md) links current guides.
 
 The owner requires GitHub Actions-built, GHCR-published production images. Do not
 deploy another local-image fallback or treat a Git push as publication. Follow
@@ -44,7 +44,6 @@ tracks. Do not remove a required caller without converting and testing it.
 ```bash
 make pre-ui       # Install v3 dependencies
 make pre-producer # Install the isolated gallery-dl producer test runtime
-make pre-backup   # Install the isolated host backup test runtime
 make generate     # Generate Go and v3 GraphQL bindings
 make ui           # Build the embedded v3 app and login locales
 # Terminal 1:
@@ -77,7 +76,6 @@ make it                # Go unit + integration tests only
 make validate-producer # Python delivery, lease and gallery-dl lifecycle tests
 make validate-library  # Native manual tag/performer helper contracts
 make validate-archive  # Portable archive integrity, restore and offline access
-make validate-backup   # Host publication, native/media bindings and restore policy
 make lint              # CI-pinned golangci-lint via go run
 make fmt               # Format Go source
 make validate-ui-v3    # Biome, generation/types, formatting, locales, tests, native contracts
@@ -99,249 +97,25 @@ Native producer tests require Python 3.12 or newer. `make pre-producer` installs
 the pinned gallery-dl/yt-dlp test dependencies into `.local/native-producer`;
 `PRODUCER_PYTHON` can select another prepared environment. The supported package
 in `integrations/gallery-dl` uses only the standard library for delivery.
-Producer/backup environments and dependency installation use `uv venv` and
-`uv pip --python` with explicit interpreter paths. Verification uses Python
-`-I` so workspace `PYTHONPATH` cannot shadow installed modules. Producer wheel builds discard obsolete
-`build/lib` modules, and both setup targets verify installed source files with
-`scripts/verify_producer_install.py`. A staged worker policy must fingerprint the
-same code as the actual installed runtime; source-import tests alone cannot prove it.
-Host/n8n launch paths now select the native adapter. The n8n initial-profile
-queue and native download worker are running; host scrape, intake, dedupe and
-backup schedules have resumed and their execution is being observed. Do not equate an installed
-launcher, active timer or admitted job with completed ingestion.
-`integrations/archive` provides the standard-library `stash-archive` tool for
-compressed native SQLite snapshots, original artwork and explicit configuration
-or operating-state components. See the [portable archive format](docs/native-archive-format.md).
-Restore verifies complete contents into a new directory and never activates a
-server or worker. `export --server` captures the application's fixed WAL view,
-configuration, runtime overrides, TLS assets and deletion recovery trees after
-the declared producer/download snapshots. The authorized publisher can release
-temporary components after durable publication; retained checkpoint/release
-records prevent the same UUID from capturing newer state. Complete external-file/
-media inventory, publisher/abandoned-stage retention integration and S3/restore activation remain required;
-declared component coverage does not establish a complete production backup.
-External SQLite state such as n8n executions uses the `operating_database` role.
-Capture committed WAL contents with SQLite backup, retain its original staged
-bytes on retry and verify database metadata again on restore. Include matching
-encryption/configuration files and external execution payloads separately;
-worker publication locks alone do not stop unrelated n8n writers or pruning.
-The host backup's optional `quiesce_containers` setting briefly pauses explicit
-rootless Podman containers after taking worker barriers. Separate bounded
-systemd guards resume their exact IDs even if the publisher dies; sealed retries
-validate the original evidence without pausing again. Enable this for n8n only
-at the coordinated native handoff, with its database and payloads inventoried.
-Worker inventories can declare `state_directories` for changing external payload
-trees, including n8n `binaryData`. Enumerate and hash their regular files with
-bounded traversal, retain empty directories, and reject changes before sealing.
-Keep live SQLite databases outside opaque trees and declare them explicitly.
-The optional external-boundary handshake keeps the native writer guard until a
-bounded host confirmation and seals that evidence with the checkpoint. Establish
-producer barriers before requesting that guard; the server never executes
-filesystem provider commands. Sealed retries must reuse the original view.
-The host-side `ArtworkPins` provider retains original artwork inodes during that
-callback and binds export/retry to the sealed evidence. Retire pins through
-publication-aware release or server-fenced unsealed abandonment, keeping small
-receipts and resuming interrupted cleanup. Native gallery-dl mutations share a cooperative publication
-lock. The host acquires `PublicationBarrier` across the inventoried worker lock
-roots before the database guard, then releases it after retaining immutable
-views. Existing backup/dedupe exclusion is still required; legacy workers do not
-participate. `ZFSMedia` retains a held, GUID-bound snapshot of an explicitly
-inventoried Linux ZFS dataset; nested datasets/mounts fail closed.
-`HostFilesystemCapture` coordinates that view and artwork pins with the native
-handshake, releasing producer barriers before the large database copy and on
-sealed replay. The enclosing host backup keeps its existing backup/dedupe lock.
-Daily-script integration, complete component/media-manifest inventory and remote
-publication verification remain required; the providers do not upload to S3.
-Host backup retries use `HostFilesystemCapture.prepare` to persist the original
-download archives, producer outboxes and external configuration in a private
-`ComponentStage`. Seal that stage before media publication, then pass it to the
-exporter. Reopened or uncertain attempts only GET an already sealed server view;
-they cannot create a later snapshot with old worker state. The stage inventory
-is bound into the server's filesystem receipt and checked again while packing.
-Publication-aware component release validates the complete archived inventory,
-supports interrupted cleanup and keeps permanent identity/receipt files.
-The tracked host tools in `integrations/backup` now publish v4 native/media
-manifests through host-owned S3 clients, require verified object checksums,
-and support native download/audit plus historical media restore inputs. Their
-isolated runtime (`make pre-backup`) and regression gate (`make validate-backup`)
-are separate from the server. Installed scripts and scheduling remain unchanged.
-Native archive publication reuses full-checksum receipts from a private,
-rebuildable `object-receipts.sqlite3` index after a complete paginated inventory
-confirms unchanged object identity. New/unknown/changed objects still require
-checksum verification; explicit audits and downloads bypass cached evidence.
-Use 64 MiB raw chunks for new portable exports while retaining 1 MiB input support.
-Keep database/record images in Standard and bulk media in Deep Archive, with
-bounded retention and request-count tests. New cold-media objects use immutable
-content keys in Deep Archive; existing verified filename objects can be reused.
-Do not require bucket versioning to compensate for mutable filename keys.
-The media readers accept v4 object descriptors with separate restore paths and
-a bound cold store, retaining v2/v3 historical input. Native selection v2 binds
-those identities into the portable archive. Deduplicate remote requests by
-object key; different source paths can share bytes. Offline restore verifies all
-selected bytes before extraction and rejects changed inputs and path collisions.
-Cold checksum audits are explicit (`--media-checksums`), never a routine daily
-HEAD sweep. The cold ledger now retains verified checksum receipts, path bindings
-and interrupted-upload associations. One complete inventory reuses unchanged
-proofs; matching renamed/duplicate videos share objects. Cleanup protects all
-current references and rechecks returning or changed live paths before tagging.
-Historical filename videos without additional S3 checksums may use matching
-plaintext/SSE-S3 single-part MD5 or 5/16 MiB multipart ETags plus independently
-computed local SHA-256. Verify complete local bytes before adoption; shape,
-part count and uploader metadata cannot prove integrity. Reject KMS/SSE-C and
-unusable modern checksums. New uploads, content keys and archive publication
-still require full-object S3 checksums. Durable receipts avoid repeated hashing
-or per-object HEAD requests for unchanged media. Whole-library adoption remains
-a deployment check; passing sampled matches does not complete it.
-Retained selections verify every selected object without rescanning. Historical
-v3 in-flight native attempts require their original writer. Production inventory,
-Standard reclamation, full cost measurements and cutover review remain open.
-Successful native commits now publish immutable history receipts before releasing
-their captures. Retain seven successful snapshots by default plus configured
-archive UUID pins. Retirement decisions are durable; every retained snapshot's
-cold-media references protect cleanup, and deferred historical deletion intents
-remain queued. History caches rebuild from remote receipts and verified masters
-using paginated listings without daily per-media HEAD requests. The real 64 MiB
-encoder measurement is recorded in `docs/native-backup-cost-measurement.json`;
-synthetic title edits do not establish daily production churn. Opt-in Standard
-cleanup now protects all retained native graphs, records chunk retirement before
-expiring per-run inventories, and reclaims known large local metadata after
-release/retirement. Tag state is invalidated durably before mutation; publication
-cancels expiration and verifies presence before reusing an object. Unchanged
-runs avoid per-object tag/HEAD sweeps. Native archives already contain the host
-ledgers; duplicate mutable/per-run ledger uploads are removed. Existing legacy
-ledger backups remain untouched. Review and verify the scoped lifecycle and
-versioning configuration before enabling `standard_cleanup`; the publisher
-cannot install policy. Actual policy activation and expiration remain open.
-Host publication/history/recovery/audit/restore share a 512 MiB master JSON
-limit, with 1 MiB extra for the archived media-binding envelope. Native artifact
-inventories have a separate 1 GiB streamed transport limit; the portable small
-manifest and record bounds remain unchanged. Download inventories and encoded
-objects in bounded reads, verify their complete digest/length, then publish a
-new local file. The measured 272,373-video shape exceeds the former 128 MiB cap
-with SHA-256 descriptors; see `docs/native-backup-manifest-scale.json` for the
-isolated publication/history/restore proof and its synthetic-data limits.
-An optional `worker_inventory` declaration resolves download/metadata worker
-profiles, layered private references, helper assets, cookie files and archive
-templates under the declared worker barriers. The host retains the closure per
-run and verifies parsed dependency hashes against the actual component snapshots
-before sealing. Retries use the original closure. `stash-s3-inventory` performs
-read-only inspection with explicit container mappings and never prints resolved
-credentials. Match declarations to actual launchers and published workflows;
-automatic dependency resolution does not prove that every deployment was listed.
-The host now journals one active attempt and resumes its original sealed view,
-media selection or published cleanup after restart. Owned scratch is reclaimed
-only under backup exclusion, which upload/validator children inherit. The S3
-current pointer uses a retained conditional-write token and cannot replace a
-newer publication on retry. Complete production worker/config inventory,
-media-generation reconciliation, full capture measurements and relocated
-restore/cutover review remain required.
-Unsealed retries use the authenticated checkpoint status/abandon protocol before
-scoped host cleanup. Admission and abandonment records permanently reserve UUIDs;
-neither partial output nor a missing GET authorizes recapture. Preserve unknown
-files, reject foreign mounts/holds/clones, and never force ZFS cleanup. ZFS command
-supervisors retain the existing backup lock through sudo and caller timeout;
-close the caller's descriptor rather than explicitly unlocking shared ownership.
-Abandonment is a failed backup invocation; only the next run gets a fresh UUID.
-Filesystem artwork writes publish flushed replacement inodes; never truncate a
-blob in place because readers and backup pins may retain that inode. Orphan
-cleanup must recheck references under a write transaction and use the deletion
-journal, so it cannot bypass a native checkpoint or delete a newly adopted blob.
-The producer CLI can validate a portable worker profile and execute one claimed
-source attempt with concurrent outbox delivery. Website-access references stay
-local, and source completion remains distinct from verified media intake.
-`stash-ingest-config` stages new profiles from ordered gallery-dl JSON layers.
-Preserve conditional map order and layered private references; conversion does
-not activate a worker or replace the existing configuration files.
-`--layered` emits `stash-gallery-worker-layers-v1` references instead of flattened
-copies. Download admissions save the normalized policy in producer schema 17;
-dispatch must retain access to old policies after shared config edits. Include
-both JSON layers and saved-policy dependencies in the host backup inventory.
-`stash-ingest dispatch` discovers scoped work through the native API. Producer
-schema 7 retains pagination/backoff, caller URL snapshots and each ticket's original submission
-assignments. `ticket-status` checks completed source windows against those
-assignments; later rescans cannot complete an earlier cancelled ticket. Discovery
-and admission do not certify completion. Preserve existing request/event state
-when upgrading older outboxes.
-`lookup-collections` resolves exact current source URLs through the producer's
-collection/root grants. Preserve missing and ambiguous candidates for review;
-historical URLs must not silently redirect scheduled work to a new target.
-An explicit root grant covers registered collections at that logical root,
-including later additions; existing collection grants do not widen on migration.
-It grants no source administration or unbound metadata access. Bounded lookup
-responses expose truncation so a partial candidate set never appears unique.
-`queue-sources` freezes a caller's URL list, policy and absolute window before
-network access. Resolution commits each collection binding and ticket together;
-never reinterpret a bound target after a retry. `call-status` checks every
-original ticket and cannot certify media intake. Staged host launchers for Twitter,
-Reddit, Instagram, Coomer, Kemono, Bluesky and TikTok expand lists/modes/dates into source calls. Full-history
-and Reddit top mode require a separate reviewed global `skip=true` profile.
-Local recording is not source completion; strict inspection returns pending until
-all original tickets finish. The staged n8n adapter records stable execution
-identities, checks permanent history before source admission and retains its
-completion proof before submission. Pending workflow results must wait and
-inspect the same token; local recording cannot reach a success branch.
-Instagram downloads retain versioned `instagram_media` membership before the
-pinned extractor filters/reorders files. Preserve carousel slots and separate
-story identity/date from its tray or highlight container. Profile dispatch may
-queue only verified same-service child collections before a source date exists;
-each child still applies the original window. New capture partitioning requires
-that explicit evidence so historical Instagram signatures remain replayable.
-The staged Instagram timer still needs native registration, durable outbox and
-dispatcher/recovery activation at cutover.
-Coomer/Kemono user/post/posts-listing downloads require `original=true` and retain
-`mirror_media` version 1 before upstream file selection or mutation. Revalidate
-primary/attachment/inline membership in the backend; primary aliases must not
-create false albums, and selected download order must not replace source order.
-Unsupported audio/archive outputs retain excluded captures without downloads,
-file receipts or download-archive acknowledgements. Windows require original
-`published` timestamps. New shared-body partitioning requires explicit evidence;
-historical signatures remain unchanged. The staged mirror profiles/launchers are
-inactive; Discord, favorites and artist containers still need separate adapters.
-Bluesky/TikTok downloads retain `bluesky_media`/`tiktok_media` version 1 with
-backend validation against original blobs/photos/videos. Keep missing slots,
-repeat positions, DID-qualified posts, quoted post identity and original source
-timestamps. TikTok image keys exclude signed URL/rendition changes; its generated
-titles and selected images are per-file patches. Preserve historical capture
-partitions. TikTok requires audio/covers/subtitles disabled and defaults to post
-collections rather than profile avatars. Explicit unsupported includes fail;
-following/artwork need separate adapters. Profile and shortlink children must
-apply the original run window. Never allow the pinned TikTok loop's caught
-extraction errors to certify a completed source run. Host profiles are staged
-only, with the intentional TikTok media choices recorded for cutover review.
-`source_backfill_decisions` now retains permanent account-backfill history in
-the native database. Historical acceptance/skip imports retain their entire
-source row without creating source-run coverage. Native completion proves every
-component URL through the producer's original request hashes and completed
-windows. The maintenance importer validates a read-only journal snapshot and
-uses application-authorized batches; producer tokens cannot import historical
-assertions. Producer schema 7 commits each n8n history check and its source
-snapshot together; later account history cannot replace that caller's original
-tickets. `stash-ingest-n8n-config` stages the known workflow graphs, preserving
-IDs, credential references and result branches while adding a durable wait.
-`stash-import-n8n-receipts` explicitly imports a reviewed frozen receipt snapshot
-into the producer outbox. Exact bytes and manifests survive replay; old tokens
-can be inspected locally but cannot become native completion proof or new work.
-`stash-import-scan-journal` retains a reviewed frozen journal in the native
-database with atomic receipts, bounded inspection and explicit dispositions.
-It does not activate jobs. `stash-activate-scan-journal` separately previews and
-applies an explicit source/profile/cutoff binding, consolidating exact target
-requests while retaining deferrals and retry delays. Recovery never transfers
-old process ownership or creates completion proof. The native worker understands
-the original archive-key cursor; widened windows replay without archive stopping.
-Production source registration, final cutover bindings and recovery callers
-remain open.
-`stash-activate-automation-discovery` separately previews one explicit retained
-account listing and target selection into a private review file. Apply/status
-must reuse that file, endpoint and digest after interruption. Preserve the saved
-cursor/history, source record hashes, current collection/root and worker policy;
-binding targets does not admit source jobs or accept a post identity. Runtime
-and website-access configuration remain producer-local.
-`stash-backfill-source-albums` saves reviewed per-post previews and request UUIDs
-before historical album admission. Reuse the same plan/digest after interruption;
-status must match its original post, policy and signature. Explicit retry prepares
-a new plan and preserves committed publication/event identity. Indexed selected-post
-discovery retains exclusions, but multiple pages do not establish a global snapshot
-under concurrent writers. Album plan completion is not catalog migration completion.
+Producer environments use `uv venv` and `uv pip --python` with explicit
+interpreter paths. Verify installed modules with Python `-I` so workspace imports
+cannot shadow the package. A staged worker policy must fingerprint the actual
+installed runtime; source-import tests alone cannot establish that.
+
+`integrations/archive` provides the portable `stash-archive` client for native
+SQLite snapshots, original artwork and declared configuration/state. Restore
+verifies contents into a new directory without starting a server or worker.
+See the [archive contract](docs/native-archive-format.md) and
+[ingestion contract](docs/native-ingestion.md) for checkpoint, delivery, retry
+and publication-lock invariants. Website credentials belong to external workers.
+The server never executes ZFS, Podman or S3 commands on behalf of a client.
+
+Installation-specific schedules, destinations, FileFlows code and release records
+belong in the operations repository. Its image and host packages have independent
+CI and deployment. Preserve active outboxes, identities, locks and captured backup
+views when changing a deployment; never treat an installed timer as proof that a
+job completed. Ordinary library use must continue with every optional integration
+disabled; see [optional integrations](docs/optional-integrations.md).
 
 ## Architecture
 

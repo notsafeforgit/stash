@@ -1,10 +1,10 @@
 # Project documentation
 
 This branch is the `v3-rewrite` independent fork of Stash. Active UI development
-is in `ui/v3/`. The [native archive transition](native-archive-transition-plan.md)
-retires v2.5 compatibility and brings catalogs into the application.
-[Implementation progress](native-archive-progress.md) records verified work and
-the production cutover status. The [final compatible release](releases/v2.5-compatible-final.md)
+is in `ui/v3/`. The [architecture and upgrade boundaries](native-archive-transition-plan.md)
+describe the native application and its supported historical inputs.
+Personal automation and production records are maintained separately.
+The [final compatible release](releases/v2.5-compatible-final.md)
 provides the frozen fallback for users who do not migrate.
 
 ## Current development guides
@@ -35,7 +35,6 @@ provides the frozen fallback for users who do not migrate.
 | [Native bulk updates](native-bulk-updates.md) | Completed versus queued edits, caller conversion, cache refresh and host helpers |
 | [Native entity queries](native-queries.md) | Filter expressions, explicit IDs, full-selection totals and converted clients |
 | [Portable native archives](native-archive-format.md) | Compressed database/artwork snapshots, explicit operating-state components, verified restores and offline inspection |
-| [Host backup integration](../integrations/backup/README.md) | Staged native/media publication, host-owned S3 verification and restore tools; installed daily scripts remain unchanged |
 | [Repository guidance](../CLAUDE.md) and [v3 contributor guidance](../ui/v3/AGENTS.md) | Coding conventions and backend/player constraints |
 | [Plugin host](../ui/v3/docs/plugin-host.md) | Current v3 UI plugin API, startup lifecycle, and failure handling |
 | [Versioned plugin manifests](plugin-manifests.md) | Independent v3 plugin contract, rejected packages, and API generations |
@@ -72,12 +71,10 @@ installation and community links; those downloads are mainline releases.
 
 ## Future plans and historical material
 
-- [Native archive and independent fork transition](native-archive-transition-plan.md)
-  is the requested full implementation plan for retiring v2.5 compatibility,
-  promoting fork storage, importing existing catalogs, and moving gallery-dl
-  and n8n to native ingestion. It includes migration, backup, cutover, and
-  verification requirements; the progress record tracks the completed cutover
-  and remaining owner review.
+- [Native architecture and upgrades](native-archive-transition-plan.md)
+  describes the shared application scope, upgrade responsibilities and external
+  automation boundary. The original production cutover records live with that
+  installation's operations repository.
 - The [TV implementation plan](../ui/v3/docs/tv-mode-plan.md) records the
   accepted scope and performance constraints behind the implemented feature.
 - The [2026-09-08 v3 quality audit](../ui/v3/docs/quality-audit-2026-09-08.md)

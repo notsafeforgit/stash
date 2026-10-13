@@ -33,7 +33,7 @@ producer outbox. Whole-call inspection requires source coverage for every
 original ticket. Launcher integration, additional
 post adapters, host/n8n activation, catalog import, and native administration/review
 UI remain required.
-Deployment status is recorded in [implementation progress](native-archive-progress.md).
+Installation-specific deployment status is maintained with each deployment's operations records.
 Root, collection and policy administration endpoints are described below.
 
 ## Performer links from captured profiles

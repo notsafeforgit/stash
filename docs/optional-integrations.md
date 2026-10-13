@@ -42,16 +42,15 @@ available; disabling a UI feature must not invalidate existing relationships.
 
 Existing installations using source tracking must explicitly enable it before
 upgrading to this default. No account count or database contents implicitly turns
-it on. The owner's production deployment opts in through its own configuration.
+it on. Each deployment opts in through its own configuration.
 
 ## S3 backup
 
 S3 backup is an independent, **optional host integration**. Installing or starting
 Stash does not install a backup timer, read AWS credentials or upload to a bucket.
-The [host backup tools](../integrations/backup/README.md) run only after a host
-administrator configures their paths, credentials, destination and schedule.
-The installation-specific examples in that directory describe the owner's host;
-they are not application defaults.
+A separately installed backup coordinator owns its paths, credentials, destination
+and schedule. Installation-specific publishers and production records live outside
+this repository and are not included in the Stash application build or CI.
 
 Stash's authenticated local checkpoint/export APIs remain available for backups
 to other destinations. They do no S3 publication by themselves. Owners can use
@@ -61,3 +60,20 @@ tracking and cloud backup do not depend on one another.
 Temporary deletion recovery records remain core behavior, even with both
 integrations unused. They coordinate SQLite with filesystem changes and are
 removed after successful deletion; see [file deletion](file-deletion.md).
+
+## External automation
+
+FileFlows, phone-upload workflows, n8n schedules and host backup policies belong
+to the deployment that uses them. Stash neither installs nor starts those services.
+The application image provides the server and its media runtime; an automation
+sidecar is an independently released API client.
+
+Workers mount their own configuration, API tokens, persistent delivery state and
+the media folders they need. They call the supported HTTP APIs rather than opening
+the Stash database. Keep download/publication lock directories shared between
+workers when coordinating captures. A FileFlows installation can run its encoder
+separately and submit the finished file through the [local intake API](native-manual-intake.md).
+
+Reusable packages stay in this repository: [gallery-dl integration](../integrations/gallery-dl/QUICKSTART.md)
+and [portable archives](native-archive-format.md). They can be installed on another
+host or in an optional container. Running an ordinary Stash library requires neither.

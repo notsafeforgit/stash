@@ -17,31 +17,9 @@ GHCR. A local build, or uploading a locally built image to GHCR, does not satisf
 the owner's delivery requirement. Report push, publication and deployment as
 separate outcomes, with the run URLs and actual running registry digest.
 
-### When dispatch reports Actions disabled
-
-Inspect both `GET /repos/{owner}/{repo}/actions/permissions` and the workflow's
-state. An enabled repository policy and an active workflow do not prove GitHub
-will accept a dispatch. On October 9, both readbacks were enabled/active for
-`notsafeforgit/stash`, but push created no checks and workflow dispatch returned
-HTTP 422, `Actions has been disabled for this repository.` Reapplying the enabled
-policy and enabling the workflow did not clear the error, including with REST
-API version `2026-03-10`.
-
-[GitHub documents a separate GitHub-controlled disabled state](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#managing-github-actions-permissions-for-your-repository)
-that settings changes cannot clear and advises contacting Support for review.
-Keep the HTTP status, response message, UTC timestamp and `X-GitHub-Request-Id`
-with the enabled/active readbacks. Do not diagnose billing or a disabled settings
-toggle without evidence. Publication must remain blocked until a run actually
-starts and succeeds; neither a successful push nor registry access establishes
-that the publishing workflow ran. Do not substitute a local image.
-
-The restriction cleared later on October 9: source revision `48cdadac2a`
-[published successfully](https://github.com/notsafeforgit/stash/actions/runs/37994520342),
-and the [wrapper build](https://github.com/notsafeforgit/stash-s6/actions/runs/37997504208)
-consumed that exact source digest. That historical deployment used the wrapper
-GHCR digest; [the progress record](native-archive-progress.md#current-release-position--2026-10-10-utc)
-retains the current identities. The earlier restriction does not describe the
-current Actions state.
+Personal automation has a separate build and release in `stash-ops`. Updating
+its flows, worker deployment or backup policy does not publish a Stash image.
+Only install those optional services when needed; see [optional integrations](optional-integrations.md).
 
 ## 1. Publish and verify the Stash image
 
@@ -62,7 +40,7 @@ The [publisher](../.github/workflows/ghcr-publish.yml) calls the shared
 bindings and validates/builds the UI once, shares those exact generated files
 and app/share/offline assets with the Go jobs, and compiles Linux amd64 in
 parallel with backend validation. SQLite tests, other Go tests, Go lint, and
-the four Python suites run as separate jobs. Go partitions come from the complete
+the three Python suites run as separate jobs. Go partitions come from the complete
 tagged package list, so new packages are included automatically. Both Go test
 runners install the Python producer used by cross-language fixtures; `make it`
 checks that runtime before starting the long suite. Publication requires every

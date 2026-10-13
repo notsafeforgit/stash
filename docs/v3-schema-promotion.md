@@ -3,8 +3,8 @@
 > Historical promotion proposal, superseded by the full
 > [native archive transition plan](native-archive-transition-plan.md).
 > The native branch has already removed the v2.5 UI and its opt-in selector;
-> [implementation progress](native-archive-progress.md) tracks remaining API
-> retirement and cutover work. The rollback-window choices below describe the
+> [architecture and upgrade boundaries](native-archive-transition-plan.md) describe the native contract.
+> The rollback-window choices below describe the
 > earlier proposal, not the current release contract.
 
 

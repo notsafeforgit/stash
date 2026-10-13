@@ -2,7 +2,7 @@
 
 This repository develops an independent native media archive based on Stash.
 Read the [fork policy](../FORK.md), [transition plan](native-archive-transition-plan.md)
-and [implementation progress](native-archive-progress.md) before proposing
+and [architecture and upgrade boundaries](native-archive-transition-plan.md) before proposing
 changes. Implementation continues on `v3-rewrite`; merging into `develop`
 requires verification and the owner's success review.
 

@@ -1,9 +1,0 @@
-[Unit]
-Description=Import finished phone videos and metadata into Stash
-After=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=%h/.local/bin/uv run --no-project --python /usr/bin/python3 %h/.local/share/stash-fileflows/intake.py --config %h/.config/stash-fileflows/intake.json
-UMask=0077
-TimeoutStartSec=10min

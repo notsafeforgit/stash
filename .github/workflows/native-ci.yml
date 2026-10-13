@@ -139,7 +139,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [producer, library, archive, backup]
+        suite: [producer, library, archive]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -153,7 +153,6 @@ jobs:
           cache-dependency-glob: |
             integrations/gallery-dl/pyproject.toml
             integrations/archive/pyproject.toml
-            ${{ matrix.suite == 'backup' && 'integrations/backup/pyproject.toml' || 'integrations/gallery-dl/pyproject.toml' }}
       - name: Install media test runtime
         if: matrix.suite == 'producer'
         timeout-minutes: 5
@@ -163,9 +162,6 @@ jobs:
       - name: Install producer test dependencies
         if: matrix.suite == 'producer' || matrix.suite == 'archive'
         run: make pre-producer
-      - name: Install backup test dependencies
-        if: matrix.suite == 'backup'
-        run: make pre-backup
       - run: make validate-${{ matrix.suite }}
 
   binary:

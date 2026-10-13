@@ -452,7 +452,7 @@ validate: validate-fork
 VALIDATION_JOBS ?= 2
 .PHONY: validate-fork validate-fork-backend
 validate-fork:
-	$(MAKE) -j$(VALIDATION_JOBS) validate-fork-backend validate-producer validate-library validate-archive validate-backup validate-ci
+	$(MAKE) -j$(VALIDATION_JOBS) validate-fork-backend validate-producer validate-library validate-archive validate-ci
 
 validate-fork-backend: generate-backend ui-ci
 	$(MAKE) validate-backend
@@ -466,17 +466,7 @@ validate-ci:
 	sh -n docker/runtime/root/usr/local/bin/uv-pip docker/runtime/root/usr/local/bin/uv-py
 	go run github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 
-export BACKUP_PYTHON ?= $(abspath .local/native-backup/bin/python)
 UV ?= uv
-
-.PHONY: pre-backup validate-backup
-pre-backup:
-	$(UV) venv --allow-existing --python python3 .local/native-backup
-	$(UV) pip install --python .local/native-backup/bin/python ./integrations/archive ./integrations/gallery-dl ./integrations/backup
-	.local/native-backup/bin/python -I -B scripts/verify_producer_install.py
-
-validate-backup:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=integrations/archive/src:integrations/gallery-dl/src "$(BACKUP_PYTHON)" -m unittest discover -s integrations/backup/host/s3-backup-tests -v
 
 .PHONY: validate-archive
 validate-archive:
@@ -485,7 +475,6 @@ validate-archive:
 .PHONY: validate-library
 validate-library:
 	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s integrations/library -p 'test_*.py' -v
-	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s integrations/fileflows -p 'test_*.py' -v
 
 .PHONY: validate-producer
 export PRODUCER_PYTHON ?= $(abspath .local/native-producer/bin/python)

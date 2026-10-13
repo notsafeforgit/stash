@@ -1,7 +1,7 @@
 # Native schema promotion
 
-The development schema is 1000114. The deployed schema and release are recorded
-in [implementation progress](native-archive-progress.md). New migrations are
+The development schema is 1000114. See the
+[architecture and upgrade boundaries](native-archive-transition-plan.md). New migrations are
 rehearsed on copies before deployment. Schema 1000114 adds opt-in monitoring
 subscriptions and immutable associations for scheduled runs, separate from
 source definitions, downloader configuration and manual imports. Existing
@@ -61,9 +61,8 @@ The migration creates empty tables and retains all existing performer URLs;
 it cannot infer historical removals from missing links. Schema 1000096 added
 provider metadata import receipts, following schema 1000095's
 [file deduplication receipts](native-file-deduplication.md).
-The [populated verified release](native-profile-release-verification.json)
-records the earlier schema-1000097 checkpoint; subsequent migration and release
-checks are recorded in the implementation progress document.
+Installation-specific migration checkpoints and release verification records
+belong to the deployment's operations repository.
 
 The independent schema begins at primary migration 1000000 and identifies itself
 with `native_schema.lineage = org.notsafeforgit.stash.native-archive`. New

@@ -58,7 +58,7 @@ class CheckSelectionTest(unittest.TestCase):
         self.assertEqual(self.select()["backend"], "false")
 
     def test_post_deployment_notes_do_not_hide_the_next_frontend_only_change(self):
-        self.commit("docs/native-archive-progress.md")
+        self.commit("docs/optional-integrations.md")
         self.commit("ui/v3/src/app.tsx")
         self.assertEqual(self.select()["backend"], "false")
         self.commit("docs/releases/native.json")

@@ -677,36 +677,11 @@ Symbolic-link objects and paths outside the fixed output layout are rejected.
 
 An archive digest detects corruption and identifies the exact archive. Trust in
 a downloaded manifest comes from the enclosing backup's verified publication
-record. The [host backup integration](../integrations/backup/README.md) now binds
-the retained native/filesystem view to a v4 media manifest and verifies S3
-Standard object checksums before committing its current manifest. Repeated
-publication can reuse a durable checksum receipt when a fresh paginated inventory
-reports the same remote object identity. Explicit audit and restore always check
-remote checksums; listing metadata alone cannot establish initial integrity. Credentials,
-scheduling and S3 publication belong to that host package, not this component
-transport or the Stash server. Complete production inventory and cutover proof
-remain separate gates.
-
-The host publishes version 4 media manifests, whose version 2 selection
-binds each restore path to a distinct object descriptor and explicitly records
-the cold bucket/prefix. Multiple paths may share one checksum-verified object.
-The complete native archive binding includes those descriptors, paths and store;
-subset media plans drop the whole-library native claim. Historical selection
-version 1 remains readable. Immutable uploads, durable cold-object receipts and
-path-aware cleanup preserve replacement identities while sharing unchanged bytes;
-see [immutable media publication and restore](../integrations/backup/README.md#immutable-media-publication-and-restore).
-This does not require S3 object versions or change the portable bundle format.
-
-The host transport distinguishes large media masters from the portable bundle's
-small manifest. Host master JSON is bounded at 512 MiB, and its archived media
-selection permits another 1 MiB for the binding envelope. The host permits a
-1 GiB complete `artifacts.jsonl` inventory and streams it to a new verified file
-in 1 MiB reads; each individual record retains the portable format's existing
-limit. Encoded-object downloads use the same digest-checked streaming path.
-Only a complete matching file is published; failed downloads remove their
-temporary output and do not overwrite existing destinations. See the
-[manifest-capacity rehearsal](native-backup-manifest-scale.json) for the measured
-272,373-video shape, original cap failure and isolated metadata round trip.
+record. A separate publisher owns destination credentials, scheduling, remote
+checksums, media manifests and retention. It must verify durable publication
+before releasing the retained checkpoint and filesystem views. Those mechanisms
+are deployment integrations, not dependencies of the portable format or Stash.
+See [optional integrations](optional-integrations.md).
 
 ## Validation
 

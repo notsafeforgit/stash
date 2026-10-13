@@ -1,15 +1,10 @@
 # Independent fork maintenance
 
-This repository develops an independent native media archive based on Stash.
-The [native archive transition plan](docs/native-archive-transition-plan.md)
-defines the full migration scope and acceptance criteria.
-[Implementation progress](docs/native-archive-progress.md) records completed
-work, verification, and deployment status. The native application is running in
-production. The original compatible database and recovery artifacts remain
-retained for final acceptance. Worker rollout, independent cloud restore and
-the supplementary native home backup are verified. The owner's success review
-is the remaining merge gate; ordinary queues and unrelated home-backup
-maintenance continue separately.
+This repository develops an independent media library based on Stash. Its
+[architecture and upgrade boundaries](docs/native-archive-transition-plan.md)
+cover shared application behavior. Personal automation and production records
+live in the separate `notsafeforgit/stash-ops` repository; they are optional API
+clients and do not participate in the Stash application build.
 
 ## Branch and release policy
 
@@ -158,13 +153,9 @@ and retained external protocols. Replace v2.5 round-trip/build checks with
 native migration and contract tests as their runtime paths are removed. Keep
 security and dependency checks for the remaining application.
 
-Use the [cutover runbook](docs/native-archive-transition-plan.md#production-cutover-runbook),
-full-copy migration rehearsal, semantic reconciliation, and confirmed coordinated
-backup publication before deploying the new writer. The owner's October 9 rollout
-decision permits the separate cloud restore drill to finish after launch. Keep its
-result independent of publication, retain the recovery copies until it passes,
-and require verified restore coverage before declaring the transition complete.
-Update architecture, contributor guidance,
-build/CI, packaging, and deployment instructions with their implementation
-changes. Do not describe planned work as already deployed or declare completion
-while the plan's acceptance criteria remain unmet.
+Rehearse supported database upgrades on copies, verify semantic preservation,
+and keep a recoverable backup before changing a production writer. Routine native
+releases do not repeat an installation's completed one-time cutover. Update shared
+architecture, contributor, build and packaging guidance with implementation changes.
+Keep installation-specific cutover evidence and schedules in the operations repo.
+Do not describe planned work as deployed.

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { ApolloClient, ApolloLink, Observable } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
 import { EntityListPage } from "@/components/list/entity-list-page";
+import { View } from "@/components/list/views";
 import {
   useImageListConfig,
   useSceneListConfig,
@@ -59,6 +60,9 @@ function makeClient() {
           const start = ((variables.filter?.page ?? 1) - 1) * size;
           let data: object;
           switch (name) {
+            case "FindSavedFilters":
+              data = { findSavedFilters: [] };
+              break;
             case "FindImageList":
               data = {
                 findImages: {
@@ -140,6 +144,7 @@ function Images() {
     <>
       <EntityListPage
         config={config}
+        view={View.Images}
         keyboardShortcutsDisabled={lightboxOpen}
       />
       {lightboxElement}
@@ -152,6 +157,7 @@ function Scenes() {
     <>
       <EntityListPage
         config={config}
+        view={View.Scenes}
         keyboardShortcutsDisabled={lightboxOpen}
       />
       {lightboxElement}

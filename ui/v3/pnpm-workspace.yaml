@@ -51,3 +51,8 @@ overrides:
   "@videojs/hlsjs-video@10.0.1>hls.js": 1.7.3
   "unplugin>esbuild": ^0.28.1
   "tsx>esbuild": ^0.28.1
+
+# Keep touch-generated combobox clicks in WebKit; mousedown still retains focus.
+# Recheck entity-list-filters.browser.ts before removing this on an upgrade.
+patchedDependencies:
+  '@base-ui/react@1.8.0': patches/@base-ui__react@1.8.0.patch

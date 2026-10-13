@@ -131,6 +131,11 @@ function useFilterURL(
       setFilterState(newFilter);
       if (active) {
         const newParams = newFilter.makeQueryParameters();
+        // Empty conditions/subgroups and UI preferences still belong in local
+        // state. Only effective query changes should navigate; round-tripping
+        // an unfinished filter through the URL would discard its draft nodes.
+        const prevParams = prevFilter.makeQueryParameters();
+        if (newParams === prevParams) return;
         const merged = mergeFilterParams(location.searchStr, newParams);
         const hash = location.hash ? `#${location.hash}` : "";
         const newHref = merged
@@ -148,8 +153,7 @@ function useFilterURL(
             .join("&");
         const isPageOnlyChange =
           newFilter.currentPage !== prevFilter.currentPage &&
-          stripPageParam(newFilter.makeQueryParameters()) ===
-            stripPageParam(prevFilter.makeQueryParameters());
+          stripPageParam(newParams) === stripPageParam(prevParams);
         // The list owns pagination offsets, including the header above an
         // embedded list. A raw history write lets the router restore the
         // previous page's offset after the list has already reset its scroll.

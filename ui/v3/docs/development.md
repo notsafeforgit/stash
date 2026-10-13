@@ -15,6 +15,13 @@ scoped dependency overrides live in `pnpm-workspace.yaml`. `make lint` runs the
 CI-pinned Go linter through
 `go run`, so a separate golangci-lint installation is unnecessary.
 
+The pinned Base UI patch in `patches/` lets touch presses generate their native
+combobox selection click in WebKit. Mouse presses still prevent focus changes,
+and the existing mousedown handler keeps the search input focused. When upgrading
+Base UI, rerun `entity-list-filters.browser.ts` in Chromium and WebKit before
+removing or updating the patch. Keep its pnpm lockfile hash in sync with
+`pnpm patch-commit`.
+
 ## First checkout and local development
 
 Install the UI dependencies, generate supported bindings, and build the

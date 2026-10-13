@@ -1,0 +1,34 @@
+diff --git a/combobox/item/ComboboxItem.js b/combobox/item/ComboboxItem.js
+index fda28c04da142fb407b052f006a8eb6f1345fac1..efebabc16aed323baf41798b3872b59c7089e6c4 100644
+--- a/combobox/item/ComboboxItem.js
++++ b/combobox/item/ComboboxItem.js
+@@ -136,7 +136,11 @@ function ComboboxItemInner(props) {
+       if (event.isPrimary) {
+         store.context.pointerDownItemRef.current = event.currentTarget;
+       }
+-      event.preventDefault();
++      // WebKit suppresses the touch-generated click if pointerdown is canceled.
++      // The mousedown handler below still preserves the input's focus.
++      if (event.pointerType !== 'touch') {
++        event.preventDefault();
++      }
+     },
+     onMouseDown(event) {
+       // iOS Safari can emit a synthetic mousedown for touch taps without a preceding
+diff --git a/combobox/item/ComboboxItem.mjs b/combobox/item/ComboboxItem.mjs
+index ce2bb658fe170c25918e3c4533debac55f33639b..a1af61bcd03eef7f67d1d2a1969a6854ac34471e 100644
+--- a/combobox/item/ComboboxItem.mjs
++++ b/combobox/item/ComboboxItem.mjs
+@@ -130,7 +130,11 @@ function ComboboxItemInner(props) {
+       if (event.isPrimary) {
+         store.context.pointerDownItemRef.current = event.currentTarget;
+       }
+-      event.preventDefault();
++      // WebKit suppresses the touch-generated click if pointerdown is canceled.
++      // The mousedown handler below still preserves the input's focus.
++      if (event.pointerType !== 'touch') {
++        event.preventDefault();
++      }
+     },
+     onMouseDown(event) {
+       // iOS Safari can emit a synthetic mousedown for touch taps without a preceding

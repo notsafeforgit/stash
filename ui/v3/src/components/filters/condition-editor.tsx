@@ -245,9 +245,11 @@ const ConditionEditorComponent: React.FC<ConditionEditorProps> = ({
 
   const onChangeField = useCallback(
     (field: CriterionType) => {
-      onChange(createASTCondition(mode, field));
+      // This is still the same condition. Replacing its key would unmount the
+      // field picker during selection and lose keyboard/input focus.
+      onChange({ ...createASTCondition(mode, field), id: node.id });
     },
-    [mode, onChange],
+    [mode, node.id, onChange],
   );
 
   const dragItem: ASTDragItem = {

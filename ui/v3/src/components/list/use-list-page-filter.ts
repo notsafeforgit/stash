@@ -195,10 +195,9 @@ export function useListPageFilter({
   // Wrap setFilter to intercept display mode / zoom changes and persist them.
   // Use `filter` (the memoized value with prefs applied) as the base for
   // functional updaters — callers always have `filter` in scope, not rawFilter.
-  // Only call rawSetFilter when URL-relevant parameters actually change; zoom
-  // and displayMode are UI-only prefs that don't belong in the URL, and routing
-  // through rawSetFilter for those would trigger router.history.replace
-  // unnecessarily, adding latency to instant UI actions like zoom.
+  // Always retain the editor state, including unfinished conditions that are
+  // deliberately omitted from query parameters. useFilterState avoids URL
+  // navigation when the effective query is unchanged, including for UI prefs.
   // EntityList reveals the committed layout through its empty paint surface;
   // preference updates stay synchronous and never capture page snapshots.
   const setFilter = useCallback(
@@ -215,28 +214,15 @@ export function useListPageFilter({
         setDisplayModePref(next.displayMode);
       }
       const zoomChanged = next.zoomIndex !== intendedZoomRef.current;
-      const urlDiffers =
-        next.makeQueryParameters() !== rawFilter.makeQueryParameters();
-      const applyNonZoom = () => {
-        if (urlDiffers) rawSetFilter(next);
-      };
-
       if (zoomChanged) {
         // Update intended zoom synchronously so rapid follow-up clicks
         // see the new target before React commits.
         intendedZoomRef.current = next.zoomIndex;
         setZoomPref(next.zoomIndex);
       }
-      applyNonZoom();
+      rawSetFilter(next);
     },
-    [
-      rawFilter,
-      filter,
-      rawSetFilter,
-      displayModePref,
-      setDisplayModePref,
-      setZoomPref,
-    ],
+    [filter, rawSetFilter, displayModePref, setDisplayModePref, setZoomPref],
   );
 
   const [mobileGridCols, setMobileGridCols] = useMobileGridColumns(filterMode);

@@ -310,6 +310,15 @@ test("video previews use the scene lightbox and retain its video element when na
   await page
     .locator('.entity-card[data-id="scene-1"] [data-entity-card-preview]')
     .click();
+  const video = page.locator("video");
+  await expect(video).toBeVisible();
+  // After the entrance delay Safari may require a Play gesture for sound.
+  // Silent autoplay is deliberately no longer used to bypass that policy.
+  await page.waitForTimeout(650);
+  if (await video.evaluate((element: HTMLVideoElement) => element.paused)) {
+    await page.getByRole("button", { name: "Play", exact: true }).first().tap();
+  }
+  await expect(video).toHaveJSProperty("muted", false);
   await expect
     .poll(() =>
       page

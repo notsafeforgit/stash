@@ -154,8 +154,9 @@ behavior. Browser tests verify pause/resume does not introduce seeks or reloads.
   `HlsJsVideo` through a typed source, with an explicit MIME type for direct files.
   Retain playhead, paused state and playback rate through the pending-resume path,
   including WebKit’s explicit resume after `canplay`.
-- Muted autoplay fallback is only for `NotAllowedError` on a current request.
-  Source-change aborts and obsolete requests must not change the audio state.
+- Autoplay rejection leaves the player paused with its audio state intact.
+  The user can press Play to authorize audible playback. Animation delays,
+  source-change aborts and obsolete requests must not change the audio state.
 - Buffered seeks stay in place. Distant desktop HLS seeks can flush the engine;
   iOS ManagedMediaSource and clipped playlists use source reloads.
 - Every forced reload changes the URL, even a repeated target at zero.
@@ -213,11 +214,18 @@ source MIME types, resolution limits and codec/GOP checks.
 endpoint families by default, under the normal media authentication boundary.
 
 [pkg/ffmpeg/stream_v3_segmented.go](../../../pkg/ffmpeg/stream_v3_segmented.go)
-owns the v3 stream variants and segment serving;
-[stream_segmented.go](../../../pkg/ffmpeg/stream_segmented.go) constructs the
-FFmpeg pipeline. Full-scene playlists expose scene time, while clipped playlists
+owns the v3 stream variants, FFmpeg pipeline and segment serving.
+Full-scene playlists expose scene time, while clipped playlists
 are relative to the segment-aligned clip origin. Media-sequence numbers identify
 segments; they are not a browser playback-time offset.
+
+[stream_v3_encoding.go](../../../pkg/ffmpeg/stream_v3_encoding.go) shares the
+transcode's H.264 level and delivery budget with its master playlist. Original
+resolution retains the source dimensions and frame rate, with a bounded video
+bitrate (24 Mbps for UHD up to 30 fps, 36 Mbps above 30 fps). The encoder can
+reduce detail to meet that ceiling; original files and codec-copy streams remain
+unchanged. UHD at 60 fps uses Level 5.2. Bandwidth includes the one-second VBV
+burst allowance and AAC instead of advertising the input file's average bitrate.
 
 [stream_v3_session.go](../../../pkg/ffmpeg/stream_v3_session.go) isolates encoder
 sessions between players, markers, and tabs. Released sessions reject late

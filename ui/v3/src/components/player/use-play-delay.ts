@@ -2,15 +2,10 @@
  * Play-delay gate. Used by the lightbox to keep the video silent and
  * still while the swipe animation is in flight.
  *
- * We deliberately do NOT toggle the `autoPlay` attribute off — iOS's
- * muted-fallback autoplay path is gated on the *attribute* being set
- * when canplay fires; flipping it off and calling play() programmatically
- * later gets rejected by the media-engagement heuristic, even with the
- * muted retry. Instead, listen for the `playing` event during the window
- * and pause immediately, which iOS treats as a normal pause of an
- * already-authorized stream. After the window expires we call play() once
- * to resume — this is allowed because the original play was authorized
- * by the autoplay attribute.
+ * Leave the `autoPlay` attribute in place and pause playback during the
+ * animation. Try to resume once at the deadline using the current audio
+ * state. Safari may require a new Play gesture at that point; an autoplay
+ * rejection must not silently mute the persistent video element.
  *
  * The deadline resume is gated on `autoplayIntentRef`, so with autostart
  * off the gate doubles as the lightbox's autostart enforcement: any
@@ -47,7 +42,6 @@ export function usePlayDelay(
 
     const deadline = Date.now() + delayMs;
     let suppressed = true;
-    let active = true;
 
     function findVideo(): HTMLVideoElement | null {
       return root?.querySelector("video") ?? null;
@@ -95,31 +89,14 @@ export function usePlayDelay(
         const video = findVideo();
         if (!video?.paused) return;
         if (!autoplayIntentRef.current) return;
-        const source = video.currentSrc;
-        video.play().catch((error: unknown) => {
-          // Source changes can abort play(). Only a browser permission
-          // rejection warrants muted autoplay; obsolete requests must not
-          // change the next source's audio or override a user's pause.
-          if (
-            !(error instanceof DOMException) ||
-            error.name !== "NotAllowedError" ||
-            !active ||
-            !autoplayIntentRef.current ||
-            userPlaybackIntentRef.current ||
-            findVideo() !== video ||
-            video.currentSrc !== source
-          ) {
-            return;
-          }
-          video.muted = true;
-          video.play().catch(() => {});
-        });
+        // Keep the user's sound setting. If autoplay is denied, the existing
+        // Play control supplies the gesture Safari needs for audible playback.
+        video.play().catch(() => {});
       },
       Math.max(0, deadline - Date.now()),
     );
 
     return () => {
-      active = false;
       window.clearTimeout(t);
       observer.disconnect();
       if (attached) detach(attached);

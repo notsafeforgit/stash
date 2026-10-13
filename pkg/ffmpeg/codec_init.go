@@ -20,14 +20,9 @@ func CodecInit(codec VideoCodec) (args Args) {
 			"-preset", "veryfast",
 			"-crf", "25",
 			"-sc_threshold", "0",
-			// Profile + level pinned so the master playlist's advertised
-			// CODECS string matches what's in the init segment. MSE
-			// refuses to decode segments whose actual codec disagrees
-			// with the SourceBuffer's declared codec, and SPF reads the
-			// SourceBuffer's codec from the master playlist. High @ 5.1
-			// covers 4K @ 60fps — high enough that the encoder picks
-			// lower actual levels for typical content (the ceiling, not
-			// the floor) while still letting 4K@60 transcodes succeed.
+			// Default for callers without rendition dimensions. Native HLS
+			// overrides the level using liveHLSEncoding and shares that
+			// choice with its manifest (4K at 60 fps requires Level 5.2).
 			"-profile:v", "high",
 			"-level", "5.1",
 		)

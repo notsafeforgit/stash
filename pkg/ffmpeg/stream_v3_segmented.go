@@ -690,9 +690,16 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 		videoFilter = prependVideoFilter(rotationFilter, videoFilter)
 	}
 
-	args = append(args, s.streamType.Args(codec, segment, videoFilter, s.videoOnly(), s.outputDir, frameRate)...)
-
+	streamArgs := s.streamType.Args(codec, segment, videoFilter, s.videoOnly(), s.outputDir, frameRate)
+	// Output options must precede the output URL. FFmpeg ignores trailing
+	// options, including a user's live-transcode overrides, after that URL.
+	args = append(args, streamArgs[:len(streamArgs)-1]...)
+	if s.streamType == V3StreamTypeHLS {
+		width, height := scaledDimensions(s.vf, s.maxTranscodeSize)
+		args = append(args, liveHLSEncoding(width, height, frameRate).args(codec)...)
+	}
 	args = append(args, extraOutputArgs...)
+	args = append(args, streamArgs[len(streamArgs)-1])
 
 	return args
 }
@@ -818,7 +825,7 @@ func serveV3HLSManifestFMP4(sm *StreamManager, w http.ResponseWriter, r *http.Re
 	// Segment responses are immutable for an hour. A new timeline must not
 	// splice those cached bytes into fragments produced by the corrected
 	// encoder after an upgrade; keep this revision stable across seeks.
-	urlQuery.Set("v3_hls", "2")
+	urlQuery.Set("v3_hls", "3")
 
 	copyAuthParams(urlQuery, r.URL.Query())
 	if session := r.URL.Query().Get("stream_session"); session != "" {
@@ -1074,11 +1081,12 @@ func approxBandwidth(vf *models.VideoFile) int {
 // advertised in the master playlist's RESOLUTION attribute. Returns the
 // source dimensions unchanged when no resolution override is in effect.
 func scaledResolution(vf *models.VideoFile, resolution string) (int, int) {
-	w, h := vf.Width, vf.Height
-	if resolution == "" {
-		return w, h
-	}
 	maxResolution := models.StreamingResolutionEnum(resolution).GetMaxResolution()
+	return scaledDimensions(vf, maxResolution)
+}
+
+func scaledDimensions(vf *models.VideoFile, maxResolution int) (int, int) {
+	w, h := vf.Width, vf.Height
 	if maxResolution == 0 || w == 0 || h == 0 {
 		return w, h
 	}
@@ -1134,14 +1142,9 @@ func hlsMasterTrackURL(r *http.Request, track Track) string {
 	return prefix + u.String()
 }
 
-// serveV3HLSMasterManifest serves the master playlist for the H.264+AAC
-// transcode variant (`/stream.m3u8`). Codecs match the pinned
-// `-profile:v high -level 5.1` in the encoder args (CodecInit for
-// VideoCodecLibX264) so the SourceBuffer SPF creates accepts the
-// segments the encoder produces. The pinned ceiling is high enough
-// for 4K@60 — the encoder picks lower actual levels for typical
-// content, and MSE (lenient on Chrome, stricter on Safari) accepts
-// segments whose level is at or below the declared ceiling.
+// serveV3HLSMasterManifest serves the H.264+AAC transcode master. Its
+// codec level and bandwidth come from the same output encoding policy as
+// FFmpeg, rather than the input file's codec or average bitrate.
 //
 // Audio is omitted from the CODECS string when the source has no
 // audio. The transcode pipeline emits video-only segments in that
@@ -1152,10 +1155,17 @@ func hlsMasterTrackURL(r *http.Request, track Track) string {
 // player loads segments, hls.js logs "no audio data", and playback
 // never starts. iOS Safari's native HLS path fails the same way.
 func serveV3HLSMasterManifest(sm *StreamManager, w http.ResponseWriter, r *http.Request, vf *models.VideoFile, resolution string) {
-	width, height := scaledResolution(vf, resolution)
+	maxResolution := 0
+	if resolution != "" {
+		maxResolution = models.StreamingResolutionEnum(resolution).GetMaxResolution()
+	} else if sm.config != nil {
+		maxResolution = sm.config.GetMaxStreamingTranscodeSize().GetMaxResolution()
+	}
+	width, height := scaledDimensions(vf, maxResolution)
+	encoding := liveHLSEncoding(width, height, vf.FrameRateFinite())
 	videoURL := hlsMasterTrackURL(r, TrackVideo)
 	var audioURL string
-	codecs := "avc1.640033" // H.264 High @ Level 5.1
+	codecs := encoding.codecString()
 	if ProbeAudioCodec(vf.AudioCodec) != MissingUnsupported {
 		audioURL = hlsMasterTrackURL(r, TrackAudio)
 		codecs += ",mp4a.40.2" // AAC-LC
@@ -1164,7 +1174,7 @@ func serveV3HLSMasterManifest(sm *StreamManager, w http.ResponseWriter, r *http.
 	writeMasterPlaylist(
 		&buf,
 		videoURL, audioURL,
-		approxBandwidth(vf),
+		encoding.bandwidth(audioURL != ""),
 		width, height,
 		codecs,
 	)

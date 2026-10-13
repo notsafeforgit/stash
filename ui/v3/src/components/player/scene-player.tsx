@@ -211,13 +211,12 @@ interface ScenePlayerProps {
   onLoopToggle?: () => void;
   /**
    * Suppress visible playback for this many milliseconds after each selection.
-   * The `<video autoPlay>` attribute stays set so iOS's muted-fallback
-   * autoplay path still works (a programmatic play() call after this
-   * point is treated as a user-gesture-required action and routinely
-   * rejected on iOS), but every `playing` event during the window
-   * triggers an immediate `pause()` and the player resumes only after
+   * The `<video autoPlay>` attribute stays set, but every `playing` event
+   * during the window triggers an immediate `pause()`. Playback resumes after
    * the timer fires. Used by the lightbox so the video doesn't start
-   * playing while the slide is still animating into place.
+   * playing while the slide is still animating into place. If the browser
+   * denies the delayed resume, the player stays paused with its audio state
+   * intact until the user presses Play.
    */
   playDelayMs?: number;
   /**

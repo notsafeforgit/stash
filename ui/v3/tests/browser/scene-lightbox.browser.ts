@@ -1,6 +1,57 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./test";
 
+test("blocked autoplay preserves sound and the user can press Play", async ({
+  page,
+}) => {
+  // Model Safari's gesture requirement while using the real player, audio
+  // media, animation deadline and controls in both browser engines.
+  await page.addInitScript(() => {
+    let allowed = false;
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () {
+      return allowed
+        ? play.call(this)
+        : Promise.reject(
+            new DOMException("Autoplay denied", "NotAllowedError"),
+          );
+    };
+    document.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (
+          event.isTrusted &&
+          event.target instanceof Element &&
+          event.target.closest("[data-scene-player]")
+        )
+          allowed = true;
+      },
+      true,
+    );
+    document.addEventListener(
+      "playing",
+      (event) => {
+        if (!allowed && event.target instanceof HTMLVideoElement)
+          event.target.pause();
+      },
+      true,
+    );
+  });
+  const video = await open(page);
+  // Finish the gate, including any rejected play promise it scheduled.
+  await page.waitForTimeout(650);
+  await expect(video).toHaveJSProperty("paused", true);
+  await expect(video).toHaveJSProperty("muted", false);
+  await page.getByRole("button", { name: "Play", exact: true }).first().tap();
+  await expect(video).toHaveJSProperty("paused", false);
+  await expect(video).toHaveJSProperty("muted", false);
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.currentTime),
+    )
+    .toBeGreaterThan(0.2);
+});
+
 test("online lightbox uses shared activity accounting without a detail route owner", async ({
   page,
 }) => {

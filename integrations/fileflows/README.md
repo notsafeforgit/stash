@@ -1,23 +1,16 @@
-# iPhone clip batches through FileFlows
+# Ordered clip batches through FileFlows
 
 This optional integration joins uploaded clips using the existing adaptive
 AV1/Opus FileFlows pipeline and imports the finished video through Stash's
 native local-file API. It does not create source posts or retain NFO files.
 
-The shortcut reads each selected video's recording date before exporting it,
-assigns a unique clip name, and hashes the exported file. A JSON manifest carries
-the title, description, and clip timestamps. Filenames come from the saved file
-paths so hidden extensions stay in the manifest. Recording timestamps explicitly
-include ISO 8601 time and timezone, preserving order within the same day.
-File details read the saved file through Shortcuts' `WFInput` parameter. Existing
-uploads with blank clip names or hidden extensions can still be processed when
-the expected `clip-N` resolves to exactly one supported file and its checksum
-matches. Ambiguous files remain untouched for review.
-For multiple clips, the shortcut
-offers **Recording date (oldest first)** or **Choose clip order**. The latter
-shows clips with their recording date, filename and available preview; choose
-the first clip, then each next clip from those remaining. This happens before
-any upload files are created, so cancelling leaves Photos untouched.
+Uploaders provide a `stash-clips.json` manifest with format
+`stash-clip-batch-v1`, a unique `batch_id`, `title`, `details`, and `clips`.
+Each clip supplies its filename (`clip-N.mov`, `.mp4`, or `.m4v`), SHA-256
+checksum, and ISO 8601 `recorded_at` timestamp including time and timezone.
+Existing uploads with blank clip names or hidden extensions can still be
+processed when the expected `clip-N` resolves to exactly one supported file
+and its checksum matches. Ambiguous files remain untouched for review.
 
 The manifest's `order` is `recorded_at` for chronological order or `input` to
 follow the `clips` array exactly. Older manifests without `order` retain
@@ -30,19 +23,8 @@ Uploads use a unique `stash-upload-<batch_id>.part` folder. Stash's automatic
 folder discovery ignores that unfinished folder. FileFlows verifies the
 manifest and every clip hash before encoding. Incomplete uploads are held and
 retried after five minutes. Invalid or unexpected files fail without deleting
-originals. Uploading through a phone file provider still needs a successful
-connection; retries must finish the same batch folder.
-
-Cancelling before export creates no batch. An interrupted export can leave a
-local folder without its final manifest; the wrapper leaves that draft in
-Workspace and lets the user select the original clips again. It does not send
-unfinished drafts to FileFlows or erase them. Once the manifest has been saved,
-opening the wrapper without share-sheet input offers **Retry saved uploads**
-or **Choose new clips**. Retrying moves only those saved batches, preserving
-their batch IDs, metadata and clip order, and does not delete anything in Photos.
-FileFlows checks every hash and waits if a transfer is incomplete. This does not
-resume a cancelled picker or export halfway through, and a file-provider move
-completing is not an acknowledgement that server-side encoding has finished.
+originals. Upload retries must finish the same batch folder. A completed
+transfer is not an acknowledgement that server-side encoding has finished.
 
 After its existing output validation, FileFlows publishes a small
 `stash-import-<batch_id>.json` beside the final MKV, then cleans up the exact
@@ -56,11 +38,11 @@ Finished filenames use the readable title and an eight-character batch suffix,
 with the title limited to 180 UTF-8 bytes to leave room for publication staging
 names. The full batch identity remains in the handoff metadata. A filename
 collision stops without overwriting an existing video. Stash's title contains
-only the text supplied by the shortcut.
+only the text supplied in the manifest.
 
 The small pending JSON is removed only when Stash acknowledges successful media
 registration without conflicts. It remains available during restarts, failed
-imports, and conflicts. API credentials stay on the host, outside the shortcut
+imports, and conflicts. API credentials stay on the host, outside uploaders
 and FileFlows. No additional source history or discovery records are created.
 
 iPhone spatial recordings can include an APAC track alongside an AAC stereo
@@ -85,16 +67,6 @@ for review; the output does not retain Apple's spatial audio track.
    The example user service and timer run it once per minute without overlap.
    A nonempty error report means the pending handoff needs attention; the video
    and metadata are preserved. Do not edit a manifest after admission to Stash.
-4. `build_shortcuts.py WRAPPER.shortcut PROCESSOR.shortcut OUTPUT_DIR` builds
-   unsigned replacements named **Upload Jess Videos** and **Process and Organize
-   Videos**, matching the original shortcuts and the wrapper's helper reference.
-   The original folder
-   bookmarks and post-upload Photos deletion action are preserved. Signing and
-   running the resulting files requires macOS/iOS; Linux validates their plist
-   structure but cannot execute Apple Shortcuts. Import the processing shortcut
-   before the upload wrapper, replace the existing shortcuts when prompted, and
-   check the folder bookmarks on the iPhone. `sign-on-mac.sh` signs both files
-   under these original names.
 
 Example host configuration (keep it private):
 

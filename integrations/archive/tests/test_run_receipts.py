@@ -27,6 +27,7 @@ class RunReceiptTests(ReceiptFixture):
             body = migration.split(f'CREATE TABLE {name} (', 1)[1].split('\n);', 1)[0]
             self.db.executescript(f'CREATE TABLE {name} (' + body + '\n);')
         self.db.execute('CREATE TABLE source_run_retrievals(run_uuid TEXT PRIMARY KEY, url TEXT NOT NULL)')
+        self.db.execute('CREATE TABLE source_run_subscriptions(run_uuid TEXT PRIMARY KEY, collection_uuid TEXT NOT NULL, revision INTEGER NOT NULL)')
         value = self.cases[0]['input']
         self.db.execute("INSERT INTO source_collection_revisions VALUES(?,?)",
                         (value['collection_uuid'], value['collection_revision']))
@@ -60,6 +61,9 @@ class RunReceiptTests(ReceiptFixture):
                         (PRODUCER,request['request_uuid'],native_hash,run))
         if 'retrieval_url' in request:
             self.db.execute('INSERT OR IGNORE INTO source_run_retrievals VALUES(?,?)', (run, request['retrieval_url']))
+        if 'subscription_revision' in request:
+            self.db.execute('INSERT OR IGNORE INTO source_run_subscriptions VALUES(?,?,?)',
+                            (run, request['collection_uuid'], request['subscription_revision']))
         self.db.commit()
         receipt = dict(request,uuid=run,root_uuid=MEDIA_ROOT,root_revision=1,state='queued')
         if acknowledge:
@@ -120,8 +124,45 @@ class RunReceiptTests(ReceiptFixture):
     def test_old_snapshot_without_profile_retrievals_remains_readable(self):
         self.admit(self.submit())
         self.db.execute('DROP TABLE source_run_retrievals')
+        self.db.execute('DROP TABLE source_run_subscriptions')
         self.db.commit()
         self.assertEqual(self.admissions()['counts']['admitted'], 1)
+
+    def test_scheduled_admission_retains_subscription_without_requiring_it_in_receipt(self):
+        receipt = self.admit(self.submit(self.request(subscription_revision=3)))
+        # SourceRun responses omit this request-only field; its native binding
+        # and the original request digest provide the immutable evidence.
+        receipt.pop('subscription_revision')
+        self.box.db.execute('UPDATE run_requests SET receipt=?', (encode(receipt),))
+        self.assertEqual(self.admissions()['counts']['admitted'], 1)
+        self.db.execute('UPDATE source_run_subscriptions SET revision=4')
+        self.db.commit()
+        with self.assertRaisesRegex(InvalidArchive, 'subscription binding'):
+            self.admissions()
+        self.db.execute('DELETE FROM source_run_subscriptions')
+        self.db.commit()
+        with self.assertRaisesRegex(InvalidArchive, 'subscription binding'):
+            self.admissions()
+
+    def test_scheduled_requests_preserve_pending_and_lost_response_states(self):
+        self.queue.enqueue(self.request(subscription_revision=1))
+        self.assertEqual(self.admissions()['pending_windows'], 1)
+        delivery = self.queue.claim(str(uuid.uuid4()))
+        self.assertEqual(self.admissions()['counts']['sending'], 1)
+        self.admit(delivery, acknowledge=False)
+        self.assertEqual(self.admissions()['counts']['accepted_unacknowledged'], 1)
+
+    def test_manual_admission_can_be_linked_to_subscription_after_admission(self):
+        receipt = self.admit(self.submit())
+        self.db.execute('INSERT INTO source_run_subscriptions VALUES(?,?,1)',
+                        (receipt['uuid'], receipt['collection_uuid']))
+        self.db.commit()
+        self.assertEqual(self.admissions()['counts']['admitted'], 1)
+
+    def test_invalid_subscription_revisions_are_rejected(self):
+        for revision in (True, 0, -1, '1', None, 2147483648):
+            with self.subTest(revision=revision), self.assertRaisesRegex(InvalidArchive, 'subscription revision'):
+                native_request_digest(dict(self.cases[0]['input'], subscription_revision=revision))
 
     def test_lost_response_preserves_unadmitted_original_and_later_run_state(self):
         delivery = self.submit()

@@ -12,6 +12,7 @@ from .storage import HEX, InvalidArchive, decode_json, json_bytes
 MAX_REQUEST = 8192
 MAX_WINDOWS = 64
 FIELDS = ("collection_uuid", "collection_revision", "operation", "policy_sha256", "cooldown_seconds")
+OPTIONAL_FIELDS = {"retrieval_url", "subscription_revision"}
 STAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.(\d{1,9}))?(?:Z|[+-]\d{2}:\d{2})\Z")
 
 
@@ -44,8 +45,11 @@ def window(value):
 
 
 def template(value):
-    if not isinstance(value, dict) or set(value) - {"retrieval_url"} != set(FIELDS):
+    if not isinstance(value, dict) or set(value) - OPTIONAL_FIELDS != set(FIELDS):
         raise InvalidArchive("Invalid retained source request template")
+    if 'subscription_revision' in value and (type(value['subscription_revision']) is not int
+            or not 1 <= value['subscription_revision'] <= 2147483647):
+        raise InvalidArchive("Invalid retained source subscription revision")
     if "retrieval_url" in value:
         raw = value["retrieval_url"]
         try:
@@ -72,7 +76,7 @@ def native_request_digest(value):
     SQLite source_run_requests stores this normalized typed representation, not
     the raw HTTP digest. Keep its field order and UTC RFC3339Nano timestamps.
     """
-    if not isinstance(value, dict) or set(value) - {"retrieval_url"} != set(FIELDS) | {"request_uuid", "window"}:
+    if not isinstance(value, dict) or set(value) - OPTIONAL_FIELDS != set(FIELDS) | {"request_uuid", "window"}:
         raise InvalidArchive("Invalid source admission request")
     identifier(value["request_uuid"])
     definition = template({key: item for key, item in value.items() if key not in ('request_uuid', 'window')})
@@ -94,6 +98,8 @@ def native_request_digest(value):
         ordered['window']['basis'] = normalized['basis']
     if 'retrieval_url' in definition:
         ordered = {'retrieval_url': definition['retrieval_url'], **ordered}
+    if 'subscription_revision' in definition:
+        ordered = {'subscription_revision': definition['subscription_revision'], **ordered}
     raw = json.dumps(ordered, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
     # Go's default JSON encoder escapes HTML characters, including URL '&'.
     for character in ('&', '<', '>', '\u2028', '\u2029'):
@@ -121,6 +127,9 @@ def verify_run_admissions(library, queue, producer, version):
     retrieval = ('(SELECT url FROM source_run_retrievals WHERE run_uuid=j.uuid)'
                  if library.execute("SELECT 1 FROM sqlite_schema WHERE name='source_run_retrievals'").fetchone()
                  else 'NULL')
+    subscription = ('(SELECT revision FROM source_run_subscriptions WHERE run_uuid=j.uuid AND collection_uuid=j.collection_uuid)'
+                    if library.execute("SELECT 1 FROM sqlite_schema WHERE name='source_run_subscriptions'").fetchone()
+                    else 'NULL')
     if version == 1:
         if queue.execute("SELECT 1 FROM sqlite_schema WHERE name IN ('run_intents','run_requests') LIMIT 1").fetchone():
             raise InvalidArchive("Producer schema version would omit retained source admission state")
@@ -176,7 +185,7 @@ def verify_run_admissions(library, queue, producer, version):
         native_hash = native_request_digest(request)
         native = list(objects(library, f"""SELECT r.digest,r.run_uuid,j.uuid AS native_run_uuid,
             j.collection_uuid,j.collection_revision,j.operation,j.policy_sha256,j.cooldown_seconds,j.root_uuid,j.root_revision,
-            {retrieval} AS retrieval_url
+            {retrieval} AS retrieval_url,{subscription} AS subscription_revision
             FROM source_run_requests r LEFT JOIN source_runs j ON j.uuid=r.run_uuid
             WHERE r.producer_uuid=? AND r.request_uuid=?""", (producer, row["request_uuid"])))
         if len(native) > 1:
@@ -188,6 +197,11 @@ def verify_run_admissions(library, queue, producer, version):
                     or json_bytes({key:server[key] for key in FIELDS}) != json_bytes({key:request[key] for key in FIELDS})):
                 raise InvalidArchive("Native source admission does not match the original request")
             identifier(server["run_uuid"])
+            # Older manual runs can acquire a subscription binding later. Only
+            # explicitly scheduled requests require their original revision here.
+            if ('subscription_revision' in request
+                    and server['subscription_revision'] != request['subscription_revision']):
+                raise InvalidArchive("Native source admission lost its subscription binding")
         if row["state"] == "admitted":
             if server is None:
                 raise InvalidArchive("Admitted producer request is missing from the native snapshot")

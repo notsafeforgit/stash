@@ -145,5 +145,40 @@
       "retrieval_url": "https://www.reddit.com/search?q=author:example+nsfw:yes&include_over_18=on&sort=top&t=year"
     },
     "native_sha256": "72fe52be75678c4dd0a6665575d3e583ec8b009ddfc81393a0db7a97d584af0b"
+  },
+  {
+    "name": "monitoring_subscription",
+    "input": {
+      "request_uuid": "33333333-3333-4333-8333-333333333333",
+      "collection_uuid": "22222222-2222-4222-8222-222222222222",
+      "collection_revision": 7,
+      "operation": "download",
+      "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "window": {
+        "since": null,
+        "until": "2026-10-01T00:00:00Z"
+      },
+      "cooldown_seconds": 30,
+      "subscription_revision": 3
+    },
+    "native_sha256": "a1ebab0f358eed82b65a707c380e6081ee55be1e40a59a738e0e0503503c6652"
+  },
+  {
+    "name": "monitoring_subscription_retrieval",
+    "input": {
+      "request_uuid": "33333333-3333-4333-8333-333333333333",
+      "collection_uuid": "22222222-2222-4222-8222-222222222222",
+      "collection_revision": 7,
+      "operation": "download",
+      "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "window": {
+        "since": null,
+        "until": "2026-10-01T00:00:00Z"
+      },
+      "cooldown_seconds": 30,
+      "subscription_revision": 2147483647,
+      "retrieval_url": "https://www.reddit.com/user/example/submitted/?sort=top&t=year"
+    },
+    "native_sha256": "71a47595822d2cae5307f2fd29eb458a33f2edc538c268d3578ef64f8602bbb3"
   }
 ]

@@ -111,6 +111,9 @@ test("mobile settings search opens above the row and navigates to the highlighte
   if (!inputBox || !resultBox) throw new Error("Missing search geometry");
   expect(resultBox.y + resultBox.height).toBeLessThanOrEqual(inputBox.y);
   await result.tap();
+  await expect(input).not.toBeFocused();
+  await expect(page).toHaveURL(/\/settings\/library$/);
+  await result.tap();
   await expect(page).toHaveURL(/\/settings\/interface\?hl=Language$/);
   await expect(input).toBeHidden();
   await expect(trigger).toBeFocused();

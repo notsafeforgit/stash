@@ -16,6 +16,7 @@ import { cn } from "src/lib/utils";
 import { useIntl } from "react-intl";
 import { Input } from "src/components/ui/input";
 import { Button } from "src/components/ui/button";
+import { useOutsideTap } from "@/hooks/use-outside-tap";
 
 export interface SearchInputProps {
   /** Current search term from the filter model (for external reset sync). */
@@ -44,6 +45,15 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   const debounceRef = useRef<number | null>(null);
   const [initialValue] = useState(value ?? "");
   const [hasValue, setHasValue] = useState(!!value);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Mobile rows own this gesture together with their Close button. Also cover
+  // touch use of the inline search on wider tablet layouts.
+  useOutsideTap({
+    isActive: () => !mobile && document.activeElement === inputRef.current,
+    isInside: (target) => !!containerRef.current?.contains(target),
+    onDismiss: () => inputRef.current?.blur(),
+  });
 
   // Sync external resets (e.g. loading a saved filter) without clobbering
   // what the user is currently typing.
@@ -91,7 +101,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   });
 
   return (
-    <div className={cn("relative", className)}>
+    <div ref={containerRef} className={cn("relative", className)}>
       <Input
         ref={inputRef}
         type="search"

@@ -399,8 +399,7 @@ test("page jump rejects invalid values and resets its draft after navigation", a
   await input.fill("3");
   await input.press("Enter");
   await expect(state).toContainText("page 3:");
-  await expect(sections).toHaveAttribute("aria-expanded", "false");
-  await sections.tap();
+  await expect(sections).toHaveAttribute("aria-expanded", "true");
   await expect(input).toHaveValue("3");
   await input.fill("5");
   await page
@@ -408,7 +407,7 @@ test("page jump rejects invalid values and resets its draft after navigation", a
     .getByRole("button", { name: "Prev", exact: true })
     .tap();
   await expect(state).toContainText("page 2:");
-  await sections.tap();
+  await expect(sections).toHaveAttribute("aria-expanded", "true");
   await expect(input).toHaveValue("2");
   await page.keyboard.press("Escape");
   await page
@@ -432,6 +431,8 @@ test("page jump resets its draft when the result count changes", async ({
   await input.fill("5");
   await page.getByRole("button", { name: "Reduce results", exact: true }).tap();
   await expect(sections).toHaveAttribute("aria-expanded", "false");
+  // The dismissal tap must not activate the button underneath the popup.
+  await page.getByRole("button", { name: "Reduce results", exact: true }).tap();
   await sections.tap();
   await expect(input).toHaveAttribute("max", "2");
   await expect(input).toHaveValue("1");
@@ -492,6 +493,13 @@ test("standalone lists provide page jumping, view options, and navigation", asyn
   await page.getByRole("spinbutton", { name: "Go to page" }).fill("2");
   await page.getByRole("button", { name: "Go", exact: true }).tap();
   await expect(page.getByTestId("list-state")).toContainText("page 2:");
+  await page.getByRole("button", { name: "View options", exact: true }).tap();
+  await expect(
+    row.getByRole("button", { name: "Pages", exact: true }),
+  ).toHaveAttribute("aria-expanded", "false");
+  await expect(
+    page.getByRole("dialog", { name: "View options", exact: true }),
+  ).toBeHidden();
   await page.getByRole("button", { name: "View options", exact: true }).tap();
   await expect(
     page.getByRole("dialog", { name: "View options", exact: true }),

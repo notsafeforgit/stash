@@ -10,6 +10,7 @@ import {
 import { Button } from "src/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NumberInput } from "src/components/filters/number-input";
+import { usePopoverOutsideTap } from "@/hooks/use-outside-tap";
 import {
   Popover,
   PopoverContent,
@@ -42,7 +43,6 @@ const PageJumpForm: React.FC<{
     if (value >= 1 && value <= totalPages) {
       onChangePage(value);
     }
-    onClose();
   }
 
   return (
@@ -110,6 +110,9 @@ export const ListPagination: React.FC<ListPaginationProps> = ({
   const totalPages =
     totalItems === undefined ? 0 : Math.ceil(totalItems / itemsPerPage);
   const [showJump, setShowJump] = useState(false);
+  const { triggerRef, popupRef } = usePopoverOutsideTap(showJump, () =>
+    setShowJump(false),
+  );
 
   if (totalPages <= 1) return null;
 
@@ -158,6 +161,7 @@ export const ListPagination: React.FC<ListPaginationProps> = ({
               {page === currentPage ? (
                 <Popover open={showJump} onOpenChange={setShowJump}>
                   <PopoverTrigger
+                    ref={triggerRef}
                     render={
                       <PaginationLink
                         isActive
@@ -169,6 +173,7 @@ export const ListPagination: React.FC<ListPaginationProps> = ({
                     }
                   />
                   <PopoverContent
+                    ref={popupRef}
                     className="w-auto p-2"
                     side="bottom"
                     align="center"

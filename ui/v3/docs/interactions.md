@@ -148,6 +148,14 @@ row modes with navigation and a page picker. Desktop retains
 its sidebar controls and tab strip. Collection pages use the `md` breakpoint;
 media pages use `lg`, matching their existing split layouts.
 
+Page pickers stay open after previous/next and page-jump actions. Outside touch
+taps dismiss the picker without activating the underlying control or list item;
+outside swipes leave it open and retain native list scrolling. The shared
+`useOutsideTap` waits for click before dismissing and consumes the gesture's
+compatibility mouse events, avoiding early focus changes and click-through.
+It does not add a backdrop or lock scrolling. Mouse and keyboard interactions
+continue through Base UI, including Escape and focus restoration.
+
 An active list query keeps Search highlighted even when its input is closed.
 Tap opens the input; long press opens the existing Base UI context menu anchored
 above the Search button, independent of the finger's position within it, with the
@@ -165,6 +173,11 @@ layout size and position throughout, and focus still happens inside the opening
 gesture. Blur flushes pending text before the exit animation; its completion
 restores the toolbar and focus. Interrupted animations cancel cleanly, unmount
 cancels pending work, and reduced-motion preference skips the animation.
+While the search input is focused, the first outside touch tap blurs it and
+flushes its pending text without activating the tapped item. The query and row
+remain available; a subsequent tap can activate the item. Swipes keep native
+scrolling, and taps on the row's Clear/Close controls work immediately. Inline
+entity search uses the same policy on touch devices with wider layouts.
 
 Drawer motion uses `transform` for dragging and enter/exit animations. Do not
 combine it with the separate CSS `translate` property on the popup: Base UI

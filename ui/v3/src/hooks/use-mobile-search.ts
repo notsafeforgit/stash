@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { useOutsideTap } from "./use-outside-tap";
 
 // Leave room for the input's focus ring without changing its layout bounds.
 const EXPANDED_CLIP = "inset(-4px -4px -4px -4px)";
@@ -13,6 +14,12 @@ export function useMobileSearch() {
   const rowRef = useRef<HTMLDivElement>(null);
   const collapsedClipRef = useRef(EXPANDED_CLIP);
   const animationRef = useRef<Animation | null>(null);
+
+  useOutsideTap({
+    isActive: () => isOpen && document.activeElement === inputRef.current,
+    isInside: (target) => !!rowRef.current?.contains(target),
+    onDismiss: () => inputRef.current?.blur(),
+  });
 
   useEffect(() => () => animationRef.current?.cancel(), []);
 

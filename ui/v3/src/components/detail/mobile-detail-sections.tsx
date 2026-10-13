@@ -15,6 +15,7 @@ import {
   useMobileDetailChrome,
 } from "@/components/layout/mobile-detail-chrome";
 import type { DetailTabStripItem } from "./detail-tab-strip";
+import { usePopoverOutsideTap } from "@/hooks/use-outside-tap";
 
 /** The original Tabs context owns selection and panels, including inside the popover. */
 export function MobileDetailSections({
@@ -29,6 +30,10 @@ export function MobileDetailSections({
   const intl = useIntl();
   const chrome = useMobileDetailChrome();
   const setPanel = chrome?.setPanel;
+  const { triggerRef, popupRef } = usePopoverOutsideTap(
+    chrome?.panel === "sections",
+    () => setPanel?.(null),
+  );
   const previousTab = useRef(activeTab);
   useEffect(() => {
     if (previousTab.current === activeTab) return;
@@ -50,6 +55,7 @@ export function MobileDetailSections({
         onOpenChange={(open) => chrome.setPanel(open ? "sections" : null)}
       >
         <PopoverTrigger
+          ref={triggerRef}
           render={
             <Button
               variant="ghost"
@@ -66,6 +72,7 @@ export function MobileDetailSections({
           <ChevronUp data-icon="inline-end" />
         </PopoverTrigger>
         <PopoverContent
+          ref={popupRef}
           side="top"
           align="start"
           keepMounted

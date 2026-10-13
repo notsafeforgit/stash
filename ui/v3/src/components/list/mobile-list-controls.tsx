@@ -29,6 +29,7 @@ import {
 } from "@/components/layout/mobile-detail-chrome";
 import { useMobileKeyboardLayout } from "@/hooks/use-mobile-keyboard-layout";
 import { useMobileSearch } from "@/hooks/use-mobile-search";
+import { usePopoverOutsideTap } from "@/hooks/use-outside-tap";
 import { cn } from "@/lib/utils";
 import type { ListFilterModel } from "@/models/list-filter/filter";
 import { SearchInput } from "./search-input";
@@ -75,6 +76,9 @@ export function MobileListControls({
   const search = useMobileSearch();
   const openNavigation = useMobileNavigation();
   const [pagesOpen, setPagesOpen] = useState(false);
+  const { triggerRef, popupRef } = usePopoverOutsideTap(pagesOpen, () =>
+    setPagesOpen(false),
+  );
   const keyboardRef = useMobileKeyboardLayout<HTMLDivElement>();
   const mode =
     selecting || hasSelection ? "selection" : search.isOpen ? "search" : null;
@@ -95,8 +99,6 @@ export function MobileListControls({
       totalItems={totalCount}
       onChangePage={(page) => {
         setFilter(filter.changePage(page));
-        setPagesOpen(false);
-        chrome?.setPanel(null);
       }}
     />
   );
@@ -209,6 +211,7 @@ export function MobileListControls({
                     {pageCount > 1 ? (
                       <Popover open={pagesOpen} onOpenChange={setPagesOpen}>
                         <PopoverTrigger
+                          ref={triggerRef}
                           render={
                             <Button
                               variant="ghost"
@@ -227,6 +230,7 @@ export function MobileListControls({
                           <ChevronUp data-icon="inline-end" />
                         </PopoverTrigger>
                         <PopoverContent
+                          ref={popupRef}
                           side="top"
                           className="w-80 max-w-[calc(100vw-1.5rem)]"
                         >

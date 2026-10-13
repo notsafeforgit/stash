@@ -190,16 +190,20 @@ make test-ui-v3-browser
 ```
 
 The [browser workflow](../../../.github/workflows/v3-browser-tests.yml) runs
-Chromium on Ubuntu 24.04 with two shards and WebKit on Ubuntu 26.04 with four.
+Chromium with two shards and WebKit with four in a digest-pinned Playwright
+Ubuntu 26.04 container. The image holds both browsers and their system media
+libraries; CI does not reinstall packages from changing Ubuntu repositories.
 WebKit needs the newer GStreamer media runtime: the 1.24 backend on Ubuntu 24.04
 can deadlock or crash during HLS EOF seeks even with a bare video element.
 Chromium uses two workers per shard. WebKit uses one to avoid competing media
 pipelines during playback and frame-timing checks on small CI runners.
-For matching local Linux coverage, use Playwright's version-matched
-[`-resolute` container image](https://playwright.dev/docs/docker#image-tags).
-Each job installs its browser with `playwright install --with-deps`. The workflow
-runs for relevant pushes and pull requests and saves traces and screenshots on
-failure. To inspect a local failure, run
+For matching local Linux coverage, use the exact image pinned in the workflow.
+Update its version and digest alongside `@playwright/test` in `package.json` and
+the lockfile; mismatched browser and package versions are unsupported. See
+Playwright's [container guidance](https://playwright.dev/docs/docker#image-tags).
+The workflow runs for relevant pushes and pull requests and saves traces and
+screenshots on failure. Browser process diagnostics (`DEBUG=pw:browser`) retain
+native stderr and exit information in job logs. To inspect a local failure, run
 `pnpm --dir ui/v3 exec playwright show-report`.
 
 Linux WebKit coverage does not verify Apple's media stack or physical iPhone

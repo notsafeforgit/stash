@@ -23,10 +23,12 @@ concurrency:
 
 jobs:
   browser:
-    runs-on: ${{ matrix.os }}
-    # Fresh WebKit runners can spend over 20 minutes installing dependencies.
-    # Keep separate setup and test limits so provisioning cannot consume the
-    # test shard's budget; playback assertions retain their own deadlines.
+    runs-on: ubuntu-24.04
+    # Pin browsers and their system media libraries together, matching local
+    # reproduction. Update this image alongside @playwright/test in ui/v3.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-resolute@sha256:b022639ae9197f864040f92eef7b57c6d4b47db2190f77c909d8a5d902dd4b7e
+      options: --ipc=host
     timeout-minutes: 65
     strategy:
       fail-fast: false
@@ -35,25 +37,22 @@ jobs:
         shard: [1, 2]
         include:
           - browser: chromium
-            os: ubuntu-24.04
             shards: 2
           # Use GStreamer 1.28: Noble's 1.24 media backend can deadlock or
           # crash during HLS EOF seeks, including with a bare video element.
           - browser: webkit
-            os: ubuntu-26.04
             shards: 4
           # Each WebKit shard runs one worker so media timing checks do not
           # compete for the same runner. Keep the per-job test count bounded.
           - browser: webkit
-            os: ubuntu-26.04
             shard: 3
             shards: 4
           - browser: webkit
-            os: ubuntu-26.04
             shard: 4
             shards: 4
     defaults:
       run:
+        shell: bash
         working-directory: ui/v3
     steps:
       - uses: actions/checkout@v6
@@ -66,11 +65,12 @@ jobs:
           cache: pnpm
           cache-dependency-path: ui/v3/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
-        timeout-minutes: 25
       - run: pnpm run test:browser --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
         # Chromium's 327-test shards take more than 20 minutes on these runners.
         timeout-minutes: 35
+        env:
+          # Retain native browser exits/stderr when a media process crashes.
+          DEBUG: pw:browser
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

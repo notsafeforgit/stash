@@ -5,6 +5,7 @@ import {
   activityRunDetail,
   activityIds,
 } from "../fixtures/archive-activity";
+import { collection } from "../fixtures/collections";
 
 test.use({
   expectedConsoleErrors: ["the server responded with a status of 503"],
@@ -35,6 +36,18 @@ async function setup(page: Page) {
       completed_windows: remote.running ? 0 : 1,
       lease_until: remote.running ? "2026-10-12T01:00:00Z" : null,
     };
+    if (url.pathname === "/api/v3/archive/collections") {
+      expect(req.method()).toBe("GET");
+      return route.fulfill({
+        json: [
+          {
+            ...collection(),
+            uuid: row.collection_uuid,
+            label: row.collection_label,
+          },
+        ],
+      });
+    }
     if (url.pathname.endsWith("/page-info")) {
       const state = url.searchParams.get("state");
       return route.fulfill({
@@ -201,5 +214,14 @@ test("the activity entry point opens scrape runs", async ({ page }) => {
   await expect(
     page.getByRole("combobox", { name: "Job type", exact: true }),
   ).toHaveCount(0);
+  const collectionPicker = page.getByRole("combobox", {
+    name: "Source collection",
+    exact: true,
+  });
+  await expect(collectionPicker).toHaveAttribute("aria-busy", "false");
+  await collectionPicker.click();
+  await expect(
+    page.getByRole("option", { name: "Instagram · example", exact: true }),
+  ).toBeVisible();
   expect(remote.writes).toEqual([]);
 });

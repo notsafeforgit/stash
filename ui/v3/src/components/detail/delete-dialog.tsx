@@ -60,6 +60,9 @@ interface DeleteDialogProps {
   details?: React.ReactNode;
   /** Label for the disclosure toggle. Defaults to "Show details" / "Hide details". */
   detailsLabel?: string;
+  /** Scope controls, disabled while deletion is in progress. */
+  renderOptions?: (busy: boolean) => React.ReactNode;
+  confirmDisabled?: boolean;
   /** Called with chosen options when the user confirms. Should throw on error. */
   onConfirm: (
     opts: DeleteOptions,
@@ -140,6 +143,8 @@ export function DeleteDialog({
   deleteFileLabel,
   details,
   detailsLabel,
+  renderOptions,
+  confirmDisabled = false,
   onConfirm,
 }: DeleteDialogProps) {
   const intl = useIntl();
@@ -151,6 +156,7 @@ export function DeleteDialog({
   const report = useToast().error;
 
   async function handleConfirm() {
+    if (confirmDisabled || isDeleting) return;
     setIsDeleting(true);
     setProgress(null);
     try {
@@ -235,6 +241,8 @@ export function DeleteDialog({
             })}
           </DialogDescription>
         </DialogHeader>
+
+        {renderOptions?.(isDeleting)}
 
         {showFileOptions && (
           <div className="flex flex-col gap-3">
@@ -323,7 +331,7 @@ export function DeleteDialog({
           <Button
             variant="destructive"
             size="sm"
-            disabled={isDeleting}
+            disabled={isDeleting || confirmDisabled}
             onClick={handleConfirm}
           >
             {isDeleting ? <Spinner className="size-4" /> : <Trash2 />}

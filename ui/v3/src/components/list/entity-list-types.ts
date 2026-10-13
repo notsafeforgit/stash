@@ -7,6 +7,14 @@ import type { IHasID } from "@/utils/data";
 import type { ListFilterModel } from "@/models/list-filter/filter";
 import type { ISortByOption } from "@/models/list-filter/filter-options";
 import type { View } from "./views";
+import type { BulkApplyTarget } from "./list-provider";
+
+/** Snapshot of the selection and filter when a delete action is opened. */
+export interface ListDeleteSelection {
+  ids: string[];
+  matching?: BulkApplyTarget;
+  totalCount?: number;
+}
 
 /**
  * Imperative handle for page navigation, populated by EntityListPage on a ref
@@ -175,4 +183,6 @@ export interface EntityListPageConfig<
    * bar (e.g. a "+ New" button). Hidden in selection mode.
    */
   pageActions?: React.ReactNode;
+  /** Delete action shared by the selection toolbar and card/row menus. */
+  onDeleteSelection?: (selection: ListDeleteSelection) => void;
 }

@@ -15,6 +15,7 @@ import {
 import { EntityContextMenuContent } from "./entity-context-menu-content";
 import { OpenInNewTabMenuItem } from "./open-in-new-tab-menu-item";
 import { SelectAllMenuItem } from "./select-all-menu-item";
+import { useListContextOptional } from "@/components/list/list-provider";
 
 interface MarkerContextMenuProps {
   marker: Pick<GQL.SceneMarkerDataFragment, "id" | "seconds" | "scene">;
@@ -30,6 +31,9 @@ export function useMarkerContextMenu({
   const intl = useIntl();
   const navigate = useNavigate();
   const router = useRouter();
+  const { getSelectedIds, onDeleteSelection } = useListContextOptional();
+  const [selectedCount, setSelectedCount] = useState(0);
+  const deletingSelection = !!onDeleteSelection && selectedCount > 0;
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [destroyMarker] = useEntityMutation(GQL.SceneMarkerDestroyDocument);
   const destination = entityDestination.scene(marker.scene.id, {
@@ -58,6 +62,7 @@ export function useMarkerContextMenu({
   }
 
   return {
+    onContextMenuOpen: () => setSelectedCount(getSelectedIds().size),
     menuContent: (
       <EntityContextMenuContent title={title}>
         {onSelectedChanged && (
@@ -71,24 +76,34 @@ export function useMarkerContextMenu({
         <SelectAllMenuItem />
         <OpenInNewTabMenuItem href={router.buildLocation(destination).href} />
         <ContextMenuSeparator />
-        <ContextMenuItem
-          onClick={() =>
-            navigate({
-              ...destination,
-              state: { returnTo: router.state.location.href },
-            })
-          }
-        >
-          {intl.formatMessage({ id: "actions.edit", defaultMessage: "Edit" })}…
-        </ContextMenuItem>
+        {!deletingSelection && (
+          <ContextMenuItem
+            onClick={() =>
+              navigate({
+                ...destination,
+                state: { returnTo: router.state.location.href },
+              })
+            }
+          >
+            {intl.formatMessage({ id: "actions.edit", defaultMessage: "Edit" })}
+            …
+          </ContextMenuItem>
+        )}
         <ContextMenuItem
           variant="destructive"
-          onClick={() => setDeleteOpen(true)}
+          onClick={
+            deletingSelection ? onDeleteSelection : () => setDeleteOpen(true)
+          }
         >
-          {intl.formatMessage({
-            id: "actions.delete",
-            defaultMessage: "Delete",
-          })}
+          {deletingSelection
+            ? intl.formatMessage(
+                { id: "actions.delete_markers_count" },
+                { count: selectedCount },
+              )
+            : intl.formatMessage({
+                id: "actions.delete",
+                defaultMessage: "Delete",
+              })}
           …
         </ContextMenuItem>
       </EntityContextMenuContent>
@@ -108,10 +123,15 @@ export function MarkerRowContextMenu({
   children,
   ...props
 }: MarkerContextMenuProps & { children: React.ReactElement }) {
-  const { menuContent, dialogs } = useMarkerContextMenu(props);
+  const { menuContent, dialogs, onContextMenuOpen } =
+    useMarkerContextMenu(props);
   return (
     <>
-      <ContextMenu>
+      <ContextMenu
+        onOpenChange={(open) => {
+          if (open) onContextMenuOpen();
+        }}
+      >
         <ContextMenuTrigger render={children} />
         {menuContent}
       </ContextMenu>

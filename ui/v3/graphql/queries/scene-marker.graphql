@@ -12,3 +12,19 @@ query FindSceneMarkers(
     }
   }
 }
+
+# Resolve the exact matching UUIDs before confirming a cross-page deletion.
+query FindSceneMarkerIDs(
+  $filter: FindFilterType
+  $scene_marker_filter_ast: FilterASTInput
+) {
+  findSceneMarkers(
+    filter: $filter
+    scene_marker_filter_ast: $scene_marker_filter_ast
+  ) {
+    count
+    scene_markers {
+      id
+    }
+  }
+}

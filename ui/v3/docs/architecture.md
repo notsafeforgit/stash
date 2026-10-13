@@ -368,8 +368,17 @@ Only active embedded panels synchronize shared URL parameters. Selection stores
 IDs and derives selected objects from current list data. `list-provider.tsx`
 shares selection capabilities; `entity-list-items.ts` binds each item provider
 and consumer to one generated entity projection. Set `ItemsProvider` in a list
-configuration when its cards expose bulk menus. Consumers cannot choose a new
-item type independently of their provider.
+configuration when its bulk menus need selected entity objects. Consumers cannot
+choose a new item type independently of their provider. ID-only actions can use
+the stable selection accessors directly.
+
+`onDeleteSelection` supplies the same action to the desktop/mobile selection
+toolbar and card/row menus. It snapshots selected UUIDs, the current search and
+AST filter, and the matching count. Marker deletion keeps its dialog at page
+level, resolves all matching UUIDs only when explicitly requested, and confirms
+the resolved count before deleting in batches. It never advances offset pages
+while deleting, never deletes parent scenes or media files, and reports only
+acknowledged batches after a failure.
 
 Wall cards render their selected and accessible state from React data. Each
 card subtree is memoized on its own selected flag, so selecting one card does

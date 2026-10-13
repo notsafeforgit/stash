@@ -26,6 +26,8 @@ export type ListContextState = {
   onSelectAll: () => void;
   /** Clear all selections. Stable identity. */
   onSelectNone: () => void;
+  /** Open deletion for the current selection, with the current filter scope. */
+  onDeleteSelection?: () => void;
 };
 
 export const ListStateContext = React.createContext<ListContextState | null>(

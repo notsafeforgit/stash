@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { useDocumentTitle } from "src/hooks/title";
@@ -9,6 +9,8 @@ import { useMarkerLightbox } from "src/components/lightbox";
 import { View } from "src/components/list/views";
 import { markerTableColumns, markerTitle } from "./-markers-table-columns";
 import { MarkerRowContextMenu } from "@/components/cards/use-marker-context-menu";
+import { MarkerDeleteDialog } from "@/components/detail/marker-delete-dialog";
+import type { ListDeleteSelection } from "@/components/list/entity-list-types";
 
 type MarkersQuery = GQL.FindSceneMarkersQuery;
 type MarkerItem =
@@ -16,6 +18,8 @@ type MarkerItem =
 
 function MarkersPage() {
   const intl = useIntl();
+  const [deleteSelection, setDeleteSelection] =
+    useState<ListDeleteSelection | null>(null);
   useDocumentTitle(
     intl.formatMessage({ id: "markers", defaultMessage: "Markers" }),
   );
@@ -76,6 +80,7 @@ function MarkersPage() {
         </MarkerRowContextMenu>
       ),
       tableVisibilityKey: "markers",
+      onDeleteSelection: setDeleteSelection,
       onCardPreviewClick,
       pageNavRef,
       onItemsChanged,
@@ -90,6 +95,12 @@ function MarkersPage() {
         keyboardShortcutsDisabled={lightboxOpen}
       />
       {lightboxElement}
+      {deleteSelection && (
+        <MarkerDeleteDialog
+          selection={deleteSelection}
+          onClose={() => setDeleteSelection(null)}
+        />
+      )}
     </>
   );
 }

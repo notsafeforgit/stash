@@ -59,7 +59,7 @@ export const MarkerCard: React.FC<MarkerCardProps> = ({
       ? `${sceneTitle} — ${marker.primary_tag.name}`
       : marker.primary_tag.name);
   const timestamp = formatTimestamp(marker.seconds);
-  const { menuContent, dialogs } = useMarkerContextMenu({
+  const { menuContent, dialogs, onContextMenuOpen } = useMarkerContextMenu({
     marker,
     title,
     onSelectedChanged,
@@ -109,6 +109,7 @@ export const MarkerCard: React.FC<MarkerCardProps> = ({
         prefetch={prefetch}
         className="marker-card"
         contextMenu={menuContent}
+        onContextMenuOpen={onContextMenuOpen}
       >
         <EntityCard.SelectCheckbox />
         <EntityCard.Preview

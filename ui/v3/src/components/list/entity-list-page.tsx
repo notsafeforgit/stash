@@ -1,5 +1,5 @@
 import { useCommittedRef } from "@/hooks/use-committed-ref";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import type { OperationVariables } from "@apollo/client";
 import { QueryError } from "@/components/query-error";
 import type { IHasID } from "@/utils/data";
@@ -15,7 +15,8 @@ import {
   EmptyMedia,
 } from "@/components/ui/empty";
 import { useIntl } from "react-intl";
-import { SearchXIcon } from "lucide-react";
+import { SearchXIcon, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { EntityList } from "./entity-list";
 import { useListSidebar } from "./use-list-sidebar";
 import { useListSelect } from "./use-list-select";
@@ -145,7 +146,9 @@ export function EntityListPage<
     renderTagger,
     getWallDimensions,
     pageActions,
+    onDeleteSelection,
   } = config;
+  const intl = useIntl();
 
   // viewProp (from the component prop) takes precedence over config.view.
   const view = viewProp ?? configView;
@@ -222,6 +225,42 @@ export function EntityListPage<
     [filter],
   );
 
+  const deleteSelection = useCallback(() => {
+    const ids = [...listSelect.getSelectedIds()];
+    if (isLoading || !ids.length) return;
+    onDeleteSelection?.({
+      ids,
+      matching:
+        source.kind === "graphql" && count !== undefined
+          ? applyToAllTarget
+          : undefined,
+      totalCount: count,
+    });
+  }, [
+    listSelect.getSelectedIds,
+    isLoading,
+    onDeleteSelection,
+    source.kind,
+    count,
+    applyToAllTarget,
+  ]);
+  const selectionActions = listSelect.hasSelection ? (
+    <>
+      {shareSelection}
+      {onDeleteSelection && (
+        <Button
+          variant="ghost"
+          size={isMobileSidebar ? "icon-lg" : "icon-sm"}
+          disabled={isLoading}
+          onClick={deleteSelection}
+          aria-label={intl.formatMessage({ id: "actions.delete_selected" })}
+        >
+          <Trash2 />
+        </Button>
+      )}
+    </>
+  ) : undefined;
+
   // Stable context: only changes when query results or filter change, never on selection.
   // Cards read selection imperatively via getSelectedIds when needed
   // (e.g. on context-menu open) rather than subscribing to reactive values.
@@ -233,6 +272,7 @@ export function EntityListPage<
       getSelectedIds: listSelect.getSelectedIds,
       onSelectAll: listSelect.onSelectAll,
       onSelectNone: listSelect.onSelectNone,
+      onDeleteSelection: onDeleteSelection ? deleteSelection : undefined,
     }),
     [
       count,
@@ -240,6 +280,8 @@ export function EntityListPage<
       listSelect.getSelectedIds,
       listSelect.onSelectAll,
       listSelect.onSelectNone,
+      onDeleteSelection,
+      deleteSelection,
     ],
   );
 
@@ -337,7 +379,7 @@ export function EntityListPage<
       hasSelection={listSelect.hasSelection}
       selecting={listSelect.selecting}
       selectedCount={listSelect.selectedItems.length}
-      selectionActions={shareSelection}
+      selectionActions={selectionActions}
       onSelectAll={listSelect.onSelectAll}
       onSelectNone={listSelect.onSelectNone}
       onTaggerMode={renderTagger ? () => setTaggerActive((v) => !v) : undefined}
@@ -372,7 +414,7 @@ export function EntityListPage<
       setCardAspect={supportsCardAspect ? setCardAspect : undefined}
       sortOptions={sortOptionsOverride}
       pageActions={pageActions}
-      operationComponent={shareSelection}
+      operationComponent={selectionActions}
       mobileGridCols={mobileGridCols}
     >
       {error && (

@@ -45,8 +45,9 @@ minimumReleaseAgeExclude:
   - regjsparser@0.13.3
   - which-typed-array@1.1.24
 
-# RC.2 pins an older playback engine; keep its security fixes.
+# The 10.0.1 adapter still pins hls.js 1.6.7. Retain the current stable engine,
+# including its Safari ManagedMediaSource seek and end-of-stream fixes.
 overrides:
-  "@videojs/hlsjs-video@10.0.0-rc.2>hls.js": 1.7.3
+  "@videojs/hlsjs-video@10.0.1>hls.js": 1.7.3
   "unplugin>esbuild": ^0.28.1
   "tsx>esbuild": ^0.28.1

@@ -1,11 +1,54 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./test";
 
+for (const mode of ["", "hls"]) {
+  test(`${mode || "direct"} popup startup does not pause after its first playing event`, async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const started = new WeakSet<HTMLVideoElement>();
+      const interruptions: number[] = [];
+      document.addEventListener(
+        "playing",
+        (event) => {
+          if (event.target instanceof HTMLVideoElement)
+            started.add(event.target);
+        },
+        true,
+      );
+      document.addEventListener(
+        "pause",
+        (event) => {
+          if (
+            event.target instanceof HTMLVideoElement &&
+            started.has(event.target)
+          ) {
+            interruptions.push(event.target.currentTime);
+            document.documentElement.dataset.startupInterruptions =
+              JSON.stringify(interruptions);
+          }
+        },
+        true,
+      );
+    });
+    const video = await open(page, mode ? `?mode=${mode}` : "");
+    await expect
+      .poll(() =>
+        video.evaluate((element: HTMLVideoElement) => element.currentTime),
+      )
+      .toBeGreaterThan(1.2);
+    expect(
+      await page.locator("html").getAttribute("data-startup-interruptions"),
+    ).toBeNull();
+    await expect(video).toHaveJSProperty("muted", false);
+  });
+}
+
 test("blocked autoplay preserves sound and the user can press Play", async ({
   page,
 }) => {
   // Model Safari's gesture requirement while using the real player, audio
-  // media, animation deadline and controls in both browser engines.
+  // media and controls in both browser engines.
   await page.addInitScript(() => {
     let allowed = false;
     const play = HTMLMediaElement.prototype.play;
@@ -38,7 +81,7 @@ test("blocked autoplay preserves sound and the user can press Play", async ({
     );
   });
   const video = await open(page);
-  // Finish the gate, including any rejected play promise it scheduled.
+  // A rejected autoplay attempt must remain paused with sound enabled.
   await page.waitForTimeout(650);
   await expect(video).toHaveJSProperty("paused", true);
   await expect(video).toHaveJSProperty("muted", false);

@@ -353,7 +353,7 @@ function useHotkeys({
           break;
 
         case "m":
-          store.toggleMuted();
+          store.setMuted(!store.state.muted);
           break;
         case "f":
           onToggleFullscreen();
@@ -584,8 +584,10 @@ function ControlBar({
   const intl = useIntl();
   const paused = Player.usePlayer((s) => s.paused);
   const muted = Player.usePlayer((s) => s.muted);
-  const pip = Player.usePlayer((s) => s.pip);
-  const canPip = Player.usePlayer((s) => s.pipAvailability === "available");
+  const pip = Player.usePlayer((s) => s.isPictureInPicture);
+  const canPip = Player.usePlayer(
+    (s) => s.pictureInPictureAvailability === "available",
+  );
   const store = Player.usePlayer();
 
   // Lightbox callers provide dismissal only on touch devices. Time and
@@ -609,7 +611,13 @@ function ControlBar({
           type="button"
           variant="ghost"
           size="icon"
-          onClick={() => store.togglePictureInPicture()}
+          onClick={() => {
+            void (
+              store.state.isPictureInPicture
+                ? store.exitPictureInPicture()
+                : store.requestPictureInPicture()
+            ).catch(() => {});
+          }}
           className={cn(OVERLAY_BTN, "text-white/80", onClose && "size-11")}
           aria-label={
             pip ? "Exit picture-in-picture" : "Enter picture-in-picture"
@@ -781,7 +789,7 @@ function ControlBar({
               type="button"
               variant="ghost"
               size="icon"
-              onClick={() => store.toggleMuted()}
+              onClick={() => store.setMuted(!store.state.muted)}
               className={cn(OVERLAY_BTN, "text-white/80", mobileControlClass)}
               aria-label={muted ? "Unmute" : "Mute"}
             >
@@ -887,7 +895,7 @@ export interface PlayerControlsProps {
   canAdvance: boolean;
   onCyclePlaybackMode: () => void;
   /** Override for the play/pause toggle wired into every play button and
-   *  the spacebar hotkey. Defaults to `store.togglePaused()`. The marker
+   *  the spacebar hotkey. Defaults to the store's play/pause actions. The marker
    *  lightbox supplies a wrapper that intercepts an unpause-after-clip-end
    *  to also seek the playhead back to the clip start synchronously
    *  (Safari blocks programmatic `play()` that crosses an async boundary,
@@ -896,9 +904,8 @@ export interface PlayerControlsProps {
   onTogglePaused?: () => void;
   /** Notifies the parent that the user explicitly initiated playback
    *  outside the `onTogglePaused` path (the pre-start big-play-button
-   *  click calls `store.play()` directly). The scene player feeds this
-   *  into the play-delay gate so a quick click right after the lightbox
-   *  opens isn't swallowed as suppressed autoplay. */
+   *  click calls `store.play()` directly). The scene player retains that
+   *  intent if a source load is still pending. */
   onUserPlaybackGesture?: () => void;
   /** When set, replaces the player's built-in fullscreen logic and
    *  hides the in-bar fullscreen button on hover-capable devices.
@@ -986,15 +993,20 @@ export function PlayerControls({
   const intl = useIntl();
   const duration = fileDuration ?? 0;
   const store = Player.usePlayer();
-  // Default to the raw store toggle when the parent doesn't override.
+  // Default to the store's play/pause actions when the parent doesn't override.
   // The marker lightbox passes its own to intercept replay-from-stop.
-  const togglePaused = onTogglePaused ?? (() => store.togglePaused());
+  const togglePaused =
+    onTogglePaused ??
+    (() => {
+      if (store.state.paused) void store.play().catch(() => {});
+      else store.pause();
+    });
 
   // Native fullscreen on the outer wrapper survives provider key-remounts
   // (quality switch, seek past buffer); v10's store-level fullscreen is used
   // as a fallback when the container can't be fullscreened (iOS → video
   // element fullscreen).
-  const storeFullscreen = Player.usePlayer((s) => s.fullscreen);
+  const storeFullscreen = Player.usePlayer((s) => s.isFullscreen);
   const [containerFullscreen, setContainerFullscreen] = useState(false);
   useEffect(() => {
     function onChange() {
@@ -1050,7 +1062,11 @@ export function PlayerControls({
       return;
     }
     if (!el || typeof el.requestFullscreen !== "function") {
-      void store.toggleFullscreen();
+      void (
+        store.state.isFullscreen
+          ? store.exitFullscreen()
+          : store.requestFullscreen()
+      ).catch(() => {});
       return;
     }
     if (document.fullscreenElement === el) {

@@ -29,7 +29,7 @@ export function PlatformMediaEffects({
         !latest.current.suspended &&
           !state.paused &&
           !state.ended &&
-          !state.pip &&
+          !state.isPictureInPicture &&
           state.remotePlaybackState === "disconnected",
       );
     };

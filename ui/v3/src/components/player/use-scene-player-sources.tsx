@@ -1010,9 +1010,9 @@ export function useScenePlayerSources({
       if (pending.wasPaused) {
         s.pause();
       } else {
-        // A pause, animation gate, or newer source can cancel this request.
-        // Media errors remain observable through the player store; autoplay
-        // permission fallback belongs to usePlayDelay.
+        // A pause or newer source can cancel this request. If Safari denies
+        // autoplay, leave sound intact and let the existing Play control
+        // supply a user gesture. Media errors remain visible in the store.
         void s.play().catch(() => {});
       }
     }

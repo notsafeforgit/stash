@@ -20,10 +20,10 @@ per-client coordinator in `core/scene-activity.ts`. Do not add route-owned
 automatic activity mutations. Explicit marker, offline, and disabled scopes
 exclude server accounting. See [TV mode](tv-mode.md) for feed ownership,
 quality policy, inline presentation, and the full feature map.
-The Video.js packages are pinned together in [package.json](../package.json).
+The Video.js 10.0.1 packages are pinned together in [package.json](../package.json).
 [pnpm-workspace.yaml](../pnpm-workspace.yaml) contains a version-scoped hls.js
-override; reassess it with the next adapter upgrade instead of downgrading the
-engine implicitly.
+override at 1.7.3; the 10.0.1 adapter still declares 1.6.7. Reassess it with the
+next adapter upgrade instead of losing the engine's Safari seek fixes.
 
 | Module | Responsibility |
 | --- | --- |
@@ -51,8 +51,10 @@ and source until the actual animation finishes. Only then does the player move
 to the center and load the selected scene; interrupted swipes cannot load obsolete
 selections. The same player/store/video survives scenes, markers and loading
 sentinels; closing the lightbox disposes that session. No media DOM is moved
-between slides. Only the initial entrance uses a fixed autoplay delay, and a late
-EOF from an outgoing scene cannot advance the new selection.
+between slides. Opening playback starts when media is ready; there is no timer
+that pauses a video after its first playing event. A late EOF from an outgoing
+scene cannot advance the new selection. Autoplay keeps the current sound state;
+if Safari rejects it, the existing Play control supplies the required gesture.
 
 `playbackKey` identifies the selected scene/marker independently of media ownership.
 Selection changes reset source preferences, clip offsets, poster/started latches,
@@ -64,7 +66,7 @@ the selected scene. Offline resume writes flush before the shared playhead chang
 
 Audio and playback rate belong to the persistent media element. A held 2× gesture
 keeps its touch target through automatic advance and restores the prior rate on
-release. Animation deadlines and asynchronous seeks belong to their playback/load;
+release. Asynchronous seeks belong to their playback/load;
 obsolete work cannot resume or mute a later scene. Deferred freeze-frame JPEG
 exports are also cancelled when cleared or superseded. Loop mode restarts on the
 existing media just before the boundary (at most 5 ms or a quarter frame early),

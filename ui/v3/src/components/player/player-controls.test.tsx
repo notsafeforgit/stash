@@ -85,6 +85,68 @@ function video() {
   return element;
 }
 
+it("mutes and restores sound through the player controls", async () => {
+  await act(async () => root.render(<PlayerSession />));
+  for (const [label, muted] of [
+    ["Mute", true],
+    ["Unmute", false],
+  ] as const) {
+    const button = container.querySelector(`button[aria-label="${label}"]`);
+    if (!(button instanceof HTMLButtonElement))
+      throw new Error(`Missing ${label} button`);
+    await act(async () => button.click());
+    expect(video().muted).toBe(muted);
+  }
+  expect(onError).not.toHaveBeenCalled();
+});
+
+it("enters and exits Safari picture-in-picture through the current player API", async () => {
+  const prototype = HTMLVideoElement.prototype;
+  const keys = ["webkitPresentationMode", "webkitSetPresentationMode"];
+  const descriptors = keys.map((key) =>
+    Object.getOwnPropertyDescriptor(prototype, key),
+  );
+  const modes: string[] = [];
+  Object.defineProperties(prototype, {
+    webkitPresentationMode: {
+      configurable: true,
+      get(this: HTMLVideoElement) {
+        return this.dataset.presentationMode ?? "inline";
+      },
+    },
+    webkitSetPresentationMode: {
+      configurable: true,
+      value(this: HTMLVideoElement, mode: string) {
+        modes.push(mode);
+        this.dataset.presentationMode = mode;
+        this.dispatchEvent(new Event("webkitpresentationmodechanged"));
+      },
+    },
+  });
+  vi.spyOn(HTMLMediaElement.prototype, "readyState", "get").mockReturnValue(
+    HTMLMediaElement.HAVE_METADATA,
+  );
+  try {
+    await act(async () => root.render(<PlayerSession />));
+    for (const action of ["Enter", "Exit"]) {
+      const button = container.querySelector(
+        `button[aria-label="${action} picture-in-picture"]`,
+      );
+      if (!(button instanceof HTMLButtonElement))
+        throw new Error(`Missing ${action} picture-in-picture button`);
+      await act(async () => button.click());
+    }
+    expect(modes).toEqual(["picture-in-picture", "inline"]);
+    expect(onError).not.toHaveBeenCalled();
+  } finally {
+    keys.forEach((key, index) => {
+      const descriptor = descriptors[index];
+      if (descriptor) Object.defineProperty(prototype, key, descriptor);
+      else Reflect.deleteProperty(prototype, key);
+    });
+  }
+});
+
 it("offers AirPlay only when Video.js reports an available target", async () => {
   const picker = vi.fn();
   const remoteDescriptor = Object.getOwnPropertyDescriptor(

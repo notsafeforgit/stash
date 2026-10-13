@@ -164,7 +164,7 @@ export function ScenePlayerControlsProvider({
           ready: latest.current.ready,
           zoomed: latest.current.zoomed,
           error: store.state.error?.message ?? null,
-          canPip: store.state.pipAvailability === "available",
+          canPip: store.state.pictureInPictureAvailability === "available",
         }),
         play: () => latest.current.play(),
         pause: () => latest.current.pause(),
@@ -185,7 +185,7 @@ export function ScenePlayerControlsProvider({
           if (Number.isFinite(volume))
             store.setVolume(Math.max(0, Math.min(1, volume)));
         },
-        toggleMuted: () => store.toggleMuted(),
+        toggleMuted: () => store.setMuted(!store.state.muted),
         setRate: (rate) => {
           if (Number.isFinite(rate) && rate >= 0.25 && rate <= 16)
             store.setPlaybackRate(rate);
@@ -223,8 +223,12 @@ export function ScenePlayerControlsProvider({
         retry: () => latest.current.retry(),
         resetZoom: () => latest.current.resetZoom(),
         togglePip: () => {
-          if (store.state.pipAvailability === "available")
-            void store.togglePictureInPicture();
+          if (store.state.pictureInPictureAvailability === "available")
+            void (
+              store.state.isPictureInPicture
+                ? store.exitPictureInPicture()
+                : store.requestPictureInPicture()
+            ).catch(() => {});
         },
       },
     };

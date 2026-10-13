@@ -26,7 +26,7 @@ function readRanges(
 }
 
 /**
- * Video.js rc.2's buffer feature only samples on download/metadata events.
+ * Video.js 10.0.1's buffer feature only samples on download/metadata events.
  * WebKit's MSE buffers can grow or be evicted without those notifications,
  * including while paused. Sample the public media ranges at most four times
  * a second between events, only while a visible player has a loaded source.

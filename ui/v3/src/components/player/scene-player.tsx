@@ -1,5 +1,4 @@
 import type { PreviewImageData } from "@/components/shared/preview-image";
-import { useCommittedRef } from "@/hooks/use-committed-ref";
 import type { PlayerQuality } from "@/core/player-quality";
 import { selectFixedQuality } from "@/core/player-quality";
 import { getPreferredSource } from "./scene-player-sources";
@@ -67,7 +66,6 @@ import {
   PlayerPoster,
   StartedEffect,
 } from "./player-overlays";
-import { usePlayDelay } from "./use-play-delay";
 import { usePlayerLoop } from "./use-player-loop";
 import { useScenePlayerSources } from "./use-scene-player-sources";
 import type { PlayerTranscodeSession } from "./player-transcode-session";
@@ -209,16 +207,6 @@ interface ScenePlayerProps {
    */
   loopEnabled?: boolean;
   onLoopToggle?: () => void;
-  /**
-   * Suppress visible playback for this many milliseconds after each selection.
-   * The `<video autoPlay>` attribute stays set, but every `playing` event
-   * during the window triggers an immediate `pause()`. Playback resumes after
-   * the timer fires. Used by the lightbox so the video doesn't start
-   * playing while the slide is still animating into place. If the browser
-   * denies the delayed resume, the player stays paused with its audio state
-   * intact until the user presses Play.
-   */
-  playDelayMs?: number;
   /**
    * Enables the always-mounted video transform layer's pinch / trackpad-pinch /
    * drag-when-zoomed gestures. Controls and other overlays stay fixed while
@@ -372,7 +360,6 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   onClose,
   loopEnabled: loopEnabledProp,
   onLoopToggle: onLoopToggleProp,
-  playDelayMs = 0,
   enablePinchZoom = false,
   onToggleViewer,
   viewerOpen = false,
@@ -388,7 +375,6 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   const playbackRateRef = useRef(1);
   const stoppedAtEndRef = useRef(false);
   const endedHandledRef = useRef(false);
-  const userPlaybackIntentRef = useRef(false);
   // Store handle captured by <StoreBridge> below — lets callbacks read
   // paused/currentTime/playbackRate and call play/pause/seek without being
   // descendants of Player.Player themselves.
@@ -661,7 +647,6 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // biome-ignore lint/correctness/useExhaustiveDependencies: These latches belong to a playback selection, including its loading gap.
   useLayoutEffect(() => {
     stoppedAtEndRef.current = false;
-    userPlaybackIntentRef.current = false;
     endedHandledRef.current = false;
   }, [playbackKey, suspended]);
 
@@ -687,7 +672,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     handleSourceChange,
     handleMediaError,
     handleSeek,
-    handleSeekPreview: previewSeek,
+    handleSeekPreview,
     handleSeekBy,
     setPendingPaused,
     handleRestart,
@@ -803,28 +788,16 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     stoppedAtEndRef.current = false;
   }, []);
   const handlePause = useCallback(() => {
-    // Explicit pause commands own playback just like the play/pause toggle.
-    // The animation autoplay gate must not resume a deferred TV pause.
-    userPlaybackIntentRef.current = true;
+    // A pending source load must retain an explicit pause command.
     setPendingPaused(true);
     storeRef.current?.pause();
   }, [setPendingPaused]);
   useEffect(() => {
     sendPause?.(handlePause);
   }, [sendPause, handlePause]);
-  const handleSeekPreview = useCallback(
-    (time: number | null) => {
-      // A drag owns playback even during the lightbox's opening animation.
-      // Its delayed autoplay must not undo the temporary preview pause.
-      if (time !== null) userPlaybackIntentRef.current = true;
-      previewSeek(time);
-    },
-    [previewSeek],
-  );
   const handlePlay = useCallback(() => {
     const store = storeRef.current;
     if (!store) return;
-    userPlaybackIntentRef.current = true;
     setPendingPaused(false);
     // Replay is a new playthrough. Keep its seek and play in the original
     // gesture, including sources trimmed past the start of a marker/scene.
@@ -880,19 +853,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     (autostartEnabled || autoAdvanceOverride) &&
     initialAutoplayIntent;
 
-  const autoplayIntentRef = useCommittedRef(effectiveAutoPlay);
-
-  usePlayDelay(
-    fullscreenContainerRef,
-    playDelayMs,
-    autoplayIntentRef,
-    userPlaybackIntentRef,
-    playbackKey,
-    suspended,
-  );
-
   const handleUserPlaybackGesture = useCallback(() => {
-    userPlaybackIntentRef.current = true;
     setPendingPaused(false);
   }, [setPendingPaused]);
 

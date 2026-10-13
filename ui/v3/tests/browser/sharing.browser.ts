@@ -312,7 +312,7 @@ test("video previews use the scene lightbox and retain its video element when na
     .click();
   const video = page.locator("video");
   await expect(video).toBeVisible();
-  // After the entrance delay Safari may require a Play gesture for sound.
+  // Safari may require a Play gesture for sound after the media loads.
   // Silent autoplay is deliberately no longer used to bypass that policy.
   await page.waitForTimeout(650);
   if (await video.evaluate((element: HTMLVideoElement) => element.paused)) {

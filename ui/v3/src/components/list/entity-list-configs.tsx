@@ -79,6 +79,7 @@ export function imageToSlide(image: ImageItem): LightboxSlide {
   const title = imageTitle(image);
   return {
     src,
+    thumbnail: image.paths.thumbnail || image.paths.preview || src,
     alt: title,
     imageId: image.id,
     imageTitle: title,

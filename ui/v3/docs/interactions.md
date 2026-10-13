@@ -52,7 +52,7 @@ list can animate. Grid zoom commits immediately on all devices; it no longer
 captures native View Transition snapshots.
 
 Image and scene lightboxes share `lightbox/use-lightbox-motion.ts`: a 240ms
-entrance reveal, 180ms exit, 240ms swipe settling and 180ms button/keyboard
+entrance reveal, 100ms exit, 240ms swipe settling and 180ms button/keyboard
 navigation. Image zoom keeps its 250ms timing. An empty black surface in YARL's
 controls slot fades away to reveal the media and fades back for dismissal.
 The media stays opaque and untransformed, preserving video and swipe geometry
@@ -63,10 +63,17 @@ work cannot consume the entrance unseen. The cover starts at 99% opacity to
 allow initial media rasterization. YARL's root CSS opacity transition is disabled
 when Web Animations are available; unsupported browsers retain the native fade.
 YARL owns gestures and exit completion.
-Mobile Close, Escape and browser Back use the library's exit before
-disposing the player, consuming exactly one history entry. The optional visual
+Mobile Close and Escape consume the temporary history entry while the exit
+runs, so returning to the list does not wait for a second, serial navigation.
+Browser Back starts the same exit. Disposal waits for both to finish, preventing
+a quick reopen from racing an outstanding history traversal. Each dismissal
+consumes exactly one entry. The optional visual
 dismissal callback in `use-lightbox-history.ts` also preserves the existing
 history-only contract for the focused scene viewer.
+The desktop image strip uses Stash thumbnails rather than original files.
+Phones omit that already-hidden strip entirely to avoid loading and decoding
+images for invisible controls. Page-boundary placeholders render a spinner,
+without an empty image URL.
 
 `cards/use-card-press.ts` uses the same interruptible animation owner to enlarge
 the entire card slightly on primary-pointer down and ease it back on release.

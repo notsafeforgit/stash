@@ -200,7 +200,10 @@ function SceneDetailPage() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const viewerButtonRef = useRef<HTMLButtonElement>(null);
   const closeViewer = useCallback(() => setViewerOpen(false), []);
-  const requestCloseViewer = useLightboxHistory(viewerOpen, closeViewer);
+  const { close: requestCloseViewer } = useLightboxHistory(
+    viewerOpen,
+    closeViewer,
+  );
   const toggleViewer = useCallback(() => {
     if (viewerOpen) requestCloseViewer();
     else setViewerOpen(true);

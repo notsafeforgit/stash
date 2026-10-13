@@ -30,8 +30,31 @@ export function useLightboxHistory(
 ) {
   const activeIdRef = useRef<number | undefined>(undefined);
   const dismissingRef = useRef(false);
+  const exitFinishedRef = useRef(false);
+  const closedRef = useRef(false);
   const onCloseRef = useCommittedRef(onClose);
   const onDismissRef = useCommittedRef(onDismiss);
+
+  const notifyClosed = useCallback(() => {
+    if (closedRef.current) return;
+    closedRef.current = true;
+    onCloseRef.current();
+  }, []);
+
+  // Start history traversal alongside the visual exit, instead of adding its
+  // router work after the animation. Keep the overlay mounted until both finish
+  // so a quick reopen cannot push an entry ahead of an outstanding Back.
+  const beginClose = useCallback(() => {
+    const id = activeIdRef.current;
+    if (
+      id !== undefined &&
+      getLightboxHistoryId(window.history.state) === id &&
+      !dismissingRef.current
+    ) {
+      dismissingRef.current = true;
+      window.history.back();
+    }
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -39,6 +62,8 @@ export function useLightboxHistory(
     const id = ++nextLightboxHistoryId;
     activeIdRef.current = id;
     dismissingRef.current = false;
+    exitFinishedRef.current = false;
+    closedRef.current = false;
     // Effect replay must not push an entry and asynchronously pop the next
     // setup's entry. Commit after replay, before the next user input event.
     let cancelled = false;
@@ -66,10 +91,12 @@ export function useLightboxHistory(
       activeIdRef.current = undefined;
       const completingClose = dismissingRef.current;
       dismissingRef.current = false;
-      // Browser Back starts the optional visual exit. A close whose exit
-      // already finished only completes the matching history operation.
-      if (!completingClose && onDismissRef.current) onDismissRef.current();
-      else onCloseRef.current();
+      // Browser Back starts the optional visual exit. Button/Escape dismissal
+      // may still be animating when its history traversal completes.
+      if (completingClose) {
+        if (exitFinishedRef.current) notifyClosed();
+      } else if (onDismissRef.current) onDismissRef.current();
+      else notifyClosed();
     }
 
     window.addEventListener("popstate", handlePopState);
@@ -82,26 +109,21 @@ export function useLightboxHistory(
       // here as long as no navigation has already replaced it.
       if (
         activeIdRef.current === id &&
-        getLightboxHistoryId(window.history.state) === id
+        getLightboxHistoryId(window.history.state) === id &&
+        !dismissingRef.current
       ) {
         activeIdRef.current = undefined;
         dismissingRef.current = true;
         window.history.back();
       }
     };
-  }, [open]);
+  }, [open, notifyClosed]);
 
-  return useCallback(() => {
-    const id = activeIdRef.current;
-    if (id !== undefined && getLightboxHistoryId(window.history.state) === id) {
-      if (dismissingRef.current) return;
-      dismissingRef.current = true;
-      window.history.back();
-      return;
-    }
+  const close = useCallback(() => {
+    exitFinishedRef.current = true;
+    beginClose();
+    if (!dismissingRef.current) notifyClosed();
+  }, [beginClose, notifyClosed]);
 
-    activeIdRef.current = undefined;
-    dismissingRef.current = false;
-    onCloseRef.current();
-  }, []);
+  return { beginClose, close };
 }

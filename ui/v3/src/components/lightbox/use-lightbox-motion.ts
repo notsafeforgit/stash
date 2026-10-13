@@ -10,7 +10,7 @@ import { useLightboxHistory } from "./use-lightbox-history";
 
 /** YARL owns gestures and exit completion. The entrance waits for a paint. */
 export const lightboxAnimation = {
-  fade: motion.duration.lightbox,
+  fade: motion.duration.lightboxExit,
   swipe: motion.duration.swipe,
   navigation: motion.duration.lightbox,
   easing: {
@@ -60,19 +60,24 @@ export function useLightboxMotion(open: boolean, onClose: () => void) {
     if (controllerRef.current) controllerRef.current.close();
     else onCloseRef.current();
   }, []);
+  const { beginClose, close: finishClose } = useLightboxHistory(
+    open,
+    onClose,
+    requestClose,
+  );
   const onExiting = useCallback(() => {
     closing.current = true;
+    beginClose();
     const element = surface.current;
     if (!element || !visual.current) return;
     const opacity = getComputedStyle(element).opacity;
     visual.current.play(element, [{ opacity }, { opacity: 1 }], {
-      duration: motion.duration.lightbox,
+      duration: motion.duration.lightboxExit,
       easing: motion.easing.reveal,
       id: "lightbox-exit",
       hold: true,
     });
-  }, []);
-  const finishClose = useLightboxHistory(open, onClose, requestClose);
+  }, [beginClose]);
   const portal = {
     container: {
       // YARL still owns its close timer. Its CSS opacity transition must not

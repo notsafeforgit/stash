@@ -1122,7 +1122,9 @@ export function ImageLightbox({
     return slides.map((s) => {
       if (!s.imageId) return s;
       const override = slideSrcOverrides[s.imageId];
-      return override ? { ...s, src: override } : s;
+      // This newly rotated original is already loaded for the active slide.
+      // Reuse it in the strip until the list supplies a refreshed thumbnail.
+      return override ? { ...s, src: override, thumbnail: override } : s;
     });
   }, [slides, slideSrcOverrides]);
 
@@ -1180,10 +1182,12 @@ export function ImageLightbox({
 
   // Slideshow + thumbnails are unnecessary with one slide and no boundary
   // sentinels; display and rating preferences still apply to that viewer.
+  // Phones hide the thumbnail strip. Do not mount it and load its images
+  // underneath display:none while the full-size slides are also decoding.
   const plugins = [
     Fullscreen,
     ...(settings.displayMode === "fitXY" ? [Zoom] : []),
-    ...(isSingleSlideMode ? [] : [Thumbnails, Slideshow]),
+    ...(isSingleSlideMode ? [] : [...(mobile ? [] : [Thumbnails]), Slideshow]),
   ];
 
   const renderSlide = useCallback(
@@ -1365,6 +1369,10 @@ export function ImageLightbox({
           ...lightboxIconRenders,
           ...(mobile && { buttonZoom: () => null }),
           iconLoading: () => <Spinner className="size-10 text-white/70" />,
+          thumbnail: ({ slide }) =>
+            getImageSlide(slide)?.loading ? (
+              <Spinner className="size-4 text-white/70" />
+            ) : undefined,
           slide: renderSlide,
           slideHeader: renderSlideHeader,
           slideFooter: renderSlideFooter,

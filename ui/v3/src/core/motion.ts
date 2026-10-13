@@ -8,6 +8,7 @@ export const motion = {
     content: 140,
     lightbox: 180,
     lightboxEnter: 240,
+    lightboxExit: 100,
     press: 100,
     release: 180,
     swipe: 240,

@@ -83,6 +83,7 @@ import { DialogDismissalFixture } from "./dialog-dismissal";
 import { EntityCardsFixture } from "./entity-cards";
 import { EmbeddedListFixture } from "./embedded-list";
 import { DeferredListFixture } from "./deferred-list";
+import { LightboxListFixture } from "./lightbox-list";
 import { RouteTransitionsFixture } from "./route-transitions";
 import { HomeFixture } from "./home";
 import { TvFixture } from "./tv";
@@ -352,6 +353,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/deferred-list",
       component: DeferredListFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/lightbox-list",
+      component: LightboxListFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

@@ -31,9 +31,14 @@ export function thumbnailColumn<T extends IHasID>(
       const preview = getPreviewImage?.(row.original);
       const src = getImagePath(row.original) || preview?.fallback;
       return (
-        <Link {...getDestination(row.original)} className="block shrink-0">
+        <Link
+          {...getDestination(row.original)}
+          draggable={false}
+          className="block shrink-0"
+        >
           {src ? (
             <PreviewImage
+              draggable={false}
               src={src}
               preview={preview}
               thumbnail

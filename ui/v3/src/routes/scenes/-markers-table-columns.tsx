@@ -15,7 +15,7 @@ import { DataTableColumnHeader } from "src/components/list/data-table-column-hea
 type MarkerItem =
   GQL.FindSceneMarkersQuery["findSceneMarkers"]["scene_markers"][number];
 
-function markerTitle(m: MarkerItem): string {
+export function markerTitle(m: MarkerItem): string {
   if (m.title) return m.title;
   const sceneTitle = objectTitle(m.scene);
   return sceneTitle

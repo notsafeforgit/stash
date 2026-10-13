@@ -1354,6 +1354,7 @@
     "delete_confirm": "Are you sure you want to delete {entityName}?",
     "delete_unconfirmed": "The server did not confirm deletion.",
     "delete_partial_failure": "Deletion stopped: {completed} of {total} confirmed. Refresh the list before retrying.",
+    "delete_marker_failed": "The marker could not be deleted",
     "delete_progress": "Deleted {completed} of {total}",
     "delete_confirm_body": "This action cannot be undone.",
     "delete_count_title": "Delete {count}?",

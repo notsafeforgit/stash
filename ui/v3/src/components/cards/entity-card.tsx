@@ -259,6 +259,7 @@ function EntityCardFrame({
       */}
       {renderLink({
         "data-card-link": true,
+        draggable: false,
         className:
           "absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
         onClick: handleAnchorClick,
@@ -421,6 +422,7 @@ function FadeInImage({
   return (
     <PreviewImage
       alt={alt}
+      draggable={false}
       ref={ref}
       src={src}
       className={cn(
@@ -816,6 +818,7 @@ function EntityCardPreview({
         <div>
           {mediaActive && studioImagePath && !isMobile && (
             <img
+              draggable={false}
               className="max-w-[2.5rem] rounded bg-black/60 object-contain px-0.5 py-0.5"
               style={{ height: "1.1rem" }}
               src={studioImagePath}

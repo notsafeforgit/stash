@@ -270,6 +270,15 @@
   -webkit-touch-callout: none;
 }
 
+/* A card hold belongs to its context menu. Disabling selection/callouts alone
+   still lets Safari lift an image or link into a native drag session. */
+.entity-card img,
+.entity-card a,
+[data-slot="context-menu-trigger"] img,
+[data-slot="context-menu-trigger"] a {
+  -webkit-user-drag: none;
+}
+
 /* Editable surfaces and copyable technical data opt in. Mark just the
    value with data-selectable-text, not a surrounding panel with controls.
    Code/preformatted output is copyable by default. Restore iOS's callout

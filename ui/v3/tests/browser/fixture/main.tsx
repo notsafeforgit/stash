@@ -76,6 +76,7 @@ import { SceneDetailFixture } from "./scene-detail";
 import { SceneCoverFixture } from "./scene-cover";
 import { SceneDeletionFixture } from "./scene-deletion";
 import { MarkerEditorFixture } from "./marker-editor";
+import { MarkerListFixture } from "./marker-list";
 import { MergeDialogsFixture } from "./merge-dialogs";
 import { BulkUpdateFixture } from "./bulk-update";
 import { BulkDeletionFixture } from "./bulk-deletion";
@@ -363,6 +364,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/embedded-list",
       component: EmbeddedListFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/scenes/markers",
+      component: MarkerListFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

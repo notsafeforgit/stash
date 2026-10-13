@@ -7,7 +7,8 @@ import { EntityListPage, type EntityListPageConfig } from "src/components/list";
 import { MarkerCard } from "src/components/cards";
 import { useMarkerLightbox } from "src/components/lightbox";
 import { View } from "src/components/list/views";
-import { markerTableColumns } from "./-markers-table-columns";
+import { markerTableColumns, markerTitle } from "./-markers-table-columns";
+import { MarkerRowContextMenu } from "@/components/cards/use-marker-context-menu";
 
 type MarkersQuery = GQL.FindSceneMarkersQuery;
 type MarkerItem =
@@ -65,6 +66,15 @@ function MarkersPage() {
         />
       ),
       tableColumns: markerTableColumns,
+      renderTableRow: (marker, row, onSelectedChanged) => (
+        <MarkerRowContextMenu
+          marker={marker}
+          title={markerTitle(marker)}
+          onSelectedChanged={onSelectedChanged}
+        >
+          {row}
+        </MarkerRowContextMenu>
+      ),
       tableVisibilityKey: "markers",
       onCardPreviewClick,
       pageNavRef,

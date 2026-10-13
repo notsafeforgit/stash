@@ -15,6 +15,7 @@ export const albumPolicySchema = z.enum([
   "source-identifiers-v1",
   "legacy-reddit-filename-v1",
   "legacy-twitter-filename-v1",
+  "linked-post-media-v1",
 ]);
 const action = z.enum(["create", "sync", "disabled", "ineligible"]);
 export const albumIdentitySchema = z.object({

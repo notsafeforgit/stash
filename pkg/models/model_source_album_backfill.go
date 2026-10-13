@@ -6,13 +6,14 @@ const (
 	SourceAlbumIdentifiersV1     = "source-identifiers-v1"
 	SourceAlbumRedditFilenameV1  = "legacy-reddit-filename-v1"
 	SourceAlbumTwitterFilenameV1 = "legacy-twitter-filename-v1"
+	SourceAlbumLinkedMediaV1     = "linked-post-media-v1"
 )
 
 // Filename matching is an explicit historical policy. It binds an existing
 // typed attachment to a file observation. The Twitter policy can also recover
 // an incomplete source list from retained, post-qualified original filenames.
 func ValidSourceAlbumPolicy(policy string) bool {
-	return policy == SourceAlbumIdentifiersV1 || policy == SourceAlbumRedditFilenameV1 || policy == SourceAlbumTwitterFilenameV1
+	return policy == SourceAlbumIdentifiersV1 || policy == SourceAlbumRedditFilenameV1 || policy == SourceAlbumTwitterFilenameV1 || policy == SourceAlbumLinkedMediaV1
 }
 
 type SourceAlbumProof struct {

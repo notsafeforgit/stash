@@ -224,6 +224,20 @@ class AlbumBackfillTests(unittest.TestCase):
             self.assertEqual(1, report["posts"])
             self.assertFalse(client.jobs, "preparing a recovery does not mutate the library")
 
+    def test_linked_media_discovery_preserves_unknown_order(self):
+        client = MemoryAlbumClient()
+        post = next(iter(client.previews))
+        client.discovery_override = [{"post_uuid": post, "post_state": "active", "selection_uuid": "", "mode": "unselected"}]
+        client.previews[post].update(policy="linked-post-media-v1", entries=[], matches=[])
+        client.previews[post].pop("selection_uuid", None)
+        with tempfile.TemporaryDirectory() as directory:
+            report = prepare(client, Path(directory) / "plan", "linked-post-media-v1")
+            self.assertEqual(1, report["posts"])
+            self.assertIn("policy=linked-post-media-v1", client.calls[0][1])
+            plan = Plan(Path(directory) / "plan", report["plan_sha256"])
+            self.assertEqual([], plan.record(post)["preview"]["entries"])
+            self.assertFalse(client.jobs)
+
     def test_forgotten_and_review_items_are_retained_without_submission(self):
         with tempfile.TemporaryDirectory() as directory:
             client = MemoryAlbumClient(2)

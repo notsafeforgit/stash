@@ -98,6 +98,7 @@ var ErrSourceGalleryConflict = errors.New("source album or gallery changed; revi
 type SourceGalleryReaderWriter interface {
 	LibraryMedia(context.Context, int, int, int) (*GalleryMediaReferences, error)
 	FilenameBackfillPosts(context.Context, string, int) ([]SelectedSourcePost, error)
+	LinkedMediaBackfillPosts(context.Context, string, int) ([]SelectedSourcePost, error)
 	PreviewAssociationReview(context.Context, GalleryAssociationReviewInput) (*GalleryAssociationReviewPreview, error)
 	ApplyAssociationReview(context.Context, GalleryAssociationReviewApplyInput) (*GalleryAssociationReview, bool, error)
 	AssociationReview(context.Context, string) (*GalleryAssociationReview, error)

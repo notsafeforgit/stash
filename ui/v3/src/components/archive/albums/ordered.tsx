@@ -479,11 +479,25 @@ export function SourceAlbum({
             </DownloadSlots>
             {!result.data?.items.length && (
               <PostEmpty
-                title={msg(
-                  "source_albums.empty",
-                  "The selected source list has no positions",
-                )}
-              />
+                title={
+                  selection.declared_album && !selection.complete
+                    ? msg(
+                        "source_albums.order_unknown",
+                        "Original attachment order is unknown",
+                      )
+                    : msg(
+                        "source_albums.empty",
+                        "The selected source list has no positions",
+                      )
+                }
+              >
+                {selection.declared_album &&
+                  !selection.complete &&
+                  msg(
+                    "source_albums.order_unknown_help",
+                    "Confirmed images and scenes can still belong to this post's gallery. Open the gallery to browse its media.",
+                  )}
+              </PostEmpty>
             )}
           </>
         ))}

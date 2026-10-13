@@ -73,6 +73,15 @@ it("accepts partial Twitter filename recovery with its original evidence and gap
   const api = createAlbumReviewAPI(endpoint, async () => Response.json(result));
   expect(await api.preview(albumReviewPost, result.policy)).toEqual(result);
 });
+it("accepts a confirmed post gallery without invented attachment positions", async () => {
+  const result = albumPreview();
+  result.policy = "linked-post-media-v1";
+  result.entries = [];
+  result.matches = [];
+  delete result.selection_uuid;
+  const api = createAlbumReviewAPI(endpoint, async () => Response.json(result));
+  expect(await api.preview(albumReviewPost, result.policy)).toEqual(result);
+});
 it("keeps repeated attachments and gaps but rejects duplicate positions, partial candidates and overlapping changes", () => {
   const preview = albumPreview();
   preview.entries.push({ ...preview.entries[0]!, position: 99 });

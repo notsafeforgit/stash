@@ -452,6 +452,39 @@ func sourceGalleryMembershipPreview(ctx context.Context, ret *models.SourceGalle
 		}
 		ret.Entries = append(ret.Entries, item)
 	}
+	// Confirmed whole-post links can establish membership without knowing a
+	// source slot. Keep them unordered, including when a later partial capture
+	// supplies positions for only some members. A pinned list or an explicit
+	// attachment rejection remains authoritative.
+	allowPostLinks := selection.Decision.Mode == "automatic"
+	for _, choice := range choices {
+		if choice.State == "unlinked" || choice.State == "undecided" {
+			allowPostLinks = false
+		}
+	}
+	if allowPostLinks {
+		canonical := make(map[string]*models.ArchiveEntity, len(resolved))
+		for _, media := range resolved {
+			canonical[media.UUID] = media
+		}
+		for id, state := range postStates {
+			if state == "conflict" {
+				ret.Action = "review"
+			}
+			media := canonical[id]
+			if state != "linked" || !archiveMedia(media) || media.State != models.ArchiveEntityActive {
+				continue
+			}
+			policy := policies[id]
+			if policy.library != nil && policy.library.State == "excluded" {
+				continue
+			}
+			if !desired[id] && !present[id] {
+				ret.Add = append(ret.Add, *media)
+			}
+			desired[id] = true
+		}
+	}
 	for _, member := range members {
 		policy := policies[member.UUID]
 		if desired[member.UUID] || member.Cover || policy.library != nil || policy.source == nil {

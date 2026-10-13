@@ -34,9 +34,12 @@ func (rs *nativeArchiveRoutes) albumPosts(w http.ResponseWriter, r *http.Request
 	}
 	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
 		var err error
-		if policy == models.SourceAlbumTwitterFilenameV1 {
+		switch policy {
+		case models.SourceAlbumTwitterFilenameV1:
 			rows, err = rs.repo.SourceGallery.FilenameBackfillPosts(ctx, after, limit)
-		} else {
+		case models.SourceAlbumLinkedMediaV1:
+			rows, err = rs.repo.SourceGallery.LinkedMediaBackfillPosts(ctx, after, limit)
+		default:
 			rows, err = rs.repo.SourceAttachment.SelectedPosts(ctx, after, limit)
 		}
 		return err

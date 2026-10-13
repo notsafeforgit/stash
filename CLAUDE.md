@@ -781,6 +781,12 @@ and uses `legacy:twitter:filename` slot references rather than invented native
 media IDs. It creates no captures or copied post payloads. Existing selections
 and captured lists win; recovery's existing capture reference supplies metadata
 only. See [source albums](docs/native-source-albums.md#recovering-historical-twitter-albums).
+The `linked-post-media-v1` policy also recovers an album from two or more
+distinct, active, confirmed post-media links when no source list was retained.
+It records an empty partial album declaration with unknown order and total;
+membership comes from those existing decisions, never invented attachment IDs.
+Automatic album sync includes confirmed unordered members while protecting
+pinned lists, rejected attachments, gallery exclusions and manual members.
 Preserve every existing attachment decision, including a
 deliberately undecided review. Ambiguous candidates, changed file generations,
 changed ownership and media-kind disagreements remain unresolved. A bounded

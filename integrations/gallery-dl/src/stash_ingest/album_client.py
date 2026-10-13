@@ -13,7 +13,7 @@ from .client import Unavailable
 from .encoding import InvalidData, decode, encode, identifier
 from .post_identity import current_post
 
-POLICIES = ("source-identifiers-v1", "legacy-reddit-filename-v1", "legacy-twitter-filename-v1")
+POLICIES = ("source-identifiers-v1", "legacy-reddit-filename-v1", "legacy-twitter-filename-v1", "linked-post-media-v1")
 MAX_PREVIEW_BYTES = 64 << 20
 MAX_POSTS = 100000
 ACTIONS = {"create", "sync", "disabled", "ineligible", "review"}
@@ -174,7 +174,7 @@ class AlbumClient(ImportClient):
             for row in page:
                 try:
                     post = identifier(row["post_uuid"])
-                    if row["mode"] == "unselected" and policy == "legacy-twitter-filename-v1":
+                    if row["mode"] == "unselected" and policy in ("legacy-twitter-filename-v1", "linked-post-media-v1"):
                         if row.get("selection_uuid"):
                             raise InvalidData("Unselected post has a saved selection")
                     else:

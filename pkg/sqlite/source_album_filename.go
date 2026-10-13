@@ -155,6 +155,22 @@ func (s *SourceGalleryStore) previewFilenameSelection(ctx context.Context, post 
 	if len(entries) > archive.MaxManifestEntries {
 		return nil, false, models.ErrSourceAlbumLimit
 	}
+	capture, err := sourceAlbumMetadataAnchor(ctx, post)
+	if err != nil || capture == "" {
+		return nil, capture == "", err
+	}
+	ret := &models.AttachmentSelection{DeclaredAlbum: true, Decision: models.AttachmentSelectionDecision{
+		PostUUID: post, Mode: "automatic", Origin: "migration", Reason: twitterFilenameReason, CaptureUUID: &capture,
+		ManifestUUIDs: []string{},
+	}}
+	for _, entry := range entries {
+		ret.Entries = append(ret.Entries, entry)
+	}
+	slices.SortFunc(ret.Entries, func(a, b models.SourceAttachmentManifestEntry) int { return a.Position - b.Position })
+	return ret, false, nil
+}
+
+func sourceAlbumMetadataAnchor(ctx context.Context, post string) (string, error) {
 	// This is only a metadata anchor, not the witness for the recovered list.
 	// Read a bounded indexed page per identity member, preferring retained text.
 	var captures []struct {
@@ -169,29 +185,21 @@ func (s *SourceGalleryStore) previewFilenameSelection(ctx context.Context, post 
  ) SELECT c.uuid,json_extract(r.metadata,'$.original_text') AS text FROM candidates
  JOIN source_captures c ON c.uuid=candidates.uuid JOIN source_post_revisions r ON r.uuid=c.revision_uuid
  ORDER BY (coalesce(json_extract(r.metadata,'$.original_text'),'')=''),c.uuid LIMIT 1`, post); err != nil {
-		return nil, false, err
+		return "", err
 	}
 	if len(captures) == 0 {
-		return nil, true, nil
+		return "", nil
 	}
-	ret := &models.AttachmentSelection{DeclaredAlbum: true, Decision: models.AttachmentSelectionDecision{
-		PostUUID: post, Mode: "automatic", Origin: "migration", Reason: twitterFilenameReason, CaptureUUID: &captures[0].UUID,
-		ManifestUUIDs: []string{},
-	}}
-	for _, entry := range entries {
-		ret.Entries = append(ret.Entries, entry)
-	}
-	slices.SortFunc(ret.Entries, func(a, b models.SourceAttachmentManifestEntry) int { return a.Position - b.Position })
-	return ret, false, nil
+	return captures[0].UUID, nil
 }
 
-func (s *SourceGalleryStore) recoverFilenameSelection(ctx context.Context, post string, proposed *models.AttachmentSelection) error {
+func (s *SourceGalleryStore) recoverAlbumSelection(ctx context.Context, post string, proposed *models.AttachmentSelection) error {
 	store := &SourceAttachmentStore{}
 	current, err := store.Selection(ctx, post)
 	if err != nil {
 		return err
 	}
-	if current != nil || !filenameSelection(proposed) {
+	if current != nil || (!filenameSelection(proposed) && !linkedMediaSelection(proposed)) {
 		return models.ErrSourceGalleryConflict
 	}
 	input := models.SourceAttachmentManifestInput{DeclaredAlbum: true}
@@ -208,6 +216,6 @@ func (s *SourceGalleryStore) recoverFilenameSelection(ctx context.Context, post 
 		return err
 	}
 	_, err = store.publishSelection(ctx, parent, models.AttachmentSelectionInput{PostUUID: post, ExpectedPostRevision: parent.Revision,
-		Mode: "automatic", Origin: "migration", Reason: twitterFilenameReason}, proposed)
+		Mode: "automatic", Origin: "migration", Reason: proposed.Decision.Reason}, proposed)
 	return err
 }

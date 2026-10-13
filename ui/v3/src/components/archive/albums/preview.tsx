@@ -354,10 +354,15 @@ export function AlbumPreviewForm({
                         "album_review.twitter_filename_help",
                         "Recover missing source order from original numbered Twitter file names. Missing positions remain gaps and the total attachment count stays unknown. Existing source lists and saved choices are preserved.",
                       )
-                    : msg(
-                        "album_review.reddit_names_help",
-                        "Also recognize original Reddit file names containing both the post ID and media ID. Conflicting explicit IDs never fall back to a file name.",
-                      )}
+                    : field.state.value === "linked-post-media-v1"
+                      ? msg(
+                          "album_review.linked_media_help",
+                          "Group two or more confirmed media links to the same post. Images and scenes share a gallery; original attachment order and total count remain unknown. Saved choices are preserved.",
+                        )
+                      : msg(
+                          "album_review.reddit_names_help",
+                          "Also recognize original Reddit file names containing both the post ID and media ID. Conflicting explicit IDs never fall back to a file name.",
+                        )}
               </FieldDescription>
             </Field>
           )}

@@ -19,6 +19,10 @@ export function useAlbumLabels() {
         "album_review.twitter_names",
         "Twitter file names",
       ),
+      "linked-post-media-v1": msg(
+        "album_review.linked_media",
+        "Confirmed post media",
+      ),
     },
     action: {
       create: msg("album_review.create", "Create album gallery"),

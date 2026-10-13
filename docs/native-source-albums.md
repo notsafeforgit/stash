@@ -165,8 +165,30 @@ ordered list survives. Schema 1000036 permits legacy/review evidence without an
 attachment or capture reference, and retains only the references actually known.
 This preserves reposts and older catalog appearances without duplicating media
 or inventing a capture, attachment ID, or album position. Such evidence does not
-automatically select attachment media or create an album. Automatic galleries
-still require a supported source list and appropriate media associations.
+automatically select attachment media or create an album. Confirmed post-to-media
+decisions can establish an album through the recovery below.
+
+## Albums with confirmed media and unknown order
+
+The `linked-post-media-v1` backfill groups two or more distinct, active library
+items already linked to the same post. It supports images and scenes together,
+including older catalog posts whose original attachment list was not retained.
+Choose **Confirmed post media** in album review, or use
+`stash-backfill-source-albums prepare --policy linked-post-media-v1`.
+
+The saved partial album records that the post has multiple media. Its original
+positions and expected total remain unknown; no attachment IDs or captures are
+invented. Existing post decisions supply membership, and an existing capture
+supplies the initial title, description and date. Files display in library file
+order until actual source positions become available. A later automatic source
+list can add known positions without dropping confirmed, unordered members.
+
+Filename/title resemblance and retained evidence alone do not qualify. Merged
+copies count once. Conflicting links, unselected retained source lists and
+attachment rejections require review; pinned selections and gallery exclusions
+remain protected. Removing a post link updates automatic membership while
+preserving manual members and covers. No website requests are made by this
+backfill, and no media files or existing titles are changed.
 
 ## Ordering and incomplete downloads
 

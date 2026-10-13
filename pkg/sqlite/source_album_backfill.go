@@ -222,6 +222,22 @@ func (s *SourceGalleryStore) PreviewBackfill(ctx context.Context, post, policy s
 		return nil, err
 	}
 	ret := &models.SourceAlbumBackfillPreview{PostUUID: gallery.PostUUID, Policy: policy, Gallery: gallery, Matches: []models.SourceAlbumMatch{}}
+	if policy == models.SourceAlbumLinkedMediaV1 && gallery.Action != "disabled" && gallery.Action != "review" {
+		var review bool
+		ret.Recovery, review, err = s.previewLinkedMediaSelection(ctx, gallery.PostUUID)
+		if err != nil {
+			return nil, err
+		}
+		if review {
+			ret.Gallery.Action = "review"
+			ret.Gallery, err = finishSourceGalleryPreview(ret.Gallery)
+		} else if ret.Recovery != nil {
+			ret.Gallery, err = s.previewSinglePostSelection(ctx, gallery.PostUUID, nil, nil, false, ret.Recovery)
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
 	if policy == models.SourceAlbumTwitterFilenameV1 && gallery.Action != "disabled" && gallery.Action != "review" {
 		var review bool
 		ret.Recovery, review, err = s.previewFilenameSelection(ctx, gallery.PostUUID)
@@ -410,7 +426,7 @@ func (s *SourceGalleryStore) Backfill(ctx context.Context, post, policy, signatu
 	})
 	result := &models.SourceAlbumBackfillResult{}
 	if preview.Recovery != nil {
-		if err := s.recoverFilenameSelection(ctx, post, preview.Recovery); err != nil {
+		if err := s.recoverAlbumSelection(ctx, post, preview.Recovery); err != nil {
 			return nil, err
 		}
 	}

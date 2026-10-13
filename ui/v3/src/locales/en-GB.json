@@ -3436,6 +3436,8 @@
     "gallery_deleted": "Associated gallery deleted",
     "availability_help": "Source-list completeness is separate from file availability. Registered files may be offline; unselected items may need downloading or linking.",
     "empty": "The selected source list has no positions",
+    "order_unknown": "Original attachment order is unknown",
+    "order_unknown_help": "Confirmed images and scenes can still belong to this post's gallery. Open the gallery to browse its media.",
     "position": "Position {position}",
     "positions": "Positions {first}–{last}",
     "files": "{count, plural, =0 {No files registered in Stash} one {# file registered in Stash} other {# files registered in Stash}}",
@@ -3465,6 +3467,8 @@
   },
   "album_review": {
     "twitter_names": "Twitter file names",
+    "linked_media": "Confirmed post media",
+    "linked_media_help": "Group two or more confirmed media links to the same post. Images and scenes share a gallery; original attachment order and total count remain unknown. Saved choices are preserved.",
     "twitter_filename_basis": "Original numbered Twitter file name",
     "twitter_filename_help": "Recover missing source order from original numbered Twitter file names. Missing positions remain gaps and the total attachment count stays unknown. Existing source lists and saved choices are preserved.",
     "candidate_identity": "Library item identity",

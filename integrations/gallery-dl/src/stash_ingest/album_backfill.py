@@ -120,7 +120,7 @@ def prepare(client, output, policy, posts=None):
                 yield {"post_uuid": post, "post_state": "active"}
         rows = current_rows()
     else:
-        rows = client.selected_posts(policy) if policy == "legacy-twitter-filename-v1" else client.selected_posts()
+        rows = client.selected_posts(policy) if policy in ("legacy-twitter-filename-v1", "linked-post-media-v1") else client.selected_posts()
 
     def records():
         for row in rows:

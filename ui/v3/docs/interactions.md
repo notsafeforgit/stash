@@ -103,6 +103,14 @@ layout also offers Discard to reset fields without leaving the editor.
 
 ## Entity editing
 
+The shared saved-filter picker uses a searchable popover with separate load,
+pin and delete buttons. It is not a listbox with interactive buttons inside its
+options. Delete confirms the preset name and returns focus to the picker trigger.
+Only an acknowledged server deletion removes the cached preset and its local
+pin; deleting the active preset clears its label, preserving the applied AST,
+search, and default-filter snapshot. A bare root condition from a saved/API
+filter is wrapped only for editing, so it remains visible in the builder.
+
 All seven single-entity edit sheets use `components/detail/entity-edit-sheet.tsx`.
 Its fixed header provides the title. Close stays in the bottom action area on
 mobile and in the header on desktop, including while data is loading or

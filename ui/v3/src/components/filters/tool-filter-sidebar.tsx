@@ -58,13 +58,6 @@ export function ToolFilterSidebar({
         }
       : setFilter;
 
-  // FilterBuilder expects the root to be a group node; top-level filter ASTs
-  // are always groups in practice (the URL decoder wraps bare conditions in a group).
-  const root =
-    displayedFilter.filterAst?.kind === "group"
-      ? displayedFilter.filterAst
-      : undefined;
-
   const sidebarContent = (
     <>
       {applyMode === "manual" && (
@@ -113,7 +106,7 @@ export function ToolFilterSidebar({
         mode={mode}
         filter={displayedFilter}
         setFilter={setDisplayedFilter}
-        root={root}
+        root={displayedFilter.filterAst}
         onChange={(node) => {
           const next = displayedFilter.clone();
           next.filterAst = node;

@@ -285,10 +285,6 @@ export function EntityListPage<
     ],
   );
 
-  // FilterBuilder expects the root to be a group node; top-level filter ASTs
-  // are always groups in practice (the URL decoder wraps bare conditions in a group).
-  const filterAst =
-    filter.filterAst?.kind === "group" ? filter.filterAst : undefined;
   const activeFilterCount = filter.count();
 
   const totalPages =
@@ -355,7 +351,7 @@ export function EntityListPage<
       view={view}
       filter={filter}
       setFilter={setFilter}
-      root={filterAst}
+      root={filter.filterAst}
       onChange={(node) => {
         const next = filter.clone();
         next.filterAst = node;

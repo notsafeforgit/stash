@@ -6,6 +6,8 @@ import { Route as markersRoute } from "@/routes/scenes/markers";
 import { scenes } from "./scene-lightbox";
 import type { FilterAstNodeInput } from "@/core/generated-graphql";
 import { Toaster } from "@/components/ui/sonner";
+import { FilterMode } from "@/core/generated-graphql";
+import { savedFiltersLink } from "./saved-filters";
 
 declare global {
   interface Window {
@@ -73,87 +75,92 @@ function makeClient() {
   }
   return new ApolloClient({
     cache: createCache(),
-    link: new ApolloLink(
-      (operation) =>
-        new Observable((observer) => {
-          const { operationName, variables } = operation;
-          let data: object;
-          switch (operationName) {
-            case "FindSavedFilters":
-              data = { findSavedFilters: [] };
-              break;
-            case "FindSceneMarkers":
-            case "FindSceneMarkerIDs": {
-              window.markerListQueries.push({
-                operation: operationName,
-                variables,
-              });
-              const matching = markers.filter(
-                (marker) =>
-                  matches(marker, variables.scene_marker_filter_ast?.root) &&
-                  marker.title
-                    .toLowerCase()
-                    .includes((variables.filter?.q ?? "").toLowerCase()),
-              );
-              const perPage = variables.filter?.per_page ?? 40;
-              const offset = ((variables.filter?.page ?? 1) - 1) * perPage;
-              const page =
-                perPage === -1
-                  ? matching
-                  : matching.slice(offset, offset + perPage);
-              data = {
-                findSceneMarkers: {
-                  __typename: "FindSceneMarkersResultType",
-                  count: matching.length,
-                  scene_markers:
-                    operationName === "FindSceneMarkerIDs" &&
-                    window.markerListIncomplete
-                      ? page.slice(0, 1)
-                      : page,
-                },
-              };
-              break;
-            }
-            case "FindScene":
-              data = { findScene: { ...scene, scene_markers: markers } };
-              break;
-            case "SceneMarkerDestroy":
-              window.markerListMutations.push({
-                operation: operationName,
-                id: variables.id,
-              });
-              markers = markers.filter((marker) => marker.id !== variables.id);
-              data = { sceneMarkerDestroy: true };
-              break;
-            case "SceneMarkersDestroy":
-              window.markerListMutations.push({
-                operation: operationName,
-                ids: variables.ids,
-              });
-              batchCount++;
-              if (batchCount === window.markerListFailBatch) {
-                data = { sceneMarkersDestroy: false };
+    link: ApolloLink.from([
+      savedFiltersLink(FilterMode.SceneMarkers),
+      new ApolloLink(
+        (operation) =>
+          new Observable((observer) => {
+            const { operationName, variables } = operation;
+            let data: object;
+            switch (operationName) {
+              case "FindSavedFilters":
+                data = { findSavedFilters: [] };
+                break;
+              case "FindSceneMarkers":
+              case "FindSceneMarkerIDs": {
+                window.markerListQueries.push({
+                  operation: operationName,
+                  variables,
+                });
+                const matching = markers.filter(
+                  (marker) =>
+                    matches(marker, variables.scene_marker_filter_ast?.root) &&
+                    marker.title
+                      .toLowerCase()
+                      .includes((variables.filter?.q ?? "").toLowerCase()),
+                );
+                const perPage = variables.filter?.per_page ?? 40;
+                const offset = ((variables.filter?.page ?? 1) - 1) * perPage;
+                const page =
+                  perPage === -1
+                    ? matching
+                    : matching.slice(offset, offset + perPage);
+                data = {
+                  findSceneMarkers: {
+                    __typename: "FindSceneMarkersResultType",
+                    count: matching.length,
+                    scene_markers:
+                      operationName === "FindSceneMarkerIDs" &&
+                      window.markerListIncomplete
+                        ? page.slice(0, 1)
+                        : page,
+                  },
+                };
                 break;
               }
-              markers = markers.filter(
-                (marker) => !variables.ids.includes(marker.id),
-              );
-              window.markerListRemaining = markers.map((marker) => marker.id);
-              data = { sceneMarkersDestroy: true };
-              break;
-            case "SceneSaveActivity":
-              data = { sceneSaveActivity: true };
-              break;
-            default:
-              observer.error(
-                new Error(`Unexpected marker operation ${operationName}`),
-              );
-              return;
-          }
-          observer.next({ data });
-          observer.complete();
-        }),
-    ),
+              case "FindScene":
+                data = { findScene: { ...scene, scene_markers: markers } };
+                break;
+              case "SceneMarkerDestroy":
+                window.markerListMutations.push({
+                  operation: operationName,
+                  id: variables.id,
+                });
+                markers = markers.filter(
+                  (marker) => marker.id !== variables.id,
+                );
+                data = { sceneMarkerDestroy: true };
+                break;
+              case "SceneMarkersDestroy":
+                window.markerListMutations.push({
+                  operation: operationName,
+                  ids: variables.ids,
+                });
+                batchCount++;
+                if (batchCount === window.markerListFailBatch) {
+                  data = { sceneMarkersDestroy: false };
+                  break;
+                }
+                markers = markers.filter(
+                  (marker) => !variables.ids.includes(marker.id),
+                );
+                window.markerListRemaining = markers.map((marker) => marker.id);
+                data = { sceneMarkersDestroy: true };
+                break;
+              case "SceneSaveActivity":
+                data = { sceneSaveActivity: true };
+                break;
+              default:
+                observer.error(
+                  new Error(`Unexpected marker operation ${operationName}`),
+                );
+                return;
+            }
+            observer.next({ data });
+            observer.complete();
+          }),
+      ),
+    ]),
   });
 }
 

@@ -4,20 +4,21 @@ import { useCallback, useMemo, useState, useEffect } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { X } from "lucide-react";
 import { Button } from "src/components/ui/button";
-import {
-  PinButton,
-  PinnableComboBox,
-} from "src/components/ui/pinnable-combo-box";
 import type { SavedFilterDataFragment } from "src/core/generated-graphql";
 import type { ListFilterModel } from "src/models/list-filter/filter";
 import { SaveFilterDialog } from "./saved-filter-list";
-import { useFindSavedFilters, useSaveFilter } from "src/core/saved-filters";
+import {
+  useDestroySavedFilter,
+  useFindSavedFilters,
+  useSaveFilter,
+} from "src/core/saved-filters";
 import { useToast } from "src/hooks/toast";
 import { getPinnedSavedFiltersKey } from "./filter-builder-types";
 import type { View } from "src/components/list/views";
 import { useDefaultFilterActions } from "src/hooks/default-filter";
 import { DefaultFilterConflict } from "./default-filter-conflict";
 import { notifySavedFilterLoaded } from "src/plugins/registry";
+import { SavedFilterPicker } from "./saved-filter-picker";
 
 function readPinnedSavedFilters(mode: FilterMode): string[] {
   if (typeof window === "undefined") return [];
@@ -52,7 +53,11 @@ function usePinnedSavedFilters(mode: FilterMode) {
     );
   }, []);
 
-  return { pinnedIds, togglePinned };
+  const removePinned = useCallback((id: string) => {
+    setPinnedIds((current) => current.filter((value) => value !== id));
+  }, []);
+
+  return { pinnedIds, togglePinned, removePinned };
 }
 
 export const SavedFilterBar: React.FC<{
@@ -77,19 +82,17 @@ export const SavedFilterBar: React.FC<{
   const Toast = useToast();
   const { data, previousData, refetch } = useFindSavedFilters(filter.mode);
   const saveFilter = useSaveFilter();
+  const [destroySavedFilter] = useDestroySavedFilter();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { pinnedIds, togglePinned } = usePinnedSavedFilters(filter.mode);
+  const { pinnedIds, togglePinned, removePinned } = usePinnedSavedFilters(
+    filter.mode,
+  );
   const defaultFilter = useDefaultFilterActions(view, filter);
 
   const savedFilters = useMemo(
     () => data?.findSavedFilters ?? previousData?.findSavedFilters ?? [],
     [data, previousData],
-  );
-
-  const savedFilterOptions = useMemo(
-    () => savedFilters.map((f) => ({ value: f.id, label: f.name })),
-    [savedFilters],
   );
 
   const selectedFilterId =
@@ -151,6 +154,25 @@ export const SavedFilterBar: React.FC<{
       defaultMessage: "Saved filters",
     });
 
+  async function deleteSavedFilter(saved: SavedFilterDataFragment) {
+    const result = await destroySavedFilter({
+      variables: { input: { id: saved.id } },
+    });
+    if (result.data?.destroySavedFilter !== true) {
+      throw new Error(
+        intl.formatMessage({ id: "search_filter.delete_saved_filter_failed" }),
+      );
+    }
+    removePinned(saved.id);
+    if (currentSavedFilterName === saved.name) onCurrentSavedFilterChange();
+    Toast.success(
+      intl.formatMessage(
+        { id: "search_filter.saved_filter_deleted" },
+        { name: saved.name },
+      ),
+    );
+  }
+
   return (
     <>
       {showSaveDialog && (
@@ -168,21 +190,14 @@ export const SavedFilterBar: React.FC<{
       )}
       <div className="rounded-lg border bg-card p-3 flex flex-col gap-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <PinnableComboBox
-            currentLabel={triggerLabel}
-            options={savedFilterOptions}
-            selectedValue={selectedFilterId}
-            searchPlaceholder="Search saved filters…"
-            pinnedValues={pinnedIds}
-            pinnedSectionLabel="Pinned"
-            allSectionLabel="Saved filters"
-            onSelect={(id) => {
-              const sf = savedFilters.find((f) => f.id === id);
-              if (sf) loadSavedFilter(sf);
-            }}
-            renderItemAddon={(id, isPinned) => (
-              <PinButton pinned={isPinned} onToggle={() => togglePinned(id)} />
-            )}
+          <SavedFilterPicker
+            label={triggerLabel}
+            filters={savedFilters}
+            selectedId={selectedFilterId}
+            pinnedIds={pinnedIds}
+            onSelect={loadSavedFilter}
+            onTogglePinned={togglePinned}
+            onDelete={deleteSavedFilter}
           />
           <Button variant="outline" onClick={() => setShowSaveDialog(true)}>
             <FormattedMessage

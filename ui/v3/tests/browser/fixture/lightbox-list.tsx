@@ -9,6 +9,9 @@ import {
 } from "@/components/list/entity-list-configs";
 import { createCache } from "@/core/create-client";
 import type * as GQL from "@/core/generated-graphql";
+import { FilterMode } from "@/core/generated-graphql";
+import { savedFiltersLink } from "./saved-filters";
+import { Toaster } from "@/components/ui/sonner";
 import { ConfigurationProvider } from "@/hooks/config";
 import { images } from "./image-lightbox";
 import { scenes } from "./scene-lightbox";
@@ -49,91 +52,104 @@ function makeClient() {
   window.lightboxListRequests = [];
   return new ApolloClient({
     cache: createCache(),
-    link: new ApolloLink(
-      (operation) =>
-        new Observable((observer) => {
-          const name = operation.operationName;
-          window.lightboxListRequests.push(name ?? "");
-          const variables: GQL.FindSceneListQueryVariables & { id?: string } =
-            operation.variables;
-          const size = variables.filter?.per_page ?? 40;
-          const start = ((variables.filter?.page ?? 1) - 1) * size;
-          let data: object;
-          switch (name) {
-            case "FindSavedFilters":
-              data = { findSavedFilters: [] };
-              break;
-            case "FindImageList":
-              data = {
-                findImages: {
-                  __typename: "FindImagesResultType",
-                  images: imageItems.slice(start, start + size),
-                },
-              };
-              break;
-            case "FindSceneList":
-              data = {
-                findScenes: {
-                  __typename: "FindScenesResultType",
-                  scenes: sceneItems.slice(start, start + size),
-                },
-              };
-              break;
-            case "FindImageListCount":
-            case "FindSceneListCount":
-              data = {
-                result: {
-                  __typename:
-                    name === "FindImageListCount"
-                      ? "FindImagesResultType"
-                      : "FindScenesResultType",
-                  count: ids.length,
-                },
-              };
-              break;
-            case "FindImage":
-              data = {
-                findImage: imageItems.find((item) => item.id === variables.id),
-              };
-              break;
-            case "ImageRotate": {
-              const item = imageItems.find((item) => item.id === variables.id);
-              if (!item) throw new Error("Unknown image to rotate");
-              data = {
-                imageRotate: {
-                  ...item,
-                  paths: {
-                    ...item.paths,
-                    image: `${item.paths.image}#rotated`,
+    link: ApolloLink.from([
+      savedFiltersLink(
+        new URLSearchParams(location.search).get("kind") === "scene"
+          ? FilterMode.Scenes
+          : FilterMode.Images,
+      ),
+      new ApolloLink(
+        (operation) =>
+          new Observable((observer) => {
+            const name = operation.operationName;
+            window.lightboxListRequests.push(name ?? "");
+            const variables: GQL.FindSceneListQueryVariables & { id?: string } =
+              operation.variables;
+            const size = variables.filter?.per_page ?? 40;
+            const start = ((variables.filter?.page ?? 1) - 1) * size;
+            let data: object;
+            switch (name) {
+              case "FindSavedFilters":
+                data = { findSavedFilters: [] };
+                break;
+              case "FindImageList":
+                data = {
+                  findImages: {
+                    __typename: "FindImagesResultType",
+                    images: imageItems.slice(start, start + size),
                   },
-                },
-              };
-              break;
+                };
+                break;
+              case "FindSceneList":
+                data = {
+                  findScenes: {
+                    __typename: "FindScenesResultType",
+                    scenes: sceneItems.slice(start, start + size),
+                  },
+                };
+                break;
+              case "FindImageListCount":
+              case "FindSceneListCount":
+                data = {
+                  result: {
+                    __typename:
+                      name === "FindImageListCount"
+                        ? "FindImagesResultType"
+                        : "FindScenesResultType",
+                    count: ids.length,
+                  },
+                };
+                break;
+              case "FindImage":
+                data = {
+                  findImage: imageItems.find(
+                    (item) => item.id === variables.id,
+                  ),
+                };
+                break;
+              case "ImageRotate": {
+                const item = imageItems.find(
+                  (item) => item.id === variables.id,
+                );
+                if (!item) throw new Error("Unknown image to rotate");
+                data = {
+                  imageRotate: {
+                    ...item,
+                    paths: {
+                      ...item.paths,
+                      image: `${item.paths.image}#rotated`,
+                    },
+                  },
+                };
+                break;
+              }
+              case "FindScene":
+                data = {
+                  findScene: sceneItems.find(
+                    (item) => item.id === variables.id,
+                  ),
+                };
+                break;
+              case "SceneSaveActivity":
+                data = { sceneSaveActivity: true };
+                break;
+              case "SceneAddPlay":
+                data = {
+                  sceneAddPlay: {
+                    __typename: "HistoryMutationResult",
+                    count: 1,
+                    history: [],
+                  },
+                };
+                break;
+              default:
+                throw new Error(`Unexpected lightbox list query: ${name}`);
             }
-            case "FindScene":
-              data = {
-                findScene: sceneItems.find((item) => item.id === variables.id),
-              };
-              break;
-            case "SceneSaveActivity":
-              data = { sceneSaveActivity: true };
-              break;
-            case "SceneAddPlay":
-              data = {
-                sceneAddPlay: {
-                  __typename: "HistoryMutationResult",
-                  count: 1,
-                  history: [],
-                },
-              };
-              break;
-            default:
-              throw new Error(`Unexpected lightbox list query: ${name}`);
-          }
-          observer.next({ data });
-          observer.complete();
-        }),
-    ),
+            observer.next({ data });
+            observer.complete();
+          }),
+      ),
+    ]),
   });
 }
 
@@ -176,6 +192,7 @@ export function LightboxListFixture() {
           ) : (
             <Images />
           )}
+          <Toaster />
         </div>
       </ConfigurationProvider>
     </ApolloProvider>

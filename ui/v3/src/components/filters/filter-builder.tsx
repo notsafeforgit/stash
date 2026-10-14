@@ -32,8 +32,12 @@ import {
   encodeFilterASTNode,
   type FilterASTConditionNode,
   type FilterASTGroupNode,
+  type FilterASTNode,
 } from "src/models/list-filter/filter-ast";
-import type { FilterMode } from "src/core/generated-graphql";
+import {
+  FilterGroupOperator,
+  type FilterMode,
+} from "src/core/generated-graphql";
 import type { ListFilterModel } from "src/models/list-filter/filter";
 import type { View } from "src/components/list/views";
 import { useMediaQuery } from "src/utils/screen";
@@ -118,7 +122,7 @@ export const FilterBuilder: React.FC<{
   mode: FilterMode;
   filter: ListFilterModel;
   setFilter: (filter: ListFilterModel) => void;
-  root?: FilterASTGroupNode;
+  root?: FilterASTNode;
   onChange: (node?: FilterASTGroupNode) => void;
   isOpen?: boolean;
   currentSavedFilterName?: string;
@@ -135,7 +139,7 @@ export const FilterBuilder: React.FC<{
   mode,
   filter,
   setFilter,
-  root,
+  root: rootNode,
   onChange,
   isOpen = false,
   currentSavedFilterName,
@@ -143,6 +147,17 @@ export const FilterBuilder: React.FC<{
   lockedRoot,
   view,
 }) => {
+  // Saved/API filters may have a bare condition. Give the editor a stable
+  // group without changing the applied AST until the user edits it.
+  const root = useMemo<FilterASTGroupNode | undefined>(() => {
+    if (!rootNode || rootNode.kind === "group") return rootNode;
+    return {
+      kind: "group",
+      id: `root:${rootNode.id}`,
+      operator: FilterGroupOperator.And,
+      children: [rootNode],
+    };
+  }, [rootNode]);
   const isNarrow = useMediaQuery("only screen and (max-width: 767px)");
   const [copied, setCopied] = useState(false);
   const copiedTimerRef = useRef<number | undefined>(undefined);

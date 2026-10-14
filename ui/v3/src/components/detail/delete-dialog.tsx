@@ -39,6 +39,9 @@ interface DeleteDialogProps {
   aboveLightbox?: boolean;
   /** Entity name shown quoted in the title, e.g. "My Scene" → Delete "My Scene"? */
   entityName?: string;
+  description?: React.ReactNode;
+  /** Return focus to a stable control when the initiating item disappears. */
+  finalFocus?: React.ComponentProps<typeof DialogContent>["finalFocus"];
   /**
    * Quantity phrase shown unquoted in the title for bulk deletes,
    * e.g. "3 scenes" → Delete 3 scenes?
@@ -138,6 +141,8 @@ export function DeleteDialog({
   onOpenChange,
   aboveLightbox = false,
   entityName,
+  description,
+  finalFocus,
   entityCountLabel,
   showFileOptions = false,
   deleteFileLabel,
@@ -228,6 +233,7 @@ export function DeleteDialog({
   return (
     <Dialog open={open} onOpenChange={isDeleting ? () => {} : onOpenChange}>
       <DialogContent
+        finalFocus={finalFocus}
         showCloseButton={false}
         className={layerClassName}
         overlayClassName={layerClassName}
@@ -235,10 +241,11 @@ export function DeleteDialog({
         <DialogHeader>
           <DialogTitle>{titleNode}</DialogTitle>
           <DialogDescription>
-            {intl.formatMessage({
-              id: "dialogs.delete_confirm_body",
-              defaultMessage: "This action cannot be undone.",
-            })}
+            {description ??
+              intl.formatMessage({
+                id: "dialogs.delete_confirm_body",
+                defaultMessage: "This action cannot be undone.",
+              })}
           </DialogDescription>
         </DialogHeader>
 

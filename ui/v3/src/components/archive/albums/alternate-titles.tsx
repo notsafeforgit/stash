@@ -10,12 +10,17 @@ import {
 
 export function GalleryAlternateTitles({
   titles,
+  primaryTitle,
 }: {
   titles: readonly string[];
+  primaryTitle?: string | null;
 }) {
   const msg = useMsg();
   const intl = useIntl();
-  if (titles.length === 0) return null;
+  const uniqueTitles = [...new Set(titles.map((title) => title.trim()))].filter(
+    (title) => title !== "" && title !== primaryTitle?.trim(),
+  );
+  if (uniqueTitles.length === 0) return null;
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
@@ -23,7 +28,7 @@ export function GalleryAlternateTitles({
         {msg("gallery_origin.alternate_titles", "Alternate post titles")}
       </span>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
-        {titles.slice(0, 3).map((title) => (
+        {uniqueTitles.slice(0, 3).map((title) => (
           <li
             key={title}
             className="whitespace-pre-wrap wrap-anywhere"
@@ -33,7 +38,7 @@ export function GalleryAlternateTitles({
           </li>
         ))}
       </ul>
-      {titles.length > 3 && (
+      {uniqueTitles.length > 3 && (
         <Collapsible>
           <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
             {intl.formatMessage(
@@ -42,13 +47,13 @@ export function GalleryAlternateTitles({
                 defaultMessage:
                   "{count, plural, one {# more title} other {# more titles}}",
               },
-              { count: titles.length - 3 },
+              { count: uniqueTitles.length - 3 },
             )}
             <ChevronDown data-icon="inline-end" />
           </CollapsibleTrigger>
           <CollapsibleContent>
             <ul className="m-0 flex list-none flex-col gap-2 p-0 pt-2">
-              {titles.slice(3).map((title) => (
+              {uniqueTitles.slice(3).map((title) => (
                 <li
                   key={title}
                   className="whitespace-pre-wrap wrap-anywhere"

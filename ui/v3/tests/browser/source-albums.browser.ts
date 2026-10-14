@@ -18,6 +18,7 @@ async function archive(
     failed?: boolean;
     manyPosts?: boolean;
     untitled?: boolean;
+    repeatedTitles?: boolean;
   } = {},
 ) {
   const requests: URL[] = [];
@@ -75,12 +76,33 @@ async function archive(
                   })),
                 };
               })
-            : [
-                {
-                  ...postSummary(),
-                  ...(options.untitled ? { latest_capture: null } : {}),
-                },
-              ],
+            : options.repeatedTitles
+              ? Array.from({ length: 3 }, (_, i) => {
+                  const summary = postSummary();
+                  const uuid = albumUUID(2000 + i);
+                  return {
+                    ...summary,
+                    requested_uuid: uuid,
+                    uuid,
+                    identifiers: [
+                      { namespace: "native:reddit", value: `example-${i}` },
+                    ],
+                    latest_capture: {
+                      ...summary.latest_capture,
+                      title: "An alternate post title",
+                    },
+                    urls: summary.urls.map((row) => ({
+                      ...row,
+                      post_uuid: uuid,
+                    })),
+                  };
+                })
+              : [
+                  {
+                    ...postSummary(),
+                    ...(options.untitled ? { latest_capture: null } : {}),
+                  },
+                ],
       };
     } else if (url.pathname.endsWith("/album-media")) {
       const response = albumPage();
@@ -307,7 +329,7 @@ for (const desktop of [false, true])
       summary.getByText("Source-post album", { exact: true }),
     ).toBeVisible();
     const parent = summary.getByRole("link", {
-      name: postSummary().latest_capture?.title ?? "",
+      name: "Post example",
       exact: true,
     });
     await expect(parent).toBeVisible();
@@ -417,7 +439,7 @@ test("an untitled album links to its source post ID", async ({ page }) => {
 test("consolidated album titles expand on mobile without widening the page", async ({
   page,
 }) => {
-  await archive(page);
+  const remote = await archive(page, { repeatedTitles: true });
   await page.goto("/source-albums?alternateTitles=1");
   const summary = page.locator("[data-gallery-origin]");
   await expect(
@@ -426,6 +448,29 @@ test("consolidated album titles expand on mobile without widening the page", asy
   await expect(
     summary.getByText("An alternate post title", { exact: true }),
   ).toBeVisible();
+  await expect(
+    summary.getByText("An alternate post title", { exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    summary.getByText("Another caption", { exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    summary.getByText("Library gallery", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    summary.getByText("Source posts", { exact: true }),
+  ).toBeVisible();
+  for (let i = 0; i < 3; i++) {
+    const link = summary.getByRole("link", {
+      name: `Post example-${i}`,
+      exact: true,
+    });
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute(
+      "href",
+      new RegExp(`/source-posts\\?.*post=${albumUUID(2000 + i)}`),
+    );
+  }
   await expect(
     summary.getByText("A fourth caption", { exact: true }),
   ).not.toBeVisible();
@@ -443,4 +488,5 @@ test("consolidated album titles expand on mobile without widening the page", asy
   await page.screenshot({
     path: `/tmp/stash-gallery-titles-${test.info().project.name}.png`,
   });
+  expect(remote.writes).toEqual([]);
 });

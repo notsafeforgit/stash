@@ -21,6 +21,7 @@ export function GalleryOrigin({
   onViewAlbums,
 }: {
   gallery: {
+    title?: string | null;
     folder?: { path: string } | null;
     files: readonly { path: string }[];
     alternate_titles?: readonly string[];
@@ -60,7 +61,10 @@ export function GalleryOrigin({
       </CardHeader>
       <CardContent className="flex min-w-0 flex-col gap-3">
         {label && <Badge variant="secondary">{label}</Badge>}
-        <GalleryAlternateTitles titles={gallery.alternate_titles ?? []} />
+        <GalleryAlternateTitles
+          titles={gallery.alternate_titles ?? []}
+          primaryTitle={gallery.title}
+        />
         {!resolved && sources.busy && (
           <div
             className="flex items-center gap-2 text-sm text-muted-foreground"
@@ -85,12 +89,14 @@ export function GalleryOrigin({
         {hasPosts && (
           <>
             <div className="flex min-w-0 flex-col gap-2">
+              <span className="text-sm text-muted-foreground">
+                {msg("source_posts.title", "Source posts")}
+              </span>
               {posts.slice(0, 3).map((post) => {
                 const identifier =
                   post.identifiers.find(
                     (id) => !id.namespace.startsWith("legacy:"),
                   ) ?? post.identifiers[0];
-                const title = post.latest_capture?.title?.trim();
                 return (
                   <Link
                     key={post.uuid}
@@ -103,15 +109,13 @@ export function GalleryOrigin({
                       namespace: "",
                     }}
                   >
-                    {title ||
-                      intl.formatMessage(
-                        {
-                          id: "gallery_origin.post_id",
-                          defaultMessage: "Post {id}",
-                        },
-                        { id: identifier?.value ?? post.uuid },
-                      )}
-                    {title && post.latest_capture?.title_truncated ? "…" : ""}
+                    {intl.formatMessage(
+                      {
+                        id: "gallery_origin.post_id",
+                        defaultMessage: "Post {id}",
+                      },
+                      { id: identifier?.value ?? post.uuid },
+                    )}
                   </Link>
                 );
               })}

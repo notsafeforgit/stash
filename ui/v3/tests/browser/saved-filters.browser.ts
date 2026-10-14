@@ -307,12 +307,12 @@ test("saving and overwriting still work after removing a preset", async ({
     name: "Save filter",
     exact: true,
   });
+  const name = save.getByRole("combobox", { name: "Filter name", exact: true });
+  await name.fill("Short");
   await expect(
-    save.getByRole("button", { name: "Short clips", exact: true }),
+    page.getByRole("option", { name: "Short clips", exact: true }),
   ).toHaveCount(0);
-  await save
-    .getByRole("textbox", { name: "Filter name", exact: true })
-    .fill("New preset");
+  await name.fill("New preset");
   await save.getByRole("button", { name: "Save", exact: true }).tap();
   await expect(save).toBeHidden();
   await page.getByRole("button", { name: "New preset", exact: true }).tap();
@@ -321,8 +321,9 @@ test("saving and overwriting still work after removing a preset", async ({
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Save filter", exact: true }).tap();
-  await save
-    .getByRole("button", { name: "Favourite clips", exact: true })
+  await name.fill("Favourite");
+  await page
+    .getByRole("option", { name: "Favourite clips", exact: true })
     .tap();
   await save.getByRole("button", { name: "Save", exact: true }).tap();
   await expect(save).toBeHidden();
@@ -330,5 +331,149 @@ test("saving and overwriting still work after removing a preset", async ({
     { operation: "DestroySavedFilter", id: shortId },
     { operation: "SaveFilter", name: "New preset" },
     { operation: "SaveFilter", id: favouriteId, name: "Favourite clips" },
+  ]);
+});
+
+async function openSaveFilter(page: Page, kind = "image") {
+  await openFilters(page, kind);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Save filter", exact: true }).tap();
+  const dialog = page.getByRole("dialog", { name: "Save filter", exact: true });
+  const name = dialog.getByRole("combobox", {
+    name: "Filter name",
+    exact: true,
+  });
+  await expect(name).toBeVisible();
+  return {
+    dialog,
+    name,
+    save: dialog.getByRole("button", { name: "Save", exact: true }),
+  };
+}
+
+for (const kind of ["image", "scene", "marker"]) {
+  test(`saving ${kind} filters searches existing names and selects an overwrite with the keyboard`, async ({
+    page,
+  }) => {
+    const { dialog, name, save } = await openSaveFilter(page, kind);
+    await expect(save).toBeDisabled();
+    await name.fill("cLiPs");
+    await expect(page.getByRole("option")).toHaveCount(2);
+    await name.fill("sHoRt");
+    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(
+      page.getByRole("option", { name: "Short clips", exact: true }),
+    ).toBeVisible();
+    await name.press("ArrowDown");
+    await name.press("Enter");
+    await expect(name).toHaveValue("Short clips");
+    await expect(
+      dialog.getByText('Saved filter "Short clips" will be overwritten.', {
+        exact: true,
+      }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => window.savedFilterMutations)).toEqual([]);
+    await save.tap();
+    await expect(dialog).toBeHidden();
+    expect(await page.evaluate(() => window.savedFilterMutations)).toEqual([
+      { operation: "SaveFilter", id: shortId, name: "Short clips" },
+    ]);
+  });
+}
+
+for (const submit of ["button", "Enter"]) {
+  test(`a typed name saves a new filter with ${submit} when suggestions are not selected`, async ({
+    page,
+  }) => {
+    const { dialog, name, save } = await openSaveFilter(page);
+    await name.fill("clips");
+    await expect(page.getByRole("option")).toHaveCount(2);
+    if (submit === "button") await save.tap();
+    else await name.press("Enter");
+    await expect(dialog).toBeHidden();
+    expect(await page.evaluate(() => window.savedFilterMutations)).toEqual([
+      { operation: "SaveFilter", name: "clips" },
+    ]);
+  });
+}
+
+test("many saved filters scroll inside the save dialog on a small screen", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 568 });
+  await page.addInitScript(() => {
+    window.savedFilterNames = [
+      "Favourite clips",
+      "Short clips",
+      ...Array.from({ length: 30 }, (_, index) => `Preset ${index + 1}`),
+    ];
+  });
+  const { dialog, name, save } = await openSaveFilter(page);
+  const list = dialog.getByRole("listbox");
+  await expect(dialog.getByRole("option")).toHaveCount(32);
+  const dimensions = await list.evaluate((element) => ({
+    height: element.clientHeight,
+    content: element.scrollHeight,
+    bottom: element.getBoundingClientRect().bottom,
+  }));
+  expect(dimensions.content).toBeGreaterThan(dimensions.height);
+  expect(dimensions.bottom).toBeLessThan(568);
+  await list.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await dialog.getByRole("option", { name: "Preset 30", exact: true }).tap();
+  await expect(name).toHaveValue("Preset 30");
+  await save.tap();
+  await expect(dialog).toBeHidden();
+  expect(await page.evaluate(() => window.savedFilterMutations)).toEqual([
+    {
+      operation: "SaveFilter",
+      id: "00000000-0000-4000-8000-000000009032",
+      name: "Preset 30",
+    },
+  ]);
+});
+
+test("typing an existing name requires an explicit overwrite selection", async ({
+  page,
+}) => {
+  const { dialog, name, save } = await openSaveFilter(page);
+  await name.fill(" Short clips ");
+  await expect(save).toBeDisabled();
+  await expect(
+    dialog.getByText(
+      "A filter with this name already exists. Select it to overwrite it, or choose another name.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await name.press("Enter");
+  expect(await page.evaluate(() => window.savedFilterMutations)).toEqual([]);
+  await page.getByRole("option", { name: "Short clips", exact: true }).tap();
+  await expect(save).toBeEnabled();
+  await save.tap();
+  await expect(dialog).toBeHidden();
+  expect(await page.evaluate(() => window.savedFilterMutations)).toEqual([
+    { operation: "SaveFilter", id: shortId, name: "Short clips" },
+  ]);
+});
+
+test("editing a selected name clears overwrite intent and saves a new filter", async ({
+  page,
+}) => {
+  const { dialog, name, save } = await openSaveFilter(page);
+  await name.fill("Short");
+  await page.getByRole("option", { name: "Short clips", exact: true }).tap();
+  await expect(
+    dialog.getByText('Saved filter "Short clips" will be overwritten.', {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await name.fill(" Short clips copy ");
+  await expect(dialog.getByText(/will be overwritten/)).toHaveCount(0);
+  await expect(page.getByRole("option")).toHaveCount(0);
+  await save.tap();
+  await expect(dialog).toBeHidden();
+  expect(await page.evaluate(() => window.savedFilterMutations)).toEqual([
+    { operation: "SaveFilter", name: "Short clips copy" },
   ]);
 });

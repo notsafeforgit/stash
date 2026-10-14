@@ -1,92 +1,190 @@
-import { Label } from "@/components/ui/label";
-import type React from "react";
-import { useId, useMemo, useState } from "react";
-import { Dialog } from "@base-ui/react";
+import { useId } from "react";
+import { useForm, useStore } from "@tanstack/react-form";
 import { FormattedMessage, useIntl } from "react-intl";
-import { Button } from "src/components/ui/button";
-import { Input } from "src/components/ui/input";
-import type { FilterMode } from "src/core/generated-graphql";
-import { useFindSavedFilters } from "src/core/saved-filters";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import {
+  Combobox,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  useComboboxFilter,
+} from "@/components/ui/combobox";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import type { FilterMode } from "@/core/generated-graphql";
+import { useFindSavedFilters } from "@/core/saved-filters";
 
-export const SaveFilterDialog: React.FC<{
+export function SaveFilterDialog({
+  mode,
+  onClose,
+  isSaving = false,
+}: {
   mode: FilterMode;
   onClose: (name?: string, id?: string) => void;
   isSaving?: boolean;
-}> = ({ mode, onClose, isSaving = false }) => {
+}) {
   const intl = useIntl();
   const nameId = useId();
-  const [filterName, setFilterName] = useState("");
-
-  const { data } = useFindSavedFilters(mode);
-
-  const overwritingFilter = useMemo(() => {
-    const savedFilters = data?.findSavedFilters ?? [];
+  const hintId = useId();
+  const statusId = useId();
+  const { contains } = useComboboxFilter({ locale: intl.locale });
+  const { data, previousData } = useFindSavedFilters(mode);
+  const savedFilters =
+    data?.findSavedFilters ?? previousData?.findSavedFilters ?? [];
+  const form = useForm({
+    defaultValues: { name: "", selectedId: null as string | null },
+    validators: {
+      onChange: z.object({
+        name: z.string().trim().min(1),
+        selectedId: z.string().nullable(),
+      }),
+    },
+    onSubmit: ({ value }) => {
+      if (isSaving) return;
+      const selected = savedFilters.find(
+        (filter) =>
+          filter.id === value.selectedId && filter.name === value.name,
+      );
+      if (!selected && namedFilter(value.name)) return;
+      onClose(value.name.trim(), selected?.id);
+    },
+  });
+  const values = useStore(form.store, (state) => state.values);
+  const selected =
+    savedFilters.find((filter) => filter.id === values.selectedId) ?? null;
+  const filteredItems = savedFilters.filter((filter) =>
+    contains(filter.name, values.name.trim()),
+  );
+  function namedFilter(name: string) {
     return savedFilters.find(
-      (f) => f.name.toLowerCase() === filterName.toLowerCase(),
+      (filter) =>
+        filter.name.toLocaleLowerCase(intl.locale) ===
+        name.trim().toLocaleLowerCase(intl.locale),
     );
-  }, [data?.findSavedFilters, filterName]);
+  }
+  const nameTaken = !selected && !!namedFilter(values.name);
 
   return (
-    <Dialog.Root
+    <Dialog
       open
       onOpenChange={(open) => {
-        if (!open) onClose();
+        if (!open && !isSaving) onClose();
       }}
     >
-      <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/50" />
-        <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-background p-6 shadow-lg">
-          <Dialog.Title className="mb-4 text-lg font-semibold">
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
+      >
+        <DialogHeader>
+          <DialogTitle>
             <FormattedMessage id="actions.save_filter" />
-          </Dialog.Title>
-
-          <div className="space-y-4">
-            <div>
-              <Label
-                htmlFor={nameId}
-                className="mb-1 block text-sm font-medium"
-              >
+          </DialogTitle>
+        </DialogHeader>
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void form.handleSubmit();
+          }}
+        >
+          <FieldGroup>
+            <Field data-disabled={isSaving} data-invalid={nameTaken}>
+              <FieldLabel htmlFor={nameId}>
                 <FormattedMessage id="filter_name" />
-              </Label>
-              <Input
-                id={nameId}
-                type="text"
-                placeholder={`${intl.formatMessage({ id: "filter_name" })}…`}
-                value={filterName}
-                onChange={(e) => setFilterName(e.target.value)}
+              </FieldLabel>
+              <Combobox
+                inline
+                open
+                items={savedFilters}
+                filteredItems={filteredItems}
+                value={selected}
+                inputValue={values.name}
+                itemToStringLabel={(filter) => filter.name}
+                itemToStringValue={(filter) => filter.id}
+                isItemEqualToValue={(filter, value) => filter.id === value.id}
+                onValueChange={(filter) => {
+                  if (!filter) return;
+                  form.setFieldValue("name", filter.name);
+                  form.setFieldValue("selectedId", filter.id);
+                }}
+                onInputValueChange={(name, details) => {
+                  // Popup/selection resets must not erase a freely typed name.
+                  // Only an explicit item selection authorizes an overwrite.
+                  if (
+                    details.reason === "input-change" ||
+                    details.reason === "input-clear"
+                  ) {
+                    form.setFieldValue("name", name);
+                    form.setFieldValue("selectedId", null);
+                  }
+                }}
                 disabled={isSaving}
-                autoFocus
-              />
-            </div>
-
-            {(data?.findSavedFilters ?? []).length > 0 && (
-              <ul className="max-h-40 overflow-y-auto rounded border border-input text-sm">
-                {(data?.findSavedFilters ?? []).map((f) => (
-                  <li key={f.id}>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start h-auto rounded-none px-3 py-1.5 font-normal hover:bg-accent"
-                      onClick={() => setFilterName(f.name)}
-                    >
-                      {f.name}
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {!!overwritingFilter && (
-              <p className="text-sm text-yellow-500">
-                <FormattedMessage
-                  id="dialogs.overwrite_filter_warning"
-                  values={{ entityName: overwritingFilter.name }}
+              >
+                <ComboboxInput
+                  id={nameId}
+                  placeholder={intl.formatMessage({
+                    id: "search_filter.save_name_placeholder",
+                  })}
+                  aria-describedby={`${hintId} ${statusId}`}
+                  aria-invalid={nameTaken}
+                  disabled={isSaving}
+                  showTrigger={false}
+                  autoFocus
                 />
-              </p>
-            )}
-          </div>
-
-          <div className="mt-6 flex justify-end gap-2">
+                <div className="rounded-md border">
+                  <ComboboxEmpty>
+                    <FormattedMessage id="search_filter.save_no_matches" />
+                  </ComboboxEmpty>
+                  <ComboboxList className="max-h-48">
+                    {(filter: (typeof savedFilters)[number]) => (
+                      <ComboboxItem
+                        key={filter.id}
+                        value={filter}
+                        className="min-h-11"
+                      >
+                        {filter.name}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </div>
+              </Combobox>
+              <FieldDescription id={hintId}>
+                <FormattedMessage id="search_filter.save_name_help" />
+              </FieldDescription>
+              <div id={statusId} aria-live="polite">
+                {nameTaken && (
+                  <FieldError>
+                    <FormattedMessage id="search_filter.save_name_exists" />
+                  </FieldError>
+                )}
+                {selected && (
+                  <FieldDescription>
+                    <FormattedMessage
+                      id="dialogs.overwrite_filter_warning"
+                      values={{ entityName: selected.name }}
+                    />
+                  </FieldDescription>
+                )}
+              </div>
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
             <Button
+              type="button"
               variant="outline"
               onClick={() => onClose()}
               disabled={isSaving}
@@ -94,8 +192,8 @@ export const SaveFilterDialog: React.FC<{
               <FormattedMessage id="actions.cancel" />
             </Button>
             <Button
-              onClick={() => onClose(filterName, overwritingFilter?.id)}
-              disabled={isSaving || !filterName.trim()}
+              type="submit"
+              disabled={isSaving || !values.name.trim() || nameTaken}
             >
               {isSaving ? (
                 <FormattedMessage
@@ -106,9 +204,9 @@ export const SaveFilterDialog: React.FC<{
                 <FormattedMessage id="actions.save" />
               )}
             </Button>
-          </div>
-        </Dialog.Popup>
-      </Dialog.Portal>
-    </Dialog.Root>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
-};
+}

@@ -10,6 +10,7 @@ import {
 declare global {
   interface Window {
     savedFiltersFixture?: boolean;
+    savedFilterNames?: string[];
     savedFilterFailure?: "false" | "network";
     holdSavedFilterDelete?: boolean;
     releaseSavedFilterDelete?: () => void;
@@ -23,12 +24,11 @@ export const savedFilterIds = [
 ];
 
 export function savedFiltersLink(mode: FilterMode) {
-  let filters: SavedFilterDataFragment[] = [
-    "Favourite clips",
-    "Short clips",
-  ].map((name, index) => ({
+  let filters: SavedFilterDataFragment[] = (
+    window.savedFilterNames ?? ["Favourite clips", "Short clips"]
+  ).map((name, index) => ({
     __typename: "SavedFilter",
-    id: savedFilterIds[index]!,
+    id: `00000000-0000-4000-8000-${String(9001 + index).padStart(12, "0")}`,
     name,
     mode,
     find_filter: null,

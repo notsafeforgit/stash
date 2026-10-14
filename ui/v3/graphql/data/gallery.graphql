@@ -3,6 +3,7 @@ fragment GalleryData on Gallery {
   created_at
   updated_at
   title
+  alternate_titles
   code
   date
   urls

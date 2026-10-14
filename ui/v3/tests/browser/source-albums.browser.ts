@@ -413,3 +413,34 @@ test("an untitled album links to its source post ID", async ({ page }) => {
     summary.getByRole("link", { name: "Post example", exact: true }),
   ).toBeVisible();
 });
+
+test("consolidated album titles expand on mobile without widening the page", async ({
+  page,
+}) => {
+  await archive(page);
+  await page.goto("/source-albums?alternateTitles=1");
+  const summary = page.locator("[data-gallery-origin]");
+  await expect(
+    summary.getByText("Alternate post titles", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    summary.getByText("An alternate post title", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    summary.getByText("A fourth caption", { exact: true }),
+  ).not.toBeVisible();
+  await summary
+    .getByRole("button", { name: "1 more title", exact: true })
+    .click();
+  await expect(
+    summary.getByText("A fourth caption", { exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: `/tmp/stash-gallery-titles-${test.info().project.name}.png`,
+  });
+});

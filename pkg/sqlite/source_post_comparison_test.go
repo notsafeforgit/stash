@@ -180,7 +180,7 @@ func TestSourcePostComparisonEquivalentSourcesDoNotConflictOnAllocatedUUIDs(t *t
 	require.True(t, read.Right.Selection.Complete)
 }
 
-func TestSourcePostComparisonPreservesConflictingGalleriesAndDisabledChoice(t *testing.T) {
+func TestSourcePostComparisonConsolidatesSharedGalleriesAndPreservesDisabledChoice(t *testing.T) {
 	_, repo := archiveTestDatabase(t)
 	a := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "legacy:catalog:example", Value: "old-key"}, "")
 	b := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "post-id"}, "")
@@ -191,8 +191,8 @@ func TestSourcePostComparisonPreservesConflictingGalleriesAndDisabledChoice(t *t
 		syncSourceGallery(t, repo, post.UUID)
 	}
 	read := comparePosts(t, repo, a.UUID, b.UUID)
-	require.Equal(t, []string{"gallery_choice"}, comparisonIssueKinds(read))
-	require.NotEqual(t, read.Left.Album.Gallery.UUID, read.Right.Album.Gallery.UUID)
+	require.Empty(t, comparisonIssueKinds(read))
+	require.Equal(t, read.Left.Album.Gallery.UUID, read.Right.Album.Gallery.UUID)
 	leftID, rightID := *read.Left.Album.Gallery.LocalID, *read.Right.Album.Gallery.LocalID
 	sourceGalleryMemberships(t, repo, leftID, []int{41}, nil)
 	sourceGalleryMemberships(t, repo, rightID, []int{41}, nil)
@@ -208,6 +208,31 @@ func TestSourcePostComparisonPreservesConflictingGalleriesAndDisabledChoice(t *t
 	require.Equal(t, []string{"gallery_choice"}, comparisonIssueKinds(read))
 	sourceGalleryMemberships(t, repo, leftID, []int{41}, nil)
 	sourceGalleryMemberships(t, repo, rightID, []int{41}, nil)
+}
+
+func TestSourcePostComparisonPreservesConflictingManualGalleries(t *testing.T) {
+	_, repo := archiveTestDatabase(t)
+	a := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "legacy:catalog:example", Value: "old-key"}, "")
+	b := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "post-id"}, "")
+	for _, post := range []*models.SourcePost{a, b} {
+		gallery := createArchiveGallery(t, repo, "Curated album")
+		require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+			return repo.Gallery.AddImages(ctx, gallery.ID, 41)
+		}))
+		identity := archiveFind(t, repo, models.ArchiveGallery, gallery.ID)
+		require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+			_, err := repo.SourceGallery.DecideAssociation(ctx, models.SourceGalleryChoiceInput{
+				PostUUID: post.UUID, ExpectedPostRevision: post.Revision, State: "linked", Origin: "review",
+				GalleryUUID: identity.UUID, ExpectedGalleryRevision: identity.Revision})
+			return err
+		}))
+	}
+	read := comparePosts(t, repo, a.UUID, b.UUID)
+	require.Equal(t, []string{"gallery_choice"}, comparisonIssueKinds(read))
+	require.NotEqual(t, read.Left.Album.Gallery.UUID, read.Right.Album.Gallery.UUID)
+	for _, album := range []*models.SourcePostLibraryItem{read.Left.Album.Gallery, read.Right.Album.Gallery} {
+		sourceGalleryMemberships(t, repo, *album.LocalID, []int{41}, nil)
+	}
 }
 
 func TestSourcePostComparisonRejectsInvalidMissingAndOversizedScopes(t *testing.T) {

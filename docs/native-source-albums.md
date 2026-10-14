@@ -1,8 +1,8 @@
 # Native source albums
 
 The native gallery repository can maintain a logical gallery for a source
-post or an evidenced Twitter thread, with ordered image/video attachments and
-explicit membership choices.
+post, an evidenced Twitter thread, or overlapping source albums, with ordered
+image/video attachments and explicit membership choices.
 
 Gallery pages open on **Media**, which browses images and scenes together and
 plays both kinds in one viewer. It reads the existing `galleries_images` and
@@ -37,6 +37,32 @@ can retain multiple parent posts; the Source albums tab shows all of them and
 their individual attachment order. Shared media can retain titles from other
 posts. The summary and tab reuse one paginated lookup, and viewing them changes
 no metadata or membership.
+
+## Overlapping source albums
+
+Source-post albums sharing at least one library image or scene consolidate into
+the oldest gallery. The rule is transitive: A sharing with B, and B sharing with
+C, produces one gallery containing the union. Manual, folder and ZIP galleries
+are outside this rule. Files, media identities, and source posts are unchanged.
+Existing UUID links redirect to the survivor; each post retains its caption and
+attachment list. Mixed playback keeps the existing source publication/attachment
+ordering and shows each member once.
+
+Schema 1000117 adds deduplicated alternate gallery titles. `Gallery.alternate_titles`
+excludes the current main title; the Gallery source card shows those alternatives
+with an expandable remainder. Tags, performers, URLs and chapters are combined.
+The oldest selected cover is retained. Conflicting curated code, photographer,
+studio, rating or custom fields prevent an automatic merge instead of discarding
+those values. Membership exclusions absent from the union are retained.
+
+Normal source synchronization checks overlaps after updating membership, so late
+downloads can join previously separate albums. Shared members still required by
+another post survive refreshes. For existing albums, application-authenticated
+`GET /api/v3/archive/entities/{uuid}/gallery-consolidation` previews the entire
+component, counts and conflicts. `POST` to the same URL with its `signature`
+applies one transaction. A changed component rejects the stale preview. Repeating
+the operation with a fresh preview is harmless; old UUIDs resolve to the result.
+The schema upgrade itself does not perform a library-wide consolidation.
 
 ## Gallery covers
 
@@ -73,8 +99,9 @@ Each post retains its own text, captures, attachment order and associations;
 reused media appears only once in the gallery. A thread can start with two
 single-media posts, and replies can arrive before the root. Other authors'
 replies remain navigable but do not automatically join that creator's gallery.
-Missing or conflicting identity evidence requires review. Already separate
-galleries are not silently merged, and manual gallery choices, exclusions and
+Missing or conflicting identity evidence requires review. Separate source
+galleries consolidate when they share media; thread evidence alone does not
+merge previously separate galleries. Manual gallery choices, exclusions and
 deletions remain protected. Thread planning is bounded to 256 posts.
 
 Schema 1000105 begins recording these relationships on incoming native captures;

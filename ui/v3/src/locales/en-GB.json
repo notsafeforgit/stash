@@ -3477,6 +3477,8 @@
     "title": "Source albums"
   },
   "gallery_origin": {
+    "alternate_titles": "Alternate post titles",
+    "more_titles": "{count, plural, one {# more title} other {# more titles}}",
     "title": "Gallery source",
     "source_album": "Source-post album",
     "folder_gallery": "Folder gallery",

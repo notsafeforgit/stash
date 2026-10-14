@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import type { GallerySources } from "./gallery-sources";
+import { GalleryAlternateTitles } from "./alternate-titles";
 
 export function GalleryOrigin({
   gallery,
@@ -22,6 +23,7 @@ export function GalleryOrigin({
   gallery: {
     folder?: { path: string } | null;
     files: readonly { path: string }[];
+    alternate_titles?: readonly string[];
   };
   sources: GallerySources;
   onViewAlbums: () => void;
@@ -58,6 +60,7 @@ export function GalleryOrigin({
       </CardHeader>
       <CardContent className="flex min-w-0 flex-col gap-3">
         {label && <Badge variant="secondary">{label}</Badge>}
+        <GalleryAlternateTitles titles={gallery.alternate_titles ?? []} />
         {!resolved && sources.busy && (
           <div
             className="flex items-center gap-2 text-sm text-muted-foreground"

@@ -12,6 +12,14 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
+func (r *galleryResolver) AlternateTitles(ctx context.Context, obj *models.Gallery) (ret []string, err error) {
+	err = r.withReadTxn(ctx, func(ctx context.Context) error {
+		ret, err = r.repository.SourceGallery.AlternateTitles(ctx, obj.ID)
+		return err
+	})
+	return ret, err
+}
+
 func (r *galleryResolver) getFiles(ctx context.Context, obj *models.Gallery) ([]models.File, error) {
 	fileIDs, err := loaders.From(ctx).GalleryFiles.Load(obj.ID)
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 
 func removeContinuousSourceSchema(t *testing.T, db *sql.DB) {
 	t.Helper()
+	removeGalleryConsolidationSchema(t, db)
 	var definition string
 	require.NoError(t, db.QueryRow("SELECT sql FROM sqlite_schema WHERE name='source_runs'").Scan(&definition))
 	const unrestricted = "CHECK(typeof(failures)='integer' AND failures>=0)"

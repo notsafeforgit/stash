@@ -7,6 +7,8 @@ type GalleryPathsType {
 type Gallery {
   id: ID! @libraryID(kind: "gallery")
   title: String
+  "Other titles retained from overlapping source albums."
+  alternate_titles: [String!]!
   code: String
   url: String @deprecated(reason: "Use urls")
   urls: [String!]!

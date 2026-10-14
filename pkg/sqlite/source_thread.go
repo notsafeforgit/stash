@@ -185,18 +185,18 @@ func sourceThreadSharesGallery(ctx context.Context, gallery, post string) (bool,
 		allowed[m.PostUUID] = true
 	}
 	var posts []string
-	if err := dbWrapper.Select(ctx, &posts, `SELECT post_uuid FROM post_gallery_links WHERE gallery_uuid=? LIMIT 257`, gallery); err != nil {
+	if err := dbWrapper.Select(ctx, &posts, `SELECT post_uuid FROM post_gallery_links WHERE gallery_uuid=? LIMIT 1025`, gallery); err != nil {
 		return false, err
 	}
-	if len(posts) > 256 {
+	if len(posts) > 1024 {
 		return false, nil
 	}
 	for _, p := range posts {
-		if !allowed[p] {
-			return false, nil
+		if allowed[p] {
+			return true, nil
 		}
 	}
-	return len(posts) > 0, nil
+	return false, nil
 }
 
 func sourceThreadFallbackTitle(row sourceThreadRow) string {

@@ -178,20 +178,7 @@ func (s *SourceGalleryStore) syncThread(ctx context.Context, preview *models.Sou
 			}
 		}
 	}
-	final, err := s.Preview(ctx, preview.PostUUID)
-	if err != nil {
-		return nil, err
-	}
-	txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
-		current, err := s.Preview(ctx, preview.PostUUID)
-		if err != nil {
-			return err
-		}
-		if current.Signature != final.Signature {
-			return models.ErrSourceGalleryConflict
-		}
-		return nil
-	})
+	// Sync guards the final state after any overlapping albums consolidate.
 	complete = true
 	return ret, nil
 }

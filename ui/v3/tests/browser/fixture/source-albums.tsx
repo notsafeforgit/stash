@@ -12,6 +12,14 @@ export function SourceAlbumsFixture() {
   const sources = useGallerySources("12");
   const params = new URLSearchParams(window.location.search);
   const gallery = {
+    alternate_titles: params.has("alternateTitles")
+      ? [
+          "An alternate post title",
+          "Another caption",
+          "A third caption",
+          "A fourth caption",
+        ]
+      : [],
     folder: params.get("folder") ? { path: params.get("folder") ?? "" } : null,
     files: params.get("archive") ? [{ path: params.get("archive") ?? "" }] : [],
   };

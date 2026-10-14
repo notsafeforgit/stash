@@ -2,8 +2,11 @@ package sqlite
 
 import (
 	"context"
+	"errors"
+	"slices"
 
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/txn"
 )
 
 func (s *SourceGalleryStore) Sync(ctx context.Context, post, signature string) (*models.SourceGallerySyncResult, error) {
@@ -14,10 +17,56 @@ func (s *SourceGalleryStore) Sync(ctx context.Context, post, signature string) (
 	if signature == "" || signature != preview.Signature || preview.Action == "review" {
 		return nil, models.ErrSourceGalleryConflict
 	}
+	var ret *models.SourceGallerySyncResult
 	if len(preview.ThreadPlans) > 0 {
-		return s.syncThread(ctx, preview)
+		ret, err = s.syncThread(ctx, preview)
+	} else {
+		ret, err = s.syncPreview(ctx, preview)
 	}
-	return s.syncPreview(ctx, preview)
+	if err != nil || ret.GalleryUUID == "" || (ret.Action != "create" && ret.Action != "sync") {
+		return ret, err
+	}
+	merge, err := s.PreviewConsolidation(ctx, ret.GalleryUUID)
+	if err != nil && !errors.Is(err, models.ErrSourceAlbumLimit) {
+		return nil, err
+	}
+	// An oversized component needs separate review, but thread synchronization
+	// must still register its transaction guard below.
+	if err == nil && len(merge.Galleries) > 1 && len(merge.Conflicts) == 0 {
+		result, err := s.consolidate(ctx, merge)
+		if err != nil {
+			return nil, err
+		}
+		if ret.GalleryUUID != result.GalleryUUID {
+			ret.Created, ret.Action = false, "sync"
+		}
+		ret.GalleryUUID = result.GalleryUUID
+		id := merge.Galleries[0].LocalID
+		ret.GalleryID = &id
+		for _, id := range result.Added {
+			if !slices.Contains(ret.Added, id) {
+				ret.Added = append(ret.Added, id)
+			}
+		}
+	}
+	if len(preview.ThreadPlans) == 0 {
+		return ret, nil
+	}
+	final, err := s.Preview(ctx, post)
+	if err != nil {
+		return nil, err
+	}
+	txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
+		current, err := s.Preview(ctx, post)
+		if err != nil {
+			return err
+		}
+		if current.Signature != final.Signature {
+			return models.ErrSourceGalleryConflict
+		}
+		return nil
+	})
+	return ret, nil
 }
 
 func (s *SourceGalleryStore) syncPreview(ctx context.Context, preview *models.SourceGalleryPreview) (*models.SourceGallerySyncResult, error) {

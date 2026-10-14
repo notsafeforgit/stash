@@ -149,6 +149,7 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	selection := applySelection(t, repo, models.AttachmentSelectionInput{PostUUID: post.UUID, ExpectedPostRevision: selectionPost(t, repo, post.UUID).Revision,
 		CaptureUUID: capture.UUID, Mode: "pinned", Origin: "review", Reason: "private-account-album-choice"})
 	album := syncSourceGallery(t, repo, post.UUID)
+	attachmentSQL(t, source, "INSERT INTO gallery_alternate_titles(gallery_id,title) VALUES (?,?)", *album.GalleryID, "private-account-alternate-title")
 	membership := sourceGalleryHistory(t, repo, album.GalleryUUID)
 	require.Len(t, membership, 1)
 	account := createSourceAccount(t, repo, "native:reddit")
@@ -232,7 +233,7 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	for _, table := range []string{"source_attachments", "source_attachment_manifests", "source_attachment_entries", "source_capture_attachment_manifests", "source_media_evidence", "attachment_media_decisions", "attachment_media_links", "post_attachment_decisions", "post_attachment_decision_manifests", "post_attachment_selections"} {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
 	}
-	for _, table := range []string{"post_gallery_decisions", "post_gallery_links", "source_gallery_write_context", "gallery_membership_events", "gallery_membership_heads"} {
+	for _, table := range []string{"gallery_alternate_titles", "source_gallery_merge_context", "post_gallery_decisions", "post_gallery_links", "source_gallery_write_context", "gallery_membership_events", "gallery_membership_heads"} {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
 	}
 	for _, table := range []string{"source_post_urls", "source_post_url_evidence", "source_post_identifier_evidence", "source_post_account_claims"} {

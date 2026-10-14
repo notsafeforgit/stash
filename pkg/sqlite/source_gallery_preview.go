@@ -494,6 +494,15 @@ func sourceGalleryMembershipPreview(ctx context.Context, ret *models.SourceGalle
 			ret.Remove = append(ret.Remove, *member.resolve())
 		}
 	}
+	if len(ret.Remove) > 0 {
+		// Shared albums are a union. Refreshing one constituent post must not
+		// remove media still selected by another post in the consolidated album.
+		wanted, err := sourceGalleryOtherMedia(ctx, ret.Gallery.UUID, owners)
+		if err != nil {
+			return nil, err
+		}
+		ret.Remove = slices.DeleteFunc(ret.Remove, func(m models.ArchiveEntity) bool { return wanted[m.UUID] })
+	}
 	for _, values := range [][]models.ArchiveEntity{ret.Add, ret.Remove} {
 		slices.SortFunc(values, func(a, b models.ArchiveEntity) int { return cmp.Compare(a.UUID, b.UUID) })
 	}

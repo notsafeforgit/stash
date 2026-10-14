@@ -11,12 +11,12 @@ import (
 )
 
 func TestCapturedAlbumsPopulateNativeGalleriesAfterMediaAssociations(t *testing.T) {
-	_, repo := archiveTestDatabase(t)
 	for _, tc := range []struct{ platform, raw string }{
 		{"reddit", `{"category":"reddit","id":"reddit-album","gallery_data":{"items":[{"media_id":"image"},{"media_id":"video"}]},"media_metadata":{"image":{"e":"Image"},"video":{"e":"RedditVideo"}}}`},
 		{"twitter", `{"category":"twitter","tweet_id":"twitter-album","extended_entities":{"media":[{"id_str":"image","type":"photo"},{"id_str":"video","type":"video"}]}}`},
 	} {
 		t.Run(tc.platform, func(t *testing.T) {
+			_, repo := archiveTestDatabase(t)
 			album, err := archive.ExtractCapturedAlbum([]byte(tc.raw))
 			require.NoError(t, err)
 			post := sourceTestPost(t, repo, album.Post, "")

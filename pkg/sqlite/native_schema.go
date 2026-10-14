@@ -101,6 +101,20 @@ func validateNativeConnection(conn *sqlx.DB, auditData bool) error {
 		if present[forkSchemaMigrationsTable] {
 			return errors.New("native database still contains an active fork migration ledger")
 		}
+		if version >= NativeSchemaBaseline+117 {
+			for _, name := range []string{"gallery_alternate_titles", "source_gallery_merge_context"} {
+				if !present[name] {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+			var unfinished bool
+			if err := conn.Get(&unfinished, "SELECT EXISTS(SELECT 1 FROM source_gallery_merge_context)"); err != nil {
+				return err
+			}
+			if unfinished {
+				return errors.New("native database contains an unfinished gallery consolidation")
+			}
+		}
 		if version >= NativeSchemaBaseline+105 {
 			for _, name := range []string{"post_gallery_links", "source_post_threads", "source_post_threads_conversation", "source_post_threads_author", "source_post_threads_parent", "source_post_thread_scope", "source_post_thread_immutable", "post_gallery_thread_share_insert", "post_gallery_thread_share_update"} {
 				var exists bool

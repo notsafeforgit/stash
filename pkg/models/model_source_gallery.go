@@ -96,6 +96,9 @@ type GalleryMediaReferences struct {
 var ErrSourceGalleryConflict = errors.New("source album or gallery changed; review a fresh preview")
 
 type SourceGalleryReaderWriter interface {
+	PreviewConsolidation(context.Context, string) (*GalleryConsolidationPreview, error)
+	Consolidate(context.Context, string, string) (*GalleryConsolidationResult, error)
+	AlternateTitles(context.Context, int) ([]string, error)
 	LibraryMedia(context.Context, int, int, int) (*GalleryMediaReferences, error)
 	FilenameBackfillPosts(context.Context, string, int) ([]SelectedSourcePost, error)
 	LinkedMediaBackfillPosts(context.Context, string, int) ([]SelectedSourcePost, error)

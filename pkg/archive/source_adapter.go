@@ -61,6 +61,10 @@ func ExtractCapturedPost(raw []byte) (*models.SourcePostIdentifier, error) {
 	return sourceadapter.ExtractCapturedPost(raw)
 }
 
+func ExtractCapturedPostURL(raw []byte) (*sourceadapter.CapturedPostURL, error) {
+	return sourceadapter.ExtractCapturedPostURL(raw)
+}
+
 func CapturedPostPlatform(post models.SourcePostIdentifier) string {
 	return sourceadapter.CapturedPostPlatform(post)
 }

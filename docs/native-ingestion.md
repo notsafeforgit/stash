@@ -491,6 +491,16 @@ Reddit crossposts and independent social posts keep their own identity. Supporte
 Imgur/Redgifs child hosts retain their enclosing post scope, caption and publisher.
 A social extractor's parent feed/profile does not replace its actual post.
 
+Reddit and Twitter captures also fill a missing source-post URL in the same
+transaction as the receipt. Reddit uses its captured permalink when it matches
+the post ID, otherwise its stable comments route; Twitter uses its stable status
+route. Media/CDN URLs, quoted posts and discovery feeds are not source-post links.
+Existing links are preserved, and repeated captures do not add URL evidence.
+An authenticated administrator can repair older captures with
+`POST /api/v3/archive/capture-urls/backfill` and
+`{"capture_uuids":["<capture UUID>"]}` (1–25 distinct UUIDs per batch). This uses
+retained metadata only, without fetching posts, creating captures or editing media.
+
 ### Source interpretation and archive validation
 
 `pkg/sourceadapter` owns the offline interpretation of gallery-dl/child-extractor

@@ -63,6 +63,22 @@ func (rs *nativeArchiveRoutes) reviewPostURLs(w http.ResponseWriter, r *http.Req
 	ingestJSON(w, http.StatusOK, map[string]any{"requested_uuid": post, "urls": ret})
 }
 
+func (rs *nativeArchiveRoutes) backfillCaptureURLs(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		CaptureUUIDs []string `json:"capture_uuids"`
+	}
+	if err := readIngestJSON(w, r, 8192, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	result, err := ingest.New(rs.repo).BackfillCaptureURLs(r.Context(), input.CaptureUUIDs)
+	if err != nil {
+		nativeArchiveError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, result)
+}
+
 type sourceReviewCapture struct {
 	UUID             string     `json:"uuid"`
 	PostUUID         string     `json:"post_uuid"`

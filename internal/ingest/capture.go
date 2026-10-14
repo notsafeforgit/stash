@@ -303,6 +303,9 @@ func (s *Service) recordCaptureEffects(ctx context.Context, capture *models.Sour
 	if err := s.Repo.SourceCollection.RecordCapture(ctx, provenance); err != nil {
 		return nil, nil, err
 	}
+	if _, err := s.recordCaptureURL(ctx, capture); err != nil {
+		return nil, nil, err
+	}
 	result := &CaptureResult{Status: "committed", Publisher: "unavailable", Album: "unavailable", Review: []string{}}
 	if err := s.capturePublisher(ctx, capture.UUID, result); err != nil {
 		return nil, nil, err

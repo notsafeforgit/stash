@@ -61,6 +61,10 @@ export function useListData<
         ? total.data.result.count
         : undefined
       : page.count,
+    countError:
+      source.kind === "graphql"
+        ? !!(countQuery ? total.error : raw.error)
+        : !!source.error,
     loading:
       source.kind === "local"
         ? !!source.loading

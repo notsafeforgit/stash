@@ -177,8 +177,16 @@ export function EntityListPage<
   >();
   const { isMobileSidebar, openFilterSidebar } = sidebarState;
 
-  const { count, items, loading, error, hasData, refetch, refreshing } =
-    useListData(source, filter);
+  const {
+    count,
+    countError,
+    items,
+    loading,
+    error,
+    hasData,
+    refetch,
+    refreshing,
+  } = useListData(source, filter);
   let isLoading = loading;
 
   // First-paint split: even on a warm Apollo cache, mounting 40+ cards is
@@ -371,6 +379,7 @@ export function EntityListPage<
       filter={filter}
       setFilter={setFilter}
       totalCount={count}
+      countError={countError}
       activeFilterCount={activeFilterCount}
       hasSelection={listSelect.hasSelection}
       selecting={listSelect.selecting}
@@ -399,6 +408,7 @@ export function EntityListPage<
       activeFilterCount={activeFilterCount}
       view={view}
       totalCount={count}
+      countError={countError}
       preserveScrollDuringRefill={preserveScrollDuringRefill}
       scrollRestorationReady={isActive && !isLoading}
       sidebarContent={sidebarContent}

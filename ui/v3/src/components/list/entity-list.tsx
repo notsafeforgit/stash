@@ -67,6 +67,7 @@ export interface EntityListProps {
   view?: View;
   /** Total number of matching items (for pagination) */
   totalCount: number | undefined;
+  countError?: boolean;
   /** Retain the current viewport while a cache deletion leaves this page
    *  temporarily short and a refetch pulls later items into the gap. */
   preserveScrollDuringRefill?: boolean;
@@ -123,6 +124,7 @@ export const EntityList: React.FC<EntityListProps> = ({
   activeFilterCount,
   view,
   totalCount,
+  countError,
   preserveScrollDuringRefill = false,
   scrollRestorationReady = true,
   sidebarContent,
@@ -355,6 +357,7 @@ export const EntityList: React.FC<EntityListProps> = ({
                           currentPage={filter.currentPage}
                           itemsPerPage={filter.itemsPerPage}
                           totalItems={totalCount}
+                          countError={countError}
                           metadataByline={metadataByline}
                         />
                       </span>

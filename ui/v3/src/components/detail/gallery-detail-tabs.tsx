@@ -115,13 +115,20 @@ export function GalleryDetailsTab({ gallery }: { gallery: GalleryData }) {
         </MetaRow>
       )}
 
-      {gallery.performers && gallery.performers.length > 0 && (
-        <MetaRow
-          label={intl.formatMessage({
-            id: "performers",
-            defaultMessage: "Performers",
-          })}
-        >
+      <MetaRow
+        label={intl.formatMessage({
+          id: "performers",
+          defaultMessage: "Performers",
+        })}
+      >
+        {gallery.performers.length === 0 ? (
+          <span className="text-muted-foreground">
+            {intl.formatMessage({
+              id: "gallery.performers_unassigned",
+              defaultMessage: "No performers assigned",
+            })}
+          </span>
+        ) : (
           <div className="flex flex-wrap gap-1">
             {gallery.performers.map((p) => (
               <Badge
@@ -138,8 +145,8 @@ export function GalleryDetailsTab({ gallery }: { gallery: GalleryData }) {
               </Badge>
             ))}
           </div>
-        </MetaRow>
-      )}
+        )}
+      </MetaRow>
 
       {gallery.tags && gallery.tags.length > 0 && (
         <MetaRow

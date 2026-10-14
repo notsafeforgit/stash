@@ -33,13 +33,17 @@ import { usePopoverOutsideTap } from "@/hooks/use-outside-tap";
 import { cn } from "@/lib/utils";
 import type { ListFilterModel } from "@/models/list-filter/filter";
 import { SearchInput } from "./search-input";
-import { MobileListPagePicker } from "./mobile-list-pagination";
+import {
+  CountUnavailable,
+  MobileListPagePicker,
+} from "./mobile-list-pagination";
 import { MobileSearchButton } from "./mobile-search-button";
 
 export interface MobileListControlsProps {
   filter: ListFilterModel;
   setFilter: Dispatch<SetStateAction<ListFilterModel>>;
   totalCount: number | undefined;
+  countError?: boolean;
   activeFilterCount: number;
   selecting: boolean;
   hasSelection: boolean;
@@ -58,6 +62,7 @@ export function MobileListControls({
   filter,
   setFilter,
   totalCount,
+  countError,
   activeFilterCount,
   selecting,
   hasSelection,
@@ -97,6 +102,7 @@ export function MobileListControls({
       currentPage={filter.currentPage}
       itemsPerPage={filter.itemsPerPage}
       totalItems={totalCount}
+      countError={countError}
       onChangePage={(page) => {
         setFilter(filter.changePage(page));
       }}
@@ -245,7 +251,9 @@ export function MobileListControls({
                       </Popover>
                     ) : (
                       <span className="text-sm text-muted-foreground tabular-nums">
-                        {totalCount === undefined ? (
+                        {countError ? (
+                          <CountUnavailable />
+                        ) : totalCount === undefined ? (
                           <Skeleton
                             className="h-4 w-10"
                             aria-label={intl.formatMessage({

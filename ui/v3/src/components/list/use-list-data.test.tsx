@@ -17,7 +17,11 @@ import { FilterMode, type FindFilterType } from "@/core/generated-graphql";
 import { ListFilterModel } from "@/models/list-filter/filter";
 import type { GraphQLDataSource } from "./entity-list-types";
 import { SearchInput } from "./search-input";
-import { MobileListPagination } from "./mobile-list-pagination";
+import {
+  MobileListPagination,
+  MobileListPagePicker,
+} from "./mobile-list-pagination";
+import { PaginationMeta } from "./list-pagination";
 import { useListData } from "./use-list-data";
 import { useListPageRefill } from "./use-list-page-refill";
 
@@ -45,7 +49,10 @@ function Harness({ refill = false }: { refill?: boolean }) {
   const [filter, setFilter] = useState(
     () => new ListFilterModel(FilterMode.Scenes),
   );
-  const { items, count, loading, error, refetch } = useListData(source, filter);
+  const { items, count, countError, loading, error, refetch } = useListData(
+    source,
+    filter,
+  );
   useListPageRefill({
     remote: refill,
     filter,
@@ -93,6 +100,23 @@ function Harness({ refill = false }: { refill?: boolean }) {
           </span>
         ))}
       </output>
+      <div data-page-picker>
+        <MobileListPagePicker
+          currentPage={filter.currentPage}
+          itemsPerPage={filter.itemsPerPage}
+          totalItems={count}
+          countError={countError}
+          onChangePage={(page) => setFilter(filter.changePage(page))}
+        />
+      </div>
+      <div data-pagination-meta>
+        <PaginationMeta
+          currentPage={filter.currentPage}
+          itemsPerPage={filter.itemsPerPage}
+          totalItems={count}
+          countError={countError}
+        />
+      </div>
       {refill && (
         <MobileListPagination
           currentPage={filter.currentPage}
@@ -272,6 +296,30 @@ it("never applies the previous filter's late count and preserves usable cards on
     count: "unknown",
     error: "count unavailable",
   });
+  expect(container.querySelector('[data-item="7"]')).not.toBeNull();
+  expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(0);
+  expect(container.querySelector("[data-page-picker]")?.textContent).toContain(
+    "Count unavailable",
+  );
+  expect(
+    container.querySelector("[data-pagination-meta]")?.textContent,
+  ).toContain("Count unavailable");
+
+  await act(async () => {
+    Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Refresh")
+      ?.click();
+  });
+  await act(async () => {
+    request("ListRows", "new").rows(["7"]);
+    request("ListCount", "new").count(1);
+  });
+  expect(container.querySelector("[data-page-picker]")?.textContent).toBe(
+    "1–1 / 1",
+  );
+  expect(container.querySelector("[data-pagination-meta]")?.textContent).toBe(
+    "1–1 of 1",
+  );
   expect(container.querySelector('[data-item="7"]')).not.toBeNull();
 });
 

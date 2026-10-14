@@ -123,6 +123,7 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
   filter,
   setFilter,
   totalCount,
+  countError,
   activeFilterCount,
   hasSelection,
   selecting,
@@ -499,6 +500,7 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
         filter={filter}
         setFilter={setFilter}
         totalCount={totalCount}
+        countError={countError}
         activeFilterCount={activeFilterCount}
         hasSelection={hasSelection}
         selecting={selecting}

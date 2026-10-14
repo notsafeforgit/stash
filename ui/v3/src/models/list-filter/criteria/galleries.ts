@@ -1,4 +1,7 @@
-import { CriterionModifier } from "src/core/generated-graphql";
+import {
+  CriterionModifier,
+  type MultiCriterionInput,
+} from "src/core/generated-graphql";
 import {
   ModifierCriterionOption,
   IHierarchicalLabeledIdCriterion,
@@ -27,4 +30,11 @@ export const GalleriesCriterionOption: ModifierCriterionOption =
     makeCriterion: () => new GalleriesCriterion(GalleriesCriterionOption),
   });
 
-export class GalleriesCriterion extends IHierarchicalLabeledIdCriterion {}
+export class GalleriesCriterion extends IHierarchicalLabeledIdCriterion {
+  public override toCriterionInput(): MultiCriterionInput {
+    // The shared selector stores included/excluded IDs in the same shape as
+    // hierarchical selectors. Gallery membership itself has no hierarchy.
+    const { value, excludes, modifier } = super.toCriterionInput();
+    return { value, excludes, modifier };
+  }
+}

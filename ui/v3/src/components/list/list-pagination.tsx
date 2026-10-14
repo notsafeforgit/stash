@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "src/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CountUnavailable } from "./mobile-list-pagination";
 import { NumberInput } from "src/components/filters/number-input";
 import { usePopoverOutsideTap } from "@/hooks/use-outside-tap";
 import {
@@ -236,6 +237,7 @@ interface PaginationMetaProps {
   currentPage: number;
   itemsPerPage: number;
   totalItems: number | undefined;
+  countError?: boolean;
   metadataByline?: React.ReactNode;
 }
 
@@ -243,10 +245,12 @@ export const PaginationMeta: React.FC<PaginationMetaProps> = ({
   currentPage,
   itemsPerPage,
   totalItems,
+  countError,
   metadataByline,
 }) => {
   const intl = useIntl();
 
+  if (countError) return <CountUnavailable />;
   if (totalItems === undefined)
     return (
       <Skeleton

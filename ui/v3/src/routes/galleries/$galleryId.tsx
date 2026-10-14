@@ -131,20 +131,25 @@ function GalleryDetailPage() {
 
   const entityTabs: DetailTabsTab[] = gallery
     ? [
-        {
-          id: "media",
-          icon: Images,
-          label: intl.formatMessage({
-            id: "media",
-            defaultMessage: "Media",
-          }),
-          content: (
-            <GalleryMedia
-              key={`${gallery.id}:${gallery.updated_at}:${mediaVersion}`}
-              id={gallery.id}
-            />
-          ),
-        },
+        ...((gallery.image_count > 0 && gallery.scenes.length > 0) ||
+        (gallery.image_count === 0 && gallery.scenes.length === 0)
+          ? [
+              {
+                id: "media",
+                icon: Images,
+                label: intl.formatMessage({
+                  id: "gallery_media.all",
+                  defaultMessage: "All media",
+                }),
+                content: (
+                  <GalleryMedia
+                    key={`${gallery.id}:${gallery.updated_at}:${mediaVersion}`}
+                    id={gallery.id}
+                  />
+                ),
+              },
+            ]
+          : []),
         ...(gallery.image_count > 0
           ? [
               {

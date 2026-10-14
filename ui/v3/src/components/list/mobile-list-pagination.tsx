@@ -17,6 +17,7 @@ export interface MobileListPaginationProps {
   currentPage: number;
   itemsPerPage: number;
   totalItems: number | undefined;
+  countError?: boolean;
   onChangePage: (page: number) => void;
 }
 
@@ -69,8 +70,10 @@ export function MobileListPagination({
 
 /** Page jump is on demand; opening the section picker never opens the keyboard. */
 export function MobileListPagePicker(props: MobileListPaginationProps) {
-  const { currentPage, itemsPerPage, totalItems, onChangePage } = props;
+  const { currentPage, itemsPerPage, totalItems, onChangePage, countError } =
+    props;
   const intl = useIntl();
+  if (countError) return <CountUnavailable />;
   if (totalItems === undefined)
     return (
       <Skeleton
@@ -102,6 +105,18 @@ export function MobileListPagePicker(props: MobileListPaginationProps) {
         </>
       )}
     </div>
+  );
+}
+
+export function CountUnavailable() {
+  const intl = useIntl();
+  return (
+    <span className="text-sm text-muted-foreground" role="status">
+      {intl.formatMessage({
+        id: "pagination.count_unavailable",
+        defaultMessage: "Count unavailable",
+      })}
+    </span>
   );
 }
 

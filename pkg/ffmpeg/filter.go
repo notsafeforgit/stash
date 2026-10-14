@@ -2,6 +2,7 @@ package ffmpeg
 
 import (
 	"fmt"
+	"math"
 )
 
 // VideoFilter represents video filter parameters to be passed to ffmpeg.
@@ -36,7 +37,7 @@ func (f VideoFilter) ScaleMaxSize(maxDimensions int) VideoFilter {
 	return f.Append(fmt.Sprintf("scale=%v:%v:force_original_aspect_ratio=decrease", maxDimensions, maxDimensions))
 }
 
-// ScaleMax returns a VideoFilter scaling to maxSize. It will scale width if it is larger than height, otherwise it will scale height.
+// ScaleMax caps the shorter edge at maxSize without upscaling.
 func (f VideoFilter) ScaleMax(inputWidth, inputHeight, maxSize int) VideoFilter {
 	// get the smaller dimension of the input
 	videoSize := inputHeight
@@ -65,22 +66,20 @@ func (f VideoFilter) ScaleMaxLM(width int, height int, reqHeight int, maxWidth i
 		return f.ScaleMax(width, height, reqHeight)
 	}
 
-	aspectRatio := float64(width) / float64(height)
-	desiredHeight := reqHeight
-	if desiredHeight == 0 {
-		desiredHeight = height
+	if width <= 0 || height <= 0 {
+		return f
 	}
-	desiredWidth := int(float64(desiredHeight) * aspectRatio)
-
-	if desiredHeight <= maxHeight && desiredWidth <= maxWidth {
-		return f.ScaleMax(width, height, reqHeight)
+	// All three limits are ceilings. Starting at 1 prevents a large requested
+	// tier from upscaling a small, unusually wide/portrait source before the
+	// hardware's maximum dimensions are applied.
+	scale := math.Min(1, math.Min(float64(maxWidth)/float64(width), float64(maxHeight)/float64(height)))
+	if reqHeight > 0 {
+		scale = math.Min(scale, float64(reqHeight)/float64(min(width, height)))
 	}
-
-	if float64(desiredHeight-maxHeight) > float64(desiredWidth-maxWidth) {
-		return f.ScaleDimensions(-2, maxHeight)
-	} else {
-		return f.ScaleDimensions(maxWidth, -2)
+	if scale >= 1 {
+		return f
 	}
+	return f.ScaleDimensions(int(float64(width)*scale)&^1, int(float64(height)*scale)&^1)
 }
 
 // SetBT709ColorParameters overrides frame color metadata before later filters.

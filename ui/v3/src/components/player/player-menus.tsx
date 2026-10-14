@@ -152,7 +152,9 @@ export function QualityMenu({
     return visibleSources.findIndex((o) => o.label === s.label) === i;
   });
 
-  if (deduped.length <= 1) return null;
+  // Even a sole source must be selectable if the remembered ceiling left
+  // playback unselected and the user needs an explicit override.
+  if (!deduped.length || (deduped.length === 1 && activeSource)) return null;
 
   // Active-row match: by label when labelled, otherwise fall back to
   // reference equality via `src`.

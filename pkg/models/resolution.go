@@ -182,8 +182,10 @@ var streamingResolutionMax = map[StreamingResolutionEnum]int{
 	StreamingResolutionEnumStandard:   resolutionRanges[ResolutionEnumStandard].min,
 	StreamingResolutionEnumStandardHd: resolutionRanges[ResolutionEnumStandardHd].min,
 	StreamingResolutionEnumFullHd:     resolutionRanges[ResolutionEnumFullHd].min,
-	StreamingResolutionEnumFourK:      resolutionRanges[ResolutionEnumFourK].min,
-	StreamingResolutionEnumOriginal:   0,
+	// Library resolution categories have broad matching ranges; the encoder
+	// tier must use the actual 2160p ceiling advertised by playback settings.
+	StreamingResolutionEnumFourK:    2160,
+	StreamingResolutionEnumOriginal: 0,
 }
 
 func (e StreamingResolutionEnum) GetMaxResolution() int {

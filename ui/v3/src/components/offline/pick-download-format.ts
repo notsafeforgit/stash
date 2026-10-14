@@ -33,13 +33,12 @@
  * without it the decision falls through to HEVC or H.264.
  *
  * Resolution semantics: the user's max-resolution preference is a
- * **ceiling**. If the source is shorter (vertical) than the ceiling,
- * we don't artificially upscale — we use Original. The "would scale"
- * test is `source_height > ceiling_height`; only then does the
- * codec-copy fast path get rejected and a transcode picked.
+ * **ceiling on the shorter edge**, including portrait video. Originals that
+ * fit can use codec copy; unknown dimensions cannot establish that they fit.
  */
 
 import { StreamingResolutionEnum } from "src/core/generated-graphql";
+import { qualityHeight } from "@/core/player-quality";
 
 export type DownloadMode = "copy" | "copy-aac" | "h264" | "hevc" | "av1";
 
@@ -93,33 +92,27 @@ export interface PickFormatResult {
   effectiveHeight: number;
 }
 
-/**
- * Frontend mirror of `pkg/models/resolution.go:streamingResolutionMax`.
- * The `min` height for each `StreamingResolutionEnum` value — the
- * maximum the source can be without being scaled down to that bucket.
- */
-const RESOLUTION_HEIGHT: Record<StreamingResolutionEnum, number> = {
-  [StreamingResolutionEnum.Low]: 240,
-  [StreamingResolutionEnum.Standard]: 480,
-  [StreamingResolutionEnum.StandardHd]: 720,
-  [StreamingResolutionEnum.FullHd]: 1080,
-  [StreamingResolutionEnum.FourK]: 2160,
-  [StreamingResolutionEnum.Original]: 0, // sentinel: no cap
-};
-
 export function pickDownloadFormat({
   source,
   device,
   server,
   maxResolution,
 }: PickFormatInput): PickFormatResult {
-  const cap = RESOLUTION_HEIGHT[maxResolution] ?? 0;
-  const sourceShort = Math.min(source.width || 0, source.height || 0);
-  const willScale = cap > 0 && sourceShort > cap;
+  const cap =
+    maxResolution === StreamingResolutionEnum.Original
+      ? 0
+      : qualityHeight[maxResolution];
+  const knownDimensions =
+    Number.isFinite(source.width) &&
+    Number.isFinite(source.height) &&
+    source.width > 0 &&
+    source.height > 0;
+  const sourceShort = Math.min(source.width, source.height);
+  const fits = cap === 0 || (knownDimensions && sourceShort <= cap);
 
   // 1. Pure copy — fastest path. No scale possible (codec-copy can't
   //    filter), so only when the user's resolution cap doesn't bite.
-  if (!willScale && device.videoAndAudioInMp4) {
+  if (fits && device.videoAndAudioInMp4) {
     return {
       mode: "copy",
       resolution: StreamingResolutionEnum.Original,
@@ -130,7 +123,7 @@ export function pickDownloadFormat({
   // 2. Video-copy + AAC re-encode. Same scale constraint on video
   //    (still codec-copied), but source-audio support no longer
   //    matters — AAC is always produced.
-  if (!willScale && device.videoInMp4) {
+  if (fits && device.videoInMp4) {
     return {
       mode: "copy-aac",
       resolution: StreamingResolutionEnum.Original,
@@ -147,10 +140,9 @@ export function pickDownloadFormat({
     targetMode = "hevc";
   }
 
-  // For transcode, the effective height is min(source, cap). When
-  // cap=0 (Original) we keep source. When source < cap we don't
-  // upscale.
-  const effective = cap > 0 ? Math.min(source.height || 0, cap) : source.height;
+  // The ceiling applies to the shorter edge, not always the frame height.
+  const scale = cap > 0 ? Math.min(1, cap / sourceShort) : 1;
+  const effective = knownDimensions ? Math.floor(source.height * scale) : 0;
   return {
     mode: targetMode,
     resolution: maxResolution,

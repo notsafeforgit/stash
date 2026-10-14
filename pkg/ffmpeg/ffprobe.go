@@ -122,7 +122,7 @@ type VideoFile struct {
 	AudioCodec string
 }
 
-// TranscodeScale calculates the dimension scaling for a transcode, where maxSize is the maximum size of the longest dimension of the input video.
+// TranscodeScale caps the shorter dimension at maxSize without upscaling.
 // If no scaling is required, then returns 0, 0.
 // Returns -2 for the dimension that will scale to maintain aspect ratio.
 func (v *VideoFile) TranscodeScale(maxSize int) (int, int) {

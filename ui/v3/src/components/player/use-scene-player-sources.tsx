@@ -40,8 +40,6 @@ import { getHlsEngine, flushAndRestartAt, suspendHlsBuffering } from "./hls";
 import { isTimeBuffered, readTimeRanges } from "./buffered-ranges";
 import { createBufferedSeekPreview } from "./buffered-seek-preview";
 import {
-  BEST_QUALITY_LABELS,
-  QUALITY_STORAGE_KEY,
   computeInitialResume,
   filterSources,
   getCompatibilitySource,
@@ -50,6 +48,7 @@ import {
   startOffsetStrategyFor,
   type RawStream,
 } from "./scene-player-sources";
+import { savePlayerQualityPreference } from "@/core/player-quality-preference";
 
 interface SourceScene {
   id: string;
@@ -461,39 +460,26 @@ export function useScenePlayerSources({
         return;
       }
 
-      // Saved label collapses direct + remux into one preference slot
-      // ("Direct stream"). They're interchangeable best-quality tiers,
-      // and only one is offered per browser+scene; saving them under
-      // the same key means the user's "best available" choice persists
-      // even when the highest tier on the next scene is the other of
-      // the two.
-      const persistedLabel =
-        source.label && BEST_QUALITY_LABELS.has(source.label)
-          ? "Direct stream"
-          : source.label;
+      // This exact source is a per-item override. Remember its resolution as
+      // a ceiling for later items; TV supplies its own separate preference.
+      if (!automatic && !qualityPreference) savePlayerQualityPreference(source);
 
       // No-op when the picked source is already active. Without this
       // guard the rest of the function still flips `reloading` true
       // and stashes a `pendingResumeRef`, but the URL doesn't change —
       // `finalSrc` stays the same — so the `<video>` doesn't reload,
       // `canPlay` never re-fires, and `handleCanPlay` never clears the
-      // reloading state. Result: spinner pinned forever. Still update
-      // the saved-quality preference so a click on an already-active
-      // "Direct stream" entry locks in the user's preference even when
-      // nothing else changes.
+      // reloading state. Result: spinner pinned forever. The saved-quality
+      // preference is still updated above even when nothing else changes.
       if (source.src === activeSrc) {
-        if (!automatic && persistedLabel && !qualityPreference) {
-          localStorage.setItem(QUALITY_STORAGE_KEY, persistedLabel);
-        }
+        // Keep this explicit choice stable if another render reads the new
+        // ceiling and would prefer a different source on this same item.
+        setManualSource(source);
         return;
       }
 
       loadRetryAttemptedRef.current = false;
       setLoadFailed(false);
-
-      if (!automatic && persistedLabel && !qualityPreference) {
-        localStorage.setItem(QUALITY_STORAGE_KEY, persistedLabel);
-      }
 
       // Clip-ended source changes restart from scene-time 0 rather than
       // carrying the end-of-clip playhead through the URL's `?start=`.

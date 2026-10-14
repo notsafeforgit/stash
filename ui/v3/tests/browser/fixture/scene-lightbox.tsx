@@ -73,6 +73,11 @@ const entry: OfflineEntry = {
   status: "complete",
   opfs_path: "fixture",
   server_status: "present",
+  // Keep the nested marker parent and the top-level scene consistent for
+  // Apollo's normalized file cache in resolution-ceiling scenarios.
+  ...(new URLSearchParams(location.search).has("large")
+    ? { width: 3840, height: 2160, width_actual: 3840, height_actual: 2160 }
+    : {}),
 };
 const url = (path: string) => new URL(path, location.href).href;
 // Distinct, decoded posters make the swipe handoff observable without relying
@@ -116,12 +121,16 @@ export const scenes = ["1", "2", "3", "slow"].map(
                 label: "Direct stream",
               },
             ]),
-        {
-          __typename: "SceneStreamEndpoint" as const,
-          url: url(`/scene/${id}/stream.master.m3u8?resolution=LOW`),
-          mime_type: "application/vnd.apple.mpegurl",
-          label: "HLS (240p)",
-        },
+        ...(!new URLSearchParams(location.search).has("direct-only")
+          ? [
+              {
+                __typename: "SceneStreamEndpoint" as const,
+                url: url(`/scene/${id}/stream.master.m3u8?resolution=LOW`),
+                mime_type: "application/vnd.apple.mpegurl",
+                label: "HLS (240p)",
+              },
+            ]
+          : []),
       ],
       scene_markers: [6, 8, 2].map((seconds, index) => ({
         __typename: "SceneMarker",

@@ -467,7 +467,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     description: {
       id: "offline.settings.max_resolution_description",
       defaultMessage:
-        "Cap on the resolution downloaded for offline playback. Source files shorter than the cap are downloaded at original.",
+        "Resolution ceiling on the shorter edge, including portrait video. Compatible originals within the limit are copied; transcoding is used only for resizing or codec compatibility.",
     },
   },
   {
@@ -918,7 +918,8 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     },
     description: {
       id: "config.general.maximum_transcode_size_desc",
-      defaultMessage: "Maximum size for generated transcodes",
+      defaultMessage:
+        "Resolution ceiling for generated transcodes, measured on the shorter edge. Smaller videos keep their dimensions.",
     },
   },
   {
@@ -933,7 +934,8 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     },
     description: {
       id: "config.general.maximum_streaming_transcode_size_desc",
-      defaultMessage: "Maximum size for transcoded streams",
+      defaultMessage:
+        "Resolution ceiling for transcoded streams, measured on the shorter edge. Smaller videos keep their dimensions; direct playback and remuxing preserve the original resolution.",
     },
   },
   {

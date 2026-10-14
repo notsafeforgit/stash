@@ -17,8 +17,7 @@ export {
 import { isHlsPlaylist } from "./hls";
 import { canPlaySource, type PlayerSource } from "./player-utils";
 import { selectFixedQuality, type PlayerQuality } from "@/core/player-quality";
-
-export const QUALITY_STORAGE_KEY = "stash-player-quality";
+import { loadPlayerQualityPreference } from "@/core/player-quality-preference";
 
 export type RawStream = {
   url: string;
@@ -119,7 +118,7 @@ function findSourceByPath(
 /** A native decoding failure can recover through the existing H.264/AAC stream. */
 export function getCompatibilitySource(
   sources: PlayerSource[],
-  quality?: PlayerQuality,
+  quality: PlayerQuality = loadPlayerQualityPreference(),
   dimensions: { width?: number; height?: number } = {},
 ) {
   if (quality?.kind === "fixed") {
@@ -157,23 +156,7 @@ function findOriginalResolutionTranscode(
   });
 }
 
-// Saved labels that mean "best available quality": direct stream and
-// the two fMP4 codec-copy variants (full remux, video-copy + AAC). All
-// three preserve the source video bitstream — the remux variants differ
-// only in whether the audio rides along untouched or gets re-encoded to
-// AAC — and which one is offered varies per browser. The user's "give
-// me the best" preference should follow them across scenes/devices, so
-// they share a virtual preference slot at the persistence layer.
-export const BEST_QUALITY_LABELS = new Set([
-  "Direct stream",
-  "HLS (remux)",
-  "HLS (remux + AAC)",
-]);
-
-export function getPreferredSource(
-  sources: PlayerSource[],
-  useSavedPreference = true,
-): PlayerSource | null {
+function getPreferredSource(sources: PlayerSource[]): PlayerSource | null {
   if (!sources.length) return null;
 
   const direct = sources.find((s) => {
@@ -190,29 +173,6 @@ export function getPreferredSource(
   const remuxAac = findSourceByPath(sources, "/stream.fmp4.aac.master.m3u8");
   const originalHls = findOriginalResolutionTranscode(sources);
   const hls = findSourceByPath(sources, "/stream.master.m3u8");
-
-  let saved: string | null = null;
-  try {
-    if (useSavedPreference) saved = localStorage.getItem(QUALITY_STORAGE_KEY);
-  } catch {
-    /* unavailable storage */
-  }
-  if (saved) {
-    if (BEST_QUALITY_LABELS.has(saved)) {
-      // Virtual "best quality" preference: direct → full remux →
-      // video-copy + AAC remux → original-resolution transcode.
-      // Non-exact label match so a saved "HLS (remux)" on one scene
-      // still picks direct or AAC-remux on another scene where the
-      // exact label happens to be unavailable.
-      if (direct) return direct;
-      if (remux) return remux;
-      if (remuxAac) return remuxAac;
-      if (originalHls) return originalHls;
-    } else {
-      const match = sources.find((s) => s.label === saved);
-      if (match) return match;
-    }
-  }
 
   // Default preference order: direct > full fMP4 codec-copy >
   // video-copy + AAC fMP4 > original-resolution HLS transcode >
@@ -235,9 +195,18 @@ export function selectScenePlayerSource(
   quality: PlayerQuality | undefined,
   dimensions: { width: number | undefined; height: number | undefined },
 ) {
-  return quality?.kind === "fixed"
-    ? selectFixedQuality(sources, quality, dimensions)
-    : getPreferredSource(sources, quality === undefined);
+  // Offline files were capped when downloaded; playback cannot resize a blob
+  // and should not apply an unrelated online streaming preference to it.
+  if (
+    quality === undefined &&
+    sources.every((source) => source.src.startsWith("blob:"))
+  ) {
+    return getPreferredSource(sources);
+  }
+  const preference = quality ?? loadPlayerQualityPreference();
+  return preference.kind === "fixed"
+    ? selectFixedQuality(sources, preference, dimensions)
+    : getPreferredSource(sources);
 }
 
 export function computeInitialResume(

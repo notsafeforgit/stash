@@ -143,7 +143,7 @@ export function OfflineSettingsSection() {
         )}
         description={msg(
           "offline.settings.max_resolution_description",
-          "Cap on the resolution downloaded for offline playback. Source files shorter than the cap are downloaded at original.",
+          "Resolution ceiling on the shorter edge, including portrait video. Compatible originals within the limit are copied; transcoding is used only for resizing or codec compatibility.",
         )}
         value={maxRes}
         options={resolutionOptions}

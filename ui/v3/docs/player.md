@@ -204,6 +204,32 @@ AirPlay uses Video.js 10's `AirPlayButton` and built-in HLS AirPlay bridge; PiP
 uses its existing feature store. Unavailable controls stay hidden, and local
 blob media disables remote playback. Receivers must be able to fetch the source.
 
+## Resolution defaults
+
+Online players remember a quality choice as a resolution ceiling on the shorter
+edge, including portrait video. The shared selector prefers compatible direct
+playback, remux, then remux with AAC audio when the original fits. Otherwise it
+chooses the highest advertised transcode within the limit. Unknown dimensions
+cannot establish that an original fits. If no source satisfies the limit, the
+player requires an explicit source choice instead of silently exceeding it.
+
+A manual source selection applies exactly to the current item; its resolution
+becomes the ceiling for later online items. Storage uses resolution enums, with
+a narrowly scoped upgrade reader for older v3 display-label preferences. TV has
+its own saved ceiling and does not overwrite the ordinary player's preference.
+Codec recovery respects either ceiling without changing it.
+
+Offline downloads have a separate saved ceiling. Compatible originals within it
+use video codec copy. Resize and compatibility transcodes preserve smaller
+dimensions and use the shorter edge for landscape and portrait files across
+H.264, HEVC and AV1. Downloaded blobs play as saved; an online preference cannot
+resize them or prevent offline playback.
+
+Server settings for maximum generated and streaming transcode sizes limit
+encoded outputs; they do not resize direct or remuxed streams. Generated copies
+and hardware scaler limits must not upscale smaller originals. Encoder quality
+and bitrate controls remain encoding parameters, not playback resolution tiers.
+
 ## Backend streaming boundary
 
 [`Scene.sceneStreams`](../../../internal/api/resolver_model_scene.go) supplies
@@ -249,5 +275,5 @@ iOS playback separately from Linux Chromium/WebKit fixtures.
 Native decoding or unsupported-format errors on a direct source fall back to the
 available H.264/AAC HLS source. This uses the normal source transition, preserves
 position and playback intent, and leaves the saved quality preference unchanged.
-When TV specifies a resolution ceiling, the fallback also stays within it.
+The fallback also stays within the active TV or ordinary-player resolution ceiling.
 Network errors and revoked share requests do not trigger this codec fallback.

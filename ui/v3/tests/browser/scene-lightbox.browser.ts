@@ -183,6 +183,86 @@ async function next(page: Page, index: number) {
   ).toHaveAttribute("data-playback-ready", "true");
 }
 
+test("a remembered quality is a ceiling across direct and transcode-only scenes", async ({
+  page,
+}) => {
+  // Upgrade an existing preference whose exact label is also advertised.
+  await page.addInitScript(() =>
+    localStorage.setItem("stash-player-quality", "HLS (240p)"),
+  );
+  const video = await open(page, "?paused");
+  await expect(video).toHaveAttribute("src", /\/scene\/1\/stream(?:[?#]|$)/);
+  const transcode = page.waitForRequest(
+    (request) =>
+      request.url().includes("/scene/2/stream.master.m3u8") &&
+      request.url().includes("resolution=LOW"),
+  );
+  await next(page, 1);
+  await transcode;
+  await next(page, 2);
+  await expect(video).toHaveAttribute("src", /\/scene\/3\/stream(?:[?#]|$)/);
+  expect(
+    await page.evaluate(() => localStorage.getItem("stash-player-quality")),
+  ).toBe("HLS (240p)");
+});
+
+test("a remembered ceiling uses a lower tier when its exact tier is unavailable", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "stash-player-quality",
+      JSON.stringify({ kind: "fixed", resolution: "FULL_HD" }),
+    ),
+  );
+  const sources: string[] = [];
+  page.on("request", (request) => {
+    if (/\/scene\/1\/stream(?:\.master\.m3u8)?(?:[?#]|$)/.test(request.url()))
+      sources.push(request.url());
+  });
+  await open(page, "?paused&large");
+  expect(sources.length).toBeGreaterThan(0);
+  expect(
+    sources.every(
+      (url) =>
+        url.includes("stream.master.m3u8") && url.includes("resolution=LOW"),
+    ),
+  ).toBe(true);
+});
+
+test("an unavailable ceiling leaves even a sole source selectable as an explicit override", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "stash-player-quality",
+      JSON.stringify({ kind: "fixed", resolution: "FULL_HD" }),
+    ),
+  );
+  const sources: string[] = [];
+  page.on("request", (request) => {
+    if (/\/scene\/1\/stream(?:[?#]|$)/.test(request.url()))
+      sources.push(request.url());
+  });
+  await page.goto("/scene-lightbox?paused&large&direct-only");
+  await page.getByRole("button", { name: "Open scenes" }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Saved quality unavailable",
+  );
+  expect(sources).toHaveLength(0);
+  await page.getByRole("button", { name: "Quality", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: /^Direct stream/ }).click();
+  await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+    "data-playback-ready",
+    "true",
+  );
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.locator("video")).toHaveAttribute(
+    "src",
+    /\/scene\/1\/stream(?:[?#]|$)/,
+  );
+});
+
 async function holdCarouselAnimations(page: Page) {
   await page.evaluate(() => {
     const animate = Element.prototype.animate;
@@ -728,6 +808,11 @@ test("a paused quality change before idle warm-up preserves its playhead, then t
     .getByRole("menuitemradio", { name: "HLS (240p)", exact: true })
     .click();
   await playlistRequest;
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("stash-player-quality") ?? "null"),
+    ),
+  ).toEqual({ kind: "fixed", resolution: "LOW" });
   await expect(page.locator("[data-scene-player]")).toHaveAttribute(
     "data-playback-ready",
     "true",
@@ -745,6 +830,7 @@ test("a paused quality change before idle warm-up preserves its playhead, then t
   await expect(
     page.getByRole("link", { name: "Scene 3", exact: true }),
   ).toBeVisible();
+  await expect(video).toHaveAttribute("src", /\/scene\/3\/stream(?:[?#]|$)/);
   await expect(video).toHaveJSProperty("paused", false);
   await expect
     .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))

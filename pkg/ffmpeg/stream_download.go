@@ -3,7 +3,6 @@ package ffmpeg
 import (
 	"fmt"
 	"io"
-	"math"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -26,8 +25,8 @@ import (
 // codec set or when a smaller resolution was asked for.
 //
 // "copy" forces codec-copy and returns 400 when the source's codecs
-// don't fit MP4 — useful for callers that want a hard guarantee of no
-// re-encode.
+// don't fit MP4 or exceed the requested resolution ceiling — useful for
+// callers that want a hard guarantee of no re-encode.
 //
 // "copy-aac" copies the source video bitstream untouched and
 // re-encodes the audio track to AAC. Targets clients that decode the
@@ -295,14 +294,19 @@ func (sm *StreamManager) ServeDownload(w http.ResponseWriter, r *http.Request, o
 		}
 	}
 
-	keepResolution := options.Resolution == "" ||
-		options.Resolution == models.StreamingResolutionEnumOriginal
+	ceiling := options.Resolution.GetMaxResolution()
+	keepResolution := ceiling == 0 ||
+		(vf.Width > 0 && vf.Height > 0 && min(vf.Width, vf.Height) <= ceiling)
 
 	encoding := encDownloadH264 // default
 	switch options.Mode {
 	case DownloadModeCopy:
 		if !canCopyToMP4(vf.VideoCodec, audioCodec) {
 			http.Error(w, "source codecs don't fit MP4 (copy mode); request mode=h264, mode=hevc, mode=copy-aac, or mode=auto instead", http.StatusBadRequest)
+			return
+		}
+		if !keepResolution {
+			http.Error(w, "source dimensions do not fit the resolution ceiling for copy mode; request mode=auto instead", http.StatusBadRequest)
 			return
 		}
 		encoding = encDownloadCopy
@@ -556,9 +560,7 @@ func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, res
 	case encDownloadHEVC:
 		if codec == VideoCodecLibX265 {
 			args = append(args, hevcDownloadEncoderArgs(srcColor)...)
-			if maxResolution > 0 && vf.Height > maxResolution {
-				args = args.VideoFilter(VideoFilter("").ScaleHeight(maxResolution))
-			}
+			args = args.VideoFilter(VideoFilter("").ScaleMax(vf.Width, vf.Height, maxResolution))
 		} else {
 			// HW HEVC (currently VAAPI only). Build the filter chain
 			// manually rather than via hwMaxResFilter because the
@@ -688,27 +690,34 @@ func hevcHWVideoFilter(codec VideoCodec, vf *models.VideoFile, reqHeight int, fu
 	if srcColor.isHDR() {
 		gpuFmt = "p010"
 	}
-	scale := reqHeight > 0 && vf.Height > reqHeight
+	w, h := downloadScaleDimensions(vf, reqHeight)
+	scale := w != vf.Width || h != vf.Height
 
 	var f VideoFilter
 	if fullhw {
 		if scale {
-			w := int(math.Round(float64(vf.Width) * float64(reqHeight) / float64(vf.Height)))
-			if w%2 != 0 {
-				w++
-			}
-			f = f.Append(fmt.Sprintf("scale_vaapi=w=%d:h=%d:format=%s", w, reqHeight, gpuFmt))
+			f = f.Append(fmt.Sprintf("scale_vaapi=w=%d:h=%d:format=%s", w, h, gpuFmt))
 		} else {
 			f = f.Append("scale_vaapi=format=" + gpuFmt)
 		}
 	} else {
 		if scale {
-			f = f.ScaleHeight(reqHeight)
+			f = f.ScaleMax(vf.Width, vf.Height, reqHeight)
 		}
 		f = f.Append("format=" + gpuFmt)
 		f = f.Append("hwupload")
 	}
 	return f
+}
+
+// Use the same short-edge ceiling as HLS; GPU scalers require explicit even
+// dimensions. Unscaled sources retain their existing format conversion path.
+func downloadScaleDimensions(vf *models.VideoFile, ceiling int) (int, int) {
+	w, h := scaledDimensions(vf, ceiling)
+	if w == vf.Width && h == vf.Height {
+		return w, h
+	}
+	return w &^ 1, h &^ 1
 }
 
 // hdrColorFlags writes source ffprobe color tags into both the
@@ -792,28 +801,21 @@ func av1HWVideoFilter(codec VideoCodec, vf *models.VideoFile, reqHeight int, ful
 	if srcColor.isHDR() {
 		gpuFmt = "p010"
 	}
-	scale := reqHeight > 0 && vf.Height > reqHeight
-
-	scaledW := func() int {
-		w := int(math.Round(float64(vf.Width) * float64(reqHeight) / float64(vf.Height)))
-		if w%2 != 0 {
-			w++
-		}
-		return w
-	}
+	w, h := downloadScaleDimensions(vf, reqHeight)
+	scale := w != vf.Width || h != vf.Height
 
 	var f VideoFilter
 	switch codec {
 	case VideoCodecVAV1:
 		if fullhw {
 			if scale {
-				f = f.Append(fmt.Sprintf("scale_vaapi=w=%d:h=%d:format=%s", scaledW(), reqHeight, gpuFmt))
+				f = f.Append(fmt.Sprintf("scale_vaapi=w=%d:h=%d:format=%s", w, h, gpuFmt))
 			} else {
 				f = f.Append("scale_vaapi=format=" + gpuFmt)
 			}
 		} else {
 			if scale {
-				f = f.ScaleHeight(reqHeight)
+				f = f.ScaleMax(vf.Width, vf.Height, reqHeight)
 			}
 			f = f.Append("format=" + gpuFmt)
 			f = f.Append("hwupload")
@@ -821,13 +823,13 @@ func av1HWVideoFilter(codec VideoCodec, vf *models.VideoFile, reqHeight int, ful
 	case VideoCodecIAV1:
 		if fullhw {
 			if scale {
-				f = f.Append(fmt.Sprintf("scale_qsv=w=%d:h=%d:format=%s", scaledW(), reqHeight, gpuFmt))
+				f = f.Append(fmt.Sprintf("scale_qsv=w=%d:h=%d:format=%s", w, h, gpuFmt))
 			} else {
 				f = f.Append("scale_qsv=format=" + gpuFmt)
 			}
 		} else {
 			if scale {
-				f = f.ScaleHeight(reqHeight)
+				f = f.ScaleMax(vf.Width, vf.Height, reqHeight)
 			}
 			f = f.Append("hwupload=extra_hw_frames=64")
 			f = f.Append("format=qsv")
@@ -835,13 +837,13 @@ func av1HWVideoFilter(codec VideoCodec, vf *models.VideoFile, reqHeight int, ful
 	case VideoCodecNAV1:
 		if fullhw {
 			if scale {
-				f = f.Append(fmt.Sprintf("scale_cuda=w=%d:h=%d:format=%s", scaledW(), reqHeight, gpuFmt))
+				f = f.Append(fmt.Sprintf("scale_cuda=w=%d:h=%d:format=%s", w, h, gpuFmt))
 			} else {
 				f = f.Append("scale_cuda=format=" + gpuFmt)
 			}
 		} else {
 			if scale {
-				f = f.ScaleHeight(reqHeight)
+				f = f.ScaleMax(vf.Width, vf.Height, reqHeight)
 			}
 			f = f.Append("format=" + gpuFmt)
 			f = f.Append("hwupload_cuda")

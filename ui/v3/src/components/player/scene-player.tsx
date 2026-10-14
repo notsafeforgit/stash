@@ -1,7 +1,6 @@
 import type { PreviewImageData } from "@/components/shared/preview-image";
 import type { PlayerQuality } from "@/core/player-quality";
-import { selectFixedQuality } from "@/core/player-quality";
-import { getPreferredSource } from "./scene-player-sources";
+import { selectScenePlayerSource } from "./scene-player-sources";
 import type { SceneActivityScope } from "@/core/scene-activity";
 import { SceneActivityEffects } from "./scene-activity-effects";
 import { ScenePlayerControlsProvider } from "./scene-player-controls";
@@ -49,6 +48,7 @@ import { cn } from "src/lib/utils";
 import { Badge } from "src/components/ui/badge";
 import { Spinner } from "src/components/ui/spinner";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FormattedMessage } from "react-intl";
 import { languageMap } from "src/utils/caption";
 import { resolution as resolutionLabel } from "src/utils/file";
@@ -1161,13 +1161,14 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
                 )
               }
               resetQuality={() => {
-                const source =
-                  qualityPreference?.kind === "fixed"
-                    ? selectFixedQuality(sources, qualityPreference, {
-                        width: file?.width,
-                        height: file?.height,
-                      })
-                    : getPreferredSource(sources, !qualityPreference);
+                const source = selectScenePlayerSource(
+                  sources,
+                  qualityPreference,
+                  {
+                    width: file?.width,
+                    height: file?.height,
+                  },
+                );
                 if (source) handleSourceChange(source);
               }}
             >
@@ -1223,6 +1224,24 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
         >
           <Spinner className="size-12 text-white" />
         </div>
+        {controls === "standard" && !activeSource && sources.length > 0 && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none p-4">
+            <Alert className="max-w-xs pointer-events-auto">
+              <AlertTitle>
+                <FormattedMessage
+                  id="errors.playback_quality_unavailable"
+                  defaultMessage="Saved quality unavailable"
+                />
+              </AlertTitle>
+              <AlertDescription>
+                <FormattedMessage
+                  id="errors.playback_quality_unavailable_description"
+                  defaultMessage="No compatible source fits your saved resolution ceiling. Use Quality to choose a source."
+                />
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
         {loadFailed && (
           <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
             <div

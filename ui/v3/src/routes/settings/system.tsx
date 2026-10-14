@@ -296,7 +296,7 @@ function SettingsSystemPage() {
           )}
           description={msg(
             "config.general.maximum_transcode_size_desc",
-            "Maximum size for generated transcodes",
+            "Resolution ceiling for generated transcodes, measured on the shorter edge. Smaller videos keep their dimensions.",
           )}
           value={
             general.maxTranscodeSize ?? GQL.StreamingResolutionEnum.Original
@@ -313,7 +313,7 @@ function SettingsSystemPage() {
           )}
           description={msg(
             "config.general.maximum_streaming_transcode_size_desc",
-            "Maximum size for transcoded streams",
+            "Resolution ceiling for transcoded streams, measured on the shorter edge. Smaller videos keep their dimensions; direct playback and remuxing preserve the original resolution.",
           )}
           value={
             general.maxStreamingTranscodeSize ??

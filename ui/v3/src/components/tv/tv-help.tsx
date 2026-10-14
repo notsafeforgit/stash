@@ -160,7 +160,7 @@ export default function TvHelp({ close }: { close: () => void }) {
           <p>
             <FormattedMessage
               id="tv.text.tv_settings_live_in_the_app_s_settings_tv_page"
-              defaultMessage="TV settings live in the app’s Settings → TV page. One default quality applies to scenes and markers. A fixed quality chooses an advertised transcode at that resolution or below; if none is available, choose a temporary source explicitly. Source choices in TV apply to the current item."
+              defaultMessage="TV settings live in the app’s Settings → TV page. One default quality applies to scenes and markers. A resolution ceiling prefers compatible originals within the limit, then a transcode at that resolution or below. If none is available, choose a temporary source explicitly. Source choices in TV apply to the current item."
             />
           </p>
           <p>

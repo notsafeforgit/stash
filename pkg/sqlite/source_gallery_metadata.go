@@ -15,7 +15,8 @@ func recordNewSourceGalleryMetadata(ctx context.Context, entityUUID string, prev
 		CaptureUUID string `db:"capture_uuid"`
 		HasTitle    bool   `db:"has_title"`
 	}
-	if err := dbWrapper.Get(ctx, &evidence, `SELECT c.uuid AS capture_uuid, coalesce(json_extract(r.metadata,'$.title'),'')!='' AS has_title
+	if err := dbWrapper.Get(ctx, &evidence, `SELECT c.uuid AS capture_uuid,
+(coalesce(json_extract(r.metadata,'$.title'),'')!='' OR coalesce(json_extract(r.metadata,'$.original_text'),'')!='') AS has_title
 FROM post_attachment_decisions d JOIN source_captures c ON c.uuid=d.capture_uuid
 JOIN source_post_revisions r ON r.uuid=c.revision_uuid
 WHERE d.uuid=? AND d.post_uuid=?`, preview.SelectionUUID, preview.PostUUID); err != nil {

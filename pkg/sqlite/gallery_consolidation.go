@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -164,13 +165,32 @@ func (s *SourceGalleryStore) consolidate(ctx context.Context, p *models.GalleryC
 		}
 	}
 	for _, g := range p.Galleries {
-		if strings.TrimSpace(g.Title) != "" {
+		if strings.TrimSpace(g.Title) != "" && g.Title != "Source album" {
 			if _, err := dbWrapper.Exec(ctx, "INSERT OR IGNORE INTO gallery_alternate_titles(gallery_id,title) VALUES(?,?)", target.LocalID, g.Title); err != nil {
 				return nil, err
 			}
 		}
 		if g.UUID == target.UUID {
 			continue
+		}
+		if (target.Title == "" || target.Title == "Source album") && g.Title != "" && g.Title != "Source album" {
+			state, err := (&MetadataFieldStore{}).State(ctx, target.UUID, "title")
+			if err != nil {
+				return nil, err
+			}
+			if !state.Protected {
+				value, err := json.Marshal(g.Title)
+				if err != nil {
+					return nil, err
+				}
+				if _, err := (&MetadataFieldStore{}).ApplyAutomatic(ctx, models.MetadataFieldDecisionInput{
+					EntityUUID: target.UUID, ExpectedEntityRevision: state.Entity.Revision, Field: "title", Mode: "inherit", Origin: "policy",
+					Value: value, Reason: "Use the caption title from a consolidated source album",
+				}); err != nil {
+					return nil, err
+				}
+				target.Title = g.Title
+			}
 		}
 		if err := s.mergeSourceGallery(ctx, g, target); err != nil {
 			return nil, err
@@ -246,7 +266,7 @@ WHERE s.gallery_id=? AND NOT EXISTS(SELECT 1 FROM gallery_custom_fields d WHERE 
 WHERE gallery_id=? AND NOT EXISTS(SELECT 1 FROM gallery_covers WHERE gallery_id=?)`, target.LocalID, source.LocalID, target.LocalID); err != nil {
 		return err
 	}
-	for _, field := range []string{"title", "details", "date", "code", "photographer", "studio_id", "rating"} {
+	for _, field := range []string{"details", "date", "code", "photographer", "studio_id", "rating"} {
 		if _, err := dbWrapper.Exec(ctx, "UPDATE galleries SET "+field+"=(SELECT "+field+" FROM galleries WHERE id=?) WHERE id=? AND ("+field+" IS NULL OR "+field+"='')", source.LocalID, target.LocalID); err != nil {
 			return err
 		}
@@ -273,6 +293,6 @@ WHERE gallery_id=? AND NOT EXISTS(SELECT 1 FROM gallery_covers WHERE gallery_id=
 func (s *SourceGalleryStore) AlternateTitles(ctx context.Context, id int) ([]string, error) {
 	ret := []string{}
 	err := dbWrapper.Select(ctx, &ret, `SELECT title FROM gallery_alternate_titles WHERE gallery_id=?
-AND title<>coalesce((SELECT title FROM galleries WHERE id=?),'') ORDER BY title COLLATE NATURAL_CI`, id, id)
+AND title!='Source album' AND title<>coalesce((SELECT title FROM galleries WHERE id=?),'') ORDER BY title COLLATE NATURAL_CI`, id, id)
 	return ret, err
 }

@@ -131,7 +131,7 @@ func TestPostConsolidationPlanGalleryMetadataAndClaimsUseBoundedIndexes(t *testi
 	a := identityPost(t, repo, "legacy:catalog:fixture", "first")
 	capture := postSelectionCapture(t, repo, a, 0, 1)
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
-		owner, metadata, err := sourceGalleryCaptureMetadata(ctx, capture.UUID)
+		owner, _, metadata, err := sourceGalleryCaptureMetadata(ctx, capture.UUID)
 		require.NoError(t, err)
 		require.Equal(t, a, owner)
 		require.Equal(t, capture.Metadata, metadata)

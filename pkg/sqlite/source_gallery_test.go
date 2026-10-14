@@ -78,6 +78,8 @@ func TestSourceGalleryCreatesMixedAlbumSharesMediaAndSurvivesReplay(t *testing.T
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "mixed-album"}, "")
 	captureInput := sourceTestCapture(t, post.UUID, 1, "biography")
 	details, date := "Post description", "2026-09-28"
+	// This fixture carries Twitter text, which supplies the display title.
+	captureInput.Metadata.Title = nil
 	captureInput.Metadata.OriginalText, captureInput.Metadata.PublishedAt = &details, &date
 	capture := recordSourceTestCapture(t, repo, captureInput)
 	video := sourceAttachmentEntry(1, "video")
@@ -88,7 +90,7 @@ func TestSourceGalleryCreatesMixedAlbumSharesMediaAndSurvivesReplay(t *testing.T
 		CaptureUUID: capture.UUID, Mode: "automatic", Origin: "ingest"})
 	image := chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveImage, 41)
 	scene := chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveScene, 31)
-	manual := createArchiveGallery(t, repo, "Shared title")
+	manual := createArchiveGallery(t, repo, details)
 	preview := sourceGalleryPreview(t, repo, post.UUID)
 	require.Equal(t, preview, sourceGalleryPreview(t, repo, post.UUID), "preview is read only")
 	require.Equal(t, "create", preview.Action)
@@ -121,12 +123,12 @@ func TestSourceGalleryCreatesMixedAlbumSharesMediaAndSurvivesReplay(t *testing.T
 		require.NoError(t, err)
 		require.Equal(t, models.GalleryOriginSource, gallery.Origin)
 		require.False(t, gallery.IsUserCreated())
-		require.Equal(t, "Shared title", gallery.Title)
+		require.Equal(t, details, gallery.Title)
 		require.Equal(t, details, gallery.Details)
 		require.Equal(t, date, gallery.Date.String())
 		require.Nil(t, gallery.FolderID)
 		require.Nil(t, gallery.PrimaryFileID)
-		found, err := repo.Gallery.FindUserGalleryByTitle(ctx, "Shared title")
+		found, err := repo.Gallery.FindUserGalleryByTitle(ctx, details)
 		require.NoError(t, err)
 		require.Len(t, found, 1)
 		require.Equal(t, manual.ID, found[0].ID)

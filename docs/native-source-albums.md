@@ -38,6 +38,14 @@ their individual attachment order. Shared media can retain titles from other
 posts. The summary and tab reuse one paginated lookup, and viewing them changes
 no metadata or membership.
 
+Twitter/X posts have text, not a separate source title. Post headings and newly
+created albums use the first nonempty line or sentence of that text, bounded to
+200 characters. A media-only Twitter post uses its source post ID. Other sites
+prefer their actual title and fall back to the same caption excerpt. These are
+display labels: the complete original text stays in the source record and album
+description. Creating a label never fabricates a title in captured metadata, and
+later synchronization preserves manually edited gallery titles.
+
 ## Overlapping source albums
 
 Source-post albums sharing at least one library image or scene consolidate into
@@ -51,6 +59,8 @@ ordering and shows each member once.
 Schema 1000117 adds deduplicated alternate gallery titles. `Gallery.alternate_titles`
 excludes the current main title; the Gallery source card shows those alternatives
 with an expandable remainder. Tags, performers, URLs and chapters are combined.
+The old generated “Source album” placeholder is not an alternate post title; an
+inherited placeholder yields to a caption title when albums consolidate.
 The oldest selected cover is retained. Conflicting curated code, photographer,
 studio, rating or custom fields prevent an automatic merge instead of discarding
 those values. Membership exclusions absent from the union are retained.

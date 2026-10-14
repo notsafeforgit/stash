@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"slices"
-	"strings"
 
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
@@ -111,9 +110,6 @@ func (s *SourceGalleryStore) previewThread(ctx context.Context, value string, pr
 	if shared == nil {
 		first := ret.ThreadPlans[0]
 		ret.Title, ret.Details, ret.Date = first.Title, first.Details, first.Date
-		if strings.TrimSpace(first.Details) != "" {
-			ret.Title = string([]rune(strings.TrimSpace(first.Details))[:min(200, len([]rune(strings.TrimSpace(first.Details))))])
-		}
 		if ret.Title == "" || ret.Title == "Source album" {
 			ret.Title = sourceThreadFallbackTitle(eligible[0])
 		}

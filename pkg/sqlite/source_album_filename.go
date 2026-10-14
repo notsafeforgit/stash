@@ -79,10 +79,6 @@ func twitterFilenameSlot(relative string, posts []models.SourcePostIdentifier) (
 	return "", 0, false
 }
 
-func twitterFilenameTitle(value string) bool {
-	return value == "" || twitterOriginalFilename.MatchString(value) || twitterOriginalFilename.MatchString(value+".jpg")
-}
-
 func filenameAttachmentID(post string, ref models.SourcePostIdentifier) string {
 	return uuid.NewSHA1(uuid.MustParse(post), []byte("source-filename-attachment-v1\x00"+ref.Namespace+"\x00"+ref.Value)).String()
 }

@@ -16,8 +16,9 @@ type SourcePostMediaReview struct {
 	LinkedAttachments   int                         `json:"linked_attachments"`
 }
 
-// The list title is an excerpt. Full shared revision metadata is available on
-// demand. An unknown capture time remains null, distinct from import time.
+// The list title is a display heading: a source title or a short caption excerpt
+// (Twitter has no separate title). Full, unchanged source metadata is available
+// on demand. An unknown capture time remains null, distinct from import time.
 type SourcePostReviewCapture struct {
 	UUID           string     `json:"uuid"`
 	PostUUID       string     `json:"post_uuid"`

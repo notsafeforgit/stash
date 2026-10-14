@@ -115,6 +115,28 @@ func TestGalleryConsolidationRejectsStalePreviewAndCuratedConflicts(t *testing.T
 	sourceGalleryMemberships(t, repo, *b.LocalID, []int{41}, nil)
 }
 
+func TestGalleryConsolidationReplacesInheritedPlaceholderWithCaption(t *testing.T) {
+	_, repo := archiveTestDatabase(t)
+	a := consolidationGallery(t, repo, "Source album", []int{41}, nil)
+	consolidationGallery(t, repo, "A useful caption", []int{41}, nil)
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, err := repo.MetadataField.Decide(ctx, models.MetadataFieldDecisionInput{
+			EntityUUID: a.UUID, ExpectedEntityRevision: a.Revision, Field: "title", Mode: "inherit", Origin: "migration", Value: []byte(`"Source album"`),
+		})
+		return err
+	}))
+	consolidationApply(t, repo, a.UUID, consolidationPreview(t, repo, a.UUID))
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		g, err := repo.Gallery.Find(ctx, *a.LocalID)
+		require.NoError(t, err)
+		require.Equal(t, "A useful caption", g.Title)
+		titles, err := repo.SourceGallery.AlternateTitles(ctx, *a.LocalID)
+		require.NoError(t, err)
+		require.Empty(t, titles, "a generated placeholder is not an alternate post title")
+		return nil
+	}))
+}
+
 func TestGalleryConsolidationNewImportsKeepPostsAndLateMedia(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	posts := []string{}

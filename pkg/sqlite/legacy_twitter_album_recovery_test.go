@@ -53,7 +53,7 @@ func TestLegacyTwitterRecoveryMixedOrphansAndReplay(t *testing.T) {
 		return nil
 	}))
 	albumPreview := albumBackfillPreview(t, f.repo, post, models.SourceAlbumIdentifiersV1)
-	require.Equal(t, recoveryTweet, albumPreview.Gallery.Title)
+	require.Equal(t, "Twitter post "+recoveryTweet, albumPreview.Gallery.Title)
 	album := applyAlbumBackfill(t, f.repo, albumPreview)
 	sourceGalleryMemberships(t, f.repo, *album.Gallery.GalleryID, []int{41}, []int{31})
 	replayed, err := f.db.ApplyLegacyTwitterRecovery(t.Context(), input, preview.Signature)

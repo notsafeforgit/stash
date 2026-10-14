@@ -23,6 +23,7 @@ async function archive(
     unsafeURL?: boolean;
     merged?: boolean;
     thread?: boolean;
+    captionOnly?: boolean;
   } = {},
 ) {
   const requests: URL[] = [];
@@ -182,7 +183,7 @@ async function archive(
       result = {
         requested_uuid: path.split("/").at(-2),
         metadata: {
-          title: "Full retained caption",
+          title: options.captionOnly ? undefined : "Full retained caption",
           original_text: "One shared description",
           published_at: "2026-09-29",
         },
@@ -201,6 +202,20 @@ async function archive(
     },
   };
 }
+
+test("caption-only post content does not invent an untitled heading", async ({
+  page,
+}) => {
+  await archive(page, { captionOnly: true });
+  await page.goto(`/source-posts?post=${postIds.post}`);
+  await page.getByRole("button", { name: "Post content", exact: true }).click();
+  await expect(
+    page.getByText("One shared description", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Untitled source post", { exact: true }),
+  ).toHaveCount(0);
+});
 
 for (const desktop of [false, true]) {
   test(`thread navigation on ${desktop ? "desktop" : "mobile"} retains missing ancestors and local reply links`, async ({

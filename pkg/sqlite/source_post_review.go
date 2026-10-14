@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/sourceadapter"
 )
 
 // Each branch starts from the selected media's indexes, not the post library.
@@ -148,8 +149,8 @@ HAVING count(*)=1 AND max(d.state)='linked' AND max(d.media_uuid) IN `+getInBind
 }
 
 const sourceReviewCaptureProjection = `c.uuid,c.post_uuid,c.revision_uuid,c.origin,c.platform,c.captured_at,c.recorded_at,
-substr(json_extract(r.metadata,'$.title'),1,512) AS title,
-coalesce(length(json_extract(r.metadata,'$.title'))>512,0) AS title_truncated,
+substr(trim(json_extract(r.metadata,'$.title'),char(9)||char(10)||char(13)||' '),1,513) AS title,
+substr(trim(json_extract(r.metadata,'$.original_text'),char(9)||char(10)||char(13)||' '),1,513) AS original_text,
 json_extract(r.metadata,'$.published_at') AS published_at,json_extract(r.metadata,'$.date_basis') AS date_basis`
 
 func sourceReviewLatestCapture(ctx context.Context, post string) (*models.SourcePostReviewCapture, error) {
@@ -178,17 +179,17 @@ func sourceReviewCurrentLatestCapture(ctx context.Context, post string) (*models
 
 func readSourceReviewCapture(ctx context.Context, query string, args ...interface{}) (*models.SourcePostReviewCapture, error) {
 	var row struct {
-		UUID           string         `db:"uuid"`
-		PostUUID       string         `db:"post_uuid"`
-		RevisionUUID   string         `db:"revision_uuid"`
-		Origin         string         `db:"origin"`
-		Platform       string         `db:"platform"`
-		CapturedAt     NullTimestamp  `db:"captured_at"`
-		RecordedAt     NullTimestamp  `db:"recorded_at"`
-		Title          sql.NullString `db:"title"`
-		PublishedAt    sql.NullString `db:"published_at"`
-		DateBasis      sql.NullString `db:"date_basis"`
-		TitleTruncated bool           `db:"title_truncated"`
+		UUID         string         `db:"uuid"`
+		PostUUID     string         `db:"post_uuid"`
+		RevisionUUID string         `db:"revision_uuid"`
+		Origin       string         `db:"origin"`
+		Platform     string         `db:"platform"`
+		CapturedAt   NullTimestamp  `db:"captured_at"`
+		RecordedAt   NullTimestamp  `db:"recorded_at"`
+		Title        sql.NullString `db:"title"`
+		OriginalText sql.NullString `db:"original_text"`
+		PublishedAt  sql.NullString `db:"published_at"`
+		DateBasis    sql.NullString `db:"date_basis"`
 	}
 	// Project only compact metadata. This deliberately never joins source_payloads
 	// or profile bodies, and uses the same observation/recording clock as Captures.
@@ -205,7 +206,41 @@ func readSourceReviewCapture(ctx context.Context, query string, args ...interfac
 		}
 		return nil
 	}
+	title, truncated := sourceadapter.PostTitle(row.Platform, models.SourcePostMetadata{
+		Title: stringPtr(row.Title), OriginalText: stringPtr(row.OriginalText),
+	}, 512)
+	if title == "" && (row.Platform == "twitter" || row.Platform == "x") {
+		title, err = sourcePostFallbackTitle(ctx, row.PostUUID, row.Platform)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var heading *string
+	if title != "" {
+		heading = &title
+	}
 	return &models.SourcePostReviewCapture{UUID: row.UUID, PostUUID: row.PostUUID, RevisionUUID: row.RevisionUUID, Origin: row.Origin, Platform: row.Platform,
-		CapturedAt: row.CapturedAt.TimePtr(), RecordedAt: row.RecordedAt.TimePtr(), Title: stringPtr(row.Title), TitleTruncated: row.TitleTruncated,
+		CapturedAt: row.CapturedAt.TimePtr(), RecordedAt: row.RecordedAt.TimePtr(), Title: heading, TitleTruncated: truncated,
 		PublishedAt: stringPtr(row.PublishedAt), DateBasis: stringPtr(row.DateBasis)}, nil
+}
+
+// Media-only posts still have a useful source identifier. Do not fabricate a
+// source title or load the payload just to label a post or its album.
+func sourcePostFallbackTitle(ctx context.Context, post, platform string) (string, error) {
+	if platform == "x" {
+		platform = "twitter"
+	}
+	var identifiers []string
+	if err := dbWrapper.Select(ctx, &identifiers, `SELECT value FROM source_post_identifiers
+WHERE post_uuid=? AND namespace=? ORDER BY value LIMIT 1`, post, "native:"+platform); err != nil {
+		return "", err
+	}
+	id := post
+	if len(identifiers) > 0 {
+		id = identifiers[0]
+	}
+	if platform == "twitter" {
+		return "Twitter post " + id, nil
+	}
+	return "Source post " + id, nil
 }

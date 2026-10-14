@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
-	"strings"
 
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/sourceadapter"
 )
 
 const maxSourceGalleryMembers = 8192
@@ -319,28 +319,30 @@ func sourceGallerySelectPreview(ctx context.Context, ret *models.SourceGalleryPr
 		if !selection.IsAlbum() && !forceAlbum {
 			return false, nil
 		}
-		ret.Action, ret.Title = "create", "Source album"
+		ret.Action = "create"
 		if selection.Decision.CaptureUUID == nil {
 			return false, models.ErrSourcePayloadCorrupt
 		}
-		owner, metadata, err := sourceGalleryCaptureMetadata(ctx, *selection.Decision.CaptureUUID)
+		owner, platform, metadata, err := sourceGalleryCaptureMetadata(ctx, *selection.Decision.CaptureUUID)
 		if err != nil {
 			return false, err
 		}
 		if !owners[owner] {
 			return false, models.ErrSourcePayloadCorrupt
 		}
-		if metadata.Title != nil && *metadata.Title != "" {
-			ret.Title = *metadata.Title
-		}
-		// Imported Twitter titles often contain only the downloader filename.
-		// A filename recovery uses the retained post text, then the post ID.
+		// Recovered Twitter captures can predate a known platform label.
 		if filenameSelection(selection) {
-			ret.Title = strings.Split(selection.Entries[0].Attachment.Reference.Value, "_")[0]
-			if metadata.OriginalText != nil && strings.TrimSpace(*metadata.OriginalText) != "" {
-				ret.Title = strings.TrimSpace(*metadata.OriginalText)
-			} else if metadata.Title != nil && !twitterFilenameTitle(*metadata.Title) {
-				ret.Title = *metadata.Title
+			platform = "twitter"
+		}
+		var truncated bool
+		ret.Title, truncated = sourceadapter.PostTitle(platform, metadata, 512)
+		if truncated {
+			ret.Title += "…"
+		}
+		if ret.Title == "" {
+			ret.Title, err = sourcePostFallbackTitle(ctx, owner, platform)
+			if err != nil {
+				return false, err
 			}
 		}
 		if metadata.OriginalText != nil {
@@ -357,28 +359,29 @@ func sourceGallerySelectPreview(ctx context.Context, ret *models.SourceGalleryPr
 	return true, nil
 }
 
-const sourceGalleryCaptureMetadataQuery = `SELECT c.post_uuid,r.metadata
+const sourceGalleryCaptureMetadataQuery = `SELECT c.post_uuid,c.platform,r.metadata
 FROM source_captures c JOIN source_post_revisions r ON r.post_uuid=c.post_uuid AND r.uuid=c.revision_uuid
 WHERE c.uuid=?`
 
 // Album labels need only the retained metadata projection. Do not reconstruct
 // source bodies, per-media patches or embedded profiles for a gallery preview.
-func sourceGalleryCaptureMetadata(ctx context.Context, capture string) (string, models.SourcePostMetadata, error) {
+func sourceGalleryCaptureMetadata(ctx context.Context, capture string) (string, string, models.SourcePostMetadata, error) {
 	var row struct {
 		PostUUID string `db:"post_uuid"`
+		Platform string `db:"platform"`
 		Metadata string `db:"metadata"`
 	}
 	var metadata models.SourcePostMetadata
 	if err := dbWrapper.Get(ctx, &row, sourceGalleryCaptureMetadataQuery, capture); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", metadata, models.ErrSourcePayloadCorrupt
+			return "", "", metadata, models.ErrSourcePayloadCorrupt
 		}
-		return "", metadata, err
+		return "", "", metadata, err
 	}
 	if len(row.Metadata) > 262144 || json.Unmarshal([]byte(row.Metadata), &metadata) != nil {
-		return "", metadata, models.ErrSourcePayloadCorrupt
+		return "", "", metadata, models.ErrSourcePayloadCorrupt
 	}
-	return row.PostUUID, metadata, nil
+	return row.PostUUID, row.Platform, metadata, nil
 }
 
 func sourceGalleryMembershipPreview(ctx context.Context, ret *models.SourceGalleryPreview, selection *models.AttachmentSelection, choices map[string]sourceAlbumMediaChoice, postChoices []sourcePostMediaRow, owners map[string]bool) (*models.SourceGalleryPreview, error) {

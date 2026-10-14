@@ -100,12 +100,13 @@ export function PostContent({
       )}
       {metadata !== null && (
         <Card size="sm">
-          <CardHeader>
-            <CardTitle className="wrap-anywhere" data-selectable-text>
-              {metadata.title ||
-                msg("source_review.untitled", "Untitled source post")}
-            </CardTitle>
-          </CardHeader>
+          {metadata.title && (
+            <CardHeader>
+              <CardTitle className="wrap-anywhere" data-selectable-text>
+                {metadata.title}
+              </CardTitle>
+            </CardHeader>
+          )}
           <CardContent className="flex flex-col gap-3">
             {metadata.original_text &&
               metadata.original_text !== metadata.title && (

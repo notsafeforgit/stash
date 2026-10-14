@@ -105,6 +105,8 @@ def main(argv=None):
     dispatch = commands.add_parser("dispatch", help="Deliver queued events, submit a request and discover one source attempt")
     dispatch.add_argument("--profile", required=True)
     dispatch_all = commands.add_parser("dispatch-all", help="Deliver saved work and rotate across all configured worker profiles")
+    dispatch_all.add_argument("--max-passes", type=int, choices=range(1, 101), default=1, metavar="1..100",
+                              help="Continue through ready attempts without an external timer delay; stop when idle or blocked")
     dispatch_all.add_argument("--profiles", required=True, help="Local stash-gallery-dispatch-v1 configuration")
     enrichment_policy = commands.add_parser("enrichment-policy", help="Validate a metadata-only profile without a media root")
     enrichment_policy.add_argument("--profile", required=True)
@@ -252,9 +254,9 @@ def main(argv=None):
             with worker_output():
                 output = dispatch_once(box, client, args.profile)
         elif args.command == "dispatch-all":
-            from .worker_dispatch import Profiles, dispatch_all
+            from .worker_dispatch import Profiles, dispatch_available
             with worker_output():
-                output = dispatch_all(box, client, Profiles(args.profiles))
+                output = dispatch_available(box, client, Profiles(args.profiles), max_passes=args.max_passes)
         elif args.command == "enrichment-policy":
             from .enrichment_configuration import EnrichmentConfiguration
             profile = EnrichmentConfiguration(args.profile)

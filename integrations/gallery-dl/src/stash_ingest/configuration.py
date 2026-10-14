@@ -19,9 +19,10 @@ SCHEMA = "stash-gallery-worker-v1"
 LAYERED_SCHEMA = "stash-gallery-worker-layers-v1"
 CONFIG_LIMIT = 1 << 20
 ASSET_LIMIT = 4 << 20
-GALLERY_COMMIT = "a7b7dc950f35caa149230552cb158fe32410eeac"
+GALLERY_COMMIT = "07f5d2a11b41f5531ec5f7b54f9199ca6bb5fbe0"
 GALLERY_VERSION = "1.33.0.dev0"
-YTDLP_VERSION = "2026.9.27.232945.dev0"
+YTDLP_COMMIT = "897341241f2bfb2439fe0367f4c7c9ccd29a3828"
+YTDLP_VERSION = "2026.08.19"
 REFERENCE = re.compile(r"\$\{stash:([a-z][a-z0-9_]{0,63})\}")
 ACCESS_OPTIONS = frozenset(("username", "password", "cookies", "cookies-from-browser", "proxy",
                             "headers", "http-headers", "authorization", "oauth", "netrc", "client-id"))
@@ -138,16 +139,18 @@ def _asset(path, expected):
 def runtime_identity():
     try:
         gallery, ytdlp = distribution("gallery-dl"), distribution("yt-dlp")
-        direct = decode((gallery.read_text("direct_url.json") or "{}").encode())
-        vcs = direct.get("vcs_info") if isinstance(direct, dict) else None
-        if (gallery.version != GALLERY_VERSION or ytdlp.version != YTDLP_VERSION
-                or not isinstance(vcs, dict) or vcs.get("commit_id") != GALLERY_COMMIT):
-            raise InvalidData("Worker requires the validated gallery-dl and yt-dlp runtime")
+        for package, version, commit in ((gallery, GALLERY_VERSION, GALLERY_COMMIT),
+                                         (ytdlp, YTDLP_VERSION, YTDLP_COMMIT)):
+            direct = decode((package.read_text("direct_url.json") or "{}").encode())
+            vcs = direct.get("vcs_info") if isinstance(direct, dict) else None
+            if (package.version != version or not isinstance(vcs, dict) or vcs.get("commit_id") != commit):
+                raise InvalidData("Worker requires the validated gallery-dl and yt-dlp runtime")
     except PackageNotFoundError:
         raise InvalidData("Install the pinned gallery-dl worker runtime before use") from None
     files = sorted(Path(__file__).parent.glob("*.py"))
     sources = {file.name: digest(file.read_bytes()) for file in files}
-    return {"gallery_dl": GALLERY_COMMIT, "yt_dlp": YTDLP_VERSION, "adapter_sha256": digest(encode(sources))}
+    return {"gallery_dl": GALLERY_COMMIT, "yt_dlp": YTDLP_VERSION,
+            "yt_dlp_commit": YTDLP_COMMIT, "adapter_sha256": digest(encode(sources))}
 
 
 class Configuration:

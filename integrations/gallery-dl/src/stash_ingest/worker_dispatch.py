@@ -149,3 +149,24 @@ def dispatch_all(box, client, profiles):
             "discovery": DiscoveryJournal(box).summary(),
             "discovery_detail": DiscoveryDetailJournal(box).summary(),
             "intake_completion": "inspect_native_receipts"}
+
+
+def dispatch_available(box, client, profiles, *, max_passes=1):
+    """Continue after completed attempts; return promptly when no work can run.
+
+    Each pass still discovers and claims work through the server's shared request
+    budgets, priorities, leases and retry deadlines. The bound lets a service
+    release its process periodically without a timer delay after every account.
+    """
+    if type(max_passes) is not int or not 1 <= max_passes <= 100:
+        raise InvalidData("Worker dispatch requires one to one hundred passes")
+    attempts = []
+    for _ in range(max_passes):
+        result = dispatch_all(box, client, profiles)
+        attempts.append({key: result[key] for key in ('state', 'profile_id', 'run_uuid', 'job_uuid', 'error_code')
+                         if key in result})
+        if result['state'] not in ('source_succeeded', 'completed', 'page_delivered', 'yielded', 'retry', 'deferred'):
+            break
+        if result.get('delivery_error') or result.get('error_code') == 'worker_interrupted':
+            break
+    return {**result, 'dispatch_passes': len(attempts), 'dispatch_attempts': attempts}

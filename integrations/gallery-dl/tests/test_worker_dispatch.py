@@ -14,10 +14,50 @@ from stash_ingest.encoding import InvalidData, encode
 from stash_ingest.enrichment_client import EnrichmentClient
 from stash_ingest.enrichment_dispatch import EnrichmentDispatcher
 from stash_ingest.outbox import Outbox, SCHEMA as OUTBOX_SCHEMA
-from stash_ingest.worker_dispatch import Profiles, WorkerDispatcher, SCHEMA
+from stash_ingest.worker_dispatch import Profiles, WorkerDispatcher, SCHEMA, dispatch_available
 from helpers import PRODUCER
 import test_enrichment_dispatch as dispatch_fixtures
 from test_outbox_migration import schema_nine
+
+
+class AvailableDispatchTests(unittest.TestCase):
+    def test_ready_accounts_continue_until_idle_without_retrying_the_idle_pass(self):
+        results = [{'state': 'source_succeeded', 'run_uuid': 'first'},
+                   {'state': 'retry', 'run_uuid': 'second', 'error_code': 'not_found'},
+                   {'state': 'yielded', 'run_uuid': 'third'},
+                   {'state': 'source_succeeded', 'run_uuid': 'fourth'},
+                   {'state': 'idle', 'outbox': {'counts': {'pending': 0}}}]
+        with patch('stash_ingest.worker_dispatch.dispatch_all', side_effect=results) as dispatch:
+            result = dispatch_available('box', 'client', 'profiles', max_passes=16)
+        self.assertEqual(dispatch.call_count, 5)
+        self.assertEqual(result['state'], 'idle')
+        self.assertEqual(result['dispatch_passes'], 5)
+        self.assertEqual(result['dispatch_attempts'][1]['error_code'], 'not_found')
+        self.assertEqual(result['outbox'], results[-1]['outbox'])
+
+    def test_blocked_or_unavailable_workers_do_not_spin(self):
+        for state in ('waiting', 'backoff', 'unavailable', 'contended', 'paused', 'completion_unconfirmed'):
+            with self.subTest(state=state), patch('stash_ingest.worker_dispatch.dispatch_all', return_value={'state': state}) as dispatch:
+                result = dispatch_available('box', 'client', 'profiles', max_passes=16)
+                self.assertEqual(result['state'], state)
+                dispatch.assert_called_once()
+
+    def test_interruption_and_delivery_failure_stop_before_claiming_another_account(self):
+        for result in ({'state': 'retry', 'error_code': 'worker_interrupted'},
+                       {'state': 'source_succeeded', 'delivery_error': 'network_unavailable'}):
+            with self.subTest(result=result), patch('stash_ingest.worker_dispatch.dispatch_all', return_value=result) as dispatch:
+                actual = dispatch_available('box', 'client', 'profiles', max_passes=16)
+                self.assertEqual(actual['dispatch_passes'], 1)
+                dispatch.assert_called_once()
+
+    def test_a_busy_queue_releases_the_process_after_the_selected_bound(self):
+        with patch('stash_ingest.worker_dispatch.dispatch_all', return_value={'state': 'source_succeeded'}) as dispatch:
+            result = dispatch_available('box', 'client', 'profiles', max_passes=3)
+            self.assertEqual(dispatch.call_count, 3)
+            self.assertEqual(result['dispatch_passes'], 3)
+        for invalid in (0, 101, True, 1.5):
+            with self.subTest(invalid=invalid), self.assertRaises(InvalidData):
+                dispatch_available('box', 'client', 'profiles', max_passes=invalid)
 
 
 class WorkerDispatchTests(unittest.TestCase):

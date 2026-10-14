@@ -589,7 +589,22 @@ podman build --pull=never \
   --file integrations/gallery-dl/Containerfile.n8n integrations/gallery-dl
 ```
 
-The build validates the exact supported gallery-dl commit and yt-dlp version.
+The build installs both downloaders with uv from exact upstream Git commits:
+gallery-dl from Codeberg and yt-dlp from GitHub. It validates both installed
+commit IDs, not just their package versions; upstream development branches can
+retain an older version label. Updating these pins requires producer tests and
+an explicit policy handoff for already queued work, preserving its coverage and
+progress. Dependencies are installed when building the published worker image,
+not downloaded again each time a worker starts.
+
+`dispatch-all --max-passes 16` keeps claiming ready work after an ended attempt
+instead of waiting for an external timer after every account. Every pass still
+uses the same server priorities, request budgets, retry deadlines and leases.
+It returns when idle, blocked, unavailable or interrupted, and after at most
+sixteen passes. The default remains one pass for callers that want a single
+bounded scheduling step. Results include `dispatch_passes` and a bounded
+`dispatch_attempts` summary without repeating outbox contents.
+
 Native launchers use `/opt/stash-ingest/bin/stash-ingest` and its sibling Python
 interpreter. n8n's existing PATH, entry point and system Python environment stay
 as supplied by the base image. Private website config, Stash token references,

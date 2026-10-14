@@ -5,13 +5,15 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
 from gallery_dl import config
 
 from stash_ingest.cli import main
-from stash_ingest.configuration import Configuration, SCHEMA
+from stash_ingest.configuration import (Configuration, SCHEMA, GALLERY_COMMIT, GALLERY_VERSION,
+                                        YTDLP_COMMIT, YTDLP_VERSION, runtime_identity)
 from stash_ingest.encoding import InvalidData, digest
 from stash_ingest.filesystem import Root
 from helpers import ROOT, PRODUCER
@@ -55,6 +57,16 @@ class ConfigurationTests(unittest.TestCase):
 
     def write(self):
         self.path.write_text(json.dumps(self.value))
+
+    def test_git_runtime_checks_both_commits_even_if_package_versions_match(self):
+        def package(version, commit):
+            return SimpleNamespace(version=version, read_text=lambda _: json.dumps({'vcs_info': {'commit_id': commit}}))
+        for gallery_commit, yt_commit in [(GALLERY_COMMIT, '0' * 40), ('0' * 40, YTDLP_COMMIT)]:
+            with (self.subTest(gallery=gallery_commit, yt_dlp=yt_commit),
+                  patch('stash_ingest.configuration.distribution', side_effect=[
+                      package(GALLERY_VERSION, gallery_commit), package(YTDLP_VERSION, yt_commit)]),
+                  self.assertRaises(InvalidData)):
+                runtime_identity()
 
     def test_reviewed_source_mode_has_a_distinct_policy(self):
         original = Configuration(self.path)

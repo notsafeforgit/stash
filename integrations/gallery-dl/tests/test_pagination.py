@@ -2,8 +2,8 @@ import json
 import unittest
 from unittest.mock import Mock
 
-from gallery_dl import config
-from gallery_dl.extractor import reddit, twitter
+from gallery_dl import config, extractor
+from gallery_dl.extractor import instagram, reddit, twitter
 from stash_ingest import pagination, recent
 from stash_ingest.producer import Producer
 from stash_ingest.runs import SourcePaused
@@ -16,7 +16,11 @@ PAGE = {'extractor': 'reddit:user-submitted', 'url': 'https://www.reddit.com/use
 
 
 class PaginationTests(unittest.TestCase):
-    setUp = test_producer.ProducerTests.setUp
+    def setUp(self):
+        test_producer.ProducerTests.setUp(self)
+        # Register complete modules before directly constructing their classes;
+        # gallery-dl otherwise mixes compiled and uncompiled regexes by order.
+        list(extractor.extractors())
 
     def resumed(self, page=None):
         prepared = self.producer.prepare(reddit_data('anchor'))
@@ -109,6 +113,90 @@ class PaginationTests(unittest.TestCase):
         for data, _ in recent.posts(((data, ()) for data in rows), self.producer, 'reddit'):
             seen.append(data['id'])
         self.assertEqual(seen, [str(i) for i in range(8)])
+
+    def test_instagram_real_feed_resumes_page_without_affecting_profile_or_story_requests(self):
+        config.clear()
+        self.addCleanup(config.clear)
+        target = instagram.InstagramPostsExtractor.from_url('https://www.instagram.com/example/posts/')
+        target.initialize()
+        page = {'extractor': 'instagram:posts', 'url': target.url, 'cursor': 'saved-remote-page', 'item': ''}
+        producer, anchor = self.resumed(page)
+        calls = []
+        target.api.user = Mock(return_value={'username': 'example', 'id': '456'})
+        target.api._extract_fb_tokens = Mock(return_value=('fixture', 'fixture'))
+        target.api._extract_docid = Mock(return_value=None)
+        target.cache = lambda fn, *args, **kwargs: fn(*args)
+
+        def request(url, **kwargs):
+            body = kwargs.get('data', {})
+            calls.append(body)
+            if body.get('fb_api_req_friendly_name') == 'PolarisProfilePostsTabContentQuery_connection':
+                # The original page must be saved before the request, without
+                # pretending its partially downloaded last item was completed.
+                variables = json.loads(body['variables'])
+                current = variables['after']
+                if len([b for b in calls if b.get('fb_api_req_friendly_name') == body['fb_api_req_friendly_name']]) == 1:
+                    self.assertEqual(current, 'saved-remote-page')
+                    self.assertEqual(producer.resume_cursor, anchor)
+                data = {'edges': [{'node': {'pk': current}}],
+                        'page_info': {'has_next_page': current == 'saved-remote-page', 'end_cursor': 'following-page'}}
+                return Mock(text=json.dumps({'data': {'xdt_api__v1__feed__user_timeline_graphql_connection': data}}))
+            return Mock()
+
+        target.request = request
+        pagination.install(target, producer)
+        target.request(target.root + '/api/graphql', data={'fb_api_req_friendly_name': 'PolarisProfilePageContentQuery'})
+        target.request(target.root + '/graphql/query', data={'fb_api_req_friendly_name': 'PolarisStoriesV3ReelPageGalleryQuery'})
+        self.assertFalse(producer.pagination_started)
+        self.assertEqual(list(target.posts()), [{'pk': 'saved-remote-page'}, {'pk': 'following-page'}])
+        self.assertEqual(self.lease.pages[-1]['cursor'], 'following-page')
+        self.assertEqual(producer.resume_cursor, '')
+
+    def test_instagram_stories_and_highlights_do_not_use_feed_cursor(self):
+        for cls, url in ((instagram.InstagramStoriesExtractor, 'https://www.instagram.com/stories/example/'),
+                         (instagram.InstagramHighlightsExtractor, 'https://www.instagram.com/example/highlights/')):
+            target = cls.from_url(url)
+            target.initialize()
+            original = target.request
+            pagination.install(target, self.producer)
+            self.assertEqual(target.request, original)
+            self.producer.scan_mode = 'routine'
+            self.assertFalse(recent.chronological(target, self.producer))
+
+    def test_prior_instagram_feed_cannot_consume_another_feeds_saved_attachment(self):
+        config.clear()
+        self.addCleanup(config.clear)
+        target = instagram.InstagramPostsExtractor.from_url('https://www.instagram.com/example/posts/')
+        target.initialize()
+        page = {'extractor': 'instagram:photos', 'url': 'https://www.instagram.com/example/photos/',
+                'cursor': 'saved-photo-page', 'item': ''}
+        producer, anchor = self.resumed(page)
+        producer.scan_mode = 'routine'
+        target.request = Mock()
+        pagination.install(target, producer)
+        target.request(target.root + '/graphql/query', data={
+            'fb_api_req_friendly_name': 'PolarisProfilePostsTabContentQuery_connection',
+            'variables': json.dumps({'after': None})})
+        self.assertFalse(producer.pagination_started)
+        key, replay = producer.cursor(producer.prepare(reddit_data('anchor')))
+        producer.checkpoint(key, replay, True)
+        self.assertEqual(producer.resume_cursor, anchor)
+        self.assertEqual(self.lease.checkpoints, [])
+        rows = [{'pk': '1'}, {'pk': '2'}]
+        target.posts = lambda: iter(rows)
+        recent.install(target, producer)
+        visited = []
+        for record in target.posts():
+            visited.append(record['pk'])
+            producer.routine_post_items = 1
+            producer.routine_post_attachments = {('native:instagram', record['pk'])}
+        self.assertEqual(visited, ['1'], 'a preceding feed can finish at its known boundary')
+        with self.assertRaises(SourcePaused):
+            producer.traversed()
+        producer.begin_page(page)
+        key, replay = producer.cursor(producer.prepare(reddit_data('anchor')))
+        producer.checkpoint(key, replay, True)
+        self.assertEqual(producer.resume_cursor, '')
 
     def test_first_wholly_archived_post_stops_without_fetching_more(self):
         rows = [reddit_data(str(i), id=str(i)) for i in range(10)]

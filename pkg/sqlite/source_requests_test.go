@@ -96,3 +96,31 @@ func TestSourcePaginationPersistsPageWithoutInventingCompletedItems(t *testing.T
 	require.NotNil(t, resumed)
 	require.Equal(t, progress, resumed.Progress)
 }
+
+func TestInstagramSourcePaginationResumesPartialAlbum(t *testing.T) {
+	f := newSourceRunFixture(t)
+	run := f.claim(t, f.submit(t, f.request()))
+	page := &models.SourcePagination{Extractor: "instagram:posts", URL: "https://www.instagram.com/example/posts/", Cursor: "opaque-feed-page", Item: "album-item-1"}
+	progress := models.SourceRunProgress{ItemsSeen: 1, FilesCompleted: 1, Cursor: page.Item, Pagination: page}
+	run, err := f.coordinator.Progress(t.Context(), f.token, run.Lease(), progress)
+	require.NoError(t, err)
+	queued, err := f.coordinator.Finish(t.Context(), f.token, run.Lease(), models.SourceRunOutcome{State: "retry", ErrorCode: "worker_interrupted"})
+	require.NoError(t, err)
+	f.now = queued.AvailableAt
+	resumed := f.claim(t, queued)
+	require.NotNil(t, resumed)
+	require.Equal(t, progress, resumed.Progress, "the next album item must resume on the same remote page")
+
+	invalid := progress
+	invalid.Pagination = &models.SourcePagination{Extractor: page.Extractor, URL: page.URL, Cursor: page.Cursor, Item: "uncompleted-item"}
+	_, err = f.coordinator.Progress(t.Context(), f.token, resumed.Lease(), invalid)
+	require.ErrorIs(t, err, models.ErrSourceRunInvalid)
+
+	progress.ItemsSeen++
+	progress.FilesCompleted++
+	progress.Cursor = "album-item-2"
+	progress.Pagination = &models.SourcePagination{Extractor: page.Extractor, URL: page.URL, Cursor: page.Cursor, Item: progress.Cursor}
+	completed, err := f.coordinator.Progress(t.Context(), f.token, resumed.Lease(), progress)
+	require.NoError(t, err)
+	require.Equal(t, progress, completed.Progress)
+}

@@ -224,6 +224,11 @@ class Producer:
     def cursor(self, prepared, *, legacy_cursor=None):
         key = digest(encode([source.post(prepared.source), prepared.attachment,
                              prepared.source.get("type")]))
+        if self.saved_pagination is not None and not self.pagination_started:
+            # A profile can revisit stories or another feed before reaching
+            # its saved page. Even the same media there cannot acknowledge the
+            # unfinished attachment within the original feed's page.
+            return key, True
         replay = bool(self.resume_cursor)
         if replay:
             self.replay_seen += 1

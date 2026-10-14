@@ -305,7 +305,7 @@ class NativeDownloadJob(job.DownloadJob):
         elif self.extractor.category in ('ytdl', 'ytdl-generic'):
             from . import ytdl_source
             ytdl_source.install(self.extractor, self.producer)
-        if self.extractor.category in ('reddit', 'twitter'):
+        if self.extractor.category in ('reddit', 'twitter', 'instagram'):
             from . import pagination
             pagination.install(self.extractor, self.producer)
             recent.install(self.extractor, self.producer)

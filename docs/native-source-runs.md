@@ -34,7 +34,11 @@ Reviewed `stash-gallery-worker-v1` profiles have a `scan_mode`:
   download archive must already contain every item. Dates alone, deleted items,
   empty/unsupported children and partial albums do not establish that boundary.
   Replayed checkpoint posts cannot end the run before unfinished work resumes.
-  Initial and explicit recovery traversals still inspect the full requested range.
+  Instagram's posts/photos feed uses the same complete-post boundary, including
+  its pinned-post and original carousel membership evidence. Stories and
+  highlights always inspect all available items: stories can be oldest first,
+  and an existing highlight can acquire new media. Initial and explicit recovery
+  traversals still inspect the full requested range.
 - `initial` (default): preserve complete initial-import traversal, including the
   profile's explicitly configured historical retrieval strategy.
 - `recovery`: historical traversal at the lowest request priority. Host launchers
@@ -85,7 +89,8 @@ rate limits, server failures and timeouts are not treated as confirmed deletions
 
 ## Remote pagination
 
-Reddit and Twitter checkpoints include the extractor, public retrieval URL,
+Reddit, Twitter and Instagram posts/photos checkpoints include the extractor,
+public retrieval URL,
 opaque cursor for the current remote page, and last completed attachment within
 that page. The page start is committed before requesting it. A restart fetches
 that page again, processes it safely through the normal durable delivery path,
@@ -98,6 +103,11 @@ An older attachment-only checkpoint still replays until its anchor before it
 is upgraded to a page checkpoint. A missing anchor in an already restored page
 is safe to pass only after replaying that entire page. Other extractors retain
 the existing bounded item replay until they have a dedicated pagination adapter.
+
+Instagram feed checkpoints require `source_run_instagram_pagination_protocol: 1`.
+Only the post-feed GraphQL connection updates them; profile lookups, story
+containers and media detail requests cannot replace a saved feed page. Stories
+and highlights retain item replay and never inherit the feed's pagination cursor.
 
 ## Shared source budget
 

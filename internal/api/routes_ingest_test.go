@@ -60,6 +60,7 @@ func TestIngestHTTPAuthenticationPartialBatchAndReceiptIsolation(t *testing.T) {
 	good := request(http.MethodGet, capabilities, "Bearer "+token, nil)
 	require.Equal(t, http.StatusOK, good.Code)
 	require.Contains(t, good.Body.String(), `"file_ingestion":false`)
+	require.Contains(t, good.Body.String(), `"source_run_instagram_pagination_protocol":1`)
 	var supported struct {
 		Namespaces []string `json:"post_namespaces"`
 		Prefixes   []string `json:"post_namespace_prefixes"`

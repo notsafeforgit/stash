@@ -831,7 +831,12 @@ Create the canonical state directory first. Both profiles must use
 `source_adapter`, and share the same verified media root and lock directory.
 Convert the existing complete gallery-dl configuration so its service-specific
 directories, filenames, download archives, filters and originals preference
-remain in effect. Configure `new_source_policy.rules` using the native metadata
+remain in effect. Prefer layered profiles referencing that same shared config,
+with `scan_mode: "initial"` and `full_history: true`, so one-off downloads pick up
+config edits without maintaining another copy. For example, a Kemono profile URL
+passed to `stash-gallery-dl` uses the same durable intake as scheduled scrapes;
+the invocation itself does not create a daily monitoring subscription.
+Configure `new_source_policy.rules` using the native metadata
 policy schema; this example only supplies filename titles on creation, with no
 source-field mappings. Source registration
 and policy initialization use `STASH_API_KEY`, or the environment variable named

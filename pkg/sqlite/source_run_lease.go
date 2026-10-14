@@ -239,7 +239,7 @@ func (s *SourceRunStore) Progress(ctx context.Context, lease models.SourceRunLea
 		u, err := url.Parse(page.URL)
 		if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Fragment != "" ||
 			len(page.URL) > 4096 || len(page.Cursor) > 8192 || len(page.Item) > 1024 || len(page.Extractor) > 80 ||
-			(!strings.HasPrefix(page.Extractor, "twitter:") && !strings.HasPrefix(page.Extractor, "reddit:")) ||
+			(!strings.HasPrefix(page.Extractor, "twitter:") && !strings.HasPrefix(page.Extractor, "reddit:") && !strings.HasPrefix(page.Extractor, "instagram:")) ||
 			strings.ContainsFunc(page.URL+page.Cursor+page.Item+page.Extractor, unicode.IsControl) ||
 			(page.Item != "" && page.Item != p.Cursor) {
 			return nil, models.ErrSourceRunInvalid

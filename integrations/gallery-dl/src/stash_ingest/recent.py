@@ -11,10 +11,14 @@ def chronological(target, producer):
     if target.category == 'reddit':
         return (target.subcategory in ('user', 'user-submitted', 'subreddit', 'subreddit-new', 'home-search', 'subreddit-search')
                 and parse_qs(urlsplit(target.url).query).get('sort', ['new'] if target.subcategory in ('user', 'user-submitted', 'subreddit-new') else []) == ['new'])
+    if target.category == 'instagram':
+        # Stories are oldest first and highlight containers can gain items.
+        # Neither can stop at an archived item. Only the profile post feed can.
+        return target.subcategory in ('posts', 'photos')
     return False
 
 
-def posts(iterator, producer, category):
+def posts(iterator, producer, category, *, resume_scope=True):
     previous = None
     for entry in iterator:
         data = entry[0] if category == 'reddit' else entry
@@ -22,20 +26,22 @@ def posts(iterator, producer, category):
             yield entry
             continue
         legacy = data.get('legacy', data)
-        key = data.get('rest_id') or data.get('id') or legacy.get('id_str')
+        key = data.get('pk') if category == 'instagram' else data.get('rest_id') or data.get('id') or legacy.get('id_str')
         if not key or key == previous:
             yield entry
             continue
         previous = key
         pinned = data.get('stickied') or data.get('pinned') or data.get('_pinned')
-        replaying = bool(producer.resume_cursor) or producer.replay_archive
+        if category == 'instagram':
+            pinned = pinned or data.get('timeline_pinned_user_ids') or data.get('clips_tab_pinned_user_ids')
+        replaying = (resume_scope and bool(producer.resume_cursor)) or producer.replay_archive
         # A yielded post is consumed fully, with all media and external-host
         # children, before deciding to stop. Attachment counts are not posts.
         producer.routine_post_items = 0
         producer.routine_post_new = False
         producer.routine_post_attachments = set()
         yield entry
-        if (not pinned and not replaying and not producer.resume_cursor
+        if (not pinned and not replaying and (not resume_scope or not producer.resume_cursor)
                 and producer.routine_post_items and not producer.routine_post_new
                 and complete_manifest(data, category, producer.routine_post_attachments)):
             return
@@ -43,7 +49,10 @@ def posts(iterator, producer, category):
 
 def complete_manifest(data, category, downloaded):
     """A silently omitted album item must not turn a partial post into a boundary."""
-    if category == 'reddit':
+    if category == 'instagram':
+        entries = data.get('carousel_media', [] if data.get('media_type') == 8 else [data])
+        key = 'pk'
+    elif category == 'reddit':
         parents = data.get('crosspost_parent_list')
         if parents:
             if not isinstance(parents, list) or not isinstance(parents[-1], dict):
@@ -101,6 +110,11 @@ def install(target, producer):
         # legacy timeline keeps its original traversal until it completes.
         original = target.tweets
         target.tweets = lambda: posts(original(), producer, 'twitter')
+    elif target.category == 'instagram':
+        original = target.posts
+        saved = producer.saved_pagination
+        resume_scope = saved is None or (saved['extractor'], saved['url']) == ('instagram:' + target.subcategory, target.url)
+        target.posts = lambda: posts(original(), producer, 'instagram', resume_scope=resume_scope)
     else:
         original = target.submissions
         target.submissions = lambda: posts(original(), producer, 'reddit')

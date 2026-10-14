@@ -34,6 +34,14 @@ def carousel():
             'carousel_media': [media(701, stamp=STAMP-100), None, media(702, video=True, stamp=STAMP-200)]}
 
 
+def post(number, *, items=None, pinned=False):
+    value = {**media(number), 'user': {'pk': '456', 'username': 'example'},
+             'caption': {'text': 'Original caption'}, 'timeline_pinned_user_ids': ['456'] if pinned else []}
+    if items is not None:
+        value.update(media_type=8, carousel_media=items)
+    return value
+
+
 def stories(*, highlight=False):
     return {'id': 'highlight:987' if highlight else '456', 'seen': STAMP + 86400,
             'user': {'pk': '456', 'username': 'example'},
@@ -51,7 +59,18 @@ class InstagramFixture(InstagramExtractor):
         return {}
 
     def posts(self):
-        return iter(copy.deepcopy(self.records))
+        for index, record in enumerate(self.records):
+            if index % 2 == 0:
+                self.visited.append('page ' + str(index // 2))
+            yield copy.deepcopy(record)
+
+
+class InstagramStoriesFixture(InstagramFixture):
+    subcategory = 'stories'
+
+
+class InstagramHighlightsFixture(InstagramFixture):
+    subcategory = 'highlights'
 
 
 class InstagramTests(unittest.TestCase):
@@ -84,6 +103,63 @@ class InstagramGalleryTests(unittest.TestCase):
     task = test_gallery.GalleryTests.task
     events = test_gallery.GalleryTests.events
     archive_count = test_gallery.GalleryTests.archive_count
+
+    def test_routine_posts_stop_before_next_page_after_complete_known_album(self):
+        known = post(123, items=[media(701), media(702, video=True)])
+        self.assertEqual(self.task(known, fixture=InstagramFixture).run(), 0)
+        self.producer.scan_mode = 'routine'
+        task = self.task(post(124), known, post(122), fixture=InstagramFixture)
+        self.assertEqual(task.run(), 0)
+        self.assertEqual(task.extractor.visited, ['page 0'])
+        self.assertEqual(self.archive_count(), 3)
+
+    def test_pinned_posts_and_partial_albums_cannot_hide_new_attachments(self):
+        pinned = post(123, pinned=True)
+        first = [media(n) for n in range(701, 705)]
+        known = post(125)
+        self.assertEqual(self.task(pinned, post(124, items=first), known, fixture=InstagramFixture).run(), 0)
+        self.producer.scan_mode = 'routine'
+        config.set(('extractor',), 'skip', 'abort:4')
+        task = self.task(pinned, post(124, items=[*first, media(705, video=True)]), known, post(126), fixture=InstagramFixture)
+        self.assertEqual(task.run(), 0)
+        self.assertEqual(task.extractor.visited, ['page 0', 'page 1'])
+        self.assertEqual(self.archive_count(), 7)
+        self.assertTrue(any(e['kind'] == 'file.completed' and e['source']['attachment']['value'] == '705' for e in self.events()))
+        self.assertFalse(any(e['kind'] == 'source.capture' and e['post']['value'] == '126' for e in self.events()))
+
+    def test_missing_or_filtered_album_items_do_not_establish_known_post_boundary(self):
+        known = post(123, items=[media(701), media(702)])
+        self.assertEqual(self.task(known, fixture=InstagramFixture).run(), 0)
+        self.producer.scan_mode = 'routine'
+        config.set(('extractor',), 'image-filter', 'media_id != "703"')
+        task = self.task(post(123, items=[media(701), None, media(702)]),
+                         post(124, items=[media(701), media(702), media(703)]), post(125), fixture=InstagramFixture)
+        self.assertEqual(task.run(), 0)
+        self.assertEqual(task.extractor.visited, ['page 0', 'page 1'])
+        self.assertEqual(self.archive_count(), 3)
+
+    def test_initial_and_recovery_keep_traversing_known_posts(self):
+        known = post(123)
+        self.assertEqual(self.task(known, fixture=InstagramFixture).run(), 0)
+        for mode in ('initial', 'recovery'):
+            self.producer.scan_mode = mode
+            task = self.task(known, post(124), post(125), fixture=InstagramFixture)
+            self.assertEqual(task.run(), 0)
+            self.assertEqual(task.extractor.visited, ['page 0', 'page 1'])
+
+    def test_routine_story_and_highlight_checks_keep_newer_items_after_known_ones(self):
+        for highlight in (False, True):
+            with self.subTest(highlight=highlight):
+                fixture = InstagramHighlightsFixture if highlight else InstagramStoriesFixture
+                record = stories(highlight=highlight)
+                record['items'] = [media(701)]
+                self.assertEqual(self.task(record, fixture=fixture).run(), 0)
+                self.producer.scan_mode = 'routine'
+                task = self.task(stories(highlight=highlight), fixture=fixture)
+                self.assertEqual(task.run(), 0)
+                captured = [e['post']['value'] for e in self.events() if e['kind'] == 'source.capture']
+                self.assertIn('702', captured)
+                self.assertIn('703', captured)
 
     def test_carousel_original_order_missing_slot_and_mixed_files_survive_reversed_downloads(self):
         config.set(('extractor',), 'order-files', 'reverse')

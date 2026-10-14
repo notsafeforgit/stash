@@ -25,19 +25,43 @@ def validate(page):
                 or any(ord(char) < 32 or ord(char) == 127 for char in value)):
             raise InvalidData('Invalid source pagination value')
     parsed = urlsplit(page['url'])
-    if (not page['extractor'].startswith(('twitter:', 'reddit:')) or parsed.scheme != 'https'
+    if (not page['extractor'].startswith(('twitter:', 'reddit:', 'instagram:')) or parsed.scheme != 'https'
             or not parsed.hostname or parsed.username is not None or parsed.password is not None or parsed.fragment):
         raise InvalidData('Invalid source pagination target')
     return dict(page)
 
 
 def install(target, producer):
-    if target.category not in ('twitter', 'reddit'):
+    if target.category not in ('twitter', 'reddit', 'instagram'):
         return
     category = target.category + ':' + target.subcategory
     saved = producer.saved_pagination
     resume = saved if saved is not None and (saved['extractor'], saved['url']) == (category, target.url) else None
-    if target.category == 'twitter' and hasattr(target, 'api'):
+    if target.category == 'instagram':
+        # The pinned post/photo feed uses one GraphQL connection. Profile
+        # lookups, story reels and individual media are different requests and
+        # must neither consume its saved cursor nor replace its checkpoint.
+        if target.subcategory not in ('posts', 'photos'):
+            return
+        original_config, original_request = target.config, target.request
+
+        def configuration(key, default=None):
+            if key == 'cursor' and resume is not None:
+                return resume['cursor'] or True
+            return original_config(key, default)
+
+        def request(url, *args, **kwargs):
+            body = kwargs.get('data')
+            if (url == target.root + '/graphql/query' and isinstance(body, dict)
+                    and body.get('fb_api_req_friendly_name') == 'PolarisProfilePostsTabContentQuery_connection'
+                    and (saved is None or producer.pagination_started or resume is not None)):
+                variables = json.loads(body['variables'])
+                producer.begin_page({'extractor': category, 'url': target.url,
+                                     'cursor': variables.get('after') or '', 'item': ''})
+            return original_request(url, *args, **kwargs)
+
+        target.config, target.request = configuration, request
+    elif target.category == 'twitter' and hasattr(target, 'api'):
         original_config = target.config
 
         def configuration(key, default=None):

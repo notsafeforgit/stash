@@ -43,6 +43,7 @@ func TestNativeStartupValidationDoesNotReadArchiveHistory(t *testing.T) {
 		"pragma_index_info": true, "pragma_index_xinfo": true,
 		"source_account_consolidation_context": true, "capture_publisher_write_context": true,
 		"source_post_consolidation_context": true, "source_gallery_write_context": true,
+		"source_gallery_merge_context": true,
 		"metadata_field_write_context": true, "metadata_field_pending": true,
 		"metadata_field_decisions": true, // sealed=0 uses its required partial index
 	}

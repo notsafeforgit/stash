@@ -59,6 +59,24 @@ def _entry(item, *, static_videos=True):
     return {"id": _numeric(_id(item["pk"])), "kind": kind}
 
 
+def original_media(post):
+    """Distinguish an empty reel or single file from a missing carousel."""
+    story = "items" in post
+    album = not story and (post.get("media_type") == 8 or bool(post.get("carousel_media")))
+    if story:
+        original = post["items"]
+    elif album:
+        original = post.get("carousel_media")
+    elif post.get("media_type") in (1, 2) or "carousel_media" not in post:
+        original = [post]
+    else:
+        original = post.get("carousel_media")
+    if (not isinstance(original, (list, tuple)) or len(original) > 4096
+            or not original and not story):
+        raise InvalidData("Instagram source has no bounded original attachment list")
+    return story, album, original
+
+
 def install(extractor):
     """Keep source order, including missing files, and split story containers."""
     from gallery_dl.extractor.common import Message
@@ -71,10 +89,7 @@ def install(extractor):
     parse, original_items = extractor._parse_post, extractor.items
 
     def parse_post(self, post):
-        story = "items" in post
-        original = post["items"] if story else post.get("carousel_media", [post])
-        if not isinstance(original, (list, tuple)) or not 1 <= len(original) <= 4096:
-            raise InvalidData("Instagram source has no bounded original attachment list")
+        story, album, original = original_media(post)
         entries = [_entry(item, static_videos=self._static_video) for item in original]
         originals = {}
         if story:
@@ -103,7 +118,7 @@ def install(extractor):
                                "container": {"id": _id(result["post_id"]), "type": result["type"]}}
         else:
             result[FIELD] = {"version": 1, "post_id": _numeric(_id(result["post_id"])),
-                             "album": "carousel_media" in post, "items": entries}
+                             "album": album, "items": entries}
         return result
 
     def items(self):

@@ -39,6 +39,9 @@ Reviewed `stash-gallery-worker-v1` profiles have a `scan_mode`:
   highlights always inspect all available items: stories can be oldest first,
   and an existing highlight can acquire new media. Initial and explicit recovery
   traversals still inspect the full requested range.
+  Empty story/highlight containers produce no posts. A null/empty carousel field
+  on an explicitly single-media post still identifies one attachment; an actual
+  carousel without its attachment list remains an error.
 - `initial` (default): preserve complete initial-import traversal, including the
   profile's explicitly configured historical retrieval strategy.
 - `recovery`: historical traversal at the lowest request priority. Host launchers

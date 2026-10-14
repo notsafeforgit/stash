@@ -161,6 +161,41 @@ class InstagramGalleryTests(unittest.TestCase):
                 self.assertIn('702', captured)
                 self.assertIn('703', captured)
 
+    def test_empty_story_or_highlight_container_does_not_block_later_media(self):
+        for highlight in (False, True):
+            with self.subTest(highlight=highlight):
+                empty = stories(highlight=highlight)
+                empty['items'] = []
+                task = self.task(empty, stories(highlight=highlight), fixture=InstagramFixture)
+                self.assertEqual(task.run(), 0)
+                self.assertIsNone(self.producer.failure_code)
+        self.assertEqual(self.archive_count(), 3)
+        captures = [e for e in self.events() if e['kind'] == 'source.capture']
+        self.assertEqual({e['post']['value'] for e in captures}, {'701', '702', '703'})
+
+    def test_single_media_with_empty_carousel_field_is_a_complete_single_post(self):
+        for empty in (None, []):
+            for video in (False, True):
+                with self.subTest(carousel=empty, video=video):
+                    record = {**post(123), **media(123, video=video), 'carousel_media': empty}
+                    self.producer.scan_mode = 'initial'
+                    self.assertEqual(self.task(record, fixture=InstagramFixture).run(), 0)
+                    self.producer.scan_mode = 'routine'
+                    task = self.task(record, post(124), fixture=InstagramFixture)
+                    self.assertEqual(task.run(), 0)
+                    captures = [e for e in self.events() if e['kind'] == 'source.capture']
+                    self.assertEqual({e['post']['value'] for e in captures}, {'123'})
+                    self.assertTrue(all(not e['source']['instagram_media']['album'] for e in captures))
+
+    def test_missing_or_empty_actual_carousel_remains_an_error(self):
+        for empty in (None, []):
+            with self.subTest(carousel=empty):
+                record = {**post(123), 'media_type': 8, 'carousel_media': empty}
+                task = self.task(record, fixture=InstagramFixture)
+                self.assertNotEqual(task.run(), 0)
+                self.assertEqual(self.producer.failure_code, 'source_rejected')
+        self.assertEqual(self.events(), [])
+
     def test_carousel_original_order_missing_slot_and_mixed_files_survive_reversed_downloads(self):
         config.set(('extractor',), 'order-files', 'reverse')
         task = self.task(carousel(), fixture=InstagramFixture)

@@ -50,7 +50,8 @@ def posts(iterator, producer, category, *, resume_scope=True):
 def complete_manifest(data, category, downloaded):
     """A silently omitted album item must not turn a partial post into a boundary."""
     if category == 'instagram':
-        entries = data.get('carousel_media', [] if data.get('media_type') == 8 else [data])
+        from .instagram import original_media
+        _, _, entries = original_media(data)
         key = 'pk'
     elif category == 'reddit':
         parents = data.get('crosspost_parent_list')

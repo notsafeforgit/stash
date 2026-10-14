@@ -114,7 +114,7 @@ class LayeredConfigurationTests(unittest.TestCase):
             row['document'] += b' '
             with self.assertRaises(InvalidData):
                 saved.load(row)
-            with patch('stash_ingest.configuration.runtime_identity', return_value={'adapter_sha256': 'different'}):
+            with patch('stash_ingest.configuration.policy_identity', return_value={'adapter_sha256': 'different'}):
                 with self.assertRaises(InvalidData):
                     saved.load(saved.rows(self.filename)[0])
 

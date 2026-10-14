@@ -12,8 +12,8 @@ from unittest.mock import patch
 from gallery_dl import config
 
 from stash_ingest.cli import main
-from stash_ingest.configuration import (Configuration, SCHEMA, GALLERY_COMMIT, GALLERY_VERSION,
-                                        YTDLP_COMMIT, YTDLP_VERSION, runtime_identity)
+from stash_ingest.configuration import Configuration, SCHEMA, runtime_identity
+from stash_ingest.runtime import REPOSITORIES
 from stash_ingest.encoding import InvalidData, digest
 from stash_ingest.filesystem import Root
 from helpers import ROOT, PRODUCER
@@ -58,13 +58,22 @@ class ConfigurationTests(unittest.TestCase):
     def write(self):
         self.path.write_text(json.dumps(self.value))
 
-    def test_git_runtime_checks_both_commits_even_if_package_versions_match(self):
-        def package(version, commit):
-            return SimpleNamespace(version=version, read_text=lambda _: json.dumps({'vcs_info': {'commit_id': commit}}))
-        for gallery_commit, yt_commit in [(GALLERY_COMMIT, '0' * 40), ('0' * 40, YTDLP_COMMIT)]:
-            with (self.subTest(gallery=gallery_commit, yt_dlp=yt_commit),
-                  patch('stash_ingest.configuration.distribution', side_effect=[
-                      package(GALLERY_VERSION, gallery_commit), package(YTDLP_VERSION, yt_commit)]),
+    def test_upstream_patches_preserve_policy_and_report_actual_commits(self):
+        original = Configuration(self.path)
+        def package(name):
+            return SimpleNamespace(version="new-development-version", read_text=lambda _: json.dumps({
+                "url": REPOSITORIES[name], "vcs_info": {"vcs": "git", "commit_id": "a" * 40}}))
+        with patch('stash_ingest.runtime.distribution', side_effect=package):
+            updated = Configuration(self.path)
+            self.assertEqual(original.policy_sha256, updated.policy_sha256)
+            self.assertEqual(runtime_identity()['downloaders']['gallery-dl']['commit'], 'a' * 40)
+            self.assertEqual(runtime_identity()['downloaders']['yt-dlp']['version'], 'new-development-version')
+
+    def test_downloader_provenance_must_identify_official_sources(self):
+        for direct in ({}, {'url': 'https://example.test/gallery.git', 'vcs_info': {'vcs': 'git', 'commit_id': 'a' * 40}},
+                       {'url': REPOSITORIES['gallery-dl'], 'vcs_info': {'vcs': 'git', 'commit_id': 'master'}}):
+            with (self.subTest(direct=direct),
+                  patch('stash_ingest.runtime.distribution', return_value=SimpleNamespace(version='1', read_text=lambda _: json.dumps(direct))),
                   self.assertRaises(InvalidData)):
                 runtime_identity()
 

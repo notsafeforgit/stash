@@ -14,6 +14,7 @@ from stash_ingest.discovery_dispatch import DiscoveryDispatcher
 from stash_ingest.discovery_journal import DiscoveryJournal
 from stash_ingest.encoding import native_json
 from stash_ingest.outbox import Outbox, SCHEMA
+from stash_ingest.runtime import CAPTURE_VERSION, LEGACY_CAPTURE_VERSIONS
 from helpers import PRODUCER
 from test_discovery_client import execution_fixture
 from test_outbox_migration import schema_eleven
@@ -74,6 +75,23 @@ class DiscoveryDispatchTests(unittest.TestCase):
             self.assertEqual(self.worker(box).state()["available_at"], 1030)
         self.assertEqual(self.listings.call_args.kwargs["after"], first)
         self.admit.assert_not_called()
+
+    def test_upgraded_profile_finishes_old_listing_without_skipping_a_filtered_boundary(self):
+        self.profile.extractor_version = CAPTURE_VERSION
+        first, boundary, later = sorted([str(uuid.uuid4()) for _ in range(3)])
+        old = {"uuid": first, "definition_sha256": "b" * 64}
+        new = {"uuid": later, "definition_sha256": "c" * 64}
+        def pages(collection, policy, version, **kwargs):
+            if version == CAPTURE_VERSION:
+                return {"listings": [new], "after": later, "has_more": False}
+            if version == LEGACY_CAPTURE_VERSIONS[0]:
+                return {"listings": [old], "after": boundary, "has_more": True}
+            return {"listings": [], "after": "", "has_more": False}
+        self.listings.side_effect = pages
+        with closing(self.open()) as box:
+            self.worker(box).once()
+            self.assertEqual(self.worker(box).state()["listing_after"], first)
+        self.admit.assert_called_once_with(first, old["definition_sha256"], self.profile.policy_sha256, LEGACY_CAPTURE_VERSIONS[0])
 
     def test_lost_admission_is_recovered_as_an_admitted_job(self):
         candidate = self.candidate()

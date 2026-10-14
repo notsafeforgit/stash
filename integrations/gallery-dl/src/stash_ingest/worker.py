@@ -66,8 +66,8 @@ def _confirmed_attempt(client, lease, outcome, error_code, error_scope):
 
 def execute(box, client, configuration, run_uuid):
     """Never launch source work without a matching policy and live claim."""
-    from gallery_dl import config, exception
-    from .gallery import NativeDownloadJob, SUPPORTED_VERSION
+    from gallery_dl import config, exception, version
+    from .gallery import NativeDownloadJob
 
     identifier(run_uuid)
     if (box.endpoint, box.producer) != (client.endpoint, client.producer):
@@ -118,7 +118,7 @@ def execute(box, client, configuration, run_uuid):
                 configuration.check()
                 delivery.check()
 
-            producer = Producer(box, lease, configuration.root, extractor_version=SUPPORTED_VERSION,
+            producer = Producer(box, lease, configuration.root, extractor_version=version.__version__,
                                 configuration_check=check_configuration, source_category=configuration.source_category,
                                 scan_mode=configuration.scan_mode)
             target = lease.run["target_url"]

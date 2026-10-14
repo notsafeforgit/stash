@@ -9,6 +9,7 @@ from .enrichment_worker import execute
 from .events import sha256
 from .outbox import Capacity, Conflict
 from .worker_policy import execution_policy
+from .runtime import capture_versions, ready_jobs
 
 PAGE_SIZE = 20
 DELIVERY_POLICY = "0" * 64
@@ -132,7 +133,7 @@ class EnrichmentDispatcher:
             if result["state"] == "ownership_required" and self.configuration is not None:
                 current = self.client.describe(value.job_uuid)
                 if (execution_policy(current["job"], value.definition["arguments"]["policy_sha256"]) == self.configuration.policy_sha256
-                        and value.definition["arguments"]["extractor_version"] == self.configuration.extractor_version):
+                        and value.definition["arguments"]["extractor_version"] in capture_versions(self.configuration)):
                     result = self._execute(state, value.job_uuid, self.configuration)
                 else:
                     result = {**result, "state": "profile_required"}
@@ -166,8 +167,7 @@ class EnrichmentDispatcher:
             if type(capabilities.get(self.protocol)) is not int or capabilities[self.protocol] != 1:
                 raise Unavailable("native_enrichment_dispatch_unavailable")
             previous = state["job_after"]
-            page = self.client.ready_jobs(self.key[0], self.key[1], self.configuration.extractor_version,
-                                          after=state["job_after"], limit=PAGE_SIZE)
+            page = ready_jobs(self.client, self.key[0], self.configuration, after=state["job_after"], limit=PAGE_SIZE)
             for candidate in page:
                 if not self.save(state, job_after=candidate["sequence"]):
                     return {"state": "contended"}

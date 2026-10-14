@@ -128,16 +128,17 @@ def classify(exc):
             "ConnectTimeout": "timeout"}.get(name, "extraction_failed")
 
 
-def collect(url, settings, resume=None, *, factory=None, check=lambda: None, reserve_source=None, allow_empty=False):
+def collect(url, settings, resume=None, *, factory=None, check=lambda: None, reserve_source=None, allow_empty=False,
+            checkpoint_version=None):
     from gallery_dl import config, extractor, util, version
     from gallery_dl.extractor.common import Extractor, Message
     from .gallery import SUPPORTED_VERSION, twitter_evidence
     from . import instagram
 
-    if version.__version__ != SUPPORTED_VERSION:
-        return {"error": "runtime_changed"}
+    from .runtime import capture_version
+    checkpoint_version = capture_version(checkpoint_version or SUPPORTED_VERSION)
     try:
-        bundle = Bundle(url, version.__version__, resume)
+        bundle = Bundle(url, checkpoint_version, resume)
     except InvalidData:
         return {"error": "invalid_checkpoint" if resume is not None else "not_a_post_url"}
     # Accessors hold references to this dictionary: never replace it.
@@ -203,7 +204,7 @@ def collect(url, settings, resume=None, *, factory=None, check=lambda: None, res
                 return
             walk(target, parent, depth)
         except Exception as exc:
-            restored = Bundle(bundle.value["url"], version.__version__, before)
+            restored = Bundle(bundle.value["url"], checkpoint_version, before)
             bundle.__dict__.update(restored.__dict__)
             seen.clear()
             seen.update(previous_seen)
@@ -333,9 +334,12 @@ def _exchange(command, body, timeout, check=lambda: None, reserve_source=None):
                 raise
 
 
-def fetch(url, settings, resume=None, *, timeout=180, check=lambda: None, reserve_source=None, allow_empty=False):
+def fetch(url, settings, resume=None, *, timeout=180, check=lambda: None, reserve_source=None, allow_empty=False,
+          checkpoint_version=None):
     """Caller owns durable checkpoint publication and source lease management."""
     from .gallery import SUPPORTED_VERSION
+    from .runtime import capture_version
+    checkpoint_version = capture_version(checkpoint_version or SUPPORTED_VERSION)
     public_url(url)
     safe_config(settings)
     if type(timeout) not in {int, float} or not 0 < timeout <= 600:
@@ -343,8 +347,10 @@ def fetch(url, settings, resume=None, *, timeout=180, check=lambda: None, reserv
     if type(allow_empty) is not bool:
         raise InvalidData("Invalid empty detail policy")
     if resume is not None:
-        Bundle(url, SUPPORTED_VERSION, resume)
+        Bundle(url, checkpoint_version, resume)
     request = {"url": url, "settings": settings, "resume": resume}
+    if checkpoint_version != SUPPORTED_VERSION:
+        request["checkpoint_version"] = checkpoint_version
     if allow_empty:
         request["allow_empty"] = True
     if reserve_source is not None:
@@ -357,7 +363,7 @@ def fetch(url, settings, resume=None, *, timeout=180, check=lambda: None, reserv
         if (isinstance(result, dict) and set(result) == {"error"}
                 and isinstance(result["error"], str) and result["error"] in ERRORS):
             return result
-        return Bundle(url, SUPPORTED_VERSION, result).checkpoint()
+        return Bundle(url, checkpoint_version, result).checkpoint()
     except (InvalidData, OSError):
         return {"error": "worker_failed"}
 
@@ -377,9 +383,12 @@ def main(collector=None):
         raw = sys.stdin.buffer.readline(INPUT_LIMIT + 2)
         request = decode(raw.removesuffix(b"\n"), INPUT_LIMIT, preserve_numbers=True)
         if (not isinstance(request, dict) or not {"url", "settings", "resume"} <= set(request)
-                or set(request) - {"url", "settings", "resume", "source_pacing", "allow_empty", "request_budget"}):
+                or set(request) - {"url", "settings", "resume", "source_pacing", "allow_empty", "request_budget", "checkpoint_version"}):
             raise InvalidData("Invalid metadata fetch request")
         options = {}
+        if "checkpoint_version" in request:
+            from .runtime import capture_version
+            options["checkpoint_version"] = capture_version(request["checkpoint_version"])
         if "allow_empty" in request:
             if request["allow_empty"] is not True:
                 raise InvalidData("Invalid empty detail policy")

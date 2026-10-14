@@ -11,6 +11,7 @@ from .outbox import Capacity, Conflict
 from .runs import SourcePaused
 from .worker_policy import execution_policy
 from .request_budget import MetadataBudget
+from .runtime import capture_versions
 
 
 def _deliver(journal, client, value):
@@ -150,7 +151,8 @@ def execute_metadata(box, transport, configuration, job_uuid, journal_type, clie
                 lease.check()
                 configuration.check()
 
-            head = client.head(job_uuid, value.definition["url"], configuration.extractor_version)
+            checkpoint_version = job["arguments"]["extractor_version"]
+            head = client.head(job_uuid, value.definition["url"], checkpoint_version)
             resume = head["body"] if head else client.seed(lease.job, value.definition["url"])
             if head is not None and head["pending_count"] == 0:
                 value = journal.intent(value, lease.job, journal.completion_intent, {"receipt": {k: v for k, v in head.items() if k != "body"}})
@@ -161,7 +163,8 @@ def execute_metadata(box, transport, configuration, job_uuid, journal_type, clie
                     value = journal.intent(value, lease.job, "failure", {"error_code": "worker_failed"})
                     _deliver(journal, client, value)
                     return _result(journal, job_uuid, "capacity")
-                result = fetcher(value.definition["url"], configuration.settings(),
+                options = {} if checkpoint_version == configuration.extractor_version else {"checkpoint_version": checkpoint_version}
+                result = fetcher(value.definition["url"], configuration.settings(), **options,
                                  resume=resume, check=check,
                                  reserve_source=MetadataBudget(lease) if client_type is EnrichmentClient else lease.reserve_source)
                 if (isinstance(result, dict) and set(result) == {"error"}
@@ -195,6 +198,6 @@ def execute_metadata(box, transport, configuration, job_uuid, journal_type, clie
 def _configuration(configuration, job, url):
     configuration.check()
     if (execution_policy(job, job["arguments"]["policy_sha256"]) != configuration.policy_sha256
-            or job["arguments"]["extractor_version"] != configuration.extractor_version
+            or job["arguments"]["extractor_version"] not in capture_versions(configuration)
             or not configuration.accepts(url)):
         raise Conflict("Enrichment job does not match this reviewed metadata profile")

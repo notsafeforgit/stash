@@ -22,8 +22,10 @@ from .outbox import Capacity
 from .publication_lock import PublicationBusy, publication_lock
 from .source_window import validate_keywords
 from .scan_resume import legacy_cursor
+from .runtime import CAPTURE_VERSION, downloader_identity
 
-SUPPORTED_VERSION = "1.33.0-dev"
+# Metadata jobs bind to our capture protocol, independently of upstream patches.
+SUPPORTED_VERSION = CAPTURE_VERSION
 
 
 def source_url(extractor):
@@ -210,8 +212,7 @@ class NativeDownloadJob(job.DownloadJob):
     """
 
     def __init__(self, extractor, parent=None, *, producer=None, lock_directory=None):
-        if version.__version__ != SUPPORTED_VERSION:
-            raise InvalidData("Gallery-dl runtime changed; validate the native adapter before use")
+        downloader_identity()
         self.producer = producer if producer is not None else parent.producer
         self.lock_directory = Path(lock_directory if lock_directory is not None else parent.lock_directory).resolve(strict=True)
         self.producer.check()

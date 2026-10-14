@@ -99,8 +99,10 @@ the pinned gallery-dl/yt-dlp test dependencies into `.local/native-producer`;
 in `integrations/gallery-dl` uses only the standard library for delivery.
 Producer environments use `uv venv` and `uv pip --python` with explicit
 interpreter paths. Verify installed modules with Python `-I` so workspace imports
-cannot shadow the package. A staged worker policy must fingerprint the actual
-installed runtime; source-import tests alone cannot establish that.
+cannot shadow the package. A staged worker policy fingerprints the installed
+adapter and capture contract; record actual downloader versions/commits separately.
+Tested upstream downloader patches preserve policies. Source-import tests alone
+cannot verify an installed runtime or its compatibility with saved checkpoints.
 
 `integrations/archive` provides the portable `stash-archive` client for native
 SQLite snapshots, original artwork and declared configuration/state. Restore

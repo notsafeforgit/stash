@@ -91,13 +91,13 @@ class _PageComplete(Exception):
     pass
 
 
-def collect(url, settings, cursor=None, *, factory=None, check=lambda: None, reserve_source=None):
+def collect(url, settings, cursor=None, *, factory=None, check=lambda: None, reserve_source=None, checkpoint_version=None):
     from gallery_dl import config, extractor, util, version
     from gallery_dl.extractor.common import Extractor, Message
     from .gallery import SUPPORTED_VERSION, twitter_evidence
 
-    if version.__version__ != SUPPORTED_VERSION:
-        return {"error": "runtime_changed"}
+    from .runtime import capture_version
+    checkpoint_version = capture_version(checkpoint_version or SUPPORTED_VERSION)
     try:
         platform = profile_platform(url)
     except InvalidData:
@@ -131,9 +131,9 @@ def collect(url, settings, cursor=None, *, factory=None, check=lambda: None, res
         pause = util.build_duration_func(target.config("sleep-extractor"))
         if pause is not None:
             target.sleep(pause(), "extractor")
-        bundle = Bundle(url, version.__version__, max_records=MAX_RECORDS)
+        bundle = Bundle(url, checkpoint_version, max_records=MAX_RECORDS)
         result = {"schema": SCHEMA, "url": url, "retention_policy": POLICY,
-                  "extractor_version": version.__version__, "cursor": cursor,
+                  "extractor_version": checkpoint_version, "cursor": cursor,
                   "next_cursor": None, "complete": False, "records": []}
         if platform == "twitter":
             twitter_evidence(target)
@@ -195,20 +195,24 @@ def collect(url, settings, cursor=None, *, factory=None, check=lambda: None, res
             if result["next_cursor"] is None or result["next_cursor"] == cursor:
                 return {"error": "pagination_stalled"}
         result["records"] = bundle.checkpoint()["records"]
-        return validate_page(result, url, version.__version__, cursor)
+        return validate_page(result, url, checkpoint_version, cursor)
     except InvalidData:
         return {"error": "result_too_large"}
     except Exception as exc:
         return {"error": metadata_fetch.classify(exc)}
 
 
-def fetch(url, settings, cursor=None, *, timeout=180, check=lambda: None, reserve_source=None):
+def fetch(url, settings, cursor=None, *, timeout=180, check=lambda: None, reserve_source=None, checkpoint_version=None):
     from .gallery import SUPPORTED_VERSION
+    from .runtime import capture_version
+    checkpoint_version = capture_version(checkpoint_version or SUPPORTED_VERSION)
     cursor = page_cursor(profile_platform(url), cursor)
     metadata_fetch.safe_config(settings)
     if type(timeout) not in {int, float} or not 0 < timeout <= 600:
         raise InvalidData("Discovery fetch timeout must be at most ten minutes")
     request = {"url": url, "settings": settings, "resume": copy.deepcopy(cursor)}
+    if checkpoint_version != SUPPORTED_VERSION:
+        request["checkpoint_version"] = checkpoint_version
     if reserve_source is not None:
         request["source_pacing"] = True
     try:
@@ -217,7 +221,7 @@ def fetch(url, settings, cursor=None, *, timeout=180, check=lambda: None, reserv
         if (isinstance(result, dict) and set(result) == {"error"}
                 and isinstance(result["error"], str) and result["error"] in ERRORS):
             return result
-        return validate_page(result, url, SUPPORTED_VERSION, cursor)
+        return validate_page(result, url, checkpoint_version, cursor)
     except (InvalidData, OSError):
         return {"error": "worker_failed"}
 

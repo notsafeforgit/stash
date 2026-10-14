@@ -7,6 +7,7 @@ from .enrichment_client import EnrichmentClient
 from .enrichment_dispatch import EnrichmentDispatcher, PAGE_SIZE
 from .events import sha256
 from .outbox import Capacity, Conflict
+from .runtime import capture_versions
 
 
 def migrate(db):
@@ -32,7 +33,11 @@ class CollectionDispatcher:
         return EnrichmentClient(transport)
 
     def ready(self, after):
-        return self.client.ready_collections(self.policy, self.configuration.extractor_version, after=after, limit=PAGE_SIZE)
+        rows = {}
+        for version in capture_versions(self.configuration):
+            for row in self.client.ready_collections(self.policy, version, after=after, limit=PAGE_SIZE):
+                rows[row["uuid"]] = row
+        return [rows[key] for key in sorted(rows)[:PAGE_SIZE]]
 
     def selected(self, collection):
         return EnrichmentDispatcher(self.box, self.transport, collection, self.configuration).once()

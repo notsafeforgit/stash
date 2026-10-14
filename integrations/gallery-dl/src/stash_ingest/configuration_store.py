@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from .configuration import CONFIG_LIMIT, Configuration, profile_bytes, runtime_identity
+from .configuration import CONFIG_LIMIT, Configuration, profile_bytes, policy_identity
 from .encoding import InvalidData, decode, digest, encode
 from .outbox import Capacity
 
@@ -38,7 +38,7 @@ class Configurations:
         filename = str(Path(filename).resolve())
         return self.db.execute("""SELECT * FROM worker_configurations WHERE profile=? AND runtime_sha256=?
             AND (?=0 OR available_at<=?) ORDER BY checked_order,policy_sha256""",
-            (filename, digest(encode(runtime_identity())), int(ready), self.box.clock())).fetchall()
+            (filename, digest(encode(policy_identity())), int(ready), self.box.clock())).fetchall()
 
     @staticmethod
     def load(row):

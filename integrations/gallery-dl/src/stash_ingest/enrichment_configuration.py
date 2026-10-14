@@ -2,7 +2,7 @@
 
 import copy
 
-from .configuration import Configuration, CONFIG_LIMIT, _snapshot, profile_bytes, runtime_identity
+from .configuration import Configuration, CONFIG_LIMIT, _snapshot, profile_bytes, policy_identity
 from .encoding import InvalidData, digest, encode
 from .gallery import SUPPORTED_VERSION
 from .metadata_fetch import POSTS, is_post, public_url, safe_config
@@ -29,7 +29,7 @@ class EnrichmentConfiguration(Configuration):
         self._gallery = safe_config(expanded)
         self.extractor_version = SUPPORTED_VERSION
         self.policy_sha256 = digest(encode({"version": self.schema, "operation": self.operation,
-            "source_category": self.source_category, "runtime": runtime_identity(),
+            "source_category": self.source_category, "runtime": policy_identity(),
             "gallery_sha256": digest(profile_bytes(template)), "assets": assets}, CONFIG_LIMIT))
 
     def check(self):

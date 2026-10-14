@@ -8,6 +8,7 @@ from .encoding import InvalidData, identifier
 from .events import sha256
 from .outbox import Capacity, Conflict
 from .worker_policy import execution_policy
+from .runtime import capture_versions, ready_jobs
 
 PAGE_SIZE = 20
 DELIVERY_POLICY = "0" * 64
@@ -102,7 +103,7 @@ class DiscoveryDispatcher:
                 listing = value.definition["listing"]
                 current = self.client.describe(value.job_uuid)
                 if (execution_policy(current["job"], listing["policy_sha256"]) == self.configuration.policy_sha256
-                        and listing["extractor_version"] == self.configuration.extractor_version):
+                        and listing["extractor_version"] in capture_versions(self.configuration)):
                     result = self._execute(state, value.job_uuid, self.configuration)
                 else:
                     result = {**result, "state": "profile_required"}
@@ -132,8 +133,7 @@ class DiscoveryDispatcher:
             if type(capabilities.get("discovery_dispatch_protocol")) is not int or capabilities["discovery_dispatch_protocol"] != 1:
                 raise Unavailable("native_discovery_dispatch_unavailable")
             previous = state["job_after"]
-            jobs = self.client.ready_jobs(self.key[0], self.key[1], self.configuration.extractor_version,
-                                          after=previous, limit=PAGE_SIZE)
+            jobs = ready_jobs(self.client, self.key[0], self.configuration, after=previous, limit=PAGE_SIZE)
             for candidate in jobs:
                 if not self.save(state, job_after=candidate["sequence"]):
                     return {"state": "contended"}
@@ -147,14 +147,21 @@ class DiscoveryDispatcher:
             if previous or jobs:
                 # Wrap admitted retry discovery before admitting fresh work.
                 return {"state": "waiting"}
-            page = self.client.ready_listings(self.key[0], self.key[1], self.configuration.extractor_version,
-                                              after=state["listing_after"], limit=PAGE_SIZE)
-            for candidate in page["listings"]:
+            pages = [(version, self.client.ready_listings(self.key[0], self.key[1], version,
+                      after=state["listing_after"], limit=PAGE_SIZE)) for version in capture_versions(self.configuration)]
+            # A shared cursor advances only as far as every version's page has
+            # been inspected. Old listing definitions can finish after upgrade.
+            boundaries = [page["after"] for _, page in pages if page["has_more"]]
+            boundary = min(boundaries) if boundaries else None
+            candidates = sorted([(candidate, version) for version, page in pages for candidate in page["listings"]
+                                 if boundary is None or candidate["uuid"] <= boundary], key=lambda item: item[0]["uuid"])
+            candidates = candidates[:PAGE_SIZE]
+            for candidate, version in candidates:
                 if not self.save(state, listing_after=candidate["uuid"]):
                     return {"state": "contended"}
                 try:
                     job = self.client.admit(candidate["uuid"], candidate["definition_sha256"],
-                                            self.key[1], self.configuration.extractor_version)
+                                            self.key[1], version)
                 except Unavailable as error:
                     if error.status == 409:
                         continue
@@ -162,12 +169,14 @@ class DiscoveryDispatcher:
                 return self._execute(state, job["uuid"], self.configuration)
             # Empty filtered pages still advance. An inspection cursor alone
             # cannot establish listing completion or a published source match.
-            changes = {"listing_after": page["after"] if page["has_more"] else ""}
-            if not page["has_more"]:
+            has_more = bool(boundary) or len(candidates) == PAGE_SIZE
+            after = candidates[-1][0]["uuid"] if len(candidates) == PAGE_SIZE else boundary
+            changes = {"listing_after": after if has_more else ""}
+            if not has_more:
                 changes.update(failures=0, available_at=self.box.clock() + 30, error_code=None)
             if not self.save(state, **changes):
                 return {"state": "contended"}
-            return {"state": "waiting" if page["has_more"] else "idle"}
+            return {"state": "waiting" if has_more else "idle"}
         except (Unavailable, InvalidData) as error:
             return self.unavailable(state, error)
 

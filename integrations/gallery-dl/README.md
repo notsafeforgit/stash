@@ -384,11 +384,13 @@ stay in worker memory and gallery-dl; they are not sent to Stash or copied into
 the outbox. The Stash API token still uses the separate `--token-env` option.
 
 The policy SHA-256 includes the portable gallery configuration, reviewed asset
-digests, pinned gallery-dl/yt-dlp runtime identity and adapter source digest. It
+digests, the native capture contract and adapter source digest. It
 excludes private values, local binding paths, directory identities and the
 requested run window. Equivalent host/container profiles therefore share a
 policy; rotating cookies does not create a new policy. Changing extraction or
-conversion settings/code does. Conditional map order is retained in the digest
+conversion settings/code does. Upstream downloader patches do not change the
+policy; runtime diagnostics separately report their actual versions and commits.
+Conditional map order is retained in the digest
 and saved profile: rearranging first-match filename rules changes the policy.
 Relative binding paths resolve against the
 profile file. Keep one worker in each process: gallery-dl configuration is
@@ -589,13 +591,22 @@ podman build --pull=never \
   --file integrations/gallery-dl/Containerfile.n8n integrations/gallery-dl
 ```
 
-The build installs both downloaders with uv from exact upstream Git commits:
-gallery-dl from Codeberg and yt-dlp from GitHub. It validates both installed
-commit IDs, not just their package versions; upstream development branches can
-retain an older version label. Updating these pins requires producer tests and
-an explicit policy handoff for already queued work, preserving its coverage and
-progress. Dependencies are installed when building the published worker image,
-not downloaded again each time a worker starts.
+The build installs baseline downloader commits with uv: gallery-dl from Codeberg
+and yt-dlp from GitHub. Deployments can independently install newer commits and
+test them against the adapter before activation. The optional operations image
+does this on startup in a separate environment, with the baked baseline and last
+working installation as fallbacks. Runtime diagnostics report actual versions and
+Git commits because development branches can retain an older version label.
+Downloader updates preserve queue policies; changes to the adapter or reviewed
+configuration still require a policy handoff. Never modify a running worker's
+environment in place.
+
+Metadata job `extractor_version` now identifies the native capture adapter
+(`stash-gallery-v1`), whose checkpoint format is independent of downloader
+patches. Download capture events still report the actual gallery-dl version.
+Upgrade-only handling finishes previously admitted metadata jobs using their
+original version header and captured prefix; new jobs use the adapter contract.
+It does not relabel retained observations or refetch completed checkpoint parts.
 
 `dispatch-all --max-passes 16` keeps claiming ready work after an ended attempt
 instead of waiting for an external timer after every account. Every pass still

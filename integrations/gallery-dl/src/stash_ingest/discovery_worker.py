@@ -10,6 +10,7 @@ from .metadata_bundle import MAX_BYTES
 from .outbox import Capacity, Conflict
 from .runs import SourcePaused
 from .worker_policy import execution_policy
+from .runtime import capture_versions
 
 
 def _deliver(journal, client, value):
@@ -32,7 +33,7 @@ def _configuration(configuration, description):
     configuration.check()
     listing = description["listing"]
     if (configuration.operation != "account.list_page" or execution_policy(description["job"], listing["policy_sha256"]) != configuration.policy_sha256
-            or listing["extractor_version"] != configuration.extractor_version
+            or listing["extractor_version"] not in capture_versions(configuration)
             or not configuration.accepts(listing["profile_url"])):
         raise Conflict("Discovery job does not match this reviewed listing profile")
 
@@ -117,7 +118,9 @@ def execute(box, transport, configuration, job_uuid, *, fetcher=fetch):
                 value = journal.failure(value, lease.job, "worker_failed")
                 _deliver(journal, client, value)
                 return _result(journal, job_uuid, "capacity")
-            result = fetcher(current["listing"]["profile_url"], configuration.settings(), current["cursor"],
+            checkpoint_version = current["listing"]["extractor_version"]
+            options = {} if checkpoint_version == configuration.extractor_version else {"checkpoint_version": checkpoint_version}
+            result = fetcher(current["listing"]["profile_url"], configuration.settings(), current["cursor"], **options,
                              check=check, reserve_source=lease.reserve_source)
             if (isinstance(result, dict) and set(result) == {"error"}
                     and isinstance(result["error"], str) and result["error"] in ERRORS):

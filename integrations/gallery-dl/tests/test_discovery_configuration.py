@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from stash_ingest.configuration import CONFIG_LIMIT, profile_bytes, runtime_identity
+from stash_ingest.configuration import CONFIG_LIMIT, profile_bytes, policy_identity
 from stash_ingest.discovery_configuration import DiscoveryConfiguration, SCHEMA
 from stash_ingest.encoding import InvalidData, digest, encode
 from stash_ingest.enrichment_configuration import EnrichmentConfiguration, SCHEMA as ENRICHMENT_SCHEMA
@@ -50,7 +50,7 @@ class DiscoveryConfigurationTests(unittest.TestCase):
             self.assertFalse(enrichment.accepts("https://x.com/example/timeline"))
             self.assertNotEqual(discovery.policy_sha256, enrichment.policy_sha256)
             expected = digest(encode({"version": ENRICHMENT_SCHEMA, "operation": "post.enrich", "source_category": "twitter",
-                "runtime": runtime_identity(), "gallery_sha256": digest(profile_bytes(safe_config(value["gallery"]))), "assets": {}}, CONFIG_LIMIT))
+                "runtime": policy_identity(), "gallery_sha256": digest(profile_bytes(safe_config(value["gallery"]))), "assets": {}}, CONFIG_LIMIT))
             self.assertEqual(enrichment.policy_sha256, expected)
             with self.assertRaises(InvalidData):
                 DiscoveryConfiguration.from_document({**value, "source_category": "instagram"}, directory)

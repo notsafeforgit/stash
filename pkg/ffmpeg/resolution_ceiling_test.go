@@ -37,7 +37,8 @@ func TestDownloadCopyRespectsResolutionCeiling(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			sm := &StreamManager{lockManager: fsutil.NewReadLockManager()}
-			file := &models.VideoFile{BaseFile: &models.BaseFile{Path: path}, VideoCodec: H264, Format: Mp4Ffmpeg, Width: tc.width, Height: tc.height}
+			// Scanning stores the normalized container, not ffprobe's raw name.
+			file := &models.VideoFile{BaseFile: &models.BaseFile{Path: path}, VideoCodec: H264, Format: string(Mp4), Width: tc.width, Height: tc.height}
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			req.Header.Set("Range", "bytes=2-5")
 			w := httptest.NewRecorder()

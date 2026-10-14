@@ -204,10 +204,10 @@ func canCopyVideoToMP4(videoCodec string) bool {
 // support (and therefore range-resume on interrupted downloads) for
 // free, plus zero CPU cost on the server.
 //
-// MP4-family detection: the database's `format` field for MP4 / MOV
-// / M4V / 3GP all share the ffprobe demuxer name
-// "mov,mp4,m4a,3gp,3g2,mj2", so a single equality check covers the
-// whole family. WebM, MKV, AVI, etc. fall through to the ffmpeg
+// MP4-family detection accepts the normalized library container names as
+// well as ffprobe's raw "mov,mp4,m4a,3gp,3g2,mj2" demuxer name.
+// MatchContainer normally stores "mp4", not that raw name. WebM, MKV,
+// AVI, etc. fall through to the ffmpeg
 // remux path even when their codecs would technically fit MP4 —
 // remuxing is unavoidable for those.
 //
@@ -220,7 +220,9 @@ func canServeSourceDirectly(vf *models.VideoFile) bool {
 	if vf == nil {
 		return false
 	}
-	if vf.Format != Mp4Ffmpeg {
+	switch vf.Format {
+	case string(Mp4), string(Mov), string(M4v), Mp4Ffmpeg:
+	default:
 		return false
 	}
 	audioCodec := MissingUnsupported

@@ -8,13 +8,28 @@ import {
   useState,
   type ComponentProps,
   type ComponentType,
+  type ReactNode,
 } from "react";
 import YARLightbox, {
   type GenericSlide,
   type RenderSlideProps,
   type FullscreenRef,
+  type ZoomRef,
+  isImageSlide,
+  useLightboxState,
 } from "yet-another-react-lightbox";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
+import Zoom from "yet-another-react-lightbox/plugins/zoom";
+import { useQuery } from "@apollo/client/react";
+import { FindImageDocument } from "@/core/generated-graphql";
+import {
+  type LightboxSlide,
+  LIGHTBOX_ZOOM_TUNING,
+  ImageEntityFooter,
+  OriginalSizeButton,
+  LightboxImageActionsButton,
+  useAtOriginalSize,
+} from "./lightbox";
 import { Spinner } from "src/components/ui/spinner";
 import { SceneSlideContent } from "./scene-slide-content";
 import { PersistentSceneCarousel } from "./scene-carousel";
@@ -46,6 +61,8 @@ export interface SceneSlide extends GenericSlide {
   posterImage?: PreviewImageData | null;
   /** Transient placeholder shown while the next/prev page is loading. */
   loading?: boolean;
+  /** Keep the single media element while viewing an image, with no source. */
+  suspended?: boolean;
   /** When set, the player starts playback at this marker's `seconds` and the
    *  overlay shows marker title + primary tag + tags instead of the scene's
    *  title + performers. */
@@ -78,9 +95,35 @@ export interface SceneLightboxProps {
   slideContent?: ComponentType<SceneLightboxSlideProps>;
 }
 
+export interface MediaLightboxProps extends Omit<SceneLightboxProps, "slides"> {
+  slides: (SceneSlide | LightboxSlide)[];
+  totalCount?: number;
+  renderPending?: () => ReactNode;
+}
+
+function ImageFooter({ id, touch }: { id: string; touch: boolean }) {
+  // Only mounted for the selected image. The normalized cache is shared with
+  // the regular image lightbox; revisiting it needs no additional request.
+  const { data } = useQuery(FindImageDocument, { variables: { id } });
+  if (data?.findImage?.id !== id) return null;
+  return <ImageEntityFooter imageId={id} mobile={touch} showRating={!touch} />;
+}
+
+function MediaCounter({ total }: { total: number }) {
+  const { currentIndex, currentSlide } = useLightboxState();
+  if (currentSlide?.loading || total < 2) return null;
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center text-xs tabular-nums text-white/85">
+      <span className="rounded bg-black/45 px-2 py-1">
+        {currentIndex + 1} / {total}
+      </span>
+    </div>
+  );
+}
+
 export type SceneLightboxSlideProps = ComponentProps<typeof SceneSlideContent>;
 
-export function SceneLightbox({
+export function MediaLightbox({
   open,
   onClose,
   slides,
@@ -88,7 +131,9 @@ export function SceneLightbox({
   onView,
   finite = false,
   slideContent: SlideContent = SceneSlideContent,
-}: SceneLightboxProps) {
+  totalCount,
+  renderPending,
+}: MediaLightboxProps) {
   const {
     controllerRef,
     portal,
@@ -98,6 +143,13 @@ export function SceneLightbox({
     onExiting,
   } = useLightboxMotion(open, onClose);
   const touch = useIsTouch();
+  const [view, setView] = useState({ propIndex: index, currentIndex: index });
+  if (view.propIndex !== index)
+    setView({ propIndex: index, currentIndex: index });
+  const selected = slides[view.currentIndex];
+  const imageActive = !!selected && isImageSlide(selected);
+  const zoomRef = useRef<ZoomRef>(null);
+  const [atOriginal, zoomCallbacks] = useAtOriginalSize(zoomRef);
   // Lightbox fullscreen ref — populated by the YARL Fullscreen plugin via
   // its `fullscreen.ref` prop. Used so the embedded ScenePlayer can
   // delegate fullscreen requests (its hidden button + `f` hotkey) to the
@@ -287,6 +339,13 @@ export function SceneLightbox({
 
   const renderSlide = useCallback(
     ({ slide, offset }: RenderSlideProps) => {
+      if (isImageSlide(slide)) {
+        if (slide.loading)
+          return (
+            renderPending?.() ?? <Spinner className="size-10 text-white/70" />
+          );
+        return undefined;
+      }
       if (slide.type !== "scene") return undefined;
       return (
         <SlideContent
@@ -308,6 +367,7 @@ export function SceneLightbox({
       touch,
       requestClose,
       SlideContent,
+      renderPending,
     ],
   );
 
@@ -319,17 +379,47 @@ export function SceneLightbox({
       animation={lightboxAnimation}
       slides={slides}
       index={index}
-      plugins={[Fullscreen, PersistentSceneCarousel]}
+      plugins={[Fullscreen, Zoom, PersistentSceneCarousel]}
       fullscreen={{ ref: fullscreenRef }}
+      zoom={{ ...LIGHTBOX_ZOOM_TUNING, ref: zoomRef }}
+      className={
+        imageActive
+          ? "image-lightbox lightbox-mobile-toolbar-bottom chrome-revealed"
+          : undefined
+      }
       carousel={{ finite, preload: 1, ...(touch && { padding: 0 }) }}
       controller={{
         ref: controllerRef,
         disableSwipeNavigation: isSingleSlide && !finite,
       }}
-      toolbar={{ buttons: ["fullscreen", "close"] }}
+      toolbar={{
+        buttons: [
+          ...(imageActive && !selected?.loading
+            ? [
+                "zoom" as const,
+                <OriginalSizeButton
+                  key="original"
+                  zoomRef={zoomRef}
+                  atOriginal={atOriginal}
+                />,
+                <LightboxImageActionsButton
+                  key="actions"
+                  zoomRef={zoomRef}
+                  atOriginal={atOriginal}
+                  zoomEnabled
+                />,
+              ]
+            : []),
+          "fullscreen",
+          "close",
+        ],
+      }}
       on={{
         exiting: onExiting,
+        zoom: zoomCallbacks.zoom,
         view: ({ index: newIndex }) => {
+          setView({ propIndex: index, currentIndex: newIndex });
+          zoomCallbacks.view();
           // Latch the wheel lockout on every slide change so the
           // trackpad momentum tail can't drag the next slide partway
           // in. The lock has a hard 700 ms ceiling and an early-
@@ -341,15 +431,25 @@ export function SceneLightbox({
       }}
       render={{
         ...lightboxIconRenders,
-        controls: () => <LightboxMotionSurface onReady={onSurfaceReady} />,
+        controls: () => (
+          <>
+            <LightboxMotionSurface onReady={onSurfaceReady} />
+            {totalCount !== undefined && <MediaCounter total={totalCount} />}
+          </>
+        ),
         // Touch users close from the player's control bar. Pending/error
         // slides expose the same action at the bottom until a player exists.
-        ...(touch && {
-          buttonClose: () => null,
-          buttonFullscreen: () => null,
-        }),
+        ...(touch &&
+          !imageActive && {
+            buttonClose: () => null,
+            buttonFullscreen: () => null,
+          }),
         iconLoading: () => <Spinner className="size-10 text-white/70" />,
         slide: renderSlide,
+        slideFooter: ({ slide }) =>
+          isImageSlide(slide) && !slide.loading && slide.imageId ? (
+            <ImageFooter id={slide.imageId} touch={touch} />
+          ) : null,
         ...(isSingleSlide &&
           !finite && {
             buttonPrev: () => null,
@@ -358,4 +458,9 @@ export function SceneLightbox({
       }}
     />
   );
+}
+
+// Scene lists, markers and offline playback share this same carousel/player.
+export function SceneLightbox(props: SceneLightboxProps) {
+  return <MediaLightbox {...props} />;
 }

@@ -44,6 +44,18 @@ query FindGalleryMedia($id: ID!, $offset: Int! = 0, $limit: Int! = 60) {
           title
           paths {
             thumbnail
+            image
+            preview
+          }
+          visual_files {
+            ... on ImageFile {
+              width
+              height
+            }
+            ... on VideoFile {
+              width
+              height
+            }
           }
         }
         scene {

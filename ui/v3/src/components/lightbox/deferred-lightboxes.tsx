@@ -11,3 +11,9 @@ export const SceneLightbox = deferredOverlay(
   (props) => ({ open: props.open, onClose: props.onClose }),
   LightboxPending,
 );
+
+export const MediaLightbox = deferredOverlay(
+  async () => ({ default: (await import("./scene-lightbox")).MediaLightbox }),
+  (props) => ({ open: props.open, onClose: props.onClose }),
+  LightboxPending,
+);

@@ -1094,6 +1094,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
 
             {controls === "standard" && (
               <PlayerControls
+                hotkeysEnabled={!suspended}
                 castingAllowed={castingAllowed}
                 Player={Player}
                 playbackKey={playbackKey}

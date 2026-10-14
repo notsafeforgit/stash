@@ -24,8 +24,10 @@ export const SceneVideo = memo(function SceneVideo({
   startPosition,
   ...props
 }: SceneVideoProps) {
-  const source = useMemo<HlsSource | null>(() => {
-    if (!src) return null;
+  const source = useMemo<HlsSource>(() => {
+    // A null source is inferred as HLS and attaches an empty MediaSource.
+    // Explicit native idle releases the old engine without replacing the video.
+    if (!src) return { src: "", type: ContentTypes.MP4 };
     if (!isHlsPlaylist(src)) {
       return { src, type: sourceType ?? ContentTypes.MP4 };
     }

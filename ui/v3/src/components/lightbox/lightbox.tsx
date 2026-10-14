@@ -324,7 +324,7 @@ function LightboxDeleteShortcut({
   return null;
 }
 
-function ImageEntityFooter({
+export function ImageEntityFooter({
   imageId,
   onRequestDelete,
   showRating,

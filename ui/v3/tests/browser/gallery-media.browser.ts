@@ -16,11 +16,13 @@ async function fixture(
     empty?: boolean;
     failNext?: boolean;
     failCover?: boolean;
+    failScene?: boolean;
   } = {},
 ) {
   const pages: number[] = [];
   const coverWrites: SetGalleryCoverMutationVariables[] = [];
   const coverReads: string[] = [];
+  const detailReads: string[] = [];
   let selected: SetGalleryCoverMutationVariables | undefined;
   const image = (id: string): GalleryMediaItem => ({
     __typename: "GalleryMediaItem",
@@ -128,11 +130,20 @@ async function fixture(
         },
       });
     }
-    if (body.operationName === "FindImage")
+    if (body.operationName === "FindImage") {
+      detailReads.push(`image:${body.variables.id}`);
       return route.fulfill({
         json: { data: { findImage: playbackImage(body.variables.id) } },
       });
-    if (body.operationName === "FindScene")
+    }
+    if (body.operationName === "FindScene") {
+      detailReads.push(`scene:${body.variables.id}`);
+      if (options.failScene) {
+        options.failScene = false;
+        return route.fulfill({
+          json: { errors: [{ message: "Scene temporarily unavailable" }] },
+        });
+      }
       return route.fulfill({
         json: {
           data: {
@@ -140,9 +151,10 @@ async function fixture(
           },
         },
       });
+    }
     throw new Error(`Unexpected GraphQL operation ${body.operationName}`);
   });
-  return { pages, coverWrites, coverReads };
+  return { pages, coverWrites, coverReads, detailReads };
 }
 
 for (const desktop of [false, true]) {
@@ -153,11 +165,16 @@ for (const desktop of [false, true]) {
     const { pages } = await fixture(page);
     await page.goto("/gallery-media");
     await expect(page.locator("[data-gallery-media]")).toHaveCount(2);
+    await expect(
+      page.locator("[data-gallery-media] [data-slot=card]"),
+    ).toHaveCount(0);
     await page
       .getByRole("button", { name: "View gallery", exact: true })
       .click();
-    const viewer = page.getByRole("dialog", { name: "Gallery viewer" });
-    await expect(viewer.locator("img.yarl__slide_image")).toBeVisible();
+    const viewer = page.locator(".yarl__root");
+    await expect(
+      viewer.locator(".yarl__slide_current img.yarl__slide_image"),
+    ).toBeVisible();
     await viewer.getByRole("button", { name: "Next", exact: true }).click();
     const video = viewer.locator("video").first();
     await expect
@@ -174,11 +191,13 @@ for (const desktop of [false, true]) {
       animations: "disabled",
     });
     await viewer.getByRole("button", { name: "Next", exact: true }).click();
-    await expect(viewer.locator("img.yarl__slide_image")).toBeVisible();
-    await expect(viewer.locator("video")).toHaveCount(0);
     await expect(
-      viewer.getByText("3 of 3 · First image", { exact: true }),
+      viewer.locator(".yarl__slide_current img.yarl__slide_image"),
     ).toBeVisible();
+    await expect(viewer.locator("video")).toBeHidden();
+    await expect(viewer.locator("video")).toHaveJSProperty("paused", true);
+    await expect(viewer.locator("video")).not.toHaveAttribute("src", /.+/);
+    await expect(viewer.getByText("3 / 3", { exact: true })).toBeVisible();
     await expect(
       viewer.getByRole("button", { name: "Next", exact: true }),
     ).toBeDisabled();
@@ -196,12 +215,122 @@ test("gallery stops pagination playback when membership changes", async ({
   await fixture(page, { changed: true });
   await page.goto("/gallery-media");
   await page.getByRole("button", { name: "Second video", exact: true }).click();
-  const viewer = page.getByRole("dialog", { name: "Gallery viewer" });
+  const viewer = page.locator(".yarl__root");
   await viewer.getByRole("button", { name: "Next", exact: true }).click();
   await expect(
     viewer.getByText("This album changed", { exact: true }),
   ).toBeVisible();
-  await expect(viewer.locator("video")).toHaveCount(0);
+  await expect(viewer.locator("video")).toBeHidden();
+  await expect(viewer.locator("video")).toHaveJSProperty("paused", true);
+  await expect(viewer.locator("video")).not.toHaveAttribute("src", /.+/);
+});
+
+for (const preference of ["muted", "playbackRate"] as const) {
+  test(`mixed lightbox loads details on demand and retains one idle player across images (${preference})`, async ({
+    page,
+  }) => {
+    const state = await fixture(page);
+    await page.goto("/gallery-media");
+    await expect(page.locator("[data-gallery-media]")).toHaveCount(2);
+    expect(state.detailReads).toEqual([]);
+    await page
+      .getByRole("button", { name: "First image", exact: true })
+      .click();
+    const viewer = page.getByRole("dialog", { name: "Lightbox", exact: true });
+    await expect(
+      viewer.locator(".yarl__slide_current img.yarl__slide_image"),
+    ).toBeVisible();
+    await expect.poll(() => state.detailReads).toEqual(["image:7"]);
+    await expect(viewer.locator("video")).toHaveCount(0);
+    await viewer.getByRole("button", { name: "Zoom in", exact: true }).click();
+    await expect(
+      viewer.getByRole("button", { name: "Zoom out", exact: true }),
+    ).toBeEnabled();
+    await viewer.getByRole("button", { name: "Next", exact: true }).click();
+    const video = viewer.locator("video");
+    await expect(video).toHaveCount(1);
+    await expect
+      .poll(() =>
+        video.evaluate((element: HTMLVideoElement) => element.readyState),
+      )
+      .toBeGreaterThanOrEqual(2);
+    const originalVideo = await video.elementHandle();
+    expect(originalVideo).not.toBeNull();
+    if (preference === "muted") {
+      await page.keyboard.press("m");
+      await expect(video).toHaveJSProperty("muted", true);
+    } else {
+      await video.evaluate((element: HTMLVideoElement) => {
+        element.playbackRate = 1.5;
+      });
+      await expect(video).toHaveJSProperty("playbackRate", 1.5);
+    }
+    await viewer.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(viewer.getByText("3 / 3", { exact: true })).toBeVisible();
+    await expect(video).toBeHidden();
+    await expect(video).toHaveJSProperty("paused", true);
+    await expect(video).not.toHaveAttribute("src", /.+/);
+    // A hidden video's global hotkeys must not change its sound or play it.
+    expect(
+      await video.evaluate(
+        (element, original) => element === original,
+        originalVideo,
+      ),
+    ).toBe(true);
+    // WebKit's idle native element may report its default audio flags while
+    // there is no source. Check hotkeys leave it idle, then check the retained
+    // user preference once media is loaded again below.
+    const idleMuted = await video.evaluate(
+      (element: HTMLVideoElement) => element.muted,
+    );
+    await page.keyboard.press("m");
+    await expect(video).toHaveJSProperty("muted", idleMuted);
+    await expect(video).toHaveJSProperty("paused", true);
+    await viewer.getByRole("button", { name: "Previous", exact: true }).click();
+    await expect(video).toBeVisible();
+    await expect
+      .poll(() =>
+        video.evaluate((element: HTMLVideoElement) => element.readyState),
+      )
+      .toBeGreaterThanOrEqual(2);
+    expect(
+      await video.evaluate(
+        (element, original) => element === original,
+        originalVideo,
+      ),
+    ).toBe(true);
+    await expect(video).toHaveJSProperty(
+      preference,
+      preference === "muted" ? true : 1.5,
+    );
+    expect(state.detailReads.filter((read) => read === "scene:8")).toEqual([
+      "scene:8",
+    ]);
+    const pages = [...state.pages];
+    await page.goBack();
+    await expect(viewer).toHaveCount(0);
+    await expect(page.locator("[data-gallery-media]")).toHaveCount(3);
+    expect(state.pages).toEqual(pages);
+    expect(
+      await originalVideo!.evaluate((element) => element.isConnected),
+    ).toBe(false);
+  });
+}
+
+test("mixed lightbox can retry unavailable video details without losing its position", async ({
+  page,
+}) => {
+  await fixture(page, { failScene: true });
+  await page.goto("/gallery-media");
+  await page.getByRole("button", { name: "Second video", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Lightbox", exact: true });
+  await expect(
+    viewer.getByText("This media is unavailable", { exact: true }),
+  ).toBeVisible();
+  await expect(viewer.getByText("2 / 3", { exact: true })).toBeVisible();
+  await viewer.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(viewer.locator("video")).toBeVisible();
+  await expect(viewer.getByText("2 / 3", { exact: true })).toBeVisible();
 });
 
 test("image and scene covers refresh only the selected gallery and keep its media page", async ({
@@ -284,7 +413,7 @@ test("video-only gallery has playable contents", async ({ page }) => {
   await page.goto("/gallery-media");
   await expect(page.locator('[data-gallery-media="scene:8"]')).toBeVisible();
   await page.getByRole("button", { name: "View gallery", exact: true }).click();
-  const viewer = page.getByRole("dialog", { name: "Gallery viewer" });
+  const viewer = page.locator(".yarl__root");
   await expect(viewer.locator("video").first()).toBeVisible();
   await expect(
     viewer.getByRole("button", { name: "Next", exact: true }),
@@ -308,7 +437,7 @@ test("failed next page can be retried without skipping an item", async ({
   await fixture(page, { failNext: true });
   await page.goto("/gallery-media");
   await page.getByRole("button", { name: "Second video", exact: true }).click();
-  const viewer = page.getByRole("dialog", { name: "Gallery viewer" });
+  const viewer = page.locator(".yarl__root");
   await viewer.getByRole("button", { name: "Next", exact: true }).click();
   await expect(
     viewer.getByText("Could not load gallery media", { exact: true }),
@@ -317,8 +446,8 @@ test("failed next page can be retried without skipping an item", async ({
     viewer.getByRole("button", { name: "Next", exact: true }),
   ).toBeDisabled();
   await viewer.getByRole("button", { name: "Retry", exact: true }).click();
-  await expect(viewer.locator("img.yarl__slide_image")).toBeVisible();
   await expect(
-    viewer.getByText("3 of 3 · First image", { exact: true }),
+    viewer.locator(".yarl__slide_current img.yarl__slide_image"),
   ).toBeVisible();
+  await expect(viewer.getByText("3 / 3", { exact: true })).toBeVisible();
 });

@@ -42,8 +42,8 @@ next adapter upgrade instead of losing the engine's Safari seek fixes.
 
 ## Media lifetime and selection
 
-The scene lightbox uses [scene-carousel.tsx](../src/components/lightbox/scene-carousel.tsx),
-a YARL carousel module with three keyed posters and one persistent player above
+Scene and mixed-media lightboxes use [scene-carousel.tsx](../src/components/lightbox/scene-carousel.tsx),
+a YARL carousel module with three keyed image/poster slots and one persistent player above
 the track. YARL's controller still
 owns pointer/wheel navigation, drag offsets and swipe animations. The decoded
 incoming poster stays mounted while the outgoing player keeps its visual position
@@ -55,6 +55,20 @@ between slides. Opening playback starts when media is ready; there is no timer
 that pauses a video after its first playing event. A late EOF from an outgoing
 scene cannot advance the new selection. Autoplay keeps the current sound state;
 if Safari rejects it, the existing Play control supplies the required gesture.
+
+`MediaLightbox` accepts image and scene slides in one ordered list. Gallery media
+uses this viewer instead of a separate dialog. Images use the existing YARL Zoom
+renderer and image metadata controls; only the selected image queries its details,
+and only neighboring image pixels preload. Videos query details only after their
+slide settles. While an image is selected the retained video is hidden, suspended,
+and has no active source or keyboard shortcuts. Audio and playback rate survive
+returning to a video. The idle source explicitly uses the native adapter: Video.js
+otherwise infers a null source as HLS and attaches an empty MediaSource.
+
+Gallery pagination appends a loading slide and fetches the next page on navigation.
+Errors retain that position with Retry; a changed membership signature suspends
+playback until the gallery is reloaded. Dismissal uses the same lightbox history
+and animation handling as scene lists, preserving the loaded gallery grid.
 
 `playbackKey` identifies the selected scene/marker independently of media ownership.
 Selection changes reset source preferences, clip offsets, poster/started latches,

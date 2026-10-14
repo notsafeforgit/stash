@@ -860,6 +860,7 @@ export function useScenePlayerSources({
   const handleMediaError = useCallback(
     (event: SyntheticEvent<HTMLVideoElement>) => {
       if (
+        !finalSrc ||
         !activeSrc ||
         !isDirectStreamSrc(activeSrc) ||
         currentLoadRef.current !== load
@@ -876,6 +877,7 @@ export function useScenePlayerSources({
       if (fallback) handleSourceChange(fallback, true);
     },
     [
+      finalSrc,
       activeSrc,
       load,
       sources,

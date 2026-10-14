@@ -1,34 +1,20 @@
-import { useState } from "react";
-import { Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useIntl } from "react-intl";
+import { useCallback, useMemo, useState } from "react";
 import { useMsg } from "@/hooks/message";
-import { useCommittedRef } from "@/hooks/use-committed-ref";
-import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  AlbumImage,
-  AlbumVideo,
-} from "@/components/archive/albums/playback-media";
+import { MediaLightbox } from "@/components/lightbox/scene-lightbox";
+import type { LightboxSlide, SceneSlide } from "@/components/lightbox";
 import type { AlbumReadPage } from "@/components/archive/albums/read";
 import { NativeArchiveError } from "@/core/native-archive/client";
 import {
-  galleryMediaKey,
   GalleryMediaReadError,
   type GalleryMediaItem,
   type GalleryMediaPage,
 } from "./gallery-media";
 
+const PENDING: LightboxSlide = { src: "", loading: true };
+
 export default function GalleryMediaPlayback({
-  gallery,
   data,
   index: initialIndex,
   signature,
@@ -37,7 +23,6 @@ export default function GalleryMediaPlayback({
   onMore,
   onClose,
 }: {
-  gallery: string;
   data?: AlbumReadPage<GalleryMediaItem, number, GalleryMediaPage>;
   index: number;
   signature: string;
@@ -47,142 +32,85 @@ export default function GalleryMediaPlayback({
   onClose: () => void;
 }) {
   const msg = useMsg();
-  const intl = useIntl();
   const [index, setIndex] = useState(initialIndex);
-  const latestIndex = useCommittedRef(index);
-  const item = data?.items[index];
   const changed =
     (data !== undefined && data.signature !== signature) ||
     (error instanceof NativeArchiveError && error.code === "album_changed");
-  const hasNext =
-    !!item && (index + 1 < (data?.items.length ?? 0) || data?.next != null);
-  function next() {
-    if (latestIndex.current !== index || changed || busy || !hasNext) return;
-    setIndex(index + 1);
-    if (!data?.items[index + 1]) void onMore();
-  }
-  return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent className="flex h-[90dvh] max-w-[calc(100%-1rem)] flex-col sm:max-w-6xl">
-        <DialogHeader className="shrink-0 pr-8">
-          <DialogTitle>
-            {msg("gallery_media.viewer", "Gallery viewer")}
-          </DialogTitle>
-          <DialogDescription>
-            {msg(
-              "gallery_media.viewer_help",
-              "Browse images and play scenes in this gallery's order.",
-            )}
-          </DialogDescription>
-        </DialogHeader>
+  const slides = useMemo<(LightboxSlide | SceneSlide)[]>(() => {
+    if (changed) return [PENDING];
+    const items = (data?.items ?? []).map(
+      (item): LightboxSlide | SceneSlide => {
+        if (item.scene)
+          return {
+            type: "scene",
+            sceneId: item.scene.id,
+            title: item.scene.title ?? undefined,
+            posterSrc: item.scene.paths.screenshot ?? undefined,
+          };
+        const image = item.image;
+        return {
+          src: image?.paths.image ?? image?.paths.preview ?? "",
+          thumbnail: image?.paths.thumbnail ?? undefined,
+          imageId: image?.id,
+          imageTitle: image?.title ?? undefined,
+          alt: image?.title ?? undefined,
+          width: image?.visual_files[0]?.width,
+          height: image?.visual_files[0]?.height,
+        };
+      },
+    );
+    return data?.next != null ? [...items, PENDING] : items;
+  }, [data?.items, data?.next, changed]);
+  const onView = useCallback(
+    (next: number) => {
+      if (changed) return;
+      setIndex(next);
+      // Reaching the boundary loads one page. Failed reads stay on that same
+      // slot until Retry; swiping back never discards the already loaded list.
+      if (
+        next === data?.items.length &&
+        data.next != null &&
+        !busy &&
+        error === undefined
+      )
+        void onMore();
+    },
+    [changed, data, busy, error, onMore],
+  );
+  const renderPending = useCallback(
+    () => (
+      <div className="max-w-lg p-4">
         {changed ? (
           <Alert>
             <AlertTitle>
               {msg("source_albums.changed", "This album changed")}
             </AlertTitle>
             <AlertDescription>
-              <p>
-                {msg(
-                  "gallery_media.changed",
-                  "Close the viewer and reload the gallery before continuing.",
-                )}
-              </p>
-              <Button variant="outline" onClick={onClose}>
-                {msg("actions.close", "Close")}
-              </Button>
+              {msg(
+                "gallery_media.changed",
+                "Close the viewer and reload the gallery before continuing.",
+              )}
             </AlertDescription>
           </Alert>
+        ) : error !== undefined ? (
+          <GalleryMediaReadError error={error} retry={() => void onMore()} />
         ) : (
-          <>
-            <div
-              className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-muted"
-              data-gallery-viewer-index={index}
-            >
-              {item?.scene ? (
-                <AlbumVideo
-                  id={item.scene.id}
-                  playbackKey={`gallery:${gallery}:${signature}:${index}:${galleryMediaKey(item)}`}
-                  onNext={hasNext ? next : undefined}
-                />
-              ) : item?.image ? (
-                <AlbumImage key={item.image.id} id={item.image.id} />
-              ) : busy ? (
-                <Spinner />
-              ) : error !== undefined ? (
-                <GalleryMediaReadError
-                  error={error}
-                  retry={() => void onMore()}
-                />
-              ) : (
-                <p>
-                  {msg(
-                    "album_playback.unavailable",
-                    "This media is unavailable",
-                  )}
-                </p>
-              )}
-            </div>
-            <div className="flex shrink-0 flex-col gap-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p
-                  className="min-w-0 flex-1 wrap-anywhere text-sm"
-                  aria-live="polite"
-                >
-                  {intl.formatMessage(
-                    {
-                      id: "gallery_media.position",
-                      defaultMessage: "{position, number} of {count, number}",
-                    },
-                    { position: index + 1, count: data?.header.count ?? 0 },
-                  )}
-                  {(item?.scene?.title || item?.image?.title) &&
-                    ` · ${item?.scene?.title || item?.image?.title}`}
-                </p>
-                {item?.scene ? (
-                  <Link
-                    to="/scenes/$sceneId"
-                    params={{ sceneId: item.scene.id }}
-                  >
-                    {msg("source_albums.open_media", "Open media")}
-                  </Link>
-                ) : (
-                  item?.image && (
-                    <Link
-                      to="/images/$imageId"
-                      params={{ imageId: item.image.id }}
-                    >
-                      {msg("source_albums.open_media", "Open media")}
-                    </Link>
-                  )
-                )}
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="outline"
-                  disabled={index === 0 || !data}
-                  onClick={() => setIndex(index - 1)}
-                >
-                  <ChevronLeft data-icon="inline-start" />
-                  {msg("actions.previous", "Previous")}
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={!hasNext || busy}
-                  onClick={next}
-                >
-                  {msg("actions.next", "Next")}
-                  <ChevronRight data-icon="inline-end" />
-                </Button>
-              </div>
-            </div>
-          </>
+          <Spinner className="size-10 text-white/70" />
         )}
-      </DialogContent>
-    </Dialog>
+      </div>
+    ),
+    [changed, error, onMore, msg],
+  );
+  return (
+    <MediaLightbox
+      open
+      finite
+      slides={slides}
+      index={changed ? 0 : index}
+      totalCount={changed ? 0 : data?.header.count}
+      onView={onView}
+      onClose={onClose}
+      renderPending={renderPending}
+    />
   );
 }

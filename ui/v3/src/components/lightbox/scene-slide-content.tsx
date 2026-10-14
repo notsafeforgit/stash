@@ -11,6 +11,8 @@ import { useIsTruncated } from "src/hooks/use-is-truncated";
 import { Spinner } from "src/components/ui/spinner";
 import { Badge } from "src/components/ui/badge";
 import { Button } from "src/components/ui/button";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { useMsg } from "@/hooks/message";
 import {
   Tooltip,
   TooltipContent,
@@ -112,9 +114,10 @@ function ActiveSceneSlide({
   onNext,
   onClose,
 }: SceneSlideContentProps) {
-  const { data, loading } = useQuery(
+  const msg = useMsg();
+  const { data, loading, error, refetch } = useQuery(
     GQL.FindSceneDocument,
-    slide.loading || slide.offlineEntry
+    slide.loading || slide.suspended || slide.offlineEntry
       ? skipToken
       : { variables: { id: slide.sceneId } },
   );
@@ -128,13 +131,14 @@ function ActiveSceneSlide({
   );
   // Apollo may retain the previous result while variables change. Never
   // expose that result as the newly selected scene.
-  const scene = slide.loading
-    ? undefined
-    : slide.offlineEntry
-      ? offlineScene
-      : data?.findScene?.id === slide.sceneId
-        ? data.findScene
-        : undefined;
+  const scene =
+    slide.loading || slide.suspended || error
+      ? undefined
+      : slide.offlineEntry
+        ? offlineScene
+        : data?.findScene?.id === slide.sceneId
+          ? data.findScene
+          : undefined;
 
   // Keep the player mounted through query/OPFS gaps and boundary sentinels.
   // Suspended playback clears its source and releases the previous transcode;
@@ -236,6 +240,35 @@ function ActiveSceneSlide({
               <Spinner className="size-10 text-white/70" />
             </div>
           )}
+          {!slide.loading &&
+            !slide.suspended &&
+            !loading &&
+            !slide.offlineEntry && (
+              <div className="absolute inset-0 flex items-center justify-center p-4">
+                <Alert className="max-w-md">
+                  <AlertTitle>
+                    {msg(
+                      "album_playback.unavailable",
+                      "This media is unavailable",
+                    )}
+                  </AlertTitle>
+                  <AlertDescription>
+                    <p>
+                      {msg(
+                        "album_playback.unavailable_help",
+                        "It may have been removed or its file may be offline. The source position is retained.",
+                      )}
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => void refetch().catch(() => {})}
+                    >
+                      {msg("actions.retry", "Retry")}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
           <PendingPlayerClose onClose={onClose} />
         </div>
       )}

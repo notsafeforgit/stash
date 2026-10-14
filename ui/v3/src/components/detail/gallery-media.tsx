@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import { Link } from "@tanstack/react-router";
 import { Images, Play, MoreHorizontal } from "lucide-react";
@@ -8,14 +8,6 @@ import {
   type FindGalleryMediaQuery,
 } from "@/core/generated-graphql";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { NativeArchiveError } from "@/core/native-archive/client";
 import { Spinner } from "@/components/ui/spinner";
@@ -30,8 +22,14 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { useGalleryCover } from "./use-gallery-cover";
+import { deferredOverlay } from "@/components/shared/deferred-overlay";
+import { LightboxPending } from "@/components/lightbox/lightbox-pending";
 
-const GalleryMediaPlayback = lazy(() => import("./gallery-media-playback"));
+const GalleryMediaPlayback = deferredOverlay(
+  () => import("./gallery-media-playback"),
+  (props) => ({ open: true, onClose: props.onClose }),
+  LightboxPending,
+);
 export type GalleryMediaPage = NonNullable<
   FindGalleryMediaQuery["findGallery"]
 >["media"];
@@ -143,45 +141,50 @@ export function GalleryMedia({ id }: { id: string }) {
         {items.map((item, index) => {
           const media = item.scene ?? item.image;
           if (!media) return null;
-          const kind = item.scene
-            ? msg("scene", "Scene")
-            : msg("image", "Image");
           const title =
             media.title ||
             `${item.scene ? msg("scene", "Scene") : msg("image", "Image")} #${media.id}`;
           const thumbnail =
             item.scene?.paths.screenshot ?? item.image?.paths.thumbnail;
           return (
-            <Card
+            <div
               key={galleryMediaKey(item)}
-              size="sm"
+              className="min-w-0"
               data-gallery-media={galleryMediaKey(item)}
             >
-              <CardContent>
-                <Button
-                  variant="ghost"
-                  className="h-auto w-full overflow-hidden p-0"
-                  aria-label={title}
-                  onClick={() =>
-                    setPlayback({ index, signature: result.data!.signature })
-                  }
-                >
-                  {thumbnail ? (
-                    <img
-                      src={thumbnail}
-                      alt=""
-                      loading="lazy"
-                      className="aspect-square w-full object-contain"
-                    />
-                  ) : (
-                    <span className="flex aspect-square w-full items-center justify-center">
-                      <Images />
-                    </span>
-                  )}
-                </Button>
-              </CardContent>
-              <CardHeader>
-                <CardTitle>
+              <Button
+                variant="ghost"
+                className="relative h-auto w-full overflow-hidden p-0"
+                aria-label={title}
+                onClick={() =>
+                  setPlayback({ index, signature: result.data!.signature })
+                }
+              >
+                {thumbnail ? (
+                  <img
+                    src={thumbnail}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    draggable={false}
+                    className="aspect-square w-full object-contain"
+                  />
+                ) : (
+                  <span className="flex aspect-square w-full items-center justify-center">
+                    <Images />
+                  </span>
+                )}
+                {item.scene && (
+                  <span
+                    className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-background/80 p-1.5 text-foreground"
+                    aria-hidden="true"
+                  >
+                    <Play className="size-4" />
+                  </span>
+                )}
+              </Button>
+              <div className="flex items-start gap-1 pt-1">
+                <div className="min-w-0 flex-1 text-sm">
                   {item.scene ? (
                     <Link
                       className="line-clamp-2 break-words"
@@ -199,10 +202,7 @@ export function GalleryMedia({ id }: { id: string }) {
                       {title}
                     </Link>
                   )}
-                </CardTitle>
-              </CardHeader>
-              <CardFooter className="justify-between">
-                <Badge variant="secondary">{kind}</Badge>
+                </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     render={
@@ -237,8 +237,8 @@ export function GalleryMedia({ id }: { id: string }) {
                     </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </CardFooter>
-            </Card>
+              </div>
+            </div>
           );
         })}
       </div>
@@ -252,17 +252,14 @@ export function GalleryMedia({ id }: { id: string }) {
         </Button>
       )}
       {playback && (
-        <Suspense fallback={<Spinner />}>
-          <GalleryMediaPlayback
-            gallery={id}
-            data={result.data}
-            {...playback}
-            busy={result.busy}
-            error={result.error}
-            onMore={result.more}
-            onClose={() => setPlayback(null)}
-          />
-        </Suspense>
+        <GalleryMediaPlayback
+          data={result.data}
+          {...playback}
+          busy={result.busy}
+          error={result.error}
+          onMore={result.more}
+          onClose={() => setPlayback(null)}
+        />
       )}
     </div>
   );

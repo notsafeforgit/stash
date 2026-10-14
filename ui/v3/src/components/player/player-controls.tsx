@@ -265,6 +265,7 @@ function RelSeekButton({
 // ── Hotkeys ────────────────────────────────────────────────────────────────────
 
 function useHotkeys({
+  enabled,
   Player,
   frameRate,
   onSeekBy,
@@ -273,6 +274,7 @@ function useHotkeys({
   onTogglePaused,
   disableSeekArrows,
 }: {
+  enabled: boolean;
   Player: PlayerInstance;
   frameRate: number;
   onSeekBy: (seconds: number) => void;
@@ -383,6 +385,7 @@ function useHotkeys({
   );
 
   useEffect(() => {
+    if (!enabled) return;
     // Capture phase, not bubble: a player button (e.g. the +10s seek
     // button in the control bar) that happens to hold keyboard focus
     // would otherwise have its keydown processed first, and Safari
@@ -396,7 +399,7 @@ function useHotkeys({
     window.addEventListener("keydown", handler, { capture: true });
     return () =>
       window.removeEventListener("keydown", handler, { capture: true });
-  }, [handler]);
+  }, [handler, enabled]);
 }
 
 // ── Touch overlay ─────────────────────────────────────────────────────────────
@@ -868,6 +871,7 @@ function ControlBar({
 // ── Main export ────────────────────────────────────────────────────────────────
 
 export interface PlayerControlsProps {
+  hotkeysEnabled?: boolean;
   castingAllowed?: boolean;
   Player: PlayerInstance;
   /** End an outgoing scene/marker's scrub without interrupting held speed. */
@@ -954,6 +958,7 @@ export interface PlayerControlsProps {
 }
 
 export function PlayerControls({
+  hotkeysEnabled = true,
   castingAllowed = true,
   Player,
   playbackKey,
@@ -1077,6 +1082,7 @@ export function PlayerControls({
   }, [onToggleFullscreenOverride, fullscreenContainerRef, store]);
 
   useHotkeys({
+    enabled: hotkeysEnabled,
     Player,
     frameRate: frameRate ?? 0,
     onSeekBy,

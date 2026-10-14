@@ -1,7 +1,8 @@
-export { Lightbox, SceneLightbox } from "./deferred-lightboxes";
+export { Lightbox, SceneLightbox, MediaLightbox } from "./deferred-lightboxes";
 export type { LightboxProps, LightboxSlide, DisplayMode } from "./lightbox";
 export type {
   SceneLightboxProps,
+  MediaLightboxProps,
   SceneSlide,
   SceneSlideMarker,
 } from "./scene-lightbox";

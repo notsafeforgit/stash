@@ -4,7 +4,10 @@ import {
   useScenePlayerControls,
   useScenePlayerValue,
 } from "@/components/player/scene-player-controls";
-import { PositionScrubber } from "@/components/player/position-scrubber";
+import {
+  PositionScrubber,
+  type ScrubberCrossAxisPan,
+} from "@/components/player/position-scrubber";
 import { useTvRotation } from "./tv-slider";
 import { useSpriteInfo } from "@/hooks/use-sprite-info";
 import type { PlaybackRange } from "@/core/marker-range";
@@ -20,10 +23,12 @@ export function TvTimeline({
   scene,
   range,
   showSceneMarkers,
+  crossAxisPan,
 }: {
   scene: TvScene;
   range: PlaybackRange;
   showSceneMarkers: boolean;
+  crossAxisPan: ScrubberCrossAxisPan;
 }) {
   const msg = useMsg();
   const position = useScenePlayerValue("displayPosition");
@@ -112,6 +117,7 @@ export function TvTimeline({
         key={`${scene.id}:${range.start}:${range.end}:${rotation}`}
         value={value}
         duration={duration}
+        crossAxisPan={crossAxisPan}
         bufferedRanges={bufferedRanges}
         bufferedOffset={-range.start}
         direction={

@@ -90,6 +90,51 @@ const time = (slider: HTMLElement) =>
   Number(slider.getAttribute("aria-valuenow"));
 
 for (const direction of ["right", "down", "up"] as const) {
+  it(`hands cross-axis drags to the feed without seeking when facing ${direction}`, async () => {
+    const pan = { onDrag: vi.fn(), onEnd: vi.fn(), onCancel: vi.fn() };
+    const slider = await render({ direction, crossAxisPan: pan });
+    const x = direction === "right" ? 200 : direction === "down" ? 280 : 120;
+    const y = direction === "right" ? 120 : 200;
+    await pointer(slider, "pointerdown");
+    await pointer(slider, "pointermove", x, y);
+    expect(pan.onDrag).toHaveBeenLastCalledWith(-80);
+    await wait(2000);
+    expect(preview).not.toHaveBeenCalled();
+    expect(vibrate).not.toHaveBeenCalled();
+    await pointer(slider, "pointerup", x, y);
+    expect(pan.onEnd).toHaveBeenCalledExactlyOnceWith(-80);
+    expect(seek).not.toHaveBeenCalled();
+    expect(pan.onCancel).not.toHaveBeenCalled();
+    expect(slider.hasAttribute("data-dragging")).toBe(false);
+  });
+}
+
+it("keeps horizontal scrubbing after the gesture is claimed, even if the finger then moves vertically", async () => {
+  const pan = { onDrag: vi.fn(), onEnd: vi.fn(), onCancel: vi.fn() };
+  const slider = await render({ crossAxisPan: pan });
+  await pointer(slider, "pointerdown");
+  await pointer(slider, "pointermove", 220, 200);
+  await pointer(slider, "pointermove", 220, 100);
+  await pointer(slider, "pointerup", 220, 100);
+  expect(seek).toHaveBeenCalledExactlyOnceWith(66);
+  expect(pan.onDrag).not.toHaveBeenCalled();
+  expect(pan.onEnd).not.toHaveBeenCalled();
+});
+
+it("cancels an interrupted feed drag and accepts the next seek tap", async () => {
+  const pan = { onDrag: vi.fn(), onEnd: vi.fn(), onCancel: vi.fn() };
+  const slider = await render({ crossAxisPan: pan });
+  await pointer(slider, "pointerdown");
+  await pointer(slider, "pointermove", 200, 100);
+  await pointer(slider, "pointercancel", 200, 100);
+  expect(pan.onCancel).toHaveBeenCalledTimes(1);
+  expect(pan.onEnd).not.toHaveBeenCalled();
+  await pointer(slider, "pointerdown");
+  await pointer(slider, "pointerup");
+  expect(seek).toHaveBeenCalledExactlyOnceWith(60);
+});
+
+for (const direction of ["right", "down", "up"] as const) {
   it(`anchors successive touch zooms and commits the precise time when seeking ${direction}`, async () => {
     const slider = await render({ direction });
     await pointer(slider, "pointerdown");

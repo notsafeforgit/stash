@@ -133,8 +133,12 @@ Metadata links open the app's existing detail routes. Returning to TV restores
 the recent feed, selection, and scalar playback state while cached. Rating,
 organized state, and O-counter operations target the parent scene in both modes.
 **Information** toggles transparent metadata beside the lower action rail.
-Its bounded scroller wraps long titles and tags; playback, swiping and automatic
-advance continue outside it. Hiding the controls hides the metadata too.
+Long titles and tags wrap beside the action rail. Vertical swipes and wheel
+gestures navigate the feed across the video, metadata, action buttons and footer.
+Swiping a button does not activate it; tapping still does. The timeline chooses
+the gesture's initial direction: across its track seeks, while perpendicular
+movement navigates the feed, including in rotated presentation. Open menus and
+dialogs keep their own scrolling. Hiding the controls hides the metadata too.
 The O-counter has a numeric badge and an anchored, nonmodal popover for Add O,
 Decrement O and Reset O. Badges show four digits in full and cap larger values
 at `9999+`; the popover shows the full, localized count. Custom pinned and folder

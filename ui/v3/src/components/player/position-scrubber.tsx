@@ -23,6 +23,13 @@ interface TouchScrub {
   range: PlaybackRange;
 }
 
+/** Optional owner for drags perpendicular to the timeline (TV feed navigation). */
+export interface ScrubberCrossAxisPan {
+  onDrag: (offset: number) => void;
+  onEnd: (offset: number) => void;
+  onCancel: () => void;
+}
+
 /** The video scrubber shared by standard controls and TV. All times are in
  * the caller's display coordinates; seeking into a scene stays at its boundary.
  * Pointer drags can preview buffered frames and commit once, including when rotated. */
@@ -39,6 +46,7 @@ export function PositionScrubber({
   onSeekPreview,
   onScrubChange,
   onPreviewChange,
+  crossAxisPan,
 }: {
   value: number;
   duration: number;
@@ -54,24 +62,28 @@ export function PositionScrubber({
   onSeekPreview?: (time: number | null) => void;
   onScrubChange?: (time: number | null) => void;
   onPreviewChange?: (visible: boolean) => void;
+  crossAxisPan?: ScrubberCrossAxisPan;
 }) {
   const msg = useMsg();
   const trackRef = useRef<HTMLDivElement>(null);
   const pointer = useRef<number | null>(null);
   const origin = useRef({ x: 0, y: 0 });
   const previewing = useRef(false);
+  const gesture = useRef<"pending" | "seek" | "pan">("seek");
   const touchScrub = useRef<TouchScrub | null>(null);
   const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbacks = useCommittedRef({
     onSeekPreview,
     onScrubChange,
     onPreviewChange,
+    crossAxisPan,
   });
   useEffect(
     () => () => {
       if (dwellTimer.current !== null) clearTimeout(dwellTimer.current);
       touchScrub.current = null;
       if (previewing.current) callbacks.current.onSeekPreview?.(null);
+      if (gesture.current === "pan") callbacks.current.crossAxisPan?.onCancel();
       if (pointer.current !== null) {
         callbacks.current.onScrubChange?.(null);
         callbacks.current.onPreviewChange?.(false);
@@ -113,6 +125,10 @@ export function PositionScrubber({
         pointerRatio(event) * (visibleRange.end - visibleRange.start),
     );
   };
+  const crossAxisOffset = (event: React.PointerEvent<HTMLDivElement>) =>
+    direction === "right"
+      ? event.clientY - origin.current.y
+      : (event.clientX - origin.current.x) * (direction === "down" ? -1 : 1);
   const clearDwell = () => {
     if (dwellTimer.current !== null) clearTimeout(dwellTimer.current);
     dwellTimer.current = null;
@@ -127,6 +143,7 @@ export function PositionScrubber({
     dwellTimer.current = setTimeout(
       () => {
         if (touchScrub.current !== touch) return;
+        gesture.current = "seek";
         const previousSpan = touch.range.end - touch.range.start;
         // Long scenes enter a useful minute-wide window on the first dwell.
         // Further dwells refine it down to a second, including short marker clips.
@@ -154,10 +171,12 @@ export function PositionScrubber({
     setPrecisionRange(null);
     pointer.current = null;
     previewing.current = false;
+    gesture.current = "seek";
     change(null);
     onPreviewChange?.(false);
   };
   const cancel = () => {
+    if (gesture.current === "pan") crossAxisPan?.onCancel();
     if (previewing.current) onSeekPreview?.(null);
     finish();
   };
@@ -198,6 +217,7 @@ export function PositionScrubber({
         event.stopPropagation();
         event.preventDefault();
         pointer.current = event.pointerId;
+        gesture.current = crossAxisPan ? "pending" : "seek";
         origin.current = { x: event.clientX, y: event.clientY };
         event.currentTarget.focus({ preventScroll: true });
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -216,6 +236,26 @@ export function PositionScrubber({
       onPointerMove={(event) => {
         if (pointer.current !== event.pointerId) return;
         event.stopPropagation();
+        if (gesture.current === "pending") {
+          const along =
+            direction === "right"
+              ? event.clientX - origin.current.x
+              : event.clientY - origin.current.y;
+          const across = crossAxisOffset(event);
+          if (Math.max(Math.abs(along), Math.abs(across)) < 10) return;
+          gesture.current = Math.abs(across) > Math.abs(along) ? "pan" : "seek";
+          if (gesture.current === "pan") {
+            clearDwell();
+            touchScrub.current = null;
+            change(null);
+            onPreviewChange?.(false);
+          }
+        }
+        if (gesture.current === "pan") {
+          event.preventDefault();
+          crossAxisPan?.onDrag(crossAxisOffset(event));
+          return;
+        }
         const next = position(event);
         change(next);
         const touch = touchScrub.current;
@@ -250,11 +290,14 @@ export function PositionScrubber({
       onPointerUp={(event) => {
         if (pointer.current !== event.pointerId) return;
         event.stopPropagation();
+        const panning = gesture.current === "pan";
+        const offset = crossAxisOffset(event);
         const next = position(event);
         finish();
         if (event.currentTarget.hasPointerCapture(event.pointerId))
           event.currentTarget.releasePointerCapture(event.pointerId);
-        onSeek(next);
+        if (panning) crossAxisPan?.onEnd(offset);
+        else onSeek(next);
       }}
       onPointerCancel={(event) => {
         if (pointer.current !== event.pointerId) return;

@@ -1,7 +1,3 @@
-type VitePreloadErrorEvent = Event & {
-  payload?: unknown;
-};
-
 const reloadKeyPrefix = "stash:v3:vite-preload-reload:";
 const retryWindowMs = 5 * 60 * 1000;
 const dynamicImportFailureMessages = [
@@ -109,10 +105,10 @@ export function installVitePreloadErrorHandler() {
 
   pruneOldReloadKeys(Date.now());
 
-  window.addEventListener("vite:preloadError", (event) => {
-    const preloadEvent = event as VitePreloadErrorEvent;
-    attemptReload(preloadEvent.payload, event);
-  });
+  // Vite emits preloadError before the import promise rejects. React's local
+  // lazy boundaries can handle that rejection and retain the user's selection
+  // or draft. Only recover automatically when the failure is truly unhandled;
+  // a handled overlay offers an explicit reload through its Retry button.
 
   window.addEventListener("unhandledrejection", (event) => {
     if (!isDynamicImportFailure(event.reason)) return;

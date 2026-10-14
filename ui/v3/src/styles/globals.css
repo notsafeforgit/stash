@@ -1078,7 +1078,8 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
 }
 /* Match the unlayered page gesture policy: a layered touch-none utility cannot
    override it, and this surface must own vertical drags and speed holds. */
-[data-tv-play-surface] {
+[data-tv-controls],
+[data-tv-controls] * {
   touch-action: none;
 }
 .tv-viewport[data-tv-rotation="clockwise"] .tv-surface,

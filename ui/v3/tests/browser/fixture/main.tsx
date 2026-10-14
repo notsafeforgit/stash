@@ -84,6 +84,7 @@ import { DialogDismissalFixture } from "./dialog-dismissal";
 import { EntityCardsFixture } from "./entity-cards";
 import { EmbeddedListFixture } from "./embedded-list";
 import { DeferredListFixture } from "./deferred-list";
+import { PerformerListFixture } from "./performer-list";
 import { LightboxListFixture } from "./lightbox-list";
 import { RouteTransitionsFixture } from "./route-transitions";
 import { HomeFixture } from "./home";
@@ -350,6 +351,11 @@ const settingsRoute = createRoute({
 const libraryFolderFixture = window.name === "library-folder-fixture";
 const router = createRouter({
   routeTree: rootRoute.addChildren([
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/performer-list",
+      component: PerformerListFixture,
+    }),
     createRoute({
       getParentRoute: () => rootRoute,
       path: "/deferred-list",

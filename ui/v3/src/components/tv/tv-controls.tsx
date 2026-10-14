@@ -616,6 +616,7 @@ export function TvControls({
               scene={scene}
               range={range}
               showSceneMarkers={item.kind === "scene"}
+              crossAxisPan={input.timelinePan}
             />
           </>
         )}

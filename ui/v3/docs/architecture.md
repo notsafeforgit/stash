@@ -107,6 +107,10 @@ Preloading does not mount the player or load scene media. After first opening,
 deferred wrappers preserve component lifetime, drafts, and closing animations;
 pending or failed downloads of feature code remain dismissible. Generic tables
 use `lazyModule` to preserve item/column types across the lazy boundary.
+Vite's early `preloadError` event must not automatically reload the document:
+local lazy boundaries handle the subsequent rejection while keeping the list,
+selection and drafts mounted. Their Retry action explicitly reloads stale code.
+Only an unhandled startup import failure uses automatic, bounded reload recovery.
 
 Home mounts its first carousel immediately and uses `DeferredMount` to start
 other rows when they approach its scroll viewport. Mounted rows retain their

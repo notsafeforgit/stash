@@ -2,7 +2,7 @@ import {
   useCallback,
   useEffect,
   useRef,
-  type MouseEvent,
+  type MouseEvent as ReactMouseEvent,
   type RefObject,
 } from "react";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
@@ -129,7 +129,7 @@ export function useTvInputs({
     [controls, endHold, overlaysBlocked],
   );
   const tap = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
       const candidate = completedTap.current;
       cancelTap();
       if (latest.current.blocked || overlaysBlocked()) return;
@@ -166,6 +166,31 @@ export function useTvInputs({
     )
       endHold();
   }, [selectionKey, endHold, cancelTap]);
+  const dragFeed = useCallback(
+    (offset: number) => {
+      if (latest.current.blocked || overlaysBlocked()) return;
+      const height = surface.current?.clientHeight ?? 0;
+      latest.current.drag(
+        Math.max(-height * 0.8, Math.min(height * 0.8, offset)),
+      );
+    },
+    [surface, overlaysBlocked],
+  );
+  const finishDrag = useCallback(
+    (offset: number) => {
+      if (
+        !latest.current.blocked &&
+        !overlaysBlocked() &&
+        Math.abs(offset) > 55
+      )
+        latest.current.dispatch({
+          type: "navigate",
+          direction: offset < 0 ? 1 : -1,
+        });
+      else latest.current.cancelDrag();
+    },
+    [overlaysBlocked],
+  );
   useEffect(() => {
     const element = surface.current;
     if (!element || blocked) return;
@@ -177,6 +202,11 @@ export function useTvInputs({
       return !!control && !control.hasAttribute("data-video-gesture-surface");
     };
     const blockedNow = () => latest.current.blocked || overlaysBlocked();
+    const ownsNavigation = (target: EventTarget | null) =>
+      target instanceof Element &&
+      !!target.closest(
+        "input,textarea,select,[role=dialog],[role=menu],[contenteditable=true]",
+      );
     let pointer:
       | {
           id: number;
@@ -186,12 +216,14 @@ export function useTvInputs({
           touch: boolean;
           key: string;
           wasPaused: boolean;
+          playback: boolean;
         }
       | undefined;
     const pointers = new Set<number>();
     let wheelLast = 0;
     let wheelTotal = 0;
     let wheelCommitted = false;
+    let suppressClick = false;
     const cancel = () => {
       pointer = undefined;
       pointers.clear();
@@ -203,7 +235,15 @@ export function useTvInputs({
       // Controls such as the scrubber own their release and stop propagation.
       // Tracking those pointers here would leave phantom fingers in the set,
       // causing the next video tap to be discarded as a multitouch gesture.
-      if (blockedNow() || ignored(event.target) || event.button !== 0) return;
+      suppressClick = false;
+      if (
+        blockedNow() ||
+        ownsNavigation(event.target) ||
+        (event.target instanceof Element &&
+          event.target.closest("[role=slider]")) ||
+        event.button !== 0
+      )
+        return;
       pointers.add(event.pointerId);
       if (pointers.size > 1) {
         pointer = undefined;
@@ -221,8 +261,9 @@ export function useTvInputs({
         touch: event.pointerType === "touch",
         key: latest.current.selectionKey,
         wasPaused: controls.read().paused,
+        playback: !ignored(event.target),
       };
-      startHold(1, 500);
+      if (pointer.playback) startHold(1, 500);
     };
     const move = (event: PointerEvent) => {
       if (
@@ -245,7 +286,7 @@ export function useTvInputs({
         return;
       cancelTap();
       endHold();
-      if (controls.read().zoomed) {
+      if (pointer.playback && controls.read().zoomed) {
         pointer = undefined;
         return;
       }
@@ -254,14 +295,10 @@ export function useTvInputs({
         return;
       }
       pointer.moved = true;
+      suppressClick = true;
       element.setPointerCapture(event.pointerId);
       event.preventDefault();
-      latest.current.drag(
-        Math.max(
-          -element.clientHeight * 0.8,
-          Math.min(element.clientHeight * 0.8, delta.y),
-        ),
-      );
+      dragFeed(delta.y);
     };
     const up = (event: PointerEvent) => {
       pointers.delete(event.pointerId);
@@ -280,13 +317,8 @@ export function useTvInputs({
       if (held || blockedNow() || event.defaultPrevented) return;
       if (current.moved) {
         event.preventDefault();
-        if (Math.abs(delta.y) > 55)
-          latest.current.dispatch({
-            type: "navigate",
-            direction: delta.y < 0 ? 1 : -1,
-          });
-        else latest.current.cancelDrag();
-      } else {
+        finishDrag(delta.y);
+      } else if (current.playback) {
         completedTap.current = {
           touch: current.touch,
           key: current.key,
@@ -297,10 +329,10 @@ export function useTvInputs({
     const wheel = (event: WheelEvent) => {
       if (
         blockedNow() ||
-        ignored(event.target) ||
+        ownsNavigation(event.target) ||
         event.ctrlKey ||
         event.metaKey ||
-        controls.read().zoomed ||
+        (!ignored(event.target) && controls.read().zoomed) ||
         event.defaultPrevented
       )
         return;
@@ -408,6 +440,15 @@ export function useTvInputs({
     const contextMenu = (event: Event) => {
       if (!ignored(event.target)) event.preventDefault();
     };
+    // A drag that began on a button must not activate it on release, even
+    // when the pointer ends over that same button or a feed transition cancels.
+    const click = (event: MouseEvent) => {
+      if (!suppressClick || event.detail === 0) return;
+      suppressClick = false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    element.addEventListener("click", click, true);
     element.addEventListener("contextmenu", contextMenu);
     return () => {
       element.removeEventListener("pointerdown", down);
@@ -415,6 +456,7 @@ export function useTvInputs({
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", cancel);
       element.removeEventListener("contextmenu", contextMenu);
+      element.removeEventListener("click", click, true);
       element.removeEventListener("wheel", wheel);
       window.removeEventListener("keydown", keyDown);
       window.removeEventListener("keyup", keyUp);
@@ -431,6 +473,11 @@ export function useTvInputs({
     endHold,
     cancelTap,
     blocked,
+    dragFeed,
+    finishDrag,
   ]);
-  return { tap };
+  return {
+    tap,
+    timelinePan: { onDrag: dragFeed, onEnd: finishDrag, onCancel: cancelDrag },
+  };
 }

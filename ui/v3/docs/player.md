@@ -249,4 +249,5 @@ iOS playback separately from Linux Chromium/WebKit fixtures.
 Native decoding or unsupported-format errors on a direct source fall back to the
 available H.264/AAC HLS source. This uses the normal source transition, preserves
 position and playback intent, and leaves the saved quality preference unchanged.
+When TV specifies a resolution ceiling, the fallback also stays within it.
 Network errors and revoked share requests do not trigger this codec fallback.

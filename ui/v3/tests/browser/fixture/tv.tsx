@@ -60,9 +60,13 @@ const scenes: GQL.SceneDataFragment[] = Array.from(
       id,
       o_counter: Number(params.get("count") ?? 0),
       resume_time: params.has("resume") ? 4 : base.resume_time,
-      files: params.has("portrait")
-        ? base.files.map((file) => ({ ...file, width: 180, height: 320 }))
-        : base.files,
+      // Model HD originals while serving tiny synthetic media. A 240p ceiling
+      // must exercise HLS; a 1080p ceiling should preserve these originals.
+      files: base.files.map((file) => ({
+        ...file,
+        width: params.has("portrait") ? 720 : 1280,
+        height: params.has("portrait") ? 1280 : 720,
+      })),
       title: params.has("long-info")
         ? `Scene ${id} ${"VeryLongUnbrokenTitle".repeat(25)}`
         : `Scene ${id}`,
@@ -184,7 +188,9 @@ const settings: TvSettings = {
       : "normal",
   defaultQuality: params.has("low")
     ? { kind: "fixed", resolution: GQL.StreamingResolutionEnum.Low }
-    : { kind: "best" },
+    : params.has("full-hd")
+      ? { kind: "fixed", resolution: GQL.StreamingResolutionEnum.FullHd }
+      : { kind: "best" },
 };
 const legacyRail: TvRailEntry[] = [
   {

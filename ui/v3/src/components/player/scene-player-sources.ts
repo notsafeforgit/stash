@@ -117,7 +117,24 @@ function findSourceByPath(
 }
 
 /** A native decoding failure can recover through the existing H.264/AAC stream. */
-export function getCompatibilitySource(sources: PlayerSource[]) {
+export function getCompatibilitySource(
+  sources: PlayerSource[],
+  quality?: PlayerQuality,
+  dimensions: { width?: number; height?: number } = {},
+) {
+  if (quality?.kind === "fixed") {
+    return selectFixedQuality(
+      sources.filter((source) => {
+        try {
+          return new URL(source.src).pathname.endsWith("/stream.master.m3u8");
+        } catch {
+          return false;
+        }
+      }),
+      quality,
+      dimensions,
+    );
+  }
   return findSourceByPath(sources, "/stream.master.m3u8");
 }
 

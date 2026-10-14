@@ -54,9 +54,15 @@ and elapsed position. Sprite previews, marker metadata and activity still use
 the original scene timestamps internally.
 
 One saved **default quality for scenes and markers** is applied before each
-item loads. A fixed resolution selects an advertised normal HLS transcode at
-that resolution or below. If none is compatible, TV offers quality selection
-or skipping; it does not silently load a higher quality or a direct/remux stream.
+item loads. A fixed resolution is a ceiling on the shorter image edge, including
+portrait video. When the original's known dimensions fit, TV prefers a compatible
+direct stream, then full remux, then video-copy with AAC audio. Otherwise it
+selects an advertised HLS transcode at that resolution or below. Unknown original
+dimensions cannot establish that a direct/remux stream fits the ceiling. Codec
+checks still apply, and a direct decoding failure falls back to an HLS transcode
+within the ceiling. If no eligible source is available, TV offers quality
+selection or skipping instead of silently exceeding the limit. This is a
+resolution limit, not a bitrate limit.
 An explicit source selection lasts for the current item and preserves scene
 time and playback state. It does not change the shared player's saved quality.
 Transcodes are generated on demand by Stash; no generated video preview mode

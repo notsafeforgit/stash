@@ -883,10 +883,21 @@ export function useScenePlayerSources({
       // Native codec/container support can be over-reported. Recover only
       // decoding/format failures, not network errors or expired share access.
       if (code !== 3 && code !== 4) return;
-      const fallback = getCompatibilitySource(sources);
+      const fallback = getCompatibilitySource(sources, qualityPreference, {
+        width: fileWidth,
+        height: fileHeight,
+      });
       if (fallback) handleSourceChange(fallback, true);
     },
-    [activeSrc, load, sources, handleSourceChange],
+    [
+      activeSrc,
+      load,
+      sources,
+      qualityPreference,
+      fileWidth,
+      fileHeight,
+      handleSourceChange,
+    ],
   );
 
   // Pre-position the `<video>` synchronously inside `loadedmetadata`,

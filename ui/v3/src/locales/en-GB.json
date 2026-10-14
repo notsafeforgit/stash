@@ -2735,7 +2735,7 @@
       "start_muted": "Start muted",
       "start_muted_description": "Applies when entering TV. Your mute choice carries across videos; your browser may still require muted autoplay.",
       "quality": "Default quality for scenes and markers",
-      "quality_description": "Lower resolutions use the normal scene stream. A fixed quality never silently falls back to a higher resolution or the original file.",
+      "quality_description": "Sets a maximum resolution. Compatible originals within the limit play directly; larger or incompatible files use HLS. This does not limit bitrate.",
       "start": "Start scenes at",
       "window": "Scene playback length",
       "seconds": "Length in seconds",

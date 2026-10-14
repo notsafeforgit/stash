@@ -264,7 +264,7 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
           )}
           description={msg(
             "tv.settings.quality_description",
-            "Lower resolutions use the normal scene stream. A fixed quality never silently falls back to a higher resolution or the original file.",
+            "Sets a maximum resolution. Compatible originals within the limit play directly; larger or incompatible files use HLS. This does not limit bitrate.",
           )}
           value={
             values.defaultQuality.kind === "best"

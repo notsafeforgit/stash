@@ -141,31 +141,43 @@ test("rapid scrolling followed by exit cannot start late prepared streams", asyn
   expect([...sessions].every((id) => released.has(id))).toBe(true);
 });
 
-test("direct files prepare adjacent loads without extra visible players or transcodes", async ({
-  page,
-}) => {
-  await serveSceneMedia(page);
-  const loaded = new Set<string>();
-  const transcodes: string[] = [];
-  page.on("request", (request) => {
-    const url = new URL(request.url());
-    if (url.pathname.endsWith("/stream")) loaded.add(url.pathname);
-    if (/streams\.(keepalive|stop)$|\.m3u8$/.test(url.pathname))
-      transcodes.push(url.pathname);
+for (const scenario of [
+  { name: "best quality scenes", query: "", portrait: false },
+  { name: "1080p portrait scenes", query: "&full-hd&portrait", portrait: true },
+  {
+    name: "1080p portrait markers",
+    query: "&full-hd&portrait&markers",
+    portrait: true,
+  },
+]) {
+  test(`direct ${scenario.name} prepare adjacent loads without extra visible players or transcodes`, async ({
+    page,
+  }) => {
+    await serveSceneMedia(page, scenario.portrait ? "portrait" : "landscape");
+    const loaded = new Set<string>();
+    const transcodes: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (url.pathname.endsWith("/stream")) loaded.add(url.pathname);
+      if (/streams\.(keepalive|stop)$|\.m3u8$/.test(url.pathname))
+        transcodes.push(url.pathname);
+    });
+    await page.goto(`/tv-fixture/tv?paused&preload=5${scenario.query}`);
+    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+      "data-playback-ready",
+      "true",
+    );
+    // Three markers share each parent scene, while scene entries each use a file.
+    const markers = scenario.query.includes("&markers");
+    await expect.poll(() => loaded.size).toBe(markers ? 1 : 3);
+    await page.keyboard.press("ArrowDown");
+    await expect.poll(() => loaded.size).toBe(markers ? 2 : 4);
+    await page.keyboard.press("ArrowDown");
+    await expect.poll(() => loaded.size).toBe(markers ? 2 : 5);
+    await expect(page.locator("video")).toHaveCount(1);
+    expect(transcodes).toEqual([]);
   });
-  await page.goto("/tv-fixture/tv?paused&preload=5");
-  await expect(page.locator("[data-scene-player]")).toHaveAttribute(
-    "data-playback-ready",
-    "true",
-  );
-  await expect.poll(() => loaded.size).toBe(3);
-  await page.keyboard.press("ArrowDown");
-  await expect.poll(() => loaded.size).toBe(4);
-  await page.keyboard.press("ArrowDown");
-  await expect.poll(() => loaded.size).toBe(5);
-  await expect(page.locator("video")).toHaveCount(1);
-  expect(transcodes).toEqual([]);
-});
+}
 
 test("prepared-video capacity saves immediately with localized descriptive options", async ({
   page,

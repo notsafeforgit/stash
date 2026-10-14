@@ -67,8 +67,7 @@ class LauncherTests(unittest.TestCase):
         expected_new = ["https://www.reddit.com/user/Alpha/submitted/?sort=new",
                         "https://www.reddit.com/search?q=author%3AAlpha+nsfw%3Ayes&include_over_18=on&sort=new&t=all",
                         "https://www.reddit.com/r/Pictures/?sort=new", "https://www.reddit.com/user/me/saved/?sort=new"]
-        self.assertEqual(reddit_urls(["Alpha"], subs, saved=True), [expected_new[0], *expected_new[2:]])
-        self.assertEqual(reddit_urls(["Alpha"], subs, saved=True, recovery=True), expected_new)
+        self.assertEqual(reddit_urls(["Alpha"], subs, saved=True), expected_new)
         self.assertEqual(reddit_urls(["Alpha"], [], mode="top"), [
             "https://www.reddit.com/user/Alpha/submitted/?sort=top&t=all",
             "https://www.reddit.com/search?q=author%3AAlpha+nsfw%3Ayes&include_over_18=on&sort=top&t=all",
@@ -212,6 +211,20 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertEqual(len(result["targets"]), 6)
         self.assertTrue(result["full_history"])
+        self.assertFalse(self.outbox.exists())
+
+    def test_daily_reddit_checks_include_search_without_enabling_full_history(self):
+        args = ['--username', 'Example', '--dry-run', '--outbox', str(self.outbox)]
+        status, routine, errors = self.invoke(reddit_main, args)
+        self.assertEqual((status, errors), (0, ''))
+        self.assertFalse(routine['full_history'])
+        self.assertEqual(routine['targets'], [
+            'https://www.reddit.com/user/Example/submitted/?sort=new',
+            'https://www.reddit.com/search?q=author%3AExample+nsfw%3Ayes&include_over_18=on&sort=new&t=all'])
+        status, recovery, errors = self.invoke(reddit_main, [*args, '--recovery'])
+        self.assertEqual((status, errors), (0, ''))
+        self.assertTrue(recovery['full_history'])
+        self.assertEqual(recovery['targets'], routine['targets'])
         self.assertFalse(self.outbox.exists())
 
     def test_saved_list_request_survives_missing_inputs_without_becoming_completed(self):

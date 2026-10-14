@@ -101,7 +101,7 @@ class SubscriptionLauncherTests(unittest.TestCase):
     setUp = test_launchers.LauncherTests.setUp
     invoke = test_launchers.LauncherTests.invoke
 
-    def test_monitored_reddit_uses_one_listing_and_freezes_binding_into_queue(self):
+    def test_monitored_reddit_queues_daily_profile_and_search_for_one_subscription(self):
         cid = '10000000-0000-4000-8000-000000000001'
         item = {'enabled': True, 'revision': 7, 'collection': {'uuid': cid, 'root_uuid': ROOT,
             'namespace': 'native:reddit', 'target_url': 'https://www.reddit.com/user/example/', 'state': 'active'}}
@@ -109,20 +109,28 @@ class SubscriptionLauncherTests(unittest.TestCase):
         client.capabilities.return_value = {'source_subscriptions': True}
         client._request.return_value = {'items': [item], 'total': 1}
         targets, bindings = subscribed_targets(client, ROOT, 'reddit')
-        self.assertEqual(targets, ['https://www.reddit.com/user/example/submitted/?sort=new'])
+        self.assertEqual(targets, ['https://www.reddit.com/user/example/submitted/?sort=new',
+            'https://www.reddit.com/search?q=author%3Aexample+nsfw%3Ayes&include_over_18=on&sort=new&t=all'])
+        self.assertEqual(bindings, {url: {'collection_uuid': cid, 'revision': 7} for url in targets})
         spec = {'targets': targets, 'subscriptions': bindings, 'root_uuid': ROOT, 'operation': 'download',
                 'policy_sha256': 'a' * 64, 'cooldown_seconds': 0, 'window': {'since': None, 'until': '2026-10-01T12:00:00Z'}}
         with closing(Outbox(self.outbox, 'http://fixture.invalid', self.base[self.base.index('--producer')+1])) as box:
             calls = SourceCalls(box)
             calls.record(self.call, 'b' * 64, lambda: spec)
             delivery = calls.claim('20000000-0000-4000-8000-000000000001')
-            calls.bind(delivery, delivery.targets[0], {'target_url': targets[0], 'state': 'resolved', 'has_more': False,
-                'candidates': [{'collection_uuid': cid, 'collection_revision': 3, 'state': 'active', 'retrieval_url': targets[0]}]})
-            template = json.loads(box.db.execute('SELECT template FROM run_intents').fetchone()[0])
-            self.assertEqual(template['subscription_revision'], 7)
-            self.assertEqual(template['collection_uuid'], cid)
-        recovery, _ = subscribed_targets(client, ROOT, 'reddit', recovery=True)
-        self.assertEqual(len(recovery), 2)
+            # Both passes are queued before either is scraped: an unavailable
+            # profile must not prevent the independent search from running.
+            for target in delivery.targets:
+                url = target['target_url']
+                calls.bind(delivery, target, {'target_url': url, 'state': 'resolved', 'has_more': False,
+                    'candidates': [{'collection_uuid': cid, 'collection_revision': 3, 'state': 'active', 'retrieval_url': url}]})
+            templates = [json.loads(row[0]) for row in box.db.execute('SELECT template FROM run_intents')]
+            self.assertEqual({template['retrieval_url'] for template in templates}, set(targets))
+            self.assertEqual(len(templates), 2)
+            for template in templates:
+                self.assertEqual(template['subscription_revision'], 7)
+                self.assertEqual(template['collection_uuid'], cid)
+            self.assertEqual(calls.summary(self.call)['counts']['queued'], 2)
         for changed in ({'enabled': False}, {'revision': 0}, {'collection': {**item['collection'], 'root_uuid': cid}}):
             client._request.return_value = {'items': [{**item, **changed}], 'total': 1}
             with self.assertRaises(Unavailable):

@@ -11,7 +11,7 @@ class NoSubscriptions(Exception):
     pass
 
 
-def subscribed_targets(client, root, service, *, mode='new', recovery=False):
+def subscribed_targets(client, root, service, *, mode='new'):
     identifier(root)
     namespace = 'mirror:' + service + ':*' if service in ('coomer', 'kemono') else 'native:' + service
     if client.capabilities().get('source_subscriptions') is not True:
@@ -37,7 +37,7 @@ def subscribed_targets(client, root, service, *, mode='new', recovery=False):
                     raise InvalidData('Mismatched subscription')
                 urls = [url]
                 if service == 'reddit' and (profile := PROFILE.fullmatch(url)):
-                    urls = reddit_urls([profile[1]], [], mode=mode, recovery=recovery)
+                    urls = reddit_urls([profile[1]], [], mode=mode)
                 for retrieval in urls:
                     binding = {'collection_uuid': cid, 'revision': revision}
                     if retrieval in bindings and bindings[retrieval] != binding:

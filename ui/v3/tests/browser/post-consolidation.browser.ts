@@ -71,6 +71,11 @@ async function archive(
       return route.fulfill({ json: { total: 1, offset: 0 } });
     const path = url.pathname.replace(/^.*\/api\/v3\/archive\//, "");
     const body = route.request().postData();
+    if (
+      route.request().method() === "GET" &&
+      (path === `posts/${source}/studios` || path === `posts/${target}/studios`)
+    )
+      return route.fulfill({ json: [] });
     if (path === "posts") return route.fulfill({ json: [summary(target)] });
     if (path === `posts/${source}` || path === `posts/${target}`) {
       if (committed && refreshFails)

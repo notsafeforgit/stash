@@ -93,6 +93,7 @@ async function archive(
           ? []
           : [post];
     } else if (/^posts\/[^/]+$/.test(path)) result = post;
+    else if (/^posts\/[^/]+\/studios$/.test(path)) result = [];
     else if (path.endsWith("/thread"))
       result = {
         requested_uuid: post.requested_uuid,

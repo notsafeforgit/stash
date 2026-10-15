@@ -55,6 +55,7 @@ async function archive(
       result = {
         requested_uuid: postIds.gallery,
         gallery: postAlbum().gallery,
+        studios: [],
         posts: options.empty
           ? []
           : options.manyPosts

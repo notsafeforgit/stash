@@ -73,6 +73,10 @@ async function archive(
     if (path === "collections") return route.fulfill({ json: [collection()] });
     if (path === `collections/${collectionID}`)
       return route.fulfill({ json: collection() });
+    if (path === `collections/${collectionID}/studio`)
+      return route.fulfill({
+        json: { collection_uuid: collectionID, revision: 0, studio: null },
+      });
     if (path === `media-roots/${rootID}`)
       return route.fulfill({ json: mediaRoot() });
     if (path === `collections/${collectionID}/metadata-policy`) {

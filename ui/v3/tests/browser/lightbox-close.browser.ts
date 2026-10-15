@@ -10,6 +10,18 @@ for (const kind of ["image", "scene"] as const) {
       await serveSceneMedia(page);
       await page.goto(`/lightbox-list?kind=${kind}&p=2`);
       await expect(page.locator("article[data-id]").first()).toBeVisible();
+      // The fixture's dev server can finish generating the portrait utility
+      // after the first cards mount. Establish the scroll position after that
+      // layout and the font swap, so this checks dismissal, not a CSS reload.
+      await expect(
+        page.locator("[data-entity-card-preview]").first(),
+      ).toHaveCSS("aspect-ratio", kind === "image" ? "2 / 3" : "16 / 9");
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        );
+      });
       const scroller = page.locator("[data-scroll-restoration-id]").last();
       await scroller.evaluate((element) => {
         element.scrollTop = 600;

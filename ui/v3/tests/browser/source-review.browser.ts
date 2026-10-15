@@ -97,6 +97,7 @@ async function archive(
       };
     else if (path.endsWith("/source-posts"))
       result = options.empty ? [] : [post];
+    else if (/\/posts\/[^/]+\/studios$/.test(path)) result = [];
     else if (/\/posts\/[^/]+$/.test(path))
       result = {
         ...postSummary(),

@@ -5,6 +5,7 @@ import {
   createBooleanCriterionOption,
   createDateCriterionOption,
   createMandatoryTimestampCriterionOption,
+  StringCriterionOption,
 } from "./criteria/criterion";
 import { FavoritePerformerCriterionOption } from "./criteria/favorite";
 import { GenderCriterionOption } from "./criteria/gender";
@@ -113,7 +114,12 @@ const criterionOptions = [
   createStringCriterionOption("url"),
   createStringCriterionOption("names"),
   createStringCriterionOption("name", "canonical_name"),
-  createStringCriterionOption("aliases"),
+  // Preserve existing saved conditions without offering a separate name kind.
+  new StringCriterionOption({
+    type: "aliases",
+    messageID: "other_names",
+    selectable: false,
+  }),
   RatingCriterionOption,
   createMandatoryNumberCriterionOption("tag_count"),
   createMandatoryNumberCriterionOption("scene_count"),

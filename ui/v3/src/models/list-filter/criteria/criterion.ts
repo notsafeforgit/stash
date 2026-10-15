@@ -296,6 +296,7 @@ interface CriterionOptionParams {
   type: CriterionType;
   makeCriterion: MakeCriterionFn;
   hidden?: boolean;
+  selectable?: boolean;
   sfwMessageID?: string;
   // Override the GraphQL filter field name used when serializing this criterion
   // into an AST condition. Defaults to `type`. Used when multiple client
@@ -313,12 +314,15 @@ export class CriterionOption {
 
   // used for legacy criteria that are not shown in the UI
   public readonly hidden: boolean = false;
+  // Existing conditions can remain editable after a field leaves the picker.
+  public readonly selectable: boolean;
 
   constructor(options: CriterionOptionParams) {
     this.type = options.type;
     this.messageID = options.messageID;
     this.makeCriterionFn = options.makeCriterion;
     this.hidden = options.hidden ?? false;
+    this.selectable = options.selectable ?? true;
     this.sfwMessageID = options.sfwMessageID;
     this.serverField = options.serverField;
   }

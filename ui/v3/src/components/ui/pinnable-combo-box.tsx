@@ -131,9 +131,11 @@ export function PinnableComboBox({
         if (v !== null) onSelect(v);
       }}
       onInputValueChange={(v: string) => setQuery(v)}
-      onOpenChange={(open: boolean) => {
-        setOpen(open);
-        if (open) setQuery("");
+      onOpenChange={(nextOpen, details) => {
+        setOpen(nextOpen);
+        // Typing can open the popup after the input callback has set its query.
+        // Clearing it here would show every option while the typed text remains.
+        if (nextOpen && details.reason !== "input-change") setQuery("");
       }}
       itemToStringLabel={(v: string | null) =>
         options.find((o) => o.value === v)?.label ??

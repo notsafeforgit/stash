@@ -1,8 +1,10 @@
 import { CriterionModifier } from "src/core/generated-graphql";
+import type { IntlShape } from "react-intl";
 import type { CriterionType } from "../types";
 import {
   ModifierCriterionOption,
   StringCriterion,
+  resolveOption,
   type Option,
 } from "./criterion";
 
@@ -10,6 +12,13 @@ const CODE_OPTION = { value: "code", messageID: "scene_code" };
 const COVER_OPTION = { value: "cover", messageID: "cover_image" };
 
 export class IsMissingCriterion extends StringCriterion {
+  protected override getLabelValue(intl: IntlShape): string {
+    const option = this.modifierCriterionOption()
+      .options?.map(resolveOption)
+      .find((option) => option.value === this.value);
+    return option ? intl.formatMessage({ id: option.messageID }) : this.value;
+  }
+
   public toCriterionInput(): string {
     return this.value;
   }
@@ -88,7 +97,7 @@ export const PerformerIsMissingCriterionOption = new IsMissingCriterionOption(
     "career_end",
     "tattoos",
     "piercings",
-    "aliases",
+    { value: "aliases", messageID: "other_names" },
     "gender",
     "birthdate",
     "death_date",

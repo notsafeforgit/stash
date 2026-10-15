@@ -133,11 +133,19 @@ export { NumberInput } from "./number-input";
 
 const FieldComboBox: React.FC<{
   value: CriterionType;
+  currentLabel: string;
   options: ReturnType<typeof astCriterionOptions>;
   pinnedFields: CriterionType[];
   onChange: (value: CriterionType) => void;
   onTogglePinned: (value: CriterionType) => void;
-}> = ({ value, options, pinnedFields, onChange, onTogglePinned }) => {
+}> = ({
+  value,
+  currentLabel,
+  options,
+  pinnedFields,
+  onChange,
+  onTogglePinned,
+}) => {
   const intl = useIntl();
 
   const sortedOptions = useMemo(
@@ -148,9 +156,6 @@ const FieldComboBox: React.FC<{
       })),
     [intl, options],
   );
-
-  const currentLabel =
-    sortedOptions.find((o) => o.value === value)?.label ?? "";
 
   return (
     <PinnableComboBox
@@ -309,6 +314,9 @@ const ConditionEditorComponent: React.FC<ConditionEditorProps> = ({
               <div className="flex-1 min-w-0">
                 <FieldComboBox
                   value={node.field}
+                  currentLabel={intl.formatMessage({
+                    id: node.criterion.criterionOption.messageID,
+                  })}
                   options={criterionOptions}
                   pinnedFields={pinnedFields}
                   onChange={onChangeField}

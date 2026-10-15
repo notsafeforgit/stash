@@ -97,7 +97,7 @@ function makeID() {
 
 export function astCriterionOptions(mode: FilterMode) {
   return getFilterOptions(mode).criterionOptions.filter(
-    (option) => !option.hidden,
+    (option) => !option.hidden && option.selectable,
   );
 }
 
@@ -105,7 +105,9 @@ export function astSupportsCriterionType(
   mode: FilterMode,
   type: CriterionType,
 ) {
-  return astCriterionOptions(mode).some((option) => option.type === type);
+  return getFilterOptions(mode).criterionOptions.some(
+    (option) => !option.hidden && option.type === type,
+  );
 }
 
 export function createASTCondition(

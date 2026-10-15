@@ -139,7 +139,7 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:twitter", Value: "private-account-post"}, "")
 	capture := recordSourceTestCapture(t, repo, sourceTestCapture(t, post.UUID, 1, "private-account-biography"))
 	manifest := recordAttachmentManifest(t, repo, models.SourceAttachmentManifestInput{CaptureUUID: capture.UUID, Complete: true, DeclaredAlbum: true,
-		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "private-account-attachment")}})
+		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "private-account-attachment"), sourceAttachmentEntry(1, "private-account-second-attachment")}})
 	attachment := manifestEntries(t, repo, manifest.UUID)[0].Attachment
 	media := archiveFind(t, repo, models.ArchiveScene, 31)
 	mediaEvidence := recordMediaEvidence(t, repo, models.SourceMediaEvidence{UUID: uuid.NewString(), PostUUID: attachment.PostUUID, CaptureUUID: capture.UUID, AttachmentUUID: attachment.UUID,

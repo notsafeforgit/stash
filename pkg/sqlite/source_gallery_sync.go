@@ -26,6 +26,12 @@ func (s *SourceGalleryStore) Sync(ctx context.Context, post, signature string) (
 	if err != nil || ret.GalleryUUID == "" || (ret.Action != "create" && ret.Action != "sync") {
 		return ret, err
 	}
+	// Existing albums also gain inheritance on a normal resync, even when
+	// their member list was already current before this feature was enabled.
+	if _, err := dbWrapper.Exec(ctx, `INSERT OR IGNORE INTO source_gallery_performer_pending
+SELECT id FROM galleries WHERE id=? AND origin='source'`, *ret.GalleryID); err != nil {
+		return nil, err
+	}
 	merge, err := s.PreviewConsolidation(ctx, ret.GalleryUUID)
 	if err != nil && !errors.Is(err, models.ErrSourceAlbumLimit) {
 		return nil, err

@@ -265,8 +265,25 @@ Manifest completeness means every source slot has an identity. It says nothing
 about whether media files have downloaded. Deleted or unavailable items retain
 their source IDs; unidentified slots leave gaps with the known count. Later
 positions never shift to hide missing evidence. A source-declared Reddit album
-remains an album even with one known item or temporarily missing gallery data.
+with an unknown total remains eligible even with one known item or temporarily
+missing gallery data. A complete list containing only one attachment, or a
+declared total of one, does not create a gallery even when Reddit marks the post
+as a gallery. Its post metadata and attachment captions remain retained. A known
+multi-item post remains eligible when only one local file is currently available.
 Ordinary single-media posts are not automatically galleries.
+
+Source galleries inherit the distinct performers assigned to their member
+images and scenes. Membership changes, metadata imports and ordinary performer
+edits refresh only the affected galleries in the same transaction. Explicit
+gallery performer choices (including clearing the field) take precedence;
+folder and manual galleries are unchanged. Performer merges and removal retain
+inheritance instead of turning the derived list into a manual choice.
+
+Account ownership does not itself identify everyone depicted in an account's
+media. For a profile whose downloads should receive a performer by default,
+configure a constant `performers` mapping in its existing image and scene
+metadata policy. This is opt-in per collection; aggregator feeds need no such
+mapping. The normal metadata rules protect explicit media edits.
 
 Reddit animations leave their media-kind hint unknown because extraction may
 yield GIF or MP4. Local file classification and attachment-to-media association

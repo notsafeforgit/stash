@@ -82,6 +82,12 @@ func singleBackfillFixture(t *testing.T) (sourceFileFixture, string, string) {
 
 func TestSourceAlbumBackfillOrdersMixedMediaAndUsesOriginalPaths(t *testing.T) {
 	f := newSourceFileFixture(t)
+	// Keep this publisher-attribution assertion independent of the fixture's
+	// existing depicted performer, which source galleries now inherit.
+	require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, err := f.repo.Scene.UpdatePartial(ctx, 31, models.ScenePartial{PerformerIDs: &models.UpdateIDs{Mode: models.RelationshipUpdateModeSet, IDs: []int{}}})
+		return err
+	}))
 	recordContentClaim(t, f.repo, f.claim)
 	post := sourceTestPost(t, f.repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "ab123"}, "")
 	selection := selectAlbum(t, f.repo, post.UUID, models.SourceAttachmentManifestInput{DeclaredAlbum: true, Entries: []models.SourceAttachmentEntry{

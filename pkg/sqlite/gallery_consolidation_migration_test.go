@@ -13,6 +13,7 @@ import (
 
 func removeGalleryConsolidationSchema(t *testing.T, db *sql.DB) {
 	t.Helper()
+	removeSourceGalleryPerformerSchema(t, db)
 	if queryUint(t, db, "SELECT count(*) FROM sqlite_schema WHERE name='gallery_alternate_titles'") == 0 {
 		return
 	}

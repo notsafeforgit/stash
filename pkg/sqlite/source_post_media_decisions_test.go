@@ -173,7 +173,8 @@ func TestPostMediaMergeConflictsRequireReviewAndRetainHistory(t *testing.T) {
 func TestPostMediaUnlinkSuppressesSourceAlbumButPreservesManualMembership(t *testing.T) {
 	_, repo := archiveTestDatabase(t)
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "album-unlink"}, "")
-	selection := selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{Complete: true, DeclaredAlbum: true, Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "clip")}})
+	selection := selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{Complete: true, DeclaredAlbum: true,
+		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "clip"), sourceAttachmentEntry(1, "second")}})
 	attachment := selection.Entries[0].Attachment
 	media := chooseAlbumMedia(t, repo, attachment.UUID, models.ArchiveScene, 31)
 	album := syncSourceGallery(t, repo, post.UUID)

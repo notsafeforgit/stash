@@ -28,7 +28,7 @@ type AttachmentSelection struct {
 }
 
 func (s AttachmentSelection) IsAlbum() bool {
-	return s.Decision.Mode != "disabled" && (s.DeclaredAlbum || len(s.Entries) > 1 || (s.ExpectedCount != nil && *s.ExpectedCount > 1))
+	return s.Decision.Mode != "disabled" && sourceAttachmentAlbum(s.DeclaredAlbum, s.Complete, s.ExpectedCount, len(s.Entries))
 }
 
 type AttachmentSelectionInput struct {

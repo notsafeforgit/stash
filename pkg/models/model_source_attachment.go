@@ -42,7 +42,17 @@ type SourceAttachmentManifest struct {
 }
 
 func (m SourceAttachmentManifest) IsAlbum() bool {
-	return m.DeclaredAlbum || m.EntryCount > 1 || (m.ExpectedCount != nil && *m.ExpectedCount > 1)
+	return sourceAttachmentAlbum(m.DeclaredAlbum, m.Complete, m.ExpectedCount, m.EntryCount)
+}
+
+// A source's album flag can describe a complete one-item post. Preserve the
+// declaration as evidence, but only treat unknown or multiple-item lists as
+// albums. Local download availability does not determine source cardinality.
+func sourceAttachmentAlbum(declared, complete bool, expected *int, entries int) bool {
+	if entries > 1 || (expected != nil && *expected > 1) {
+		return true
+	}
+	return declared && !complete && expected == nil
 }
 
 type SourceAttachmentManifestEntry struct {

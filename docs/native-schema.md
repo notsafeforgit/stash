@@ -1,8 +1,14 @@
 # Native schema promotion
 
-The development schema is 1000114. See the
+The development schema is 1000118. See the
 [architecture and upgrade boundaries](native-archive-transition-plan.md). New migrations are
-rehearsed on copies before deployment. Schema 1000114 adds opt-in monitoring
+rehearsed on copies before deployment. Schema 1000118 adds a transaction-local
+work set for source galleries to inherit performers from their images and
+scenes. It creates no historical assignments; normal member/performer edits and
+album resynchronization refresh affected galleries while preserving explicit
+choices. Schema 1000117 added source-gallery consolidation and alternate titles.
+
+Schema 1000114 adds opt-in monitoring
 subscriptions and immutable associations for scheduled runs, separate from
 source definitions, downloader configuration and manual imports. Existing
 sources default to monitoring off; importing an installation's subscription

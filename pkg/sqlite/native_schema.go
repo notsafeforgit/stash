@@ -101,6 +101,9 @@ func validateNativeConnection(conn *sqlx.DB, auditData bool) error {
 		if present[forkSchemaMigrationsTable] {
 			return errors.New("native database still contains an active fork migration ledger")
 		}
+		if version >= NativeSchemaBaseline+118 && !present["source_gallery_performer_pending"] {
+			return errors.New("native database schema is incomplete: missing source_gallery_performer_pending")
+		}
 		if version >= NativeSchemaBaseline+117 {
 			for _, name := range []string{"gallery_alternate_titles", "source_gallery_merge_context"} {
 				if !present[name] {

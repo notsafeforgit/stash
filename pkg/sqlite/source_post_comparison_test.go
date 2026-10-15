@@ -186,7 +186,7 @@ func TestSourcePostComparisonConsolidatesSharedGalleriesAndPreservesDisabledChoi
 	b := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "post-id"}, "")
 	for _, post := range []*models.SourcePost{a, b} {
 		selection := selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{Complete: true, DeclaredAlbum: true,
-			Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "first")}})
+			Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "first"), sourceAttachmentEntry(1, "second")}})
 		chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveImage, 41)
 		syncSourceGallery(t, repo, post.UUID)
 	}

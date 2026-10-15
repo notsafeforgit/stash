@@ -249,6 +249,17 @@ SELECT ?,uuid,revision,'linked',?,?,?,'Combined source albums sharing library me
 	for _, relation := range []struct{ table, column string }{
 		{"galleries_images", "image_id"}, {"scenes_galleries", "scene_id"}, {"performers_galleries", "performer_id"}, {"galleries_tags", "tag_id"}, {"gallery_urls", "url"}, {"gallery_alternate_titles", "title"},
 	} {
+		if relation.table == "performers_galleries" {
+			state, err := (&MetadataFieldStore{}).State(ctx, source.UUID, "performers")
+			if err != nil {
+				return err
+			}
+			// The union of member performers is recomputed at commit. Copying
+			// these derived rows as ordinary edits would freeze inheritance.
+			if !state.Protected {
+				continue
+			}
+		}
 		// NOT EXISTS avoids firing BEFORE INSERT audit triggers for duplicates.
 		q := "INSERT INTO " + relation.table + "(gallery_id," + relation.column + ") SELECT ?,s." + relation.column + " FROM " + relation.table + " s WHERE s.gallery_id=? AND NOT EXISTS(SELECT 1 FROM " + relation.table + " d WHERE d.gallery_id=? AND d." + relation.column + "=s." + relation.column + ")"
 		if _, err := dbWrapper.Exec(ctx, q, target.LocalID, source.LocalID, target.LocalID); err != nil {

@@ -75,6 +75,12 @@ func sourceGalleryHistory(t *testing.T, repo models.Repository, gallery string) 
 
 func TestSourceGalleryCreatesMixedAlbumSharesMediaAndSurvivesReplay(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
+	// This test checks that publisher ownership does not tag media. The shared
+	// library fixture otherwise gives scene 31 a depicted performer already.
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, err := repo.Scene.UpdatePartial(ctx, 31, models.ScenePartial{PerformerIDs: &models.UpdateIDs{Mode: models.RelationshipUpdateModeSet, IDs: []int{}}})
+		return err
+	}))
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "mixed-album"}, "")
 	captureInput := sourceTestCapture(t, post.UUID, 1, "biography")
 	details, date := "Post description", "2026-09-28"
@@ -175,6 +181,10 @@ func TestSourceGalleryEligibilityMissingMediaAndLateDownloads(t *testing.T) {
 	selection := selectAlbum(t, repo, post.UUID, manifest)
 	chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveImage, 41)
 	require.Equal(t, "ineligible", syncSourceGallery(t, repo, post.UUID).Action, "a normal single-media post needs no gallery")
+	manifest.DeclaredAlbum = true
+	selection = selectAlbum(t, repo, post.UUID, manifest)
+	require.False(t, selection.IsAlbum(), "a complete source-declared album with one attachment needs no gallery")
+	require.Equal(t, "ineligible", syncSourceGallery(t, repo, post.UUID).Action)
 	manifest.Complete, manifest.DeclaredAlbum = false, true
 	manifest.Entries = append(manifest.Entries, sourceAttachmentEntry(2, "later"), sourceAttachmentEntry(3, "unlinked"))
 	selection = selectAlbum(t, repo, post.UUID, manifest)

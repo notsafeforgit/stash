@@ -26,7 +26,7 @@ func TestSourcePostCaptionTitlesReachAlbumsAndEveryPostSummary(t *testing.T) {
 			}
 			capture := recordSourceTestCapture(t, repo, input)
 			recordAttachmentManifest(t, repo, models.SourceAttachmentManifestInput{CaptureUUID: capture.UUID, DeclaredAlbum: true, Complete: true,
-				Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "image")}})
+				Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "image"), sourceAttachmentEntry(1, "second")}})
 			selection := applySelection(t, repo, models.AttachmentSelectionInput{PostUUID: post.UUID, ExpectedPostRevision: selectionPost(t, repo, post.UUID).Revision,
 				CaptureUUID: capture.UUID, Mode: "automatic", Origin: "ingest"})
 			chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveImage, 41)

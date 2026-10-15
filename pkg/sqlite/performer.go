@@ -404,6 +404,12 @@ func (qb *PerformerStore) Update(ctx context.Context, updatedObject *models.Upda
 }
 
 func (qb *PerformerStore) Destroy(ctx context.Context, id int) error {
+	return preserveSourceGalleryPerformers(ctx, []int{id}, func() error {
+		return qb.destroy(ctx, id)
+	})
+}
+
+func (qb *PerformerStore) destroy(ctx context.Context, id int) error {
 	// must handle image checksums manually
 	if err := qb.destroyImage(ctx, id); err != nil {
 		return err
@@ -1007,6 +1013,12 @@ func (qb *PerformerStore) FindByStashIDStatus(ctx context.Context, hasStashID bo
 }
 
 func (qb *PerformerStore) Merge(ctx context.Context, source []int, destination int) error {
+	return preserveSourceGalleryPerformers(ctx, source, func() error {
+		return qb.merge(ctx, source, destination)
+	})
+}
+
+func (qb *PerformerStore) merge(ctx context.Context, source []int, destination int) error {
 	if len(source) == 0 {
 		return nil
 	}

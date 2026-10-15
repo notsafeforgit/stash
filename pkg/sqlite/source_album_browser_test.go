@@ -144,7 +144,7 @@ func TestSourceAlbumBrowserRetainsDisabledDeletedAndForgottenEvidence(t *testing
 	db, repo := archiveTestDatabase(t)
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "retained"}, "")
 	selection := selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{Complete: true, DeclaredAlbum: true,
-		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "scene")}})
+		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "scene"), sourceAttachmentEntry(1, "second")}})
 	media := chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveScene, 31)
 	result := syncSourceGallery(t, repo, post.UUID)
 	before := readSourceAlbum(t, repo, post.UUID, -1, 25)
@@ -175,7 +175,7 @@ func TestSourceAlbumBrowserRetainsDisabledDeletedAndForgottenEvidence(t *testing
 	require.Equal(t, "forgotten", disabled.PostState)
 	require.Equal(t, "disabled", disabled.Album.State)
 	require.Nil(t, disabled.Album.Gallery)
-	require.Len(t, disabled.Slots, 1)
+	require.Len(t, disabled.Slots, 2)
 	require.Equal(t, before.Selection, disabled.Selection)
 	require.Equal(t, "no_gallery", disabled.Slots[0].GalleryMembership)
 	require.Equal(t, disabled, readSourceAlbum(t, repo, post.UUID, -1, 25))
@@ -185,7 +185,7 @@ func TestSourceAlbumBrowserFollowsMediaAndGalleryRedirectsWithoutCombiningPosts(
 	_, repo := archiveTestDatabase(t)
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:twitter", Value: "first"}, "")
 	selection := selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{Complete: true, DeclaredAlbum: true,
-		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "scene")}})
+		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "scene"), sourceAttachmentEntry(1, "second")}})
 	one := chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveScene, 31)
 	two := archiveFind(t, repo, models.ArchiveScene, 32)
 	_, err := applyPostMedia(repo, postMediaInput(t, repo, post.UUID, one.UUID, "linked"))
@@ -194,7 +194,8 @@ func TestSourceAlbumBrowserFollowsMediaAndGalleryRedirectsWithoutCombiningPosts(
 	require.NoError(t, err)
 	first := syncSourceGallery(t, repo, post.UUID)
 	other := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "second"}, "")
-	selectAlbum(t, repo, other.UUID, models.SourceAttachmentManifestInput{Complete: true, DeclaredAlbum: true})
+	selectAlbum(t, repo, other.UUID, models.SourceAttachmentManifestInput{Complete: true, DeclaredAlbum: true,
+		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "other-first"), sourceAttachmentEntry(1, "other-second")}})
 	second := syncSourceGallery(t, repo, other.UUID)
 	before := readSourceAlbum(t, repo, post.UUID, -1, 25)
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {

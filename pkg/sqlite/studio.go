@@ -324,7 +324,9 @@ func (qb *StudioStore) Destroy(ctx context.Context, id int) error {
 		return err
 	}
 
-	return studioRepository.destroyExisting(ctx, []int{id})
+	return preserveSourceGalleryStudio(ctx, id, func() error {
+		return studioRepository.destroyExisting(ctx, []int{id})
+	})
 }
 
 // returns nil, nil if not found

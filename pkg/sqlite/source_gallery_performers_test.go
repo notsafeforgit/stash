@@ -35,8 +35,8 @@ DELETE FROM source_gallery_performer_pending`, nil)
 	assertSourceGalleryPerformers(t, repo, older)
 	assertSourceGalleryPerformers(t, repo, mixed, 71)
 	ids := []string{older.UUID, mixed.UUID, protected.UUID, manualIdentity.UUID, uuid.NewString()}
-	apply := func() []models.SourceGalleryPerformerResult {
-		var result []models.SourceGalleryPerformerResult
+	apply := func() []models.SourceGalleryAttributionResult {
+		var result []models.SourceGalleryAttributionResult
 		require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 			var err error
 			result, err = repo.SourceGallery.ReconcilePerformers(ctx, ids)

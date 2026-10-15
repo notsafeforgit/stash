@@ -13,6 +13,7 @@ import (
 
 func removeSourceGalleryPerformerSchema(t *testing.T, db *sql.DB) {
 	t.Helper()
+	removeSourceStudioSchema(t, db)
 	rows, err := db.Query("SELECT name FROM sqlite_schema WHERE type='trigger' AND name LIKE 'source_gallery_performers_%'")
 	require.NoError(t, err)
 	defer rows.Close()

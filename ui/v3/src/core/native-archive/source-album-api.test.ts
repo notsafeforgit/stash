@@ -133,6 +133,7 @@ it("follows gallery redirects but validates requested identity and post cursor s
     requested_uuid: postIds.gallery,
     gallery: postAlbum().gallery,
     posts: [postSummary()],
+    studios: [],
   };
   expect((await client(page).api.posts(postIds.gallery)).posts).toHaveLength(1);
   await expect(

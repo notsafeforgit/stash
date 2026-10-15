@@ -14,6 +14,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import type { GallerySources } from "./gallery-sources";
 import { GalleryAlternateTitles } from "./alternate-titles";
+import { SourceStudios } from "../source-studios";
 
 export function GalleryOrigin({
   gallery,
@@ -61,6 +62,9 @@ export function GalleryOrigin({
       </CardHeader>
       <CardContent className="flex min-w-0 flex-col gap-3">
         {label && <Badge variant="secondary">{label}</Badge>}
+        {sources.data && (
+          <SourceStudios studios={sources.data.header.studios} />
+        )}
         <GalleryAlternateTitles
           titles={gallery.alternate_titles ?? []}
           primaryTitle={gallery.title}

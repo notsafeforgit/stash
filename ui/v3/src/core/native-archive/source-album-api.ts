@@ -1,5 +1,6 @@
 import { retainedLibraryIdSchema } from "@/core/library-id";
 import { z } from "zod";
+import { sourceStudioSchema } from "./source-studio-api";
 import { accountUUIDSchema as uuid } from "./account-review-api";
 import { identitySchema } from "./metadata-review-api";
 import {
@@ -127,6 +128,7 @@ export const galleryPostsSchema = z.object({
   requested_uuid: uuid,
   gallery: postLibraryItemSchema.refine((item) => item.kind === "gallery"),
   posts: z.array(postSummarySchema).max(25),
+  studios: z.array(sourceStudioSchema),
 });
 export type AlbumPage = z.infer<typeof albumPageSchema>;
 export type AlbumSlot = z.infer<typeof albumSlotSchema>;

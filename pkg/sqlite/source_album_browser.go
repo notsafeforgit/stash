@@ -286,6 +286,10 @@ func (s *SourceGalleryStore) PostsForGallery(ctx context.Context, id, after stri
 		return nil, err
 	}
 	ret := &models.SourceGalleryPosts{RequestedUUID: id, Gallery: *item, Posts: []models.SourcePostSummary{}}
+	ret.Studios, err = (&SourceStudioStore{}).ForGallery(ctx, entity.UUID)
+	if err != nil {
+		return nil, err
+	}
 	for _, post := range posts {
 		summary, err := (&SourceEvidenceStore{}).PostSummary(ctx, post)
 		if err != nil {

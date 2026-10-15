@@ -84,6 +84,22 @@ JOIN archive_entities a ON a.uuid=l.gallery_uuid WHERE a.gallery_id IN `+in+` OR
 		// Captions and dates remain on their source posts. Conflicting curated
 		// fields require review instead of silently dropping a user's edit.
 		for _, field := range []string{"code", "photographer", "studio_id", "rating"} {
+			if field == "studio_id" {
+				choices := map[string]bool{}
+				for _, row := range rows {
+					state, err := (&MetadataFieldStore{}).State(ctx, row.UUID, "studio")
+					if err != nil {
+						return nil, err
+					}
+					if state.Protected {
+						choices[string(state.Value)] = true
+					}
+				}
+				if len(choices) > 1 {
+					p.Conflicts = append(p.Conflicts, field)
+				}
+				continue
+			}
 			var count int
 			if err := dbWrapper.Get(ctx, &count, "SELECT count(DISTINCT "+field+") FROM galleries WHERE id IN "+in+" AND "+field+" IS NOT NULL AND "+field+"!=''", ids...); err != nil {
 				return nil, err
@@ -278,6 +294,43 @@ WHERE gallery_id=? AND NOT EXISTS(SELECT 1 FROM gallery_covers WHERE gallery_id=
 		return err
 	}
 	for _, field := range []string{"details", "date", "code", "photographer", "studio_id", "rating"} {
+		if field == "studio_id" {
+			from, err := (&MetadataFieldStore{}).State(ctx, source.UUID, "studio")
+			if err != nil {
+				return err
+			}
+			to, err := (&MetadataFieldStore{}).State(ctx, target.UUID, "studio")
+			if err != nil {
+				return err
+			}
+			if !from.Protected || to.Protected {
+				continue
+			}
+			// A curated choice (including a clear) survives consolidation. An
+			// inherited studio is recomputed from all posts at commit instead.
+			input := models.MetadataFieldDecisionInput{EntityUUID: target.UUID, ExpectedEntityRevision: to.Entity.Revision,
+				Field: "studio", Mode: "set", Origin: "review", Value: from.Value, Reason: "Preserved explicit studio while combining source albums"}
+			if string(from.Value) == "null" {
+				input.Mode, input.Value = "clear", nil
+			} else {
+				var studio string
+				if err := json.Unmarshal(from.Value, &studio); err != nil {
+					return err
+				}
+				e, err := (&ArchiveEntityStore{}).Find(ctx, studio)
+				if err != nil {
+					return err
+				}
+				if e == nil {
+					return models.ErrSourceGalleryConflict
+				}
+				input.ReferenceRevisions = map[string]int{studio: e.Revision}
+			}
+			if _, err := (&MetadataFieldStore{}).Decide(ctx, input); err != nil {
+				return err
+			}
+			continue
+		}
 		if _, err := dbWrapper.Exec(ctx, "UPDATE galleries SET "+field+"=(SELECT "+field+" FROM galleries WHERE id=?) WHERE id=? AND ("+field+" IS NULL OR "+field+"='')", source.LocalID, target.LocalID); err != nil {
 			return err
 		}

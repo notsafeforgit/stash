@@ -108,6 +108,11 @@ func (db *Database) Commit(ctx context.Context) error {
 			return err
 		}
 	}
+	if writable, _ := ctx.Value(writableKey).(bool); writable && db.Version() >= NativeSchemaBaseline+119 {
+		if err := flushSourceGalleryStudios(ctx); err != nil {
+			return err
+		}
+	}
 	defer db.txnComplete(ctx)
 	if snapshot, _ := ctx.Value(readAccelerationKey).(*readSnapshot); snapshot != nil && snapshot.writable {
 		return snapshot.cache.commit(ctx, tx, snapshot)
@@ -218,6 +223,7 @@ func (db *Database) Repository() models.Repository {
 		SourceAccount:               &SourceAccountStore{},
 		MediaRoot:                   &MediaRootStore{},
 		SourceCollection:            &SourceCollectionStore{},
+		SourceStudio:                &SourceStudioStore{},
 		SourceSubscription:          &SourceSubscriptionStore{},
 		CapturePublisher:            &CapturePublisherStore{},
 		Ingest:                      &IngestStore{},

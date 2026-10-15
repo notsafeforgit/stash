@@ -104,6 +104,9 @@ func validateNativeConnection(conn *sqlx.DB, auditData bool) error {
 		if version >= NativeSchemaBaseline+118 && !present["source_gallery_performer_pending"] {
 			return errors.New("native database schema is incomplete: missing source_gallery_performer_pending")
 		}
+		if version >= NativeSchemaBaseline+119 && (!present["source_gallery_studio_pending"] || !present["source_collection_studios"]) {
+			return errors.New("native database schema is incomplete: missing source studio attribution")
+		}
 		if version >= NativeSchemaBaseline+117 {
 			for _, name := range []string{"gallery_alternate_titles", "source_gallery_merge_context"} {
 				if !present[name] {

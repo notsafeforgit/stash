@@ -1,4 +1,5 @@
 import { SourceAlbum } from "../albums/ordered";
+import { PostStudios } from "../source-studios";
 import { PostThread } from "./thread";
 import { PostMerge } from "./merge";
 import { LibraryLink } from "./library-link";
@@ -414,6 +415,11 @@ export function PostDetail({
                 </Badge>
               )}
               <PostURLs post={post} api={api} />
+              <PostStudios
+                key={post.uuid}
+                post={post.uuid}
+                endpoint={api.endpoint}
+              />
             </CardContent>
           </Card>
           <PostSection title={msg("source_review.content", "Post content")}>

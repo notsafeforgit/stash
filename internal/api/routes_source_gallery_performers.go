@@ -10,6 +10,14 @@ import (
 )
 
 func (rs *nativeArchiveRoutes) reconcileSourceGalleryPerformers(w http.ResponseWriter, r *http.Request) {
+	rs.reconcileSourceGalleryAttribution(w, r, false)
+}
+
+func (rs *nativeArchiveRoutes) reconcileSourceGalleryStudios(w http.ResponseWriter, r *http.Request) {
+	rs.reconcileSourceGalleryAttribution(w, r, true)
+}
+
+func (rs *nativeArchiveRoutes) reconcileSourceGalleryAttribution(w http.ResponseWriter, r *http.Request, studios bool) {
 	var input struct {
 		GalleryUUIDs []string `json:"gallery_uuids"`
 	}
@@ -29,17 +37,23 @@ func (rs *nativeArchiveRoutes) reconcileSourceGalleryPerformers(w http.ResponseW
 		}
 		seen[id] = true
 	}
-	var results []models.SourceGalleryPerformerResult
+	var results []models.SourceGalleryAttributionResult
 	err := rs.repo.WithTxn(r.Context(), func(ctx context.Context) error {
 		var err error
-		results, err = rs.repo.SourceGallery.ReconcilePerformers(ctx, input.GalleryUUIDs)
+		field := "performer_ids"
+		if studios {
+			field = "studio_id"
+			results, err = rs.repo.SourceGallery.ReconcileStudios(ctx, input.GalleryUUIDs)
+		} else {
+			results, err = rs.repo.SourceGallery.ReconcilePerformers(ctx, input.GalleryUUIDs)
+		}
 		if err != nil {
 			return err
 		}
 		if rs.notifyMetadata != nil {
 			for _, result := range results {
 				if result.Status == "updated" {
-					if err := rs.notifyMetadata(ctx, metadata.Input{EntityUUID: result.GalleryUUID}, []string{"performer_ids"}); err != nil {
+					if err := rs.notifyMetadata(ctx, metadata.Input{EntityUUID: result.GalleryUUID}, []string{field}); err != nil {
 						return err
 					}
 				}

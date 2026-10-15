@@ -16,9 +16,13 @@ const sourceGalleryPerformerReason = "Inherited from the gallery's images and sc
 // membership edit. Repair them explicitly in bounded batches, without changing
 // their members, treating publisher ownership as attribution, or pinning the
 // derived performers as a manual selection.
-func (s *SourceGalleryStore) ReconcilePerformers(ctx context.Context, ids []string) ([]models.SourceGalleryPerformerResult, error) {
+func (s *SourceGalleryStore) ReconcilePerformers(ctx context.Context, ids []string) ([]models.SourceGalleryAttributionResult, error) {
+	return reconcileSourceGalleryAttribution(ctx, ids, syncSourceGalleryPerformers)
+}
+
+func reconcileSourceGalleryAttribution(ctx context.Context, ids []string, sync func(context.Context, int, string) (string, error)) ([]models.SourceGalleryAttributionResult, error) {
 	if len(ids) == 0 || len(ids) > 100 {
-		return nil, errors.New("performer reconciliation requires 1 to 100 galleries")
+		return nil, errors.New("attribution reconciliation requires 1 to 100 galleries")
 	}
 	seen := make(map[string]bool, len(ids))
 	for _, id := range ids {
@@ -26,19 +30,19 @@ func (s *SourceGalleryStore) ReconcilePerformers(ctx context.Context, ids []stri
 			return nil, err
 		}
 		if seen[id] {
-			return nil, errors.New("duplicate gallery in performer reconciliation")
+			return nil, errors.New("duplicate gallery in attribution reconciliation")
 		}
 		seen[id] = true
 	}
-	ret := make([]models.SourceGalleryPerformerResult, 0, len(ids))
+	ret := make([]models.SourceGalleryAttributionResult, 0, len(ids))
 	for _, id := range ids {
-		result := models.SourceGalleryPerformerResult{GalleryUUID: id, Status: "not_source"}
+		result := models.SourceGalleryAttributionResult{GalleryUUID: id, Status: "not_source"}
 		entity, err := (&ArchiveEntityStore{}).Find(ctx, id)
 		if err != nil {
 			return nil, err
 		}
 		if entity != nil && entity.State == models.ArchiveEntityActive && entity.Kind == models.ArchiveGallery {
-			result.Status, err = syncSourceGalleryPerformers(ctx, *entity.LocalID, id)
+			result.Status, err = sync(ctx, *entity.LocalID, id)
 			if err != nil {
 				return nil, err
 			}
@@ -52,13 +56,17 @@ func (s *SourceGalleryStore) ReconcilePerformers(ctx context.Context, ids []stri
 // bulk operations. Commit processes each affected gallery once; it never scans
 // unrelated galleries. Publisher ownership alone is not performer attribution.
 func flushSourceGalleryPerformers(ctx context.Context) error {
+	return flushSourceGalleryAttribution(ctx, "source_gallery_performer_pending", syncSourceGalleryPerformers)
+}
+
+func flushSourceGalleryAttribution(ctx context.Context, table string, sync func(context.Context, int, string) (string, error)) error {
 	for {
 		var rows []struct {
 			ID   int    `db:"gallery_id"`
 			UUID string `db:"uuid"`
 		}
 		if err := dbWrapper.Select(ctx, &rows, `SELECT p.gallery_id,a.uuid
-FROM source_gallery_performer_pending p JOIN archive_entities a ON a.gallery_id=p.gallery_id
+FROM `+table+` p JOIN archive_entities a ON a.gallery_id=p.gallery_id
 ORDER BY p.gallery_id LIMIT 100`); err != nil {
 			return err
 		}
@@ -66,10 +74,10 @@ ORDER BY p.gallery_id LIMIT 100`); err != nil {
 			return nil
 		}
 		for _, row := range rows {
-			if _, err := syncSourceGalleryPerformers(ctx, row.ID, row.UUID); err != nil {
-				return fmt.Errorf("inheriting source gallery performers: %w", err)
+			if _, err := sync(ctx, row.ID, row.UUID); err != nil {
+				return fmt.Errorf("inheriting source gallery attribution: %w", err)
 			}
-			if _, err := dbWrapper.Exec(ctx, "DELETE FROM source_gallery_performer_pending WHERE gallery_id=?", row.ID); err != nil {
+			if _, err := dbWrapper.Exec(ctx, "DELETE FROM "+table+" WHERE gallery_id=?", row.ID); err != nil {
 				return err
 			}
 		}

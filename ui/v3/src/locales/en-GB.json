@@ -3440,6 +3440,11 @@
     "retired_at": "Identity retired: {date}",
     "title": "Source accounts"
   },
+  "source_studios": {
+    "title": "Source studios",
+    "collection_title": "Source studio",
+    "help": "Associate this source with an existing studio, such as a subreddit or repost account. Posts show every source studio. Source albums inherit a primary studio only when there is one clear match; explicit gallery choices are preserved."
+  },
   "source_albums": {
     "changed": "This album changed",
     "changed_help": "Reload to view the current source order and library associations.",

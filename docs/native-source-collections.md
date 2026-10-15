@@ -72,6 +72,38 @@ Worker activation and metadata policy remain separate operations. Existing
 collections expose **Edit metadata rules**, including fixed performer selection
 for folder scans. **Settings → Library** manages folders and their bindings.
 
+## Studios for aggregate sources
+
+**Source studio** associates a subreddit, repost account or other collection
+with an existing studio. Studio names, aliases and URLs can help identify the
+right record; this is independent of performer attribution. The association
+is stored in the native database, not a gallery-dl configuration file.
+
+Posts display the distinct studios of their associated sources. Shared source
+albums display all those studios across every linked post, even when the post
+list spans multiple pages. An album inherits its primary studio only when the
+union contains exactly one studio. Multiple studios leave the inherited primary
+empty. Explicit gallery studio assignments and clears take precedence. Overlap
+merging accepts different inherited studios, retaining the full source union;
+conflicting manual studio choices still require review. Manual/folder galleries
+are not changed by this inheritance.
+
+The association has its own revision, so changing it does not invalidate scraper
+leases or collection metadata policies. `GET`/`PUT
+/api/v3/archive/collections/{uuid}/studio` reads or saves
+`{"expected_revision":0,"studio_uuid":"<studio UUID>"}`; `null` clears it.
+`GET /api/v3/archive/posts/{uuid}/studios` returns the distinct studio references.
+Gallery `album-posts` responses include `studios` across the complete album.
+`POST /api/v3/archive/source-galleries/studios/reconcile`, with 1–100
+`gallery_uuids`, repairs inherited primaries without changing protected choices.
+Normal source and album changes update affected galleries automatically.
+Media's own studio remains governed by its metadata rules or explicit edits.
+
+Schema 1000119 stores the current source association in
+`source_collection_studios`. Database backups include it automatically. A
+transaction-local gallery work set is emptied at commit; it is not another
+scrape queue or historical catalog. No duplicated post payload is introduced.
+
 ## Account review and incidental authors
 
 Account review defaults to **Tracked accounts**: accounts directly associated

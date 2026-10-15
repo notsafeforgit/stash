@@ -33,6 +33,7 @@ import { CollectionHistory } from "./history";
 import { MetadataPolicyEditor } from "../metadata-policy/editor";
 import { ManualIntake } from "../manual-intake/editor";
 import { SourceMonitoring } from "../source-monitoring";
+import { CollectionStudio } from "./studio";
 
 export function CollectionEditor({
   api,
@@ -332,6 +333,14 @@ export function CollectionEditor({
             id={id}
           />
         )}
+      {data?.current && (
+        <CollectionStudio
+          key={id}
+          endpoint={api.endpoint}
+          collection={id}
+          disabled={!ready || busy || !!saved}
+        />
+      )}
       {data?.current && (
         <MetadataPolicyEditor
           collections={api}

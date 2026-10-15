@@ -55,4 +55,5 @@ type SourceGalleryPosts struct {
 	RequestedUUID string                `json:"requested_uuid"`
 	Gallery       SourcePostLibraryItem `json:"gallery"`
 	Posts         []SourcePostSummary   `json:"posts"`
+	Studios       []SourceStudio        `json:"studios"`
 }

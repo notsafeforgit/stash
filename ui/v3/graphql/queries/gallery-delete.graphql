@@ -1,0 +1,11 @@
+query GalleryDeletePreview($ids: [ID!]!) {
+  galleryDeletePreview(ids: $ids) {
+    gallery_count
+    source_count
+    image_count
+    scene_count
+    shared_image_count
+    shared_scene_count
+    zip_count
+  }
+}

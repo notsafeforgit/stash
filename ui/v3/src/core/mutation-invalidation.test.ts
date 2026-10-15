@@ -14,6 +14,20 @@ import {
 } from "./mutation-invalidation";
 
 describe("entity mutation invalidation", () => {
+  it("refreshes mixed media and markers after deleting gallery members", () => {
+    const fields = affectedQueryFields(
+      gql`mutation { galleryDestroy(input: {}) }`,
+    );
+    for (const field of [
+      "findGalleries",
+      "findImages",
+      "findScenes",
+      "findSceneMarkers",
+      "findFiles",
+    ])
+      expect(fields.has(field)).toBe(true);
+    expect(fields.has("configuration")).toBe(false);
+  });
   it("includes changed relationships and aggregates, excluding unrelated services", () => {
     const fields = affectedQueryFields(
       gql`mutation { sceneUpdate(input: {}) { id } }`,

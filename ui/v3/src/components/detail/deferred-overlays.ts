@@ -21,6 +21,9 @@ export const GalleryEditSheet = deferredEditSheet(async () => ({
 export const GalleryBulkEditSheet = deferredDialog(async () => ({
   default: (await import("./gallery-bulk-edit-sheet")).GalleryBulkEditSheet,
 }));
+export const GalleryDeleteDialog = deferredDialog(async () => ({
+  default: (await import("./gallery-delete-dialog")).GalleryDeleteDialog,
+}));
 export const GroupEditSheet = deferredEditSheet(async () => ({
   default: (await import("./group-edit-sheet")).GroupEditSheet,
 }));

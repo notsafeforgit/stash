@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
@@ -16,6 +16,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin"
 	"github.com/stashapp/stash/pkg/plugin/hook"
+	"github.com/stashapp/stash/pkg/scene"
 	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
 	"github.com/stashapp/stash/pkg/utils"
 )
@@ -262,6 +263,14 @@ func (r *mutationResolver) galleryUpdate(ctx context.Context, input models.Galle
 }
 
 func (r *mutationResolver) GalleryDestroy(ctx context.Context, input models.GalleryDestroyInput) (bool, error) {
+	options := gallery.DeletionOptions{
+		Media: input.DeleteMedia, SharedMedia: input.DeleteSharedMedia,
+		Files: utils.IsTrue(input.DeleteFile), Generated: utils.IsTrue(input.DeleteGenerated),
+		FileEntries: utils.IsTrue(input.DestroyFileEntry),
+	}
+	if err := options.Validate(); err != nil {
+		return false, err
+	}
 	folders, err := manager.LibraryPaths(ctx, r.repository)
 	if err != nil {
 		return false, err
@@ -272,76 +281,54 @@ func (r *mutationResolver) GalleryDestroy(ctx context.Context, input models.Gall
 	}
 
 	trashPath := manager.GetInstance().Config.GetDeleteTrashPath()
-
-	var galleries []*models.Gallery
-	var imgsDestroyed []*models.Image
-	fileDeleter := &image.FileDeleter{
-		Deleter: file.NewDeleterWithTrash(trashPath),
-		Paths:   manager.GetInstance().Paths,
-	}
-
-	deleteGenerated := utils.IsTrue(input.DeleteGenerated)
-	deleteFile := utils.IsTrue(input.DeleteFile)
-	destroyFileEntry := utils.IsTrue(input.DestroyFileEntry)
-
+	var plan *gallery.DeletionPlan
+	var deleted *gallery.DeletionResult
+	deleter := file.NewBatchDeleterWithTrash(trashPath)
+	imageFiles := &image.FileDeleter{Deleter: deleter, Paths: manager.GetInstance().Paths}
+	fileNamingAlgo := manager.GetInstance().Config.GetVideoFileNamingAlgorithm()
+	sceneFiles := &scene.FileDeleter{Deleter: deleter, Paths: manager.GetInstance().Paths, FileNamingAlgo: fileNamingAlgo}
+	deletion := gallery.Deletion{Repository: r.repository, Images: r.imageService, Scenes: r.sceneService}
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		fileDeleter.RegisterHooks(ctx)
-		qb := r.repository.Gallery
-
-		for _, id := range galleryIDs {
-			gallery, err := qb.Find(ctx, id)
-			if err != nil {
-				return err
-			}
-
-			if gallery == nil {
-				return fmt.Errorf("gallery with id %d not found", id)
-			}
-
-			if err := gallery.LoadFiles(ctx, qb); err != nil {
-				return fmt.Errorf("loading files for gallery %d", id)
-			}
-
-			galleries = append(galleries, gallery)
-
-			imgsDestroyed, err = r.galleryService.Destroy(ctx, gallery, fileDeleter, deleteGenerated, deleteFile, destroyFileEntry)
-			if err != nil {
-				return err
-			}
+		deleter.RegisterHooks(ctx)
+		plan, err = deletion.Plan(ctx, galleryIDs)
+		if err != nil {
+			return err
 		}
-
-		return nil
+		deleted, err = deletion.Apply(ctx, plan, options, imageFiles, sceneFiles, func(s *models.Scene) {
+			manager.KillRunningStreams(s, fileNamingAlgo)
+		})
+		return err
 	}); err != nil {
 		return false, err
 	}
 
-	for _, gallery := range galleries {
-		// don't delete stash library paths
-		path := gallery.Path
-		if deleteFile && path != "" && !isStashPath(path, folders) {
-			// try to remove the folder - it is possible that it is not empty
-			// so swallow the error if present
-			_ = os.Remove(path)
+	for _, path := range deleted.EmptyFolders {
+		// Never remove a library root, retained ZIP, symlink or regular file.
+		// Only an empty backing directory may be removed after commit.
+		if !isStashPath(path, folders) {
+			_ = syscall.Rmdir(path)
 		}
 	}
-
-	// call post hook after performing the other actionsa
-	for _, gallery := range galleries {
-		r.hookExecutor.ExecutePostHooks(ctx, gallery.ID, hook.GalleryDestroyPost, plugin.GalleryDestroyInput{
-			GalleryDestroyInput: input,
-			Checksum:            gallery.PrimaryChecksum(),
-			Path:                gallery.Path,
+	// Notify only after the entire selection commits.
+	for _, g := range plan.Galleries {
+		r.hookExecutor.ExecutePostHooks(ctx, g.ID, hook.GalleryDestroyPost, plugin.GalleryDestroyInput{
+			GalleryDestroyInput: input, Checksum: g.PrimaryChecksum(), Path: g.Path,
 		}, nil)
 	}
-
-	// call image destroy post hook as well
-	for _, img := range imgsDestroyed {
+	for _, img := range deleted.Images {
 		r.hookExecutor.ExecutePostHooks(ctx, img.ID, hook.ImageDestroyPost, plugin.ImageDestroyInput{
-			Checksum: img.Checksum,
-			Path:     img.Path,
+			ImageDestroyInput: models.ImageDestroyInput{ID: strconv.Itoa(img.ID), DeleteFile: input.DeleteFile,
+				DeleteGenerated: input.DeleteGenerated, DestroyFileEntry: input.DestroyFileEntry},
+			Checksum: img.Checksum, Path: img.Path,
 		}, nil)
 	}
-
+	for _, s := range deleted.Scenes {
+		r.hookExecutor.ExecutePostHooks(ctx, s.ID, hook.SceneDestroyPost, plugin.SceneDestroyInput{
+			SceneDestroyInput: models.SceneDestroyInput{ID: strconv.Itoa(s.ID), DeleteFile: input.DeleteFile,
+				DeleteGenerated: input.DeleteGenerated, DestroyFileEntry: input.DestroyFileEntry},
+			Checksum: s.Checksum, OSHash: s.OSHash, Path: s.Path,
+		}, nil)
+	}
 	return true, nil
 }
 

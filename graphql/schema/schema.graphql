@@ -142,6 +142,7 @@ type Query {
   ): FindGroupsResultType! @libraryScope(kind: "group")
 
   findGallery(id: ID! @libraryID(kind: "gallery")): Gallery @libraryScope(kind: "gallery")
+  galleryDeletePreview(ids: [ID!]! @libraryID(kind: "gallery")): GalleryDeletePreview! @libraryScope(kind: "gallery")
   findGalleries(
     gallery_filter_ast: FilterASTInput
     filter: FindFilterType

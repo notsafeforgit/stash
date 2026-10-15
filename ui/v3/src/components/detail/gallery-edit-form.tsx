@@ -6,7 +6,7 @@ import { useIntl } from "react-intl";
 import { Save, RotateCcw, Trash2 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { objectTitle } from "src/core/files";
-import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
+import { useEntityMutation } from "src/core/client";
 import { galleryLabel } from "src/lib/gallery-utils";
 import { Button } from "src/components/ui/button";
 import { Input } from "src/components/ui/input";
@@ -21,7 +21,7 @@ import {
 } from "src/components/forms/async-entity-select";
 import { UrlListField } from "src/components/forms/url-list-field";
 import { DatePicker } from "src/components/ui/date-picker";
-import { DeleteDialog } from "src/components/detail/delete-dialog";
+import { GalleryDeleteDialog } from "./deferred-overlays";
 import {
   CustomFieldsField,
   type CustomFieldMap,
@@ -110,9 +110,6 @@ export function GalleryEditForm({
   const [updateGallery, { loading: saving }] = useEntityMutation(
     GQL.GalleryUpdateDocument,
   );
-  const [destroyGallery, { loading: deleting }] = useEntityMutation(
-    GQL.GalleryDestroyDocument,
-  );
 
   // Studio search
   const [studioOptions, setStudioOptions] = useState<EntityOption[]>([]);
@@ -184,36 +181,8 @@ export function GalleryEditForm({
     },
   });
 
-  const busy = saving || deleting;
-
   const [deleteOpen, setDeleteOpen] = useState(false);
-
-  async function handleConfirmedDelete({
-    deleteFile,
-    deleteGenerated,
-  }: {
-    deleteFile: boolean;
-    deleteGenerated: boolean;
-  }) {
-    await destroyGallery({
-      variables: {
-        ids: [gallery.id],
-        delete_file: deleteFile,
-        delete_generated: deleteGenerated,
-      },
-      update(cache) {
-        removeEntitiesFromCache({
-          cache,
-          typename: "Gallery",
-          listFieldName: "findGalleries",
-          itemsField: "galleries",
-          ids: [gallery.id],
-        });
-      },
-    });
-    if (onDeleted) onDeleted();
-    else goBack();
-  }
+  const busy = saving || deleteOpen;
 
   return (
     <form
@@ -565,16 +534,12 @@ export function GalleryEditForm({
           })}
         </Button>
       </div>
-      <DeleteDialog
+      <GalleryDeleteDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
+        ids={[gallery.id]}
         entityName={galleryLabel(gallery)}
-        showFileOptions
-        deleteFileLabel={intl.formatMessage({
-          id: "dialogs.delete_gallery_files",
-          defaultMessage: "Delete gallery files",
-        })}
-        onConfirm={handleConfirmedDelete}
+        onDeleted={onDeleted ?? goBack}
       />
     </form>
   );

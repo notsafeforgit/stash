@@ -4125,5 +4125,17 @@
     "showing": "Showing {shown, number} of {total, number} running scrapes.",
     "idle": "No scrape is currently running. Open all scrape runs for queued work and completed runs.",
     "open": "View all scrape runs"
+  },
+  "gallery_deletion": {
+    "media_help": "Deleted images and scenes are removed from the library and every gallery that uses them.",
+    "gallery_help": "Remove only the galleries and their associations. Keep every image, scene and file.",
+    "files": "Also delete the media files from disk",
+    "members": "Contains {images, plural, one {# image} other {# images}} and {scenes, plural, one {# scene} other {# scenes}} (each counted once).",
+    "media": "Also delete the gallery’s images and scenes",
+    "shared": "Also delete media used by other galleries",
+    "shared_help": "{images, plural, one {# image} other {# images}} and {scenes, plural, one {# scene} other {# scenes}} also belong to galleries outside this selection. They are kept unless you select this option.",
+    "removing": "Will delete {images, plural, one {# image} other {# images}} and {scenes, plural, one {# scene} other {# scenes}} from the library.",
+    "zip_help": "ZIP files still used by another gallery or retained media are kept. Individual files inside a retained ZIP cannot be removed.",
+    "source_help": "Source post metadata stays available. Deleted source albums are not automatically recreated."
   }
 }

@@ -4,8 +4,33 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/stashapp/stash/pkg/gallery"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
 )
+
+func (r *queryResolver) GalleryDeletePreview(ctx context.Context, ids []string) (ret *models.GalleryDeletePreview, err error) {
+	keys, err := stringslice.StringSliceToIntSlice(ids)
+	if err != nil {
+		return nil, err
+	}
+	err = r.withReadTxn(ctx, func(ctx context.Context) error {
+		deletion := gallery.Deletion{Repository: r.repository}
+		plan, err := deletion.Plan(ctx, keys)
+		if err != nil {
+			return err
+		}
+		ret = &models.GalleryDeletePreview{GalleryCount: len(plan.Galleries), ImageCount: len(plan.Images), SceneCount: len(plan.Scenes),
+			SharedImageCount: len(plan.SharedImages), SharedSceneCount: len(plan.SharedScenes), ZipCount: len(plan.ZipFiles)}
+		for _, g := range plan.Galleries {
+			if g.Origin == models.GalleryOriginSource {
+				ret.SourceCount++
+			}
+		}
+		return nil
+	})
+	return ret, err
+}
 
 func (r *queryResolver) FindGallery(ctx context.Context, id string) (ret *models.Gallery, err error) {
 	idInt, err := strconv.Atoi(id)

@@ -3,17 +3,17 @@ import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
 import { useNavigate, useRouter } from "@tanstack/react-router";
-import * as GQL from "src/core/generated-graphql";
 import { galleryLabel } from "src/lib/gallery-utils";
-import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
 import {
   ContextMenu,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "src/components/ui/context-menu";
-import { DeleteDialog } from "src/components/detail/delete-dialog";
-import { GalleryBulkEditSheet } from "@/components/detail/deferred-overlays";
+import {
+  GalleryBulkEditSheet,
+  GalleryDeleteDialog,
+} from "@/components/detail/deferred-overlays";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -46,8 +46,6 @@ export function useGalleryContextMenu({
   const navigate = useNavigate();
   const router = useRouter();
 
-  const [destroyGallery] = useEntityMutation(GQL.GalleryDestroyDocument);
-
   const {
     selectedItems,
     totalCount,
@@ -62,57 +60,6 @@ export function useGalleryContextMenu({
   } = useBulkCardActions(GalleryListItems.useItems());
 
   const [deleteOpen, setDeleteOpen] = useState(false);
-
-  async function handleConfirmedDelete({
-    deleteFile,
-    deleteGenerated,
-  }: {
-    deleteFile: boolean;
-    deleteGenerated: boolean;
-  }) {
-    await destroyGallery({
-      variables: {
-        ids: [gallery.id],
-        delete_file: deleteFile,
-        delete_generated: deleteGenerated,
-      },
-      update(cache) {
-        removeEntitiesFromCache({
-          cache,
-          typename: "Gallery",
-          listFieldName: "findGalleries",
-          itemsField: "galleries",
-          ids: [gallery.id],
-        });
-      },
-    });
-  }
-
-  async function handleConfirmedBulkDelete({
-    deleteFile,
-    deleteGenerated,
-  }: {
-    deleteFile: boolean;
-    deleteGenerated: boolean;
-  }) {
-    const ids = selectedItems.map((i) => i.id);
-    await destroyGallery({
-      variables: {
-        ids,
-        delete_file: deleteFile,
-        delete_generated: deleteGenerated,
-      },
-      update(cache) {
-        removeEntitiesFromCache({
-          cache,
-          typename: "Gallery",
-          listFieldName: "findGalleries",
-          itemsField: "galleries",
-          ids,
-        });
-      },
-    });
-  }
 
   const menuContent = (
     <EntityContextMenuContent title={galleryLabel(gallery)}>
@@ -168,35 +115,18 @@ export function useGalleryContextMenu({
 
   const dialogs = (
     <>
-      <DeleteDialog
+      <GalleryDeleteDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         entityName={galleryLabel(gallery)}
-        showFileOptions
-        deleteFileLabel={intl.formatMessage({
-          id: "dialogs.delete_gallery_files",
-          defaultMessage: "Delete gallery files",
-        })}
-        onConfirm={handleConfirmedDelete}
+        ids={[gallery.id]}
       />
       {showBulkActions && (
         <>
-          <DeleteDialog
+          <GalleryDeleteDialog
             open={bulkDeleteOpen}
             onOpenChange={setBulkDeleteOpen}
-            entityCountLabel={intl.formatMessage(
-              {
-                id: "dialogs.delete_galleries_count",
-                defaultMessage: "{count} galleries",
-              },
-              { count: bulkCount },
-            )}
-            showFileOptions
-            deleteFileLabel={intl.formatMessage({
-              id: "dialogs.delete_gallery_files",
-              defaultMessage: "Delete gallery files",
-            })}
-            onConfirm={handleConfirmedBulkDelete}
+            ids={selectedItems.map((item) => item.id)}
           />
           <GalleryBulkEditSheet
             open={bulkEditOpen}

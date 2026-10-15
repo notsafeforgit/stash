@@ -24,12 +24,16 @@ mutation GalleriesUpdate($input: [GalleryUpdateInput!]!) {
 
 mutation GalleryDestroy(
   $ids: [ID!]!
+  $delete_media: Boolean! = false
+  $delete_shared_media: Boolean! = false
   $delete_file: Boolean
   $delete_generated: Boolean
 ) {
   galleryDestroy(
     input: {
       ids: $ids
+      delete_media: $delete_media
+      delete_shared_media: $delete_shared_media
       delete_file: $delete_file
       delete_generated: $delete_generated
     }

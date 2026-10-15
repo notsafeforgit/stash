@@ -337,3 +337,31 @@ every 15 seconds without overlapping requests; hidden pages and offscreen groups
 suspend polling. A failed refresh keeps the last successful check with an error
 message. Navigation cancels obsolete reads. Viewing reports never changes links,
 metadata, source runs or files.
+## Deleting galleries and their media
+
+Every gallery deletion entry point uses the same confirmation. The default
+removes only the gallery and its memberships, preserving images, scenes and
+files, including for folder- and ZIP-backed galleries. Source post metadata and
+media-to-post associations remain available. A deleted source album is not
+automatically recreated on the next scrape or reconciliation.
+
+**Also delete the gallery’s images and scenes** removes its actual member
+entities from the library. The confirmation counts each image and scene once,
+even when multiple selected galleries share it. Media also belonging to galleries
+outside the selection is kept by default; an explicit additional choice includes
+that shared media. Deleting an entity removes it from every gallery. Other files
+in the same folder are not implied members and are left alone.
+
+**Also delete the media files from disk** is a separate option, available only
+with media deletion. It uses the normal recoverable file-deletion/trash handling,
+scene stream shutdown and post-success hooks. Generated supporting files have
+their own option. An archive used by another gallery or retained media stays on
+disk; individual members cannot be removed from a retained ZIP. Empty backing
+folders may be removed, but library roots are preserved.
+
+`galleryDeletePreview(ids: [ID!]!)` returns member and shared-member counts for
+native gallery UUIDs. `galleryDestroy` accepts `delete_media` and
+`delete_shared_media` (both default false), alongside `delete_file` and
+`delete_generated`. File deletion, file-entry deletion and shared-media deletion
+require `delete_media`. Planning is repeated inside the mutation transaction so
+membership and sharing are checked against the state actually being changed.

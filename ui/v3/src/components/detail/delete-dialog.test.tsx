@@ -72,7 +72,10 @@ describe("DeleteDialog", () => {
       </IntlProvider>,
     );
 
-    expect(markup).toContain('data-content-class="z-[10000]"');
+    const contentClasses = markup
+      .match(/data-content-class="([^"]*)"/)?.[1]
+      ?.split(" ");
+    expect(contentClasses).toContain("z-[10000]");
     expect(markup).toContain('data-overlay-class="z-[10000]"');
   });
 });

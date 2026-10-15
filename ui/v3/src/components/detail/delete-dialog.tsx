@@ -235,7 +235,10 @@ export function DeleteDialog({
       <DialogContent
         finalFocus={finalFocus}
         showCloseButton={false}
-        className={layerClassName}
+        className={cn(
+          "max-h-[calc(100dvh-2rem)] overflow-y-auto",
+          layerClassName,
+        )}
         overlayClassName={layerClassName}
       >
         <DialogHeader>

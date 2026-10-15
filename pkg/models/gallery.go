@@ -98,11 +98,21 @@ type GalleryUpdateInput struct {
 }
 
 type GalleryDestroyInput struct {
-	Ids []string `json:"ids"`
-	// If true, then the zip file will be deleted if the gallery is zip-file-based.
-	// If gallery is folder-based, then any files not associated with other
-	// galleries will be deleted, along with the folder, if it is not empty.
+	Ids               []string `json:"ids"`
+	DeleteMedia       bool     `json:"delete_media"`
+	DeleteSharedMedia bool     `json:"delete_shared_media"`
+	// File deletion requires explicit media deletion, for every gallery origin.
 	DeleteFile       *bool `json:"delete_file"`
 	DeleteGenerated  *bool `json:"delete_generated"`
 	DestroyFileEntry *bool `json:"destroy_file_entry"`
+}
+
+type GalleryDeletePreview struct {
+	GalleryCount     int `json:"gallery_count"`
+	SourceCount      int `json:"source_count"`
+	ImageCount       int `json:"image_count"`
+	SceneCount       int `json:"scene_count"`
+	SharedImageCount int `json:"shared_image_count"`
+	SharedSceneCount int `json:"shared_scene_count"`
+	ZipCount         int `json:"zip_count"`
 }

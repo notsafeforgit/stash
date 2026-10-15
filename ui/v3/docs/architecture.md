@@ -400,6 +400,15 @@ and `performer_images`). Only list-owned URL parameters override them;
 Returning to a tab without explicit filter parameters restores that view's
 saved default without serializing it into the shared page URL.
 
+Text conditions have a per-condition **Case sensitive** switch, independent of
+the comparison operator. New conditions ignore case, including Unicode letters.
+The optional `case_sensitive` boolean travels in AST condition values and saved
+filters (`cs` in compact filter URLs). Conditions saved without it retain their
+existing SQLite LIKE or regex behavior until a case preference is set. Regex
+inline flags still control their own scopes. Empty/not-empty and numeric
+conditions do not need a case switch. Multi-value negative text conditions
+exclude an entity when any alias or URL matches.
+
 ### Returning to a list
 
 TanStack Router owns scroll tracking and its session cache. The router and

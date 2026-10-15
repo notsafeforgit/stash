@@ -102,8 +102,9 @@ func (e CriterionModifier) MarshalGQL(w io.Writer) {
 }
 
 type StringCriterionInput struct {
-	Value    string            `json:"value"`
-	Modifier CriterionModifier `json:"modifier"`
+	Value         string            `json:"value"`
+	Modifier      CriterionModifier `json:"modifier"`
+	CaseSensitive *bool             `json:"case_sensitive,omitempty"`
 }
 
 func (i StringCriterionInput) ValidModifier() bool {
@@ -211,9 +212,10 @@ type OrientationCriterionInput struct {
 }
 
 type CustomFieldCriterionInput struct {
-	Field    string            `json:"field"`
-	Value    []any             `json:"value"`
-	Modifier CriterionModifier `json:"modifier"`
+	Field         string            `json:"field"`
+	Value         []any             `json:"value"`
+	Modifier      CriterionModifier `json:"modifier"`
+	CaseSensitive *bool             `json:"case_sensitive,omitempty"`
 }
 
 type FingerprintFilterInput struct {

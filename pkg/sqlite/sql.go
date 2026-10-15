@@ -148,16 +148,14 @@ func getCountSort(primaryTable, joinTable, primaryFK, direction string) string {
 	return fmt.Sprintf(" ORDER BY (SELECT COUNT(*) FROM %s AS sort WHERE sort.%s = %s.id) %s", joinTable, primaryFK, primaryTable, getSortDirection(direction))
 }
 
-// getStringSearchClause returns a sqlClause for searching strings in the provided columns.
+// getStringSearchClauseCase returns a sqlClause for searching strings in the provided columns.
 // It is used for includes and excludes string criteria.
-func getStringSearchClause(columns []string, q string, not bool) sqlClause {
+func getStringSearchClauseCase(columns []string, q string, not bool, caseSensitive *bool) sqlClause {
 	var likeClauses []string
 	var args []interface{}
 
-	notStr := ""
 	binaryType := " OR "
 	if not {
-		notStr = " NOT"
 		binaryType = " AND "
 	}
 	q = strings.TrimSpace(q)
@@ -169,15 +167,17 @@ func getStringSearchClause(columns []string, q string, not bool) sqlClause {
 		// Search for any word
 		for _, word := range queryWords {
 			for _, column := range columns {
-				likeClauses = append(likeClauses, column+notStr+" LIKE ?")
-				args = append(args, "%"+word+"%")
+				clause := stringLikeClause(column, "%"+word+"%", not, caseSensitive)
+				likeClauses = append(likeClauses, clause.sql)
+				args = append(args, clause.args...)
 			}
 		}
 	} else {
 		// Search the exact query
 		for _, column := range columns {
-			likeClauses = append(likeClauses, column+notStr+" LIKE ?")
-			args = append(args, "%"+trimmedQuery+"%")
+			clause := stringLikeClause(column, "%"+trimmedQuery+"%", not, caseSensitive)
+			likeClauses = append(likeClauses, clause.sql)
+			args = append(args, clause.args...)
 		}
 	}
 	likes := strings.Join(likeClauses, binaryType)

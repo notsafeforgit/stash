@@ -17,6 +17,7 @@ import {
   ComboboxEmpty,
 } from "src/components/ui/combobox";
 import { Spinner } from "src/components/ui/spinner";
+import { CaseSensitivityToggle } from "../case-sensitivity-toggle";
 
 const MODIFIERS = [
   CriterionModifier.IsNull,
@@ -196,6 +197,12 @@ export const SingleCustomFieldFilter: React.FC<
             />
           )}
         </div>
+      )}
+      {criterion.supportsCaseSensitivity && (
+        <CaseSensitivityToggle
+          checked={criterion.matchesCase}
+          onCheckedChange={(checked) => update({ caseSensitive: checked })}
+        />
       )}
     </div>
   );

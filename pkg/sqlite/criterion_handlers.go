@@ -40,25 +40,25 @@ func stringCriterionHandler(c *models.StringCriterionInput, column string) crite
 			if modifier := c.Modifier; c.Modifier.IsValid() {
 				switch modifier {
 				case models.CriterionModifierIncludes:
-					f.whereClauses = append(f.whereClauses, getStringSearchClause([]string{column}, c.Value, false))
+					f.whereClauses = append(f.whereClauses, getStringSearchClauseCase([]string{column}, c.Value, false, c.CaseSensitive))
 				case models.CriterionModifierExcludes:
-					f.whereClauses = append(f.whereClauses, getStringSearchClause([]string{column}, c.Value, true))
+					f.whereClauses = append(f.whereClauses, getStringSearchClauseCase([]string{column}, c.Value, true, c.CaseSensitive))
 				case models.CriterionModifierEquals:
-					f.addWhere(column+" LIKE ?", c.Value)
+					f.whereClauses = append(f.whereClauses, stringLikeClause(column, c.Value, false, c.CaseSensitive))
 				case models.CriterionModifierNotEquals:
-					f.addWhere(column+" NOT LIKE ?", c.Value)
+					f.whereClauses = append(f.whereClauses, stringLikeClause(column, c.Value, true, c.CaseSensitive))
 				case models.CriterionModifierMatchesRegex:
-					if _, err := regexp.Compile(c.Value); err != nil {
+					if _, err := regexp.Compile(stringRegexPattern(c.Value, c.CaseSensitive)); err != nil {
 						f.setError(err)
 						return
 					}
-					f.addWhere(fmt.Sprintf("(%s IS NOT NULL AND %[1]s regexp ?)", column), c.Value)
+					f.addWhere(fmt.Sprintf("(%s IS NOT NULL AND %[1]s regexp ?)", column), stringRegexPattern(c.Value, c.CaseSensitive))
 				case models.CriterionModifierNotMatchesRegex:
-					if _, err := regexp.Compile(c.Value); err != nil {
+					if _, err := regexp.Compile(stringRegexPattern(c.Value, c.CaseSensitive)); err != nil {
 						f.setError(err)
 						return
 					}
-					f.addWhere(fmt.Sprintf("(%s IS NULL OR %[1]s NOT regexp ?)", column), c.Value)
+					f.addWhere(fmt.Sprintf("(%s IS NULL OR %[1]s NOT regexp ?)", column), stringRegexPattern(c.Value, c.CaseSensitive))
 				case models.CriterionModifierIsNull:
 					f.addWhere("(" + column + " IS NULL OR TRIM(" + column + ") = '')")
 				case models.CriterionModifierNotNull:
@@ -77,25 +77,25 @@ func stringNoTrimCriterionHandler(c *models.StringCriterionInput, column string)
 			if modifier := c.Modifier; c.Modifier.IsValid() {
 				switch modifier {
 				case models.CriterionModifierIncludes:
-					f.whereClauses = append(f.whereClauses, getStringSearchClause([]string{column}, c.Value, false))
+					f.whereClauses = append(f.whereClauses, getStringSearchClauseCase([]string{column}, c.Value, false, c.CaseSensitive))
 				case models.CriterionModifierExcludes:
-					f.whereClauses = append(f.whereClauses, getStringSearchClause([]string{column}, c.Value, true))
+					f.whereClauses = append(f.whereClauses, getStringSearchClauseCase([]string{column}, c.Value, true, c.CaseSensitive))
 				case models.CriterionModifierEquals:
-					f.addWhere(column+" LIKE ?", c.Value)
+					f.whereClauses = append(f.whereClauses, stringLikeClause(column, c.Value, false, c.CaseSensitive))
 				case models.CriterionModifierNotEquals:
-					f.addWhere(column+" NOT LIKE ?", c.Value)
+					f.whereClauses = append(f.whereClauses, stringLikeClause(column, c.Value, true, c.CaseSensitive))
 				case models.CriterionModifierMatchesRegex:
-					if _, err := regexp.Compile(c.Value); err != nil {
+					if _, err := regexp.Compile(stringRegexPattern(c.Value, c.CaseSensitive)); err != nil {
 						f.setError(err)
 						return
 					}
-					f.addWhere(fmt.Sprintf("(%s IS NOT NULL AND %[1]s regexp ?)", column), c.Value)
+					f.addWhere(fmt.Sprintf("(%s IS NOT NULL AND %[1]s regexp ?)", column), stringRegexPattern(c.Value, c.CaseSensitive))
 				case models.CriterionModifierNotMatchesRegex:
-					if _, err := regexp.Compile(c.Value); err != nil {
+					if _, err := regexp.Compile(stringRegexPattern(c.Value, c.CaseSensitive)); err != nil {
 						f.setError(err)
 						return
 					}
-					f.addWhere(fmt.Sprintf("(%s IS NULL OR %[1]s NOT regexp ?)", column), c.Value)
+					f.addWhere(fmt.Sprintf("(%s IS NULL OR %[1]s NOT regexp ?)", column), stringRegexPattern(c.Value, c.CaseSensitive))
 				case models.CriterionModifierIsNull:
 					f.addWhere("(" + column + " IS NULL)")
 				case models.CriterionModifierNotNull:
@@ -162,31 +162,31 @@ func pathCriterionHandler(c *models.StringCriterionInput, pathColumn string, bas
 
 				switch modifier {
 				case models.CriterionModifierIncludes:
-					f.whereClauses = append(f.whereClauses, getPathSearchClauseMany(pathColumn, basenameColumn, c.Value, addWildcards, not))
+					f.whereClauses = append(f.whereClauses, getPathSearchClauseManyCase(pathColumn, basenameColumn, c.Value, addWildcards, not, c.CaseSensitive))
 				case models.CriterionModifierExcludes:
 					not = true
-					f.whereClauses = append(f.whereClauses, getPathSearchClauseMany(pathColumn, basenameColumn, c.Value, addWildcards, not))
+					f.whereClauses = append(f.whereClauses, getPathSearchClauseManyCase(pathColumn, basenameColumn, c.Value, addWildcards, not, c.CaseSensitive))
 				case models.CriterionModifierEquals:
 					addWildcards = false
-					f.whereClauses = append(f.whereClauses, getPathSearchClause(pathColumn, basenameColumn, c.Value, addWildcards, not))
+					f.whereClauses = append(f.whereClauses, getPathSearchClauseCase(pathColumn, basenameColumn, c.Value, addWildcards, not, c.CaseSensitive))
 				case models.CriterionModifierNotEquals:
 					addWildcards = false
 					not = true
-					f.whereClauses = append(f.whereClauses, getPathSearchClause(pathColumn, basenameColumn, c.Value, addWildcards, not))
+					f.whereClauses = append(f.whereClauses, getPathSearchClauseCase(pathColumn, basenameColumn, c.Value, addWildcards, not, c.CaseSensitive))
 				case models.CriterionModifierMatchesRegex:
-					if _, err := regexp.Compile(c.Value); err != nil {
+					if _, err := regexp.Compile(stringRegexPattern(c.Value, c.CaseSensitive)); err != nil {
 						f.setError(err)
 						return
 					}
 					filepathColumn := fmt.Sprintf("%s || '%s' || %s", pathColumn, string(filepath.Separator), basenameColumn)
-					f.addWhere(fmt.Sprintf("%s IS NOT NULL AND %s IS NOT NULL AND %s regexp ?", pathColumn, basenameColumn, filepathColumn), c.Value)
+					f.addWhere(fmt.Sprintf("%s IS NOT NULL AND %s IS NOT NULL AND %s regexp ?", pathColumn, basenameColumn, filepathColumn), stringRegexPattern(c.Value, c.CaseSensitive))
 				case models.CriterionModifierNotMatchesRegex:
-					if _, err := regexp.Compile(c.Value); err != nil {
+					if _, err := regexp.Compile(stringRegexPattern(c.Value, c.CaseSensitive)); err != nil {
 						f.setError(err)
 						return
 					}
 					filepathColumn := fmt.Sprintf("%s || '%s' || %s", pathColumn, string(filepath.Separator), basenameColumn)
-					f.addWhere(fmt.Sprintf("%s IS NULL OR %s IS NULL OR %s NOT regexp ?", pathColumn, basenameColumn, filepathColumn), c.Value)
+					f.addWhere(fmt.Sprintf("%s IS NULL OR %s IS NULL OR %s NOT regexp ?", pathColumn, basenameColumn, filepathColumn), stringRegexPattern(c.Value, c.CaseSensitive))
 				case models.CriterionModifierIsNull:
 					f.addWhere(fmt.Sprintf("%s IS NULL OR TRIM(%[1]s) = '' OR %s IS NULL OR TRIM(%[2]s) = ''", pathColumn, basenameColumn))
 				case models.CriterionModifierNotNull:
@@ -199,13 +199,13 @@ func pathCriterionHandler(c *models.StringCriterionInput, pathColumn string, bas
 	}
 }
 
-func getPathSearchClause(pathColumn, basenameColumn, p string, addWildcards, not bool) sqlClause {
+func getPathSearchClauseCase(pathColumn, basenameColumn, p string, addWildcards, not bool, caseSensitive *bool) sqlClause {
 	if addWildcards {
 		p = "%" + p + "%"
 	}
 
 	filepathColumn := fmt.Sprintf("%s || '%s' || %s", pathColumn, string(filepath.Separator), basenameColumn)
-	ret := makeClause(fmt.Sprintf("%s LIKE ?", filepathColumn), p)
+	ret := stringLikeClause(filepathColumn, p, false, caseSensitive)
 
 	if not {
 		ret = ret.not()
@@ -214,9 +214,9 @@ func getPathSearchClause(pathColumn, basenameColumn, p string, addWildcards, not
 	return ret
 }
 
-// getPathSearchClauseMany splits the query string p on whitespace
+// getPathSearchClauseManyCase splits the query string p on whitespace
 // Used for backwards compatibility for the includes/excludes modifiers
-func getPathSearchClauseMany(pathColumn, basenameColumn, p string, addWildcards, not bool) sqlClause {
+func getPathSearchClauseManyCase(pathColumn, basenameColumn, p string, addWildcards, not bool, caseSensitive *bool) sqlClause {
 	q := strings.TrimSpace(p)
 	trimmedQuery := strings.Trim(q, "\"")
 
@@ -227,7 +227,7 @@ func getPathSearchClauseMany(pathColumn, basenameColumn, p string, addWildcards,
 		var ret []sqlClause
 		// Search for any word
 		for _, word := range queryWords {
-			ret = append(ret, getPathSearchClause(pathColumn, basenameColumn, word, addWildcards, not))
+			ret = append(ret, getPathSearchClauseCase(pathColumn, basenameColumn, word, addWildcards, not, caseSensitive))
 		}
 
 		if !not {
@@ -237,7 +237,7 @@ func getPathSearchClauseMany(pathColumn, basenameColumn, p string, addWildcards,
 		return andClauses(ret...)
 	}
 
-	return getPathSearchClause(pathColumn, basenameColumn, trimmedQuery, addWildcards, not)
+	return getPathSearchClauseCase(pathColumn, basenameColumn, trimmedQuery, addWildcards, not, caseSensitive)
 }
 
 func intCriterionHandler(c *models.IntCriterionInput, column string, addJoinFn func(f *filterBuilder, joinType joinType)) criterionHandlerFunc {
@@ -615,24 +615,41 @@ type stringListCriterionHandlerBuilder struct {
 	// string field on the join table
 	stringColumn string
 
-	addJoinTable   func(f *filterBuilder, joinType joinType)
-	excludeHandler func(f *filterBuilder, criterion *models.StringCriterionInput)
+	addJoinTable func(f *filterBuilder, joinType joinType)
+	// Some relations need a different subquery or treat includes as equality.
+	excludeHandler    func(f *filterBuilder, match sqlClause)
+	excludeWholeValue bool
 }
 
 func (m *stringListCriterionHandlerBuilder) handler(criterion *models.StringCriterionInput) criterionHandlerFunc {
 	return func(ctx context.Context, f *filterBuilder) {
 		if criterion != nil {
-			if criterion.Modifier == models.CriterionModifierExcludes {
-				// special handling for excludes
+			if criterion.Modifier == models.CriterionModifierExcludes || criterion.Modifier == models.CriterionModifierNotEquals || criterion.Modifier == models.CriterionModifierNotMatchesRegex {
+				// A negative list condition excludes the entity if ANY value matches.
+				// Negating individual joined rows lets an unrelated alias/URL defeat it.
+				column := m.joinTable + "." + m.stringColumn
+				value := criterion.Value
+				if criterion.Modifier == models.CriterionModifierExcludes && !m.excludeWholeValue {
+					value = "%" + value + "%"
+				}
+				match := stringLikeClause(column, value, false, criterion.CaseSensitive)
+				if criterion.Modifier == models.CriterionModifierNotMatchesRegex {
+					pattern := stringRegexPattern(value, criterion.CaseSensitive)
+					if _, err := regexp.Compile(pattern); err != nil {
+						f.setError(err)
+						return
+					}
+					match = makeClause(column+" IS NOT NULL AND "+column+" regexp ?", pattern)
+				}
 				if m.excludeHandler != nil {
-					m.excludeHandler(f, criterion)
+					m.excludeHandler(f, match)
 					return
 				}
 
 				// excludes all of the provided values
 				// need to use actual join table name for this
 				// <primaryTable>.id NOT IN (select <joinTable>.<primaryFK> from <joinTable> where <joinTable>.<foreignFK> in <values>)
-				whereClause := utils.StrFormat("{primaryTable}.id NOT IN (SELECT {joinTable}.{primaryFK} from {joinTable} where {joinTable}.{stringColumn} LIKE ?)",
+				whereClause := utils.StrFormat("{primaryTable}.id NOT IN (SELECT {joinTable}.{primaryFK} from {joinTable} where "+match.sql+")",
 					utils.StrFormatMap{
 						"primaryTable": m.primaryTable,
 						"joinTable":    m.joinTable,
@@ -641,7 +658,7 @@ func (m *stringListCriterionHandlerBuilder) handler(criterion *models.StringCrit
 					},
 				)
 
-				f.addWhere(whereClause, "%"+criterion.Value+"%")
+				f.addWhere(whereClause, match.args...)
 
 				// TODO - should we also exclude null values?
 				// m.addJoinTable(f)

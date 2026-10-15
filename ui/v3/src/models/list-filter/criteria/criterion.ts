@@ -675,12 +675,95 @@ export function createMandatoryStringCriterionOption(
 }
 
 export class StringCriterion extends ModifierCriterion<string> {
+  public caseSensitive?: boolean;
+
+  public get supportsCaseSensitivity() {
+    return (
+      this.criterionOption instanceof StringCriterionOption ||
+      this.criterionOption instanceof MandatoryStringCriterionOption
+    );
+  }
+
+  public get matchesCase() {
+    return (
+      this.caseSensitive ??
+      (this.modifier === CriterionModifier.MatchesRegex ||
+        this.modifier === CriterionModifier.NotMatchesRegex)
+    );
+  }
+
   constructor(type: ModifierCriterionOption) {
     super(type, type.options?.[0]?.toString() ?? "");
+    // New text conditions explicitly ignore case, including Unicode. Decoding
+    // older saved conditions without this flag preserves their existing behavior.
+    if (this.supportsCaseSensitivity) this.caseSensitive = false;
   }
 
   protected getLabelValue(_intl: IntlShape) {
     return this.value;
+  }
+
+  public override getLabel(intl: IntlShape, sfwContentMode = false) {
+    const label = super.getLabel(intl, sfwContentMode);
+    if (
+      !this.supportsCaseSensitivity ||
+      this.caseSensitive === undefined ||
+      this.modifier === CriterionModifier.IsNull ||
+      this.modifier === CriterionModifier.NotNull
+    ) {
+      return label;
+    }
+    return intl.formatMessage(
+      {
+        id: "search_filter.case_label",
+        defaultMessage: "{filter} ({matching})",
+      },
+      {
+        filter: label,
+        matching: intl.formatMessage(
+          this.caseSensitive
+            ? {
+                id: "search_filter.case_sensitive",
+                defaultMessage: "Case sensitive",
+              }
+            : {
+                id: "search_filter.case_insensitive",
+                defaultMessage: "Ignore case",
+              },
+        ),
+      },
+    );
+  }
+
+  public override toQueryParams() {
+    const params = super.toQueryParams();
+    if (this.supportsCaseSensitivity && this.caseSensitive !== undefined) {
+      params.case_sensitive = this.caseSensitive;
+    }
+    return params;
+  }
+
+  public override fromDecodedParams(input: unknown) {
+    super.fromDecodedParams(input);
+    const value = (input as { case_sensitive?: unknown }).case_sensitive;
+    if (value !== undefined && value !== null && typeof value !== "boolean") {
+      throw new Error("case_sensitive must be a boolean");
+    }
+    this.caseSensitive = typeof value === "boolean" ? value : undefined;
+  }
+
+  public override setFromSavedCriterion(input: unknown) {
+    this.fromDecodedParams(input);
+  }
+
+  protected override toCriterionInput(): unknown {
+    return {
+      value: this.value,
+      modifier: this.modifier,
+      ...(this.supportsCaseSensitivity && this.caseSensitive !== undefined
+        ? { case_sensitive: this.caseSensitive }
+        : {}),
+    };
   }
 
   public isValid(): boolean {

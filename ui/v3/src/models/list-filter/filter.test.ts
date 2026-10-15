@@ -2,6 +2,10 @@ import { expect, it } from "vitest";
 import { CriterionModifier, FilterMode } from "@/core/generated-graphql";
 import { decodeURLJSON } from "@/utils/url-json";
 import { ListFilterModel } from "./filter";
+import {
+  createStringCriterionOption,
+  StringCriterion,
+} from "./criteria/criterion";
 
 function titleFilter(mode: FilterMode, title: string) {
   const filter = new ListFilterModel(mode);
@@ -17,6 +21,67 @@ function titleFilter(mode: FilterMode, title: string) {
   });
   return filter;
 }
+
+it.each([true, false, undefined])(
+  "preserves case matching (%s) in URLs, saved filters and API conditions",
+  (caseSensitive) => {
+    for (const field of ["details", "path", "custom_field"]) {
+      const value = {
+        modifier: CriterionModifier.Includes,
+        value: field === "custom_field" ? ["Été"] : "Été",
+        ...(field === "custom_field" ? { field: "note" } : {}),
+        ...(caseSensitive === undefined
+          ? {}
+          : { case_sensitive: caseSensitive }),
+      };
+      const original = new ListFilterModel(FilterMode.Scenes);
+      original.configureFromSavedFilter({
+        filter_ast: { root: { condition: { field, value } } },
+      });
+      const expected = {
+        root: {
+          condition: {
+            field: field === "custom_field" ? "custom_fields" : field,
+            value: field === "custom_field" ? [value] : value,
+          },
+        },
+      };
+      expect(original.makeFilterAST()).toEqual(expected);
+      const restored = new ListFilterModel(FilterMode.Scenes);
+      restored.configureFromDecodedParams({
+        fa: original.getEncodedParams().fa ?? undefined,
+      });
+      expect(restored.makeFilterAST()).toEqual(expected);
+      const saved = new ListFilterModel(FilterMode.Scenes);
+      saved.configureFromSavedFilter({ filter_ast: restored.makeFilterAst() });
+      expect(saved.makeFilterAST()).toEqual(expected);
+    }
+  },
+);
+
+it("keeps a new text condition's case setting when cloning and changing operators", () => {
+  const criterion = new StringCriterion(createStringCriterionOption("details"));
+  expect(criterion.matchesCase).toBe(false);
+  expect(criterion.toCriterionInputValue()).toMatchObject({
+    case_sensitive: false,
+  });
+  criterion.caseSensitive = true;
+  criterion.value = "Bright";
+  const cloned = criterion.clone() as StringCriterion;
+  cloned.modifier = CriterionModifier.MatchesRegex;
+  expect(cloned.toCriterionInputValue()).toEqual({
+    value: "Bright",
+    modifier: CriterionModifier.MatchesRegex,
+    case_sensitive: true,
+  });
+  expect(() =>
+    cloned.fromDecodedParams({
+      value: "Bright",
+      modifier: CriterionModifier.Includes,
+      case_sensitive: "false",
+    }),
+  ).toThrow(/boolean/);
+});
 
 it.each(["ASCII", "café", "Ã©", "日本語 🎬"])(
   "round trips filter URLs and saved filters for %s",

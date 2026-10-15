@@ -140,6 +140,7 @@ export class CustomFieldsCriterion extends Criterion {
 // standard AND/OR groups rather than this criterion's internal shape.
 export class SingleCustomFieldCriterion extends Criterion {
   public field: string = "";
+  public caseSensitive?: boolean = false;
   public modifier: CriterionModifier = CriterionModifier.Equals;
   public value: unknown[] = [];
 
@@ -149,6 +150,28 @@ export class SingleCustomFieldCriterion extends Criterion {
 
   protected cloneValues() {
     this.value = structuredClone(this.value);
+  }
+
+  public get supportsCaseSensitivity() {
+    return (
+      typeof (this.value[0] ?? "") === "string" &&
+      [
+        CriterionModifier.Equals,
+        CriterionModifier.NotEquals,
+        CriterionModifier.Includes,
+        CriterionModifier.Excludes,
+        CriterionModifier.MatchesRegex,
+        CriterionModifier.NotMatchesRegex,
+      ].includes(this.modifier)
+    );
+  }
+
+  public get matchesCase() {
+    return (
+      this.caseSensitive ??
+      (this.modifier !== CriterionModifier.Includes &&
+        this.modifier !== CriterionModifier.Excludes)
+    );
   }
 
   public isValid(): boolean {
@@ -174,6 +197,9 @@ export class SingleCustomFieldCriterion extends Criterion {
       field: this.field,
       modifier: this.modifier,
       value: cloneDeep(this.value),
+      ...(this.caseSensitive !== undefined
+        ? { case_sensitive: this.caseSensitive }
+        : {}),
     };
   }
 
@@ -194,12 +220,34 @@ export class SingleCustomFieldCriterion extends Criterion {
       this.modifier,
     );
 
-    return intl.formatMessage(
+    const label = intl.formatMessage(
       { id: "custom_fields.criteria_format_string" },
       {
         criterion: this.field,
         modifierString,
         valueString,
+      },
+    );
+    if (!this.supportsCaseSensitivity || this.caseSensitive === undefined)
+      return label;
+    return intl.formatMessage(
+      {
+        id: "search_filter.case_label",
+        defaultMessage: "{filter} ({matching})",
+      },
+      {
+        filter: label,
+        matching: intl.formatMessage(
+          this.caseSensitive
+            ? {
+                id: "search_filter.case_sensitive",
+                defaultMessage: "Case sensitive",
+              }
+            : {
+                id: "search_filter.case_insensitive",
+                defaultMessage: "Ignore case",
+              },
+        ),
       },
     );
   }
@@ -210,6 +258,9 @@ export class SingleCustomFieldCriterion extends Criterion {
       field: this.field,
       modifier: this.modifier,
       value: this.value,
+      ...(this.caseSensitive !== undefined
+        ? { case_sensitive: this.caseSensitive }
+        : {}),
     };
   }
 
@@ -218,13 +269,22 @@ export class SingleCustomFieldCriterion extends Criterion {
       field?: string;
       modifier?: CriterionModifier;
       value?: unknown[];
+      case_sensitive?: boolean;
     };
+    if (
+      decoded.case_sensitive !== undefined &&
+      typeof decoded.case_sensitive !== "boolean"
+    ) {
+      throw new Error("case_sensitive must be a boolean");
+    }
+    this.caseSensitive = decoded.case_sensitive;
     this.field = decoded.field ?? "";
     this.modifier = decoded.modifier ?? CriterionModifier.Equals;
     this.value = cloneDeep(decoded.value ?? []);
   }
 
   public setFromSavedCriterion(input: CustomFieldCriterionInput): void {
+    this.caseSensitive = input.case_sensitive ?? undefined;
     this.field = input.field;
     this.modifier = input.modifier;
     this.value = cloneDeep(input.value ?? []);

@@ -405,8 +405,8 @@ func (qb *performerFilterHandler) aliasCriterionHandler(alias *models.StringCrit
 		addJoinTable: func(f *filterBuilder, joinType joinType) {
 			f.addJoin(joinType, performerNamesTable, "", "performer_names.performer_id = performers.id AND performer_names.position > 0")
 		},
-		excludeHandler: func(f *filterBuilder, criterion *models.StringCriterionInput) {
-			f.addWhere("NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.id AND position > 0 AND name LIKE ?)", "%"+criterion.Value+"%")
+		excludeHandler: func(f *filterBuilder, match sqlClause) {
+			f.addWhere("NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.id AND position > 0 AND "+match.sql+")", match.args...)
 		},
 	}
 
@@ -421,28 +421,30 @@ func (qb *performerFilterHandler) allNamesCriterionHandler(names *models.StringC
 
 		const canonical = performerPrimaryNameSQL
 		const aliases = "COALESCE((SELECT GROUP_CONCAT(name, ' | ') FROM performer_names WHERE performer_id = performers.id AND position > 0), '')"
-		const aliasMatch = "EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.id AND position > 0 AND name LIKE ?)"
+		canonicalMatch := stringLikeClause(canonical, names.Value, false, names.CaseSensitive)
+		aliasValueMatch := stringLikeClause("name", names.Value, false, names.CaseSensitive)
+		aliasMatch := makeClause("EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.id AND position > 0 AND "+aliasValueMatch.sql+")", aliasValueMatch.args...)
 		const aliasRegex = "EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.id AND position > 0 AND name regexp ?)"
 		const aliasPresent = "EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.id AND position > 0 AND TRIM(name) != '')"
 
 		switch names.Modifier {
 		case models.CriterionModifierIncludes:
-			f.whereClauses = append(f.whereClauses, getStringSearchClause([]string{canonical, aliases}, names.Value, false))
+			f.whereClauses = append(f.whereClauses, getStringSearchClauseCase([]string{canonical, aliases}, names.Value, false, names.CaseSensitive))
 		case models.CriterionModifierExcludes:
-			f.whereClauses = append(f.whereClauses, getStringSearchClause([]string{canonical, aliases}, names.Value, true))
+			f.whereClauses = append(f.whereClauses, getStringSearchClauseCase([]string{canonical, aliases}, names.Value, true, names.CaseSensitive))
 		case models.CriterionModifierEquals:
-			f.addWhere("("+canonical+" LIKE ? OR "+aliasMatch+")", names.Value, names.Value)
+			f.whereClauses = append(f.whereClauses, orClauses(canonicalMatch, aliasMatch))
 		case models.CriterionModifierNotEquals:
-			f.addWhere("("+canonical+" NOT LIKE ? AND NOT "+aliasMatch+")", names.Value, names.Value)
+			f.whereClauses = append(f.whereClauses, andClauses(canonicalMatch.not(), aliasMatch.not()))
 		case models.CriterionModifierMatchesRegex, models.CriterionModifierNotMatchesRegex:
-			if _, err := regexp.Compile(names.Value); err != nil {
+			if _, err := regexp.Compile(stringRegexPattern(names.Value, names.CaseSensitive)); err != nil {
 				f.setError(err)
 				return
 			}
 			if names.Modifier == models.CriterionModifierMatchesRegex {
-				f.addWhere("("+canonical+" regexp ? OR "+aliasRegex+")", names.Value, names.Value)
+				f.addWhere("("+canonical+" regexp ? OR "+aliasRegex+")", stringRegexPattern(names.Value, names.CaseSensitive), stringRegexPattern(names.Value, names.CaseSensitive))
 			} else {
-				f.addWhere("("+canonical+" NOT regexp ? AND NOT "+aliasRegex+")", names.Value, names.Value)
+				f.addWhere("("+canonical+" NOT regexp ? AND NOT "+aliasRegex+")", stringRegexPattern(names.Value, names.CaseSensitive), stringRegexPattern(names.Value, names.CaseSensitive))
 			}
 		case models.CriterionModifierIsNull:
 			f.addWhere("(" + canonical + " IS NULL OR TRIM(" + canonical + ") = '') AND NOT " + aliasPresent)

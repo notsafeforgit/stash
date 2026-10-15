@@ -237,42 +237,42 @@ func (qb *galleryFilterHandler) pathCriterionHandler(c *models.StringCriterionIn
 			if modifier := c.Modifier; c.Modifier.IsValid() {
 				switch modifier {
 				case models.CriterionModifierIncludes:
-					clause := getPathSearchClauseMany(pathColumn, basenameColumn, c.Value, addWildcards, not)
-					clause2 := getStringSearchClause([]string{folderPathColumn}, c.Value, false)
+					clause := getPathSearchClauseManyCase(pathColumn, basenameColumn, c.Value, addWildcards, not, c.CaseSensitive)
+					clause2 := getStringSearchClauseCase([]string{folderPathColumn}, c.Value, false, c.CaseSensitive)
 					f.whereClauses = append(f.whereClauses, orClauses(clause, clause2))
 				case models.CriterionModifierExcludes:
 					not = true
-					clause := getPathSearchClauseMany(pathColumn, basenameColumn, c.Value, addWildcards, not)
-					clause2 := getStringSearchClause([]string{folderPathColumn}, c.Value, true)
+					clause := getPathSearchClauseManyCase(pathColumn, basenameColumn, c.Value, addWildcards, not, c.CaseSensitive)
+					clause2 := getStringSearchClauseCase([]string{folderPathColumn}, c.Value, true, c.CaseSensitive)
 					f.whereClauses = append(f.whereClauses, orClauses(clause, clause2))
 				case models.CriterionModifierEquals:
 					addWildcards = false
-					clause := getPathSearchClause(pathColumn, basenameColumn, c.Value, addWildcards, not)
-					clause2 := makeClause(folderPathColumn+" LIKE ?", c.Value)
+					clause := getPathSearchClauseCase(pathColumn, basenameColumn, c.Value, addWildcards, not, c.CaseSensitive)
+					clause2 := stringLikeClause(folderPathColumn, c.Value, false, c.CaseSensitive)
 					f.whereClauses = append(f.whereClauses, orClauses(clause, clause2))
 				case models.CriterionModifierNotEquals:
 					addWildcards = false
 					not = true
-					clause := getPathSearchClause(pathColumn, basenameColumn, c.Value, addWildcards, not)
-					clause2 := makeClause(folderPathColumn+" NOT LIKE ?", c.Value)
+					clause := getPathSearchClauseCase(pathColumn, basenameColumn, c.Value, addWildcards, not, c.CaseSensitive)
+					clause2 := stringLikeClause(folderPathColumn, c.Value, true, c.CaseSensitive)
 					f.whereClauses = append(f.whereClauses, orClauses(clause, clause2))
 				case models.CriterionModifierMatchesRegex:
-					if _, err := regexp.Compile(c.Value); err != nil {
+					if _, err := regexp.Compile(stringRegexPattern(c.Value, c.CaseSensitive)); err != nil {
 						f.setError(err)
 						return
 					}
 					filepathColumn := fmt.Sprintf("%s || '%s' || %s", pathColumn, string(filepath.Separator), basenameColumn)
-					clause := makeClause(fmt.Sprintf("%s IS NOT NULL AND %s IS NOT NULL AND %s regexp ?", pathColumn, basenameColumn, filepathColumn), c.Value)
-					clause2 := makeClause(fmt.Sprintf("%s IS NOT NULL AND %[1]s regexp ?", folderPathColumn), c.Value)
+					clause := makeClause(fmt.Sprintf("%s IS NOT NULL AND %s IS NOT NULL AND %s regexp ?", pathColumn, basenameColumn, filepathColumn), stringRegexPattern(c.Value, c.CaseSensitive))
+					clause2 := makeClause(fmt.Sprintf("%s IS NOT NULL AND %[1]s regexp ?", folderPathColumn), stringRegexPattern(c.Value, c.CaseSensitive))
 					f.whereClauses = append(f.whereClauses, orClauses(clause, clause2))
 				case models.CriterionModifierNotMatchesRegex:
-					if _, err := regexp.Compile(c.Value); err != nil {
+					if _, err := regexp.Compile(stringRegexPattern(c.Value, c.CaseSensitive)); err != nil {
 						f.setError(err)
 						return
 					}
 					filepathColumn := fmt.Sprintf("%s || '%s' || %s", pathColumn, string(filepath.Separator), basenameColumn)
-					f.addWhere(fmt.Sprintf("%s IS NULL OR %s IS NULL OR %s NOT regexp ?", pathColumn, basenameColumn, filepathColumn), c.Value)
-					f.addWhere(fmt.Sprintf("%s IS NULL OR %[1]s NOT regexp ?", folderPathColumn), c.Value)
+					f.addWhere(fmt.Sprintf("%s IS NULL OR %s IS NULL OR %s NOT regexp ?", pathColumn, basenameColumn, filepathColumn), stringRegexPattern(c.Value, c.CaseSensitive))
+					f.addWhere(fmt.Sprintf("%s IS NULL OR %[1]s NOT regexp ?", folderPathColumn), stringRegexPattern(c.Value, c.CaseSensitive))
 				case models.CriterionModifierIsNull:
 					f.addWhere(fmt.Sprintf("%s IS NULL OR TRIM(%[1]s) = '' OR %s IS NULL OR TRIM(%[2]s) = ''", pathColumn, basenameColumn))
 					f.addWhere(fmt.Sprintf("%s IS NULL OR TRIM(%[1]s) = ''", folderPathColumn))

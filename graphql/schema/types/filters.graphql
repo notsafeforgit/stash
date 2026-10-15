@@ -121,6 +121,8 @@ input CustomFieldCriterionInput {
   field: String!
   value: [Any!]
   modifier: CriterionModifier!
+  "Match letter case for text values; numeric comparisons are unchanged."
+  case_sensitive: Boolean
 }
 
 
@@ -172,6 +174,8 @@ enum CriterionModifier {
 input StringCriterionInput {
   value: String!
   modifier: CriterionModifier!
+  "Match letter case. Omit to retain the existing LIKE/regex behavior."
+  case_sensitive: Boolean
 }
 
 input IntCriterionInput {

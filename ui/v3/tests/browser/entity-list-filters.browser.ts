@@ -1,5 +1,39 @@
 import { test, expect } from "./test";
 
+test("mobile text case toggle persists in URLs and remains independent of the operator", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/lightbox-list?kind=scene");
+  await page.getByRole("button", { name: "Filters", exact: true }).tap();
+  await page.getByRole("button", { name: "Add first condition" }).tap();
+  const condition = page.locator(".filter-condition-shell");
+  const field = condition.getByRole("combobox").first();
+  await field.tap();
+  await field.fill("Details");
+  await page.getByRole("option", { name: /^Details\b/ }).tap();
+  await condition.getByRole("textbox").fill("Bright");
+  await expect(page).toHaveURL(/fa=/);
+  const toggle = condition.getByRole("switch", { name: "Case sensitive" });
+  await expect(toggle).not.toBeChecked();
+  const ignoreCaseURL = page.url();
+  await toggle.tap();
+  await expect(toggle).toBeChecked();
+  await expect(page).not.toHaveURL(ignoreCaseURL);
+  const caseSensitiveURL = page.url();
+  await page.reload();
+  await page.getByRole("button", { name: "Filters", exact: true }).tap();
+  await expect(toggle).toBeChecked();
+  await expect(condition.getByRole("textbox")).toHaveValue("Bright");
+  await condition.getByRole("combobox").nth(1).tap();
+  await page.getByRole("option", { name: "Includes", exact: true }).tap();
+  await expect(toggle).toBeChecked();
+  await expect(page).not.toHaveURL(caseSensitiveURL);
+  await toggle.tap();
+  await expect(toggle).not.toBeChecked();
+  await page.screenshot({ path: "/tmp/stash-string-case-mobile.png" });
+});
+
 for (const kind of ["image", "scene"] as const) {
   for (const width of [390, 1280]) {
     test(`${kind} list retains unfinished filter conditions at ${width}px`, async ({

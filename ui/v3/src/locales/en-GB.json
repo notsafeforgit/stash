@@ -2253,6 +2253,9 @@
   },
   "search": "Search…",
   "search_filter": {
+    "case_sensitive": "Case sensitive",
+    "case_insensitive": "Ignore case",
+    "case_label": "{filter} ({matching})",
     "add_first_condition": "Add first condition",
     "applied": "Applied",
     "default_filter": "Default filter",

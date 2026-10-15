@@ -302,20 +302,28 @@ func (h *customFieldsFilterHandler) handleCriterion(f *filterBuilder, joinAs str
 	switch cc.Modifier {
 	case models.CriterionModifierEquals:
 		h.innerJoin(f, joinAs, cc.Field)
+		if cc.CaseSensitive != nil {
+			f.whereClauses = append(f.whereClauses, customFieldEqualityClause(joinAs+".value", cv, cc.CaseSensitive))
+			break
+		}
 		f.addWhere(fmt.Sprintf("%[1]s.value IN %s", joinAs, getInBinding(len(cv))), cv...)
 	case models.CriterionModifierNotEquals:
 		h.leftJoin(f, joinAs, cc.Field)
+		if cc.CaseSensitive != nil {
+			f.whereClauses = append(f.whereClauses, orClauses(customFieldEqualityClause(joinAs+".value", cv, cc.CaseSensitive).not(), makeClause(joinAs+".value IS NULL")))
+			break
+		}
 		f.addWhere(fmt.Sprintf("(%[1]s.value NOT IN %s OR %[1]s.value IS NULL)", joinAs, getInBinding(len(cv))), cv...)
 	case models.CriterionModifierIncludes:
 		clauses := make([]sqlClause, len(cv))
 		for i, v := range cv {
-			clauses[i] = makeClause(fmt.Sprintf("%s.value LIKE ?", joinAs), fmt.Sprintf("%%%v%%", v))
+			clauses[i] = stringLikeClause(joinAs+".value", fmt.Sprintf("%%%v%%", v), false, cc.CaseSensitive)
 		}
 		h.innerJoin(f, joinAs, cc.Field)
 		f.whereClauses = append(f.whereClauses, clauses...)
 	case models.CriterionModifierExcludes:
 		for _, v := range cv {
-			f.addWhere(fmt.Sprintf("(%[1]s.value NOT LIKE ? OR %[1]s.value IS NULL)", joinAs), fmt.Sprintf("%%%v%%", v))
+			f.whereClauses = append(f.whereClauses, orClauses(stringLikeClause(joinAs+".value", fmt.Sprintf("%%%v%%", v), true, cc.CaseSensitive), makeClause(joinAs+".value IS NULL")))
 		}
 		h.leftJoin(f, joinAs, cc.Field)
 	case models.CriterionModifierMatchesRegex:
@@ -324,11 +332,12 @@ func (h *customFieldsFilterHandler) handleCriterion(f *filterBuilder, joinAs str
 			if !ok {
 				f.setError(fmt.Errorf("unsupported custom field criterion value type: %T", v))
 			}
+			vs = stringRegexPattern(vs, cc.CaseSensitive)
 			if _, err := regexp.Compile(vs); err != nil {
 				f.setError(err)
 				return
 			}
-			f.addWhere(fmt.Sprintf("(%s.value regexp ?)", joinAs), v)
+			f.addWhere(fmt.Sprintf("(%s.value regexp ?)", joinAs), vs)
 		}
 		h.innerJoin(f, joinAs, cc.Field)
 	case models.CriterionModifierNotMatchesRegex:
@@ -337,11 +346,12 @@ func (h *customFieldsFilterHandler) handleCriterion(f *filterBuilder, joinAs str
 			if !ok {
 				f.setError(fmt.Errorf("unsupported custom field criterion value type: %T", v))
 			}
+			vs = stringRegexPattern(vs, cc.CaseSensitive)
 			if _, err := regexp.Compile(vs); err != nil {
 				f.setError(err)
 				return
 			}
-			f.addWhere(fmt.Sprintf("(%s.value IS NULL OR %[1]s.value NOT regexp ?)", joinAs), v)
+			f.addWhere(fmt.Sprintf("(%s.value IS NULL OR %[1]s.value NOT regexp ?)", joinAs), vs)
 		}
 		h.leftJoin(f, joinAs, cc.Field)
 	case models.CriterionModifierIsNull:

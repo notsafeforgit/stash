@@ -84,6 +84,7 @@ interface CompactConditionNode {
   // Custom-field name. Only set for the single-field custom_fields criterion,
   // which needs to round-trip a field name alongside modifier/value.
   cf?: string;
+  cs?: boolean;
 }
 
 type CompactASTNode = CompactGroupNode | CompactConditionNode;
@@ -249,6 +250,9 @@ export function encodeFilterASTNode(node: FilterASTNode): CompactASTNode {
     if (typeof params.field === "string" && params.field !== "") {
       out.cf = params.field;
     }
+    if (typeof params.case_sensitive === "boolean") {
+      out.cs = params.case_sensitive;
+    }
     return out;
   }
 
@@ -293,6 +297,7 @@ export function decodeFilterASTNode(
       modifier,
       value: compact.v,
       field: compact.cf,
+      case_sensitive: compact.cs,
     });
     return {
       kind: "condition",
@@ -365,6 +370,9 @@ export function encodeFilterASTNodeToSaved(node: FilterASTNode): SavedASTNode {
   if (node.kind === "condition") {
     const params = node.criterion.toQueryParams();
     const value: Record<string, unknown> = {};
+    if (typeof params.case_sensitive === "boolean") {
+      value.case_sensitive = params.case_sensitive;
+    }
     if (params.modifier !== undefined) {
       value.modifier = params.modifier;
     }
@@ -414,11 +422,13 @@ export function decodeSavedFilterASTNode(
       modifier?: unknown;
       value?: unknown;
       field?: unknown;
+      case_sensitive?: unknown;
     };
     criterion.fromDecodedParams({
       modifier: v.modifier,
       value: v.value,
       field: v.field,
+      case_sensitive: v.case_sensitive,
     });
 
     return {

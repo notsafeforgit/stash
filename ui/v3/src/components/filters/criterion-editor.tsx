@@ -1,5 +1,6 @@
 import type React from "react";
 import { useCallback, useMemo } from "react";
+import { CaseSensitivityToggle } from "./case-sensitivity-toggle";
 import { CriterionModifier } from "src/core/generated-graphql";
 import {
   DurationCriterion,
@@ -12,6 +13,7 @@ import {
   DateCriterion,
   TimestampCriterion,
   BooleanCriterion,
+  StringCriterion,
   type Criterion,
 } from "src/models/list-filter/criteria/criterion";
 import {
@@ -418,6 +420,19 @@ const GenericCriterionEditor: React.FC<GenericCriterionEditor> = ({
     >
       {modifierSelector}
       {valueControl}
+      {criterion instanceof StringCriterion &&
+        criterion.supportsCaseSensitivity &&
+        criterion.modifier !== CriterionModifier.IsNull &&
+        criterion.modifier !== CriterionModifier.NotNull && (
+          <CaseSensitivityToggle
+            checked={criterion.matchesCase}
+            onCheckedChange={(checked) => {
+              const next = criterion.clone() as StringCriterion;
+              next.caseSensitive = checked;
+              setCriterion(next);
+            }}
+          />
+        )}
     </div>
   );
 };

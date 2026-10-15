@@ -341,13 +341,14 @@ func (qb *videoFileFilterHandler) captionCriterionHandler(captions *models.Strin
 		addJoinTable: func(f *filterBuilder, joinType joinType) {
 			f.addJoin(joinType, videoCaptionsTable, "", "video_captions.file_id = files.id")
 		},
-		excludeHandler: func(f *filterBuilder, criterion *models.StringCriterionInput) {
+		excludeWholeValue: true,
+		excludeHandler: func(f *filterBuilder, match sqlClause) {
 			excludeClause := `files.id NOT IN (
 				SELECT files.id from files 
 				INNER JOIN video_captions on video_captions.file_id = files.id 
-				WHERE video_captions.language_code LIKE ?
+				WHERE ` + match.sql + `
 			)`
-			f.addWhere(excludeClause, criterion.Value)
+			f.addWhere(excludeClause, match.args...)
 
 			// TODO - should we also exclude null values?
 		},

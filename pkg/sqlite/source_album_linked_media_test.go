@@ -78,15 +78,25 @@ func TestLinkedMediaAlbumGroupsMixedMediaWithoutInventingOrder(t *testing.T) {
 	require.Equal(t, result.Gallery.GalleryUUID, ordered.GalleryUUID)
 	sourceGalleryMemberships(t, repo, *result.Gallery.GalleryID, []int{41}, []int{31})
 
-	// Explicit post unlink removes only automatic membership. Removing an
-	// image manually also stays excluded after another album sync.
+	// A post unlink leaves one item, so the automatic gallery disappears.
 	_, err := applyPostMedia(repo, postMediaInput(t, repo, post.UUID, scene.UUID, "unlinked"))
 	require.NoError(t, err)
-	sourceGalleryMemberships(t, repo, *result.Gallery.GalleryID, []int{41}, nil)
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		entity, err := repo.ArchiveEntity.Find(ctx, result.Gallery.GalleryUUID)
+		require.NoError(t, err)
+		require.Equal(t, models.ArchiveEntityDeleted, entity.State)
+		return nil
+	}))
+	// Relinking the second item can recreate the album. A subsequent manual
+	// membership exclusion is preserved instead of pruning the curated result.
+	linkAlbumPostMedia(t, repo, post.UUID, models.ArchiveScene, 31)
+	recreated := syncSourceGallery(t, repo, post.UUID)
+	require.NotEqual(t, result.Gallery.GalleryUUID, recreated.GalleryUUID)
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
-		return repo.Gallery.RemoveImages(ctx, *result.Gallery.GalleryID, *image.LocalID)
+		return repo.Gallery.RemoveImages(ctx, *recreated.GalleryID, *image.LocalID)
 	}))
 	require.Empty(t, syncSourceGallery(t, repo, post.UUID).Added)
+	sourceGalleryMemberships(t, repo, *recreated.GalleryID, nil, []int{31})
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
 	backup := filepath.Join(t.TempDir(), "linked-album.sqlite")
 	require.NoError(t, db.Backup(backup))

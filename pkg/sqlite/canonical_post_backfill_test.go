@@ -110,7 +110,7 @@ func TestCanonicalPostBackfillPreservesOriginalProofAndReceiptAcrossChainedMerge
 }
 
 func TestCanonicalAlbumBackfillSharesOriginalFilenameProofAndPreservesAttachmentOwner(t *testing.T) {
-	f, a, attachment := singleBackfillFixture(t)
+	f, a, attachment := mixedBackfillFixture(t)
 	b := sourceTestPost(t, f.repo, models.SourcePostIdentifier{Namespace: "legacy:catalog:fixture", Value: "current-post"}, "").UUID
 	var selection *models.AttachmentSelection
 	require.NoError(t, f.repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
@@ -122,7 +122,7 @@ func TestCanonicalAlbumBackfillSharesOriginalFilenameProofAndPreservesAttachment
 	sqlite.ConsolidatePostBackfillFixture(t, f.repo, a, b, *selection.Decision.CaptureUUID)
 	preview := albumBackfillPreview(t, f.repo, a, models.SourceAlbumRedditFilenameV1)
 	require.Equal(t, b, preview.PostUUID)
-	require.Len(t, preview.Matches, 1)
+	require.Len(t, preview.Matches, 2)
 	require.Equal(t, "matched", preview.Matches[0].Status)
 	require.Equal(t, attachment, preview.Matches[0].AttachmentUUID)
 	for _, signature := range []string{stale.Signature, preview.Signature} {
@@ -133,14 +133,14 @@ func TestCanonicalAlbumBackfillSharesOriginalFilenameProofAndPreservesAttachment
 		require.ErrorIs(t, err, models.ErrSourceGalleryConflict)
 	}
 	result := applyAlbumBackfill(t, f.repo, preview)
-	require.Equal(t, 1, result.Selected)
+	require.Equal(t, 2, result.Selected)
 	require.True(t, result.Gallery.Created)
 	raw := openRawDB(t, f.db.DatabasePath())
 	defer raw.Close()
 	var original string
 	require.NoError(t, raw.QueryRow("SELECT post_uuid FROM source_media_evidence WHERE attachment_uuid=?", attachment).Scan(&original))
 	require.Equal(t, a, original, "derived attachment evidence keeps the original attachment owner")
-	sourceGalleryMemberships(t, f.repo, *result.Gallery.GalleryID, nil, []int{31})
+	sourceGalleryMemberships(t, f.repo, *result.Gallery.GalleryID, []int{41}, []int{31})
 	require.NoError(t, f.db.Close())
 	require.NoError(t, f.db.Open(f.db.DatabasePath()))
 	require.Equal(t, "sync", albumBackfillPreview(t, f.db.Repository(), a, preview.Policy).Gallery.Action)

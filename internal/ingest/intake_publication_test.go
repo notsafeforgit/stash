@@ -84,12 +84,32 @@ func (f intakePublicationFixture) publishIntake(t *testing.T, prepared *ingest.P
 	return ret
 }
 
+func (f intakePublicationFixture) linkSecondImage(t *testing.T) int {
+	t.Helper()
+	attachment := f.attachment(t, 1)
+	image := models.NewImage()
+	repo := f.service.Repo
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		if err := repo.Image.Create(ctx, &models.CreateImageInput{Image: &image}); err != nil {
+			return err
+		}
+		media, err := repo.ArchiveEntity.FindByLocalID(ctx, models.ArchiveImage, image.ID)
+		if err != nil {
+			return err
+		}
+		_, err = repo.SourceAttachment.DecideMedia(ctx, models.AttachmentMediaDecisionInput{AttachmentUUID: attachment.UUID,
+			ExpectedAttachmentRevision: attachment.Revision, State: "linked", MediaUUID: media.UUID, ExpectedMediaRevision: media.Revision, Origin: "review"})
+		return err
+	}))
+	return image.ID
+}
+
 func TestIntakePublicationBuildsAlbumAsFilesArriveAndReplays(t *testing.T) {
 	f := newIntakePublicationFixture(t, true)
 	repo := f.service.Repo
 	first := f.publishIntake(t, f.prepared, f.input)
 	require.Equal(t, "linked", first.Result.SourceMedia)
-	require.NotEmpty(t, first.Result.GalleryUUID)
+	require.Empty(t, first.Result.GalleryUUID, "wait for two distinct local items")
 	replay := f.publishIntake(t, f.prepared, f.input)
 	require.Equal(t, first.Result.MediaUUID, replay.Result.MediaUUID)
 	require.Equal(t, first.Result.GalleryUUID, replay.Result.GalleryUUID)
@@ -109,10 +129,11 @@ func TestIntakePublicationBuildsAlbumAsFilesArriveAndReplays(t *testing.T) {
 	secondInput.Source = &ingest.IntakeSource{CaptureUUID: f.receipt.CaptureUUID, AttachmentUUID: f.attachment(t, 1).UUID}
 	second := f.publishIntake(t, prepared, secondInput)
 	require.NotEqual(t, first.Result.MediaUUID, second.Result.MediaUUID)
-	require.Equal(t, first.Result.GalleryUUID, second.Result.GalleryUUID)
+	require.NotEmpty(t, second.Result.GalleryUUID)
+	galleryUUID := second.Result.GalleryUUID
 	require.Empty(t, second.Result.Review)
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
-		gallery, err := repo.ArchiveEntity.Find(ctx, first.Result.GalleryUUID)
+		gallery, err := repo.ArchiveEntity.Find(ctx, galleryUUID)
 		require.NoError(t, err)
 		members, err := repo.Gallery.GetImageIDs(ctx, *gallery.LocalID)
 		require.NoError(t, err)
@@ -130,7 +151,7 @@ func TestIntakePublicationBuildsAlbumAsFilesArriveAndReplays(t *testing.T) {
 	}))
 	// An explicit membership removal remains excluded after another delivery.
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
-		gallery, err := repo.ArchiveEntity.Find(ctx, first.Result.GalleryUUID)
+		gallery, err := repo.ArchiveEntity.Find(ctx, galleryUUID)
 		if err != nil {
 			return err
 		}
@@ -138,7 +159,7 @@ func TestIntakePublicationBuildsAlbumAsFilesArriveAndReplays(t *testing.T) {
 	}))
 	f.publishIntake(t, f.prepared, f.input)
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
-		gallery, err := repo.ArchiveEntity.Find(ctx, first.Result.GalleryUUID)
+		gallery, err := repo.ArchiveEntity.Find(ctx, galleryUUID)
 		require.NoError(t, err)
 		members, err := repo.Gallery.GetImageIDs(ctx, *gallery.LocalID)
 		require.NoError(t, err)
@@ -331,6 +352,7 @@ func (f failingIntakeGallery) Sync(context.Context, string, string) (*models.Sou
 
 func TestIntakePublicationRollsBackDomainAndJobWhenGalleryFails(t *testing.T) {
 	f := newIntakePublicationFixture(t, true)
+	f.linkSecondImage(t)
 	repo := f.service.Repo
 	repo.SourceGallery = failingIntakeGallery{repo.SourceGallery}
 	durable := job.NewDurable(repo)

@@ -217,7 +217,9 @@ func (s *SourceGalleryStore) PreviewBackfill(ctx context.Context, post, policy s
 	if !models.ValidSourceAlbumPolicy(policy) {
 		return nil, models.ErrSourceAlbumPolicy
 	}
-	gallery, err := s.Preview(ctx, post)
+	// Match retained file evidence before applying the local-item minimum.
+	// Otherwise a post with two recoverable files would never reach matching.
+	gallery, err := s.previewWithMediaChoices(ctx, post, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -295,6 +297,10 @@ func (s *SourceGalleryStore) PreviewBackfill(ctx context.Context, post, policy s
 		if err != nil {
 			return nil, err
 		}
+	}
+	ret.Gallery, err = sourceGalleryLocalMinimum(ret.Gallery)
+	if err != nil {
+		return nil, err
 	}
 	guard := []any{ret.PostUUID, ret.Policy, ret.Gallery.Signature, ret.Matches}
 	if ret.Recovery != nil {

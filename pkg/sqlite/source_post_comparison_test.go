@@ -188,14 +188,15 @@ func TestSourcePostComparisonConsolidatesSharedGalleriesAndPreservesDisabledChoi
 		selection := selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{Complete: true, DeclaredAlbum: true,
 			Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "first"), sourceAttachmentEntry(1, "second")}})
 		chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveImage, 41)
+		chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveScene, 31)
 		syncSourceGallery(t, repo, post.UUID)
 	}
 	read := comparePosts(t, repo, a.UUID, b.UUID)
 	require.Empty(t, comparisonIssueKinds(read))
 	require.Equal(t, read.Left.Album.Gallery.UUID, read.Right.Album.Gallery.UUID)
 	leftID, rightID := *read.Left.Album.Gallery.LocalID, *read.Right.Album.Gallery.LocalID
-	sourceGalleryMemberships(t, repo, leftID, []int{41}, nil)
-	sourceGalleryMemberships(t, repo, rightID, []int{41}, nil)
+	sourceGalleryMemberships(t, repo, leftID, []int{41}, []int{31})
+	sourceGalleryMemberships(t, repo, rightID, []int{41}, []int{31})
 	post := selectionPost(t, repo, a.UUID)
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		_, err := repo.SourceGallery.DecideAssociation(ctx, models.SourceGalleryChoiceInput{
@@ -206,8 +207,8 @@ func TestSourcePostComparisonConsolidatesSharedGalleriesAndPreservesDisabledChoi
 	require.Equal(t, "disabled", read.Left.Album.State)
 	require.Nil(t, read.Left.Album.Gallery)
 	require.Equal(t, []string{"gallery_choice"}, comparisonIssueKinds(read))
-	sourceGalleryMemberships(t, repo, leftID, []int{41}, nil)
-	sourceGalleryMemberships(t, repo, rightID, []int{41}, nil)
+	sourceGalleryMemberships(t, repo, leftID, []int{41}, []int{31})
+	sourceGalleryMemberships(t, repo, rightID, []int{41}, []int{31})
 }
 
 func TestSourcePostComparisonPreservesConflictingManualGalleries(t *testing.T) {

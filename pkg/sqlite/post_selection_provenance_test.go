@@ -51,6 +51,36 @@ func postSelectionApply(t *testing.T, repo models.Repository, post, capture, mod
 	return selected
 }
 
+func postSelectionLocalImages(t *testing.T, repo models.Repository, post string, refs ...string) {
+	t.Helper()
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		for _, ref := range refs {
+			result, err := dbWrapper.Exec(ctx, "INSERT INTO images(created_at,updated_at) VALUES(CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)")
+			if err != nil {
+				return err
+			}
+			id, err := result.LastInsertId()
+			if err != nil {
+				return err
+			}
+			media, err := repo.ArchiveEntity.FindByLocalID(ctx, models.ArchiveImage, int(id))
+			if err != nil {
+				return err
+			}
+			attachment, err := repo.SourceAttachment.Lookup(ctx, post, models.SourcePostIdentifier{Namespace: "native:reddit", Value: ref})
+			if err != nil {
+				return err
+			}
+			_, err = repo.SourceAttachment.DecideMedia(ctx, models.AttachmentMediaDecisionInput{AttachmentUUID: attachment.UUID,
+				ExpectedAttachmentRevision: attachment.Revision, State: "linked", MediaUUID: media.UUID, ExpectedMediaRevision: media.Revision, Origin: "review"})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
+}
+
 func TestPostSelectionProvenanceCombinesOriginalListsAcrossChainedIdentities(t *testing.T) {
 	db, repo := postIdentityFixture(t)
 	a := identityPost(t, repo, "legacy:catalog:fixture", "a")
@@ -58,6 +88,7 @@ func TestPostSelectionProvenanceCombinesOriginalListsAcrossChainedIdentities(t *
 	c := identityPost(t, repo, "native:reddit", "one-post")
 	first := postSelectionCapture(t, repo, a, 0, 2)
 	second := postSelectionCapture(t, repo, b, 1)
+	postSelectionLocalImages(t, repo, a, "first", "third")
 	old := postSelectionApply(t, repo, a, first.UUID, "pinned", "review")
 	before := identityRows(t, repo, "source_captures", "source_post_revisions", "source_attachment_manifests", "source_attachment_entries")
 	publishPostIdentity(t, repo, identityRequest(t, repo, a, b))

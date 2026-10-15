@@ -55,6 +55,39 @@ func albumHTTPPost(t *testing.T, repo models.Repository) *models.SourcePost {
 	return post
 }
 
+func albumHTTPLocalMedia(t *testing.T, repo models.Repository, post string) {
+	t.Helper()
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		image, scene := models.NewImage(), models.NewScene()
+		if err := repo.Image.Create(ctx, &models.CreateImageInput{Image: &image}); err != nil {
+			return err
+		}
+		if err := repo.Scene.Create(ctx, &scene, nil); err != nil {
+			return err
+		}
+		for _, item := range []struct {
+			ref  string
+			kind models.ArchiveEntityKind
+			id   int
+		}{{"first", models.ArchiveImage, image.ID}, {"second", models.ArchiveScene, scene.ID}} {
+			media, err := repo.ArchiveEntity.FindByLocalID(ctx, item.kind, item.id)
+			if err != nil {
+				return err
+			}
+			attachment, err := repo.SourceAttachment.Lookup(ctx, post, models.SourcePostIdentifier{Namespace: "native:reddit", Value: item.ref})
+			if err != nil {
+				return err
+			}
+			_, err = repo.SourceAttachment.DecideMedia(ctx, models.AttachmentMediaDecisionInput{AttachmentUUID: attachment.UUID,
+				ExpectedAttachmentRevision: attachment.Revision, State: "linked", MediaUUID: media.UUID, ExpectedMediaRevision: media.Revision, Origin: "review"})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
+}
+
 func TestAlbumBackfillHTTPPreviewAdmissionRetryAndRuntime(t *testing.T) {
 	config.InitializeEmpty()
 	db := sqlite.NewDatabase()
@@ -95,8 +128,8 @@ func TestAlbumBackfillHTTPPreviewAdmissionRetryAndRuntime(t *testing.T) {
 	require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
 	var preview gallery.AlbumPreview
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &preview))
-	require.Equal(t, "create", preview.Action)
-	require.Equal(t, "2026-09-28", *preview.InitialMetadata.Date)
+	require.Equal(t, "ineligible", preview.Action, "source attachments without local media do not create an empty gallery")
+	require.Nil(t, preview.InitialMetadata)
 	require.Len(t, preview.Entries, 2)
 	require.Len(t, preview.Matches, 2)
 	require.NotContains(t, w.Body.String(), `"Namespace"`)

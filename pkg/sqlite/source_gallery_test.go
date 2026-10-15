@@ -158,8 +158,10 @@ func TestSourceGalleryCreatesMixedAlbumSharesMediaAndSurvivesReplay(t *testing.T
 	// Reposts may reference the same library records without copying media.
 	other := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:twitter", Value: "other-post"}, "")
 	otherSelection := selectAlbum(t, repo, other.UUID, models.SourceAttachmentManifestInput{DeclaredAlbum: true,
-		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "image")}})
+		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "image"), sourceAttachmentEntry(1, "video")}})
 	chooseAlbumMedia(t, repo, otherSelection.Entries[0].Attachment.UUID, models.ArchiveImage, 41)
+	require.Equal(t, "ineligible", syncSourceGallery(t, repo, other.UUID).Action)
+	chooseAlbumMedia(t, repo, otherSelection.Entries[1].Attachment.UUID, models.ArchiveScene, 31)
 	otherGallery := syncSourceGallery(t, repo, other.UUID)
 	require.Equal(t, result.GalleryUUID, otherGallery.GalleryUUID)
 	sourceGalleryMemberships(t, repo, *otherGallery.GalleryID, []int{41}, []int{31})
@@ -195,7 +197,8 @@ func TestSourceGalleryEligibilityMissingMediaAndLateDownloads(t *testing.T) {
 	require.Equal(t, "unselected", preview.Entries[1].Status)
 	require.Equal(t, "unlinked", preview.Entries[2].Status)
 	result := syncSourceGallery(t, repo, post.UUID)
-	sourceGalleryMemberships(t, repo, *result.GalleryID, []int{41}, nil)
+	require.Equal(t, "ineligible", result.Action)
+	require.Nil(t, result.GalleryID)
 	stale := sourceGalleryPreview(t, repo, post.UUID)
 	chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveScene, 31)
 	require.ErrorIs(t, repo.WithTxn(context.Background(), func(ctx context.Context) error {
@@ -203,14 +206,14 @@ func TestSourceGalleryEligibilityMissingMediaAndLateDownloads(t *testing.T) {
 		return err
 	}), models.ErrSourceGalleryConflict)
 	late := syncSourceGallery(t, repo, post.UUID)
-	require.Equal(t, result.GalleryUUID, late.GalleryUUID)
-	require.Len(t, late.Added, 1)
-	sourceGalleryMemberships(t, repo, *result.GalleryID, []int{41}, []int{31})
+	require.True(t, late.Created)
+	require.Len(t, late.Added, 2)
+	sourceGalleryMemberships(t, repo, *late.GalleryID, []int{41}, []int{31})
 	emptyPost := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "declared-empty"}, "")
 	selectAlbum(t, repo, emptyPost.UUID, models.SourceAttachmentManifestInput{DeclaredAlbum: true})
 	empty := syncSourceGallery(t, repo, emptyPost.UUID)
-	require.True(t, empty.Created, "a declared album does not pretend its downloads are complete")
-	sourceGalleryMemberships(t, repo, *empty.GalleryID, nil, nil)
+	require.False(t, empty.Created, "a source declaration alone does not create an empty local gallery")
+	require.Nil(t, empty.GalleryID)
 }
 
 func TestSourceGalleryPreservesManualMembershipMetadataAndCover(t *testing.T) {
@@ -287,8 +290,9 @@ func TestSourceGalleryDeletedMediaRemainsTombstoned(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:twitter", Value: uuid.NewString()}, "")
 	selection := selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{DeclaredAlbum: true,
-		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "image")}})
+		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "image"), sourceAttachmentEntry(1, "video")}})
 	image := chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveImage, 41)
+	chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveScene, 31)
 	result := syncSourceGallery(t, repo, post.UUID)
 	history := sourceGalleryHistory(t, repo, result.GalleryUUID)
 	attachmentSQL(t, db, "DELETE FROM images WHERE id=41")

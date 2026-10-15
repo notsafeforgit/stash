@@ -23,10 +23,11 @@ import (
 
 type imageConversionFixture struct {
 	intakePublicationFixture
-	before   *ingest.PublishedIntake
-	event    ingest.FileEvent
-	prepared *ingest.PreparedMedia
-	input    ingest.IntakePublication
+	before       *ingest.PublishedIntake
+	event        ingest.FileEvent
+	prepared     *ingest.PreparedMedia
+	input        ingest.IntakePublication
+	otherImageID int
 }
 
 func newImageConversionFixture(t *testing.T) imageConversionFixture {
@@ -36,6 +37,7 @@ func newImageConversionFixture(t *testing.T) imageConversionFixture {
 		t.Skip("ffmpeg unavailable")
 	}
 	f := newIntakePublicationFixture(t, true)
+	otherImageID := f.linkSecondImage(t)
 	name := filepath.Join(f.root.Binding.Path, "animation.gif")
 	output, err := os.Create(name)
 	require.NoError(t, err)
@@ -61,7 +63,7 @@ func newImageConversionFixture(t *testing.T) imageConversionFixture {
 	input.Target = *f.captureTarget(t, event.RelativePath, true)
 	input.Transformation = &ingest.IntakeTransformation{Kind: "gif-to-video", Original: *f.captureTarget(t, "animation.gif", true)}
 	require.NoError(t, os.Remove(name))
-	return imageConversionFixture{f, before, event, prepared, input}
+	return imageConversionFixture{f, before, event, prepared, input, otherImageID}
 }
 
 func TestImageConversionRetainsChoicesIdentityAlbumsAndUndatedCount(t *testing.T) {
@@ -159,7 +161,11 @@ func TestImageConversionRetainsChoicesIdentityAlbumsAndUndatedCount(t *testing.T
 			require.Equal(t, sceneUUID(result), *gallery.CoverMediaUUID)
 			images, err := repo.Gallery.GetImageIDs(ctx, gallery.ID)
 			require.NoError(t, err)
-			require.Empty(t, images)
+			if galleryUUID == f.before.Result.GalleryUUID {
+				require.Equal(t, []int{f.otherImageID}, images)
+			} else {
+				require.Empty(t, images)
+			}
 			scenes, err := repo.Gallery.GetSceneIDs(ctx, gallery.ID)
 			require.NoError(t, err)
 			require.Equal(t, []int{scene.ID}, scenes)
@@ -347,6 +353,10 @@ func TestImageConversionPreservesExplicitSourceAndGalleryUnlinks(t *testing.T) {
 			require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 				gallery, err := repo.ArchiveEntity.Find(ctx, f.before.Result.GalleryUUID)
 				require.NoError(t, err)
+				if choice != "gallery" {
+					require.Equal(t, models.ArchiveEntityDeleted, gallery.State, "unlinking leaves only one local member")
+					return nil
+				}
 				members, err := repo.Gallery.GetSceneIDs(ctx, *gallery.LocalID)
 				require.NoError(t, err)
 				require.Empty(t, members, "conversion must not override the explicit unlink")

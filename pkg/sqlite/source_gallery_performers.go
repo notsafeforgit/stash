@@ -56,7 +56,15 @@ func reconcileSourceGalleryAttribution(ctx context.Context, ids []string, sync f
 // bulk operations. Commit processes each affected gallery once; it never scans
 // unrelated galleries. Publisher ownership alone is not performer attribution.
 func flushSourceGalleryPerformers(ctx context.Context) error {
-	return flushSourceGalleryAttribution(ctx, "source_gallery_performer_pending", syncSourceGalleryPerformers)
+	return flushSourceGalleryAttribution(ctx, "source_gallery_performer_pending", func(ctx context.Context, id int, entity string) (string, error) {
+		// Membership triggers already collect changed source galleries. Prune
+		// after all changes in the transaction, never between two added items.
+		status, err := pruneSmallSourceGallery(ctx, entity, 0)
+		if err != nil || status == "removed" {
+			return status, err
+		}
+		return syncSourceGalleryPerformers(ctx, id, entity)
+	})
 }
 
 func flushSourceGalleryAttribution(ctx context.Context, table string, sync func(context.Context, int, string) (string, error)) error {

@@ -40,6 +40,7 @@ func (f intakePublicationFixture) fileStatus(t *testing.T, event string) (*inges
 
 func TestFileWorkerCommitsAlbumBeforeEffectsAndSurvivesTokenRotation(t *testing.T) {
 	f := newIntakePublicationFixture(t, true)
+	f.linkSecondImage(t)
 	event := f.fileEvent(t)
 	accepted, err := f.submitFile(t, event)
 	require.NoError(t, err)
@@ -67,7 +68,7 @@ func TestFileWorkerCommitsAlbumBeforeEffectsAndSurvivesTokenRotation(t *testing.
 				return err
 			}
 			members, err := repo.Gallery.GetImageIDs(ctx, *gallery.LocalID)
-			require.Len(t, members, 1)
+			require.Len(t, members, 2)
 			return err
 		})
 	})

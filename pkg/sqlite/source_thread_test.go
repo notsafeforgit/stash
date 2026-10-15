@@ -116,14 +116,17 @@ func TestThreadGalleryKeepsAuthorsAndManualExclusionsSeparate(t *testing.T) {
 	require.Equal(t, "ineligible", syncSourceGallery(t, repo, other).Action)
 	self := threadPost(t, repo, "102", "100", "100", "99", "99")
 	selection := threadMedia(t, repo, self, "502", models.ArchiveImage, 41)
+	require.Equal(t, "ineligible", syncSourceGallery(t, repo, self).Action, "repeated media across replies still counts once")
+	later := threadPost(t, repo, "103", "100", "102", "99", "99")
+	threadMedia(t, repo, later, "503", models.ArchiveScene, 31)
 	album := syncSourceGallery(t, repo, self)
-	require.Len(t, album.Added, 1, "the same media in two replies is one gallery member")
+	require.Len(t, album.Added, 2, "the repeated image and distinct video form one mixed gallery")
 	require.NoError(t, applyMediaChoice(repo, models.AttachmentMediaDecisionInput{AttachmentUUID: selection.Entries[0].Attachment.UUID,
 		ExpectedAttachmentRevision: findAttachment(t, repo, selection.Entries[0].Attachment.UUID).Revision, State: "unlinked", Origin: "review"}))
 	require.Empty(t, syncSourceGallery(t, repo, self).Removed, "root still selects the shared image")
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error { return repo.Gallery.RemoveImages(ctx, *album.GalleryID, 41) }))
 	require.Empty(t, syncSourceGallery(t, repo, root).Added, "do not re-add a manual exclusion")
-	sourceGalleryMemberships(t, repo, *album.GalleryID, nil, nil)
+	sourceGalleryMemberships(t, repo, *album.GalleryID, nil, []int{31})
 }
 
 func TestThreadGalleryRejectsStalePreviewAndPreservesDeletedGallery(t *testing.T) {
@@ -150,9 +153,11 @@ func TestThreadGalleryRejectsStalePreviewAndPreservesDeletedGallery(t *testing.T
 func TestThreadMigrationPreservesExistingAlbumsWithoutScanningCaptures(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	post := threadPost(t, repo, "100", "100", "", "99", "")
-	selectAlbum(t, repo, post, models.SourceAttachmentManifestInput{Complete: true, Entries: []models.SourceAttachmentEntry{
-		albumEntry(0, "native:twitter", "500", "image"), albumEntry(1, "native:twitter", "501", "image"),
+	selection := selectAlbum(t, repo, post, models.SourceAttachmentManifestInput{Complete: true, Entries: []models.SourceAttachmentEntry{
+		albumEntry(0, "native:twitter", "500", "image"), albumEntry(1, "native:twitter", "501", "video"),
 	}})
+	chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveImage, 41)
+	chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveScene, 31)
 	album := syncSourceGallery(t, repo, post)
 	require.True(t, album.Created)
 	require.NoError(t, db.Close())

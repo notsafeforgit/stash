@@ -146,12 +146,13 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 		MediaUUID: media.UUID, Basis: "legacy", Details: []byte(`{"private":"private-account-file-path"}`)})
 	require.NoError(t, applyMediaChoice(repo, models.AttachmentMediaDecisionInput{AttachmentUUID: attachment.UUID, ExpectedAttachmentRevision: attachment.Revision + 1,
 		State: "linked", MediaUUID: media.UUID, ExpectedMediaRevision: media.Revision, Origin: "review", Reason: "private-account-media-choice"}))
+	chooseAlbumMedia(t, repo, manifestEntries(t, repo, manifest.UUID)[1].Attachment.UUID, models.ArchiveImage, 41)
 	selection := applySelection(t, repo, models.AttachmentSelectionInput{PostUUID: post.UUID, ExpectedPostRevision: selectionPost(t, repo, post.UUID).Revision,
 		CaptureUUID: capture.UUID, Mode: "pinned", Origin: "review", Reason: "private-account-album-choice"})
 	album := syncSourceGallery(t, repo, post.UUID)
 	attachmentSQL(t, source, "INSERT INTO gallery_alternate_titles(gallery_id,title) VALUES (?,?)", *album.GalleryID, "private-account-alternate-title")
 	membership := sourceGalleryHistory(t, repo, album.GalleryUUID)
-	require.Len(t, membership, 1)
+	require.Len(t, membership, 2)
 	account := createSourceAccount(t, repo, "native:reddit")
 	evidence := accountEvidence()
 	evidence.Details = []byte(`{"private":"private-account-evidence"}`)

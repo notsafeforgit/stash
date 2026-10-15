@@ -30,6 +30,7 @@ func TestSourcePostCaptionTitlesReachAlbumsAndEveryPostSummary(t *testing.T) {
 			selection := applySelection(t, repo, models.AttachmentSelectionInput{PostUUID: post.UUID, ExpectedPostRevision: selectionPost(t, repo, post.UUID).Revision,
 				CaptureUUID: capture.UUID, Mode: "automatic", Origin: "ingest"})
 			chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveImage, 41)
+			chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveScene, 31)
 			album := syncSourceGallery(t, repo, post.UUID)
 			require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 				gallery, err := repo.Gallery.Find(ctx, *album.GalleryID)

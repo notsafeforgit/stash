@@ -265,12 +265,28 @@ Manifest completeness means every source slot has an identity. It says nothing
 about whether media files have downloaded. Deleted or unavailable items retain
 their source IDs; unidentified slots leave gaps with the known count. Later
 positions never shift to hide missing evidence. A source-declared Reddit album
-with an unknown total remains eligible even with one known item or temporarily
-missing gallery data. A complete list containing only one attachment, or a
-declared total of one, does not create a gallery even when Reddit marks the post
-as a gallery. Its post metadata and attachment captions remain retained. A known
-multi-item post remains eligible when only one local file is currently available.
-Ordinary single-media posts are not automatically galleries.
+with an unknown total retains its album evidence even with one known item or
+temporarily missing gallery data. A complete list containing only one attachment,
+or a declared total of one, does not create a gallery even when Reddit marks the
+post as a gallery. Its post metadata and attachment captions remain retained.
+Album evidence alone does not create a local gallery: at least two distinct
+local images/scenes must be linked, including across a captured self-reply
+thread. Repeated slots or replies pointing to the same media count once. A
+partial album waits for another local item; source attachment records and their
+gaps remain available independently. Ordinary single-media posts are not
+automatically galleries.
+
+After membership changes, an automatic source gallery with fewer than two
+items is removed in the same transaction. Its posts, attachments and media
+remain intact, and its automatic association is released so later downloads
+can create a gallery again. Explicit gallery associations, selected covers and
+manual membership choices are preserved, as are manual/folder/ZIP galleries.
+For older data, the application-authenticated endpoint
+`POST /api/v3/archive/source-galleries/prune` accepts
+`{"galleries":[{"gallery_uuid":"<uuid>","revision":1}]}` with 1–100 entries.
+Each gallery is rechecked inside the write transaction; changed revisions and
+galleries with two or more items are retained. Pruning does not delete or
+rename media files or disable scrapes.
 
 Source galleries inherit the distinct performers assigned to their member
 images and scenes. Membership changes, metadata imports and ordinary performer

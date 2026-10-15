@@ -148,6 +148,8 @@ func TestGalleryConsolidationNewImportsKeepPostsAndLateMedia(t *testing.T) {
 		selection := selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{DeclaredAlbum: true, Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "image"), sourceAttachmentEntry(1, "video")}})
 		selections = append(selections, selection)
 		chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveImage, 41)
+		require.Equal(t, "ineligible", syncSourceGallery(t, repo, post.UUID).Action)
+		chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveScene, 31)
 		result := syncSourceGallery(t, repo, post.UUID)
 		if gallery == nil {
 			gallery = result

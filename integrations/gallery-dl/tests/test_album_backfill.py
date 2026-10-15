@@ -11,7 +11,7 @@ from unittest.mock import patch
 import uuid
 
 from stash_ingest.album_backfill import Plan, inspect_plan, main, prepare, prepare_retry
-from stash_ingest.album_client import AlbumClient, POLICIES, validate_status
+from stash_ingest.album_client import AlbumClient, POLICIES, validate_publication, validate_status
 from stash_ingest.client import Unavailable
 from stash_ingest.encoding import InvalidData
 
@@ -309,6 +309,15 @@ class AlbumBackfillTests(unittest.TestCase):
                     result["publication"]["gallery_uuid"] = str(uuid.uuid4())
                     with self.assertRaises(Unavailable):
                         validate_status(result, check)
+
+    def test_one_repaired_link_can_wait_for_another_local_item(self):
+        post = str(uuid.uuid4())
+        value = {"event_uuid": str(uuid.uuid4()), "post_uuid": post, "action": "ineligible", "created": False,
+                 "selected": 1, "review": 0, "unavailable": 1, "added": 0, "removed": 0}
+        self.assertEqual(value, validate_publication(value, post))
+        for invalid in ({**value, "added": 1}, {**value, "action": "disabled"}):
+            with self.assertRaises(InvalidData):
+                validate_publication(invalid, post)
 
     def test_transport_uses_application_key_and_rejects_redirects_and_invalid_responses(self):
         calls = []

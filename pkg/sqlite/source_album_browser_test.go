@@ -146,6 +146,7 @@ func TestSourceAlbumBrowserRetainsDisabledDeletedAndForgottenEvidence(t *testing
 	selection := selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{Complete: true, DeclaredAlbum: true,
 		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "scene"), sourceAttachmentEntry(1, "second")}})
 	media := chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveScene, 31)
+	chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveImage, 41)
 	result := syncSourceGallery(t, repo, post.UUID)
 	before := readSourceAlbum(t, repo, post.UUID, -1, 25)
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
@@ -187,6 +188,7 @@ func TestSourceAlbumBrowserFollowsMediaAndGalleryRedirectsWithoutCombiningPosts(
 	selection := selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{Complete: true, DeclaredAlbum: true,
 		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "scene"), sourceAttachmentEntry(1, "second")}})
 	one := chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveScene, 31)
+	chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveImage, 41)
 	two := archiveFind(t, repo, models.ArchiveScene, 32)
 	_, err := applyPostMedia(repo, postMediaInput(t, repo, post.UUID, one.UUID, "linked"))
 	require.NoError(t, err)
@@ -196,6 +198,11 @@ func TestSourceAlbumBrowserFollowsMediaAndGalleryRedirectsWithoutCombiningPosts(
 	other := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "second"}, "")
 	selectAlbum(t, repo, other.UUID, models.SourceAttachmentManifestInput{Complete: true, DeclaredAlbum: true,
 		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "other-first"), sourceAttachmentEntry(1, "other-second")}})
+	manual := createArchiveGallery(t, repo, "Redirect destination")
+	identity := archiveFind(t, repo, models.ArchiveGallery, manual.ID)
+	require.NoError(t, decideSourceGallery(repo, models.SourceGalleryChoiceInput{PostUUID: other.UUID,
+		ExpectedPostRevision: selectionPost(t, repo, other.UUID).Revision, State: "linked", GalleryUUID: identity.UUID,
+		ExpectedGalleryRevision: identity.Revision, Origin: "review"}))
 	second := syncSourceGallery(t, repo, other.UUID)
 	before := readSourceAlbum(t, repo, post.UUID, -1, 25)
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {

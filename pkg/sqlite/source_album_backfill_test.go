@@ -80,6 +80,15 @@ func singleBackfillFixture(t *testing.T) (sourceFileFixture, string, string) {
 	return f, post.UUID, selection.Entries[0].Attachment.UUID
 }
 
+func mixedBackfillFixture(t *testing.T) (sourceFileFixture, string, string) {
+	t.Helper()
+	f, post, attachment := singleBackfillFixture(t)
+	selectAlbum(t, f.repo, post, models.SourceAttachmentManifestInput{DeclaredAlbum: true,
+		Entries: []models.SourceAttachmentEntry{albumEntry(0, "native:reddit", "cd456", "video"), albumEntry(1, "native:reddit", "ef789", "image")}})
+	albumLegacyEvidence(t, f, post, "folder/ab123_ef789_Image.jpg", nil, models.ArchiveImage, 41, 22)
+	return f, post, attachment
+}
+
 func TestSourceAlbumBackfillOrdersMixedMediaAndUsesOriginalPaths(t *testing.T) {
 	f := newSourceFileFixture(t)
 	// Keep this publisher-attribution assertion independent of the fixture's
@@ -196,11 +205,8 @@ func TestSourceAlbumBackfillPreservesEveryExistingDecision(t *testing.T) {
 			require.NotEmpty(t, preview.Matches[0].DecisionUUID)
 			result := applyAlbumBackfill(t, f.repo, preview)
 			require.Zero(t, result.Selected)
-			if state == "linked" {
-				sourceGalleryMemberships(t, f.repo, *result.Gallery.GalleryID, nil, []int{32})
-			} else {
-				sourceGalleryMemberships(t, f.repo, *result.Gallery.GalleryID, nil, nil)
-			}
+			require.Nil(t, result.Gallery.GalleryID, "one selected item cannot create a gallery")
+			require.Equal(t, "ineligible", result.Gallery.Action)
 		})
 	}
 }
@@ -250,7 +256,7 @@ func TestSourceAlbumBackfillRejectsStaleAndAmbiguousEvidence(t *testing.T) {
 func TestSourceAlbumBackfillRollbackAndPrecommitGuard(t *testing.T) {
 	for _, failure := range []string{"write-error", "late-generation", "late-owner", "late-decision"} {
 		t.Run(failure, func(t *testing.T) {
-			f, post, attachment := singleBackfillFixture(t)
+			f, post, attachment := mixedBackfillFixture(t)
 			preview := albumBackfillPreview(t, f.repo, post, models.SourceAlbumRedditFilenameV1)
 			if failure == "write-error" {
 				attachmentSQL(t, f.db, `CREATE TRIGGER backfill_failure BEFORE INSERT ON galleries BEGIN SELECT RAISE(ABORT,'injected gallery failure'); END;`)
@@ -287,6 +293,11 @@ func TestSourceAlbumBackfillRollbackAndPrecommitGuard(t *testing.T) {
 
 func TestSourceAlbumBackfillPreservesManualGalleryMembershipAndDeletion(t *testing.T) {
 	f, post, _ := singleBackfillFixture(t)
+	manual := createArchiveGallery(t, f.repo, "Curated gallery")
+	identity := archiveFind(t, f.repo, models.ArchiveGallery, manual.ID)
+	require.NoError(t, decideSourceGallery(f.repo, models.SourceGalleryChoiceInput{PostUUID: post,
+		ExpectedPostRevision: selectionPost(t, f.repo, post).Revision, State: "linked", GalleryUUID: identity.UUID,
+		ExpectedGalleryRevision: identity.Revision, Origin: "review"}))
 	album := syncSourceGallery(t, f.repo, post)
 	require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		if err := f.repo.Gallery.AddSceneIDs(ctx, *album.GalleryID, []int{31, 32}); err != nil {

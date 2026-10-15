@@ -35,7 +35,7 @@ func processAlbumJob(t *testing.T, worker *gallery.AlbumWorker) {
 }
 
 func TestAlbumJobsAdmissionReplayAndTargetedHistory(t *testing.T) {
-	f, post, _ := singleBackfillFixture(t)
+	f, post, _ := mixedBackfillFixture(t)
 	s := gallery.NewAlbumBackfill(f.repo)
 	s.Durable.MaxActive = 1
 	input := albumJobInput(t, s, post)
@@ -44,7 +44,7 @@ func TestAlbumJobsAdmissionReplayAndTargetedHistory(t *testing.T) {
 	require.Equal(t, "queued", first.State)
 	require.False(t, first.PublicationCommitted)
 	require.False(t, first.HooksFinished)
-	require.Equal(t, "create", sourceGalleryPreview(t, f.repo, post).Action)
+	require.Equal(t, "ineligible", sourceGalleryPreview(t, f.repo, post).Action, "the files have evidence but are not selected yet")
 	coalesced := input
 	coalesced.RequestUUID = uuid.NewString()
 	second, err := s.Submit(t.Context(), coalesced)
@@ -66,8 +66,8 @@ func TestAlbumJobsAdmissionReplayAndTargetedHistory(t *testing.T) {
 		require.Equal(t, &pub, current.Publication)
 		require.Equal(t, first.JobUUID, pub.EventUUID)
 		require.True(t, pub.Created)
-		require.Equal(t, 1, pub.Selected)
-		require.Equal(t, 1, pub.Added)
+		require.Equal(t, 2, pub.Selected)
+		require.Equal(t, 2, pub.Added)
 		return guard(ctx)
 	})
 	processAlbumJob(t, worker)
@@ -110,7 +110,7 @@ func TestAlbumJobsAdmissionReplayAndTargetedHistory(t *testing.T) {
 func TestAlbumJobsStalePreviewAndUnpublishedRetry(t *testing.T) {
 	for _, when := range []string{"before admission", "after admission", "cancelled before publication"} {
 		t.Run(when, func(t *testing.T) {
-			f, post, _ := singleBackfillFixture(t)
+			f, post, _ := mixedBackfillFixture(t)
 			s := gallery.NewAlbumBackfill(f.repo)
 			input := albumJobInput(t, s, post)
 			var accepted *gallery.AlbumBackfillStatus
@@ -151,7 +151,7 @@ func TestAlbumJobsStalePreviewAndUnpublishedRetry(t *testing.T) {
 }
 
 func TestAlbumJobsCheckpointFailureRollsBackDomain(t *testing.T) {
-	f, post, _ := singleBackfillFixture(t)
+	f, post, _ := mixedBackfillFixture(t)
 	s := gallery.NewAlbumBackfill(f.repo)
 	now := time.Now().UTC()
 	s.Durable.Now = func() time.Time { return now }
@@ -181,7 +181,7 @@ func TestAlbumJobsCheckpointFailureRollsBackDomain(t *testing.T) {
 }
 
 func TestAlbumJobsTerminalRetryKeepsPublicationAndManualChanges(t *testing.T) {
-	f, post, _ := singleBackfillFixture(t)
+	f, post, _ := mixedBackfillFixture(t)
 	s := gallery.NewAlbumBackfill(f.repo)
 	now := time.Now().UTC()
 	s.Durable.Now = func() time.Time { return now }
@@ -232,13 +232,13 @@ func TestAlbumJobsTerminalRetryKeepsPublicationAndManualChanges(t *testing.T) {
 	defer raw.Close()
 	require.EqualValues(t, 1, queryUint(t, raw, "SELECT count(*) FROM galleries WHERE title='User title'"))
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM scenes_galleries"), "notification retry cannot re-add excluded media")
-	require.EqualValues(t, 1, queryUint(t, raw, "SELECT count(*) FROM attachment_media_decisions"))
+	require.EqualValues(t, 2, queryUint(t, raw, "SELECT count(*) FROM attachment_media_decisions"))
 	require.Equal(t, terminal, albumJobStatus(t, s, terminal.JobUUID))
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
 }
 
 func TestAlbumJobsRestartResumesCommittedEffects(t *testing.T) {
-	f, post, _ := singleBackfillFixture(t)
+	f, post, _ := mixedBackfillFixture(t)
 	s := gallery.NewAlbumBackfill(f.repo)
 	now := time.Now().UTC()
 	s.Durable.Now = func() time.Time { return now }
@@ -276,7 +276,7 @@ func TestAlbumJobsRestartResumesCommittedEffects(t *testing.T) {
 }
 
 func TestAlbumJobsCancellationAfterCommitFencesEffects(t *testing.T) {
-	f, post, _ := singleBackfillFixture(t)
+	f, post, _ := mixedBackfillFixture(t)
 	s := gallery.NewAlbumBackfill(f.repo)
 	accepted, err := s.Submit(t.Context(), albumJobInput(t, s, post))
 	require.NoError(t, err)
@@ -306,7 +306,7 @@ func TestAlbumJobsCancellationAfterCommitFencesEffects(t *testing.T) {
 }
 
 func TestAlbumJobsHeartbeatRenewsAndCancelsOnLostOwnership(t *testing.T) {
-	f, post, _ := singleBackfillFixture(t)
+	f, post, _ := mixedBackfillFixture(t)
 	s := gallery.NewAlbumBackfill(f.repo)
 	accepted, err := s.Submit(t.Context(), albumJobInput(t, s, post))
 	require.NoError(t, err)
@@ -333,7 +333,7 @@ func TestAlbumJobsHeartbeatRenewsAndCancelsOnLostOwnership(t *testing.T) {
 }
 
 func TestAlbumJobsJSONPreviewUsesPublicNames(t *testing.T) {
-	f, post, _ := singleBackfillFixture(t)
+	f, post, _ := mixedBackfillFixture(t)
 	s := gallery.NewAlbumBackfill(f.repo)
 	preview, err := s.Preview(t.Context(), post, models.SourceAlbumRedditFilenameV1)
 	require.NoError(t, err)
@@ -345,4 +345,20 @@ func TestAlbumJobsJSONPreviewUsesPublicNames(t *testing.T) {
 	require.Equal(t, map[string]any{"namespace": "native:reddit", "value": "cd456"}, match["reference"])
 	require.NotContains(t, string(raw), "OriginalID")
 	require.NotContains(t, string(raw), "Signature")
+}
+
+func TestAlbumJobsCanRepairOneLinkWithoutCreatingGallery(t *testing.T) {
+	f, post, _ := singleBackfillFixture(t)
+	s := gallery.NewAlbumBackfill(f.repo)
+	accepted, err := s.Submit(t.Context(), albumJobInput(t, s, post))
+	require.NoError(t, err)
+	worker := gallery.NewAlbumWorker(s, func(ctx context.Context, p gallery.AlbumPublication, guard gallery.AlbumEffectGuard) error {
+		require.Equal(t, "ineligible", p.Action)
+		require.Equal(t, 1, p.Selected)
+		require.False(t, p.ChangedGallery())
+		require.Empty(t, p.GalleryUUID)
+		return guard(ctx)
+	})
+	processAlbumJob(t, worker)
+	require.Equal(t, "succeeded", albumJobStatus(t, s, accepted.JobUUID).State)
 }

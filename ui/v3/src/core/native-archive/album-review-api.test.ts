@@ -3,6 +3,7 @@ import { postIdentity, postIds } from "../../../tests/fixtures/source-posts";
 import {
   albumJobSchema,
   albumPreviewSchema,
+  albumPublicationSchema,
   createAlbumReviewAPI,
 } from "./album-review-api";
 import {
@@ -14,6 +15,25 @@ import {
 } from "../../../tests/fixtures/album-review";
 
 const endpoint = "https://example.test/library/api/v3/archive/";
+it("accepts a repaired media link while the gallery waits for a second local item", () => {
+  const publication = {
+    ...publishedAlbumJob().publication,
+    action: "ineligible",
+    created: false,
+    selected: 1,
+    added: 0,
+    removed: 0,
+    gallery_uuid: undefined,
+  };
+  expect(albumPublicationSchema.safeParse(publication).success).toBe(true);
+  expect(
+    albumPublicationSchema.safeParse({ ...publication, added: 1 }).success,
+  ).toBe(false);
+  expect(
+    albumPublicationSchema.safeParse({ ...publication, action: "disabled" })
+      .success,
+  ).toBe(false);
+});
 it("resolves the current post for new work without rewriting an original job", async () => {
   const identity = postIdentity(postIds.post, postIds.otherPost);
   const transport = vi.fn<typeof fetch>(async () => Response.json(identity));

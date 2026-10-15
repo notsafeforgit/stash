@@ -33,7 +33,8 @@ def run(setup):
         assert explicit["posts"] == 1 and explicit["matches"] == prepared["matches"] and not explicit["submitted"], explicit
         base = [*endpoint, "--plan", str(original), "--expected-sha256", prepared["plan_sha256"]]
         show = invoke(["show", "--plan", str(original), "--expected-sha256", prepared["plan_sha256"], "--post", post], 0)
-        assert show["preview"]["initial_metadata"]["title"] == "Album title"
+        assert show["preview"]["action"] == "ineligible"
+        assert "initial_metadata" not in show["preview"]
         assert not invoke(["status", *base], 3)["complete"]
         # The server commits admission, then disconnects before acknowledging it.
         assert not invoke(["apply", *base], 1)["complete"]
@@ -61,7 +62,7 @@ def run(setup):
         assert job["job_uuid"] == saved["retry_job"]
         assert job["resume_from_job_uuid"] == saved["original_job"]
         assert job["publication_committed"] and job["hooks_finished"]
-        assert job["publication"]["created"] and job["publication"]["unavailable"] == 2
+        assert not job["publication"]["created"] and job["publication"]["unavailable"] == 2
         assert invoke(["apply", *base], 0) == final, "Replay must inspect the original job even after its preview changed"
         assert invoke(["status", *endpoint, "--plan", str(original), "--expected-sha256", saved["original"]], 2)["counts"] == {"cancelled": 1}
     print(json.dumps({"phase": setup["phase"], "verified": True}))

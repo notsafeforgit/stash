@@ -174,26 +174,28 @@ func TestPostMediaUnlinkSuppressesSourceAlbumButPreservesManualMembership(t *tes
 	_, repo := archiveTestDatabase(t)
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "album-unlink"}, "")
 	selection := selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{Complete: true, DeclaredAlbum: true,
-		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "clip"), sourceAttachmentEntry(1, "second")}})
+		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "clip"), sourceAttachmentEntry(1, "second"), sourceAttachmentEntry(2, "third")}})
+	chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveImage, 41)
+	chooseAlbumMedia(t, repo, selection.Entries[2].Attachment.UUID, models.ArchiveScene, 32)
 	attachment := selection.Entries[0].Attachment
 	media := chooseAlbumMedia(t, repo, attachment.UUID, models.ArchiveScene, 31)
 	album := syncSourceGallery(t, repo, post.UUID)
-	sourceGalleryMemberships(t, repo, *album.GalleryID, nil, []int{31})
+	sourceGalleryMemberships(t, repo, *album.GalleryID, []int{41}, []int{31, 32})
 	_, err := applyPostMedia(repo, postMediaInput(t, repo, post.UUID, media.UUID, "unlinked"))
 	require.NoError(t, err)
-	sourceGalleryMemberships(t, repo, *album.GalleryID, nil, nil)
+	sourceGalleryMemberships(t, repo, *album.GalleryID, []int{41}, []int{32})
 	require.Equal(t, "post_unlinked", sourceGalleryPreview(t, repo, post.UUID).Entries[0].Status)
 	current := findAttachment(t, repo, attachment.UUID)
 	media = archiveFind(t, repo, models.ArchiveScene, 31)
 	require.ErrorIs(t, applyMediaChoice(repo, models.AttachmentMediaDecisionInput{AttachmentUUID: current.UUID, ExpectedAttachmentRevision: current.Revision, State: "linked", MediaUUID: media.UUID, ExpectedMediaRevision: media.Revision, Origin: "review"}), models.ErrSourcePostMediaConflict)
 	_, err = applyPostMedia(repo, postMediaInput(t, repo, post.UUID, media.UUID, "undecided"))
 	require.NoError(t, err)
-	sourceGalleryMemberships(t, repo, *album.GalleryID, nil, []int{31})
+	sourceGalleryMemberships(t, repo, *album.GalleryID, []int{41}, []int{31, 32})
 	// An explicitly added library membership survives a later source rejection.
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error { return repo.Gallery.AddSceneIDs(ctx, *album.GalleryID, []int{31}) }))
 	_, err = applyPostMedia(repo, postMediaInput(t, repo, post.UUID, media.UUID, "unlinked"))
 	require.NoError(t, err)
-	sourceGalleryMemberships(t, repo, *album.GalleryID, nil, []int{31})
+	sourceGalleryMemberships(t, repo, *album.GalleryID, []int{41}, []int{31, 32})
 }
 
 func TestPostMediaUnlinkPreventsHistoricalAlbumSelection(t *testing.T) {

@@ -34,6 +34,7 @@ func TestPostConsolidationApplyCreatesAlbumWithAtomicReceiptAndNotification(t *t
 	a := identityPost(t, repo, "legacy:catalog:fixture", "first")
 	b := identityPost(t, repo, "native:reddit", "one-post")
 	capture := postSelectionCapture(t, repo, a, 0, 1)
+	postSelectionLocalImages(t, repo, a, "first", "second")
 	postSelectionApply(t, repo, a, capture.UUID, "pinned", "review")
 	evidence := identityRows(t, repo, "source_captures", "source_attachment_manifests", "source_attachment_entries")
 	input := consolidationReviewRequest(t, repo, models.PostConsolidationReviewInput{SourceUUID: a, DestinationUUID: b, Reason: "Reviewed same source post"})
@@ -160,6 +161,7 @@ func TestPostConsolidationApplyCaughtLateFailureRollsBackEveryEffect(t *testing.
 			a := identityPost(t, repo, "legacy:catalog:fixture", "first")
 			b := identityPost(t, repo, "native:reddit", "one-post")
 			capture := postSelectionCapture(t, repo, a, 0, 1)
+			postSelectionLocalImages(t, repo, a, "first", "second")
 			postSelectionApply(t, repo, a, capture.UUID, "pinned", "review")
 			input := consolidationReviewRequest(t, repo, models.PostConsolidationReviewInput{SourceUUID: a, DestinationUUID: b})
 			tables := []string{"source_posts", "source_post_identities", "source_post_consolidations", "source_post_consolidation_context", "post_attachment_decisions", "post_attachment_selections", "post_gallery_decisions", "post_gallery_links", "galleries", "archive_entities", "metadata_field_decisions", "gallery_membership_events", "archive_jobs", "archive_job_submissions", "post_consolidation_reviews", "post_consolidation_review_members"}

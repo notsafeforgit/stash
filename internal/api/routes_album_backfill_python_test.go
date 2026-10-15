@@ -15,6 +15,7 @@ import (
 
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/gallery"
+	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
@@ -100,6 +101,13 @@ func TestPythonAlbumBackfillResumesLostAdmissionCancelAndRetry(t *testing.T) {
 		return err == nil && status.State == "succeeded" && status.HooksFinished
 	}, 10*time.Second, 20*time.Millisecond)
 	runtime.stop()
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		current, err := repo.SourceEvidence.FindPost(ctx, post.UUID)
+		if err != nil {
+			return err
+		}
+		return repo.SourceEvidence.AddPostIdentifier(ctx, post.UUID, models.SourcePostIdentifier{Namespace: "legacy:catalog:fixture", Value: "later"}, current.Revision)
+	}))
 	run("complete")
 	require.EqualValues(t, 1, applyCalls.Load())
 	require.EqualValues(t, 1, cancelCalls.Load())
@@ -109,7 +117,8 @@ func TestPythonAlbumBackfillResumesLostAdmissionCancelAndRetry(t *testing.T) {
 	require.Len(t, history, 2)
 	fresh, err := service.Preview(t.Context(), post.UUID, history[1].Policy)
 	require.NoError(t, err)
-	require.Equal(t, "sync", fresh.Action)
-	require.Equal(t, history[1].Publication.GalleryUUID, fresh.Gallery.UUID)
+	require.Equal(t, "ineligible", fresh.Action, "unavailable files do not create an empty gallery")
+	require.Nil(t, fresh.Gallery)
+	require.Empty(t, history[1].Publication.GalleryUUID)
 	require.NotEqual(t, history[1].Signature, fresh.Signature)
 }

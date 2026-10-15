@@ -19,6 +19,20 @@ func singleSourceAlbum(t *testing.T, repo models.Repository) (string, *models.So
 	selection := selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{DeclaredAlbum: true,
 		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "one")}})
 	chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveScene, 31)
+	// Existing one-item galleries remain valid historical/review inputs. New
+	// automatic creation is tested separately and requires two local items.
+	g := models.NewGallery()
+	g.Origin = models.GalleryOriginSource
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		if err := repo.Gallery.Create(ctx, &models.CreateGalleryInput{Gallery: &g}); err != nil {
+			return err
+		}
+		return repo.Gallery.AddSceneIDs(ctx, g.ID, []int{31})
+	}))
+	identity := archiveFind(t, repo, models.ArchiveGallery, g.ID)
+	require.NoError(t, decideSourceGallery(repo, models.SourceGalleryChoiceInput{PostUUID: post.UUID,
+		ExpectedPostRevision: selectionPost(t, repo, post.UUID).Revision, State: "linked", GalleryUUID: identity.UUID,
+		ExpectedGalleryRevision: identity.Revision, Origin: "migration"}))
 	return post.UUID, syncSourceGallery(t, repo, post.UUID)
 }
 
@@ -186,8 +200,9 @@ func TestSourceGalleryAtomicWritesAndAuditGuards(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "atomic"}, "")
 	selection := selectAlbum(t, repo, post.UUID, models.SourceAttachmentManifestInput{DeclaredAlbum: true,
-		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "one")}})
+		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "one"), sourceAttachmentEntry(1, "two")}})
 	media := chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveScene, 31)
+	chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveImage, 41)
 	preview := sourceGalleryPreview(t, repo, post.UUID)
 	raw := openRawDB(t, db.DatabasePath())
 	defer raw.Close()

@@ -34,11 +34,9 @@ func TestPostMediaUnlinkSurvivesRepeatedIngestion(t *testing.T) {
 		a, err := repo.SourcePostMedia.Association(ctx, f.receipt.PostUUID, later.Result.MediaUUID)
 		require.NoError(t, err)
 		require.True(t, a.Suppressed())
-		gallery, err := repo.ArchiveEntity.Find(ctx, first.Result.GalleryUUID)
+		gallery, err := repo.SourceGallery.Association(ctx, f.receipt.PostUUID)
 		require.NoError(t, err)
-		members, err := repo.Gallery.GetImageIDs(ctx, *gallery.LocalID)
-		require.NoError(t, err)
-		require.Empty(t, members)
+		require.Nil(t, gallery, "the sole local item never created an automatic gallery")
 		return nil
 	}))
 }

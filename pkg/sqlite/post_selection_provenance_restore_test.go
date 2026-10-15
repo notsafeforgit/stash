@@ -20,6 +20,7 @@ func TestPostSelectionProvenancePortableRestoreRetainsOriginalCaptureOwnership(t
 	a := identityPost(t, repo, "legacy:catalog:fixture", "original")
 	b := identityPost(t, repo, "native:reddit", "one-post")
 	capture := postSelectionCapture(t, repo, a, 0, 2)
+	postSelectionLocalImages(t, repo, a, "first", "third")
 	publishPostIdentity(t, repo, identityRequest(t, repo, a, b))
 	selected := postSelectionApply(t, repo, b, capture.UUID, "pinned", "review")
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {

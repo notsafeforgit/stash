@@ -66,6 +66,7 @@ func TestArchiveActivityHTTPManualContextSurvivesMissingFileAndCollectionRename(
 func TestArchiveActivityHTTPAlbumContextIncludesCommittedGallery(t *testing.T) {
 	_, repo, get := sourcePostBrowserHTTPFixture(t)
 	post := albumHTTPPost(t, repo)
+	albumHTTPLocalMedia(t, repo, post.UUID)
 	service := gallery.NewAlbumBackfill(repo)
 	preview, err := service.Preview(t.Context(), post.UUID, models.SourceAlbumIdentifiersV1)
 	require.NoError(t, err)
@@ -96,6 +97,7 @@ func TestArchiveActivityHTTPAlbumContextIncludesCommittedGallery(t *testing.T) {
 func TestArchiveActivityHTTPMergeSubjectsResolveToOneCanonicalPost(t *testing.T) {
 	_, repo, get := sourcePostBrowserHTTPFixture(t)
 	post := albumHTTPPost(t, repo)
+	albumHTTPLocalMedia(t, repo, post.UUID)
 	input := models.PostConsolidationReviewInput{DestinationUUID: post.UUID, Reason: "Same original post"}
 	var applied *models.PostConsolidationReview
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {

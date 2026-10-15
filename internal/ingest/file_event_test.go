@@ -90,7 +90,7 @@ func TestFileEventAcknowledgesQueueAndExposesCommittedResultSeparately(t *testin
 	var result ingest.IntakePublicationResult
 	require.NoError(t, json.Unmarshal(status.Result, &result))
 	require.NotEmpty(t, result.MediaUUID)
-	require.NotEmpty(t, result.GalleryUUID)
+	require.Empty(t, result.GalleryUUID, "one completed item does not create a local gallery")
 	require.Equal(t, accepted, status.Receipt, "the accepted acknowledgement is immutable after completion")
 	replay, err := f.submitFile(t, event)
 	require.NoError(t, err)
@@ -188,7 +188,10 @@ func TestSourceFileEventsLinkMediaAndOnlyDeclaredAlbumsCreateGalleries(t *testin
 				}
 				require.Equal(t, "linked", published.Result.SourceMedia)
 				require.NotEmpty(t, published.Result.MediaUUID)
-				require.Equal(t, tc.album, published.Result.GalleryUUID != "")
+				selection, err := repo.SourceAttachment.Selection(ctx, f.receipt.PostUUID)
+				require.NoError(t, err)
+				require.Equal(t, tc.album, selection.IsAlbum(), "source album evidence is retained independently")
+				require.Empty(t, published.Result.GalleryUUID, "one local item waits even for a declared source album")
 				body, err := json.Marshal(published.Result)
 				return models.ArchiveJobOutcome{State: "succeeded", Result: body}, err
 			})

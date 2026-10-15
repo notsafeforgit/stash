@@ -134,11 +134,25 @@ func identityAlbum(t *testing.T, repo models.Repository, post string) models.Sou
 		if err != nil {
 			return err
 		}
-		preview, err := repo.SourceGallery.Preview(ctx, post)
+		// Reproduce a historical empty gallery for consolidation review. New
+		// automatic albums wait for two local items; imported explicit choices
+		// still need to be reviewable without silently rewriting their history.
+		gallery := models.NewGallery()
+		gallery.Origin, gallery.Title = models.GalleryOriginSource, title
+		if err := repo.Gallery.Create(ctx, &models.CreateGalleryInput{Gallery: &gallery}); err != nil {
+			return err
+		}
+		entity, err := repo.ArchiveEntity.FindByLocalID(ctx, models.ArchiveGallery, gallery.ID)
 		if err != nil {
 			return err
 		}
-		_, err = repo.SourceGallery.Sync(ctx, post, preview.Signature)
+		p, err = repo.SourceEvidence.FindPost(ctx, post)
+		if err != nil {
+			return err
+		}
+		_, err = repo.SourceGallery.DecideAssociation(ctx, models.SourceGalleryChoiceInput{PostUUID: post,
+			ExpectedPostRevision: p.Revision, State: "linked", GalleryUUID: entity.UUID,
+			ExpectedGalleryRevision: entity.Revision, Origin: "migration"})
 		return err
 	}))
 	return input

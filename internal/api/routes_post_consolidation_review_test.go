@@ -30,6 +30,7 @@ type postMergeHTTPStatus struct {
 func TestPostConsolidationHTTPApplyRecoveryNotificationRetryAndShutdown(t *testing.T) {
 	db, repo, _ := sourcePostBrowserHTTPFixture(t)
 	post := albumHTTPPost(t, repo)
+	albumHTTPLocalMedia(t, repo, post.UUID)
 	input := models.PostConsolidationReviewInput{DestinationUUID: post.UUID, Reason: "Same original album"}
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		legacy, err := repo.SourceEvidence.EnsurePost(ctx, models.SourcePostIdentifier{Namespace: "legacy:catalog:fixture", Value: "legacy"}, "")

@@ -98,9 +98,20 @@ type SourceGalleryAttributionResult struct {
 	Status      string `json:"status"` // updated, unchanged, protected, not_source
 }
 
+type SourceGalleryPruneInput struct {
+	GalleryUUID string `json:"gallery_uuid"`
+	Revision    int    `json:"revision"`
+}
+
+type SourceGalleryPruneResult struct {
+	GalleryUUID string `json:"gallery_uuid"`
+	Status      string `json:"status"` // removed, retained, protected, missing, changed
+}
+
 var ErrSourceGalleryConflict = errors.New("source album or gallery changed; review a fresh preview")
 
 type SourceGalleryReaderWriter interface {
+	PruneSmall(context.Context, []SourceGalleryPruneInput) ([]SourceGalleryPruneResult, error)
 	// ReconcilePerformers refreshes derived attribution for at most 100 named
 	// galleries in a managed write transaction. It preserves explicit choices.
 	ReconcilePerformers(context.Context, []string) ([]SourceGalleryAttributionResult, error)

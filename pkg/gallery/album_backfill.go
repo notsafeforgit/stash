@@ -127,7 +127,8 @@ func validAlbumPublication(p *AlbumPublication, post string) bool {
 	if p.Created != (p.Action == "create") || (p.ChangedGallery() && p.GalleryUUID == "") {
 		return false
 	}
-	return (p.Action == "create" || p.Action == "sync") || (!p.ChangedGallery() && p.Selected == 0 && p.Review == 0 && p.Unavailable == 0)
+	return (p.Action == "create" || p.Action == "sync") ||
+		(!p.ChangedGallery() && (p.Action == "ineligible" || (p.Selected == 0 && p.Review == 0 && p.Unavailable == 0)))
 }
 
 func decodeAlbumWork(current *models.ArchiveJob) (*albumWork, *albumProgress, error) {

@@ -200,6 +200,7 @@ export const albumPublicationSchema = z
       (!(p.created || p.added > 0 || p.removed > 0) || !!p.gallery_uuid) &&
       (p.action === "create" ||
         p.action === "sync" ||
+        (p.action === "ineligible" && !(p.created || p.added || p.removed)) ||
         !(
           p.created ||
           p.selected ||

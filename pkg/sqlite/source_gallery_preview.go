@@ -178,7 +178,24 @@ func finishSourceGalleryPreview(ret *models.SourceGalleryPreview) (*models.Sourc
 }
 
 func (s *SourceGalleryStore) Preview(ctx context.Context, value string) (*models.SourceGalleryPreview, error) {
-	return s.previewWithMediaChoices(ctx, value, nil)
+	ret, err := s.previewWithMediaChoices(ctx, value, nil)
+	if err != nil {
+		return nil, err
+	}
+	return sourceGalleryLocalMinimum(ret)
+}
+
+// Source cardinality establishes album evidence, not local availability. Apply
+// this only after combining a thread and resolving/deduplicating media choices.
+// A later intake retries the same selections when another local item arrives.
+func sourceGalleryLocalMinimum(ret *models.SourceGalleryPreview) (*models.SourceGalleryPreview, error) {
+	if ret.Action == "create" && len(ret.Add) < 2 {
+		ret.Action = "ineligible"
+		ret.Add = []models.ArchiveEntity{}
+		ret.ThreadPlans = nil
+		return finishSourceGalleryPreview(ret)
+	}
+	return ret, nil
 }
 
 // Proposed choices exist only in a read-only backfill preview. Normal sync

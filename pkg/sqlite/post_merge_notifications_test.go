@@ -19,6 +19,7 @@ func postMergeNotificationFixture(t *testing.T) (*Database, models.Repository, *
 	a := identityPost(t, repo, "legacy:catalog:fixture", "first")
 	b := identityPost(t, repo, "native:reddit", "one-post")
 	capture := postSelectionCapture(t, repo, a, 0, 1)
+	postSelectionLocalImages(t, repo, a, "first", "second")
 	postSelectionApply(t, repo, a, capture.UUID, "pinned", "review")
 	input := consolidationReviewRequest(t, repo, models.PostConsolidationReviewInput{SourceUUID: a, DestinationUUID: b})
 	review, _ := applyConsolidationReview(t, repo, input)

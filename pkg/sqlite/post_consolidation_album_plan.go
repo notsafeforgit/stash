@@ -105,6 +105,10 @@ WHERE gallery_uuid IN ` + getInBinding(len(aliases)) + ` AND post_uuid NOT IN ` 
 
 func (p *postConsolidationPlan) setAlbumPlan(preview *models.SourceGalleryPreview) error {
 	var err error
+	preview, err = sourceGalleryLocalMinimum(preview)
+	if err != nil {
+		return err
+	}
 	p.gallery, err = finishSourceGalleryPreview(preview)
 	if err != nil {
 		return err

@@ -201,8 +201,10 @@ async function archive(page: Page, create = false) {
       result = {
         requested_uuid: postIds.gallery,
         gallery: postAlbum().gallery,
+        studios: [],
         posts: [postSummary()],
       };
+    else if (path.endsWith("/studios")) result = [];
     else if (path === `posts/${postIds.post}`) result = postSummary();
     else if (path.endsWith("/album"))
       result = postAlbumContext(

@@ -179,6 +179,7 @@ async function archive(page: Page) {
       result = {
         requested_uuid: postIds.gallery,
         gallery: postAlbum().gallery,
+        studios: [],
         posts: [postSummary()],
       };
     } else if (path.endsWith("/album-media")) {

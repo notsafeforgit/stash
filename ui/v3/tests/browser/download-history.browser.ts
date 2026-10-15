@@ -55,6 +55,7 @@ async function archive(page: Page) {
         json: {
           requested_uuid: postIds.gallery,
           gallery: postAlbum().gallery,
+          studios: [],
           posts: [postSummary()],
         },
       });

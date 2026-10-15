@@ -279,6 +279,16 @@ gallery performer choices (including clearing the field) take precedence;
 folder and manual galleries are unchanged. Performer merges and removal retain
 inheritance instead of turning the derived list into a manual choice.
 
+To repair source galleries created before inheritance was enabled, send
+`POST /api/v3/archive/source-galleries/performers/reconcile` with
+`{"gallery_uuids":["<gallery UUID>"]}` (1–100 distinct UUIDs per request).
+This application-authenticated operation recalculates performers from current
+image/scene members in one transaction. Each result reports `updated`,
+`unchanged`, `protected`, or `not_source`. It preserves explicit choices and
+manual/folder galleries, leaves membership untouched, and keeps updated fields
+in inheritance mode. Retrying a batch is safe; unchanged values create no new
+decisions or notifications. Source tracking must be enabled.
+
 Account ownership does not itself identify everyone depicted in an account's
 media. For a profile whose downloads should receive a performer by default,
 configure a constant `performers` mapping in its existing image and scene

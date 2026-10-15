@@ -93,9 +93,17 @@ type GalleryMediaReferences struct {
 	NextOffset *int
 }
 
+type SourceGalleryPerformerResult struct {
+	GalleryUUID string `json:"gallery_uuid"`
+	Status      string `json:"status"` // updated, unchanged, protected, not_source
+}
+
 var ErrSourceGalleryConflict = errors.New("source album or gallery changed; review a fresh preview")
 
 type SourceGalleryReaderWriter interface {
+	// ReconcilePerformers refreshes derived attribution for at most 100 named
+	// galleries in a managed write transaction. It preserves explicit choices.
+	ReconcilePerformers(context.Context, []string) ([]SourceGalleryPerformerResult, error)
 	PreviewConsolidation(context.Context, string) (*GalleryConsolidationPreview, error)
 	Consolidate(context.Context, string, string) (*GalleryConsolidationResult, error)
 	AlternateTitles(context.Context, int) ([]string, error)

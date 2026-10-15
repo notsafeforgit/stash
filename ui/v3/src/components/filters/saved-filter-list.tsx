@@ -87,7 +87,7 @@ export function SaveFilterDialog({
     >
       <DialogContent
         showCloseButton={false}
-        className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
+        className="h-[min(32rem,calc(100dvh-2rem))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden"
       >
         <DialogHeader>
           <DialogTitle>
@@ -95,13 +95,13 @@ export function SaveFilterDialog({
           </DialogTitle>
         </DialogHeader>
         <form
-          className="flex flex-col gap-4"
+          className="flex min-h-0 flex-col gap-4"
           onSubmit={(event) => {
             event.preventDefault();
             void form.handleSubmit();
           }}
         >
-          <FieldGroup>
+          <FieldGroup className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <Field data-disabled={isSaving} data-invalid={nameTaken}>
               <FieldLabel htmlFor={nameId}>
                 <FormattedMessage id="filter_name" />
@@ -145,11 +145,13 @@ export function SaveFilterDialog({
                   showTrigger={false}
                   autoFocus
                 />
-                <div className="rounded-md border">
-                  <ComboboxEmpty>
+                {/* Keep results and feedback inside a stable dialog, including
+                    when the query has no matches or selects an overwrite. */}
+                <div className="flex h-48 shrink-0 flex-col overflow-hidden rounded-md border">
+                  <ComboboxEmpty className="flex shrink-0 px-2 empty:p-0">
                     <FormattedMessage id="search_filter.save_no_matches" />
                   </ComboboxEmpty>
-                  <ComboboxList className="max-h-48">
+                  <ComboboxList className="min-h-0 max-h-none flex-1">
                     {(filter: (typeof savedFilters)[number]) => (
                       <ComboboxItem
                         key={filter.id}
@@ -182,7 +184,7 @@ export function SaveFilterDialog({
               </div>
             </Field>
           </FieldGroup>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 flex-row *:flex-1 sm:*:flex-none">
             <Button
               type="button"
               variant="outline"

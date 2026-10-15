@@ -351,6 +351,102 @@ async function openSaveFilter(page: Page, kind = "image") {
   };
 }
 
+for (const viewport of [
+  { width: 390, height: 844 },
+  { width: 320, height: 568 },
+  { width: 844, height: 390 },
+  { width: 1280, height: 844 },
+]) {
+  test(`save filter layout stays stable while searching and selecting at ${viewport.width}x${viewport.height}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await page.addInitScript(() => {
+      window.savedFilterNames = [
+        "Favourite clips",
+        "Short clips",
+        ...Array.from({ length: 30 }, (_, index) => `Preset ${index + 1}`),
+      ];
+    });
+    const { dialog, name, save } = await openSaveFilter(page);
+    await dialog.evaluate(async (element) => {
+      await Promise.all(
+        element.getAnimations().map((animation) => animation.finished),
+      );
+    });
+    const bounds = async () =>
+      Promise.all(
+        [dialog, name, save].map((element) =>
+          element.evaluate((node) => {
+            const { x, y, width, height } = node.getBoundingClientRect();
+            return { x, y, width, height };
+          }),
+        ),
+      );
+    const initial = await bounds();
+    for (const box of initial) {
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+      expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    }
+    await testInfo.attach("save-filter-many-matches", {
+      body: await dialog.screenshot(),
+      contentType: "image/png",
+    });
+    const expectStable = async () => {
+      const current = await bounds();
+      for (const [index, box] of current.entries()) {
+        const original = initial[index];
+        if (!original) throw new Error("Missing initial dialog bounds");
+        for (const dimension of ["x", "y", "width", "height"] as const) {
+          expect(
+            Math.abs(box[dimension] - original[dimension]),
+            `${["dialog", "input", "Save button"][index]} ${dimension}`,
+          ).toBeLessThan(1);
+        }
+      }
+      await expect(name).toBeFocused();
+    };
+    for (const letter of "Short") {
+      await name.pressSequentially(letter);
+      await expectStable();
+    }
+    await expect(dialog.getByRole("option")).toHaveCount(1);
+    await name.fill("No matching preset");
+    await expectStable();
+    await expect(
+      dialog.getByText("No matching filters. Save to create this name.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await name.fill("Short clips");
+    await expect(save).toBeDisabled();
+    await expectStable();
+    await name.press("ArrowDown");
+    await name.press("Enter");
+    await expect(save).toBeEnabled();
+    await expectStable();
+    if (viewport.height >= 568) {
+      await expect(
+        dialog.getByText('Saved filter "Short clips" will be overwritten.', {
+          exact: true,
+        }),
+      ).toBeInViewport({ ratio: 1 });
+    }
+    await testInfo.attach("save-filter-overwrite", {
+      body: await dialog.screenshot(),
+      contentType: "image/png",
+    });
+    await name.fill("Short clips copy");
+    await expectStable();
+    await name.clear();
+    await expect(dialog.getByRole("option")).toHaveCount(32);
+    await expectStable();
+    expect(await page.evaluate(() => window.savedFilterMutations)).toEqual([]);
+  });
+}
+
 for (const kind of ["image", "scene", "marker"]) {
   test(`saving ${kind} filters searches existing names and selects an overwrite with the keyboard`, async ({
     page,

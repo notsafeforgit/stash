@@ -9,7 +9,6 @@ import (
 	"slices"
 
 	"github.com/stashapp/stash/pkg/models"
-	"github.com/stashapp/stash/pkg/sourceadapter"
 )
 
 const maxSourceGalleryMembers = 8192
@@ -334,19 +333,16 @@ func sourceGallerySelectPreview(ctx context.Context, ret *models.SourceGalleryPr
 		if filenameSelection(selection) {
 			platform = "twitter"
 		}
-		var truncated bool
-		ret.Title, truncated = sourceadapter.PostTitle(platform, metadata, 512)
-		if truncated {
-			ret.Title += "…"
+		display, err := (&SourceTranslationStore{}).Display(ctx, owner, platform, metadata)
+		if err != nil {
+			return false, err
 		}
+		ret.Title, ret.Details = display.Title, display.Description
 		if ret.Title == "" {
 			ret.Title, err = sourcePostFallbackTitle(ctx, owner, platform)
 			if err != nil {
 				return false, err
 			}
-		}
-		if metadata.OriginalText != nil {
-			ret.Details = *metadata.OriginalText
 		}
 		if metadata.PublishedAt != nil {
 			if date, err := models.ParseDate(*metadata.PublishedAt); err == nil {

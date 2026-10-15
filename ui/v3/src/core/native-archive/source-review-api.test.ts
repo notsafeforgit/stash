@@ -10,6 +10,26 @@ import {
 } from "../../../tests/fixtures/source-review";
 const endpoint = "https://example.test/stash/api/v3/archive/";
 
+it("keeps original post text alongside the selected translated display", async () => {
+  const metadata = { original_text: "元の文章" };
+  const display = {
+    title: "English heading",
+    description: "English description",
+    language: "en",
+    translated: true,
+  };
+  const transport = vi
+    .fn<typeof fetch>()
+    .mockResolvedValue(
+      Response.json({ requested_uuid: sourceIds.post, metadata, display }),
+    );
+  expect(
+    await createSourceReviewAPI(endpoint, transport).postContent(
+      sourceIds.post,
+    ),
+  ).toEqual({ ...metadata, display });
+});
+
 it("validates source pagination and refuses a response for another media item", async () => {
   const transport = vi
     .fn<typeof fetch>()

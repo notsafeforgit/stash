@@ -127,6 +127,13 @@ func (s *SourceTranslationStore) RecordEvidence(ctx context.Context, input model
 	if err != nil {
 		return nil, err
 	}
+	// A result can arrive after intake. Wake only the selected post's bounded
+	// display work, atomically with publication, so a restart cannot lose it.
+	if _, err := dbWrapper.Exec(ctx, `UPDATE source_post_translation_display SET pending=1,after_entity=''
+WHERE post_uuid IN (SELECT i.post_uuid FROM source_post_identities root
+JOIN source_post_identities i ON i.canonical_uuid=root.canonical_uuid WHERE root.post_uuid=?)`, input.PostUUID); err != nil {
+		return nil, err
+	}
 	ret, err := s.Evidence(ctx, input.UUID)
 	*complete = err == nil
 	return ret, err

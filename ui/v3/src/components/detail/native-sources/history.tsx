@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useIntl } from "react-intl";
+import { ChevronDown } from "lucide-react";
 import { useMsg } from "@/hooks/message";
 import type {
   SourceDecision,
@@ -11,6 +12,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 import { ReviewError } from "../native-metadata/shared";
 
 export function LinkState({
@@ -63,6 +69,8 @@ export function PostContent({
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<unknown>();
   const [attempt, setAttempt] = useState(0);
+  const title = metadata?.display?.title ?? metadata?.title;
+  const description = metadata?.display?.description ?? metadata?.original_text;
   // biome-ignore lint/correctness/useExhaustiveDependencies: Retry reloads this post without paging historical snapshots.
   useEffect(() => {
     const controller = new AbortController();
@@ -100,23 +108,38 @@ export function PostContent({
       )}
       {metadata !== null && (
         <Card size="sm">
-          {metadata.title && (
+          {title && (
             <CardHeader>
               <CardTitle className="wrap-anywhere" data-selectable-text>
-                {metadata.title}
+                {title}
               </CardTitle>
             </CardHeader>
           )}
           <CardContent className="flex flex-col gap-3">
-            {metadata.original_text &&
-              metadata.original_text !== metadata.title && (
-                <p
-                  data-selectable-text
-                  className="whitespace-pre-wrap wrap-anywhere"
-                >
-                  {metadata.original_text}
-                </p>
-              )}
+            {description && description !== title && (
+              <p
+                data-selectable-text
+                className="whitespace-pre-wrap wrap-anywhere"
+              >
+                {description}
+              </p>
+            )}
+            {metadata.display?.translated && (
+              <Collapsible>
+                <CollapsibleTrigger render={<Button variant="outline" />}>
+                  {msg("source_review.original_text", "Original text")}
+                  <ChevronDown data-icon="inline-end" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-3">
+                  <p
+                    data-selectable-text
+                    className="whitespace-pre-wrap wrap-anywhere"
+                  >
+                    {metadata.original_text || metadata.title}
+                  </p>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
             {metadata.published_at && (
               <p className="text-sm" data-selectable-text>
                 {intl.formatMessage(

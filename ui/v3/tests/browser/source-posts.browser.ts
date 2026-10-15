@@ -24,6 +24,7 @@ async function archive(
     merged?: boolean;
     thread?: boolean;
     captionOnly?: boolean;
+    translated?: boolean;
   } = {},
 ) {
   const requests: URL[] = [];
@@ -188,6 +189,14 @@ async function archive(
           original_text: "One shared description",
           published_at: "2026-09-29",
         },
+        display: options.translated
+          ? {
+              title: "Translated caption",
+              description: "Translated description",
+              language: "en",
+              translated: true,
+            }
+          : undefined,
       };
     else if (path.endsWith("/identifiers")) result = [];
     else if (path.endsWith("/urls"))
@@ -203,6 +212,32 @@ async function archive(
     },
   };
 }
+
+test("translated post content keeps the original available", async ({
+  page,
+}) => {
+  await archive(page, { translated: true });
+  await page.goto(`/source-posts?post=${postIds.post}`);
+  await page.getByRole("button", { name: "Post content", exact: true }).click();
+  await expect(
+    page.getByText("Translated caption", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Translated description", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("One shared description", { exact: true }),
+  ).not.toBeVisible();
+  await page
+    .getByRole("button", { name: "Original text", exact: true })
+    .click();
+  await expect(
+    page.getByText("One shared description", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: test.info().outputPath("translated-post.png"),
+  });
+});
 
 test("caption-only post content does not invent an untitled heading", async ({
   page,

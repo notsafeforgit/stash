@@ -57,12 +57,27 @@ func (w *Worker) ProcessNext(ctx context.Context) (bool, error) {
 	if w.Service == nil || w.Service.Durable == nil || w.Provider == nil || !validUUID(w.OwnerUUID) || w.LeaseDuration < 5*time.Second || w.LeaseDuration > 15*time.Minute {
 		return false, models.ErrTranslationWorkInvalid
 	}
+	refreshed := 0
+	for refreshed < 50 {
+		n := 0
+		if err := w.Service.Durable.Repo.WithTxn(ctx, func(ctx context.Context) error {
+			var err error
+			n, err = w.Service.Durable.Repo.SourceTranslation.RefreshPending(ctx, 50-refreshed)
+			return err
+		}); err != nil {
+			return false, err
+		}
+		if n == 0 {
+			break
+		}
+		refreshed += n
+	}
 	if _, err := w.Service.Admit(ctx); err != nil && !errors.Is(err, models.ErrArchiveJobCapacity) {
 		return false, err
 	}
 	claimed, err := w.Service.Durable.Claim(ctx, models.ArchiveJobTranslateText, w.OwnerUUID, w.LeaseDuration)
 	if err != nil || claimed == nil {
-		return false, err
+		return refreshed > 0, err
 	}
 	return true, w.process(ctx, claimed)
 }

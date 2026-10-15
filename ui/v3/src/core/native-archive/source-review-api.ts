@@ -104,8 +104,20 @@ export const sourceRevisionSchema = z.object({
 const postContentSchema = z.object({
   requested_uuid: uuid,
   metadata: sourceRevisionSchema.shape.metadata.nullable(),
+  display: z
+    .object({
+      title: z.string(),
+      description: z.string(),
+      language: z.string().optional(),
+      translated: z.boolean(),
+    })
+    .optional(),
 });
-export type PostContent = z.infer<typeof postContentSchema>["metadata"];
+export type PostContent =
+  | (NonNullable<z.infer<typeof postContentSchema>["metadata"]> & {
+      display?: z.infer<typeof postContentSchema>["display"];
+    })
+  | null;
 const capturesSchema = z
   .object({
     requested_uuid: uuid,
@@ -267,7 +279,9 @@ export function createSourceReviewAPI(
       );
       if (result.requested_uuid !== post)
         throw new NativeArchiveError(0, "invalid_response");
-      return result.metadata;
+      return result.metadata && result.display
+        ? { ...result.metadata, display: result.display }
+        : result.metadata;
     },
     async captures(post: string, after?: SourceCapture, signal?: AbortSignal) {
       const query = new URLSearchParams({ limit: String(pageLimit) });

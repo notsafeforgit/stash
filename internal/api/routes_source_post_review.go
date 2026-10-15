@@ -159,10 +159,22 @@ func (rs *nativeArchiveRoutes) reviewPostContent(w http.ResponseWriter, r *http.
 	ret := struct {
 		RequestedUUID string                     `json:"requested_uuid"`
 		Metadata      *models.SourcePostMetadata `json:"metadata"`
+		Display       *models.SourcePostDisplay  `json:"display,omitempty"`
 	}{RequestedUUID: post}
 	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
 		var err error
 		ret.Metadata, err = rs.repo.SourceEvidence.PostContent(ctx, post)
+		if err == nil && ret.Metadata != nil {
+			summary, readErr := rs.repo.SourceEvidence.PostSummary(ctx, post)
+			if readErr != nil {
+				return readErr
+			}
+			platform := ""
+			if summary != nil && summary.LatestCapture != nil {
+				platform = summary.LatestCapture.Platform
+			}
+			ret.Display, err = rs.repo.SourceTranslation.Display(ctx, post, platform, *ret.Metadata)
+		}
 		return err
 	})
 	if err != nil {

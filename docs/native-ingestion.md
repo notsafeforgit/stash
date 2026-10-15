@@ -2566,7 +2566,8 @@ Configure it through `PUT /api/v3/archive/collections/{uuid}/translation-policy`
     "target_language": "en",
     "title": true,
     "caption": true,
-    "priority": 100
+    "priority": 100,
+    "apply_to_library": true
   }
 }
 ```
@@ -2584,14 +2585,40 @@ and receipt. Its status is `no_policy`, `disabled`, `collection_changed`, or
 `recorded`; individual recorded entries say `created`, `retained`, or `no_text`.
 Target references identify the revision observed by that decision, not a claim
 that provider execution finished. The separate translation worker must be enabled
-and configured to process due targets. Scheduling and translation evidence do not
-select scene/image titles or other curated fields.
+and configured to process due targets. `apply_to_library` is optional and defaults
+to false. When enabled, completed results refresh inherited scene/image and
+source-album titles/descriptions that match the captured text or its generated
+heading. Custom expressions, manual edits and explicit clears stay protected.
+Propagation is bounded and restartable; it does not change source text, media
+paths, bytes, membership or attribution. Results available before intake also
+apply to copied source text in metadata mappings. `.source.display` exposes the
+selected title, description, language and `translated` flag alongside the
+unchanged `.source.metadata` and retained translation choices.
 
-A missing policy disables scheduling. Disabling a policy affects future captures;
+A missing policy disables scheduling unless an optional namespace default exists.
+`GET/PUT /api/v3/archive/translation-defaults/{namespace}` reads or sets that
+default using `{ "revision": 0, "definition": { ... } }` (current revision on
+updates). A newly captured collection with no policy saves a copy of its namespace
+default. Existing policies, including explicit opt-outs, take precedence. For
+Twitter, use namespace `native:twitter`, `caption:true` and `title:false`; tweets
+have captions, not separate titles. Fresh installations have no defaults.
+
+Disabling a policy affects future captures;
 already queued targets retain their own scheduling controls. Policy changes do
 not revisit previous captures, including accepted offline deliveries. Their exact
 receipts remain replayable. Existing text can be queued explicitly through the
 [translation target APIs](native-schema.md#translation-requests-cache-and-targets).
+`POST /api/v3/archive/posts/translation-backfill` accepts up to 100 post UUIDs in
+`posts`, `target_language`, `provider_policy`, `priority`, `apply_to_library` and
+`adopt_matching_text`. It queues saved caption text (title only when no caption
+exists), reuses exact cached results, and never fetches a website. Use a lower
+priority than new captures. `adopt_matching_text:true` explicitly permits the
+repair to replace older library/imported fields that exactly match retained
+text or its generated heading. Different text, reviewed field choices, clears,
+and edits made after the repair was requested are preserved. Without that flag,
+only already inherited fields with matching source provenance are refreshed.
+The post-content API returns original `metadata` and a separate `display`;
+the UI keeps the original accessible when displaying a translation.
 
 Policies bind the reviewed collection revision. If a configured policy no longer
 matches the event's collection revision or current collection, source evidence

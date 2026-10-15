@@ -662,6 +662,14 @@ import, reviewed activation and capture scheduling are implemented; remaining
 operational imports, policy migration and review UI remain transition work. See
 [translation work](docs/native-schema.md#translation-requests-cache-and-targets).
 
+Schema 1000120 adds optional namespace translation defaults and selected post
+display languages. `apply_to_library` queues bounded, restartable propagation
+when translations complete, including inherited source-album text. It also uses
+cached translations during later media intake. Preserve exact original metadata,
+explicit edits/clears, and unrelated custom mappings. Historical text repair is
+an explicit API backfill; it makes no source-site requests. See
+[automatic translations](docs/native-ingestion.md#automatic-source-translations).
+
 `stash-import-catalog-relations` advances a received snapshot after its evidence
 pass, retaining accounts, handle history, post URLs/aliases and unselected
 post/account claims. Frozen registry mappings and original account UUIDs remain

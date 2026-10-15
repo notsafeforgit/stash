@@ -14,6 +14,7 @@ import (
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/jq"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/sourceadapter"
 )
 
 type Source struct {
@@ -158,6 +159,7 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 		return nil, err
 	}
 	var source interface{}
+	var display *models.SourcePostDisplay
 	if capture != nil {
 		payload, err := archive.RestoreCapture(capture.Payload)
 		if err != nil {
@@ -171,8 +173,12 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 		if err != nil {
 			return nil, err
 		}
+		display, err = s.Repo.SourceTranslation.Display(ctx, capture.PostUUID, capture.Platform, capture.Metadata)
+		if err != nil {
+			return nil, err
+		}
 		source = map[string]interface{}{"post_uuid": capture.PostUUID, "capture_uuid": capture.UUID, "metadata": capture.Metadata, "payload": payload,
-			"urls": urls, "urls_complete": complete, "translations": translations, "translations_complete": translationsComplete}
+			"urls": urls, "urls_complete": complete, "translations": translations, "translations_complete": translationsComplete, "display": display}
 	}
 	ret.State = "ready"
 	if blocked != "" {
@@ -225,6 +231,24 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 				if capture != nil {
 					origin, change.CaptureUUID = "source", capture.UUID
 					change.PostMediaDecisionUUID = input.Source.PostMediaDecisionUUID
+				}
+			}
+		}
+		// A selected translation may have finished before file intake. Apply it
+		// only to an expression's copied caption/generated heading, never to
+		// constants, arbitrary custom output, or unrelated mapped fields.
+		if capture != nil && display != nil && display.Translated && mapping.JQ != "" && !change.UsedFallback && (field == "title" || field == "details") {
+			var text string
+			if json.Unmarshal(value, &text) == nil && sourceadapter.MatchesPostText(text, field, capture.Platform, capture.Metadata) {
+				replacement := display.Title
+				if field == "details" {
+					replacement = display.Description
+				}
+				if replacement != "" {
+					value, err = json.Marshal(replacement)
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 		}

@@ -14,6 +14,9 @@ type TranslationPolicyDefinition struct {
 	Title          bool   `json:"title"`
 	Caption        bool   `json:"caption"`
 	Priority       int    `json:"priority"`
+	// Refresh inherited library text when a result arrives; explicit edits stay
+	// protected. Original source metadata is never replaced by a translation.
+	ApplyToLibrary bool `json:"apply_to_library,omitempty"`
 }
 
 type TranslationPolicy struct {
@@ -33,6 +36,14 @@ type TranslationPolicyInput struct {
 	Definition                 TranslationPolicyDefinition `json:"definition"`
 	Origin                     string                      `json:"origin"`
 	Reason                     string                      `json:"reason"`
+}
+
+// Optional defaults apply to newly captured sources in one namespace. A saved
+// collection policy, including an explicit disabled policy, takes precedence.
+type TranslationPolicyDefault struct {
+	Namespace  string                      `json:"namespace" db:"namespace"`
+	Revision   int                         `json:"revision" db:"revision"`
+	Definition TranslationPolicyDefinition `json:"definition"`
 }
 
 type CaptureTranslationEntry struct {
@@ -57,6 +68,8 @@ var (
 )
 
 type TranslationPolicyReaderWriter interface {
+	Default(context.Context, string) (*TranslationPolicyDefault, error)
+	PutDefault(context.Context, TranslationPolicyDefault) (*TranslationPolicyDefault, error)
 	Find(context.Context, string) (*TranslationPolicy, error)
 	History(context.Context, string, int, int) ([]*TranslationPolicy, error)
 	Put(context.Context, TranslationPolicyInput) (*TranslationPolicy, error)

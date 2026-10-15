@@ -1444,6 +1444,16 @@ no-text completion creates no translation evidence. A forgotten post retains
 does not select or overwrite entity fields. Scheduled callers must additionally
 fence the transaction through their durable job lease.
 
+Schema 1000120 adds `translation_policy_defaults` for optional namespace defaults
+and `source_post_translation_display` for a post's selected display language and
+bounded propagation cursor. Translation publication wakes an already selected
+display in the same transaction. The worker then updates matching inherited text
+in short transactions; a restart resumes the cursor. These records do not copy
+captions or retain caption versions. Original metadata and shared translated
+results remain separate. Source albums also use the selected translation at
+creation, and their derived alternate titles are deduplicated when translated.
+See [automatic translations and explicit text backfill](native-ingestion.md#automatic-source-translations).
+
 Application-authenticated inspection under `/api/v3/archive` is available at:
 
 | Route | Result |

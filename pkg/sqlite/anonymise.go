@@ -1140,7 +1140,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"catalog_cleanup_records", "catalog_cleanup_imports", "source_cleanup_intents",
 			"catalog_enrichment_records", "catalog_enrichment_imports",
 			"catalog_translation_records", "catalog_translation_imports",
-			"capture_translation_entries", "capture_translation_decisions", "translation_policy_revisions", "translation_policies",
+			"translation_policy_defaults", "source_post_translation_display", "capture_translation_entries", "capture_translation_decisions", "translation_policy_revisions", "translation_policies",
 			"translation_activation_targets", "translation_activations",
 			"automation_translation_records", "automation_translation_imports",
 			"catalog_snapshot_records", "catalog_snapshot_chunks", "catalog_snapshot_tables", "catalog_snapshots",

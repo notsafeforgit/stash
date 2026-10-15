@@ -65,6 +65,16 @@ func TestTranslationPolicyRoutesRequireReviewedRevisionsAndExposeCaptureDecision
 	request("GET", path+"/history?after=-1", nil, 400)
 	request("GET", "/collections/invalid/translation-policy", nil, 400)
 	request("PUT", path, map[string]any{"definition": map[string]any{"unexpected": true}}, 400)
+	defaultPath := "/translation-defaults/native:twitter"
+	require.JSONEq(t, "null", string(request("GET", defaultPath, nil, 200)))
+	defaultInput := models.TranslationPolicyDefault{Definition: models.TranslationPolicyDefinition{
+		Enabled: true, ProviderPolicy: models.TranslationBingTextV1, TargetLanguage: "en", Caption: true, ApplyToLibrary: true}}
+	var defaultPolicy models.TranslationPolicyDefault
+	require.NoError(t, json.Unmarshal(request("PUT", defaultPath, defaultInput, 200), &defaultPolicy))
+	require.Equal(t, 1, defaultPolicy.Revision)
+	request("PUT", defaultPath, defaultInput, 409)
+	request("GET", "/translation-defaults/invalid", nil, 400)
+	request("POST", "/posts/translation-backfill", models.TranslationBackfillInput{}, 400)
 	var decision *models.CaptureTranslationDecision
 	captureID := uuid.NewString()
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {

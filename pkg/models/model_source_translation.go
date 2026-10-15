@@ -48,6 +48,30 @@ type SourceTranslationQuery struct {
 	Limit          int
 }
 
+type SourcePostDisplay struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Language    string `json:"language,omitempty"`
+	Translated  bool   `json:"translated"`
+}
+
+type TranslationBackfillInput struct {
+	Posts          []string `json:"posts"`
+	TargetLanguage string   `json:"target_language"`
+	ProviderPolicy string   `json:"provider_policy"`
+	Priority       int      `json:"priority"`
+	ApplyToLibrary bool     `json:"apply_to_library"`
+	// An explicit repair may adopt only fields equal to retained source text or
+	// its generated heading. It cannot adopt clears or a different manual value.
+	AdoptMatchingText bool `json:"adopt_matching_text"`
+}
+
+type TranslationBackfillResult struct {
+	PostUUID   string `json:"post_uuid"`
+	Status     string `json:"status"`
+	TargetUUID string `json:"target_uuid,omitempty"`
+}
+
 var (
 	ErrSourceTranslationInvalid = errors.New("invalid retained source translation")
 	ErrSourceTranslationReplay  = errors.New("translation evidence UUID has different contents")
@@ -60,4 +84,7 @@ type SourceTranslationReaderWriter interface {
 	RecordEvidence(context.Context, SourceTranslationEvidence) (*SourceTranslationEvidence, error)
 	Evidence(context.Context, string) (*SourceTranslationEvidence, error)
 	PostEvidence(context.Context, SourceTranslationQuery) ([]SourceTranslationEvidence, error)
+	Display(context.Context, string, string, SourcePostMetadata) (*SourcePostDisplay, error)
+	Backfill(context.Context, TranslationBackfillInput, time.Time) ([]TranslationBackfillResult, error)
+	RefreshPending(context.Context, int) (int, error)
 }

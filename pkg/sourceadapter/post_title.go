@@ -59,3 +59,41 @@ func postTextHeading(text string, limit int) (string, bool) {
 	}
 	return strings.TrimSpace(string(runes[:end])), true
 }
+
+// MatchesPostText identifies copied source text and generated headings without
+// treating a different custom title/description as replaceable.
+func normalizedSourceText(value string) string {
+	return strings.TrimSpace(strings.NewReplacer("\\r\\n", "\n", "\\n", "\n", "\r\n", "\n", "\r", "\n").Replace(value))
+}
+
+func MatchesPostText(value, field, platform string, metadata models.SourcePostMetadata) bool {
+	value = normalizedSourceText(value)
+	if value == "" {
+		return false
+	}
+	if field == "details" {
+		return metadata.OriginalText != nil && value == normalizedSourceText(*metadata.OriginalText)
+	}
+	if metadata.Title != nil && value == normalizedSourceText(*metadata.Title) {
+		return true
+	}
+	if metadata.OriginalText != nil {
+		caption := normalizedSourceText(*metadata.OriginalText)
+		line, _, _ := strings.Cut(caption, "\n")
+		if value == caption || value == strings.Join(strings.Fields(line), " ") {
+			return true
+		}
+		// Earlier generated headings reserved one character for the ellipsis.
+		// Match their long source prefix without accepting short custom labels.
+		prefix := strings.TrimSuffix(value, "…")
+		if prefix != value && len([]rune(prefix)) >= 100 && len([]rune(value)) <= 201 && strings.HasPrefix(strings.Join(strings.Fields(line), " "), prefix) {
+			return true
+		}
+		metadata.OriginalText = &caption
+	}
+	title, truncated := PostTitle(platform, metadata, 512)
+	if truncated {
+		title += "…"
+	}
+	return value == title
+}

@@ -175,6 +175,12 @@ func (s *TranslationPolicyStore) ScheduleCapture(ctx context.Context, input mode
 	if err != nil {
 		return nil, err
 	}
+	if policy == nil && collection != nil && collection.Revision == input.CollectionRevision {
+		policy, err = s.initializeDefault(ctx, collection)
+		if err != nil {
+			return nil, err
+		}
+	}
 	input.CreatedAt = now.UTC()
 	ret := &models.CaptureTranslationDecision{CollectionCapture: input, Status: "no_policy", Entries: []models.CaptureTranslationEntry{}}
 	if policy != nil {
@@ -223,6 +229,11 @@ func (s *TranslationPolicyStore) captureEntries(ctx context.Context, scope model
 	}
 	if _, err := activePostLink(ctx, source.PostUUID); err != nil {
 		return nil, err
+	}
+	if policy.ApplyToLibrary {
+		if err := queueTranslationDisplay(ctx, source.PostUUID, policy.TargetLanguage, nil); err != nil {
+			return nil, err
+		}
 	}
 	var metadata models.SourcePostMetadata
 	if err := json.Unmarshal([]byte(source.Metadata), &metadata); err != nil {

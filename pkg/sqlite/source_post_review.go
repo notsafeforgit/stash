@@ -209,6 +209,15 @@ func readSourceReviewCapture(ctx context.Context, query string, args ...interfac
 	title, truncated := sourceadapter.PostTitle(row.Platform, models.SourcePostMetadata{
 		Title: stringPtr(row.Title), OriginalText: stringPtr(row.OriginalText),
 	}, 512)
+	display, err := (&SourceTranslationStore{}).Display(ctx, row.PostUUID, row.Platform, models.SourcePostMetadata{
+		Title: stringPtr(row.Title), OriginalText: stringPtr(row.OriginalText),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if display.Translated {
+		title, truncated = display.Title, false
+	}
 	if title == "" && (row.Platform == "twitter" || row.Platform == "x") {
 		title, err = sourcePostFallbackTitle(ctx, row.PostUUID, row.Platform)
 		if err != nil {

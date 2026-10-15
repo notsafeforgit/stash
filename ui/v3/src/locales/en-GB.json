@@ -3322,6 +3322,7 @@
     "attachments": "Use attachments",
     "attachments_help": "Clear the explicit post choice and use the existing attachment links. Retained file evidence alone does not select a link.",
     "content": "Post content",
+    "original_text": "Original text",
     "no_content": "No saved content for this post.",
     "published": "Published {date}",
     "published_unknown": "Publication date unknown",

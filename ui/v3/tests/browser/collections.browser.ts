@@ -109,6 +109,10 @@ async function archive(
       return route.fulfill({ json: account() });
     const [, id, tail] = path.split("/");
     if (path.startsWith("collections/") && id) {
+      if (tail === "studio" && route.request().method() === "GET")
+        return route.fulfill({
+          json: { collection_uuid: id, revision: 0, studio: null },
+        });
       if (route.request().method() === "PUT") {
         const input: CollectionInput = route.request().postDataJSON();
         writes.push(input);
@@ -308,6 +312,11 @@ test("recovers a committed save after reload without another PUT and loads histo
   await expect(
     page.getByText("Could not complete this step", { exact: true }),
   ).toBeVisible();
+  // Reload the saved mutation while unrelated debounced lookups are idle.
+  // WebKit reports navigation-aborted reads as access-control console errors.
+  await expect(page.locator('[role="combobox"][aria-busy="true"]')).toHaveCount(
+    0,
+  );
   await page.reload();
   await expect(
     page.getByRole("button", {

@@ -193,7 +193,8 @@ async function archive(page: Page) {
         album.slots = [];
       }
       result = album;
-    } else if (path.endsWith("/album"))
+    } else if (path.endsWith("/studios")) result = [];
+    else if (path.endsWith("/album"))
       result = postAlbumContext(postAlbum(), path.split("/")[1]);
     else throw new Error(`Unexpected selection read ${path}`);
     await route.fulfill({ json: result });

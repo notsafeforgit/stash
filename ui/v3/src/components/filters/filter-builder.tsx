@@ -726,11 +726,7 @@ export const FilterBuilder: React.FC<{
       {createPortal(
         <DragOverlay dropAnimation={null} modifiers={dragOverlayModifiers}>
           {draggedItem ? (
-            <FilterDragPreview
-              mode={mode}
-              draggedItem={draggedItem}
-              root={root}
-            />
+            <FilterDragPreview draggedItem={draggedItem} root={root} />
           ) : null}
         </DragOverlay>,
         document.body,

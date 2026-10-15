@@ -1,20 +1,14 @@
 import type React from "react";
 import { useMemo } from "react";
 import { useIntl } from "react-intl";
-import {
-  astCriterionOptions,
-  type FilterASTGroupNode,
-} from "src/models/list-filter/filter-ast";
-import type { FilterMode } from "src/core/generated-graphql";
+import type { FilterASTGroupNode } from "src/models/list-filter/filter-ast";
 import { type ASTDragItem, findASTNodePreview } from "./filter-builder-types";
 
 export const FilterDragPreview: React.FC<{
-  mode: FilterMode;
   draggedItem: ASTDragItem;
   root: FilterASTGroupNode;
-}> = ({ mode, draggedItem, root }) => {
+}> = ({ draggedItem, root }) => {
   const intl = useIntl();
-  const criterionOptions = useMemo(() => astCriterionOptions(mode), [mode]);
   const preview = useMemo(
     () => findASTNodePreview(root, draggedItem.nodeId),
     [draggedItem.nodeId, root],
@@ -43,12 +37,9 @@ export const FilterDragPreview: React.FC<{
     );
   }
 
-  const fieldOption = criterionOptions.find(
-    (option) => option.type === preview.field,
-  );
-  const fieldLabel = fieldOption
-    ? intl.formatMessage({ id: fieldOption.messageID })
-    : preview.field;
+  const fieldLabel = intl.formatMessage({
+    id: preview.criterion.criterionOption.messageID,
+  });
 
   return (
     <div className="filter-drag-overlay">

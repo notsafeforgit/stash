@@ -70,6 +70,13 @@ Errors retain that position with Retry; a changed membership signature suspends
 playback until the gallery is reloaded. Dismissal uses the same lightbox history
 and animation handling as scene lists, preserving the loaded gallery grid.
 
+Gallery list cards also use this paginated viewer whenever the gallery contains
+scenes, including galleries with no images. The View gallery action is available
+for either media kind. Its deferred loader shares `useGalleryMediaPages` with the
+detail view, starts reading on open, and cancels pending reads on close. Closing
+preserves the parent list and does not refetch it. Image-only galleries retain
+their image slideshow preferences and scrubbed-image starting position.
+
 `playbackKey` identifies the selected scene/marker independently of media ownership.
 Selection changes reset source preferences, clip offsets, poster/started latches,
 zoom and recovery state before the new playback becomes active. Quality changes

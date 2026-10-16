@@ -5,6 +5,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { MediaLightbox } from "@/components/lightbox/scene-lightbox";
 import type { LightboxSlide, SceneSlide } from "@/components/lightbox";
 import type { AlbumReadPage } from "@/components/archive/albums/read";
+import { PostEmpty } from "@/components/archive/posts/shared";
 import { NativeArchiveError } from "@/core/native-archive/client";
 import {
   GalleryMediaReadError,
@@ -37,7 +38,7 @@ export default function GalleryMediaPlayback({
     (data !== undefined && data.signature !== signature) ||
     (error instanceof NativeArchiveError && error.code === "album_changed");
   const slides = useMemo<(LightboxSlide | SceneSlide)[]>(() => {
-    if (changed) return [PENDING];
+    if (changed || !data?.items.length) return [PENDING];
     const items = (data?.items ?? []).map(
       (item): LightboxSlide | SceneSlide => {
         if (item.scene)
@@ -94,12 +95,19 @@ export default function GalleryMediaPlayback({
           </Alert>
         ) : error !== undefined ? (
           <GalleryMediaReadError error={error} retry={() => void onMore()} />
+        ) : data?.header.count === 0 ? (
+          <PostEmpty
+            title={msg(
+              "gallery_media.empty",
+              "No images or scenes in this gallery",
+            )}
+          />
         ) : (
           <Spinner className="size-10 text-white/70" />
         )}
       </div>
     ),
-    [changed, error, onMore, msg],
+    [changed, error, onMore, msg, data?.header.count],
   );
   return (
     <MediaLightbox

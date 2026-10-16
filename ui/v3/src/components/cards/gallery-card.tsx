@@ -187,21 +187,27 @@ export const GalleryCard: React.FC<GalleryCardProps> = ({
           </span>
         )
       )}
-      {onPreview && gallery.image_count > 0 && (
+      {onPreview && gallery.image_count + gallery.scenes.length > 0 && (
         <Button
           type="button"
           variant="ghost"
           size="icon-sm"
           className="absolute bottom-1.5 right-1.5 z-20 bg-black/60 text-white/85 hover:bg-black/75 hover:text-white"
-          title="Open slideshow"
-          aria-label="Open slideshow"
+          title={intl.formatMessage({
+            id: "gallery_media.view",
+            defaultMessage: "View gallery",
+          })}
+          aria-label={intl.formatMessage({
+            id: "gallery_media.view",
+            defaultMessage: "View gallery",
+          })}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
             onPreview(scrubIndex ?? 0);
           }}
         >
-          <Search className="size-4" />
+          <Search />
         </Button>
       )}
     </EntityCard.Preview>

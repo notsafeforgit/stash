@@ -69,10 +69,8 @@ export function GalleryMediaReadError({
   );
 }
 
-export function GalleryMedia({ id }: { id: string }) {
-  const msg = useMsg();
+export function useGalleryMediaPages(id: string) {
   const client = useApolloClient();
-  const { setCover, pending: coverPending } = useGalleryCover(id);
   const load = useCallback(
     async (offset: number | undefined, signal: AbortSignal) => {
       const response = await client.query({
@@ -94,7 +92,13 @@ export function GalleryMedia({ id }: { id: string }) {
     },
     [client, id],
   );
-  const result = useAlbumPages(load);
+  return useAlbumPages(load);
+}
+
+export function GalleryMedia({ id }: { id: string }) {
+  const msg = useMsg();
+  const { setCover, pending: coverPending } = useGalleryCover(id);
+  const result = useGalleryMediaPages(id);
   const [playback, setPlayback] = useState<{
     index: number;
     signature: string;

@@ -5,6 +5,7 @@ import { playbackImage, playbackScene } from "../fixtures/album-playback";
 import type { GalleryMediaItem } from "../../src/components/detail/gallery-media";
 import type {
   FindGalleryCoverQuery,
+  GalleryDataFragment,
   SetGalleryCoverMutationVariables,
 } from "../../src/core/generated-graphql";
 
@@ -17,12 +18,15 @@ async function fixture(
     failNext?: boolean;
     failCover?: boolean;
     failScene?: boolean;
+    failFirst?: boolean;
+    waitFirst?: Promise<void>;
   } = {},
 ) {
   const pages: number[] = [];
   const coverWrites: SetGalleryCoverMutationVariables[] = [];
   const coverReads: string[] = [];
   const detailReads: string[] = [];
+  const listReads: string[] = [];
   let selected: SetGalleryCoverMutationVariables | undefined;
   const image = (id: string): GalleryMediaItem => ({
     __typename: "GalleryMediaItem",
@@ -62,6 +66,59 @@ async function fixture(
       return route.fulfill({ json: { data: { setGalleryCover: true } } });
     }
     expect(body.query.trim().startsWith("query")).toBe(true);
+    if (body.operationName === "FindSavedFilters") {
+      return route.fulfill({ json: { data: { findSavedFilters: [] } } });
+    }
+    if (
+      body.operationName === "FindGalleries" ||
+      body.operationName === "FindGallery"
+    ) {
+      listReads.push(body.operationName);
+      const gallery: GalleryDataFragment = {
+        __typename: "Gallery",
+        id: "12",
+        title: "Mixed gallery",
+        alternate_titles: [],
+        created_at: "2026-10-15T00:00:00Z",
+        updated_at: "2026-10-15T00:00:00Z",
+        code: null,
+        date: null,
+        urls: [],
+        details: null,
+        photographer: null,
+        rating100: null,
+        organized: false,
+        files: [],
+        folder: null,
+        image_count: options.videoOnly ? 0 : 2,
+        chapters: [],
+        studio: null,
+        tags: [],
+        performers: [],
+        scenes: [playbackScene(route.request().url())],
+        paths: {
+          __typename: "GalleryPathsType",
+          cover: playbackImage().paths.thumbnail ?? "",
+          preview: "",
+        },
+        cover: null,
+        custom_fields: {},
+      };
+      return route.fulfill({
+        json: {
+          data:
+            body.operationName === "FindGalleries"
+              ? {
+                  findGalleries: {
+                    __typename: "FindGalleriesResultType",
+                    count: 1,
+                    galleries: [gallery],
+                  },
+                }
+              : { findGallery: gallery },
+        },
+      });
+    }
     if (body.operationName === "FindGalleryCover") {
       coverReads.push(body.variables.id);
       const src = playbackImage().paths.thumbnail;
@@ -101,6 +158,12 @@ async function fixture(
     if (body.operationName === "FindGalleryMedia") {
       const offset = body.variables.offset;
       pages.push(offset);
+      if (!offset && options.waitFirst) await options.waitFirst;
+      if (!offset && options.failFirst) {
+        return route.fulfill({
+          json: { errors: [{ message: "Read temporarily unavailable" }] },
+        });
+      }
       if (offset && options.failNext) {
         options.failNext = false;
         return route.fulfill({
@@ -154,8 +217,122 @@ async function fixture(
     }
     throw new Error(`Unexpected GraphQL operation ${body.operationName}`);
   });
-  return { pages, coverWrites, coverReads, detailReads };
+  return { pages, coverWrites, coverReads, detailReads, listReads };
 }
+
+for (const videoOnly of [false, true]) {
+  test(`gallery list opens ${videoOnly ? "video-only" : "mixed"} galleries in the media lightbox`, async ({
+    page,
+  }) => {
+    const state = await fixture(page, { videoOnly });
+    await page.goto("/gallery-list");
+    const card = page.locator(".gallery-card");
+    await expect(card).toBeVisible();
+    expect(state.pages).toEqual([]);
+    expect(state.detailReads).toEqual([]);
+    await card
+      .getByRole("button", { name: "View gallery", exact: true })
+      .click();
+    const viewer = page.getByRole("dialog", { name: "Lightbox", exact: true });
+    if (!videoOnly) {
+      await expect(
+        viewer.locator(".yarl__slide_current img.yarl__slide_image"),
+      ).toBeVisible();
+      expect(state.detailReads).not.toContain("scene:8");
+      await viewer.getByRole("button", { name: "Next", exact: true }).click();
+    }
+    const video = viewer.locator("video");
+    await expect(video).toHaveCount(1);
+    await expect
+      .poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState))
+      .toBeGreaterThanOrEqual(2);
+    await video.evaluate((node: HTMLVideoElement) => node.play());
+    await expect
+      .poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime))
+      .toBeGreaterThan(0.1);
+    if (!videoOnly) {
+      await viewer.getByRole("button", { name: "Next", exact: true }).click();
+      await expect(viewer.getByText("3 / 3", { exact: true })).toBeVisible();
+      await expect(video).toBeHidden();
+      await expect(video).toHaveJSProperty("paused", true);
+      await expect(video).not.toHaveAttribute("src", /.+/);
+      // StrictMode can start and cancel the initial page before remounting.
+      expect([...new Set(state.pages)]).toEqual([0, 2]);
+      expect(state.pages.filter((offset) => offset === 2)).toHaveLength(1);
+    } else {
+      expect([...new Set(state.pages)]).toEqual([0]);
+    }
+    await page.screenshot({
+      path: test
+        .info()
+        .outputPath(`gallery-list-${videoOnly ? "video" : "mixed"}.png`),
+      animations: "disabled",
+    });
+    const reads = state.listReads.length;
+    await page.keyboard.press("Escape");
+    await expect(viewer).toHaveCount(0);
+    await expect(card).toBeVisible();
+    expect(state.listReads).toHaveLength(reads);
+    await expect(page).toHaveURL(/\/gallery-list$/);
+  });
+}
+
+test("gallery list can retry the first media page without navigating away", async ({
+  page,
+}) => {
+  const options = { failFirst: true };
+  const state = await fixture(page, options);
+  await page.goto("/gallery-list");
+  await page.getByRole("button", { name: "View gallery", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Lightbox", exact: true });
+  await expect(
+    viewer.getByText("Could not load gallery media", { exact: true }),
+  ).toBeVisible();
+  const initialReads = state.pages.length;
+  options.failFirst = false;
+  await viewer.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(
+    viewer.locator(".yarl__slide_current img.yarl__slide_image"),
+  ).toBeVisible();
+  expect(state.pages).toHaveLength(initialReads + 1);
+  expect([...new Set(state.pages)]).toEqual([0]);
+});
+
+test("closing a gallery list preview while loading does not reopen it", async ({
+  page,
+}) => {
+  let release: () => void = () => {};
+  const waitFirst = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const state = await fixture(page, { waitFirst });
+  await page.goto("/gallery-list");
+  await page.getByRole("button", { name: "View gallery", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Lightbox", exact: true });
+  await expect(viewer).toBeVisible();
+  await expect.poll(() => state.pages.length).toBeGreaterThan(0);
+  await page.keyboard.press("Escape");
+  await expect(viewer).toHaveCount(0);
+  const initialReads = state.pages.length;
+  release();
+  await page.getByRole("button", { name: "View gallery", exact: true }).click();
+  await expect(
+    viewer.locator(".yarl__slide_current img.yarl__slide_image"),
+  ).toBeVisible();
+  expect(state.pages.length).toBeGreaterThan(initialReads);
+  expect([...new Set(state.pages)]).toEqual([0]);
+});
+
+test("gallery list reports an emptied gallery instead of loading forever", async ({
+  page,
+}) => {
+  await fixture(page, { empty: true });
+  await page.goto("/gallery-list");
+  await page.getByRole("button", { name: "View gallery", exact: true }).click();
+  await expect(
+    page.getByText("No images or scenes in this gallery", { exact: true }),
+  ).toBeVisible();
+});
 
 for (const desktop of [false, true]) {
   test(`gallery shows and plays images and scenes together on ${desktop ? "desktop" : "mobile"}`, async ({

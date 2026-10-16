@@ -50,6 +50,8 @@ import {
 import type { DeleteOptions } from "src/components/detail/delete-dialog";
 import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
 import { useConfigurationContextOptional } from "src/hooks/config";
+import { deferredOverlay } from "@/components/shared/deferred-overlay";
+import { LightboxPending } from "@/components/lightbox/lightbox-pending";
 import {
   selectionColumn,
   thumbnailColumn,
@@ -581,8 +583,15 @@ export function useImageListConfig(
 
 // ── useGalleryListConfig ───────────────────────────────────────────────────────
 
-function useGalleryImageLightbox() {
+const GalleryMediaLightbox = deferredOverlay(
+  () => import("@/components/detail/gallery-media-lightbox"),
+  (props) => ({ open: true, onClose: props.onClose }),
+  LightboxPending,
+);
+
+function useGalleryLightbox() {
   const pageSize = 40;
+  const [mediaGalleryId, setMediaGalleryId] = useState<string | null>(null);
   const [fetchImages] = useLazyQuery(GQL.FindImagesDocument);
   const [destroyImage] = useEntityMutation(GQL.ImageDestroyDocument);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -665,6 +674,12 @@ function useGalleryImageLightbox() {
 
   const openGalleryLightbox = useCallback(
     (gallery: GalleryItem, index = 0, autoplay = false) => {
+      if (gallery.scenes.length > 0) {
+        setLightboxOpen(false);
+        setMediaGalleryId(gallery.id);
+        return;
+      }
+      setMediaGalleryId(null);
       const page = Math.floor(index / pageSize) + 1;
       const pageIndex = index % pageSize;
       const totalCount = gallery.image_count || undefined;
@@ -771,7 +786,13 @@ function useGalleryImageLightbox() {
     [destroyImage],
   );
 
-  const lightboxElement = lightboxOpen ? (
+  const lightboxElement = mediaGalleryId ? (
+    <GalleryMediaLightbox
+      key={mediaGalleryId}
+      id={mediaGalleryId}
+      onClose={() => setMediaGalleryId(null)}
+    />
+  ) : lightboxOpen ? (
     <Lightbox
       open
       onClose={() => setLightboxOpen(false)}
@@ -786,7 +807,11 @@ function useGalleryImageLightbox() {
     />
   ) : null;
 
-  return { openGalleryLightbox, lightboxElement, lightboxOpen };
+  return {
+    openGalleryLightbox,
+    lightboxElement,
+    lightboxOpen: lightboxOpen || mediaGalleryId !== null,
+  };
 }
 
 export function useGalleryListConfig(onEdit: (id: string) => void): {
@@ -802,7 +827,7 @@ export function useGalleryListConfig(onEdit: (id: string) => void): {
   const autostartGallerySlideshow =
     ctx?.configuration.ui.autostartGallerySlideshow ?? false;
   const { openGalleryLightbox, lightboxElement, lightboxOpen } =
-    useGalleryImageLightbox();
+    useGalleryLightbox();
 
   const renderCard = useCallback(
     (

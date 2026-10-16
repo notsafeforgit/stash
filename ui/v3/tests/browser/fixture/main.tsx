@@ -5,7 +5,7 @@ import { ReviewQueueFixture } from "./review-queue";
 import { reviewQueueSearchSchema } from "@/core/native-archive/review-queue-api";
 import { savedActionSearchSchema } from "@/core/native-archive/saved-actions";
 import { SourceAlbumsFixture } from "./source-albums";
-import { GalleryMediaFixture } from "./gallery-media";
+import { GalleryMediaFixture, GalleryListFixture } from "./gallery-media";
 import { PerformerSourcesFixture } from "./performer-sources";
 import { SourcePostsFixture } from "./source-posts";
 import { ArchiveActivityFixture } from "./archive-activity";
@@ -365,6 +365,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/lightbox-list",
       component: LightboxListFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/gallery-list",
+      component: GalleryListFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

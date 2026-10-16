@@ -189,6 +189,31 @@ clock. Play remains in the input gesture and handles cancellation by a newer
 pause or seek. Marker replay and temporary scrub pauses retain their own seek
 behavior. Browser tests verify pause/resume does not introduce seeks or reloads.
 
+### On-demand cover selection
+
+Scene Operations → **Choose thumbnail** opens an independent still-frame picker
+at the current playback position (or the saved/default cover time). It does not
+seek, pause, refetch or replace the playing scene. It initially decodes up to 25
+consecutive frames; the slider and filmstrip select those frames without further
+requests. Wider view/Whole video use nine sparse samples, and Zoom in narrows the
+range before returning to individual frames. Sparse samples are seeked separately,
+so selecting a cover never requires decoding or creating a sprite for a full movie.
+
+The authenticated `GET /scene/{uuid}/frame-previews?start=…&end=…&mode=frames|samples`
+returns small JPEGs and source timestamps. Frame mode starts at `start` and returns
+at most 25 consecutive frames (fewer at EOF); `end` bounds the overview in sample
+mode. Actual decoder PTS establish selection times, including variable-frame-rate
+sources; no average-FPS frame numbering is used. Final cover generation independently
+extracts the chosen time through the existing HDR-capable cover pipeline. Picker
+JPEGs are tone-mapped SDR previews, not the final cover renditions.
+
+Preview extraction is cancelled on close/range changes, bounded to two concurrent
+requests, two decoder threads and a 60-second deadline. Each image's longest edge
+is at most 480 pixels. Subprocess output is bounded. Previews live only in request
+and dialog memory, are served with `no-store`, and disappear on close; they never
+enter the database, generated-artwork store, backups or persistent sprite cache.
+This feature does not expand the playback buffer or enable library-wide sprites.
+
 ## Playback invariants
 
 - Scene time is absolute. A clip's media time is relative to its segment-aligned

@@ -54,6 +54,9 @@ export const SceneGenerateDialog = deferredDialog(async () => ({
 export const SceneCoverResetDialog = deferredDialog(async () => ({
   default: (await import("./scene-cover-reset-dialog")).SceneCoverResetDialog,
 }));
+export const SceneThumbnailPicker = deferredDialog(async () => ({
+  default: (await import("./scene-thumbnail-picker")).SceneThumbnailPicker,
+}));
 export const ImageGenerateDialog = deferredDialog(async () => ({
   default: (await import("./image-generate-dialog")).ImageGenerateDialog,
 }));

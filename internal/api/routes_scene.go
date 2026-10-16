@@ -109,6 +109,7 @@ func (rs sceneRoutes) Routes() chi.Router {
 		r.Get("/download/progress", rs.DownloadProgress)
 
 		r.Get("/screenshot", rs.Screenshot)
+		r.Get("/frame-previews", rs.FramePreviews)
 		r.Get("/preview", rs.Preview)
 		r.Get("/webp", rs.Webp)
 		r.Get("/vtt/chapter", rs.VttChapter)

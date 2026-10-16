@@ -44,6 +44,7 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	var lostBegin, lostChunk, lostEvidence, lostRelations, lostPublisher, lostAttachment atomic.Bool
 	var lostMediaBegin, lostMediaAdvance, lostMembership, lostDocument, lostTranslation, lostEnrichment atomic.Bool
 	var lostFileHistory, lostCleanup atomic.Bool
+	membershipBatch := make(chan []models.CatalogMembershipRecord, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("ApiKey") != "fixture-application-key" || r.Header.Get("Authorization") != "" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -76,6 +77,19 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 				} else if progress.State != "running" || progress.Processed != 50 {
 					t.Errorf("expected bounded first mapping transaction, got %+v", progress)
 				}
+			}
+			if strings.HasSuffix(r.URL.Path, "/membership-import") {
+				var rows []models.CatalogMembershipRecord
+				err := repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+					parts := strings.Split(r.URL.Path, "/")
+					var err error
+					rows, err = repo.CatalogMembershipImport.Records(ctx, parts[len(parts)-2], 0, 1)
+					return err
+				})
+				if err != nil {
+					t.Error(err)
+				}
+				membershipBatch <- rows
 			}
 			connection, _, err := w.(http.Hijacker).Hijack()
 			if err != nil {
@@ -110,19 +124,21 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	require.True(t, lostMediaBegin.Load())
 	require.True(t, lostMediaAdvance.Load())
 	require.True(t, lostMembership.Load())
+	pendingMembers := <-membershipBatch
+	require.Len(t, pendingMembers, 1)
+	membershipCollection, membershipPost, membershipOrdinal := *pendingMembers[0].CollectionUUID, *pendingMembers[0].PostUUID, pendingMembers[0].Ordinal
 	require.True(t, lostDocument.Load())
 	require.True(t, lostTranslation.Load())
 	require.True(t, lostEnrichment.Load())
 	require.True(t, lostFileHistory.Load())
 	require.True(t, lostCleanup.Load())
-	var relationOrdinal, publisherOrdinal, attachmentOrdinal, mediaOrdinal, membershipOrdinal, documentOrdinal int64
+	var relationOrdinal, publisherOrdinal, attachmentOrdinal, mediaOrdinal, documentOrdinal int64
 	var translation models.CatalogTranslationRecord
 	var enrichment models.CatalogEnrichmentRecord
 	var fileHistory models.CatalogFileHistoryRecord
 	var history *models.SourceFileHistory
 	var cleanup models.CatalogCleanupRecord
 	var intent *models.SourceCleanupIntent
-	var membershipCollection, membershipPost string
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		receipt, err := repo.CatalogSnapshot.Find(ctx, snapshot)
 		require.NoError(t, err)
@@ -149,8 +165,11 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		mediaOrdinal = media[0].Ordinal
 		memberships, err := repo.CatalogMembershipImport.Records(ctx, snapshot, 0, 1)
 		require.NoError(t, err)
-		require.Len(t, memberships, 1)
-		membershipOrdinal = memberships[0].Ordinal
+		require.Empty(t, memberships)
+		completed, err := repo.CatalogMembershipImport.Find(ctx, snapshot)
+		require.NoError(t, err)
+		require.Equal(t, "mapped", completed.State)
+		require.EqualValues(t, 55, completed.MappedRecords)
 		documents, err := repo.CatalogDocumentImport.Records(ctx, snapshot, 0, 1)
 		require.NoError(t, err)
 		require.Len(t, documents, 1)
@@ -178,7 +197,6 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, history.Locations[0].ObservationUUID)
 		require.Nil(t, history.Locations[1].ObservationUUID)
-		membershipCollection, membershipPost = *memberships[0].CollectionUUID, *memberships[0].PostUUID
 		return nil
 	}))
 	for _, test := range []struct {
@@ -279,7 +297,7 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		{"GET", "/catalog-snapshots/" + snapshot + "/evidence-import/records?after=-1", "", 400},
 		{"POST", "/catalog-snapshots/" + snapshot + "/evidence-import", "application/json", 400},
 		{"POST", "/catalog-snapshots/" + snapshot + "/evidence-import", "text/plain", 400},
-		{"GET", "/collections/" + membershipCollection + "/post-memberships?limit=1", "", 200},
+		{"GET", "/collections/" + membershipCollection + "/post-memberships?limit=1", "", 404},
 		{"GET", "/posts/" + membershipPost + "/collection-memberships?limit=1", "", 200},
 		{"GET", "/posts/" + membershipPost + "/collection-memberships?limit=101", "", 400},
 		{"GET", "/collections/" + membershipCollection + "/post-memberships?after=invalid", "", 400},
@@ -299,7 +317,7 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import/records?limit=1", "", 200},
 		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import/records?limit=101", "", 400},
 		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import/records?after=-1", "", 400},
-		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import/records/" + strconv.FormatInt(membershipOrdinal, 10), "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import/records/" + strconv.FormatInt(membershipOrdinal, 10), "", 404},
 		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import/records/0", "", 400},
 		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import/records/999999", "", 404},
 		{"POST", "/catalog-snapshots/" + snapshot + "/membership-import", "application/json", 400},

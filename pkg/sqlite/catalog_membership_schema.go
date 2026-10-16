@@ -3,6 +3,7 @@ package sqlite
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -33,7 +34,7 @@ func validateCatalogMembershipSchema(conn *sqlx.DB, auditData bool) error {
 	if !auditData {
 		return nil
 	}
-	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_collection_post_evidence e
+	query := `SELECT EXISTS(SELECT 1 FROM source_collection_post_evidence e
  LEFT JOIN source_posts p ON p.uuid=e.post_uuid
  LEFT JOIN source_collection_revisions c ON c.collection_uuid=e.collection_uuid AND c.revision=e.collection_revision
  WHERE p.uuid IS NULL OR c.collection_uuid IS NULL)
@@ -65,8 +66,23 @@ func validateCatalogMembershipSchema(conn *sqlx.DB, auditData bool) error {
   OR m.collection_revision IS NOT g.collection_revision OR m.origin IS NOT 'migration' OR m.basis IS NOT 'catalog-membership'
   OR g.source_kind IS NOT json_extract(e.data,'$.values.kind') OR g.source_label IS NOT json_extract(e.data,'$.values.label')
   OR json_extract(m.details,'$.snapshot_uuid') IS NOT r.snapshot_uuid OR json_extract(m.details,'$.source_ordinal') IS NOT r.ordinal
-  OR json_extract(m.details,'$.source_sha256') IS NOT e.data_sha256)))`)
-	if err != nil {
+  OR json_extract(m.details,'$.source_sha256') IS NOT e.data_sha256)))`
+	var compactable bool
+	if err := conn.Get(&compactable, `SELECT EXISTS(SELECT 1 FROM pragma_table_info('catalog_snapshots') WHERE name='memberships_compacted')`); err != nil {
+		return err
+	}
+	if compactable {
+		// Completed aggregate receipts still prove the input was handled. Only
+		// deliberately compacted, fully mapped snapshots may omit per-row receipts.
+		query = strings.Replace(query, "OR i.source_records!=(SELECT count(*)", "OR (s.memberships_compacted=0 AND (i.source_records!=(SELECT count(*)", 1)
+		query = strings.Replace(query, "OR (i.state='mapped' AND i.review_records!=0)", `)) OR (s.memberships_compacted=1 AND (
+   i.state!='mapped' OR i.review_records!=0 OR i.processed_records!=i.source_records OR i.mapped_records!=i.source_records
+   OR i.source_records!=json_extract(CAST(s.manifest AS TEXT),'$.tables.memberships.rows')
+   OR EXISTS(SELECT 1 FROM catalog_membership_records r WHERE r.snapshot_uuid=i.snapshot_uuid)
+   OR EXISTS(SELECT 1 FROM catalog_snapshot_records r WHERE r.snapshot_uuid=i.snapshot_uuid AND r.source_table='memberships')))
+   OR (i.state='mapped' AND i.review_records!=0)`, 1)
+	}
+	if err := conn.Get(&invalid, query); err != nil {
 		return err
 	}
 	if invalid {

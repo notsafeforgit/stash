@@ -25,7 +25,9 @@ func (s *CapturePublisherStore) CatalogAssociationPosts(ctx context.Context, aft
  WHERE post_uuid>? AND origin='migration' AND basis='catalog-posts' GROUP BY post_uuid ORDER BY post_uuid LIMIT ?)
  UNION SELECT post_uuid FROM (SELECT post_uuid FROM source_collection_post_evidence
  WHERE post_uuid>? AND origin='migration' AND basis='catalog-membership' GROUP BY post_uuid ORDER BY post_uuid LIMIT ?)
-) ORDER BY post_uuid LIMIT ?`, after, limit, after, limit, limit)
+ UNION SELECT post_uuid FROM (SELECT post_uuid FROM source_post_import_labels
+ WHERE post_uuid>? AND kind='directory' GROUP BY post_uuid ORDER BY post_uuid LIMIT ?)
+) ORDER BY post_uuid LIMIT ?`, after, limit, after, limit, after, limit, limit)
 	return ids, err
 }
 
@@ -61,14 +63,16 @@ func catalogAssociationEvidence(ctx context.Context, post string, ret *models.Ca
 		ret.Evidence = append(ret.Evidence, "catalog-post:"+claim.UUID)
 	}
 	var folders []struct {
-		UUID  string `db:"uuid"`
 		Label string `db:"label"`
 	}
-	if err := dbWrapper.Select(ctx, &folders, `SELECT e.uuid,d.label
+	if err := dbWrapper.Select(ctx, &folders, `SELECT d.label
  FROM source_post_identities i CROSS JOIN source_collection_post_evidence e ON e.post_uuid=i.post_uuid
  JOIN source_collection_revisions d ON d.collection_uuid=e.collection_uuid AND d.revision=e.collection_revision
  WHERE i.canonical_uuid=? AND e.origin='migration' AND e.basis='catalog-membership' AND d.kind='directory'
- ORDER BY e.uuid LIMIT ?`, post, catalogAssociationLimit+1); err != nil {
+ UNION SELECT h.label FROM source_post_identities i
+ JOIN source_post_import_labels h ON h.post_uuid=i.post_uuid
+ WHERE i.canonical_uuid=? AND h.kind='directory'
+ ORDER BY label LIMIT ?`, post, post, catalogAssociationLimit+1); err != nil {
 		return err
 	}
 	if len(folders) > catalogAssociationLimit {
@@ -161,7 +165,7 @@ func catalogAssociationEvidence(ctx context.Context, post string, ret *models.Ca
 			}
 		}
 		ret.Candidates = append(ret.Candidates, matched...)
-		ret.Evidence = append(ret.Evidence, "directory:"+folder.UUID+":"+folder.Label)
+		ret.Evidence = append(ret.Evidence, "directory:"+folder.Label)
 	}
 	slices.Sort(ret.Candidates)
 	ret.Candidates = slices.Compact(ret.Candidates)

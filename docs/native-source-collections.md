@@ -25,8 +25,17 @@ Active (or Disabled to restore without allowing ingestion) and save. Restoration
 appends a definition revision, preserving the UUID, media associations and
 history. Stale revisions still conflict. This does not resurrect deleted media.
 
-An imported catalog collection groups previously collected posts and files. Its
-state is independent of the account's live profile subscription. Each Reddit
+Historical membership-only groups are removed after a complete catalog import.
+Useful directory/subreddit names and studio attribution remain on the posts;
+the completed aggregate receipt prevents a retry from recreating the groups.
+Unfinished or unresolved imports, groups edited by a user, and collections with
+other consumers are preserved. Native migration 1000121 also performs this
+cleanup for previously completed imports in the same database transaction.
+It does not delete posts, captures, translations, media, or active subscriptions.
+
+An imported catalog collection that still holds file observations or metadata
+policies remains a functional scope. Its state is independent of the account's
+live profile subscription. Each Reddit
 profile has one source URL, such as `https://www.reddit.com/user/example/`.
 New/top submissions and author-search passes are execution details of that source;
 they are not separate editable subscriptions. Pausing or retiring the profile

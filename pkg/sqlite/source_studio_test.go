@@ -153,6 +153,7 @@ INSERT INTO studios(id,name,created_at,updated_at) VALUES(191,'Second studio',da
 
 func removeSourceStudioSchema(t *testing.T, db *sql.DB) {
 	t.Helper()
+	removeMembershipCleanupSchema(t, db)
 	_, err := db.Exec("DROP TABLE IF EXISTS source_post_translation_display; DROP TABLE IF EXISTS translation_policy_defaults; DELETE FROM native_migration_history WHERE version=1000120")
 	require.NoError(t, err)
 	if queryUint(t, db, "SELECT count(*) FROM sqlite_schema WHERE name='source_collection_studios'") == 0 {

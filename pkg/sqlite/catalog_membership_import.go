@@ -226,6 +226,15 @@ func (s *CatalogMembershipImportStore) Advance(ctx context.Context, id, expected
 	if err != nil {
 		return nil, err
 	}
+	if prior.State == "mapped" {
+		tx, err := getTx(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := compactCatalogMemberships(ctx, tx, w.snapshot.SourceUUID); err != nil {
+			return nil, err
+		}
+	}
 	ret, err := s.Find(ctx, id)
 	*complete = err == nil
 	return ret, err

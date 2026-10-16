@@ -263,10 +263,12 @@ def run():
     memberships = CatalogMembershipClient(setup["endpoint"])
     original_members = memberships.request("GET", f"/{setup['snapshot']}/membership-import/records", None, prepared["manifest_sha256"], "application/json")
     copied_members = memberships.request("GET", f"/{copied_snapshot}/membership-import/records", None, copied["manifest_sha256"], "application/json")
-    assert len(original_members) == len(copied_members) == 55
-    assert {row["collection_uuid"] for row in original_members} == {row["collection_uuid"] for row in copied_members}
-    assert {row["post_uuid"] for row in original_members} == {row["post_uuid"] for row in copied_members}
-    assert not ({row["membership_uuid"] for row in original_members} & {row["membership_uuid"] for row in copied_members})
+    # Completed inputs keep aggregate progress, not synthetic disabled groups
+    # or a separate per-post membership receipt for every repeated import.
+    assert original_members == copied_members == []
+    for snapshot_id, sha in ((setup["snapshot"], prepared["manifest_sha256"]), (copied_snapshot, copied["manifest_sha256"])):
+        receipt = memberships.request("GET", f"/{snapshot_id}/membership-import", None, sha, "application/json")
+        assert receipt["state"] == "mapped" and receipt["mapped_records"] == 55
     client = CatalogEvidenceClient(setup["endpoint"])
     def capture_ids(snapshot_uuid, manifest_sha):
         rows = client.request("GET", f"/{snapshot_uuid}/evidence-import/records", None, manifest_sha, "application/json")

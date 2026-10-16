@@ -67,7 +67,7 @@ func advanceMembershipImport(t *testing.T, f *catalogSnapshotFixture, after int6
 	return result
 }
 
-func TestCatalogMembershipImportPreservesGroupsWithoutAttribution(t *testing.T) {
+func TestCatalogMembershipImportRetainsReviewedGroupsWithoutAttribution(t *testing.T) {
 	f := membershipImportFixture(t, 55, nil)
 	raw := openRawDB(t, f.db.DatabasePath())
 	defer raw.Close()
@@ -79,6 +79,11 @@ func TestCatalogMembershipImportPreservesGroupsWithoutAttribution(t *testing.T) 
 	first := advanceMembershipImport(t, f, 0)
 	require.Equal(t, "running", first.State)
 	require.EqualValues(t, 50, first.ProcessedRecords)
+	// A group deliberately configured after import must remain, together with
+	// the incomplete snapshot that still refers to it.
+	var reviewed string
+	require.NoError(t, raw.QueryRow("SELECT collection_uuid FROM catalog_membership_groups ORDER BY collection_uuid LIMIT 1").Scan(&reviewed))
+	putSourceCollection(t, f.repo, models.SourceCollectionInput{UUID: reviewed, ExpectedRevision: 1, Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{Label: "Reviewed grouping", Kind: "collection", State: "disabled"}})
 	require.NoError(t, f.db.Close())
 	require.NoError(t, f.db.Open(f.db.DatabasePath()))
 	result := advanceMembershipImport(t, f, first.LastOrdinal)
@@ -124,7 +129,9 @@ func TestCatalogMembershipImportPreservesGroupsWithoutAttribution(t *testing.T) 
 	}))
 	// Later review can rename or retire the group without rewriting its
 	// historical definition or the observed memberships bound to it.
-	putSourceCollection(t, f.repo, models.SourceCollectionInput{UUID: recorded.CollectionUUID, ExpectedRevision: 1, Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{Label: "Reviewed grouping", Kind: "collection", State: "retired"}})
+	var currentRevision int
+	require.NoError(t, raw.QueryRow("SELECT revision FROM source_collections WHERE uuid=?", recorded.CollectionUUID).Scan(&currentRevision))
+	putSourceCollection(t, f.repo, models.SourceCollectionInput{UUID: recorded.CollectionUUID, ExpectedRevision: currentRevision, Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{Label: "Reviewed grouping", Kind: "collection", State: "retired"}})
 	require.NoError(t, f.db.Close())
 	require.NoError(t, f.db.Open(f.db.DatabasePath()))
 	require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
@@ -216,7 +223,7 @@ func TestCatalogMembershipImportRollbackAndEmptyInput(t *testing.T) {
 }
 
 func TestCatalogMembershipAuditRejectsWrongCollectionWithoutWrites(t *testing.T) {
-	f := membershipImportFixture(t, 3, nil)
+	f := membershipImportFixture(t, 55, nil)
 	advanceMembershipImport(t, f, 0)
 	require.NoError(t, f.db.Close())
 	raw := openRawDB(t, f.db.DatabasePath())

@@ -110,6 +110,17 @@ func validateNativeConnection(conn *sqlx.DB, auditData bool) error {
 		if version >= NativeSchemaBaseline+120 && (!present["source_post_translation_display"] || !present["translation_policy_defaults"]) {
 			return errors.New("native database schema is incomplete: missing source_post_translation_display")
 		}
+		if version >= NativeSchemaBaseline+121 {
+			for _, name := range []string{"source_post_import_labels", "source_post_studios", "catalog_membership_compaction_guard"} {
+				var exists bool
+				if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+					return err
+				}
+				if !exists {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+		}
 		if version >= NativeSchemaBaseline+117 {
 			for _, name := range []string{"gallery_alternate_titles", "source_gallery_merge_context"} {
 				if !present[name] {

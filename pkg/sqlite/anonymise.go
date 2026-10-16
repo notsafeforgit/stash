@@ -1099,6 +1099,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			retainedGuards = append(retainedGuards, definition)
 		}
 		for _, table := range []string{
+			"source_post_import_labels", "source_post_studios",
 			"account_profile_urls", "performer_profile_url_suppressions",
 			"provider_metadata_imports",
 			"file_deduplications",

@@ -90,9 +90,14 @@ ON CONFLICT(collection_uuid) DO UPDATE SET studio_id=excluded.studio_id,revision
 	return s.Assignment(ctx, current.CollectionUUID)
 }
 
-const sourceStudiosSelect = `SELECT DISTINCT a.uuid,s.name FROM source_post_studio_collections e
+const sourceStudiosSelect = `SELECT DISTINCT a.uuid,s.name FROM (
+SELECT e.post_uuid,b.studio_id FROM source_post_studio_collections e
 JOIN source_collection_studios b ON b.collection_uuid=e.collection_uuid
-JOIN studios s ON s.id=b.studio_id
+UNION ALL
+SELECT i.canonical_uuid,d.studio_id FROM source_post_studios d
+JOIN source_post_identities i ON i.post_uuid=d.post_uuid
+) e
+JOIN studios s ON s.id=e.studio_id
 JOIN archive_entities a ON a.studio_id=s.id AND a.state='active'
 WHERE `
 

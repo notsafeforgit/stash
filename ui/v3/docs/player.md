@@ -64,6 +64,15 @@ slide settles. While an image is selected the retained video is hidden, suspende
 and has no active source or keyboard shortcuts. Audio and playback rate survive
 returning to a video. The idle source explicitly uses the native adapter: Video.js
 otherwise infers a null source as HLS and attaches an empty MediaSource.
+Touch image taps toggle metadata, image actions, navigation buttons and the
+counter, leaving Close available. Image-only and mixed viewers share the tap
+recognizer: double taps zoom without revealing controls, and navigation cancels
+pending reveals. An outgoing scene keeps its decoded video frame during a swipe,
+but its controls and metadata stop painting as soon as it becomes inactive.
+Image overlay spacing belongs to the image slot so changing media kinds does
+not reposition the outgoing overlay. Neither transition remounts the player.
+Open action menus own Escape and arrow keys even when touch Safari leaves focus
+on the document body; dismissing a menu must not also dismiss the lightbox.
 
 Gallery pagination appends a loading slide and fetches the next page on navigation.
 Errors retain that position with Retry; a changed membership signature suspends

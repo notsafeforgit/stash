@@ -1234,7 +1234,10 @@ export function PlayerControls({
 
   return (
     <Controls.Root>
-      <Controls.Content className="absolute inset-0 flex flex-col">
+      <Controls.Content
+        data-player-controls
+        className="absolute inset-0 flex flex-col"
+      >
         {onToggleViewer && !viewerOpen && (
           <Button
             ref={viewerButtonRef}

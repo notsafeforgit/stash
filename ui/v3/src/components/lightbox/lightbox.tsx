@@ -94,6 +94,8 @@ import {
 import { useToast } from "src/hooks/toast";
 import { lightboxAnimation, useLightboxMotion } from "./use-lightbox-motion";
 import { LightboxMotionSurface } from "./lightbox-motion-surface";
+import { useImageLightboxChrome } from "./use-image-lightbox-chrome";
+import { popupOwnsLightboxKeys } from "./lightbox-keyboard";
 import { motion } from "@/core/motion";
 import { inverseImageRotationDirection } from "./image-rotation";
 import { useMediaQuery } from "@/utils/screen";
@@ -809,7 +811,7 @@ export function LightboxImageActionsButton({
   );
 }
 
-function LightboxCloseButton() {
+export function LightboxCloseButton() {
   const intl = useIntl();
   const { close } = useController();
   const label = intl.formatMessage({
@@ -974,60 +976,10 @@ export function ImageLightbox({
   // Defaults to hidden so the image isn't cluttered on first load. The
   // visibility class is consumed by `globals.css` under `(hover: none)`,
   // so hover-capable devices ignore it and always show the overlays.
-  const [chromeRevealed, setChromeRevealed] = useState(false);
+  const [viewIndex, setViewIndex] = useState(index);
+  const { revealed: chromeRevealed, onClick: handleSlideClick } =
+    useImageLightboxChrome(`${open}:${viewIndex}`);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
-  // Defer the reveal so a second tap (YARL's double-tap-to-zoom) can
-  // cancel it. Without this, a double-tap that lands in the overlay
-  // area would reveal the chrome on tap 1, the overlay's children
-  // would re-acquire `pointer-events: auto`, and tap 2 would be
-  // absorbed by the overlay before YARL's zoom toggle could fire. The
-  // hide path stays immediate — once chrome is visible, hiding it on
-  // a subsequent tap is fine because the chrome doesn't intercept
-  // anything we'd want a follow-on tap to hit.
-  const chromeRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const lastClickAtRef = useRef(0);
-  const handleSlideClick = useCallback(() => {
-    // YARL's `on.click` fires for both taps of a double-tap (it doesn't
-    // suppress on its own). Any tap that arrives inside the double-tap
-    // window is treated as the second half of a potential zoom toggle:
-    // cancel any pending chrome reveal and stay out of YARL's way.
-    const now = Date.now();
-    const delta = now - lastClickAtRef.current;
-    lastClickAtRef.current = now;
-    if (delta < 300) {
-      if (chromeRevealTimerRef.current) {
-        clearTimeout(chromeRevealTimerRef.current);
-        chromeRevealTimerRef.current = null;
-      }
-      return;
-    }
-    setChromeRevealed((revealed) => {
-      // Hiding: immediate, no need to wait for double-tap detection
-      // (the chrome itself doesn't have anything we'd want a follow-on
-      // tap to hit while still visible).
-      if (revealed) return false;
-      // Revealing: defer so a follow-up tap can cancel and let YARL's
-      // double-tap zoom fire instead.
-      if (chromeRevealTimerRef.current) {
-        clearTimeout(chromeRevealTimerRef.current);
-      }
-      chromeRevealTimerRef.current = setTimeout(() => {
-        chromeRevealTimerRef.current = null;
-        setChromeRevealed(true);
-      }, 250);
-      return revealed;
-    });
-  }, []);
-  useEffect(
-    () => () => {
-      if (chromeRevealTimerRef.current) {
-        clearTimeout(chromeRevealTimerRef.current);
-      }
-    },
-    [],
-  );
 
   useEffect(() => {
     if (!open || !slideshowAutoplay) return;
@@ -1157,14 +1109,7 @@ export function ImageLightbox({
       // always the lightbox itself. Tooltip triggers and dropdown
       // triggers don't carry these roles, so a tooltip showing on a
       // focused chip in the slide footer doesn't trip this check.
-      const active = document.activeElement as HTMLElement | null;
-      if (
-        active?.closest(
-          '[role="menu"], [role="alertdialog"], [role="listbox"], [role="combobox"]',
-        )
-      ) {
-        return;
-      }
+      if (popupOwnsLightboxKeys()) return;
       e.preventDefault();
       requestClose();
     }
@@ -1350,6 +1295,7 @@ export function ImageLightbox({
           exiting: onExiting,
           click: handleSlideClick,
           view: ({ index: newIndex }) => {
+            setViewIndex(newIndex);
             const s = slides[newIndex];
             if (s?.loading && slideshowPlayingRef.current) {
               resumeSlideshowRef.current = true;

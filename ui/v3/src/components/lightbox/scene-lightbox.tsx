@@ -28,6 +28,7 @@ import {
   ImageEntityFooter,
   OriginalSizeButton,
   LightboxImageActionsButton,
+  LightboxCloseButton,
   useAtOriginalSize,
 } from "./lightbox";
 import { Spinner } from "src/components/ui/spinner";
@@ -38,6 +39,9 @@ import type { OfflineEntry } from "src/components/offline/offline-db";
 import { useIsTouch } from "@/utils/screen";
 import { lightboxAnimation, useLightboxMotion } from "./use-lightbox-motion";
 import { LightboxMotionSurface } from "./lightbox-motion-surface";
+import { useImageLightboxChrome } from "./use-image-lightbox-chrome";
+import { popupOwnsLightboxKeys } from "./lightbox-keyboard";
+import { cn } from "@/lib/utils";
 
 // ── Persistence keys ───────────────────────────────────────────────────────────
 
@@ -113,7 +117,10 @@ function MediaCounter({ total }: { total: number }) {
   const { currentIndex, currentSlide } = useLightboxState();
   if (currentSlide?.loading || total < 2) return null;
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center text-xs tabular-nums text-white/85">
+    <div
+      data-lightbox-counter
+      className="pointer-events-none absolute inset-x-0 top-2 flex justify-center text-xs tabular-nums text-white/85"
+    >
       <span className="rounded bg-black/45 px-2 py-1">
         {currentIndex + 1} / {total}
       </span>
@@ -148,6 +155,8 @@ export function MediaLightbox({
     setView({ propIndex: index, currentIndex: index });
   const selected = slides[view.currentIndex];
   const imageActive = !!selected && isImageSlide(selected);
+  const { revealed: chromeRevealed, onClick: onImageClick } =
+    useImageLightboxChrome(`${open}:${view.currentIndex}`, true);
   const zoomRef = useRef<ZoomRef>(null);
   const [atOriginal, zoomCallbacks] = useAtOriginalSize(zoomRef);
   // Lightbox fullscreen ref — populated by the YARL Fullscreen plugin via
@@ -301,9 +310,7 @@ export function MediaLightbox({
         active?.tagName === "INPUT" ||
         active?.tagName === "TEXTAREA" ||
         (active instanceof HTMLElement && active.isContentEditable) ||
-        active?.closest(
-          '[role="menu"], [role="alertdialog"], [role="listbox"], [role="combobox"]',
-        )
+        popupOwnsLightboxKeys()
       ) {
         return;
       }
@@ -382,11 +389,11 @@ export function MediaLightbox({
       plugins={[Fullscreen, Zoom, PersistentSceneCarousel]}
       fullscreen={{ ref: fullscreenRef }}
       zoom={{ ...LIGHTBOX_ZOOM_TUNING, ref: zoomRef }}
-      className={
-        imageActive
-          ? "image-lightbox lightbox-mobile-toolbar-bottom chrome-revealed"
-          : undefined
-      }
+      className={cn(
+        "media-lightbox",
+        imageActive && "image-lightbox lightbox-mobile-toolbar-bottom",
+        imageActive && (chromeRevealed ? "chrome-revealed" : "chrome-hidden"),
+      )}
       carousel={{ finite, preload: 1, ...(touch && { padding: 0 }) }}
       controller={{
         ref: controllerRef,
@@ -411,11 +418,17 @@ export function MediaLightbox({
               ]
             : []),
           "fullscreen",
-          "close",
+          ...(imageActive
+            ? [<LightboxCloseButton key="close" />]
+            : ["close" as const]),
         ],
       }}
       on={{
         exiting: onExiting,
+        click: ({ index: clickedIndex }) => {
+          const slide = slides[clickedIndex];
+          if (slide && isImageSlide(slide) && !slide.loading) onImageClick();
+        },
         zoom: zoomCallbacks.zoom,
         view: ({ index: newIndex }) => {
           setView({ propIndex: index, currentIndex: newIndex });

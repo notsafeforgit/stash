@@ -1064,6 +1064,34 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
   .image-lightbox.chrome-hidden .lightbox-overlay-bottom * {
     pointer-events: none;
   }
+  /* Mixed images hide their actions and counter too. Keep Close available,
+     as on a scene, without letting invisible controls swallow another tap. */
+  .media-lightbox.image-lightbox .yarl__toolbar > :not(.lightbox-close-button),
+  .media-lightbox [data-lightbox-counter] {
+    transition: opacity 200ms ease;
+  }
+  .media-lightbox.image-lightbox.chrome-hidden
+    .yarl__toolbar
+    > :not(.lightbox-close-button),
+  .media-lightbox.image-lightbox.chrome-hidden .yarl__navigation_prev,
+  .media-lightbox.image-lightbox.chrome-hidden .yarl__navigation_next,
+  .media-lightbox.image-lightbox.chrome-hidden [data-lightbox-counter] {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+/* The outgoing scene keeps its decoded frame while the track moves, but
+   its controls belong only to the active slide. Inert alone doesn't suppress
+   painting, and fading controls can otherwise appear over an incoming image.
+   Don't animate the player itself or replace its retained media element. */
+.lightbox-scene-slide[inert] [data-player-controls],
+.lightbox-scene-slide[inert] .lightbox-overlay-top,
+.lightbox-scene-slide[inert] .lightbox-overlay-bottom,
+.lightbox-scene-slide [data-scene-player][inert] [data-player-controls] {
+  visibility: hidden;
+  transition: none;
 }
 
 /* TV keeps its video, controls and portals in one stable presentation surface. */

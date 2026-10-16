@@ -177,6 +177,7 @@ function SceneCarousel({ carousel, render, styles, labels }: ComponentProps) {
             key={globalIndex + offset}
             className={cn(
               "yarl__slide yarl__flex_center",
+              slide && isImageSlide(slide) && "image-lightbox",
               offset === 0 &&
                 slide &&
                 isImageSlide(slide) &&
@@ -197,7 +198,7 @@ function SceneCarousel({ carousel, render, styles, labels }: ComponentProps) {
       {/* biome-ignore lint/a11y/useSemanticElements: A media slide is a group, not a form fieldset. */}
       <div
         className={cn(
-          "yarl__slide yarl__flex_center",
+          "yarl__slide yarl__flex_center lightbox-scene-slide",
           current && settled.slide?.type === "scene" && "yarl__slide_current",
         )}
         style={{

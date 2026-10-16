@@ -494,6 +494,140 @@ for (const preference of ["muted", "playbackRate"] as const) {
   });
 }
 
+test("mixed images toggle their chrome without stealing double-tap zoom or Close", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.goto("/gallery-media");
+  await page.getByRole("button", { name: "First image", exact: true }).tap();
+  const viewer = page.getByRole("dialog", { name: "Lightbox", exact: true });
+  const image = viewer.locator(".yarl__slide_current img.yarl__slide_image");
+  const footer = viewer.locator(
+    ".yarl__slide_current .lightbox-overlay-bottom",
+  );
+  const actions = viewer.getByRole("button", {
+    name: "Image actions",
+    exact: true,
+  });
+  await expect(footer).toHaveCSS("opacity", "1");
+  await image.tap({ position: { x: 100, y: 80 } });
+  await expect(footer).toHaveCSS("opacity", "0");
+  await expect(actions).toBeHidden();
+  await expect(viewer.getByText("1 / 3", { exact: true })).toBeHidden();
+  const close = viewer.getByRole("button", { name: "Close", exact: true });
+  await expect(close).toBeVisible();
+  await page.screenshot({
+    path: test.info().outputPath("mixed-image-hidden-chrome.png"),
+  });
+  await page.waitForTimeout(350); // Start a new gesture after the single tap.
+  // Two taps zoom while the hidden chrome stays out of the way.
+  const width = await image.evaluate(
+    (element) => element.getBoundingClientRect().width,
+  );
+  await page.touchscreen.tap(100, 250);
+  await page.touchscreen.tap(100, 250);
+  await expect
+    .poll(() =>
+      image.evaluate((element) => element.getBoundingClientRect().width),
+    )
+    .toBeGreaterThan(width);
+  await expect(footer).toHaveCSS("opacity", "0");
+  // Wait for zoom to settle, then a single tap restores the image controls.
+  await expect(
+    viewer.getByRole("button", {
+      name: "Zoom out",
+      exact: true,
+      includeHidden: true,
+    }),
+  ).toBeEnabled();
+  await page.waitForTimeout(350);
+  await page.touchscreen.tap(100, 250);
+  await expect(footer).toHaveCSS("opacity", "1");
+  await actions.tap();
+  await expect(
+    page.getByRole("menuitem", { name: "Zoom out", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(viewer).toBeVisible();
+  await page.touchscreen.tap(100, 250);
+  await expect(footer).toHaveCSS("opacity", "0");
+  await close.tap();
+  await expect(viewer).toHaveCount(0);
+});
+
+test("mixed transitions hide outgoing scene controls before the image arrives and retain the player", async ({
+  page,
+}) => {
+  const state = await fixture(page);
+  await page.goto("/gallery-media");
+  await page.getByRole("button", { name: "Second video", exact: true }).tap();
+  const viewer = page.getByRole("dialog", { name: "Lightbox", exact: true });
+  const video = viewer.locator("video");
+  await expect(viewer.locator("[data-scene-player]")).toHaveAttribute(
+    "data-playback-ready",
+    "true",
+  );
+  const original = await video.elementHandle();
+  const sceneControls = viewer.locator("[data-player-playback-controls]");
+  await expect(sceneControls).toBeVisible();
+  // Hold the actual track animation to inspect a transition, including after
+  // YARL's nominal cleanup timer. Source replacement must wait for the track.
+  await page.evaluate(() => {
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (...args) {
+      const animation = animate.apply(this, args);
+      if (this.classList.contains("yarl__carousel")) {
+        animation.pause();
+        animation.currentTime = 0;
+      }
+      return animation;
+    };
+  });
+  await page.keyboard.press("ArrowLeft");
+  await expect(viewer.getByText("1 / 3", { exact: true })).toBeVisible();
+  await expect(
+    viewer.getByRole("button", { name: "Close", exact: true }),
+  ).toBeVisible();
+  await expect(sceneControls).toBeHidden();
+  await expect(video).toBeVisible();
+  await viewer.locator(".yarl__carousel").evaluate((track) => {
+    for (const animation of track.getAnimations()) {
+      const duration = animation.effect?.getComputedTiming().duration;
+      if (typeof duration === "number") animation.currentTime = duration / 2;
+    }
+  });
+  await page.screenshot({
+    path: test.info().outputPath("mixed-scene-to-image.png"),
+  });
+  await page.waitForTimeout(300);
+  await expect(sceneControls).toBeHidden();
+  const finish = () =>
+    viewer.locator(".yarl__carousel").evaluate((track) => {
+      for (const animation of track.getAnimations()) animation.finish();
+    });
+  await finish();
+  await expect(video).toBeHidden();
+  await expect(video).toHaveJSProperty("paused", true);
+  await expect(video).not.toHaveAttribute("src", /.+/);
+  await page.keyboard.press("ArrowRight");
+  await expect(viewer.getByText("2 / 3", { exact: true })).toBeVisible();
+  await expect(sceneControls).toBeHidden();
+  await expect(video).toBeHidden();
+  await finish();
+  await expect(viewer.locator("[data-scene-player]")).toHaveAttribute(
+    "data-playback-ready",
+    "true",
+  );
+  await expect(video).toBeVisible();
+  expect(
+    await video.evaluate((element, retained) => element === retained, original),
+  ).toBe(true);
+  expect(state.detailReads.filter((read) => read === "scene:8")).toEqual([
+    "scene:8",
+  ]);
+});
+
 test("mixed lightbox can retry unavailable video details without losing its position", async ({
   page,
 }) => {

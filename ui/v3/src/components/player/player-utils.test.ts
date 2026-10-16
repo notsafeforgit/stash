@@ -28,3 +28,27 @@ it("requires an HDR video display and HEVC Main 10 in the active media engine", 
   vi.stubGlobal("matchMedia", () => ({ matches: false }));
   expect(canPlayHDRHls()).toBe(false);
 });
+
+it("uses Safari's display query when video-dynamic-range is unsupported", () => {
+  const supported = vi.fn(() => true);
+  vi.stubGlobal(
+    "ManagedMediaSource",
+    Object.assign(vi.fn(), { isTypeSupported: supported }),
+  );
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query === "(dynamic-range: high)",
+  }));
+  expect(canPlayHDRHls()).toBe(true);
+  expect(supported).toHaveBeenCalled();
+
+  // An explicitly SDR video plane must win over an HDR display, when the
+  // browser implements the more specific video query.
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches:
+      query === "(dynamic-range: high)" ||
+      query === "(video-dynamic-range: standard)",
+  }));
+  supported.mockClear();
+  expect(canPlayHDRHls()).toBe(false);
+  expect(supported).not.toHaveBeenCalled();
+});

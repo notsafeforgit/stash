@@ -99,7 +99,15 @@ function hasMSE(): boolean {
  * without upgrading the source and restarting playback after an async probe. */
 export function canPlayHDRHls(): boolean {
   if (typeof window === "undefined" || !window.matchMedia) return false;
-  if (!window.matchMedia("(video-dynamic-range: high)").matches) return false;
+  const hdrVideo = window.matchMedia("(video-dynamic-range: high)").matches;
+  // Safari implements dynamic-range but not video-dynamic-range. Unknown
+  // queries match neither high nor standard; use its display query only then.
+  // https://bugs.webkit.org/show_bug.cgi?id=249678
+  const hdrDisplay =
+    hdrVideo ||
+    (!window.matchMedia("(video-dynamic-range: standard)").matches &&
+      window.matchMedia("(dynamic-range: high)").matches);
+  if (!hdrDisplay) return false;
   const type = 'video/mp4; codecs="hvc1.2.4.L153.B0"';
   const mse = getActiveMSE();
   return mse

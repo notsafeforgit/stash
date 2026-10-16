@@ -801,10 +801,14 @@ for (const width of [390, 1280]) {
               )
               .toBe(1);
             await expect
-              .poll(() =>
-                video.evaluate(
-                  (element: HTMLVideoElement) => element.currentTime,
-                ),
+              .poll(
+                () =>
+                  video.evaluate(
+                    (element: HTMLVideoElement) => element.currentTime,
+                  ),
+                // Observing 4.5 seconds of progress needs more than the
+                // default five-second deadline when CI delays a poll.
+                { timeout: 10_000 },
               )
               .toBeGreaterThan(completedAt + 4.5);
             expect(

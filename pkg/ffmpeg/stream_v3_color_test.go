@@ -87,7 +87,7 @@ func TestV3HLSHDRConversionAndCopy(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	run := func(program string, args ...string) []byte {
+	run := func(t *testing.T, program string, args ...string) []byte {
 		t.Helper()
 		out, err := exec.CommandContext(ctx, program, args...).CombinedOutput()
 		require.NoError(t, err, "%s", out)
@@ -97,7 +97,7 @@ func TestV3HLSHDRConversionAndCopy(t *testing.T) {
 		t.Run(transfer, func(t *testing.T) {
 			dir := t.TempDir()
 			source := filepath.Join(dir, "hdr.mkv")
-			run(encoder, "-v", "error", "-f", "lavfi", "-i", "nullsrc=s=64x64:r=30,format=yuv420p10le,geq=lum=512:cb=512:cr=512,setparams=color_primaries=bt2020:color_trc="+transfer+":colorspace=bt2020nc:range=tv",
+			run(t, encoder, "-v", "error", "-f", "lavfi", "-i", "nullsrc=s=64x64:r=30,format=yuv420p10le,geq=lum=512:cb=512:cr=512,setparams=color_primaries=bt2020:color_trc="+transfer+":colorspace=bt2020nc:range=tv",
 				"-t", "4.1", "-c:v", "libx265", "-preset", "ultrafast", "-g", "60", "-x265-params", "log-level=error:pools=1:frame-threads=1:colorprim=bt2020:transfer="+transfer+":colormatrix=bt2020nc:master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,1):max-cll=1000,400",
 				"-color_primaries", "bt2020", "-color_trc", transfer, "-colorspace", "bt2020nc", "-color_range", "tv", source)
 			vf := &models.VideoFile{BaseFile: &models.BaseFile{Path: source}, Width: 64, Height: 64, FrameRate: 30, VideoCodec: Hevc, Duration: 4.1}
@@ -110,9 +110,9 @@ func TestV3HLSHDRConversionAndCopy(t *testing.T) {
 				stream := &v3RunningStream{streamType: V3StreamTypeHLS, vf: vf, outputDir: outputDir}
 				args := stream.makeStreamArgs(sm, segment)
 				require.Equal(t, transfer, stream.sourceColor.Transfer, "args=%v", args)
-				run(encoder, args...)
+				run(t, encoder, args...)
 				playlist := filepath.Join(outputDir, "playlist_video.m3u8")
-				data := run(probePath, "-v", "error", "-select_streams", "v:0", "-read_intervals", "%+#1", "-show_streams", "-show_frames", "-of", "json", playlist)
+				data := run(t, probePath, "-v", "error", "-select_streams", "v:0", "-read_intervals", "%+#1", "-show_streams", "-show_frames", "-of", "json", playlist)
 				var decoded struct{ Streams []FFProbeStream }
 				require.NoError(t, json.Unmarshal(data, &decoded))
 				require.NotEmpty(t, decoded.Streams)
@@ -125,7 +125,7 @@ func TestV3HLSHDRConversionAndCopy(t *testing.T) {
 				require.Equal(t, "tv", out.ColorRange)
 				require.NotContains(t, string(data), "Mastering display metadata")
 				require.NotContains(t, string(data), "Content light level metadata")
-				pixels := run(encoder, "-v", "error", "-i", playlist, "-frames:v", "1", "-pix_fmt", "yuv420p", "-f", "rawvideo", "-")
+				pixels := run(t, encoder, "-v", "error", "-i", playlist, "-frames:v", "1", "-pix_fmt", "yuv420p", "-f", "rawvideo", "-")
 				require.Len(t, pixels, 64*64*3/2)
 				// Truncating 10-bit 512 to 8-bit produces 128, regardless of
 				// the label. Tone mapping must visibly change these pixels.
@@ -136,7 +136,7 @@ func TestV3HLSHDRConversionAndCopy(t *testing.T) {
 			for _, kind := range []*V3StreamType{V3StreamTypeHLSCopyFMP4, V3StreamTypeHLSCopyFMP4AAC} {
 				outputDir := t.TempDir()
 				stream := &v3RunningStream{streamType: kind, vf: vf, outputDir: outputDir}
-				run(encoder, stream.makeStreamArgs(sm, 0)...)
+				run(t, encoder, stream.makeStreamArgs(sm, 0)...)
 				copied, err := sm.ffprobe.NewVideoFile(filepath.Join(outputDir, "playlist_video.m3u8"))
 				require.NoError(t, err)
 				require.Equal(t, transfer, copied.ColorTransfer)

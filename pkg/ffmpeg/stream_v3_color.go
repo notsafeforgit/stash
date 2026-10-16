@@ -93,7 +93,14 @@ func (f *FFMpeg) hlsHDRFilter(codec VideoCodec, color videoColorMetadata, fullhw
 	}
 	// HDR side data describes the original signal, not these SDR pixels. Keep
 	// unrelated side data (captions, etc.) rather than dropping everything.
-	for _, kind := range []string{"MASTERING_DISPLAY_METADATA", "CONTENT_LIGHT_LEVEL", "DYNAMIC_HDR_PLUS", "DOVI_RPU_BUFFER", "DOVI_METADATA"} {
+	// FFmpeg before 7.1 knows these AVFrameSideDataType values from libavutil/frame.h,
+	// but their sidedata filter does not expose the Dolby Vision names yet.
+	// Numeric selectors remove the same data on those supported releases.
+	doviRPUBuffer, doviMetadata := "DOVI_RPU_BUFFER", "DOVI_METADATA"
+	if !f.version.Gteq(Version{major: 7, minor: 1}) {
+		doviRPUBuffer, doviMetadata = "23", "24"
+	}
+	for _, kind := range []string{"MASTERING_DISPLAY_METADATA", "CONTENT_LIGHT_LEVEL", "DYNAMIC_HDR_PLUS", doviRPUBuffer, doviMetadata} {
 		filter = filter.Append("sidedata=mode=delete:type=" + kind)
 	}
 	return filter, true

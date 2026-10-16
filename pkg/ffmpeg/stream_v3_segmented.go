@@ -604,9 +604,17 @@ func (t V3StreamType) FileDir(hash string, maxTranscodeSize int) string {
 	}
 }
 
+// A scrub preview is a separate, silent, low-resolution H.264 session. Reuse
+// the normal frame cadence, hardware decode and SDR conversion pipeline.
+var V3StreamTypeHLSScrub = &V3StreamType{
+	Name:        "hls-scrub",
+	SegmentType: V3SegmentTypeFMP4,
+	Args:        V3StreamTypeHLS.Args,
+}
+
 func v3HLSGetCodec(sm *StreamManager, name string) (codec VideoCodec) {
 	switch name {
-	case "hls":
+	case "hls", "hls-scrub":
 		codec = VideoCodecLibX264
 		if hwcodec := sm.encoder.hwCodecHLSCompatible(); hwcodec != nil && sm.config.GetTranscodeHardwareAcceleration() {
 			codec = *hwcodec
@@ -628,7 +636,7 @@ func v3HLSGetCodec(sm *StreamManager, name string) (codec VideoCodec) {
 // variant in -var_stream_map) in this case; the master playlist
 // likewise omits the audio rendition.
 func (s *v3RunningStream) videoOnly() bool {
-	return ProbeAudioCodec(s.vf.AudioCodec) == MissingUnsupported
+	return s.streamType == V3StreamTypeHLSScrub || ProbeAudioCodec(s.vf.AudioCodec) == MissingUnsupported
 }
 
 // tracks returns the set of HLS tracks ffmpeg will produce for this
@@ -741,7 +749,7 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 	// Output options must precede the output URL. FFmpeg ignores trailing
 	// options, including a user's live-transcode overrides, after that URL.
 	args = append(args, streamArgs[:len(streamArgs)-1]...)
-	if s.streamType == V3StreamTypeHLS {
+	if s.streamType == V3StreamTypeHLS || s.streamType == V3StreamTypeHLSScrub {
 		width, height := scaledDimensions(s.vf, s.maxTranscodeSize)
 		args = append(args, liveHLSEncoding(width, height, frameRate).args(codec)...)
 	} else if preserveHDR {
@@ -752,6 +760,11 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 		args = append(args, "-tag:v", "hvc1")
 	}
 	args = append(args, extraOutputArgs...)
+	if s.streamType == V3StreamTypeHLSScrub {
+		// No reordered frames: lower decode latency and no encoder-delay PTS
+		// shift between the frame shown while scrubbing and the saved cover.
+		args = append(args, "-bf", "0")
+	}
 	if toneMap {
 		// The manifest promises SDR. Custom encoder options cannot relabel the
 		// tone-mapped pixels as the source's HLG/PQ signal.
@@ -1316,7 +1329,7 @@ func serveV3HLSMasterManifestFMP4AAC(sm *StreamManager, w http.ResponseWriter, r
 
 func (sm *StreamManager) ServeV3Manifest(w http.ResponseWriter, r *http.Request, streamType *V3StreamType, vf *models.VideoFile, resolution string) {
 	switch streamType.Name {
-	case "hls", "hls-hevc", "hls-copy-fmp4", "hls-copy-fmp4-aac":
+	case "hls", "hls-scrub", "hls-hevc", "hls-copy-fmp4", "hls-copy-fmp4-aac":
 		serveV3HLSManifestFMP4(sm, w, r, vf, resolution)
 	default:
 		http.Error(w, "no manifest for stream type "+streamType.Name, http.StatusNotFound)
@@ -1328,6 +1341,11 @@ func (sm *StreamManager) ServeV3Manifest(w http.ResponseWriter, r *http.Request,
 // so the StreamType definitions stay focused on segment generation.
 func (sm *StreamManager) ServeV3MasterManifest(w http.ResponseWriter, r *http.Request, streamType *V3StreamType, vf *models.VideoFile, resolution string) {
 	switch streamType.Name {
+	case "hls-scrub":
+		// Never mutate the source model or advertise audio for this rendition.
+		silent := *vf
+		silent.AudioCodec = ""
+		serveV3HLSMasterManifest(sm, w, r, &silent, models.StreamingResolutionEnumLow.String())
 	case "hls":
 		serveV3HLSMasterManifest(sm, w, r, vf, resolution)
 	case "hls-hevc":
@@ -1392,6 +1410,9 @@ func (sm *StreamManager) ServeV3Segment(w http.ResponseWriter, r *http.Request, 
 	maxTranscodeSize := sm.config.GetMaxStreamingTranscodeSize().GetMaxResolution()
 	if options.Resolution != "" {
 		maxTranscodeSize = models.StreamingResolutionEnum(options.Resolution).GetMaxResolution()
+	}
+	if streamType == V3StreamTypeHLSScrub {
+		maxTranscodeSize = models.StreamingResolutionEnumLow.GetMaxResolution()
 	}
 
 	session, err := V3StreamSessionFromRequest(r)
@@ -1706,6 +1727,10 @@ func (sm *StreamManager) checkV3Transcode(stream *v3RunningStream, now time.Time
 		tp := stream.tp
 		ahead := tp.maxProgress() - stream.lastSegment
 		hasWaiting := len(stream.waitingSegments) > 0
+		suspendAhead, resumeAhead := v3SuspendLookaheadSegments, v3ResumeLookaheadSegments
+		if stream.streamType == V3StreamTypeHLSScrub {
+			suspendAhead, resumeAhead = 15/segmentLength, 4/segmentLength
+		}
 		switch {
 		case hasWaiting && tp.suspended:
 			// Client is asking; thaw immediately regardless of
@@ -1717,14 +1742,14 @@ func (sm *StreamManager) checkV3Transcode(stream *v3RunningStream, now time.Time
 				TranscodeDebugf("[transcode] resumed %s (segment requested)", stream.dir)
 			}
 			tp.suspended = false
-		case !tp.suspended && !hasWaiting && ahead >= v3SuspendLookaheadSegments:
+		case !tp.suspended && !hasWaiting && ahead >= suspendAhead:
 			if err := suspendFn(tp.cmd.Process); err != nil {
 				TranscodeDebugf("[transcode] suspend %s: %v", stream.dir, err)
 			} else {
 				TranscodeDebugf("[transcode] suspended %s (%d segments ahead of client)", stream.dir, ahead)
 				tp.suspended = true
 			}
-		case tp.suspended && ahead <= v3ResumeLookaheadSegments:
+		case tp.suspended && ahead <= resumeAhead:
 			if err := resumeFn(tp.cmd.Process); err != nil {
 				TranscodeDebugf("[transcode] resume %s: %v", stream.dir, err)
 			} else {

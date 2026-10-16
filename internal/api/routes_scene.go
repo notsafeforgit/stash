@@ -77,6 +77,18 @@ func (rs sceneRoutes) Routes() chi.Router {
 		// EXT-X-MEDIA audio rendition + EXT-X-STREAM-INF video variant, both
 		// pointing at per-track media playlists under `/stream.m3u8/{track}.m3u8`.
 		r.Get("/stream.master.m3u8", rs.StreamV3HLSMaster)
+		r.Get("/stream.scrub.master.m3u8", scrubPreviewRequest(func(w http.ResponseWriter, r *http.Request) {
+			rs.streamV3MasterManifest(w, r, ffmpeg.V3StreamTypeHLSScrub, "scrub HLS master")
+		}))
+		r.Get("/stream.scrub.m3u8/{track}.m3u8", scrubPreviewRequest(func(w http.ResponseWriter, r *http.Request) {
+			rs.streamV3Manifest(w, r, ffmpeg.V3StreamTypeHLSScrub, "scrub HLS playlist")
+		}))
+		r.Get("/stream.scrub.m3u8/{track}/init.mp4", scrubPreviewRequest(func(w http.ResponseWriter, r *http.Request) {
+			rs.streamV3SegmentNamed(w, r, ffmpeg.V3StreamTypeHLSScrub, "video", "init")
+		}))
+		r.Get("/stream.scrub.m3u8/{track}/{segment}.m4s", scrubPreviewRequest(func(w http.ResponseWriter, r *http.Request) {
+			rs.streamV3Segment(w, r, ffmpeg.V3StreamTypeHLSScrub)
+		}))
 		r.Get("/stream.hevc.master.m3u8", rs.StreamV3HLSHEVCMaster)
 		r.Get("/stream.hevc.m3u8/{track}.m3u8", rs.StreamV3HLSHEVCTrackPlaylist)
 		r.Get("/stream.hevc.m3u8/{track}/init.mp4", rs.StreamV3HLSHEVCInitSegment)
@@ -109,7 +121,6 @@ func (rs sceneRoutes) Routes() chi.Router {
 		r.Get("/download/progress", rs.DownloadProgress)
 
 		r.Get("/screenshot", rs.Screenshot)
-		r.Get("/frame-previews", rs.FramePreviews)
 		r.Get("/preview", rs.Preview)
 		r.Get("/webp", rs.Webp)
 		r.Get("/vtt/chapter", rs.VttChapter)

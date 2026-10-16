@@ -1,14 +1,18 @@
 import { test, expect } from "./test";
 import { serveSceneMedia } from "./scene-media";
 
-for (const hls of [false, true]) {
+for (const { hls, remote } of [
+  { hls: false, remote: false },
+  { hls: true, remote: false },
+  { hls: true, remote: true },
+]) {
   for (const completion of ["commit", "cancel"] as const) {
-    test(`scene detail ${hls ? "HLS" : "direct"} drag ${completion} restores playback without reloading`, async ({
+    test(`scene detail ${hls ? "HLS" : "direct"} ${remote ? "remote" : "buffered"} drag ${completion} restores playback without reloading`, async ({
       page,
     }) => {
       await serveSceneMedia(page);
       await page.goto(`/scene-detail?landscape&short${hls ? "&hls" : ""}`);
-      const video = page.locator("video");
+      const video = page.locator("video[data-playback-video]");
       const player = page.locator("[data-scene-player]");
       await player.locator("[data-player-native-button]").click();
       await expect(player).toHaveAttribute("data-playback-ready", "true");
@@ -19,6 +23,20 @@ for (const hls of [false, true]) {
           ),
         )
         .toBeGreaterThan(10);
+      if (remote) {
+        // Model an unbuffered target without forcing the main decoder to
+        // reload. The low-resolution preview must own its separate requests.
+        await video.evaluate((v: HTMLVideoElement) => {
+          Object.defineProperty(v, "buffered", {
+            configurable: true,
+            get: (): TimeRanges => ({
+              length: 1,
+              start: () => 0,
+              end: () => 4,
+            }),
+          });
+        });
+      }
       const observation = await video.evaluateHandle((v: HTMLVideoElement) => {
         const state = { frame: -1, events: [] as string[] };
         const observe = (
@@ -50,9 +68,22 @@ for (const hls of [false, true]) {
       await page.mouse.down();
       await page.mouse.move(bounds.x + (bounds.width * 2) / 3, y, { steps: 4 });
       await expect(video).toHaveJSProperty("paused", true);
-      await expect
-        .poll(() => observation.evaluate((state) => state.frame))
-        .toBeCloseTo(8, 1);
+      const preview = page.locator("video[data-scrub-preview]");
+      if (remote) {
+        await expect(player.locator("[data-scrub-surface]")).toHaveAttribute(
+          "data-preview-ready",
+          "true",
+        );
+        await expect
+          .poll(() => preview.evaluate((v: HTMLVideoElement) => v.currentTime))
+          .toBeCloseTo(8, 1);
+        await expect(preview).toHaveJSProperty("muted", true);
+        await expect(preview).toHaveJSProperty("paused", true);
+      } else {
+        await expect
+          .poll(() => observation.evaluate((state) => state.frame))
+          .toBeCloseTo(8, 1);
+      }
       const clock = player.locator("[data-player-time-display]");
       // WebKit rounds input coordinates, so the target can be just below 8s.
       const seconds = Math.floor(
@@ -62,9 +93,15 @@ for (const hls of [false, true]) {
         new RegExp(`^0:${String(seconds).padStart(2, "0")}\\s*/\\s*0:12$`),
       );
       await page.waitForTimeout(300);
-      expect(
-        await video.evaluate((v: HTMLVideoElement) => v.currentTime),
-      ).toBeCloseTo(8, 1);
+      const mainTime = await video.evaluate(
+        (v: HTMLVideoElement) => v.currentTime,
+      );
+      if (remote) expect(mainTime).toBeLessThan(4);
+      else expect(mainTime).toBeCloseTo(8, 1);
+      if (remote)
+        await video.evaluate((v) => {
+          Reflect.deleteProperty(v, "buffered");
+        });
       if (completion === "cancel") {
         await scrubber.dispatchEvent("pointercancel", { pointerId: 1 });
         await expect(video).toHaveJSProperty("paused", false);
@@ -73,6 +110,11 @@ for (const hls of [false, true]) {
         ).toBeLessThan(4);
       }
       await page.mouse.up();
+      if (remote)
+        await expect(player.locator("[data-scrub-surface]")).toHaveCSS(
+          "opacity",
+          "0",
+        );
       await expect(video).toHaveJSProperty("paused", false);
       if (completion === "commit") {
         await expect

@@ -8,7 +8,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function mediaFixture(initiallyPaused = false) {
+function mediaFixture(initiallyPaused = false, external = false) {
   const video = document.createElement("video");
   let paused = initiallyPaused;
   let time = 2;
@@ -43,10 +43,12 @@ function mediaFixture(initiallyPaused = false) {
   });
   const resume = vi.fn();
   const suspend = vi.fn(() => resume);
-  const controller = createBufferedSeekPreview();
+  const onEnd = vi.fn();
+  const controller = createBufferedSeekPreview(onEnd);
   const preview = {
     ...controller,
-    preview: (target: number) => controller.preview(video, target, suspend),
+    preview: (target: number) =>
+      controller.preview(video, target, suspend, external),
   };
   return {
     video,
@@ -54,6 +56,7 @@ function mediaFixture(initiallyPaused = false) {
     seeks,
     suspend,
     resume,
+    onEnd,
     replaceRanges: (next: number[][]) => {
       ranges = next;
     },
@@ -66,6 +69,19 @@ function mediaFixture(initiallyPaused = false) {
 }
 
 describe("buffered frame scrubbing", () => {
+  it("holds the main playhead during external preview and closes that preview on commit or cancellation", () => {
+    const f = mediaFixture(false, true);
+    f.preview.preview(100);
+    f.frame();
+    f.preview.preview(4);
+    f.frame();
+    expect(f.seeks).toEqual([]);
+    expect(f.video.paused).toBe(true);
+    expect(f.preview.take()).toMatchObject({ mediaTime: 2, wasPaused: false });
+    expect(f.onEnd).toHaveBeenCalledOnce();
+    f.preview.dispose();
+    expect(f.onEnd).toHaveBeenCalledOnce();
+  });
   it("pauses once and coalesces positions while a decoded seek is in flight", () => {
     const f = mediaFixture();
     f.preview.preview(3);

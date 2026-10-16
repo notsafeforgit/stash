@@ -227,6 +227,7 @@ export function scenePlayerSourceURL(
 export function hlsStreamTypeName(src: string): string | null {
   try {
     const path = new URL(src, "https://stash.invalid").pathname;
+    if (path.endsWith("/stream.scrub.master.m3u8")) return "hls-scrub";
     if (path.endsWith("/stream.hevc.master.m3u8")) return "hls-hevc";
     if (path.endsWith("/stream.fmp4.aac.master.m3u8"))
       return "hls-copy-fmp4-aac";

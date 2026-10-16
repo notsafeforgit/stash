@@ -28,7 +28,6 @@ import {
 import {
   SceneGenerateDialog,
   SceneMergeDialog,
-  SceneThumbnailPicker,
 } from "@/components/detail/deferred-overlays";
 import { useToast } from "src/hooks/toast";
 import { useConfigurationContext } from "src/hooks/config";
@@ -63,7 +62,6 @@ export function SceneActionsMenu({
   const [generateOpen, setGenerateOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [coverBusy, setCoverBusy] = useState(false);
-  const [pickerAt, setPickerAt] = useState<number | null>(null);
   const download = useSceneDownloadAction({ scene });
   const performerImage = useScenePerformerImage(scene.id);
   const share = useShareAction([
@@ -262,21 +260,6 @@ export function SceneActionsMenu({
     onSelect: () => setGenerateOpen(true),
   });
   items.push({
-    key: "choose-thumbnail",
-    icon: Camera,
-    label: intl.formatMessage({
-      id: "scene_cover.picker",
-      defaultMessage: "Choose thumbnail",
-    }),
-    onSelect: () =>
-      setPickerAt(
-        getPlayerPosition?.() ??
-          scene.cover_origin?.at ??
-          (scene.files[0]?.duration ?? 0) * 0.2,
-      ),
-    disabled: coverBusy || !scene.files[0]?.duration,
-  });
-  items.push({
     key: "current-thumbnail",
     icon: Camera,
     label: intl.formatMessage({
@@ -444,18 +427,6 @@ export function SceneActionsMenu({
       <EntityActionsMenu items={items} busy={rotationPending} />
       {performerImage.dialog}
       {share.dialog}
-      <SceneThumbnailPicker
-        open={pickerAt !== null}
-        onOpenChange={(open) => {
-          if (!open) setPickerAt(null);
-        }}
-        sceneId={scene.id}
-        duration={scene.files[0]?.duration ?? 0}
-        initialAt={pickerAt ?? 0}
-        onSelect={(at) => {
-          void handleGenerateScreenshot(at);
-        }}
-      />
 
       <DeleteDialog
         open={deleteOpen}

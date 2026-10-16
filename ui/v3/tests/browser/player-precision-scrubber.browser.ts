@@ -32,7 +32,7 @@ for (const mode of [
     if (lightbox)
       await page.getByRole("button", { name: "Open scenes" }).click();
     const player = page.locator("[data-scene-player]");
-    const video = player.locator("video");
+    const video = player.locator("video[data-playback-video]");
     if (!tv) await player.locator("[data-player-native-button]").click();
     if (mode === "scene viewer")
       await player
@@ -161,7 +161,7 @@ for (const condition of ["buffer changes", "preview still seeking"] as const) {
     await serveSceneMedia(page);
     await page.goto("/scene-detail?landscape&short&hls");
     const player = page.locator("[data-scene-player]");
-    const video = player.locator("video");
+    const video = player.locator("video[data-playback-video]");
     await player.locator("[data-player-native-button]").click();
     await expect(player).toHaveAttribute("data-playback-ready", "true");
     await expect

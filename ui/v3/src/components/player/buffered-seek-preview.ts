@@ -2,7 +2,7 @@ import { isTimeBuffered, readTimeRanges } from "./buffered-ranges";
 
 /** A drag previews decoded frames on the existing media element. Unbuffered
  * positions never trigger a seek, and newer positions replace queued work. */
-export function createBufferedSeekPreview() {
+export function createBufferedSeekPreview(onEnd?: () => void) {
   let session: {
     video: HTMLVideoElement;
     wasPaused: boolean;
@@ -40,6 +40,7 @@ export function createBufferedSeekPreview() {
     const previous = session;
     session = null;
     previous?.video.removeEventListener("seeked", schedule);
+    if (previous) onEnd?.();
     return previous;
   };
 
@@ -50,6 +51,7 @@ export function createBufferedSeekPreview() {
       video: HTMLVideoElement,
       mediaTime: number,
       suspendBuffering: () => () => void,
+      external = false,
     ) {
       if (!Number.isFinite(mediaTime)) return;
       if (video.readyState === 0) return;
@@ -63,7 +65,10 @@ export function createBufferedSeekPreview() {
         video.pause();
         video.addEventListener("seeked", schedule);
       }
-      pending = mediaTime;
+      // An independent scrub stream previews remote frames without moving or
+      // refilling the high-resolution player. The same gesture owns pause,
+      // cancellation and the single final committed seek in either mode.
+      pending = external ? null : mediaTime;
       schedule();
     },
     /** An explicit play/pause command during the drag replaces its old intent. */

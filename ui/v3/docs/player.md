@@ -154,14 +154,35 @@ seek, engine restart, or source reload. Browser effects apply the plan; keep DOM
 operations out of the planner so it remains testable without a media element.
 
 `PositionScrubber` separates its draft position from committed seeks. A drag
-temporarily pauses playback and previews decoded frames only inside the native
-buffered ranges, rechecking for eviction before each write. Preview seeks are
-coalesced and serialized. Classic MSE hls.js fragment loading is suspended until
-the drag ends; Safari MMS and native HLS retain their browser-owned loading
-policy. Release uses the normal seek policy and restores the previous playback
-intent; cancellation restores the original position too. A simple tap does not
-pause. The independent draft position also supports generated sprite previews
-without seeking into unbuffered media.
+temporarily pauses playback. Already-buffered frames use the main video, with
+eviction checks and coalesced seeks. Outside that buffer, authenticated library
+players use a separate silent 240p H.264 HLS preview at the source frame rate.
+It shares the normal timeline, touch precision zoom and media zoom surface;
+there is no thumbnail chooser. “Generate thumbnail from current” saves the
+committed main player's position as before.
+
+The scrub stream starts only after an unbuffered target settles for 180 ms.
+It uses its own transcode session, never the main player's lease or audio state.
+Nearby frames reuse the small buffer; other seeks replace pending targets.
+Its hls.js buffer target is 15 seconds ahead/behind and 4 MiB (not a hard memory
+limit); the server suspends encoding approximately 15 seconds ahead of fetched
+segments. Source frame cadence is retained, with no B-frame reordering delay.
+HDR preview pixels are tone-mapped to SDR; the main stream's HDR mode is unchanged.
+Normal 240p encoding targets 1 Mbps, or 1.5 Mbps above 30 fps, while filling that
+window. It does not download a second copy of the entire video.
+
+On release/cancel preview fetching stops. MSE buffers and temporary segments can
+be reused for 30 seconds, then the independent session is released. Navigation,
+suspension, unmount and backgrounding release it immediately; the server's idle
+reaper covers lost clients. Native HLS has no stop-loading API and releases on
+gesture completion. Offline/share players and unavailable preview endpoints
+retain buffered previews and ordinary final seeking. Preview files are temporary
+transcode cache, not saved sprites or backup artwork.
+
+Classic MSE main-stream loading is suspended during the drag; Safari MMS and
+native HLS retain browser-owned loading. Release uses the normal seek policy
+and restores prior playback intent; cancellation restores the original position.
+A simple tap does not pause or start a preview stream.
 Native seek recovery ignores an active preview, including recovery queued before
 the drag started, so buffer changes during a hold cannot commit or reload it.
 Releasing at a preview target still being decoded reuses the pending native seek;
@@ -188,31 +209,6 @@ playback without adjusting media time or observing frames to correct the browser
 clock. Play remains in the input gesture and handles cancellation by a newer
 pause or seek. Marker replay and temporary scrub pauses retain their own seek
 behavior. Browser tests verify pause/resume does not introduce seeks or reloads.
-
-### On-demand cover selection
-
-Scene Operations → **Choose thumbnail** opens an independent still-frame picker
-at the current playback position (or the saved/default cover time). It does not
-seek, pause, refetch or replace the playing scene. It initially decodes up to 25
-consecutive frames; the slider and filmstrip select those frames without further
-requests. Wider view/Whole video use nine sparse samples, and Zoom in narrows the
-range before returning to individual frames. Sparse samples are seeked separately,
-so selecting a cover never requires decoding or creating a sprite for a full movie.
-
-The authenticated `GET /scene/{uuid}/frame-previews?start=…&end=…&mode=frames|samples`
-returns small JPEGs and source timestamps. Frame mode starts at `start` and returns
-at most 25 consecutive frames (fewer at EOF); `end` bounds the overview in sample
-mode. Actual decoder PTS establish selection times, including variable-frame-rate
-sources; no average-FPS frame numbering is used. Final cover generation independently
-extracts the chosen time through the existing HDR-capable cover pipeline. Picker
-JPEGs are tone-mapped SDR previews, not the final cover renditions.
-
-Preview extraction is cancelled on close/range changes, bounded to two concurrent
-requests, two decoder threads and a 60-second deadline. Each image's longest edge
-is at most 480 pixels. Subprocess output is bounded. Previews live only in request
-and dialog memory, are served with `no-store`, and disappear on close; they never
-enter the database, generated-artwork store, backups or persistent sprite cache.
-This feature does not expand the playback buffer or enable library-wide sprites.
 
 ## Playback invariants
 

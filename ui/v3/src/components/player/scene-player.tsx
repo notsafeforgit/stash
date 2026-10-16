@@ -42,6 +42,7 @@ import { videoFeatures } from "@videojs/react/video";
 import { bufferFeature } from "@videojs/core/dom";
 import { sceneBufferFeature } from "./scene-buffer-feature";
 import { SceneVideo } from "./scene-video";
+import { SceneScrubPreview } from "./scene-scrub-preview";
 import { PlatformMediaEffects } from "./platform-media-effects";
 import { objectTitle } from "@/core/files";
 import { cn } from "src/lib/utils";
@@ -667,6 +668,9 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     reloading,
     loadFailed,
     ready: sourceReady,
+    scrubSource,
+    scrubTime,
+    handleScrubFailure,
     seekDisplayTarget,
     freezeFrameCanvas,
     handleSourceChange,
@@ -917,6 +921,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
 
   const mediaElement = (
     <SceneVideo
+      data-playback-video
       src={finalSrc}
       startPosition={startPosition}
       sourceType={activeSource?.type}
@@ -1068,6 +1073,15 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               isTemporarySpeedActive={isTemporarySpeedActive}
             >
               {mediaElement}
+              {scrubSource && !!fileDuration && (
+                <SceneScrubPreview
+                  key={`${playbackKey}:${file?.updated_at}`}
+                  sceneId={scene.id}
+                  source={scrubSource}
+                  time={scrubTime}
+                  onFailure={handleScrubFailure}
+                />
+              )}
             </VideoFrameZoom>
 
             {/* Also hide while reloading: the dim layer of the
@@ -1086,7 +1100,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
                   ? posterImage
                   : scene.preview_image
               }
-              hide={reloading}
+              hide={reloading || scrubTime !== null}
               minMediaTime={
                 clipRange ? Math.max(0, clipRange.start - offsetStart) : 0
               }

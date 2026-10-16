@@ -26,8 +26,18 @@ export async function serveSceneMedia(
         ).href,
       });
       await route.fulfill({ response });
-    } else if (url.pathname.endsWith("/stream.master.m3u8")) {
+    } else if (url.pathname.endsWith("/stream.scrub.master.m3u8")) {
+      url.pathname = url.pathname.replace(".master.m3u8", ".m3u8/video.m3u8");
+      await route.fulfill({
+        contentType: "application/vnd.apple.mpegurl",
+        body: `#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000000,CODECS="avc1.4d400b",RESOLUTION=160x90\n${url.href}\n`,
+      });
+    } else if (
+      url.pathname.endsWith("/stream.master.m3u8") ||
+      url.pathname.endsWith("/stream.scrub.m3u8/video.m3u8")
+    ) {
       const session = url.searchParams.get("stream_session");
+      const media = url.pathname.includes("/stream.scrub.") ? "scrub" : "hls";
       const query = session
         ? `?stream_session=${encodeURIComponent(session)}`
         : "";
@@ -46,11 +56,11 @@ export async function serveSceneMedia(
           "#EXT-X-TARGETDURATION:2",
           `#EXT-X-MEDIA-SEQUENCE:${first}`,
           "#EXT-X-PLAYLIST-TYPE:VOD",
-          `#EXT-X-MAP:URI="/media/hls/init.mp4${query}"`,
+          `#EXT-X-MAP:URI="/media/${media}/init.mp4${query}"`,
           ...Array.from(
             { length: end - first },
             (_, index) =>
-              `#EXTINF:2.000000,\n/media/hls/segment-${first + index}.m4s${query}`,
+              `#EXTINF:2.000000,\n/media/${media}/segment-${first + index}.m4s${query}`,
           ),
           "#EXT-X-ENDLIST",
           "",

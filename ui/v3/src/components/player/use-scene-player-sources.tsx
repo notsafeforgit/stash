@@ -40,6 +40,7 @@ import { planSceneSeek, planSourceResume } from "./scene-player-transitions";
 import { getHlsEngine, flushAndRestartAt, suspendHlsBuffering } from "./hls";
 import { isTimeBuffered, readTimeRanges } from "./buffered-ranges";
 import { createBufferedSeekPreview } from "./buffered-seek-preview";
+import { scrubStreamURL } from "./scrub-stream";
 import {
   computeInitialResume,
   filterSources,
@@ -132,6 +133,9 @@ interface UseScenePlayerSourcesArgs {
 }
 
 interface UseScenePlayerSourcesResult {
+  scrubSource: string | null;
+  scrubTime: number | null;
+  handleScrubFailure: () => void;
   sources: PlayerSource[];
   activeSource: PlayerSource | null;
   finalSrc: string | undefined;
@@ -198,7 +202,19 @@ export function useScenePlayerSources({
   allowAutoplay,
   clipRange,
 }: UseScenePlayerSourcesArgs): UseScenePlayerSourcesResult {
-  const [seekPreview] = useState(createBufferedSeekPreview);
+  const [scrubTime, setScrubTime] = useState<number | null>(null);
+  const [seekPreview] = useState(() =>
+    createBufferedSeekPreview(() => setScrubTime(null)),
+  );
+  const [failedScrubKey, setFailedScrubKey] = useState<string | null>(null);
+  const handleScrubFailure = useCallback(
+    () => setFailedScrubKey(playbackKey),
+    [playbackKey],
+  );
+  const scrubSource =
+    suspended || failedScrubKey === playbackKey
+      ? null
+      : scrubStreamURL(scene.sceneStreams);
   const [loadFailed, setLoadFailed] = useState(false);
   const loadRetryAttemptedRef = useRef(false);
   // Presence of `clipRange` selects the trimmed-playlist code path
@@ -641,14 +657,15 @@ export function useScenePlayerSources({
         return;
       }
 
-      if (transition.kind === "restart-engine") captureFrame();
-      const finish = video
-        ? beginSeekFeedback(
-            video,
-            transition.kind === "restart-engine" ||
-              !isTimeBuffered(transition.mediaTime, mediaState.buffered),
-          )
-        : undefined;
+      const showLoading =
+        transition.kind === "restart-engine" ||
+        !isTimeBuffered(transition.mediaTime, mediaState.buffered);
+      // A separate preview can be ahead of the main video even when the
+      // main engine can seek without restarting. Hold that displayed frame
+      // until the committed seek has decoded its full-resolution replacement.
+      if (transition.kind === "restart-engine" || (preview && showLoading))
+        captureFrame();
+      const finish = video ? beginSeekFeedback(video, showLoading) : undefined;
       if (transition.kind === "restart-engine" && engine) {
         flushAndRestartAt(engine, transition.mediaTime);
       }
@@ -722,13 +739,30 @@ export function useScenePlayerSources({
       // completion boundary or advancing to another scene during the drag.
       const target = Math.max(start, Math.min(time, end - frameDuration));
       const video = rootRef.current?.querySelector("video");
-      if (video)
-        seekPreview.preview(video, target - offsetStart, () =>
-          suspendHlsBuffering(mediaRef.current),
+      if (video) {
+        // Already-buffered full-resolution frames need neither a second
+        // decoder nor a network request. Once a drag goes remote, stay on the
+        // small preview stream so crossing buffer edges cannot flicker.
+        const external =
+          !!scrubSource &&
+          (scrubTime !== null ||
+            !isTimeBuffered(
+              target - offsetStart,
+              readTimeRanges(video.buffered),
+            ));
+        seekPreview.preview(
+          video,
+          target - offsetStart,
+          () => suspendHlsBuffering(mediaRef.current),
+          external,
         );
+        if (external && seekPreview.isActive()) setScrubTime(target);
+      }
     },
     [
       seekPreview,
+      scrubSource,
+      scrubTime,
       performSeek,
       offsetStart,
       clipRange,
@@ -1040,6 +1074,9 @@ export function useScenePlayerSources({
   });
 
   return {
+    scrubSource,
+    scrubTime,
+    handleScrubFailure,
     sources,
     activeSource,
     finalSrc,

@@ -543,7 +543,7 @@ function ClipBoundHandle({
 // Like `formatDuration` above but always includes thousandths — the marker
 // editor needs millisecond precision in handle tooltips so the user can
 // read out the exact captured time.
-export function formatDurationMs(secs: number): string {
+function formatDurationMs(secs: number): string {
   const t = !Number.isFinite(secs) || secs < 0 ? 0 : secs;
   const wholeMs = Math.round(t * 1000);
   const ms = wholeMs % 1000;

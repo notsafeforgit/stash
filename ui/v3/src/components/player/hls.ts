@@ -129,6 +129,8 @@ export function hlsSegmentDuration(frameRate: number | undefined): number {
 // that needs to detect "is this an HLS-formatted URL" has to recognise
 // both shapes.
 const PLAYLIST_PATH_SUFFIXES = [
+  "/stream.scrub.master.m3u8",
+  "/stream.scrub.m3u8",
   "/stream.master.m3u8",
   "/stream.hevc.master.m3u8",
   "/stream.fmp4.master.m3u8",

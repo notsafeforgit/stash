@@ -13,6 +13,17 @@ ffmpeg -i audio.mp4 -c copy -hls_time 2 -hls_list_size 0 \
 ffmpeg -i audio.mp4 -t 2 -c copy -movflags +faststart short.mp4
 ```
 
+`scrub/` contains the same synthetic video without audio, for the independent
+paused scrub-preview decoder:
+
+```sh
+ffmpeg -i audio.mp4 -an -vf setpts=PTS-STARTPTS -r 30 -fps_mode cfr -c:v libx264 \
+  -profile:v main -pix_fmt yuv420p -bf 0 -g 60 -keyint_min 60 \
+  -sc_threshold 0 -hls_time 2 -hls_list_size 0 \
+  -hls_segment_type fmp4 -hls_playlist_type vod \
+  -hls_segment_filename scrub/segment-%d.m4s scrub/stream.m3u8
+```
+
 `loop-bframes.mp4` is a three-second moving pattern with reordered AVC frames.
 It reproduces a native-loop first-frame stall in WebKit. Loop tests wait for
 natural EOF and advancing frames on repeated returns, including when the actual

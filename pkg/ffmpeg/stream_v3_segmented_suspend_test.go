@@ -91,6 +91,22 @@ func TestCheckTranscode_SuspendsWhenLookaheadExceeds(t *testing.T) {
 	}
 }
 
+func TestScrubTranscodeBoundsLookahead(t *testing.T) {
+	suspends, resumes := withSuspendStubs(t)
+	sm, stream, tp := newCheckTranscodeFixture(t)
+	stream.streamType = V3StreamTypeHLSScrub
+	tp.progress[TrackVideo] = 15 / segmentLength
+	sm.checkV3Transcode(stream, time.Now())
+	if *suspends != 1 || !tp.suspended {
+		t.Fatal("preview encoded beyond its small lookahead window")
+	}
+	stream.lastSegment = tp.maxProgress() - 4/segmentLength
+	sm.checkV3Transcode(stream, time.Now())
+	if *resumes != 1 || tp.suspended {
+		t.Fatal("preview failed to resume when the client reached its window")
+	}
+}
+
 func TestCheckTranscode_NoSuspendUnderThreshold(t *testing.T) {
 	suspendCalls, _ := withSuspendStubs(t)
 	sm, stream, tp := newCheckTranscodeFixture(t)

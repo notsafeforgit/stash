@@ -44,7 +44,7 @@ for (const touch of [true, false]) {
         if (!tv && !detail)
           await page.getByRole("button", { name: "Open scenes" }).click();
         const player = page.locator("[data-scene-player]");
-        const video = player.locator("video");
+        const video = player.locator("video[data-playback-video]");
         if (detail) {
           await player.locator("[data-player-native-button]").click();
           if (touch)

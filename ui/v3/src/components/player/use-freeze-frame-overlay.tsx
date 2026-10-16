@@ -106,7 +106,13 @@ export function useFreezeFrameOverlay({
     // Subsequent captures reuse the buffer at the file's aspect ratio.
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     try {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // A remote scrub leaves the main playhead at its original position.
+      // Hold the frame actually on screen while the committed full-resolution
+      // seek loads, rather than flashing back to that older main-video frame.
+      const preview = root?.querySelector<HTMLVideoElement>(
+        '[data-preview-ready="true"] video[data-scrub-preview]',
+      );
+      ctx.drawImage(preview ?? video, 0, 0, canvas.width, canvas.height);
     } catch {
       // drawImage from a cross-origin video taints the canvas but
       // does not throw; if it ever does (e.g. detached element),

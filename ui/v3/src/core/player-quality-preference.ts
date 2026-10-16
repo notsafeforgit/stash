@@ -41,7 +41,10 @@ export function savePlayerQualityPreference(source: { src: string }): void {
   try {
     const url = new URL(source.src);
     let quality: PlayerQuality;
-    if (url.pathname.endsWith("/stream.master.m3u8")) {
+    if (
+      url.pathname.endsWith("/stream.master.m3u8") ||
+      url.pathname.endsWith("/stream.hevc.master.m3u8")
+    ) {
       const resolution = url.searchParams.get("resolution");
       const tier = qualityTiers.find((value) => value === resolution);
       if (!tier && resolution !== StreamingResolutionEnum.Original) return;

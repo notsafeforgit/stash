@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { serveSceneMedia } from "./scene-media";
 import {
   expect,
   holdForContextMenu,
@@ -25,18 +26,7 @@ async function action(page: Page, mobile: boolean, name: string) {
 }
 
 fixtureTest.beforeEach(async ({ page }) => {
-  await page.route("**/scene/1/**", async (route) => {
-    const url = new URL(route.request().url());
-    if (url.pathname.endsWith("/stream")) {
-      await route.fulfill({
-        response: await route.fetch({
-          url: new URL("/media/audio.mp4", url).href,
-        }),
-      });
-    } else if (/\/streams\.(stop|keepalive)$/.test(url.pathname))
-      await route.fulfill({ status: 204 });
-    else throw new Error(`Unexpected media request: ${url.pathname}`);
-  });
+  await serveSceneMedia(page);
   await page.route("**/covers/*", async (route) => {
     await route.fulfill({
       contentType: "image/svg+xml",
@@ -736,92 +726,112 @@ for (const width of [390, 1280]) {
         }
       }
 
-      fixtureTest(
-        "finishing a cover preserves playback and an in-progress edit",
-        async ({ page }) => {
-          await page.goto("/scene-cover-fixture/scenes/1");
-          const video = page.locator("video");
-          const player = page.locator("[data-scene-player]");
-          await player
-            .getByRole("button", { name: "Play", exact: true })
-            .first()
-            .click();
-          await expect
-            .poll(() =>
-              video.evaluate(
-                (element: HTMLVideoElement) => element.currentTime,
-              ),
-            )
-            .toBeGreaterThan(0.5);
-          await action(page, mobile, "Generate thumbnail from current");
-          await expect
-            .poll(() =>
-              page.evaluate(() => window.coverFixture.screenshots.length),
-            )
-            .toBe(1);
-          if (mobile) await action(page, true, "Edit");
-          else
-            await page
-              .getByRole("button", { name: "Edit", exact: true })
+      for (const hls of [false, true])
+        fixtureTest(
+          `${hls ? "HLS" : "direct"} capturing a cover preserves playback and an in-progress edit`,
+          async ({ page }) => {
+            await page.goto(
+              `/scene-cover-fixture/scenes/1${hls ? "?hls" : ""}`,
+            );
+            const video = page.locator("video");
+            const player = page.locator("[data-scene-player]");
+            await player
+              .getByRole("button", { name: "Play", exact: true })
+              .first()
               .click();
-          const title = page.getByRole("textbox", {
-            name: "Title",
-            exact: true,
-          });
-          await title.fill("My unfinished edit");
-          const before = await video.evaluate((element: HTMLVideoElement) => {
-            window.coverPlayback = { video: element, events: [] };
-            for (const name of ["emptied", "loadstart", "pause", "seeking"])
-              element.addEventListener(name, () =>
-                window.coverPlayback.events.push(name),
-              );
-            window.coverFixture.finished = true;
-            return {
-              time: element.currentTime,
-              src: element.currentSrc,
-              requests: window.coverFixture.requests.filter(
-                (name) => name === "FindScene",
-              ).length,
-            };
-          });
-          await expect
-            .poll(() =>
-              page.evaluate(
-                () =>
-                  window.coverFixture.requests.filter(
-                    (name) => name === "FindSceneCovers",
-                  ).length,
-              ),
-            )
-            .toBe(1);
-          await expect
-            .poll(() =>
-              video.evaluate(
-                (element: HTMLVideoElement) => element.currentTime,
-              ),
-            )
-            .toBeGreaterThan(before.time + 1.5);
-          expect(
-            await video.evaluate((element: HTMLVideoElement) => ({
-              same: window.coverPlayback.video === element,
-              events: window.coverPlayback.events,
-              src: element.currentSrc,
-              paused: element.paused,
-              requests: window.coverFixture.requests.filter(
-                (name) => name === "FindScene",
-              ).length,
-            })),
-          ).toEqual({
-            same: true,
-            events: [],
-            src: before.src,
-            paused: false,
-            requests: before.requests,
-          });
-          await expect(title).toHaveValue("My unfinished edit");
-          await expect(title).toBeFocused();
-        },
-      );
+            await expect
+              .poll(() =>
+                video.evaluate(
+                  (element: HTMLVideoElement) => element.currentTime,
+                ),
+              )
+              .toBeGreaterThan(0.5);
+            await expect
+              .poll(() =>
+                video.evaluate((element: HTMLVideoElement) =>
+                  element.buffered.length ? element.buffered.end(0) : 0,
+                ),
+              )
+              .toBeGreaterThan(11.8);
+            const before = await video.evaluate((element: HTMLVideoElement) => {
+              window.coverPlayback = { video: element, events: [] };
+              for (const name of ["emptied", "loadstart", "pause", "seeking"])
+                element.addEventListener(name, () =>
+                  window.coverPlayback.events.push(name),
+                );
+              return {
+                time: element.currentTime,
+                src: element.currentSrc,
+                buffered: [element.buffered.start(0), element.buffered.end(0)],
+                requests: window.coverFixture.requests.filter(
+                  (name) => name === "FindScene",
+                ).length,
+              };
+            });
+            await action(page, mobile, "Generate thumbnail from current");
+            await expect
+              .poll(() =>
+                page.evaluate(() => window.coverFixture.screenshots.length),
+              )
+              .toBe(1);
+            if (mobile) await action(page, true, "Edit");
+            else
+              await page
+                .getByRole("button", { name: "Edit", exact: true })
+                .click();
+            const title = page.getByRole("textbox", {
+              name: "Title",
+              exact: true,
+            });
+            await title.fill("My unfinished edit");
+            const completedAt = await video.evaluate(
+              (element: HTMLVideoElement) => {
+                window.coverFixture.finished = true;
+                return element.currentTime;
+              },
+            );
+            await expect
+              .poll(() =>
+                page.evaluate(
+                  () =>
+                    window.coverFixture.requests.filter(
+                      (name) => name === "FindSceneCovers",
+                    ).length,
+                ),
+              )
+              .toBe(1);
+            await expect
+              .poll(() =>
+                video.evaluate(
+                  (element: HTMLVideoElement) => element.currentTime,
+                ),
+              )
+              .toBeGreaterThan(completedAt + 4.5);
+            expect(
+              await video.evaluate((element: HTMLVideoElement) => ({
+                same: window.coverPlayback.video === element,
+                events: window.coverPlayback.events,
+                src: element.currentSrc,
+                paused: element.paused,
+                buffered: element.buffered.length
+                  ? [element.buffered.start(0), element.buffered.end(0)]
+                  : [],
+                requests: window.coverFixture.requests.filter(
+                  (name) => name === "FindScene",
+                ).length,
+              })),
+            ).toEqual({
+              same: true,
+              events: [],
+              src: before.src,
+              paused: false,
+              buffered: before.buffered,
+              requests: before.requests,
+            });
+            await expect(title).toHaveValue("My unfinished edit");
+            await expect(title).toBeFocused();
+          },
+        );
     },
   );
 }

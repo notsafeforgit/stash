@@ -27,6 +27,7 @@ import type { VideoPlayerStore } from "@videojs/react";
 import { useConfigurationContextOptional } from "src/hooks/config";
 import { isIOS, type PlayerSource } from "./player-utils";
 import {
+  hlsStreamTypeName,
   injectStreamSession,
   scenePlayerSourceURL,
 } from "./scene-player-source-url";
@@ -862,7 +863,8 @@ export function useScenePlayerSources({
       if (
         !finalSrc ||
         !activeSrc ||
-        !isDirectStreamSrc(activeSrc) ||
+        (!isDirectStreamSrc(activeSrc) &&
+          hlsStreamTypeName(activeSrc) !== "hls-hevc") ||
         currentLoadRef.current !== load
       )
         return;

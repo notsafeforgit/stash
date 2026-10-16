@@ -209,85 +209,87 @@ func TestV3HLSDecodeAcrossAV1OpusSeeks(t *testing.T) {
 		"-t", "19", "-c:v", "libaom-av1", "-cpu-used", "8", "-threads", "2",
 		"-crf", "40", "-g", "60", "-c:a", "libopus", source,
 	)
-	for _, videoOnly := range []bool{false, true} {
-		t.Run(fmt.Sprintf("videoOnly=%t", videoOnly), func(t *testing.T) {
-			var init []byte
-			cached := make(map[int][]byte)
-			for _, start := range []int{0, 5, 2, 4} {
-				dir := t.TempDir()
-				audioCodec := "opus"
-				if videoOnly {
-					audioCodec = ""
-				}
-				stream := &v3RunningStream{
-					streamType: V3StreamTypeHLS,
-					vf: &models.VideoFile{
-						BaseFile: &models.BaseFile{Path: source},
-						Width:    160, Height: 90, FrameRate: frameRate,
-						VideoCodec: "av1", AudioCodec: audioCodec,
-					},
-					outputDir: dir,
-				}
-				sm := &StreamManager{
-					encoder: &FFMpeg{}, config: rotationTestStreamConfig{}, context: ctx,
-				}
-				stream.sourceInfoOnce.Do(func() {})
-				args := stream.makeStreamArgs(sm, start)
-				args = append(args[:len(args)-1], "-t", "6.2", args[len(args)-1])
-				run(ffmpegPath, args...)
-				if init == nil {
-					init, err = os.ReadFile(filepath.Join(dir, ".init_video.mp4"))
-					if err != nil {
-						t.Fatal(err)
+	for _, streamType := range []*V3StreamType{V3StreamTypeHLS, V3StreamTypeHLSHEVC} {
+		for _, videoOnly := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/videoOnly=%t", streamType.Name, videoOnly), func(t *testing.T) {
+				var init []byte
+				cached := make(map[int][]byte)
+				for _, start := range []int{0, 5, 2, 4} {
+					dir := t.TempDir()
+					audioCodec := "opus"
+					if videoOnly {
+						audioCodec = ""
+					}
+					stream := &v3RunningStream{
+						streamType: streamType,
+						vf: &models.VideoFile{
+							BaseFile: &models.BaseFile{Path: source},
+							Width:    160, Height: 90, FrameRate: frameRate,
+							VideoCodec: "av1", AudioCodec: audioCodec,
+						},
+						outputDir: dir,
+					}
+					sm := &StreamManager{
+						encoder: &FFMpeg{}, config: rotationTestStreamConfig{}, context: ctx,
+					}
+					stream.sourceInfoOnce.Do(func() {})
+					args := stream.makeStreamArgs(sm, start)
+					args = append(args[:len(args)-1], "-t", "6.2", args[len(args)-1])
+					run(ffmpegPath, args...)
+					if init == nil {
+						init, err = os.ReadFile(filepath.Join(dir, ".init_video.mp4"))
+						if err != nil {
+							t.Fatal(err)
+						}
+					}
+					for segment := start; segment < start+3; segment++ {
+						if _, exists := cached[segment]; exists {
+							continue
+						}
+						cached[segment], err = os.ReadFile(filepath.Join(dir, fmt.Sprintf(".video_%d.m4s", segment)))
+						if err != nil {
+							t.Fatal(err)
+						}
 					}
 				}
-				for segment := start; segment < start+3; segment++ {
-					if _, exists := cached[segment]; exists {
-						continue
+				media := init
+				for segment := 0; segment < 8; segment++ {
+					if len(cached[segment]) == 0 {
+						t.Fatalf("missing cached video segment %d", segment)
 					}
-					cached[segment], err = os.ReadFile(filepath.Join(dir, fmt.Sprintf(".video_%d.m4s", segment)))
-					if err != nil {
-						t.Fatal(err)
-					}
+					media = append(media, cached[segment]...)
 				}
-			}
-			media := init
-			for segment := 0; segment < 8; segment++ {
-				if len(cached[segment]) == 0 {
-					t.Fatalf("missing cached video segment %d", segment)
-				}
-				media = append(media, cached[segment]...)
-			}
-			path := filepath.Join(t.TempDir(), "joined.mp4")
-			if err := os.WriteFile(path, media, 0o600); err != nil {
-				t.Fatal(err)
-			}
-			var probe struct {
-				Frames []struct {
-					PTS string `json:"pts_time"`
-				} `json:"frames"`
-			}
-			if err := json.Unmarshal(run(ffprobePath, "-v", "error", "-show_entries", "frame=pts_time", "-of", "json", path), &probe); err != nil {
-				t.Fatal(err)
-			}
-			if len(probe.Frames) != 8*hlsGopSize(frameRate) {
-				t.Fatalf("decoded %d frames, want %d", len(probe.Frames), 8*hlsGopSize(frameRate))
-			}
-			var origin float64
-			for i, frame := range probe.Frames {
-				pts, err := strconv.ParseFloat(frame.PTS, 64)
-				if err != nil {
+				path := filepath.Join(t.TempDir(), "joined.mp4")
+				if err := os.WriteFile(path, media, 0o600); err != nil {
 					t.Fatal(err)
 				}
-				if i == 0 {
-					origin = pts
+				var probe struct {
+					Frames []struct {
+						PTS string `json:"pts_time"`
+					} `json:"frames"`
 				}
-				want := origin + float64(i)/frameRate
-				if math.Abs(pts-want) > 0.0001 {
-					t.Fatalf("decoded frame %d has PTS %.6f, want %.6f", i, pts, want)
+				if err := json.Unmarshal(run(ffprobePath, "-v", "error", "-show_entries", "frame=pts_time", "-of", "json", path), &probe); err != nil {
+					t.Fatal(err)
 				}
-			}
-		})
+				if len(probe.Frames) != 8*hlsGopSize(frameRate) {
+					t.Fatalf("decoded %d frames, want %d", len(probe.Frames), 8*hlsGopSize(frameRate))
+				}
+				var origin float64
+				for i, frame := range probe.Frames {
+					pts, err := strconv.ParseFloat(frame.PTS, 64)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if i == 0 {
+						origin = pts
+					}
+					want := origin + float64(i)/frameRate
+					if math.Abs(pts-want) > 0.0001 {
+						t.Fatalf("decoded frame %d has PTS %.6f, want %.6f", i, pts, want)
+					}
+				}
+			})
+		}
 	}
 }
 

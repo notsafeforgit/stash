@@ -39,6 +39,11 @@ var (
 		mimeType:  ffmpeg.MimeHLS,
 		extension: ".master.m3u8",
 	}
+	hlsHDREndpointType = endpointType{
+		label:     "HLS (HDR)",
+		mimeType:  ffmpeg.MimeHLS,
+		extension: ".hevc.master.m3u8",
+	}
 	// fmp4CopyHLSEndpointType — remux the source's existing video & audio
 	// streams into fragmented-MP4 HLS segments without re-encoding. The
 	// fast path when the source's codecs are already browser-decodable
@@ -228,6 +233,7 @@ func getSceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStrea
 	// HLS transcode endpoint(s) — fallback when the source's codecs aren't
 	// playable in the target browser. Per-resolution variants via
 	// `?resolution=…`. The plain `.m3u8` re-encodes to H.264 + AAC fMP4.
+	canStreamHDR := instance != nil && instance.StreamManager.CanStreamHDR(pf)
 	for _, res := range []models.StreamingResolutionEnum{
 		models.StreamingResolutionEnumOriginal,
 		models.StreamingResolutionEnumFourK,
@@ -237,6 +243,9 @@ func getSceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStrea
 		models.StreamingResolutionEnumLow,
 	} {
 		if includeSceneStreamPath(res) {
+			if canStreamHDR {
+				endpoints = append(endpoints, makeStreamEndpoint(hlsHDREndpointType, res))
+			}
 			endpoints = append(endpoints, makeStreamEndpoint(hlsEndpointType, res))
 		}
 	}

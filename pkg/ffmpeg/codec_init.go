@@ -78,6 +78,8 @@ func CodecInit(codec VideoCodec) (args Args) {
 		args = append(args,
 			"-qp", "20",
 		)
+	case VideoCodecV265HDR:
+		args = append(args, "-profile:v", "main10")
 	case VideoCodecA264:
 		args = append(args,
 			"-quality", "speed",

@@ -2,12 +2,14 @@ package ffmpeg
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"math"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -40,6 +42,19 @@ func TestHLSColorMetadata(t *testing.T) {
 		probe := &VideoFile{VideoStream: &FFProbeStream{MimeCodecString: test.mime, Profile: test.profile, PixFmt: test.pixelFormat, Level: test.level}}
 		require.Equal(t, test.want, videoCodecString(test.codec, probe))
 	}
+}
+
+func TestHDRStreamRequiresHDRSourceAndMain10Encoder(t *testing.T) {
+	hlg := colorTransferHLG
+	vf := &models.VideoFile{ColorTransfer: &hlg}
+	sm := &StreamManager{encoder: &FFMpeg{hwCodecSupport: []VideoCodec{VideoCodecV265}}, config: hdrTestConfig{}}
+	require.False(t, sm.CanStreamHDR(vf), "8-bit HEVC capability does not establish Main 10 support")
+	sm.encoder.hwCodecSupport = []VideoCodec{VideoCodecV265HDR}
+	require.True(t, sm.CanStreamHDR(vf))
+	require.False(t, sm.CanStreamHDR(&models.VideoFile{}))
+	sm.config = rotationTestStreamConfig{}
+	require.False(t, sm.CanStreamHDR(vf), "respect disabled hardware encoding")
+	require.False(t, (*StreamManager)(nil).CanStreamHDR(vf))
 }
 
 type hdrTestConfig struct{ rotationTestStreamConfig }
@@ -148,6 +163,31 @@ func TestV3HLSHDRConversionAndCopy(t *testing.T) {
 				require.Contains(t, w.Body.String(), "VIDEO-RANGE="+sourceColorMetadata(vf, copied).hlsVideoRange())
 				require.Contains(t, w.Body.String(), "CODECS=\"hvc1.2.")
 			}
+			for _, segment := range []int{0, 1} {
+				outputDir := t.TempDir()
+				stream := &v3RunningStream{streamType: V3StreamTypeHLSHEVC, vf: vf, outputDir: outputDir}
+				args := stream.makeStreamArgs(sm, segment)
+				require.NotContains(t, strings.Join(args, " "), "tonemap")
+				run(t, encoder, args...)
+				playlist := filepath.Join(outputDir, "playlist_video.m3u8")
+				hdr, err := sm.ffprobe.NewVideoFile(playlist)
+				require.NoError(t, err)
+				require.Equal(t, Hevc, hdr.VideoCodec)
+				require.Equal(t, 10, hdr.BitDepth)
+				require.Equal(t, transfer, hdr.ColorTransfer)
+				require.Equal(t, "bt2020", hdr.ColorPrimaries)
+				require.Equal(t, "bt2020nc", hdr.ColorSpace)
+				require.Equal(t, "hvc1", hdr.VideoStream.CodecTagString)
+				require.Equal(t, liveHEVCHLSEncoding(64, 64, 30).level, hdr.VideoStream.Level)
+				pixels := run(t, encoder, "-v", "error", "-i", playlist, "-frames:v", "1", "-pix_fmt", "yuv420p10le", "-f", "rawvideo", "-")
+				require.InDelta(t, 512, binary.LittleEndian.Uint16(pixels[:2]), 4, "preserve HDR pixels, not only the tags")
+				w := httptest.NewRecorder()
+				sm.ServeV3MasterManifest(w, httptest.NewRequest("GET", "/stream.hevc.master.m3u8?stream_session=hdr", nil), V3StreamTypeHLSHEVC, vf, "ORIGINAL")
+				require.Contains(t, w.Body.String(), "VIDEO-RANGE="+sourceColorMetadata(vf, hdr).hlsVideoRange())
+				require.Contains(t, w.Body.String(), "CODECS=\"hvc1.2.4.L90.B0\"")
+				require.Contains(t, w.Body.String(), "stream.hevc.m3u8/video.m3u8?stream_session=hdr")
+				require.NotContains(t, w.Body.String(), "TYPE=AUDIO")
+			}
 			w := httptest.NewRecorder()
 			serveV3HLSMasterManifest(sm, w, httptest.NewRequest("GET", "/stream.master.m3u8", nil), vf, "ORIGINAL")
 			require.Contains(t, w.Body.String(), "VIDEO-RANGE=SDR")
@@ -198,4 +238,68 @@ func TestV3HLSHDRQSV(t *testing.T) {
 		require.Equal(t, w, result.Width)
 		require.Equal(t, h, result.Height)
 	}
+}
+
+type hdrHEVCGPUTestConfig struct{ hdrTestConfig }
+
+func (hdrHEVCGPUTestConfig) GetLiveTranscodeOutputArgs() []string {
+	return []string{"-t", "126"}
+}
+
+// Deployment check: encode beyond the reported 100-second failure point with
+// the same 4K HDR input. Keep generated segments in the test's temporary dir.
+func TestV3HLSHDRHEVCVAAPI(t *testing.T) {
+	source := os.Getenv("STASH_TEST_HDR_SOURCE")
+	if source == "" {
+		t.Skip("STASH_TEST_HDR_SOURCE and VAAPI HEVC hardware required")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	prober := NewFFProbe("ffprobe")
+	probe, err := prober.NewVideoFile(source)
+	require.NoError(t, err)
+	require.True(t, colorMetadataFromProbe(probe).isHDR())
+	vf := &models.VideoFile{BaseFile: &models.BaseFile{Path: source}, Width: probe.Width, Height: probe.Height,
+		FrameRate: probe.FrameRate, VideoCodec: probe.VideoCodec, AudioCodec: probe.AudioCodec, Duration: probe.FileDuration}
+	encoder := NewEncoder("ffmpeg")
+	encoder.initHWSupport(ctx)
+	require.NotNil(t, encoder.hwCodecHDRHLSCompatible(), "Main 10 encoding must pass the startup capability test")
+	sm := &StreamManager{encoder: encoder, ffprobe: prober, config: hdrHEVCGPUTestConfig{}, context: ctx}
+	dir := t.TempDir()
+	stream := &v3RunningStream{streamType: V3StreamTypeHLSHEVC, vf: vf, outputDir: dir}
+	args := stream.makeStreamArgs(sm, 0)
+	require.True(t, stream.fullHW, "10-bit GPU pipeline failed its capability check")
+	started := time.Now()
+	out, err := exec.CommandContext(ctx, "ffmpeg", args...).CombinedOutput()
+	require.NoError(t, err, "%s", out)
+	t.Logf("126 seconds of 4K HDR HEVC HLS: %s", time.Since(started))
+	playlist := filepath.Join(dir, "playlist_video.m3u8")
+	result, err := prober.NewVideoFile(playlist)
+	require.NoError(t, err)
+	require.Equal(t, Hevc, result.VideoCodec)
+	require.Equal(t, probe.ColorTransfer, result.ColorTransfer)
+	require.Equal(t, probe.ColorPrimaries, result.ColorPrimaries)
+	require.Equal(t, probe.ColorSpace, result.ColorSpace)
+	require.Equal(t, 10, result.BitDepth)
+	require.Equal(t, "hvc1", result.VideoStream.CodecTagString)
+	require.Equal(t, vf.Width, result.Width)
+	require.Equal(t, vf.Height, result.Height)
+	require.Equal(t, liveHEVCHLSEncoding(vf.Width, vf.Height, vf.FrameRate).level, result.VideoStream.Level)
+	// Inspect every fragment's declared duration and decode across the area
+	// where the phone stutters; this is server output, not an iOS validation.
+	contents, err := os.ReadFile(playlist)
+	require.NoError(t, err)
+	count := 0
+	for _, line := range strings.Split(string(contents), "\n") {
+		if strings.HasPrefix(line, "#EXTINF:") {
+			value, err := strconv.ParseFloat(strings.TrimSuffix(strings.TrimPrefix(line, "#EXTINF:"), ","), 64)
+			require.NoError(t, err)
+			require.Greater(t, value, 0.0)
+			require.LessOrEqual(t, value, hlsSegmentDuration(vf.FrameRate)+0.02)
+			count++
+		}
+	}
+	require.Greater(t, count, 60)
+	out, err = exec.CommandContext(ctx, "ffmpeg", "-v", "error", "-xerror", "-ss", "96", "-i", playlist, "-t", "12", "-an", "-f", "null", "-").CombinedOutput()
+	require.NoError(t, err, "%s", out)
 }

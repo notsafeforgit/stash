@@ -15,7 +15,11 @@ export {
  */
 
 import { isHlsPlaylist } from "./hls";
-import { canPlaySource, type PlayerSource } from "./player-utils";
+import {
+  canPlayHDRHls,
+  canPlaySource,
+  type PlayerSource,
+} from "./player-utils";
 import { selectFixedQuality, type PlayerQuality } from "@/core/player-quality";
 import { loadPlayerQualityPreference } from "@/core/player-quality-preference";
 
@@ -35,6 +39,7 @@ export type RawStream = {
 const ALLOWED_PATH_SUFFIXES = [
   "/stream",
   "/stream.master.m3u8",
+  "/stream.hevc.master.m3u8",
   "/stream.fmp4.master.m3u8",
   "/stream.fmp4.aac.master.m3u8",
 ];
@@ -43,6 +48,7 @@ export function filterSources(
   streams: RawStream[],
   canDecode: boolean,
   canDecodeVideo: boolean,
+  canDecodeHDR: boolean = canPlayHDRHls(),
 ): PlayerSource[] {
   return streams
     .filter((s) => {
@@ -81,6 +87,7 @@ export function filterSources(
       if (isHlsPlaylist(source.src)) {
         try {
           const path = new URL(source.src).pathname;
+          if (path.endsWith("/stream.hevc.master.m3u8")) return canDecodeHDR;
           // Full codec-copy fMP4 — requires both video AND audio source
           // codecs to be MSE/MMS-decodable in fMP4 (Opus inside MP4 fails
           // on iOS, for instance). Gated on the combined `canDecode`.
@@ -147,13 +154,16 @@ export function getCompatibilitySource(
 function findOriginalResolutionTranscode(
   sources: PlayerSource[],
 ): PlayerSource | undefined {
-  return sources.find((s) => {
+  const originals = sources.filter((s) => {
     try {
       return new URL(s.src).searchParams.get("resolution") === "ORIGINAL";
     } catch {
       return false;
     }
   });
+  return (
+    findSourceByPath(originals, "/stream.hevc.master.m3u8") ?? originals[0]
+  );
 }
 
 function getPreferredSource(sources: PlayerSource[]): PlayerSource | null {
@@ -172,7 +182,9 @@ function getPreferredSource(sources: PlayerSource[]): PlayerSource | null {
   const remux = findSourceByPath(sources, "/stream.fmp4.master.m3u8");
   const remuxAac = findSourceByPath(sources, "/stream.fmp4.aac.master.m3u8");
   const originalHls = findOriginalResolutionTranscode(sources);
-  const hls = findSourceByPath(sources, "/stream.master.m3u8");
+  const hls =
+    findSourceByPath(sources, "/stream.hevc.master.m3u8") ??
+    findSourceByPath(sources, "/stream.master.m3u8");
 
   // Default preference order: direct > full fMP4 codec-copy >
   // video-copy + AAC fMP4 > original-resolution HLS transcode >

@@ -297,6 +297,22 @@ reduce detail to meet that ceiling; original files and codec-copy streams remain
 unchanged. UHD at 60 fps uses Level 5.2. Bandwidth includes the one-second VBV
 burst allowance and AAC instead of advertising the input file's average bitrate.
 
+[stream_v3_hevc.go](../../../pkg/ffmpeg/stream_v3_hevc.go) adds HDR-preserving
+HEVC Main 10 HLS for sources with HLG/PQ metadata and a hardware encoder that
+passes the separate 10-bit capability test. Its scaler retains 10-bit pixels;
+the playlist declares the source range and the output HEVC level. UHD at 60 fps
+uses level 5.1 and a 24 Mbps video peak. The client offers this path only on an
+HDR video display with HEVC Main 10 support in its active MSE/MMS engine.
+Direct/remux still takes priority, and resolution ceilings apply to both
+transcodes. The H.264 rendition tone maps HDR to SDR for compatibility.
+
+`SceneVideo` retains 10 seconds behind playback, targets 30 seconds ahead and
+limits forward buffering to 60 seconds. The 60 MiB byte target is not a strict
+memory limit: hls.js takes the larger byte-derived or minimum-time target.
+Explicit back-buffer eviction avoids retaining an entire played 4K video until
+Safari is forced to reclaim it. The long HLS browser test checks actual buffered
+ranges beyond 100 seconds, rather than asserting configuration values.
+
 [stream_v3_session.go](../../../pkg/ffmpeg/stream_v3_session.go) isolates encoder
 sessions between players, markers, and tabs. Released sessions reject late
 segment requests so an aborted fetch cannot resurrect an evicted encoder.

@@ -613,6 +613,11 @@ func v3HLSGetCodec(sm *StreamManager, name string) (codec VideoCodec) {
 		}
 	case "hls-copy-fmp4", "hls-copy-fmp4-aac":
 		codec = VideoCodecCopy
+	case "hls-hevc":
+		codec = VideoCodecLibX265
+		if hwcodec := sm.encoder.hwCodecHDRHLSCompatible(); hwcodec != nil && sm.config.GetTranscodeHardwareAcceleration() {
+			codec = *hwcodec
+		}
 	}
 
 	return codec
@@ -671,12 +676,24 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 		s.probeSourceInfo(sm)
 		displayRotation = s.displayRotation
 	}
-	toneMap := codec != VideoCodecCopy && s.sourceColor.isHDR()
+	preserveHDR := s.streamType == V3StreamTypeHLSHEVC
+	toneMap := codec != VideoCodecCopy && s.sourceColor.isHDR() && !preserveHDR
 	s.hardwareOnce.Do(func() {
 		if codec == VideoCodecCopy || codec.CodeName == "" || !sm.config.GetTranscodeHardwareAcceleration() {
 			return
 		}
-		if toneMap {
+		switch {
+		case preserveHDR:
+			rotationFilter, rotationOK := hardwareDisplayRotationFilter(codec, displayRotation)
+			if !rotationOK {
+				return
+			}
+			filter := hlsHEVCFilter(codec, s.vf, s.maxTranscodeSize, true, s.sourceColor)
+			filter = prependVideoFilter(rotationFilter, filter)
+			width, height := scaledDimensions(s.vf, s.maxTranscodeSize)
+			encoderArgs := append(CodecInit(codec), liveHEVCHLSEncoding(width, height, s.vf.FrameRateFinite()).args(codec)...)
+			s.fullHW = sm.encoder.hwCanFullHWTranscodeWithEncoder(sm.context, codec, s.vf, displayRotation, filter, encoderArgs)
+		case toneMap:
 			rotationFilter, rotationOK := hardwareDisplayRotationFilter(codec, displayRotation)
 			filter, toneMapOK := sm.encoder.hlsHDRFilter(codec, s.sourceColor, true)
 			if !rotationOK || !toneMapOK {
@@ -685,7 +702,7 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 			filter = prependVideoFilter(rotationFilter, filter)
 			filter = prependVideoFilter(filter, sm.encoder.hwMaxResFilter(codec, s.vf, s.maxTranscodeSize, true))
 			s.fullHW = sm.encoder.hwCanFullHWTranscodeWithFilter(sm.context, codec, s.vf, displayRotation, filter)
-		} else {
+		default:
 			s.fullHW = sm.encoder.hwCanFullHWTranscodeWithRotation(sm.context, codec, s.vf, s.maxTranscodeSize, displayRotation)
 		}
 	})
@@ -709,7 +726,9 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 	args = args.Input(s.vf.Path)
 
 	videoFilter := sm.encoder.hwMaxResFilter(codec, s.vf, s.maxTranscodeSize, fullhw)
-	if toneMap {
+	if preserveHDR {
+		videoFilter = hlsHEVCFilter(codec, s.vf, s.maxTranscodeSize, fullhw, s.sourceColor)
+	} else if toneMap {
 		toneMapFilter, _ := sm.encoder.hlsHDRFilter(codec, s.sourceColor, fullhw)
 		videoFilter = prependVideoFilter(toneMapFilter, videoFilter)
 	}
@@ -725,6 +744,9 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 	if s.streamType == V3StreamTypeHLS {
 		width, height := scaledDimensions(s.vf, s.maxTranscodeSize)
 		args = append(args, liveHLSEncoding(width, height, frameRate).args(codec)...)
+	} else if preserveHDR {
+		width, height := scaledDimensions(s.vf, s.maxTranscodeSize)
+		args = append(args, liveHEVCHLSEncoding(width, height, frameRate).args(codec)...)
 	}
 	if codec == VideoCodecCopy && (s.vf.VideoCodec == H265 || s.vf.VideoCodec == Hevc) {
 		args = append(args, "-tag:v", "hvc1")
@@ -734,6 +756,8 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 		// The manifest promises SDR. Custom encoder options cannot relabel the
 		// tone-mapped pixels as the source's HLG/PQ signal.
 		args = append(args, hlsSDRColorArgs()...)
+	} else if preserveHDR && s.sourceColor.isHDR() {
+		args = append(args, hdrColorFlags(s.sourceColor)...)
 	}
 	args = append(args, streamArgs[len(streamArgs)-1])
 
@@ -1292,7 +1316,7 @@ func serveV3HLSMasterManifestFMP4AAC(sm *StreamManager, w http.ResponseWriter, r
 
 func (sm *StreamManager) ServeV3Manifest(w http.ResponseWriter, r *http.Request, streamType *V3StreamType, vf *models.VideoFile, resolution string) {
 	switch streamType.Name {
-	case "hls", "hls-copy-fmp4", "hls-copy-fmp4-aac":
+	case "hls", "hls-hevc", "hls-copy-fmp4", "hls-copy-fmp4-aac":
 		serveV3HLSManifestFMP4(sm, w, r, vf, resolution)
 	default:
 		http.Error(w, "no manifest for stream type "+streamType.Name, http.StatusNotFound)
@@ -1306,6 +1330,8 @@ func (sm *StreamManager) ServeV3MasterManifest(w http.ResponseWriter, r *http.Re
 	switch streamType.Name {
 	case "hls":
 		serveV3HLSMasterManifest(sm, w, r, vf, resolution)
+	case "hls-hevc":
+		serveV3HLSMasterManifestHEVC(sm, w, r, vf, resolution)
 	case "hls-copy-fmp4":
 		serveV3HLSMasterManifestFMP4(sm, w, r, vf, resolution)
 	case "hls-copy-fmp4-aac":

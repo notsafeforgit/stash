@@ -40,14 +40,15 @@ export const SceneVideo = memo(function SceneVideo({
           // A resumed clip must load at its playhead, while its URL keeps the
           // entire clip seekable. Standalone sources can still use URL hints.
           startPosition: startPosition ?? parseStartPosition(src),
-          // MMS rate-limits segment fetches. These existing ceilings leave
-          // enough buffered video to cover its quota cycles on iPhones.
-          ...(typeof window !== "undefined" &&
-            "ManagedMediaSource" in window && {
-              maxBufferLength: 60,
-              maxMaxBufferLength: 120,
-              maxBufferSize: 240 * 1024 * 1024,
-            }),
+          // hls.js otherwise retains the entire played portion of a VOD.
+          // At 4K this can accumulate hundreds of MB before Safari evicts it.
+          // Keep a small rewind window and enough ahead for MMS quota cycles.
+          backBufferLength: 10,
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+          // This is a buffering target, not a hard memory ceiling: hls.js
+          // uses the larger of this byte target and maxBufferLength seconds.
+          maxBufferSize: 60 * 1024 * 1024,
         },
       },
     };

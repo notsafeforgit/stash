@@ -684,12 +684,12 @@ func hevcHWEncoderArgs(codec VideoCodec, srcColor videoColorMetadata) Args {
 //     converts to the GPU upload layout, then `hwupload` moves the
 //     frame to a VAAPI surface for the encoder.
 func hevcHWVideoFilter(codec VideoCodec, vf *models.VideoFile, reqHeight int, fullhw bool, srcColor videoColorMetadata) VideoFilter {
-	if codec != VideoCodecV265 {
+	if codec != VideoCodecV265 && codec != VideoCodecV265HDR {
 		return ""
 	}
 
 	gpuFmt := "nv12"
-	if srcColor.isHDR() {
+	if srcColor.isHDR() || codec == VideoCodecV265HDR {
 		gpuFmt = "p010"
 	}
 	w, h := downloadScaleDimensions(vf, reqHeight)

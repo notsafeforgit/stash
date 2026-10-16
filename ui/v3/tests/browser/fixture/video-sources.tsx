@@ -85,6 +85,9 @@ export function VideoSourcesFixture() {
       >
         HLS at 4
       </Button>
+      <Button onClick={() => setSrc(sourceURL("/media/seek/stream.m3u8"))}>
+        Long HLS
+      </Button>
       <Button
         onClick={() =>
           setSrc(sourceURL("/media/hls/stream.m3u8?quality=720&start=6"))

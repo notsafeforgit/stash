@@ -45,27 +45,31 @@ describe("online quality preference", () => {
     },
   );
 
-  it("stores the source resolution independently of its display label", () => {
-    savePlayerQualityPreference({
-      src: "https://stash.test/scene/1/stream.master.m3u8?resolution=FULL_HD&start=15",
-    });
-    expect(
-      JSON.parse(localStorage.getItem(QUALITY_STORAGE_KEY) ?? "null"),
-    ).toEqual({
-      kind: "fixed",
-      resolution: Resolution.FullHd,
-    });
-    expect(loadPlayerQualityPreference()).toEqual({
-      kind: "fixed",
-      resolution: Resolution.FullHd,
-    });
-  });
+  it.each(["stream.master.m3u8", "stream.hevc.master.m3u8"])(
+    "stores the source resolution independently of its display label: %s",
+    (path) => {
+      savePlayerQualityPreference({
+        src: `https://stash.test/scene/1/${path}?resolution=FULL_HD&start=15`,
+      });
+      expect(
+        JSON.parse(localStorage.getItem(QUALITY_STORAGE_KEY) ?? "null"),
+      ).toEqual({
+        kind: "fixed",
+        resolution: Resolution.FullHd,
+      });
+      expect(loadPlayerQualityPreference()).toEqual({
+        kind: "fixed",
+        resolution: Resolution.FullHd,
+      });
+    },
+  );
 
   it.each([
     "stream",
     "stream.fmp4.master.m3u8",
     "stream.fmp4.aac.master.m3u8",
     "stream.master.m3u8?resolution=ORIGINAL",
+    "stream.hevc.master.m3u8?resolution=ORIGINAL",
   ])("remembers original-video choices as best available: %s", (path) => {
     localStorage.setItem(QUALITY_STORAGE_KEY, "HLS (240p)");
     savePlayerQualityPreference({ src: `https://stash.test/scene/1/${path}` });

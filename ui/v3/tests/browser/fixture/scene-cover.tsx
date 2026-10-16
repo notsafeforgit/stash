@@ -53,6 +53,7 @@ window.coverFixture = {
 const base = scenes[0];
 if (!base) throw new Error("Missing synthetic scene");
 const url = (path: string) => new URL(path, location.href).href;
+const hls = new URLSearchParams(location.search).has("hls");
 const performers: GQL.PerformerDataFragment[] = ["1", "2"].map((id) => ({
   __typename: "Performer",
   id,
@@ -171,9 +172,11 @@ const detailMock: MockedResponse<
         sceneStreams: [
           {
             __typename: "SceneStreamEndpoint" as const,
-            url: url(`/scene/1/stream?signature=${++streamRevision}`),
-            mime_type: "video/mp4",
-            label: "Direct stream",
+            url: url(
+              `/scene/1/${hls ? "stream.master.m3u8?resolution=STANDARD&" : "stream?"}signature=${++streamRevision}`,
+            ),
+            mime_type: hls ? "application/vnd.apple.mpegurl" : "video/mp4",
+            label: hls ? "HLS (original)" : "Direct stream",
           },
         ],
       },

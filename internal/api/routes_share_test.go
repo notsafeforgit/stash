@@ -130,6 +130,7 @@ func TestShareHTTPScopesEveryMediaRoute(t *testing.T) {
 		"content", "status", "media/image-1/", "media/image-1/image", "media/image-1/thumbnail", "media/image-1/download",
 		"media/image-1/stream", "media/image-1/stream.master.m3u8", "media/image-1/stream.m3u8/video.m3u8", "media/image-1/stream.m3u8/video/init.mp4", "media/image-1/stream.m3u8/video/0.m4s",
 		"media/image-1/stream.fmp4.master.m3u8", "media/image-1/stream.fmp4.m3u8/audio/init.mp4", "media/image-1/stream.fmp4.aac.m3u8/audio/0.m4s",
+		"media/image-1/stream.hevc.master.m3u8", "media/image-1/stream.hevc.m3u8/audio.m3u8", "media/image-1/stream.hevc.m3u8/video/init.mp4", "media/image-1/stream.hevc.m3u8/video/0.m4s",
 	} {
 		for _, method := range []string{http.MethodGet, http.MethodHead} {
 			request := httptest.NewRequest(method, base+endpoint+"?apikey=owner-key&token="+secret, nil)

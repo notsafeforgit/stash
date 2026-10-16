@@ -1,5 +1,43 @@
 import { test, expect } from "./test";
 
+test("long HLS playback evicts played media and bounds forward buffering", async ({
+  page,
+}) => {
+  await page.goto("/video-sources");
+  const video = page.locator("video");
+  await page.getByRole("button", { name: "Toggle sound" }).click();
+  await page.getByRole("button", { name: "Long HLS", exact: true }).click();
+  await expect(page.getByTestId("playback-state")).toHaveAttribute(
+    "data-engine",
+    "hlsjs",
+  );
+  await expect
+    .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+    .toBeGreaterThan(0.1);
+  const original = await video.elementHandle();
+  await video.evaluate((v: HTMLVideoElement) => {
+    v.playbackRate = 8;
+  });
+  // Advance through a real ten-minute fMP4 fixture, not a mocked config.
+  // This catches unlimited retention even when the fixture itself is tiny.
+  await expect
+    .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime), {
+      timeout: 25000,
+    })
+    .toBeGreaterThan(110);
+  const buffered = await video.evaluate((v: HTMLVideoElement) => ({
+    start: v.buffered.start(0),
+    end: v.buffered.end(v.buffered.length - 1),
+    time: v.currentTime,
+  }));
+  expect(buffered.start).toBeGreaterThan(buffered.time - 16);
+  expect(buffered.end).toBeLessThan(buffered.time + 65);
+  await expect(video).toHaveJSProperty("paused", false);
+  expect(await video.evaluate((v, previous) => v === previous, original)).toBe(
+    true,
+  );
+});
+
 test("direct, HLS, quality and seek reloads retain the authorized video element", async ({
   page,
 }) => {

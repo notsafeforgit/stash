@@ -1,12 +1,17 @@
 import { afterEach, expect, it, vi } from "vitest";
+import { StreamingResolutionEnum } from "@/core/generated-graphql";
 import {
+  filterSources,
   getCompatibilitySource,
   selectScenePlayerSource,
 } from "./scene-player-sources";
 
 // Source eligibility has already run before these selectors; avoid creating a
 // DOM codec probe in this test of preference selection and offline playback.
-vi.mock("./player-utils", () => ({ canPlaySource: () => true }));
+vi.mock("./player-utils", () => ({
+  canPlaySource: () => true,
+  canPlayHDRHls: () => false,
+}));
 afterEach(() => vi.unstubAllGlobals());
 
 const direct = { src: "https://stash.test/scene/1/stream" };
@@ -64,4 +69,44 @@ it("keeps an explicit TV best-quality preference separate from the ordinary ceil
       { width: 3840, height: 2160 },
     ),
   ).toBe(direct);
+});
+
+it("offers HDR only to capable displays and prefers it within the resolution ceiling", () => {
+  const hdrOriginal = {
+    src: original.src.replace("stream.master", "stream.hevc.master"),
+  };
+  const hdrHigh = {
+    src: high.src.replace("stream.master", "stream.hevc.master"),
+  };
+  const hd = { src: original.src.replace("ORIGINAL", "FULL_HD") };
+  const hdrHd = { src: hd.src.replace("stream.master", "stream.hevc.master") };
+  const raw = [original, high, hd, hdrOriginal, hdrHigh, hdrHd].map((s) => ({
+    url: s.src,
+  }));
+  const sources = filterSources(raw, false, false, true);
+  const large = { width: 2160, height: 3840 };
+  expect(selectScenePlayerSource(sources, { kind: "best" }, large)?.src).toBe(
+    hdrOriginal.src,
+  );
+  expect(
+    selectScenePlayerSource(
+      sources,
+      { kind: "fixed", resolution: StreamingResolutionEnum.FullHd },
+      large,
+    )?.src,
+  ).toBe(hdrHd.src);
+  expect(
+    getCompatibilitySource(
+      sources,
+      { kind: "fixed", resolution: StreamingResolutionEnum.FullHd },
+      large,
+    )?.src,
+  ).toBe(hd.src);
+  expect(
+    selectScenePlayerSource(
+      filterSources(raw, false, false, false),
+      { kind: "best" },
+      large,
+    )?.src,
+  ).toBe(original.src);
 });

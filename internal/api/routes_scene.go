@@ -77,6 +77,10 @@ func (rs sceneRoutes) Routes() chi.Router {
 		// EXT-X-MEDIA audio rendition + EXT-X-STREAM-INF video variant, both
 		// pointing at per-track media playlists under `/stream.m3u8/{track}.m3u8`.
 		r.Get("/stream.master.m3u8", rs.StreamV3HLSMaster)
+		r.Get("/stream.hevc.master.m3u8", rs.StreamV3HLSHEVCMaster)
+		r.Get("/stream.hevc.m3u8/{track}.m3u8", rs.StreamV3HLSHEVCTrackPlaylist)
+		r.Get("/stream.hevc.m3u8/{track}/init.mp4", rs.StreamV3HLSHEVCInitSegment)
+		r.Get("/stream.hevc.m3u8/{track}/{segment}.m4s", rs.StreamV3HLSHEVCSegment)
 		r.Get("/stream.m3u8/{track}.m3u8", rs.StreamV3HLSTrackPlaylist)
 		r.Get("/stream.m3u8/{track}/init.mp4", rs.StreamV3HLSInitSegment)
 		r.Get("/stream.m3u8/{track}/{segment}.m4s", rs.StreamV3HLSSegment)
@@ -214,6 +218,22 @@ func (rs sceneRoutes) StreamV3HLSTrackPlaylist(w http.ResponseWriter, r *http.Re
 
 func (rs sceneRoutes) StreamV3HLSMaster(w http.ResponseWriter, r *http.Request) {
 	rs.streamV3MasterManifest(w, r, ffmpeg.V3StreamTypeHLS, "HLS master")
+}
+
+func (rs sceneRoutes) StreamV3HLSHEVCMaster(w http.ResponseWriter, r *http.Request) {
+	rs.streamV3MasterManifest(w, r, ffmpeg.V3StreamTypeHLSHEVC, "HDR HLS master")
+}
+
+func (rs sceneRoutes) StreamV3HLSHEVCTrackPlaylist(w http.ResponseWriter, r *http.Request) {
+	rs.streamV3Manifest(w, r, ffmpeg.V3StreamTypeHLSHEVC, "HDR HLS track playlist")
+}
+
+func (rs sceneRoutes) StreamV3HLSHEVCInitSegment(w http.ResponseWriter, r *http.Request) {
+	rs.streamV3SegmentNamed(w, r, ffmpeg.V3StreamTypeHLSHEVC, chi.URLParam(r, "track"), "init")
+}
+
+func (rs sceneRoutes) StreamV3HLSHEVCSegment(w http.ResponseWriter, r *http.Request) {
+	rs.streamV3Segment(w, r, ffmpeg.V3StreamTypeHLSHEVC)
 }
 
 func (rs sceneRoutes) StreamV3HLSCopyFMP4Master(w http.ResponseWriter, r *http.Request) {

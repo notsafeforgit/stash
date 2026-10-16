@@ -93,6 +93,20 @@ function hasMSE(): boolean {
   );
 }
 
+/** The HDR transcode is HEVC Main 10, independent of the source codec.
+ * Use the active HLS engine's codec support and the display's video range.
+ * This synchronous check also works on the first scene after a page load,
+ * without upgrading the source and restarting playback after an async probe. */
+export function canPlayHDRHls(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  if (!window.matchMedia("(video-dynamic-range: high)").matches) return false;
+  const type = 'video/mp4; codecs="hvc1.2.4.L153.B0"';
+  const mse = getActiveMSE();
+  return mse
+    ? mse.isTypeSupported(type)
+    : hasNativeHLS() && _probeVideo.canPlayType(type) === "probably";
+}
+
 // ── Codec probe for the fMP4-remux HLS path ──────────────────────────────────
 //
 // Safari's `canPlayType` on `video/mp4; codecs="…"` reports whether the

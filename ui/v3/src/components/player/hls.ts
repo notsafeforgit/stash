@@ -130,9 +130,11 @@ export function hlsSegmentDuration(frameRate: number | undefined): number {
 // both shapes.
 const PLAYLIST_PATH_SUFFIXES = [
   "/stream.master.m3u8",
+  "/stream.hevc.master.m3u8",
   "/stream.fmp4.master.m3u8",
   "/stream.fmp4.aac.master.m3u8",
   "/stream.m3u8",
+  "/stream.hevc.m3u8",
   "/stream.fmp4.m3u8",
   "/stream.fmp4.aac.m3u8",
 ];

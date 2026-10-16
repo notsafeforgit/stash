@@ -1,19 +1,26 @@
 import { describe, expect, it } from "vitest";
 import {
+  hlsStreamTypeName,
   injectReloadNonce,
   scenePlayerSourceURL,
 } from "./scene-player-source-url";
 
 describe("scene player source URLs", () => {
-  it("retains the full clip after a mid-clip quality switch", () => {
-    const src = "https://stash.test/scene/1/stream.master.m3u8?resolution=720";
-    const url = new URL(
-      scenePlayerSourceURL(src, 125, { start: 101, end: 220 }, 0)!,
-    );
-    expect(url.searchParams.get("start")).toBe("101");
-    expect(url.searchParams.get("end")).toBe("220");
-    expect(url.searchParams.get("resolution")).toBe("720");
-  });
+  it.each(["stream.master.m3u8", "stream.hevc.master.m3u8"])(
+    "retains the full clip after a mid-clip quality switch: %s",
+    (path) => {
+      const src = `https://stash.test/scene/1/${path}?resolution=720`;
+      const url = new URL(
+        scenePlayerSourceURL(src, 125, { start: 101, end: 220 }, 0)!,
+      );
+      expect(url.searchParams.get("start")).toBe("101");
+      expect(url.searchParams.get("end")).toBe("220");
+      expect(url.searchParams.get("resolution")).toBe("720");
+      expect(hlsStreamTypeName(src)).toBe(
+        path.includes("hevc") ? "hls-hevc" : "hls",
+      );
+    },
+  );
 
   it("keeps direct-stream clip fragments valid while forcing a reload", () => {
     expect(

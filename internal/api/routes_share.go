@@ -90,6 +90,10 @@ func (rs *shareRoutes) router() http.Handler {
 				scene := sceneRoutes{routes: routes{txnManager: rs.service.Repo.TxnManager}, sceneFinder: rs.service.Repo.Scene, fileGetter: rs.service.Repo.File}
 				for endpoint, handler := range map[string]http.HandlerFunc{
 					"/stream.master.m3u8":                         scene.StreamV3HLSMaster,
+					"/stream.hevc.master.m3u8":                    scene.StreamV3HLSHEVCMaster,
+					"/stream.hevc.m3u8/{track}.m3u8":              scene.StreamV3HLSHEVCTrackPlaylist,
+					"/stream.hevc.m3u8/{track}/init.mp4":          scene.StreamV3HLSHEVCInitSegment,
+					"/stream.hevc.m3u8/{track}/{segment}.m4s":     scene.StreamV3HLSHEVCSegment,
 					"/stream.m3u8/{track}.m3u8":                   scene.StreamV3HLSTrackPlaylist,
 					"/stream.m3u8/{track}/init.mp4":               scene.StreamV3HLSInitSegment,
 					"/stream.m3u8/{track}/{segment}.m4s":          scene.StreamV3HLSSegment,
@@ -438,7 +442,7 @@ func (rs *shareRoutes) stream(handler http.HandlerFunc) http.HandlerFunc {
 			}
 		}
 		if value := q.Get("keep_type"); value != "" {
-			if value != "hls" && value != "hls-copy-fmp4" && value != "hls-copy-fmp4-aac" {
+			if value != "hls" && value != "hls-hevc" && value != "hls-copy-fmp4" && value != "hls-copy-fmp4-aac" {
 				http.NotFound(w, r)
 				return
 			}
@@ -450,9 +454,12 @@ func (rs *shareRoutes) stream(handler http.HandlerFunc) http.HandlerFunc {
 		// Count every encoder variant, not just browser sessions. A recipient
 		// cannot multiply the budget by requesting many resolutions/codecs.
 		streamType := "hls"
-		if strings.Contains(r.URL.Path, "/stream.fmp4.aac.") {
+		switch {
+		case strings.Contains(r.URL.Path, "/stream.hevc."):
+			streamType = "hls-hevc"
+		case strings.Contains(r.URL.Path, "/stream.fmp4.aac."):
 			streamType = "hls-copy-fmp4-aac"
-		} else if strings.Contains(r.URL.Path, "/stream.fmp4.") {
+		case strings.Contains(r.URL.Path, "/stream.fmp4."):
 			streamType = "hls-copy-fmp4"
 		}
 		resolution := clean.Get("resolution")

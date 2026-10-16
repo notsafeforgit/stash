@@ -30,13 +30,14 @@ var (
 	VideoCodecVVP9  = makeVideoCodec("VP9 VAAPI", "vp9_vaapi")
 	VideoCodecVVPX  = makeVideoCodec("VP8 VAAPI", "vp8_vaapi")
 	VideoCodecRK264 = makeVideoCodec("H264 Rockchip MPP (rkmpp)", "h264_rkmpp")
-	// HEVC HW encoders. Currently used only by the download endpoint
-	// (mode=hevc) to encode at GPU speed instead of waiting on libx265.
+	// HEVC HW encoders for downloads and HDR-preserving HLS.
 	// HDR10 metadata passes through the encoder when the input is
 	// 10-bit and the output profile is `main10`; the download path
 	// branches on source color metadata to pick `p010`/`main10` vs
 	// `nv12`/`main`.
 	VideoCodecV265 = makeVideoCodec("HEVC VAAPI", "hevc_vaapi")
+	// Tested separately: some devices encode Main but not Main 10.
+	VideoCodecV265HDR = makeVideoCodec("HEVC VAAPI Main 10", "hevc_vaapi")
 	// AV1 HW encoders. Used only by the download endpoint
 	// (mode=av1). AV1 is more efficient than HEVC at the same visual
 	// quality (~30% smaller bitstreams), but encode hardware is rare
@@ -90,6 +91,7 @@ func (f *FFMpeg) initHWSupport(ctx context.Context) {
 		VideoCodecI264C,
 		VideoCodecV264,
 		VideoCodecV265,
+		VideoCodecV265HDR,
 		VideoCodecVAV1,
 		VideoCodecIAV1,
 		VideoCodecNAV1,
@@ -110,6 +112,9 @@ func (f *FFMpeg) initHWSupport(ctx context.Context) {
 
 		// Test scaling
 		videoFilter := f.hwMaxResFilter(codec, vFile, minHeight, false)
+		if codec == VideoCodecV265HDR {
+			videoFilter = hlsHEVCFilter(codec, vFile, minHeight, false, videoColorMetadata{Transfer: colorTransferHLG})
+		}
 		args = append(args, CodecInit(codec)...)
 		args = args.VideoFilter(videoFilter)
 
@@ -184,6 +189,10 @@ func (f *FFMpeg) hwCanFullHWTranscodeWithRotation(ctx context.Context, codec Vid
 }
 
 func (f *FFMpeg) hwCanFullHWTranscodeWithFilter(ctx context.Context, codec VideoCodec, vf *models.VideoFile, displayRotation int64, videoFilter VideoFilter) bool {
+	return f.hwCanFullHWTranscodeWithEncoder(ctx, codec, vf, displayRotation, videoFilter, CodecInit(codec))
+}
+
+func (f *FFMpeg) hwCanFullHWTranscodeWithEncoder(ctx context.Context, codec VideoCodec, vf *models.VideoFile, displayRotation int64, videoFilter VideoFilter, encoderArgs Args) bool {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -196,7 +205,7 @@ func (f *FFMpeg) hwCanFullHWTranscodeWithFilter(ctx context.Context, codec Video
 	args = args.Input(vf.Path)
 	args = args.Duration(1)
 
-	args = append(args, CodecInit(codec)...)
+	args = append(args, encoderArgs...)
 	args = args.VideoFilter(videoFilter)
 
 	args = args.Format("null")
@@ -259,7 +268,7 @@ func hardwareDisplayRotationFilter(codec VideoCodec, displayRotation int64) (Vid
 		return VideoFilter(fmt.Sprintf("transpose_cuda=dir=%s", direction)), true
 	case VideoCodecI264, VideoCodecI264C, VideoCodecIAV1, VideoCodecIVP9:
 		return VideoFilter(fmt.Sprintf("vpp_qsv=transpose=%s", direction)), true
-	case VideoCodecV264, VideoCodecV265, VideoCodecVAV1, VideoCodecVVP9:
+	case VideoCodecV264, VideoCodecV265, VideoCodecV265HDR, VideoCodecVAV1, VideoCodecVVP9:
 		return VideoFilter(fmt.Sprintf("transpose_vaapi=dir=%s", direction)), true
 	default:
 		return "", false
@@ -300,6 +309,7 @@ func (f *FFMpeg) hwDeviceInit(args Args, toCodec VideoCodec, fullhw bool) Args {
 		}
 	case VideoCodecV264,
 		VideoCodecV265,
+		VideoCodecV265HDR,
 		VideoCodecVAV1,
 		VideoCodecVVP9:
 		args = append(args, "-vaapi_device")

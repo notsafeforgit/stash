@@ -38,7 +38,7 @@ export function selectFixedQuality<T extends { src: string }>(
     original > 0 &&
     original <= ceiling;
   let preserved: { source: T; priority: number } | undefined;
-  let selected: { source: T; height: number } | undefined;
+  let selected: { source: T; height: number; hdr: boolean } | undefined;
   for (const source of sources) {
     let url: URL;
     try {
@@ -60,7 +60,8 @@ export function selectFixedQuality<T extends { src: string }>(
         preserved = { source, priority };
       }
     }
-    if (!url.pathname.endsWith("/stream.master.m3u8")) continue;
+    const hdr = url.pathname.endsWith("/stream.hevc.master.m3u8");
+    if (!hdr && !url.pathname.endsWith("/stream.master.m3u8")) continue;
     const resolution = url.searchParams.get("resolution");
     const tier = qualityTiers.find((value) => value === resolution);
     const height = tier
@@ -71,9 +72,11 @@ export function selectFixedQuality<T extends { src: string }>(
     if (
       height > 0 &&
       height <= ceiling &&
-      (!selected || height > selected.height)
+      (!selected ||
+        height > selected.height ||
+        (height === selected.height && hdr && !selected.hdr))
     ) {
-      selected = { source, height };
+      selected = { source, height, hdr };
     }
   }
   return preserved?.source ?? selected?.source ?? null;

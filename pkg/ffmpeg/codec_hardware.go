@@ -178,6 +178,14 @@ func (f *FFMpeg) hwCanFullHWTranscodeWithRotation(ctx context.Context, codec Vid
 	if !rotationSupported {
 		return false
 	}
+	videoFilter := f.hwMaxResFilter(codec, vf, reqHeight, true)
+	videoFilter = prependVideoFilter(rotationFilter, videoFilter)
+	return f.hwCanFullHWTranscodeWithFilter(ctx, codec, vf, displayRotation, videoFilter)
+}
+
+func (f *FFMpeg) hwCanFullHWTranscodeWithFilter(ctx context.Context, codec VideoCodec, vf *models.VideoFile, displayRotation int64, videoFilter VideoFilter) bool {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 
 	var args Args
 	args = append(args, "-hide_banner")
@@ -188,8 +196,6 @@ func (f *FFMpeg) hwCanFullHWTranscodeWithRotation(ctx context.Context, codec Vid
 	args = args.Input(vf.Path)
 	args = args.Duration(1)
 
-	videoFilter := f.hwMaxResFilter(codec, vf, reqHeight, true)
-	videoFilter = prependVideoFilter(rotationFilter, videoFilter)
 	args = append(args, CodecInit(codec)...)
 	args = args.VideoFilter(videoFilter)
 

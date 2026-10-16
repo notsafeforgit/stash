@@ -42,6 +42,7 @@ ENV HOME=/config \
 COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /uvx /usr/local/bin/
 COPY --from=jellyfin-setup /etc/apt/sources.list.d/jellyfin.sources /etc/apt/sources.list.d/jellyfin.sources
 COPY --from=jellyfin-setup /etc/apt/keyrings/jellyfin.gpg /etc/apt/keyrings/jellyfin.gpg
+COPY docker/native/install-intel-opencl.sh /tmp/install-intel-opencl.sh
 RUN sed -i 's/Components: main$/Components: main contrib non-free/' /etc/apt/sources.list.d/debian.sources \
     && apt-get update && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
@@ -52,6 +53,7 @@ RUN sed -i 's/Components: main$/Components: main contrib non-free/' /etc/apt/sou
          apt-get install -y --no-install-recommends \
            i965-va-driver-shaders intel-media-va-driver-non-free mesa-va-drivers; \
        fi \
+    && sh /tmp/install-intel-opencl.sh && rm /tmp/install-intel-opencl.sh \
     && rm -rf /var/lib/apt/lists/* \
     && ln -s /usr/lib/jellyfin-ffmpeg/ffmpeg /usr/bin/ffmpeg \
     && ln -s /usr/lib/jellyfin-ffmpeg/ffprobe /usr/bin/ffprobe \

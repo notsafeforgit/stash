@@ -64,6 +64,13 @@ def main():
       for encoder in h264_qsv h264_vaapi h264_nvenc; do grep -q "$encoder" /tmp/encoders; done
       ffmpeg -v error -f lavfi -i testsrc2=size=64x64:rate=1 -frames:v 1 -c:v libx264 /tmp/test.mp4
       ffprobe -v error -show_entries stream=codec_name -of csv=p=0 /tmp/test.mp4 | grep -qx h264
+      ffmpeg -hide_banner -filters > /tmp/filters
+      for filter in zscale tonemap tonemap_opencl; do grep -qw "$filter" /tmp/filters; done
+      if [ "$(dpkg --print-architecture)" = amd64 ]; then
+        test -s /etc/OpenCL/vendors/intel.icd
+        ldd /usr/lib/x86_64-linux-gnu/intel-opencl/libigdrcl.so > /tmp/opencl-libraries
+        if grep -q 'not found' /tmp/opencl-libraries; then cat /tmp/opencl-libraries; exit 1; fi
+      fi
       vips black /tmp/test.png 16 16
       vips copy /tmp/test.png /tmp/test.avif
       vipsheader /tmp/test.avif

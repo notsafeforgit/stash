@@ -94,7 +94,7 @@ func TestV3HLSBoundedEncodingAfterSeek(t *testing.T) {
 		vf:         &models.VideoFile{BaseFile: &models.BaseFile{Path: source}, Width: 640, Height: 360, FrameRate: 59.94, Duration: 360 / 59.94},
 		outputDir:  dir,
 	}
-	stream.displayRotationOnce.Do(func() {})
+	stream.sourceInfoOnce.Do(func() {})
 	sm := &StreamManager{encoder: NewEncoder(encoder), config: encodingTestConfig{outputArgs: []string{"-metadata", "comment=live-output-option"}}, context: ctx}
 	args := stream.makeStreamArgs(sm, 1)
 	require.True(t, strings.HasSuffix(args[len(args)-1], "playlist_%v.m3u8"))

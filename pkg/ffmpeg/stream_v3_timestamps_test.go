@@ -231,7 +231,7 @@ func TestV3HLSDecodeAcrossAV1OpusSeeks(t *testing.T) {
 				sm := &StreamManager{
 					encoder: &FFMpeg{}, config: rotationTestStreamConfig{}, context: ctx,
 				}
-				stream.displayRotationOnce.Do(func() {})
+				stream.sourceInfoOnce.Do(func() {})
 				args := stream.makeStreamArgs(sm, start)
 				args = append(args[:len(args)-1], "-t", "6.2", args[len(args)-1])
 				run(ffmpegPath, args...)

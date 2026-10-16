@@ -585,8 +585,11 @@ type v3RunningStream struct {
 	lastAccessed    time.Time
 	lastSegment     int
 
-	displayRotationOnce sync.Once
-	displayRotation     int64
+	sourceInfoOnce  sync.Once
+	displayRotation int64
+	sourceColor     videoColorMetadata
+	hardwareOnce    sync.Once
+	fullHW          bool
 }
 
 func (t V3StreamType) String() string {
@@ -633,16 +636,20 @@ func (s *v3RunningStream) tracks() []Track {
 	return []Track{TrackVideo, TrackAudio}
 }
 
-func (s *v3RunningStream) getDisplayRotation(sm *StreamManager) int64 {
-	s.displayRotationOnce.Do(func() {
+func (s *v3RunningStream) probeSourceInfo(sm *StreamManager) {
+	s.sourceInfoOnce.Do(func() {
+		s.sourceColor = colorMetadataFromModel(s.vf)
+		if sm.ffprobe == nil {
+			return
+		}
 		probe, err := sm.ffprobe.NewVideoFile(s.vf.Path)
 		if err != nil {
-			TranscodeDebugf("[transcode] could not probe source display rotation: %v", err)
+			TranscodeDebugf("[transcode] could not probe source rotation/color: %v", err)
 			return
 		}
 		s.displayRotation = probe.Rotation
+		s.sourceColor = sourceColorMetadata(s.vf, probe)
 	})
-	return s.displayRotation
 }
 
 func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
@@ -661,11 +668,28 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 	// the configured hardware encoder.
 	displayRotation := int64(0)
 	if codec != VideoCodecCopy {
-		displayRotation = s.getDisplayRotation(sm)
+		s.probeSourceInfo(sm)
+		displayRotation = s.displayRotation
 	}
-	fullhw := codec.CodeName != "" &&
-		sm.config.GetTranscodeHardwareAcceleration() &&
-		sm.encoder.hwCanFullHWTranscodeWithRotation(sm.context, codec, s.vf, s.maxTranscodeSize, displayRotation)
+	toneMap := codec != VideoCodecCopy && s.sourceColor.isHDR()
+	s.hardwareOnce.Do(func() {
+		if codec == VideoCodecCopy || codec.CodeName == "" || !sm.config.GetTranscodeHardwareAcceleration() {
+			return
+		}
+		if toneMap {
+			rotationFilter, rotationOK := hardwareDisplayRotationFilter(codec, displayRotation)
+			filter, toneMapOK := sm.encoder.hlsHDRFilter(codec, s.sourceColor, true)
+			if !rotationOK || !toneMapOK {
+				return
+			}
+			filter = prependVideoFilter(rotationFilter, filter)
+			filter = prependVideoFilter(filter, sm.encoder.hwMaxResFilter(codec, s.vf, s.maxTranscodeSize, true))
+			s.fullHW = sm.encoder.hwCanFullHWTranscodeWithFilter(sm.context, codec, s.vf, displayRotation, filter)
+		} else {
+			s.fullHW = sm.encoder.hwCanFullHWTranscodeWithRotation(sm.context, codec, s.vf, s.maxTranscodeSize, displayRotation)
+		}
+	})
+	fullhw := s.fullHW
 	args = sm.encoder.hwDeviceInit(args, codec, fullhw)
 	args = append(args, extraInputArgs...)
 
@@ -685,6 +709,10 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 	args = args.Input(s.vf.Path)
 
 	videoFilter := sm.encoder.hwMaxResFilter(codec, s.vf, s.maxTranscodeSize, fullhw)
+	if toneMap {
+		toneMapFilter, _ := sm.encoder.hlsHDRFilter(codec, s.sourceColor, fullhw)
+		videoFilter = prependVideoFilter(toneMapFilter, videoFilter)
+	}
 	if fullhw {
 		rotationFilter, _ := hardwareDisplayRotationFilter(codec, displayRotation)
 		videoFilter = prependVideoFilter(rotationFilter, videoFilter)
@@ -698,7 +726,15 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 		width, height := scaledDimensions(s.vf, s.maxTranscodeSize)
 		args = append(args, liveHLSEncoding(width, height, frameRate).args(codec)...)
 	}
+	if codec == VideoCodecCopy && (s.vf.VideoCodec == H265 || s.vf.VideoCodec == Hevc) {
+		args = append(args, "-tag:v", "hvc1")
+	}
 	args = append(args, extraOutputArgs...)
+	if toneMap {
+		// The manifest promises SDR. Custom encoder options cannot relabel the
+		// tone-mapped pixels as the source's HLG/PQ signal.
+		args = append(args, hlsSDRColorArgs()...)
+	}
 	args = append(args, streamArgs[len(streamArgs)-1])
 
 	return args
@@ -965,8 +1001,7 @@ func serveV3HLSManifestFMP4(sm *StreamManager, w http.ResponseWriter, r *http.Re
 // the codec-copy variant actually emits — otherwise appended segments
 // fail to decode silently. Probes the source for profile + level so the
 // avc1/hvc1/av01 strings reflect the real bitstream.
-func fmp4MasterCodecs(sm *StreamManager, vf *models.VideoFile) string {
-	probe, _ := sm.ffprobe.NewVideoFile(vf.Path)
+func fmp4MasterCodecs(vf *models.VideoFile, probe *VideoFile) string {
 	video := videoCodecString(vf.VideoCodec, probe)
 	audio := mapAudioCodecToRFC6381(vf.AudioCodec)
 	switch {
@@ -990,30 +1025,44 @@ func fmp4MasterCodecs(sm *StreamManager, vf *models.VideoFile) string {
 // Falls back to permissive defaults for codecs we don't have probe
 // fields for.
 func videoCodecString(codec string, probe *VideoFile) string {
+	if value := probedVideoCodecString(codec, probe); value != "" {
+		return value
+	}
 	var profile string
 	var level int
+	bitDepth := 8
 	if probe != nil && probe.VideoStream != nil {
 		profile = probe.VideoStream.Profile
 		level = probe.VideoStream.Level
+		if depth := bitDepthFromStream(probe.VideoStream); depth > 0 {
+			bitDepth = depth
+		}
 	}
 	switch codec {
 	case H264:
 		return formatAvcCodec(profile, level)
 	case H265, Hevc:
-		// HEVC RFC 6381 form is `hvc1.<gen-prof>.<prof-comp>.<tier-level>.<constr>`
-		// — encoding all five fields requires the GeneralProfileSpace,
-		// CompatibilityFlags, Tier, and ConstraintFlags. ffprobe doesn't
-		// surface those directly, so use a conservative Main@3.1 string.
-		// Browsers that support HEVC at all generally accept this baseline
-		// codec hint and decode whatever's actually in the stream.
-		return "hvc1.1.6.L93.B0"
+		// Older ffprobe builds lack mime_codec_string. Preserve at least the
+		// Main/Main10 profile and level rather than advertising all HDR as 8-bit.
+		if level <= 0 {
+			level = 93
+		}
+		if bitDepth > 8 || strings.EqualFold(profile, "Main 10") {
+			return fmt.Sprintf("hvc1.2.4.L%d.B0", level)
+		}
+		return fmt.Sprintf("hvc1.1.6.L%d.B0", level)
 	case "av1":
-		// AV1 codec string format: av01.<profile>.<level><tier>.<bitdepth>
-		// Default to Main Profile, Level 4.0, Main Tier, 8-bit. Real-world
-		// AV1 sources rarely exceed level 5.1, and AV1-decoding browsers
-		// (Safari 17+, Chrome, Firefox) tolerate level mismatches as long
-		// as the actual content fits within their decoder limits.
-		return "av01.0.04M.08"
+		profileID := 0
+		switch strings.ToLower(profile) {
+		case "high":
+			profileID = 1
+		case "professional":
+			profileID = 2
+		}
+		if probe == nil || probe.VideoStream == nil || level < 0 || level > 23 {
+			level = 4
+		}
+		return fmt.Sprintf("av01.%d.%02dM.%02d", profileID, level, bitDepth)
 	case Vp9:
 		return "vp09.00.10.08"
 	default:
@@ -1105,7 +1154,7 @@ func scaledDimensions(vf *models.VideoFile, maxResolution int) (int, int) {
 // videoURL is the video track's media playlist URL (always present). audioURL
 // is the audio rendition's playlist URL; when non-empty an EXT-X-MEDIA audio
 // rendition is added and the video variant's EXT-X-STREAM-INF carries AUDIO="aac".
-func writeMasterPlaylist(buf *bytes.Buffer, videoURL, audioURL string, bandwidth int, width, height int, codecs string) {
+func writeMasterPlaylist(buf *bytes.Buffer, videoURL, audioURL string, bandwidth int, width, height int, codecs, videoRange string) {
 	fmt.Fprint(buf, "#EXTM3U\n")
 	fmt.Fprint(buf, "#EXT-X-VERSION:7\n")
 	fmt.Fprint(buf, "#EXT-X-INDEPENDENT-SEGMENTS\n")
@@ -1119,6 +1168,7 @@ func writeMasterPlaylist(buf *bytes.Buffer, videoURL, audioURL string, bandwidth
 	if codecs != "" {
 		fmt.Fprintf(buf, ",CODECS=\"%s\"", codecs)
 	}
+	fmt.Fprintf(buf, ",VIDEO-RANGE=%s", videoRange)
 	if audioURL != "" {
 		fmt.Fprintf(buf, ",AUDIO=\"aac\"")
 	}
@@ -1176,7 +1226,7 @@ func serveV3HLSMasterManifest(sm *StreamManager, w http.ResponseWriter, r *http.
 		videoURL, audioURL,
 		encoding.bandwidth(audioURL != ""),
 		width, height,
-		codecs,
+		codecs, "SDR",
 	)
 	w.Header().Set("Content-Type", MimeHLS)
 	utils.ServeStaticContent(w, r, buf.Bytes())
@@ -1187,6 +1237,7 @@ func serveV3HLSMasterManifest(sm *StreamManager, w http.ResponseWriter, r *http.
 // probe data so the advertised codec string matches the actual init
 // segment — MSE rejects mismatched segments silently.
 func serveV3HLSMasterManifestFMP4(sm *StreamManager, w http.ResponseWriter, r *http.Request, vf *models.VideoFile, resolution string) {
+	probe, _ := sm.ffprobe.NewVideoFile(vf.Path)
 	width, height := scaledResolution(vf, resolution)
 	videoURL := hlsMasterTrackURL(r, TrackVideo)
 	var audioURL string
@@ -1199,7 +1250,7 @@ func serveV3HLSMasterManifestFMP4(sm *StreamManager, w http.ResponseWriter, r *h
 		videoURL, audioURL,
 		approxBandwidth(vf),
 		width, height,
-		fmp4MasterCodecs(sm, vf),
+		fmp4MasterCodecs(vf, probe), sourceColorMetadata(vf, probe).hlsVideoRange(),
 	)
 	w.Header().Set("Content-Type", MimeHLS)
 	utils.ServeStaticContent(w, r, buf.Bytes())
@@ -1233,7 +1284,7 @@ func serveV3HLSMasterManifestFMP4AAC(sm *StreamManager, w http.ResponseWriter, r
 		videoURL, audioURL,
 		approxBandwidth(vf),
 		width, height,
-		codecs,
+		codecs, sourceColorMetadata(vf, probe).hlsVideoRange(),
 	)
 	w.Header().Set("Content-Type", MimeHLS)
 	utils.ServeStaticContent(w, r, buf.Bytes())

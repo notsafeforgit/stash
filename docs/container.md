@@ -6,6 +6,7 @@ no downstream `stash-s6` build or runtime compatibility mode. Production pins th
 verified registry digest; see [deployment](v3-deployment.md).
 
 The Debian Trixie image includes Jellyfin FFmpeg 8, Intel VA-API/QSV drivers,
+Intel OpenCL for Gen12/Arc and newer GPUs,
 Mesa VA-API drivers, NVIDIA codec support, patched libvips/HEIF/AVIF tools,
 translate-shell, Python 3.14 and version-pinned `uv`. GPU use still requires a
 supported host driver and device access. A machine without a GPU uses software
@@ -48,6 +49,20 @@ NVIDIA hosts need the NVIDIA Container Toolkit and mapped GPU devices, for
 example Docker Compose GPU reservations or Podman's CDI device selection. The
 image advertises `compute,video,utility` driver capabilities. It does not patch
 the host's NVIDIA driver or change its encoding-session limits.
+
+H.264 HLS compatibility streams tone-map PQ/HLG HDR to BT.709 SDR. Intel QSV
+and VA-API use OpenCL when the device passes a probe of the complete filter
+chain. Other devices, or missing OpenCL support, use software tone mapping
+with the selected encoder; this can be slower at 4K. Codec-copy HLS preserves
+HDR, declaring the source's PQ/HLG range and probed codec/bit depth. The source
+media is never rewritten. Intel VPP alone is not used for HLG conversion.
+
+For a GPU regression check, build the `pkg/ffmpeg` test binary and run
+`TestV3HLSHDRQSV` inside the image with `STASH_TEST_QSV_HDR_SOURCE` pointing to
+a read-only HDR clip longer than 100 seconds. It exercises a seek with original
+resolution and 1080p output, checking that the GPU path produces SDR. CI also
+tests actual PQ/HLG pixel conversion, HDR-preserving remux and GPU fallback
+without requiring a GPU.
 
 ## Move an existing deployment out of the old layout
 

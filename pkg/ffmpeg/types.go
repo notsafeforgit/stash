@@ -70,6 +70,7 @@ type FFProbeStream struct {
 	Index             int    `json:"index"`
 	IsAvc             string `json:"is_avc,omitempty"`
 	Level             int    `json:"level,omitempty"`
+	MimeCodecString   string `json:"mime_codec_string,omitempty"`
 	NalLengthSize     string `json:"nal_length_size,omitempty"`
 	NbFrames          string `json:"nb_frames"`
 	NbReadFrames      string `json:"nb_read_frames"`

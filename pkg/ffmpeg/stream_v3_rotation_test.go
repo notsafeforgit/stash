@@ -88,7 +88,7 @@ func TestRotatedHLSArgsEnableAutorotateBeforeInput(t *testing.T) {
 		},
 		outputDir: t.TempDir(),
 	}
-	stream.displayRotationOnce.Do(func() {
+	stream.sourceInfoOnce.Do(func() {
 		stream.displayRotation = -90
 	})
 

@@ -325,6 +325,65 @@ export function PerformerBulkEditSheet({
       onApplyToAllChange={handleApplyToAllChange}
     >
       <FieldGroup className="gap-4">
+        {/* Tags */}
+        <form.Field name="tag_ids">
+          {(field) => (
+            <Field>
+              <FieldLabel>
+                {intl.formatMessage({ id: "tags", defaultMessage: "Tags" })}
+              </FieldLabel>
+              <BulkEntityField
+                value={field.state.value}
+                onChange={field.handleChange}
+                options={tagOptions}
+                onSearch={(q) =>
+                  searchTags({ variables: { filter: { q, per_page: 20 } } })
+                }
+                loading={tagLoading}
+                intersectionIds={tagIntersection}
+                unionIds={tagUnion}
+                existingNames={existingTagNames}
+                disabled={saving}
+              />
+            </Field>
+          )}
+        </form.Field>
+
+        {/* Favourite */}
+        <form.Field name="favorite">
+          {(field) => (
+            <Field>
+              <FieldLabel>
+                {intl.formatMessage({
+                  id: "favourite",
+                  defaultMessage: "Favourite",
+                })}
+              </FieldLabel>
+              <BulkBooleanField
+                value={field.state.value}
+                onChange={field.handleChange}
+                disabled={saving}
+              />
+            </Field>
+          )}
+        </form.Field>
+
+        {/* Rating */}
+        <form.Field name="rating100">
+          {(field) => (
+            <Field>
+              <FieldLabel>
+                {intl.formatMessage({ id: "rating", defaultMessage: "Rating" })}
+              </FieldLabel>
+              <BulkRatingField
+                value={field.state.value}
+                onChange={field.handleChange}
+                disabled={saving}
+              />
+            </Field>
+          )}
+        </form.Field>
+
         {/* Gender */}
         <form.Field name="gender">
           {(field) => (
@@ -374,65 +433,6 @@ export function PerformerBulkEditSheet({
               <BulkTextField
                 value={field.state.value}
                 onChange={field.handleChange}
-                disabled={saving}
-              />
-            </Field>
-          )}
-        </form.Field>
-
-        {/* Rating */}
-        <form.Field name="rating100">
-          {(field) => (
-            <Field>
-              <FieldLabel>
-                {intl.formatMessage({ id: "rating", defaultMessage: "Rating" })}
-              </FieldLabel>
-              <BulkRatingField
-                value={field.state.value}
-                onChange={field.handleChange}
-                disabled={saving}
-              />
-            </Field>
-          )}
-        </form.Field>
-
-        {/* Favourite */}
-        <form.Field name="favorite">
-          {(field) => (
-            <Field>
-              <FieldLabel>
-                {intl.formatMessage({
-                  id: "favourite",
-                  defaultMessage: "Favourite",
-                })}
-              </FieldLabel>
-              <BulkBooleanField
-                value={field.state.value}
-                onChange={field.handleChange}
-                disabled={saving}
-              />
-            </Field>
-          )}
-        </form.Field>
-
-        {/* Tags */}
-        <form.Field name="tag_ids">
-          {(field) => (
-            <Field>
-              <FieldLabel>
-                {intl.formatMessage({ id: "tags", defaultMessage: "Tags" })}
-              </FieldLabel>
-              <BulkEntityField
-                value={field.state.value}
-                onChange={field.handleChange}
-                options={tagOptions}
-                onSearch={(q) =>
-                  searchTags({ variables: { filter: { q, per_page: 20 } } })
-                }
-                loading={tagLoading}
-                intersectionIds={tagIntersection}
-                unionIds={tagUnion}
-                existingNames={existingTagNames}
                 disabled={saving}
               />
             </Field>
@@ -522,8 +522,8 @@ export function PerformerBulkEditSheet({
             <Field>
               <FieldLabel>
                 {intl.formatMessage({
-                  id: "ignore_auto_tag",
-                  defaultMessage: "Ignore auto-tag",
+                  id: "performer_disable_auto_tag",
+                  defaultMessage: "Disable auto-tagging for all names",
                 })}
               </FieldLabel>
               <BulkBooleanField
@@ -553,6 +553,7 @@ export function PerformerBulkEditSheet({
             </Field>
           )}
         </form.Field>
+
         <form.Field
           name="custom_fields"
           validators={{ onChange: customFields.schema }}

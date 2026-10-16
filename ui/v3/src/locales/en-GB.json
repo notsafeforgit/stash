@@ -1723,6 +1723,7 @@
   "help": "Help",
   "history": "History",
   "ignore_auto_tag": "Ignore auto tag",
+  "performer_disable_auto_tag": "Disable auto-tagging for all names",
   "ignore_primary_name_auto_tag": "Ignore canonical name for auto tag",
   "performer_name_auto_tag_aria": "Use this name for auto-tagging",
   "performer_primary_name_auto_tag_aria": "Use the primary name for auto-tagging",

@@ -809,22 +809,6 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
     >
       <div className="flex-1 min-h-0 overflow-y-auto">
         <FieldGroup className="gap-4 px-3 pt-4 pb-3">
-          {/* Image */}
-          <form.Field name="image">
-            {(field) => (
-              <ImageField
-                label={intl.formatMessage({
-                  id: "performer_image",
-                  defaultMessage: "Performer Image",
-                })}
-                value={field.state.value}
-                onChange={field.handleChange}
-                existingImagePath={performer?.image_path}
-                disabled={busy}
-              />
-            )}
-          </form.Field>
-
           {/* Names and aliases use the v2.5 name/aliases fields as a
               compatibility representation. Promoting an alias swaps the
               selected text and its auto-tag policy into the name field. */}
@@ -916,6 +900,124 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
                   disabled={busy}
                 />
               </Field>
+            )}
+          </form.Field>
+
+          {/* Tags */}
+          <form.Field name="tags">
+            {(field) => (
+              <Field>
+                <FieldLabel>
+                  {intl.formatMessage({ id: "tags", defaultMessage: "Tags" })}
+                </FieldLabel>
+                <EntityMultiSelect
+                  value={field.state.value}
+                  onChange={field.handleChange}
+                  options={tagOptions}
+                  onSearch={(q) =>
+                    searchTags({ variables: { filter: { q, per_page: 20 } } })
+                  }
+                  loading={tagLoading}
+                  placeholder={intl.formatMessage({
+                    id: "actions.search",
+                    defaultMessage: "Search…",
+                  })}
+                  disabled={busy}
+                />
+              </Field>
+            )}
+          </form.Field>
+
+          {/* URLs */}
+          <form.Field name="urls">
+            {(field) => (
+              <Field>
+                <FieldLabel>
+                  {intl.formatMessage({ id: "urls", defaultMessage: "URLs" })}
+                </FieldLabel>
+                <UrlListField
+                  value={field.state.value}
+                  onChange={field.handleChange}
+                  disabled={busy}
+                />
+              </Field>
+            )}
+          </form.Field>
+
+          {/* Favourite */}
+          <form.Field name="favorite">
+            {(field) => (
+              <Field orientation="horizontal">
+                <FieldTitle>
+                  {intl.formatMessage({
+                    id: "favourite",
+                    defaultMessage: "Favourite",
+                  })}
+                </FieldTitle>
+                <Switch
+                  checked={field.state.value}
+                  onCheckedChange={field.handleChange}
+                  disabled={busy}
+                />
+              </Field>
+            )}
+          </form.Field>
+
+          {/* Rating */}
+          <form.Field name="rating100">
+            {(field) => (
+              <Field>
+                <FieldLabel>
+                  {intl.formatMessage({
+                    id: "rating",
+                    defaultMessage: "Rating",
+                  })}
+                </FieldLabel>
+                <RatingSystem
+                  value={field.state.value}
+                  onSetRating={field.handleChange}
+                  disabled={busy}
+                />
+              </Field>
+            )}
+          </form.Field>
+
+          {/* Details / bio */}
+          <form.Field name="details">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor={field.name}>
+                  {intl.formatMessage({
+                    id: "details",
+                    defaultMessage: "Details",
+                  })}
+                </FieldLabel>
+                <Textarea
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={busy}
+                  rows={4}
+                />
+              </Field>
+            )}
+          </form.Field>
+
+          {/* Image */}
+          <form.Field name="image">
+            {(field) => (
+              <ImageField
+                label={intl.formatMessage({
+                  id: "performer_image",
+                  defaultMessage: "Performer Image",
+                })}
+                value={field.state.value}
+                onChange={field.handleChange}
+                existingImagePath={performer?.image_path}
+                disabled={busy}
+              />
             )}
           </form.Field>
 
@@ -1030,108 +1132,6 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={busy}
-                />
-              </Field>
-            )}
-          </form.Field>
-
-          {/* Rating */}
-          <form.Field name="rating100">
-            {(field) => (
-              <Field>
-                <FieldLabel>
-                  {intl.formatMessage({
-                    id: "rating",
-                    defaultMessage: "Rating",
-                  })}
-                </FieldLabel>
-                <RatingSystem
-                  value={field.state.value}
-                  onSetRating={field.handleChange}
-                  disabled={busy}
-                />
-              </Field>
-            )}
-          </form.Field>
-
-          {/* Favourite */}
-          <form.Field name="favorite">
-            {(field) => (
-              <Field orientation="horizontal">
-                <FieldTitle>
-                  {intl.formatMessage({
-                    id: "favourite",
-                    defaultMessage: "Favourite",
-                  })}
-                </FieldTitle>
-                <Switch
-                  checked={field.state.value}
-                  onCheckedChange={field.handleChange}
-                  disabled={busy}
-                />
-              </Field>
-            )}
-          </form.Field>
-
-          {/* Details / bio */}
-          <form.Field name="details">
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>
-                  {intl.formatMessage({
-                    id: "details",
-                    defaultMessage: "Details",
-                  })}
-                </FieldLabel>
-                <Textarea
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={busy}
-                  rows={4}
-                />
-              </Field>
-            )}
-          </form.Field>
-
-          {/* URLs */}
-          <form.Field name="urls">
-            {(field) => (
-              <Field>
-                <FieldLabel>
-                  {intl.formatMessage({ id: "urls", defaultMessage: "URLs" })}
-                </FieldLabel>
-                <UrlListField
-                  value={field.state.value}
-                  onChange={field.handleChange}
-                  disabled={busy}
-                />
-              </Field>
-            )}
-          </form.Field>
-
-          {/* Tags */}
-          <form.Field name="tags">
-            {(field) => (
-              <Field>
-                <FieldLabel>
-                  {intl.formatMessage({ id: "tags", defaultMessage: "Tags" })}
-                </FieldLabel>
-                <EntityMultiSelect
-                  value={field.state.value}
-                  onChange={field.handleChange}
-                  options={tagOptions}
-                  onSearch={(q) =>
-                    searchTags({ variables: { filter: { q, per_page: 20 } } })
-                  }
-                  loading={tagLoading}
-                  placeholder={intl.formatMessage({
-                    id: "actions.search",
-                    defaultMessage: "Search…",
-                  })}
                   disabled={busy}
                 />
               </Field>
@@ -1337,50 +1337,6 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
             )}
           </form.Field>
 
-          {/* Career start */}
-          <form.Field name="career_start">
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>
-                  {intl.formatMessage({
-                    id: "career_start",
-                    defaultMessage: "Career start",
-                  })}
-                </FieldLabel>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={busy}
-                />
-              </Field>
-            )}
-          </form.Field>
-
-          {/* Career end */}
-          <form.Field name="career_end">
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>
-                  {intl.formatMessage({
-                    id: "career_end",
-                    defaultMessage: "Career end",
-                  })}
-                </FieldLabel>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={busy}
-                />
-              </Field>
-            )}
-          </form.Field>
-
           {/* Tattoos */}
           <form.Field name="tattoos">
             {(field) => (
@@ -1427,19 +1383,80 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
             )}
           </form.Field>
 
-          {/* Ignore auto-tag */}
+          {/* Career start */}
+          <form.Field name="career_start">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor={field.name}>
+                  {intl.formatMessage({
+                    id: "career_start",
+                    defaultMessage: "Career start",
+                  })}
+                </FieldLabel>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={busy}
+                />
+              </Field>
+            )}
+          </form.Field>
+
+          {/* Career end */}
+          <form.Field name="career_end">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor={field.name}>
+                  {intl.formatMessage({
+                    id: "career_end",
+                    defaultMessage: "Career end",
+                  })}
+                </FieldLabel>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={busy}
+                />
+              </Field>
+            )}
+          </form.Field>
+
+          {/* Performer-wide auto-tag override; per-name choices stay above. */}
           <form.Field name="ignore_auto_tag">
             {(field) => (
               <Field orientation="horizontal">
-                <FieldTitle>
+                <FieldLabel htmlFor={field.name}>
                   {intl.formatMessage({
-                    id: "ignore_auto_tag",
-                    defaultMessage: "Ignore auto-tag",
+                    id: "performer_disable_auto_tag",
+                    defaultMessage: "Disable auto-tagging for all names",
                   })}
-                </FieldTitle>
+                </FieldLabel>
                 <Switch
+                  id={field.name}
                   checked={field.state.value}
                   onCheckedChange={field.handleChange}
+                  disabled={busy}
+                />
+              </Field>
+            )}
+          </form.Field>
+
+          {/* Custom fields */}
+          <form.Field name="custom_fields">
+            {(field) => (
+              <Field>
+                <FieldLabel>
+                  {intl.formatMessage({ id: "custom_fields.title" })}
+                </FieldLabel>
+                <CustomFieldsField
+                  value={field.state.value}
+                  onChange={field.handleChange}
                   disabled={busy}
                 />
               </Field>
@@ -1462,22 +1479,6 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
                   disabled={busy}
                   searchType="performer"
                   searchQuery={form.state.values.name}
-                />
-              </Field>
-            )}
-          </form.Field>
-
-          {/* Custom fields */}
-          <form.Field name="custom_fields">
-            {(field) => (
-              <Field>
-                <FieldLabel>
-                  {intl.formatMessage({ id: "custom_fields.title" })}
-                </FieldLabel>
-                <CustomFieldsField
-                  value={field.state.value}
-                  onChange={field.handleChange}
-                  disabled={busy}
                 />
               </Field>
             )}

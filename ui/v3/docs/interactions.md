@@ -120,6 +120,15 @@ pinned action bars inside the remaining height. Close, Escape, and backdrop
 dismissal leave without saving; Discard resets the form and keeps the pane open.
 Successful saves close the sheet through the existing form callback.
 
+Performer creation and single-performer editing share the same field order:
+names and disambiguation, tags, URLs, favorite and rating, details, portrait,
+biographical and physical attributes, career details, then the global auto-tag
+override, custom fields and external IDs. Each name keeps its own auto-tag
+control beside it, including when choosing a different canonical name. The
+bottom override disables matching all names without changing those per-name
+choices. Bulk editing starts with tags, favorite and rating, then follows the
+same relative order for the fields it supports.
+
 ## Settings navigation
 
 `SettingsLayout` keeps the settings page mounted in its own scroller. Desktop

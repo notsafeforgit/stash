@@ -291,6 +291,19 @@ function SettingsInterfacePage() {
           onChange={(v) => saveUI("autostartGallerySlideshow", v)}
           disabled={savingUI}
         />
+        <SettingSwitch
+          label={msg(
+            "config.ui.continue_gallery_lightbox.heading",
+            "Continue to next gallery",
+          )}
+          description={msg(
+            "config.ui.continue_gallery_lightbox.description",
+            "Swipe through galleries in the current list's filter and sort order, then wrap to the beginning. When off, loop within the opened gallery.",
+          )}
+          checked={ui.continueGalleryLightbox ?? false}
+          onChange={(value) => saveUI("continueGalleryLightbox", value)}
+          disabled={savingUI}
+        />
       </SettingsSection>
 
       <SettingsSection title={msg("config.ui.editing.heading", "Editing")}>

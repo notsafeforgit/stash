@@ -305,6 +305,7 @@ export function EntityListPage<
   useEffect(() => {
     if (!pageNavRef) return;
     pageNavRef.current = {
+      filter,
       currentPage: filter.currentPage,
       totalPages,
       itemsPerPage: filter.itemsPerPage,

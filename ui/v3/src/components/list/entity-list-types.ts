@@ -21,6 +21,8 @@ export interface ListDeleteSelection {
  * provided through EntityListPageConfig.pageNavRef.
  */
 export interface PageNavHandle {
+  /** Committed list scope for viewers that page without changing the list URL. */
+  filter: ListFilterModel;
   currentPage: number;
   totalPages: number;
   itemsPerPage: number;

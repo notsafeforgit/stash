@@ -75,6 +75,7 @@ const shape = {
   showStudioText: optionalBoolean,
   previewVolume: z.number().min(0).max(100).optional().catch(undefined),
   autostartGallerySlideshow: optionalBoolean,
+  continueGalleryLightbox: optionalBoolean,
   abbreviateCounters: optionalBoolean,
   ratingSystemOptions: z
     .looseObject({

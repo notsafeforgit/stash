@@ -29,6 +29,19 @@ query FindGalleryCover($id: ID!) {
   }
 }
 
+query FindGalleryLightboxList(
+  $filter: FindFilterType
+  $gallery_filter_ast: FilterASTInput
+) {
+  findGalleries(filter: $filter, gallery_filter_ast: $gallery_filter_ast) {
+    count
+    galleries {
+      id
+      title
+    }
+  }
+}
+
 query FindGalleryMedia($id: ID!, $offset: Int! = 0, $limit: Int! = 60) {
   findGallery(id: $id) {
     id

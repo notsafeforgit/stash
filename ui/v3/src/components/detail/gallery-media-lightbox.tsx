@@ -13,6 +13,7 @@ export default function GalleryMediaLightbox({
   const result = useGalleryMediaPages(id);
   return (
     <GalleryMediaPlayback
+      loop
       data={result.data}
       index={0}
       signature={result.data?.signature ?? ""}

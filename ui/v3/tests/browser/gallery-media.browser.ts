@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { test, expect } from "./test";
 import { serveSceneMedia } from "./scene-media";
 import { playbackImage, playbackScene } from "../fixtures/album-playback";
+import { sourceTrackingConfiguration } from "./fixture/player-configuration";
 import type { GalleryMediaItem } from "../../src/components/detail/gallery-media";
 import type {
   FindGalleryCoverQuery,
@@ -20,6 +21,9 @@ async function fixture(
     failScene?: boolean;
     failFirst?: boolean;
     waitFirst?: Promise<void>;
+    sequence?: boolean;
+    failContinuation?: boolean;
+    waitContinuation?: Promise<void>;
   } = {},
 ) {
   const pages: number[] = [];
@@ -27,6 +31,11 @@ async function fixture(
   const coverReads: string[] = [];
   const detailReads: string[] = [];
   const listReads: string[] = [];
+  const sequenceLists: {
+    filter: { page: number; q?: string; sort?: string };
+  }[] = [];
+  const sequenceMedia: string[] = [];
+  let continueGalleryLightbox = options.sequence ?? false;
   let selected: SetGalleryCoverMutationVariables | undefined;
   const image = (id: string): GalleryMediaItem => ({
     __typename: "GalleryMediaItem",
@@ -53,6 +62,53 @@ async function fixture(
   await serveSceneMedia(page);
   await page.route("**/graphql", async (route) => {
     const body = route.request().postDataJSON();
+    if (body.operationName === "Configuration")
+      return route.fulfill({
+        json: {
+          data: {
+            configuration: {
+              ...sourceTrackingConfiguration,
+              ui: {
+                ...sourceTrackingConfiguration.ui,
+                continueGalleryLightbox,
+              },
+            },
+          },
+        },
+      });
+    if (body.operationName === "ConfigureUISetting") {
+      expect(body.variables.key).toBe("continueGalleryLightbox");
+      continueGalleryLightbox = body.variables.value;
+      return route.fulfill({
+        json: {
+          data: {
+            configureUISetting: {
+              ...sourceTrackingConfiguration.ui,
+              continueGalleryLightbox,
+            },
+          },
+        },
+      });
+    }
+    if (body.operationName === "FindGalleryLightboxList") {
+      sequenceLists.push(body.variables);
+      return route.fulfill({
+        json: {
+          data: {
+            findGalleries: {
+              count: 41,
+              galleries:
+                body.variables.filter.page === 1
+                  ? [
+                      { id: "12", title: "Mixed gallery" },
+                      { id: "14", title: "Empty gallery" },
+                    ]
+                  : [{ id: "13", title: "Next gallery" }],
+            },
+          },
+        },
+      });
+    }
     if (body.operationName === "SetGalleryCover") {
       expect(body.query.trim().startsWith("mutation")).toBe(true);
       coverWrites.push(body.variables);
@@ -156,6 +212,36 @@ async function fixture(
       return route.fulfill({ json: { data: { findGallery } } });
     }
     if (body.operationName === "FindGalleryMedia") {
+      sequenceMedia.push(`${body.variables.id}:${body.variables.offset}`);
+      if (body.variables.id === "13" || body.variables.id === "14") {
+        if (body.variables.id === "13" && options.waitContinuation)
+          await options.waitContinuation;
+        if (options.failContinuation && body.variables.id === "13")
+          return route.fulfill({
+            json: { errors: [{ message: "Read temporarily unavailable" }] },
+          });
+        const empty = body.variables.id === "14";
+        return route.fulfill({
+          json: {
+            data: {
+              findGallery: {
+                id: body.variables.id,
+                media: {
+                  signature: body.variables.id,
+                  count: empty ? 0 : 2,
+                  items: empty
+                    ? []
+                    : [
+                        image("10"),
+                        { ...video, scene: { ...video.scene!, id: "11" } },
+                      ],
+                  next_offset: null,
+                },
+              },
+            },
+          },
+        });
+      }
       const offset = body.variables.offset;
       pages.push(offset);
       if (!offset && options.waitFirst) await options.waitFirst;
@@ -182,11 +268,18 @@ async function fixture(
                   ? []
                   : options.videoOnly
                     ? [video]
-                    : offset
-                      ? [image("9")]
-                      : [image("7"), video],
+                    : options.sequence
+                      ? [image("7"), video, image("9")]
+                      : offset
+                        ? [image("9")]
+                        : [image("7"), video],
                 next_offset:
-                  options.empty || options.videoOnly || offset ? null : 2,
+                  options.empty ||
+                  options.videoOnly ||
+                  offset ||
+                  options.sequence
+                    ? null
+                    : 2,
               },
             },
           },
@@ -217,8 +310,190 @@ async function fixture(
     }
     throw new Error(`Unexpected GraphQL operation ${body.operationName}`);
   });
-  return { pages, coverWrites, coverReads, detailReads, listReads };
+  return {
+    pages,
+    coverWrites,
+    coverReads,
+    detailReads,
+    listReads,
+    sequenceLists,
+    sequenceMedia,
+  };
 }
+
+test("continuous gallery viewer crosses list pages, skips empty albums and returns without reloading the grid", async ({
+  page,
+}) => {
+  const state = await fixture(page, { sequence: true });
+  await page.goto(
+    "/gallery-list?sequence=1&q=matching&sortby=title&sortdir=asc",
+  );
+  await page.getByRole("button", { name: "View gallery", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Lightbox", exact: true });
+  await expect(
+    viewer.getByText("Mixed gallery", { exact: true }),
+  ).toBeVisible();
+  const originalURL = page.url();
+  const next = viewer.getByRole("button", { name: "Next", exact: true });
+  await next.click();
+  const video = viewer.locator("video");
+  await expect(video).toBeVisible();
+  await video.evaluate((node) => {
+    node.dataset.sequencePlayer = "original";
+  });
+  await next.click();
+  await expect(viewer.locator("[data-lightbox-counter]")).toContainText(
+    "3 / 3",
+  );
+  await next.click();
+  await expect(viewer.getByText("Next gallery", { exact: true })).toBeVisible();
+  await expect(viewer.locator("[data-lightbox-counter]")).toContainText(
+    "1 / 2",
+  );
+  expect(state.sequenceMedia).toContain("14:0");
+  // StrictMode may abort and repeat the first read on mount.
+  expect([...new Set(state.sequenceLists.map((v) => v.filter.page))]).toEqual([
+    1, 2,
+  ]);
+  for (const variables of state.sequenceLists) {
+    expect(variables.filter.q).toBe("matching");
+    expect(variables.filter.sort).toBe("title");
+  }
+  await viewer.getByRole("button", { name: "Previous", exact: true }).click();
+  await expect(
+    viewer.getByText("Mixed gallery", { exact: true }),
+  ).toBeVisible();
+  await expect(viewer.locator("[data-lightbox-counter]")).toContainText(
+    "3 / 3",
+  );
+  await next.click();
+  await expect(viewer.getByText("Next gallery", { exact: true })).toBeVisible();
+  await next.click();
+  await expect(video).toBeVisible();
+  await expect(video).toHaveAttribute("data-sequence-player", "original");
+  await next.click();
+  await expect(
+    viewer.getByText("Mixed gallery", { exact: true }),
+  ).toBeVisible();
+  await expect(viewer.locator("[data-lightbox-counter]")).toContainText(
+    "1 / 3",
+  );
+  expect(page.url()).toBe(originalURL);
+  const reads = state.listReads.length;
+  await viewer
+    .getByRole("button", { name: "Close", exact: true })
+    .last()
+    .click();
+  await expect(viewer).toHaveCount(0);
+  await expect(page.locator(".gallery-card")).toBeVisible();
+  expect(state.listReads.length).toBe(reads);
+});
+
+test("gallery continuation toggle persists and turning it off loops only the opened mixed gallery", async ({
+  page,
+}, testInfo) => {
+  const state = await fixture(page, { sequence: true });
+  await page.goto("/gallery-list?sequence=1");
+  await page.getByRole("button", { name: "View options", exact: true }).click();
+  const toggle = page.getByRole("switch", {
+    name: "Continue to next gallery",
+    exact: true,
+  });
+  await expect(toggle).toBeChecked();
+  await toggle.tap();
+  await expect(toggle).not.toBeChecked();
+  await page.screenshot({
+    path: testInfo.outputPath("gallery-continuation-options.png"),
+  });
+  await page.keyboard.press("Escape");
+  await page.reload();
+  await page.getByRole("button", { name: "View options", exact: true }).click();
+  await expect(toggle).not.toBeChecked();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "View gallery", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Lightbox", exact: true });
+  const next = viewer.getByRole("button", { name: "Next", exact: true });
+  await expect(viewer.locator("[data-lightbox-counter]")).toHaveText("1 / 3");
+  await next.click();
+  await expect(viewer.locator("[data-lightbox-counter]")).toHaveText("2 / 3");
+  await next.click();
+  await expect(viewer.locator("[data-lightbox-counter]")).toHaveText("3 / 3");
+  await next.click();
+  await expect(viewer.locator("[data-lightbox-counter]")).toHaveText("1 / 3");
+  expect(state.sequenceLists).toEqual([]);
+});
+
+test("continuous gallery viewer retries a failed adjacent gallery without losing its position", async ({
+  page,
+}) => {
+  const options = { sequence: true, failContinuation: true };
+  await fixture(page, options);
+  await page.goto("/gallery-list?sequence=1");
+  await page.getByRole("button", { name: "View gallery", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Lightbox", exact: true });
+  const next = viewer.getByRole("button", { name: "Next", exact: true });
+  await expect(viewer.locator("[data-lightbox-counter]")).toContainText(
+    "1 / 3",
+  );
+  for (const count of ["2 / 3", "3 / 3"]) {
+    await next.click();
+    await expect(viewer.locator("[data-lightbox-counter]")).toContainText(
+      count,
+    );
+  }
+  await next.click();
+  await expect(
+    viewer.getByText("Could not load gallery media", { exact: true }),
+  ).toBeVisible();
+  options.failContinuation = false;
+  await viewer.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(viewer.getByText("Next gallery", { exact: true })).toBeVisible();
+  await expect(viewer.locator("[data-lightbox-counter]")).toContainText(
+    "1 / 2",
+  );
+});
+
+test("continuous gallery viewer respects a swipe back while the next gallery is loading", async ({
+  page,
+}) => {
+  let release!: () => void;
+  const waitContinuation = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await fixture(page, { sequence: true, waitContinuation });
+  const response = page.waitForResponse((result) => {
+    if (!result.url().endsWith("/graphql")) return false;
+    const body = result.request().postDataJSON();
+    return (
+      body.operationName === "FindGalleryMedia" && body.variables.id === "13"
+    );
+  });
+  await page.goto("/gallery-list?sequence=1");
+  await page.getByRole("button", { name: "View gallery", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Lightbox", exact: true });
+  const counter = viewer.locator("[data-lightbox-counter]");
+  const next = viewer.getByRole("button", { name: "Next", exact: true });
+  await expect(counter).toContainText("1 / 3");
+  for (const count of ["2 / 3", "3 / 3"]) {
+    await next.click();
+    await expect(counter).toContainText(count);
+  }
+  await next.click();
+  await expect(counter).toHaveCount(0);
+  await viewer.getByRole("button", { name: "Previous", exact: true }).click();
+  await expect(counter).toContainText("3 / 3");
+  release();
+  await (await response).finished();
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
+  await expect(counter).toContainText("3 / 3");
+  await next.click();
+  await expect(viewer.getByText("Next gallery", { exact: true })).toBeVisible();
+});
 
 for (const videoOnly of [false, true]) {
   test(`gallery list opens ${videoOnly ? "video-only" : "mixed"} galleries in the media lightbox`, async ({

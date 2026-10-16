@@ -1,6 +1,11 @@
 import { GalleryMedia } from "@/components/detail/gallery-media";
 import { useQuery } from "@apollo/client/react";
-import { FindGalleryCoverDocument } from "@/core/generated-graphql";
+import {
+  ConfigurationDocument,
+  FindGalleryCoverDocument,
+} from "@/core/generated-graphql";
+import { ConfigurationProvider } from "@/hooks/config";
+import { sourceTrackingConfiguration } from "./player-configuration";
 import { Toaster } from "@/components/ui/sonner";
 import { galleryCover } from "@/lib/gallery-utils";
 import { AssociationFixtureProvider } from "./association-provider";
@@ -29,10 +34,25 @@ export function GalleryListFixture() {
   return (
     <AssociationFixtureProvider>
       <div data-app-viewport className="flex h-dvh flex-col overflow-hidden">
-        <GalleryList />
+        {new URLSearchParams(location.search).has("sequence") ? (
+          <GalleryListWithSettings />
+        ) : (
+          <GalleryList />
+        )}
         <Toaster />
       </div>
     </AssociationFixtureProvider>
+  );
+}
+
+function GalleryListWithSettings() {
+  const { data } = useQuery(ConfigurationDocument);
+  return (
+    <ConfigurationProvider
+      configuration={data?.configuration ?? sourceTrackingConfiguration}
+    >
+      <GalleryList />
+    </ConfigurationProvider>
   );
 }
 

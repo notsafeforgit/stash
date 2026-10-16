@@ -57,6 +57,7 @@ export interface IUIConfig {
 
   previewVolume?: number;
   autostartGallerySlideshow?: boolean;
+  continueGalleryLightbox?: boolean;
 
   abbreviateCounters?: boolean;
 

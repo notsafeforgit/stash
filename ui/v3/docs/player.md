@@ -86,6 +86,18 @@ detail view, starts reading on open, and cancels pending reads on close. Closing
 preserves the parent list and does not refetch it. Image-only galleries retain
 their image slideshow preferences and scrubbed-image starting position.
 
+Gallery list **View options → Continue to next gallery** (also in Settings →
+Interface) saves whether the viewer loops inside the opened gallery or follows
+the list's filter and sort order across galleries. Continuation uses the mixed
+viewer for images and scenes, including video-only galleries. It skips empty
+galleries, supports backward navigation, and wraps at the ends of the matching
+list. The gallery title and local media counter identify the current album.
+The viewer captures the list query when opened and reads small pages independently;
+closing keeps the list URL, page and scroll position. Only four media/list pages
+are cached, with adjacent metadata prefetched near a boundary. Membership
+signatures fence media pages, failed reads expose Retry, and closing cancels all
+in-flight requests. Image slideshow timing pauses for videos and loading slots.
+
 `playbackKey` identifies the selected scene/marker independently of media ownership.
 Selection changes reset source preferences, clip offsets, poster/started latches,
 zoom and recovery state before the new playback becomes active. Quality changes

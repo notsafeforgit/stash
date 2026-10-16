@@ -52,6 +52,7 @@ import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
 import { useConfigurationContextOptional } from "src/hooks/config";
 import { deferredOverlay } from "@/components/shared/deferred-overlay";
 import { LightboxPending } from "@/components/lightbox/lightbox-pending";
+import type { GallerySequenceStart } from "@/components/detail/gallery-sequence";
 import {
   selectionColumn,
   thumbnailColumn,
@@ -588,8 +589,15 @@ const GalleryMediaLightbox = deferredOverlay(
   (props) => ({ open: true, onClose: props.onClose }),
   LightboxPending,
 );
+const GallerySequenceLightbox = deferredOverlay(
+  () => import("@/components/detail/gallery-sequence-lightbox"),
+  (props) => ({ open: true, onClose: props.onClose }),
+  LightboxPending,
+);
 
-function useGalleryLightbox() {
+function useGalleryLightbox(continueGalleries: boolean) {
+  const pageNavRef = useRef<PageNavHandle | null>(null);
+  const [sequence, setSequence] = useState<GallerySequenceStart | null>(null);
   const pageSize = 40;
   const [mediaGalleryId, setMediaGalleryId] = useState<string | null>(null);
   const [fetchImages] = useLazyQuery(GQL.FindImagesDocument);
@@ -674,6 +682,19 @@ function useGalleryLightbox() {
 
   const openGalleryLightbox = useCallback(
     (gallery: GalleryItem, index = 0, autoplay = false) => {
+      const filter = pageNavRef.current?.filter;
+      if (continueGalleries && filter) {
+        setSequence({
+          gallery: { id: gallery.id, title: galleryLabel(gallery) },
+          query: {
+            filter: filter.makeFindFilter(),
+            gallery_filter_ast: filter.makeFilterAST(),
+          },
+          imageIndex: gallery.scenes.length ? 0 : index,
+          autoplay,
+        });
+        return;
+      }
       if (gallery.scenes.length > 0) {
         setLightboxOpen(false);
         setMediaGalleryId(gallery.id);
@@ -702,7 +723,7 @@ function useGalleryLightbox() {
         autoplay,
       );
     },
-    [loadPage],
+    [loadPage, continueGalleries],
   );
 
   const onLightboxView = useCallback(
@@ -786,7 +807,12 @@ function useGalleryLightbox() {
     [destroyImage],
   );
 
-  const lightboxElement = mediaGalleryId ? (
+  const lightboxElement = sequence ? (
+    <GallerySequenceLightbox
+      start={sequence}
+      onClose={() => setSequence(null)}
+    />
+  ) : mediaGalleryId ? (
     <GalleryMediaLightbox
       key={mediaGalleryId}
       id={mediaGalleryId}
@@ -808,9 +834,10 @@ function useGalleryLightbox() {
   ) : null;
 
   return {
+    pageNavRef,
     openGalleryLightbox,
     lightboxElement,
-    lightboxOpen: lightboxOpen || mediaGalleryId !== null,
+    lightboxOpen: lightboxOpen || mediaGalleryId !== null || sequence !== null,
   };
 }
 
@@ -826,8 +853,8 @@ export function useGalleryListConfig(onEdit: (id: string) => void): {
   const ctx = useConfigurationContextOptional();
   const autostartGallerySlideshow =
     ctx?.configuration.ui.autostartGallerySlideshow ?? false;
-  const { openGalleryLightbox, lightboxElement, lightboxOpen } =
-    useGalleryLightbox();
+  const { openGalleryLightbox, lightboxElement, lightboxOpen, pageNavRef } =
+    useGalleryLightbox(ctx?.configuration.ui.continueGalleryLightbox ?? false);
 
   const renderCard = useCallback(
     (
@@ -877,6 +904,7 @@ export function useGalleryListConfig(onEdit: (id: string) => void): {
   >(
     () => ({
       filterMode: GQL.FilterMode.Galleries,
+      pageNavRef,
       sharing: { kind: GQL.ShareEntityKind.Gallery, getTitle: galleryLabel },
       ItemsProvider: GalleryListItems.Provider,
       source: {
@@ -896,7 +924,7 @@ export function useGalleryListConfig(onEdit: (id: string) => void): {
       zoomable: true,
       getWallDimensions: () => ({ width: 4, height: 3 }),
     }),
-    [renderCard, renderTableRow],
+    [renderCard, renderTableRow, pageNavRef],
   );
 
   return { config, lightboxElement, lightboxOpen };

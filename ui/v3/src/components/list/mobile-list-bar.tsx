@@ -20,7 +20,8 @@ import { FormattedMessage, useIntl } from "react-intl";
 import type { ISortByOption } from "src/models/list-filter/filter-options";
 import { formatSortOptions } from "@/models/list-filter/labels";
 import { DisplayMode } from "src/models/list-filter/types";
-import { SortDirectionEnum } from "src/core/generated-graphql";
+import { FilterMode, SortDirectionEnum } from "src/core/generated-graphql";
+import { GalleryLightboxOptions } from "./gallery-lightbox-options";
 import { Button } from "src/components/ui/button";
 import {
   PinButton,
@@ -457,6 +458,10 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
               ))}
             </div>
           </div>
+
+          {filter.mode === FilterMode.Galleries && (
+            <GalleryLightboxOptions inline />
+          )}
 
           {/* Default filter — only shown when a view is provided */}
           {view && (

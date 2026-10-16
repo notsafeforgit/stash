@@ -23,6 +23,7 @@ export default function GalleryMediaPlayback({
   error,
   onMore,
   onClose,
+  loop = false,
 }: {
   data?: AlbumReadPage<GalleryMediaItem, number, GalleryMediaPage>;
   index: number;
@@ -31,6 +32,7 @@ export default function GalleryMediaPlayback({
   error: unknown;
   onMore: () => Promise<void>;
   onClose: () => void;
+  loop?: boolean;
 }) {
   const msg = useMsg();
   const [index, setIndex] = useState(initialIndex);
@@ -112,7 +114,7 @@ export default function GalleryMediaPlayback({
   return (
     <MediaLightbox
       open
-      finite
+      finite={!loop || data?.next != null || changed || !data?.items.length}
       slides={slides}
       index={changed ? 0 : index}
       totalCount={changed ? 0 : data?.header.count}

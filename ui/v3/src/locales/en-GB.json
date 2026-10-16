@@ -1115,6 +1115,11 @@
         "heading": "Auto-start gallery slideshow",
         "description": "Start slideshow playback when opening a gallery preview from the galleries list."
       },
+      "continue_gallery_lightbox": {
+        "heading": "Continue to next gallery",
+        "description": "Swipe through galleries in the current list's filter and sort order, then wrap to the beginning. When off, loop within the opened gallery.",
+        "options": "Gallery viewer options"
+      },
       "scene_list": {
         "heading": "Grid View",
         "options": {

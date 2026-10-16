@@ -30,7 +30,8 @@ import type { ListFilterModel } from "src/models/list-filter/filter";
 import { DisplayMode } from "src/models/list-filter/types";
 import type { ISortByOption } from "src/models/list-filter/filter-options";
 import { formatSortOptions } from "@/models/list-filter/labels";
-import { SortDirectionEnum } from "src/core/generated-graphql";
+import { FilterMode, SortDirectionEnum } from "src/core/generated-graphql";
+import { GalleryLightboxOptions } from "./gallery-lightbox-options";
 import type { IListSelect } from "./use-list-select";
 import type { CardAspect } from "./card-aspect-context";
 import {
@@ -331,6 +332,7 @@ export const ListToolbar: React.FC<ListToolbarProps> = ({
               "Columns" Sheet trigger into this slot so the button sits
               inline with the chrome instead of consuming a row above the
               table. */}
+          {filter.mode === FilterMode.Galleries && <GalleryLightboxOptions />}
           {filter.displayMode === DisplayMode.Table && (
             <TableToolbarSlot className="flex items-center" />
           )}

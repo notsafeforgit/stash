@@ -204,6 +204,22 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
   {
     to: "/settings/interface",
     section: {
+      id: "config.ui.scene_list.heading",
+      defaultMessage: "Scene list",
+    },
+    label: {
+      id: "config.ui.continue_gallery_lightbox.heading",
+      defaultMessage: "Continue to next gallery",
+    },
+    description: {
+      id: "config.ui.continue_gallery_lightbox.description",
+      defaultMessage:
+        "Swipe through galleries in the current list's filter and sort order, then wrap to the beginning. When off, loop within the opened gallery.",
+    },
+  },
+  {
+    to: "/settings/interface",
+    section: {
       id: "config.ui.editing.heading",
       defaultMessage: "Editing",
     },

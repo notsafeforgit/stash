@@ -15,11 +15,14 @@ import YARLightbox, {
   type RenderSlideProps,
   type FullscreenRef,
   type ZoomRef,
+  type SlideshowRef,
   isImageSlide,
   useLightboxState,
 } from "yet-another-react-lightbox";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
+import Slideshow from "yet-another-react-lightbox/plugins/slideshow";
+import { loadSettings } from "./settings";
 import { useQuery } from "@apollo/client/react";
 import { FindImageDocument } from "@/core/generated-graphql";
 import {
@@ -102,6 +105,9 @@ export interface SceneLightboxProps {
 export interface MediaLightboxProps extends Omit<SceneLightboxProps, "slides"> {
   slides: (SceneSlide | LightboxSlide)[];
   totalCount?: number;
+  pageStartIndex?: number;
+  counterLabel?: string;
+  slideshowAutoplay?: boolean;
   renderPending?: () => ReactNode;
 }
 
@@ -113,16 +119,25 @@ function ImageFooter({ id, touch }: { id: string; touch: boolean }) {
   return <ImageEntityFooter imageId={id} mobile={touch} showRating={!touch} />;
 }
 
-function MediaCounter({ total }: { total: number }) {
+function MediaCounter({
+  total,
+  start,
+  label,
+}: {
+  total: number;
+  start: number;
+  label?: string;
+}) {
   const { currentIndex, currentSlide } = useLightboxState();
-  if (currentSlide?.loading || total < 2) return null;
+  if (currentSlide?.loading || (total < 2 && !label)) return null;
   return (
     <div
       data-lightbox-counter
       className="pointer-events-none absolute inset-x-0 top-2 flex justify-center text-xs tabular-nums text-white/85"
     >
       <span className="rounded bg-black/45 px-2 py-1">
-        {currentIndex + 1} / {total}
+        {label && <span className="line-clamp-1 max-w-[70vw]">{label}</span>}
+        {start + currentIndex + 1} / {total}
       </span>
     </div>
   );
@@ -139,6 +154,9 @@ export function MediaLightbox({
   finite = false,
   slideContent: SlideContent = SceneSlideContent,
   totalCount,
+  pageStartIndex = 0,
+  counterLabel,
+  slideshowAutoplay,
   renderPending,
 }: MediaLightboxProps) {
   const {
@@ -150,11 +168,22 @@ export function MediaLightbox({
     onExiting,
   } = useLightboxMotion(open, onClose);
   const touch = useIsTouch();
+  const slideshowRef = useRef<SlideshowRef>(null);
+  const resumeSlideshow = useRef(slideshowAutoplay ?? false);
+  const [slideshowSettings] = useState(loadSettings);
   const [view, setView] = useState({ propIndex: index, currentIndex: index });
   if (view.propIndex !== index)
     setView({ propIndex: index, currentIndex: index });
   const selected = slides[view.currentIndex];
   const imageActive = !!selected && isImageSlide(selected);
+  useEffect(() => {
+    if (slideshowAutoplay === undefined) return;
+    // Image timing pauses on scenes and loading slots. Video playback keeps
+    // its own end/loop controls; it must never be cut off by an image timer.
+    if (imageActive && !selected?.loading && resumeSlideshow.current)
+      slideshowRef.current?.play();
+    else slideshowRef.current?.pause();
+  }, [imageActive, selected, slideshowAutoplay]);
   const { revealed: chromeRevealed, onClick: onImageClick } =
     useImageLightboxChrome(`${open}:${view.currentIndex}`, true);
   const zoomRef = useRef<ZoomRef>(null);
@@ -386,7 +415,16 @@ export function MediaLightbox({
       animation={lightboxAnimation}
       slides={slides}
       index={index}
-      plugins={[Fullscreen, Zoom, PersistentSceneCarousel]}
+      plugins={[
+        Fullscreen,
+        Zoom,
+        PersistentSceneCarousel,
+        ...(slideshowAutoplay !== undefined ? [Slideshow] : []),
+      ]}
+      slideshow={{
+        ref: slideshowRef,
+        delay: slideshowSettings.slideshowDelay * 1000,
+      }}
       fullscreen={{ ref: fullscreenRef }}
       zoom={{ ...LIGHTBOX_ZOOM_TUNING, ref: zoomRef }}
       className={cn(
@@ -415,6 +453,9 @@ export function MediaLightbox({
                   atOriginal={atOriginal}
                   zoomEnabled
                 />,
+                ...(slideshowAutoplay !== undefined
+                  ? ["slideshow" as const]
+                  : []),
               ]
             : []),
           "fullscreen",
@@ -424,6 +465,16 @@ export function MediaLightbox({
         ],
       }}
       on={{
+        slideshowStart: () => {
+          resumeSlideshow.current = true;
+        },
+        slideshowStop: () => {
+          // An automatic pause at a sentinel/scene retains slideshow intent.
+          const current =
+            controllerRef.current?.getLightboxState().currentSlide;
+          if (current && isImageSlide(current) && !current.loading)
+            resumeSlideshow.current = false;
+        },
         exiting: onExiting,
         click: ({ index: clickedIndex }) => {
           const slide = slides[clickedIndex];
@@ -447,7 +498,13 @@ export function MediaLightbox({
         controls: () => (
           <>
             <LightboxMotionSurface onReady={onSurfaceReady} />
-            {totalCount !== undefined && <MediaCounter total={totalCount} />}
+            {totalCount !== undefined && (
+              <MediaCounter
+                total={totalCount}
+                start={pageStartIndex}
+                label={counterLabel}
+              />
+            )}
           </>
         ),
         // Touch users close from the player's control bar. Pending/error

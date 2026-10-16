@@ -152,6 +152,8 @@ func galleryASTConditionHandler(condition *models.FilterASTCondition) (criterion
 			return nil, err
 		}
 		return studioCriterionHandler(galleryTable, &input), nil
+	case "studio_tags":
+		return studioTagsASTCriterionHandler(galleryTable, condition.Value)
 	case "performer_tags":
 		input, err := decodeASTValue[models.HierarchicalMultiCriterionInput](condition.Value)
 		if err != nil {

@@ -417,6 +417,12 @@ inline flags still control their own scopes. Empty/not-empty and numeric
 conditions do not need a case switch. Multi-value negative text conditions
 exclude an entity when any alias or URL matches.
 
+Scenes, images and galleries share the **Studio Tags** condition. It matches
+tags on the entity's primary studio, with optional ancestor/descendant studios
+and a separate tag depth. Exclusion and empty-tag filters retain entities with
+no assigned studio. Studio hierarchy and tag depth persist in saved filters and
+AST URLs using the same criterion across all three lists.
+
 ### Returning to a list
 
 TanStack Router owns scroll tracking and its session cache. The router and

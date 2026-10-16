@@ -182,6 +182,8 @@ func imageASTConditionHandler(condition *models.FilterASTCondition) (criterionHa
 			return nil, err
 		}
 		return studioCriterionHandler(imageTable, &input), nil
+	case "studio_tags":
+		return studioTagsASTCriterionHandler(imageTable, condition.Value)
 	case "performer_tags":
 		input, err := decodeASTValue[models.HierarchicalMultiCriterionInput](condition.Value)
 		if err != nil {

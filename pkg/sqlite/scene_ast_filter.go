@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	"github.com/stashapp/stash/pkg/models"
 )
@@ -363,20 +362,7 @@ func sceneASTConditionHandler(condition *models.FilterASTCondition) (criterionHa
 		}
 		return qb.captionCriterionHandler(&input), nil
 	case "studio_tags":
-		input, err := decodeASTValue[models.StudioTagFilterInput](condition.Value)
-		if err != nil {
-			return nil, err
-		}
-		studioFilter, err := sceneStudioTagFilterToStudioFilter(input)
-		if err != nil {
-			return nil, err
-		}
-		return &relatedFilterHandler{
-			relatedIDCol:          "scenes.studio_id",
-			relatedRepo:           studioRepository.repository,
-			relatedHandler:        &studioFilterHandler{studioFilter},
-			includeMissingRelated: relatedFilterIncludesMissingRelation(studioFilter),
-		}, nil
+		return studioTagsASTCriterionHandler(sceneTable, condition.Value)
 	case "file_count":
 		input, err := decodeASTValue[models.IntCriterionInput](condition.Value)
 		if err != nil {
@@ -397,57 +383,4 @@ func sceneASTConditionHandler(condition *models.FilterASTCondition) (criterionHa
 	default:
 		return nil, fmt.Errorf("scene AST condition %q is not supported yet", condition.Field)
 	}
-}
-
-func sceneStudioTagFilterToStudioFilter(input models.StudioTagFilterInput) (*models.StudioFilterType, error) {
-	mode := input.HierarchyMode
-	if mode == "" {
-		mode = models.StudioTagHierarchyModeExact
-	}
-	if !mode.IsValid() {
-		return nil, fmt.Errorf("invalid studio tag hierarchy mode %q", mode)
-	}
-
-	criterion := input.HierarchicalMultiCriterionInput
-	active, excludeOnly, _ := criterionIsExcludeOnly("HierarchicalMultiCriterionInput", reflect.ValueOf(criterion))
-	operator := models.FilterGroupOperatorOr
-	if active && excludeOnly {
-		operator = models.FilterGroupOperatorAnd
-	}
-
-	root := &models.StudioFilterType{
-		Tags: &criterion,
-	}
-	if mode == models.StudioTagHierarchyModeExact {
-		return root, nil
-	}
-
-	ancestorFilter := &models.StudioFilterType{
-		AncestorTags: &criterion,
-	}
-	if mode == models.StudioTagHierarchyModeAncestors {
-		applyStudioFilterOperator(root, operator, ancestorFilter)
-		return root, nil
-	}
-
-	descendantFilter := &models.StudioFilterType{
-		DescendantTags: &criterion,
-	}
-	if mode == models.StudioTagHierarchyModeDescendants {
-		applyStudioFilterOperator(root, operator, descendantFilter)
-		return root, nil
-	}
-
-	applyStudioFilterOperator(ancestorFilter, operator, descendantFilter)
-	applyStudioFilterOperator(root, operator, ancestorFilter)
-	return root, nil
-}
-
-func applyStudioFilterOperator(target *models.StudioFilterType, operator models.FilterGroupOperator, nested *models.StudioFilterType) {
-	if operator == models.FilterGroupOperatorAnd {
-		target.And = nested
-		return
-	}
-
-	target.Or = nested
 }

@@ -1525,9 +1525,17 @@ func (sm *StreamManager) ServeV3Segment(w http.ResponseWriter, r *http.Request, 
 
 // assume lock is held
 func (sm *StreamManager) startV3Transcode(stream *v3RunningStream, segment int, done chan<- error) {
-	// generate segment 0 if init segment requested
+	// The init file is valid at any start position. If a media request is
+	// already waiting, start there: repeatedly starting at zero for init while
+	// a distant request kills that process can starve both requests forever.
 	if segment == -1 {
 		segment = 0
+		for _, waiting := range stream.waitingSegments {
+			if waiting.idx >= 0 && !waiting.done.Load() {
+				segment = waiting.idx
+				break
+			}
+		}
 	}
 
 	TranscodeDebugf("[transcode] starting transcode for %s at segment #%d", stream.dir, segment)

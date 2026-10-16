@@ -149,6 +149,14 @@ refreshes retain the existing player, including when a refresh fails.
   page proves all deleted IDs belonged to it; other totals are invalidated while
   retained rows remain usable. This includes independently fetched totals.
 - `core/mutation-invalidation.ts` defines affected library query roots.
+  Committed entity edits expire all cached argument variants of affected roots,
+  including inactive searches and independently fetched totals. Only mounted
+  queries refetch immediately; returning to an affected list fetches its current
+  membership/count without resetting its filter, page or scroll state. Ordinary
+  detail visits with no edit and lightbox closes retain cache-first navigation.
+  Performer/tag edits invalidate dependent gallery, image and scene searches,
+  including filters through descendant performer tags. Normalized entities and
+  unrelated app data remain cached.
   `core/entity-job-invalidation.ts` refreshes after bulk jobs finish, including
   partial failures, and survives the edit sheet closing. The legacy `"sync"`
   acknowledgment causes an immediate refresh; only numeric job IDs are monitored.

@@ -132,7 +132,9 @@ export function removeEntitiesFromCache({
  * `useMutation` for mutations that change relationships, counts, or aggregate
  * fields — creates, destroys, bulk updates, edit-form submits, merges. Defaults
  * refetching to active queries in the affected library domains, including
- * parent counts and relationship lists. Configuration and plugin queries
+ * parent counts and relationship lists. Cached inactive searches expire too,
+ * so returning from an edited detail page re-evaluates membership and counts.
+ * Unchanged navigation stays cache-first. Configuration and plugin queries
  * are not part of library invalidation. Pair with `removeEntitiesFromCache`
  * inside `update` for the destroying entity's own list, so the visible card
  * still drops with no flash while the rest of the page reconciles.

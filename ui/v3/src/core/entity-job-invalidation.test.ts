@@ -208,3 +208,70 @@ it("explicit disposal cancels a pending job retry", async () => {
   expect(requests).toBe(1);
   client.stop();
 });
+
+it.each(["FINISHED", "FAILED", "CANCELLED"])(
+  "expires inactive dependent searches when a bulk job is %s, not on admission",
+  async (status) => {
+    vi.useFakeTimers();
+    let finished = false;
+    let searches = 0;
+    const query = gql`query Galleries { findGalleries { count } }`;
+    const client = new ApolloClient({
+      cache: new InMemoryCache(),
+      link: new ApolloLink(
+        (operation) =>
+          new Observable((observer) => {
+            if (operation.operationName === "FindJob") {
+              observer.next({
+                data: {
+                  findJob: {
+                    __typename: "Job",
+                    id: "12",
+                    status: finished ? status : "RUNNING",
+                    description: "Bulk performer edit",
+                    progress: 0,
+                    subTasks: [],
+                    error: null,
+                    addTime: "2026-10-15T00:00:00Z",
+                    startTime: null,
+                    endTime: null,
+                  },
+                },
+              });
+            } else {
+              searches++;
+              observer.next({
+                data: { findGalleries: { count: finished ? 0 : 2 } },
+              });
+            }
+            observer.complete();
+          }),
+      ),
+    });
+    try {
+      await client.query({ query });
+      const mutation = gql`mutation { bulkPerformerUpdate(input: {}) { status job_id selected_count updated_ids } }`;
+      refetchAfterEntityMutation(client, mutation, {
+        bulkPerformerUpdate: {
+          status: "QUEUED",
+          job_id: "12",
+          selected_count: 2,
+          updated_ids: [],
+        },
+      });
+      expect((await client.query({ query })).data).toEqual({
+        findGalleries: { count: 2 },
+      });
+      expect(searches).toBe(1);
+      finished = true;
+      await vi.advanceTimersByTimeAsync(1100);
+      expect(searches).toBe(1);
+      expect((await client.query({ query })).data).toEqual({
+        findGalleries: { count: 0 },
+      });
+      expect(searches).toBe(2);
+    } finally {
+      client.stop();
+    }
+  },
+);

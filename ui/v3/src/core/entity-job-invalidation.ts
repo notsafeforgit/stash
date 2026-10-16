@@ -1,7 +1,7 @@
 import type { ApolloClient, DocumentNode } from "@apollo/client";
 import { monitorJobCompletion } from "./monitor-job";
 import {
-  affectedActiveQueries,
+  invalidateAffectedQueries,
   rootFieldSelections,
 } from "./mutation-invalidation";
 
@@ -72,7 +72,7 @@ export function invalidateAfterEntityJob(
     if (result.kind === "unavailable")
       console.error("Could not monitor bulk update", result.error);
     void client
-      .refetchQueries({ include: affectedActiveQueries(client, mutation) })
+      .refetchQueries({ include: invalidateAffectedQueries(client, mutation) })
       .catch((error: unknown) =>
         console.error("Could not refresh library after bulk update", error),
       );
@@ -97,7 +97,7 @@ export function refetchAfterEntityMutation(
       field.name.value,
     ),
   );
-  if (!bulkFields.length) return affectedActiveQueries(client, document);
+  if (!bulkFields.length) return invalidateAffectedQueries(client, document);
   // Mixed mutations also refresh their non-bulk edits immediately.
   let refreshNow = fields.some(
     (field) => field.name.value !== "__typename" && !bulkFields.includes(field),
@@ -111,5 +111,5 @@ export function refetchAfterEntityMutation(
       invalidateAfterEntityJob(client, document, acknowledgment.id);
     else refreshNow = true;
   }
-  return refreshNow ? affectedActiveQueries(client, document) : [];
+  return refreshNow ? invalidateAffectedQueries(client, document) : [];
 }

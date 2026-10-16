@@ -131,6 +131,21 @@ export function affectedActiveQueries(
   );
 }
 
+/** Expire every cached argument variant, including searches whose route has
+ * unmounted. Only mounted queries are fetched now; inactive pages/counts miss
+ * the cache on their next visit. Keep normalized entities and unrelated app
+ * data intact, and let the caller's active refetch reconcile visible views. */
+export function invalidateAffectedQueries(
+  client: ApolloClient,
+  mutation: DocumentNode,
+): DocumentNode[] {
+  const queries = affectedActiveQueries(client, mutation);
+  for (const fieldName of affectedQueryFields(mutation)) {
+    client.cache.evict({ id: "ROOT_QUERY", fieldName, broadcast: false });
+  }
+  return queries;
+}
+
 const libraryFields: ReadonlySet<string> = new Set([
   "stats",
   "customFieldNames",

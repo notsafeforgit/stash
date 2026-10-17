@@ -1,5 +1,6 @@
 import { test, expect } from "./test";
 import { serveSceneMedia } from "./scene-media";
+import { observeVideoFrames } from "./video-frames";
 
 test.describe("desktop seek hit area", () => {
   test.use({
@@ -16,7 +17,7 @@ test.describe("desktop seek hit area", () => {
       await page.goto(`/scene-lightbox${paused ? "?paused" : ""}`);
       await page.getByRole("button", { name: "Open scenes" }).click();
       const player = page.locator("[data-scene-player]");
-      const video = player.locator("video");
+      const video = player.locator("video[data-playback-video]");
       const bar = player.locator("[data-player-control-bar]");
       const scrubber = page.getByRole("slider", { name: "Playback position" });
       await expect(player).toHaveAttribute("data-playback-ready", "true");
@@ -106,7 +107,7 @@ for (const mode of ["tv", "lightbox"]) {
       );
       const scrubber = page.getByRole("slider", { name: "Playback position" });
       const duration = Number(await scrubber.getAttribute("aria-valuemax"));
-      const video = page.locator("video");
+      const video = page.locator("video[data-playback-video]");
       const start = await video.evaluate(
         (element: HTMLVideoElement) => element.currentTime,
       );
@@ -180,6 +181,7 @@ for (const mobile of [true, false]) {
         test(`${marker ? "marker" : "scene"} TV and lightbox share the bar and seek interaction`, async ({
           page,
         }, testInfo) => {
+          await observeVideoFrames(page);
           await serveSceneMedia(page);
           const appearances = [];
           for (const mode of ["tv", "lightbox"] as const) {
@@ -194,7 +196,8 @@ for (const mobile of [true, false]) {
               "data-playback-ready",
               "true",
             );
-            const video = page.locator("video");
+            const player = page.locator("[data-scene-player]");
+            const video = player.locator("video[data-playback-video]");
             // HLS clips rebase their native timeline; display coordinates
             // remain 0..duration in both players.
             const mediaStart = await video.evaluate(
@@ -262,22 +265,32 @@ for (const mobile of [true, false]) {
                 ),
               )
               .toBe(true);
-            // Observe a compositor-bound frame, not just currentTime's
-            // optimistic setter. It must arrive while the pointer stays down.
-            const frame = await video.evaluateHandle(
-              (element: HTMLVideoElement) => {
-                const state = { time: -1 };
-                const observe = (
-                  _now: number,
-                  metadata: VideoFrameCallbackMetadata,
-                ) => {
-                  state.time = metadata.mediaTime;
-                  element.requestVideoFrameCallback(observe);
-                };
-                element.requestVideoFrameCallback(observe);
-                return state;
-              },
-            );
+            // Observe the compositor-bound frame actually displayed. WebKit
+            // can evict a buffered target during earlier drag seeks, switching
+            // the held gesture to the silent preview without moving the main
+            // video again. A nearby cached still is not an exact frame.
+            const displayedFrame = () =>
+              player.evaluate(
+                (root, { mediaStart, sourceStart }) => {
+                  const surface = root.querySelector<HTMLElement>(
+                    "[data-scrub-surface]",
+                  );
+                  const external =
+                    surface && getComputedStyle(surface).opacity === "1";
+                  if (external && surface.dataset.previewKind !== "video")
+                    return -1;
+                  const displayed = root.querySelector<HTMLVideoElement>(
+                    external
+                      ? "video[data-scrub-preview]"
+                      : "video[data-playback-video]",
+                  );
+                  const time = Number(displayed?.dataset.decodedTime ?? -1);
+                  return external ? time - sourceStart + mediaStart : time;
+                },
+                // Both marker fixtures begin at six seconds in the file;
+                // their main HLS stream may rebase that to zero.
+                { mediaStart, sourceStart: marker ? 6 : 0 },
+              );
             const start = point(0.25);
             const end = point(0.75);
             await page.mouse.move(start.x, start.y);
@@ -288,9 +301,7 @@ for (const mobile of [true, false]) {
                 Number(await scrubber.getAttribute("aria-valuenow")),
               )
               .toBeCloseTo(duration * 0.75, 1);
-            await expect
-              .poll(() => frame.evaluate((state) => state.time))
-              .toBeCloseTo(target, 1);
+            await expect.poll(displayedFrame).toBeCloseTo(target, 1);
             await expect(video).toHaveJSProperty("paused", true);
             if (marker) {
               // Holding at the segment's right edge must show its last frame
@@ -298,13 +309,11 @@ for (const mobile of [true, false]) {
               const last = point(1);
               await page.mouse.move(last.x, last.y);
               await expect
-                .poll(() => frame.evaluate((state) => state.time))
+                .poll(displayedFrame)
                 .toBeCloseTo(mediaStart + duration - 1 / 30, 1);
               await expect(video).toHaveJSProperty("paused", true);
               await page.mouse.move(end.x, end.y);
-              await expect
-                .poll(() => frame.evaluate((state) => state.time))
-                .toBeCloseTo(target, 1);
+              await expect.poll(displayedFrame).toBeCloseTo(target, 1);
             }
             await page.mouse.up();
             await expect

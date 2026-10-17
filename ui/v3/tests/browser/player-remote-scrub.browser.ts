@@ -1,30 +1,12 @@
 import { test, expect } from "./test";
 import { serveSceneMedia } from "./scene-media";
+import { observeVideoFrames } from "./video-frames";
 
 for (const mode of ["detail", "lightbox", "TV marker"] as const) {
   test(`${mode} reuses silent remote preview frames and commits once while paused`, async ({
     page,
   }) => {
-    await page.addInitScript(() => {
-      new MutationObserver((records) => {
-        for (const record of records)
-          for (const node of record.addedNodes) {
-            if (
-              !(node instanceof HTMLVideoElement) ||
-              !node.hasAttribute("data-scrub-preview")
-            )
-              continue;
-            const observe = (
-              _now: number,
-              frame: VideoFrameCallbackMetadata,
-            ) => {
-              node.dataset.decodedTime = String(frame.mediaTime);
-              node.requestVideoFrameCallback(observe);
-            };
-            node.requestVideoFrameCallback(observe);
-          }
-      }).observe(document, { childList: true, subtree: true });
-    });
+    await observeVideoFrames(page);
     await serveSceneMedia(page);
     const manifests: string[] = [];
     page.on("request", (request) => {

@@ -3,7 +3,7 @@ import { test, expect, expectTouchTargets } from "./test";
 import { serveSceneMedia } from "./scene-media";
 
 async function expectDockPaddingInert(page: Page, touch: boolean) {
-  const video = page.locator("video");
+  const video = page.locator("video[data-playback-video]");
   const paused = await video.evaluate(
     (video: HTMLVideoElement) => video.paused,
   );
@@ -65,7 +65,7 @@ for (const viewport of [
       await page.goto("/tv-fixture/tv?paused&portrait");
       const tv = page.locator("[data-tv]");
       const dock = page.locator("[data-tv-dock]");
-      const video = page.locator("video");
+      const video = page.locator("video[data-playback-video]");
       await expect(page.locator("[data-scene-player]")).toHaveAttribute(
         "data-playback-ready",
         "true",
@@ -240,6 +240,9 @@ for (const rotation of ["clockwise", "counterclockwise"]) {
       .click();
     await expectDockPaddingInert(page, true);
     await page.touchscreen.tap(195, 422);
-    await expect(page.locator("video")).toHaveJSProperty("paused", false);
+    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+      "paused",
+      false,
+    );
   });
 }

@@ -276,13 +276,16 @@ for (const device of ["mobile", "desktop"] as const) {
       await page
         .locator("[data-tv-play-surface]")
         .click({ position: { x: 150, y: 180 } });
-      await expect(page.locator("video")).toHaveJSProperty("paused", false);
+      await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+        "paused",
+        false,
+      );
       await unfocus(page);
       await page.keyboard.press("ArrowDown");
       await expect(
         info.getByRole("link", { name: "Scene 2", exact: true }),
       ).toBeVisible();
-      await expect(page.locator("video")).toHaveCount(1);
+      await expect(page.locator("video[data-playback-video]")).toHaveCount(1);
       await page.screenshot({
         path: testInfo.outputPath("tv-inline-info.png"),
       });

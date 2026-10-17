@@ -100,7 +100,7 @@ test("online lightbox uses shared activity accounting without a detail route own
 }) => {
   await page.goto("/scene-lightbox?activity");
   await page.getByRole("button", { name: "Open scenes", exact: true }).click();
-  const video = page.locator("video");
+  const video = page.locator("video[data-playback-video]");
   await expect
     .poll(() => video.evaluate((video: HTMLVideoElement) => video.currentTime))
     .toBeGreaterThan(1);
@@ -166,7 +166,7 @@ test.beforeEach(async ({ page }) => {
 async function open(page: Page, query = "") {
   await page.goto(`/scene-lightbox${query}`);
   await page.getByRole("button", { name: "Open scenes" }).click();
-  const video = page.locator("video");
+  const video = page.locator("video[data-playback-video]");
   await expect(video).toHaveCount(1);
   await expect(page.locator("[data-scene-player]")).toHaveAttribute(
     "data-playback-ready",
@@ -257,7 +257,7 @@ test("an unavailable ceiling leaves even a sole source selectable as an explicit
     "true",
   );
   await expect(page.getByRole("alert")).toHaveCount(0);
-  await expect(page.locator("video")).toHaveAttribute(
+  await expect(page.locator("video[data-playback-video]")).toHaveAttribute(
     "src",
     /\/scene\/1\/stream(?:[?#]|$)/,
   );

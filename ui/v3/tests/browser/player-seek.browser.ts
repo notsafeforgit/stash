@@ -7,7 +7,7 @@ for (const pauseDuringSeek of [false, true]) {
   }) => {
     await serveSceneMedia(page);
     await page.goto("/tv-fixture/tv?low");
-    const video = page.locator("video");
+    const video = page.locator("video[data-playback-video]");
     await expect(page.locator("[data-scene-player]")).toHaveAttribute(
       "data-playback-ready",
       "true",
@@ -112,7 +112,7 @@ for (const mobile of [true, false]) {
           await page.goto(
             `/tv-fixture/tv?${hls ? "low&" : ""}${marker ? "markers&long-marker" : ""}`,
           );
-          const video = page.locator("video");
+          const video = page.locator("video[data-playback-video]");
           await expect(page.locator("[data-scene-player]")).toHaveAttribute(
             "data-playback-ready",
             "true",

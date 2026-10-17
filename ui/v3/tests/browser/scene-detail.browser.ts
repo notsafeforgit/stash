@@ -34,7 +34,9 @@ for (const landscape of [false, true]) {
     const player = page.locator("[data-scene-player]");
     const row = player.locator("[data-player-control-row]");
     const footer = detailFooter(page);
-    const video = await player.locator("video").elementHandle();
+    const video = await player
+      .locator("video[data-playback-video]")
+      .elementHandle();
     for (const viewport of [
       { width: 320, height: 568 },
       { width: 390, height: 740 },
@@ -95,7 +97,9 @@ test("the focused viewer fills the viewport and restores the same inline player"
   await page.setViewportSize({ width: 390, height: 740 });
   await page.goto("/scene-detail");
   const player = page.locator("[data-scene-player]");
-  const video = await player.locator("video").elementHandle();
+  const video = await player
+    .locator("video[data-playback-video]")
+    .elementHandle();
   const open = player.getByRole("button", {
     name: "Open scene viewer",
     exact: true,

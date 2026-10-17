@@ -349,11 +349,13 @@ for (const width of [390, 1280]) {
               /old\.jpg/,
             );
             await card.getByText("Scene 1", { exact: true }).click();
-            await expect(page.locator("video")).toHaveCount(1);
+            await expect(
+              page.locator("video[data-playback-video]"),
+            ).toHaveCount(1);
             await expect
               .poll(() =>
                 page
-                  .locator("video")
+                  .locator("video[data-playback-video]")
                   .evaluate((video: HTMLVideoElement) => video.readyState),
               )
               .toBeGreaterThanOrEqual(2);
@@ -452,7 +454,7 @@ for (const width of [390, 1280]) {
         "performer frame preserves playback, captures the selected time and keeps unsaved edits",
         async ({ page }) => {
           await page.goto("/scene-cover-fixture/scenes/1");
-          const video = page.locator("video");
+          const video = page.locator("video[data-playback-video]");
           await page
             .locator("[data-scene-player]")
             .getByRole("button", { name: "Play", exact: true })
@@ -558,7 +560,7 @@ for (const width of [390, 1280]) {
         "performer frame at zero can be retried without resuming paused playback",
         async ({ page }) => {
           await page.goto("/scene-cover-fixture/scenes/1");
-          const video = page.locator("video");
+          const video = page.locator("video[data-playback-video]");
           await expect
             .poll(() =>
               video.evaluate((element: HTMLVideoElement) => element.readyState),
@@ -608,7 +610,7 @@ for (const width of [390, 1280]) {
               await page.goto(
                 `/scene-cover-fixture/scenes?playing${target === "performer" ? "&performer" : ""}`,
               );
-              const video = page.locator("video");
+              const video = page.locator("video[data-playback-video]");
               await page
                 .locator("[data-scene-player]")
                 .getByRole("button", { name: "Play", exact: true })
@@ -733,7 +735,7 @@ for (const width of [390, 1280]) {
             await page.goto(
               `/scene-cover-fixture/scenes/1${hls ? "?hls" : ""}`,
             );
-            const video = page.locator("video");
+            const video = page.locator("video[data-playback-video]");
             const player = page.locator("[data-scene-player]");
             await player
               .getByRole("button", { name: "Play", exact: true })

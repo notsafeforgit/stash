@@ -12,14 +12,16 @@ async function open(page: Page, query = "") {
     "data-playback-ready",
     "true",
   );
-  await page.locator("video").evaluate((video: HTMLVideoElement) => {
-    window.tvFixtureVideo = video;
-  });
+  await page
+    .locator("video[data-playback-video]")
+    .evaluate((video: HTMLVideoElement) => {
+      window.tvFixtureVideo = video;
+    });
 }
 
 const position = (page: Page) =>
   page
-    .locator("video")
+    .locator("video[data-playback-video]")
     .evaluate((video: HTMLVideoElement) => video.currentTime);
 const tap = (page: Page) =>
   page.locator("[data-tv-play-surface]").tap({ position: { x: 150, y: 250 } });
@@ -124,7 +126,7 @@ for (const source of ["direct", "HLS"] as const) {
     page,
   }) => {
     await open(page, source === "HLS" ? "low" : "");
-    const video = page.locator("video");
+    const video = page.locator("video[data-playback-video]");
     await expect(video).toHaveJSProperty("paused", false);
     await expect
       .poll(() => position(page))
@@ -145,7 +147,7 @@ test("a pause tap stays paused when the marker finishes during double-tap recogn
   page,
 }) => {
   await open(page);
-  const video = page.locator("video");
+  const video = page.locator("video[data-playback-video]");
   await expect(video).toHaveJSProperty("paused", false);
   // Finish after the tap starts, regardless of browser/CI action latency.
   await page.locator("[data-tv-play-surface]").evaluate((surface) => {
@@ -174,7 +176,7 @@ for (const input of ["mouse", "touch"] as const) {
       browserName,
     }) => {
       await open(page, paused ? "paused" : "");
-      const video = page.locator("video");
+      const video = page.locator("video[data-playback-video]");
       await expect(video).toHaveJSProperty("paused", paused);
       await video.evaluate((video: HTMLVideoElement) => {
         video.currentTime = 4;
@@ -244,8 +246,14 @@ test("an unzoomed vertical drag changes markers and a horizontal drag does not",
     "data-playback-key",
     /marker:10$/,
   );
-  await expect(page.locator("video")).toHaveJSProperty("paused", true);
-  await expect(page.locator("video")).toHaveJSProperty("playbackRate", 1);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    true,
+  );
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "playbackRate",
+    1,
+  );
   for (const [from, to, marker] of [
     [500, 250, 11],
     [250, 500, 10],
@@ -265,7 +273,7 @@ test("an unzoomed vertical drag changes markers and a horizontal drag does not",
   }
   expect(
     await page
-      .locator("video")
+      .locator("video[data-playback-video]")
       .evaluate((video) => video === window.tvFixtureVideo),
   ).toBe(true);
 });
@@ -274,7 +282,7 @@ test("holding a zoomed marker owns movement until release and restores pause", a
   page,
 }) => {
   await open(page, "paused");
-  const video = page.locator("video");
+  const video = page.locator("video[data-playback-video]");
   await tap(page);
   await tap(page);
   await expect(

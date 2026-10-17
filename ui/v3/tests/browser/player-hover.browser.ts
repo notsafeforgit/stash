@@ -34,7 +34,10 @@ for (const theme of ["light", "dark"]) {
       );
       // Use the normal paused state so the hover check does not interrupt
       // the lightbox's autoplay handoff or its pending media requests.
-      await expect(page.locator("video")).toHaveJSProperty("paused", true);
+      await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+        "paused",
+        true,
+      );
       const surface = page.locator("[data-video-gesture-surface]");
       await expect(surface).toHaveAccessibleName("Play");
       await surface.hover({ position: { x: 100, y: 100 } });

@@ -185,8 +185,9 @@ a 1 MiB byte target (not a hard memory limit). Loading stops when the requested
 frame arrives. The server suspends encoding approximately four seconds ahead.
 Source frame cadence is retained, with no B-frame reordering delay.
 The preview controller waits for hls.js to finish its initial fragment append
-and starting position before seeking; intervening at `loadeddata` can make
-WebKit reject the pending buffer.
+and starting position before seeking. A native decoder error gets one deferred
+media reattachment under the same preview lease. A second decoder failure or a
+fatal download error disables that preview; neither restarts the main player.
 HDR preview pixels are tone-mapped to SDR; the main stream's HDR mode is unchanged.
 Normal 240p encoding targets 1 Mbps, or 1.5 Mbps above 30 fps, while filling that
 window. It does not download a second copy of the entire video. Background

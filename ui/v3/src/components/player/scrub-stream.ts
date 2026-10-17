@@ -42,6 +42,9 @@ export function createScrubStream(
   let target: number | null = null;
   let seekTimer: ReturnType<typeof setTimeout> | undefined;
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  let recoveryTimer: ReturnType<typeof setTimeout> | undefined;
+  let recovered = false;
+  let recovering = false;
   let ready = false;
   let native = false;
   let disposed = false;
@@ -52,6 +55,9 @@ export function createScrubStream(
     clearTimeout(seekTimer);
     seekTimer = undefined;
     clearTimeout(idleTimer);
+    clearTimeout(recoveryTimer);
+    recoveryTimer = undefined;
+    recovering = false;
     if (!engine && !owner && !video.hasAttribute("src")) return;
     engine?.destroy();
     engine = null;
@@ -69,8 +75,36 @@ export function createScrubStream(
     release();
     onFailure();
   };
+  const mediaError = () => {
+    if (disposed || failed || !owner || recovering) return;
+    if (!engine || recovered || target === null) {
+      fail();
+      return;
+    }
+    // A native decoder can reject its first buffer transiently. Reattach once
+    // under the same server lease; never restart the main player or loop on a
+    // genuinely unsupported stream. Defer past both native and hls.js errors.
+    recovered = true;
+    recovering = true;
+    ready = false;
+    clearTimeout(seekTimer);
+    seekTimer = undefined;
+    engine.stopLoad();
+    onFrame(false);
+    recoveryTimer = setTimeout(() => {
+      recoveryTimer = undefined;
+      if (target === null || document.hidden) {
+        release();
+        return;
+      }
+      engine?.recoverMediaError();
+      recovering = false;
+      engine?.startLoad(target);
+    }, 100);
+  };
   const seek = (replace = false) => {
-    if (!ready || target === null || disposed || document.hidden) return;
+    if (!ready || recovering || target === null || disposed || document.hidden)
+      return;
     if (engine && !engine.hasEnoughToStart) return;
     if (video.seeking && !replace) return;
     try {
@@ -80,10 +114,10 @@ export function createScrubStream(
     }
   };
   const showFrame = () => {
-    if (target === null || video.seeking || video.readyState < 2) return;
+    if (recovering || target === null || video.seeking || video.readyState < 2)
+      return;
     // loadeddata can arrive before the first fragment's append completes.
-    // Let hls.js establish its initial position first; an overlapping seek can
-    // make WebKit reject the pending buffer and permanently fail the decoder.
+    // Let hls.js establish its initial position without an overlapping seek.
     if (engine && !engine.hasEnoughToStart) return;
     video.pause();
     if (Math.abs(video.currentTime - target) < 0.05) {
@@ -101,7 +135,8 @@ export function createScrubStream(
   };
   const start = () => {
     seekTimer = undefined;
-    if (target === null || disposed || failed || document.hidden) return;
+    if (target === null || disposed || failed || recovering || document.hidden)
+      return;
     if (!owner) {
       const url = new URL(source);
       owner = new PlayerTranscodeSession(sceneId, crypto.randomUUID());
@@ -130,7 +165,10 @@ export function createScrubStream(
           queueMicrotask(showFrame);
         });
         engine.on(Hls.Events.ERROR, (_event, data) => {
-          if (data.fatal) fail();
+          if (data.fatal) {
+            if (data.type === Hls.ErrorTypes.MEDIA_ERROR) mediaError();
+            else fail();
+          }
         });
         engine.attachMedia(video);
         engine.loadSource(url.toString());
@@ -154,7 +192,7 @@ export function createScrubStream(
   video.addEventListener("loadedmetadata", metadata);
   video.addEventListener("loadeddata", showFrame);
   video.addEventListener("seeked", showFrame);
-  video.addEventListener("error", fail);
+  video.addEventListener("error", mediaError);
   document.addEventListener("visibilitychange", hidden);
 
   const update = (time: number | null, active: boolean) => {
@@ -197,7 +235,7 @@ export function createScrubStream(
       video.removeEventListener("loadedmetadata", metadata);
       video.removeEventListener("loadeddata", showFrame);
       video.removeEventListener("seeked", showFrame);
-      video.removeEventListener("error", fail);
+      video.removeEventListener("error", mediaError);
       document.removeEventListener("visibilitychange", hidden);
       release();
     },

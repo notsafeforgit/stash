@@ -50,11 +50,16 @@ for (const mobile of [true, false]) {
       await expect(
         page.getByRole("button", { name: "Switch to markers", exact: true }),
       ).toHaveAccessibleDescription("Current feed: Scenes");
-      await page.locator("video").evaluate((video: HTMLVideoElement) => {
-        window.tvFixtureVideo = video;
-        video.currentTime = 2;
-      });
-      await expect(page.locator("video")).toHaveJSProperty("seeking", false);
+      await page
+        .locator("video[data-playback-video]")
+        .evaluate((video: HTMLVideoElement) => {
+          window.tvFixtureVideo = video;
+          video.currentTime = 2;
+        });
+      await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+        "seeking",
+        false,
+      );
       await choose(page, "Markers", mobile);
       await expect(page).toHaveURL(/mode=markers/);
       await ready(page, /marker:\d+$/);
@@ -66,14 +71,14 @@ for (const mobile of [true, false]) {
       await expect
         .poll(() =>
           page
-            .locator("video")
+            .locator("video[data-playback-video]")
             .evaluate((video: HTMLVideoElement) => video.currentTime),
         )
         .toBeCloseTo(2, 1);
-      await expect(page.locator("video")).toHaveCount(1);
+      await expect(page.locator("video[data-playback-video]")).toHaveCount(1);
       expect(
         await page
-          .locator("video")
+          .locator("video[data-playback-video]")
           .evaluate((video) => video === window.tvFixtureVideo),
       ).toBe(true);
       expect(

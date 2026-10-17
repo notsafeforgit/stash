@@ -79,7 +79,7 @@ for (const mobile of [true, false]) {
           try {
             await page.goto("/scene-detail?hls");
             const player = page.locator("[data-scene-player]");
-            const video = player.locator("video");
+            const video = player.locator("video[data-playback-video]");
             const originalVideo = await video.elementHandle();
             await player.locator("[data-player-native-button]").click();
             await expect(video).toHaveJSProperty("paused", false);

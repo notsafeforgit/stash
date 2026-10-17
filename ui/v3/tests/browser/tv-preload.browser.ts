@@ -62,7 +62,7 @@ for (const count of [1, 3, 5]) {
           .poll(() => [...alive.keys()].every((id) => warmed.has(id)))
           .toBe(true);
         expect(alive.has(first)).toBe(selected <= radius);
-        await expect(page.locator("video")).toHaveCount(1);
+        await expect(page.locator("video[data-playback-video]")).toHaveCount(1);
       }
       expect(released.has(first)).toBe(true);
       const retained = new Set(alive.keys());
@@ -174,7 +174,7 @@ for (const scenario of [
     await expect.poll(() => loaded.size).toBe(markers ? 2 : 4);
     await page.keyboard.press("ArrowDown");
     await expect.poll(() => loaded.size).toBe(markers ? 2 : 5);
-    await expect(page.locator("video")).toHaveCount(1);
+    await expect(page.locator("video[data-playback-video]")).toHaveCount(1);
     expect(transcodes).toEqual([]);
   });
 }

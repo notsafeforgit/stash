@@ -54,7 +54,7 @@ for (const scenario of cases) {
     if (mode.includes("lightbox"))
       await page.getByRole("button", { name: "Open scenes" }).click();
     const player = page.locator("[data-scene-player]");
-    const video = player.locator("video");
+    const video = player.locator("video[data-playback-video]");
     if (mode === "scene detail") {
       await player.locator("[data-player-native-button]").click();
       await player.getByRole("button", { name: /^Playback:/ }).click();

@@ -21,7 +21,7 @@ for (const marker of [false, true]) {
       await page.goto(`/tv-fixture/tv?long-marker${marker ? "&markers" : ""}`);
       const controls = page.locator("[data-tv-controls]");
       const indicator = controls.locator("svg.lucide-play");
-      const video = page.locator("video");
+      const video = page.locator("video[data-playback-video]");
       const player = page.locator("[data-scene-player]");
       await expect(
         controls.getByRole("status", { name: "Loading" }),

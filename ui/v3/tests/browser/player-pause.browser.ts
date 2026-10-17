@@ -17,7 +17,7 @@ for (const hls of [false, true]) {
       if (mode === "lightbox")
         await page.getByRole("button", { name: "Open scenes" }).click();
       const player = page.locator("[data-scene-player]");
-      const video = player.locator("video");
+      const video = player.locator("video[data-playback-video]");
       const surface = page.locator("[data-tv-play-surface]");
       const bar = player.locator("[data-player-control-bar]");
       if (mode === "TV") await surface.tap({ position: { x: 150, y: 250 } });

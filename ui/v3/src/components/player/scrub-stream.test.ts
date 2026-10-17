@@ -8,6 +8,7 @@ const { instances } = vi.hoisted(() => ({
     source: string;
     startLoad: ReturnType<typeof vi.fn>;
     stopLoad: ReturnType<typeof vi.fn>;
+    recoverMediaError: ReturnType<typeof vi.fn>;
     destroy: ReturnType<typeof vi.fn>;
     events: Map<string, (...args: unknown[]) => void>;
   }[],
@@ -20,11 +21,13 @@ vi.mock("@videojs/hlsjs-video", () => ({
       FRAG_BUFFERED: "buffered",
       ERROR: "error",
     };
+    static ErrorTypes = { MEDIA_ERROR: "mediaError" };
     hasEnoughToStart = true;
     source = "";
     events = new Map<string, (...args: unknown[]) => void>();
     startLoad = vi.fn();
     stopLoad = vi.fn();
+    recoverMediaError = vi.fn();
     destroy = vi.fn();
     constructor() {
       instances.push(this);
@@ -206,7 +209,41 @@ it("leaves first-fragment positioning with hls.js until its append is complete",
   expect(f.failure).not.toHaveBeenCalled();
 });
 
-it("disposes failed previews instead of looping requests, and cancels pending work on backgrounding", () => {
+it("recovers one decoder failure under the same lease and stops after a repeated failure", () => {
+  const f = fixture();
+  f.prepare(0.086);
+  vi.advanceTimersByTime(0);
+  const engine = instances[0]!;
+  f.video.dispatchEvent(new Event("error"));
+  engine.events.get("error")?.("error", { fatal: true, type: "mediaError" });
+  f.preview(9.12);
+  vi.advanceTimersByTime(100);
+  expect(engine.recoverMediaError).toHaveBeenCalledOnce();
+  expect(engine.startLoad).toHaveBeenLastCalledWith(9.12);
+  expect(instances).toHaveLength(1);
+  expect(beacon).not.toHaveBeenCalled();
+  expect(f.failure).not.toHaveBeenCalled();
+  // Failure before the replacement even reaches metadata must also terminate.
+  f.video.dispatchEvent(new Event("error"));
+  vi.advanceTimersByTime(200);
+  expect(engine.recoverMediaError).toHaveBeenCalledOnce();
+  expect(engine.destroy).toHaveBeenCalledOnce();
+  expect(f.failure).toHaveBeenCalledOnce();
+});
+
+it("cancels decoder recovery when the preview is released", () => {
+  const f = fixture();
+  f.prepare(0.086);
+  vi.advanceTimersByTime(0);
+  f.video.dispatchEvent(new Event("error"));
+  f.release();
+  vi.advanceTimersByTime(200);
+  expect(instances[0]!.recoverMediaError).not.toHaveBeenCalled();
+  expect(instances[0]!.destroy).toHaveBeenCalledOnce();
+  expect(f.failure).not.toHaveBeenCalled();
+});
+
+it("disposes failed downloads instead of looping requests, and cancels pending work on backgrounding", () => {
   const f = fixture();
   f.preview(50);
   vi.advanceTimersByTime(180);

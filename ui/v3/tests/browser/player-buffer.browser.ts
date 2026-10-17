@@ -74,7 +74,7 @@ for (const mobile of [true, false]) {
           await page.goto(item.path);
           if (item.mode === "lightbox")
             await page.getByRole("button", { name: "Open scenes" }).click();
-          const video = page.locator("video");
+          const video = page.locator("video[data-playback-video]");
           const scrubber = page.getByRole("slider", {
             name: "Playback position",
           });

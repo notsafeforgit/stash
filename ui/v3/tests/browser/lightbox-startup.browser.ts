@@ -109,7 +109,7 @@ for (const cancel of [false, true]) {
         "data-playback-ready",
         "true",
       );
-      await expect(page.locator("video")).toHaveCount(1);
+      await expect(page.locator("video[data-playback-video]")).toHaveCount(1);
     } finally {
       release?.();
     }

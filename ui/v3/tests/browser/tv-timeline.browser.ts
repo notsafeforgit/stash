@@ -13,7 +13,10 @@ async function open(page: Page, query: string) {
     "data-playback-ready",
     "true",
   );
-  await expect(page.locator("video")).toHaveJSProperty("paused", true);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    true,
+  );
 }
 
 async function expectSceneTime(page: Page, seconds: number) {
@@ -21,7 +24,7 @@ async function expectSceneTime(page: Page, seconds: number) {
     .poll(async () =>
       Math.abs(
         (await page
-          .locator("video")
+          .locator("video[data-playback-video]")
           .evaluate((video: HTMLVideoElement) => video.currentTime)) - seconds,
       ),
     )
@@ -135,7 +138,9 @@ for (const mobile of [true, false]) {
           await expect(
             dock.getByText(`0:00 / ${time(duration)}`, { exact: true }),
           ).toBeVisible();
-          await expect(page.locator("video")).toHaveJSProperty("paused", true);
+          await expect(
+            page.locator("video[data-playback-video]"),
+          ).toHaveJSProperty("paused", true);
         });
       }
     },
@@ -149,9 +154,11 @@ test("a scene segment survives quality changes and a settings round trip", async
   await clickTimeline(page, 0.5);
   await expectSceneTime(page, 8);
   const elapsed = Number(await timeline(page).getAttribute("aria-valuenow"));
-  await page.locator("video").evaluate((video: HTMLVideoElement) => {
-    window.tvFixtureVideo = video;
-  });
+  await page
+    .locator("video[data-playback-video]")
+    .evaluate((video: HTMLVideoElement) => {
+      window.tvFixtureVideo = video;
+    });
   await page.getByRole("button", { name: "Playback", exact: true }).click();
   await page.getByRole("menuitem", { name: "Quality", exact: true }).click();
   await page.getByRole("combobox", { name: "Current item quality" }).click();
@@ -169,7 +176,7 @@ test("a scene segment survives quality changes and a settings round trip", async
   await expect(timeline(page)).toHaveAttribute("aria-valuemax", "8");
   expect(
     await page
-      .locator("video")
+      .locator("video[data-playback-video]")
       .evaluate((video) => video === window.tvFixtureVideo),
   ).toBe(true);
 
@@ -215,11 +222,14 @@ test("marker navigation resets the timeline and replay returns to segment start"
   await timeline(page).press("End");
   await expectSceneTime(page, 10);
   await page.getByRole("button", { name: "Play", exact: true }).click();
-  await expect(page.locator("video")).toHaveJSProperty("paused", false);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    false,
+  );
   await expect
     .poll(() =>
       page
-        .locator("video")
+        .locator("video[data-playback-video]")
         .evaluate((video: HTMLVideoElement) => video.currentTime),
     )
     .toBeLessThan(9);

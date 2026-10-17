@@ -37,7 +37,7 @@ test("a direct decoding failure falls back to an eligible transcode without chan
   await page.goto("/tv-fixture/tv?paused&full-hd");
   const player = page.locator("[data-scene-player]");
   await expect(player).toHaveAttribute("data-playback-ready", "true");
-  const video = page.locator("video");
+  const video = page.locator("video[data-playback-video]");
   await expect(video).toHaveAttribute("src", /\/stream(?:[?#]|$)/);
   const fallback = page.waitForRequest((request) => {
     const url = new URL(request.url());

@@ -152,7 +152,7 @@ for (const desktop of [false, true]) {
       animations: "disabled",
     });
     await next(page, 1);
-    const video = viewer(page).locator("video").first();
+    const video = viewer(page).locator("video[data-playback-video]").first();
     await expect
       .poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState))
       .toBeGreaterThanOrEqual(2);
@@ -351,7 +351,7 @@ test("adjacent videos keep one player and closing releases playback", async ({
   };
   await archive(page, first);
   await open(page);
-  const player = viewer(page).locator("video").first();
+  const player = viewer(page).locator("video[data-playback-video]").first();
   await expect
     .poll(() => player.evaluate((node: HTMLVideoElement) => node.readyState))
     .toBeGreaterThanOrEqual(2);

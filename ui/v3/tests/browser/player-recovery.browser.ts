@@ -16,7 +16,7 @@ test("a quality change loads at the marker playhead without narrowing its range"
     },
   );
   await page.goto("/tv-fixture/tv?paused&markers&long-marker");
-  const video = page.locator("video");
+  const video = page.locator("video[data-playback-video]");
   const slider = page.getByRole("slider", { name: "Playback position" });
   await expect(page.locator("[data-scene-player]")).toHaveAttribute(
     "data-playback-ready",
@@ -87,7 +87,7 @@ for (const marker of [false, true]) {
       await page.goto(
         `/tv-fixture/tv?low${marker ? "&markers&long-marker" : ""}`,
       );
-      const video = page.locator("video");
+      const video = page.locator("video[data-playback-video]");
       await expect(video).toHaveJSProperty("paused", false);
       // Withhold the next real fragment until the existing stall watchdog
       // reloads. Recovery must request the current region, not clip segment 0.

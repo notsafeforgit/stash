@@ -36,7 +36,7 @@ for (const marker of [false, true]) {
         : "/scene-detail?landscape&short&hls",
     );
     const player = page.locator("[data-scene-player]");
-    const video = player.locator("video");
+    const video = player.locator("video[data-playback-video]");
     const original = await video.elementHandle();
     if (!original) throw new Error("Missing video");
     if (!marker) await player.locator("[data-player-native-button]").click();

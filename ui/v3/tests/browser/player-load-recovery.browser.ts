@@ -27,7 +27,7 @@ for (const repeatedFailure of [false, true]) {
     try {
       await page.goto("/scene-detail?landscape&short&hls");
       const player = page.locator("[data-scene-player]");
-      const video = player.locator("video");
+      const video = player.locator("video[data-playback-video]");
       await player.locator("[data-player-native-button]").click();
       await expect(player).toHaveAttribute("data-playback-ready", "true");
       await video.evaluate((v: HTMLVideoElement) => {

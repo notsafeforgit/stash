@@ -44,10 +44,13 @@ test("saves an optional scene filter and plays whole scenes inside the marker fe
   await page.keyboard.press("ArrowDown");
   await expect(player).toHaveAttribute("data-playback-key", /scene:3$/);
   await expect(player).toHaveAttribute("data-playback-ready", "true");
-  await expect(page.locator("video")).toHaveJSProperty("currentTime", 0);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "currentTime",
+    0,
+  );
   const timeline = page.locator("[data-tv-dock]").getByRole("slider");
   await expect(timeline).toHaveAttribute("aria-valuemax", "12");
-  await expect(page.locator("video")).toHaveCount(1);
+  await expect(page.locator("video[data-playback-video]")).toHaveCount(1);
   await page.screenshot({ path: "/tmp/stash-tv-extra-scenes-playback.png" });
 
   await page.getByRole("button", { name: "Navigation", exact: true }).click();

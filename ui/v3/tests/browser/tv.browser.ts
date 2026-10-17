@@ -12,10 +12,12 @@ async function open(page: Page, query = "?paused") {
     "data-playback-ready",
     "true",
   );
-  await expect(page.locator("video")).toHaveCount(1);
-  await page.locator("video").evaluate((video: HTMLVideoElement) => {
-    window.tvFixtureVideo = video;
-  });
+  await expect(page.locator("video[data-playback-video]")).toHaveCount(1);
+  await page
+    .locator("video[data-playback-video]")
+    .evaluate((video: HTMLVideoElement) => {
+      window.tvFixtureVideo = video;
+    });
 }
 async function openSettings(page: Page) {
   await page.getByRole("button", { name: "Navigation", exact: true }).click();
@@ -60,10 +62,10 @@ test("TV keeps one video and three slots across paginated navigation", async ({
   await open(page);
   for (let id = 2; id <= 12; id++) await next(page, id);
   await expect(page.locator("[data-tv-slot]")).toHaveCount(3);
-  await expect(page.locator("video")).toHaveCount(1);
+  await expect(page.locator("video[data-playback-video]")).toHaveCount(1);
   expect(
     await page
-      .locator("video")
+      .locator("video[data-playback-video]")
       .evaluate((video: HTMLVideoElement) => video === window.tvFixtureVideo),
   ).toBe(true);
   const requests = await page.evaluate(() => window.tvFixtureRequests);
@@ -97,7 +99,7 @@ test("TV quality is selected before loading and source changes retain the player
   );
   expect(
     await page
-      .locator("video")
+      .locator("video[data-playback-video]")
       .evaluate((video: HTMLVideoElement) => video === window.tvFixtureVideo),
   ).toBe(true);
   await next(page, 2);
@@ -119,7 +121,7 @@ test("TV markers use parent streams and never write activity", async ({
   await expect
     .poll(() =>
       page
-        .locator("video")
+        .locator("video[data-playback-video]")
         .evaluate((video: HTMLVideoElement) => video.currentTime),
     )
     .toBeGreaterThan(0.5);
@@ -161,7 +163,7 @@ test("TV hides unsupported fullscreen and retains inline video, rotation and nav
   );
   expect(
     await page
-      .locator("video")
+      .locator("video[data-playback-video]")
       .evaluate(
         (video: HTMLVideoElement) => video.playsInline && !video.controls,
       ),
@@ -228,9 +230,15 @@ test("TV is a top-level page with navigation instead of exit and item buttons", 
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/tv-fixture\/tv\?/);
   await page.getByRole("button", { name: "Play", exact: true }).click();
-  await expect(page.locator("video")).toHaveJSProperty("paused", false);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    false,
+  );
   await page.getByRole("button", { name: "Navigation", exact: true }).click();
-  await expect(page.locator("video")).toHaveJSProperty("paused", true);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    true,
+  );
   await page.keyboard.press("ArrowDown");
   await expect(page.locator("[data-scene-player]")).toHaveAttribute(
     "data-playback-key",
@@ -264,17 +272,29 @@ test("TV exposes mute at the bottom and uses video taps instead of transport but
     expect(bounds?.y).toBeGreaterThan(844 * 0.45);
   }
   await unmute.click();
-  await expect(page.locator("video")).toHaveJSProperty("muted", false);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "muted",
+    false,
+  );
   await surface.tap({ position: { x: 150, y: 250 } });
-  await expect(page.locator("video")).toHaveJSProperty("paused", false);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    false,
+  );
   await surface.tap({ position: { x: 150, y: 250 } });
-  await expect(page.locator("video")).toHaveJSProperty("paused", true);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    true,
+  );
   await page.keyboard.press("h");
   await expect(
     page.getByRole("button", { name: "Show TV controls", exact: true }),
   ).toBeVisible();
   await dock.getByRole("button", { name: "Mute", exact: true }).click();
-  await expect(page.locator("video")).toHaveJSProperty("muted", true);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "muted",
+    true,
+  );
   await expect(
     dock.getByRole("button", { name: "Unmute", exact: true }),
   ).toBeVisible();
@@ -399,7 +419,10 @@ for (const mode of ["scenes", "markers"] as const) {
     page,
   }) => {
     await open(page, mode === "markers" ? "?paused&markers" : "?paused");
-    await expect(page.locator("video")).toHaveJSProperty("muted", true);
+    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+      "muted",
+      true,
+    );
     for (const startMuted of [false, true]) {
       await openSettings(page);
       const preference = page.getByRole("switch", {
@@ -420,7 +443,7 @@ for (const mode of ["scenes", "markers"] as const) {
       await page
         .getByRole("link", { name: "Return to TV", exact: true })
         .click();
-      const video = page.locator("video");
+      const video = page.locator("video[data-playback-video]");
       await expect(video).toHaveJSProperty("muted", startMuted);
       await expect(page.locator("[data-scene-player]")).toHaveAttribute(
         "data-playback-ready",
@@ -474,11 +497,17 @@ test("holding the video uses 2x, consumes movement and release, and restores the
   browserName,
 }) => {
   await open(page, "?advance");
-  await expect(page.locator("video")).toHaveJSProperty("paused", false);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    false,
+  );
   await page
     .locator("[data-tv-play-surface]")
     .tap({ position: { x: 150, y: 250 } });
-  await expect(page.locator("video")).toHaveJSProperty("paused", true);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    true,
+  );
   await page.getByRole("button", { name: "Playback", exact: true }).click();
   await page
     .getByRole("menuitem", { name: "Playback speed", exact: true })
@@ -511,8 +540,14 @@ test("holding the video uses 2x, consumes movement and release, and restores the
   };
   try {
     await begin();
-    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 2);
-    await expect(page.locator("video")).toHaveJSProperty("paused", false);
+    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+      "playbackRate",
+      2,
+    );
+    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+      "paused",
+      false,
+    );
     if (input)
       await input.send("Input.dispatchTouchEvent", {
         type: "touchMove",
@@ -524,19 +559,33 @@ test("holding the video uses 2x, consumes movement and release, and restores the
       /scene:1$/,
     );
     await release();
-    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 1.5);
+    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+      "playbackRate",
+      1.5,
+    );
     // Wait through the deferred single-tap window; releasing a hold is consumed.
     await page.waitForTimeout(250);
-    await expect(page.locator("video")).toHaveJSProperty("paused", true);
+    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+      "paused",
+      true,
+    );
     await page
       .locator("[data-tv-play-surface]")
       .tap({ position: { x: 150, y: 250 } });
-    await expect(page.locator("video")).toHaveJSProperty("paused", false);
+    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+      "paused",
+      false,
+    );
     await begin();
-    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 2);
-    await page.locator("video").evaluate((video: HTMLVideoElement) => {
-      video.currentTime = video.duration - 0.1;
-    });
+    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+      "playbackRate",
+      2,
+    );
+    await page
+      .locator("video[data-playback-video]")
+      .evaluate((video: HTMLVideoElement) => {
+        video.currentTime = video.duration - 0.1;
+      });
     await expect(page.locator("[data-scene-player]")).toHaveAttribute(
       "data-playback-key",
       /scene:2$/,
@@ -545,19 +594,34 @@ test("holding the video uses 2x, consumes movement and release, and restores the
       "data-playback-ready",
       "true",
     );
-    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 2);
+    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+      "playbackRate",
+      2,
+    );
     await release();
-    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 1.5);
-    await expect(page.locator("video")).toHaveJSProperty("paused", false);
+    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+      "playbackRate",
+      1.5,
+    );
+    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+      "paused",
+      false,
+    );
     expect(
       await page
-        .locator("video")
+        .locator("video[data-playback-video]")
         .evaluate((video) => video === window.tvFixtureVideo),
     ).toBe(true);
     await begin();
-    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 2);
+    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+      "playbackRate",
+      2,
+    );
     await page.evaluate(() => window.dispatchEvent(new Event("blur")));
-    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 1.5);
+    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+      "playbackRate",
+      1.5,
+    );
     await release();
   } finally {
     await input?.detach();
@@ -570,15 +634,24 @@ test("double-tap zoom owns the gesture without changing playback", async ({
   await open(page);
   const surface = page.locator("[data-tv-play-surface]");
   await surface.tap({ position: { x: 150, y: 250 } });
-  await expect(page.locator("video")).toHaveJSProperty("paused", false);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    false,
+  );
   await surface.tap({ position: { x: 150, y: 250 } });
   await surface.tap({ position: { x: 150, y: 250 } });
   await expect(
     page.getByRole("button", { name: "Reset zoom", exact: true }),
   ).toBeVisible();
   await page.waitForTimeout(550);
-  await expect(page.locator("video")).toHaveJSProperty("paused", false);
-  await expect(page.locator("video")).toHaveJSProperty("playbackRate", 1);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    false,
+  );
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "playbackRate",
+    1,
+  );
 });
 
 for (const device of ["mobile", "desktop"] as const) {
@@ -653,7 +726,10 @@ for (const device of ["mobile", "desktop"] as const) {
       await expect(toggle).toHaveAttribute("aria-pressed", "true");
       await toggle.click();
       await expect(info).toHaveCount(0);
-      await expect(page.locator("video")).toHaveJSProperty("paused", true);
+      await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+        "paused",
+        true,
+      );
     });
   });
 }
@@ -722,10 +798,10 @@ test("vertical gestures change videos in both directions while retaining one pla
       "data-playback-key",
       /scene:1$/,
     );
-    await expect(page.locator("video")).toHaveCount(1);
+    await expect(page.locator("video[data-playback-video]")).toHaveCount(1);
     expect(
       await page
-        .locator("video")
+        .locator("video[data-playback-video]")
         .evaluate((video) => video === window.tvFixtureVideo),
     ).toBe(true);
   } finally {
@@ -845,7 +921,7 @@ test("scene activity retains absolute resume time for a segment and counts once 
   await expect
     .poll(() =>
       page
-        .locator("video")
+        .locator("video[data-playback-video]")
         .evaluate((video: HTMLVideoElement) => video.currentTime),
     )
     .toBeGreaterThan(5);
@@ -914,11 +990,14 @@ test("rotated timeline seeking follows the visible track and keeps the item sele
   await expect
     .poll(() =>
       page
-        .locator("video")
+        .locator("video[data-playback-video]")
         .evaluate((video: HTMLVideoElement) => video.currentTime),
     )
     .toBeGreaterThan(3);
-  await expect(page.locator("video")).toHaveJSProperty("paused", true);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    true,
+  );
   await expect(page.locator("[data-scene-player]")).toHaveAttribute(
     "data-playback-key",
     /scene:1$/,
@@ -930,12 +1009,24 @@ test("held seeking restores the previous rate and pause state", async ({
 }) => {
   await open(page);
   await page.keyboard.down("ArrowRight");
-  await expect(page.locator("video")).toHaveJSProperty("playbackRate", 2);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "playbackRate",
+    2,
+  );
   await page.keyboard.press("ArrowUp");
-  await expect(page.locator("video")).toHaveJSProperty("playbackRate", 4);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "playbackRate",
+    4,
+  );
   await page.keyboard.up("ArrowRight");
-  await expect(page.locator("video")).toHaveJSProperty("playbackRate", 1);
-  await expect(page.locator("video")).toHaveJSProperty("paused", true);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "playbackRate",
+    1,
+  );
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    true,
+  );
   await expect(page.locator("[data-scene-player]")).toHaveAttribute(
     "data-playback-key",
     /scene:1$/,
@@ -950,7 +1041,7 @@ test("quality changes preserve active playback and menus own navigation keys", a
   await expect
     .poll(() =>
       page
-        .locator("video")
+        .locator("video[data-playback-video]")
         .evaluate((video: HTMLVideoElement) => video.currentTime),
     )
     .toBeGreaterThan(1);
@@ -966,11 +1057,14 @@ test("quality changes preserve active playback and menus own navigation keys", a
     await quality.click();
   await page.getByRole("option", { name: "HLS (240p)", exact: true }).click();
   await page.getByRole("button", { name: "Close", exact: true }).click();
-  await expect(page.locator("video")).toHaveJSProperty("paused", false);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    false,
+  );
   await expect
     .poll(() =>
       page
-        .locator("video")
+        .locator("video[data-playback-video]")
         .evaluate((video: HTMLVideoElement) => video.currentTime),
     )
     .toBeGreaterThan(0.5);
@@ -980,21 +1074,35 @@ test("automatic advance retains audio state and one video", async ({
   page,
 }) => {
   await open(page, "?advance");
-  await expect(page.locator("video")).toHaveJSProperty("paused", false);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    false,
+  );
   await page.keyboard.press("m");
-  await expect(page.locator("video")).toHaveJSProperty("muted", false);
-  await page.locator("video").evaluate((video: HTMLVideoElement) => {
-    video.currentTime = video.duration - 0.3;
-  });
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "muted",
+    false,
+  );
+  await page
+    .locator("video[data-playback-video]")
+    .evaluate((video: HTMLVideoElement) => {
+      video.currentTime = video.duration - 0.3;
+    });
   await expect(page.locator("[data-scene-player]")).toHaveAttribute(
     "data-playback-key",
     /scene:2$/,
   );
-  await expect(page.locator("video")).toHaveJSProperty("paused", false);
-  await expect(page.locator("video")).toHaveJSProperty("muted", false);
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "paused",
+    false,
+  );
+  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
+    "muted",
+    false,
+  );
   expect(
     await page
-      .locator("video")
+      .locator("video[data-playback-video]")
       .evaluate((video) => video === window.tvFixtureVideo),
   ).toBe(true);
 });

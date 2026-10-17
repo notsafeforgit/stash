@@ -106,7 +106,9 @@ for (const surface of [
           "data-playback-key",
           /scene:2$/,
         );
-        await expect(page.locator("video")).toHaveJSProperty("muted", true);
+        await expect(
+          page.locator("video[data-playback-video]"),
+        ).toHaveJSProperty("muted", true);
         await expect(page.getByRole("dialog")).toHaveCount(0);
         await expect(page.locator("[data-tv-info]")).toHaveCount(
           surface === "information" ? 1 : 0,
@@ -114,7 +116,9 @@ for (const surface of [
         await expect(page).toHaveURL(/\/tv-fixture\/tv/);
         // The next deliberate tap still works after drag-click suppression.
         await page.getByRole("button", { name: "Unmute", exact: true }).tap();
-        await expect(page.locator("video")).toHaveJSProperty("muted", false);
+        await expect(
+          page.locator("video[data-playback-video]"),
+        ).toHaveJSProperty("muted", false);
       });
     });
   }

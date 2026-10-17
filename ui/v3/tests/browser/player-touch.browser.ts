@@ -7,7 +7,7 @@ async function openLightbox(page: Page) {
   await page.goto("/scene-lightbox");
   await page.getByRole("button", { name: "Open scenes" }).tap();
   const player = page.locator("[data-scene-player]");
-  const video = player.locator("video");
+  const video = player.locator("video[data-playback-video]");
   await expect(player).toHaveAttribute("data-playback-ready", "true");
   await expect(video).toHaveJSProperty("paused", false);
   await expect(video).toHaveJSProperty("seeking", false);

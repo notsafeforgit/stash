@@ -1079,6 +1079,9 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
                   sceneId={scene.id}
                   source={scrubSource}
                   time={scrubTime}
+                  start={clipRange?.start ?? 0}
+                  end={clipRange?.end ?? fileDuration}
+                  offset={offsetStart}
                   onFailure={handleScrubFailure}
                 />
               )}

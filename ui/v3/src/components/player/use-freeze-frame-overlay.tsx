@@ -110,9 +110,18 @@ export function useFreezeFrameOverlay({
       // Hold the frame actually on screen while the committed full-resolution
       // seek loads, rather than flashing back to that older main-video frame.
       const preview = root?.querySelector<HTMLVideoElement>(
-        '[data-preview-ready="true"] video[data-scrub-preview]',
+        '[data-preview-ready="true"][data-preview-kind="video"] video[data-scrub-preview]',
       );
-      ctx.drawImage(preview ?? video, 0, 0, canvas.width, canvas.height);
+      const still = root?.querySelector<HTMLImageElement>(
+        '[data-preview-ready="true"][data-preview-kind="still"] img[data-scrub-still]',
+      );
+      ctx.drawImage(
+        still?.complete && still.naturalWidth ? still : (preview ?? video),
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      );
     } catch {
       // drawImage from a cross-origin video taints the canvas but
       // does not throw; if it ever does (e.g. detached element),

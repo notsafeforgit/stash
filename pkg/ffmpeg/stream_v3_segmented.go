@@ -1737,7 +1737,7 @@ func (sm *StreamManager) checkV3Transcode(stream *v3RunningStream, now time.Time
 		hasWaiting := len(stream.waitingSegments) > 0
 		suspendAhead, resumeAhead := v3SuspendLookaheadSegments, v3ResumeLookaheadSegments
 		if stream.streamType == V3StreamTypeHLSScrub {
-			suspendAhead, resumeAhead = 15/segmentLength, 4/segmentLength
+			suspendAhead, resumeAhead = 4/segmentLength, 2/segmentLength
 		}
 		switch {
 		case hasWaiting && tp.suspended:

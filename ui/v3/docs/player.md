@@ -161,23 +161,48 @@ It shares the normal timeline, touch precision zoom and media zoom surface;
 there is no thumbnail chooser. “Generate thumbnail from current” saves the
 committed main player's position as before.
 
-The scrub stream starts only after an unbuffered target settles for 180 ms.
-It uses its own transcode session, never the main player's lease or audio state.
-Nearby frames reuse the small buffer; other seeks replace pending targets.
-Its hls.js buffer target is 15 seconds ahead/behind and 4 MiB (not a hard memory
-limit); the server suspends encoding approximately 15 seconds ahead of fetched
-segments. Source frame cadence is retained, with no B-frame reordering delay.
+After 1.5 seconds of healthy main playback, the same silent decoder prepares
+coarse snapshots across the selected scene/marker, beginning near the playhead
+and then covering the midpoint, quarters, eighths, etc. Up to 64 samples give
+progressively finer coverage. Preparation skips fully buffered scenes, honors
+data-saving connections, and yields while the main video seeks or has less than
+eight seconds buffered ahead (unless paused or buffered through its end).
+Foreground scrubbing always takes priority. No separate chooser is involved.
+
+Snapshots are JPEG blobs in a per-player memory cache, capped at 96 frames and
+4 MiB of compressed image data. Only the displayed still is decoded. Broad
+movement can show the nearest prepared sample immediately, while the silent
+video supplies the exact frame as the finger dwells. Fine decoded frames remain
+on screen during nearby adjustments; the still is not the saved cover. Release
+commits the selected timestamp to the main player before the existing thumbnail
+action can save its full-resolution frame.
+
+Unbuffered fine seeks are throttled at 120 ms, with a fixed pending deadline;
+continuous movement cannot indefinitely postpone a request. The stream owns
+its transcode session, never the main player's lease or audio state. Its hls.js
+buffer target is four seconds ahead, capped at six, with 15 seconds behind and
+a 1 MiB byte target (not a hard memory limit). Loading stops when the requested
+frame arrives. The server suspends encoding approximately four seconds ahead.
+Source frame cadence is retained, with no B-frame reordering delay.
+The preview controller waits for hls.js to finish its initial fragment append
+and starting position before seeking; intervening at `loadeddata` can make
+WebKit reject the pending buffer.
 HDR preview pixels are tone-mapped to SDR; the main stream's HDR mode is unchanged.
 Normal 240p encoding targets 1 Mbps, or 1.5 Mbps above 30 fps, while filling that
-window. It does not download a second copy of the entire video.
+window. It does not download a second copy of the entire video. Background
+sessions rotate after eight samples, releasing their encoded server segments
+while retaining the compressed snapshots; distant preparation cannot retain
+every sampled segment for the entire visit.
 
-On release/cancel preview fetching stops. MSE buffers and temporary segments can
-be reused for 30 seconds, then the independent session is released. Navigation,
-suspension, unmount and backgrounding release it immediately; the server's idle
-reaper covers lost clients. Native HLS has no stop-loading API and releases on
-gesture completion. Offline/share players and unavailable preview endpoints
-retain buffered previews and ordinary final seeking. Preview files are temporary
-transcode cache, not saved sprites or backup artwork.
+On release/cancel foreground fetching stops; healthy playback can resume remaining
+background samples. Idle MSE buffers and encoded segments expire after 30 seconds.
+Compressed snapshots survive decoder expiry, then expire after five minutes of
+paused inactivity. Navigation, suspension, unmount and backgrounding release
+both immediately; the server's idle reaper covers lost clients. Native HLS has no
+stop-loading API and releases after each background sample or gesture completion.
+Offline/share players and unavailable preview endpoints retain buffered previews
+and ordinary final seeking. None of these previews becomes saved sprites or
+backup artwork.
 
 Classic MSE main-stream loading is suspended during the drag; Safari MMS and
 native HLS retain browser-owned loading. Release uses the normal seek policy

@@ -27,14 +27,14 @@ export function scrubStreamURL(
   return null;
 }
 
-/** Inert until a drag settles. Buffered seeks reuse decoded low-resolution
- * media; distant targets are coalesced so pointer moves do not spawn encoders.
+/** Buffered seeks reuse decoded low-resolution media. Unbuffered targets are
+ * throttled, not debounced: continuous dragging must still request frames.
  * This video never joins the main Video.js store or browser media session. */
 export function createScrubStream(
   video: HTMLVideoElement,
   sceneId: string,
   source: string,
-  onFrame: (visible: boolean) => void,
+  onFrame: (visible: boolean, time?: number) => void,
   onFailure: () => void,
 ) {
   let engine: Hls | null = null;
@@ -46,10 +46,13 @@ export function createScrubStream(
   let native = false;
   let disposed = false;
   let failed = false;
+  let foreground = false;
 
   const release = () => {
     clearTimeout(seekTimer);
+    seekTimer = undefined;
     clearTimeout(idleTimer);
+    if (!engine && !owner && !video.hasAttribute("src")) return;
     engine?.destroy();
     engine = null;
     owner?.dispose();
@@ -61,14 +64,15 @@ export function createScrubStream(
     onFrame(false);
   };
   const fail = () => {
-    if (disposed || failed) return;
+    if (disposed || failed || !owner) return;
     failed = true;
     release();
     onFailure();
   };
-  const seek = () => {
+  const seek = (replace = false) => {
     if (!ready || target === null || disposed || document.hidden) return;
-    if (video.seeking) return;
+    if (engine && !engine.hasEnoughToStart) return;
+    if (video.seeking && !replace) return;
     try {
       video.currentTime = target;
     } catch {
@@ -77,10 +81,17 @@ export function createScrubStream(
   };
   const showFrame = () => {
     if (target === null || video.seeking || video.readyState < 2) return;
+    // loadeddata can arrive before the first fragment's append completes.
+    // Let hls.js establish its initial position first; an overlapping seek can
+    // make WebKit reject the pending buffer and permanently fail the decoder.
+    if (engine && !engine.hasEnoughToStart) return;
     video.pause();
     if (Math.abs(video.currentTime - target) < 0.05) {
       video.dataset.scrubTime = String(video.currentTime);
-      onFrame(true);
+      // A paused preview must not continue filling after it has its frame.
+      // The next foreground target or background sample explicitly resumes it.
+      engine?.stopLoad();
+      onFrame(foreground, video.currentTime);
     } else seek();
   };
   const metadata = () => {
@@ -89,6 +100,7 @@ export function createScrubStream(
     // avoids racing that first append with a second native seek in WebKit.
   };
   const start = () => {
+    seekTimer = undefined;
     if (target === null || disposed || failed || document.hidden) return;
     if (!owner) {
       const url = new URL(source);
@@ -101,9 +113,9 @@ export function createScrubStream(
           autoStartLoad: false,
           startPosition: target,
           backBufferLength: 15,
-          maxBufferLength: 15,
-          maxMaxBufferLength: 30,
-          maxBufferSize: 4 * 1024 * 1024,
+          maxBufferLength: 4,
+          maxMaxBufferLength: 6,
+          maxBufferSize: 1024 * 1024,
           // A preview error must not generate an unlimited retry stream.
           fragLoadingMaxRetry: 1,
           manifestLoadingMaxRetry: 1,
@@ -111,6 +123,11 @@ export function createScrubStream(
         });
         engine.on(Hls.Events.MANIFEST_PARSED, () => {
           if (target !== null) engine?.startLoad(target);
+        });
+        engine.on(Hls.Events.FRAG_BUFFERED, () => {
+          // Finish the engine's append/position callbacks before we stop its
+          // loader or the coordinator requests the next background sample.
+          queueMicrotask(showFrame);
         });
         engine.on(Hls.Events.ERROR, (_event, data) => {
           if (data.fatal) fail();
@@ -126,7 +143,9 @@ export function createScrubStream(
       }
     } else {
       engine?.startLoad(target);
-      seek();
+      // Supersede a slow background seek when the user requests another area.
+      // Waiting for its seeked event could otherwise starve the new target.
+      seek(true);
     }
   };
   const hidden = () => {
@@ -138,27 +157,39 @@ export function createScrubStream(
   video.addEventListener("error", fail);
   document.addEventListener("visibilitychange", hidden);
 
+  const update = (time: number | null, active: boolean) => {
+    target = time;
+    foreground = active;
+    clearTimeout(idleTimer);
+    if (time === null) {
+      clearTimeout(seekTimer);
+      seekTimer = undefined;
+      onFrame(false);
+      engine?.stopLoad();
+      if (native) release();
+      else idleTimer = setTimeout(release, 30_000);
+    } else if (ready && isTimeBuffered(time, readTimeRanges(video.buffered))) {
+      clearTimeout(seekTimer);
+      seekTimer = undefined;
+      seek();
+      showFrame();
+    } else if (seekTimer === undefined) {
+      // Keep the existing deadline as the finger moves. The callback reads
+      // the newest target instead of waiting indefinitely for a quiet pointer.
+      seekTimer = setTimeout(start, active ? 120 : 0);
+    }
+  };
+
   return {
     preview(time: number | null) {
-      target = time;
-      clearTimeout(seekTimer);
-      clearTimeout(idleTimer);
-      if (time === null) {
-        onFrame(false);
-        engine?.stopLoad();
-        // Native HLS exposes no stopLoad; release it immediately. MSE buffers
-        // can be reused during repeated fine adjustments for thirty seconds.
-        if (native) release();
-        else idleTimer = setTimeout(release, 30_000);
-      } else if (
-        ready &&
-        isTimeBuffered(time, readTimeRanges(video.buffered))
-      ) {
-        seek();
-        showFrame();
-      } else {
-        seekTimer = setTimeout(start, 180);
-      }
+      update(time, time !== null);
+    },
+    prepare(time: number) {
+      update(time, false);
+    },
+    release() {
+      target = null;
+      release();
     },
     dispose() {
       disposed = true;

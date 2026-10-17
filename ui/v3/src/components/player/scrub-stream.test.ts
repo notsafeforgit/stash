@@ -4,6 +4,7 @@ import { createScrubStream, scrubStreamURL } from "./scrub-stream";
 
 const { instances } = vi.hoisted(() => ({
   instances: [] as {
+    hasEnoughToStart: boolean;
     source: string;
     startLoad: ReturnType<typeof vi.fn>;
     stopLoad: ReturnType<typeof vi.fn>;
@@ -14,7 +15,12 @@ const { instances } = vi.hoisted(() => ({
 vi.mock("@videojs/hlsjs-video", () => ({
   Hls: class {
     static isSupported = () => true;
-    static Events = { MANIFEST_PARSED: "manifest", ERROR: "error" };
+    static Events = {
+      MANIFEST_PARSED: "manifest",
+      FRAG_BUFFERED: "buffered",
+      ERROR: "error",
+    };
+    hasEnoughToStart = true;
     source = "";
     events = new Map<string, (...args: unknown[]) => void>();
     startLoad = vi.fn();
@@ -92,7 +98,7 @@ it("requires a library HLS endpoint and preserves authorization without inheriti
   ).toBeNull();
 });
 
-it("does no work on a quick gesture and coalesces unbuffered positions before starting an independent owner", () => {
+it("does no work on a quick gesture and throttles unbuffered positions under an independent owner", () => {
   const f = fixture();
   f.preview(10);
   vi.advanceTimersByTime(100);
@@ -131,7 +137,7 @@ it("reuses buffered frames without another download, then releases idle media an
   f.preview(40.2);
   f.video.dispatchEvent(new Event("seeked"));
   expect(f.video.currentTime).toBe(40.2);
-  expect(f.frames).toHaveBeenLastCalledWith(true);
+  expect(f.frames).toHaveBeenLastCalledWith(true, 40.2);
   expect(instances).toHaveLength(1);
   expect(instances[0]!.startLoad).not.toHaveBeenCalled();
   f.preview(null);
@@ -146,6 +152,58 @@ it("reuses buffered frames without another download, then releases idle media an
   vi.advanceTimersByTime(180);
   expect(instances).toHaveLength(2);
   expect(instances[1]!.source).not.toBe(instances[0]!.source);
+});
+
+it("starts requests during continuous motion without waiting for a quiet pointer", () => {
+  const f = fixture();
+  for (const target of [10, 20, 30, 40, 50, 60]) {
+    f.preview(target);
+    vi.advanceTimersByTime(40);
+  }
+  expect(instances).toHaveLength(1);
+  expect(new URL(instances[0]!.source).searchParams.get("start")).toBe("30");
+  expect(instances[0]!.startLoad).toHaveBeenLastCalledWith(60);
+});
+
+it("prepares silent frames without showing them and stops background loading after delivery", () => {
+  const f = fixture();
+  f.prepare(40);
+  vi.advanceTimersByTime(0);
+  Object.defineProperties(f.video, {
+    readyState: { get: () => 4 },
+    buffered: { get: () => ({ length: 1, start: () => 38, end: () => 50 }) },
+  });
+  f.video.currentTime = 40;
+  f.video.dispatchEvent(new Event("loadedmetadata"));
+  f.video.dispatchEvent(new Event("loadeddata"));
+  expect(f.frames).toHaveBeenLastCalledWith(false, 40);
+  expect(instances[0]!.stopLoad).toHaveBeenCalled();
+  f.preview(40.5);
+  f.video.dispatchEvent(new Event("seeked"));
+  expect(f.frames).toHaveBeenLastCalledWith(true, 40.5);
+  f.release();
+  expect(instances[0]!.destroy).toHaveBeenCalledOnce();
+});
+
+it("leaves first-fragment positioning with hls.js until its append is complete", async () => {
+  const f = fixture();
+  f.prepare(0.16);
+  vi.advanceTimersByTime(0);
+  instances[0]!.hasEnoughToStart = false;
+  Object.defineProperty(f.video, "readyState", { get: () => 3 });
+  f.video.dispatchEvent(new Event("loadedmetadata"));
+  f.video.dispatchEvent(new Event("loadeddata"));
+  expect(f.video.currentTime).toBe(0);
+  expect(f.frames).not.toHaveBeenCalled();
+  expect(instances[0]!.stopLoad).not.toHaveBeenCalled();
+  instances[0]!.hasEnoughToStart = true;
+  f.video.currentTime = 0.16;
+  instances[0]!.events.get("buffered")?.();
+  await Promise.resolve();
+  expect(f.frames).toHaveBeenLastCalledWith(false, 0.16);
+  f.release();
+  f.video.dispatchEvent(new Event("error"));
+  expect(f.failure).not.toHaveBeenCalled();
 });
 
 it("disposes failed previews instead of looping requests, and cancels pending work on backgrounding", () => {

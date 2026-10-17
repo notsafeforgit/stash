@@ -83,7 +83,10 @@ func (r *mutationResolver) MetadataGenerate(ctx context.Context, input manager.G
 }
 
 func (r *mutationResolver) MetadataAutoTag(ctx context.Context, input manager.AutoTagMetadataInput) (string, error) {
-	jobID := manager.GetInstance().AutoTag(ctx, input)
+	jobID, err := manager.GetInstance().AutoTag(ctx, input)
+	if err != nil {
+		return "", err
+	}
 	return strconv.Itoa(jobID), nil
 }
 

@@ -167,30 +167,30 @@ input AutoTagMetadataInput {
   "Paths to tag, null for all files"
   paths: [String!]
   """
-  IDs of performers to tag files with, or "*" for all
+  Performer UUIDs to tag files with, or a single "*" for all
   """
   performers: [String!]
   """
-  IDs of studios to tag files with, or "*" for all
+  Studio UUIDs to tag files with, or a single "*" for all
   """
   studios: [String!]
   """
-  IDs of tags to tag files with, or "*" for all
+  Tag UUIDs to tag files with, or a single "*" for all
   """
   tags: [String!]
 }
 
 type AutoTagMetadataOptions {
   """
-  IDs of performers to tag files with, or "*" for all
+  Performer UUIDs to tag files with, or a single "*" for all
   """
   performers: [String!]
   """
-  IDs of studios to tag files with, or "*" for all
+  Studio UUIDs to tag files with, or a single "*" for all
   """
   studios: [String!]
   """
-  IDs of tags to tag files with, or "*" for all
+  Tag UUIDs to tag files with, or a single "*" for all
   """
   tags: [String!]
 }

@@ -2,14 +2,15 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/stashapp/stash/internal/autotag"
+	"github.com/stashapp/stash/pkg/entityid"
 	"github.com/stashapp/stash/pkg/image"
 	"github.com/stashapp/stash/pkg/job"
 	"github.com/stashapp/stash/pkg/logger"
@@ -22,11 +23,13 @@ type autoTagJob struct {
 	repository models.Repository
 	input      AutoTagMetadataInput
 
-	cache match.Cache
+	cache  match.Cache
+	errors []error
 }
 
 func (j *autoTagJob) Execute(ctx context.Context, progress *job.Progress) error {
 	begin := time.Now()
+	ctx = entityid.WithRepository(ctx, j.repository)
 
 	input := j.input
 	if j.isFileBasedAutoTag(input) {
@@ -37,8 +40,11 @@ func (j *autoTagJob) Execute(ctx context.Context, progress *job.Progress) error 
 		j.autoTagSpecific(ctx, progress)
 	}
 
-	logger.Infof("Finished auto-tag after %s", time.Since(begin).String())
-	return nil
+	err := errors.Join(j.errors...)
+	if err == nil {
+		logger.Infof("Finished auto-tag after %s", time.Since(begin).String())
+	}
+	return err
 }
 
 func (j *autoTagJob) isFileBasedAutoTag(input AutoTagMetadataInput) bool {
@@ -103,6 +109,7 @@ func (j *autoTagJob) autoTagSpecific(ctx context.Context, progress *job.Progress
 
 		return nil
 	}); err != nil {
+		j.errors = append(j.errors, err)
 		if !job.IsCancelled(ctx) {
 			logger.Errorf("auto-tag error: %v", err)
 		}
@@ -149,9 +156,9 @@ func (j *autoTagJob) autoTagPerformers(ctx context.Context, progress *job.Progre
 					return fmt.Errorf("querying performers: %w", err)
 				}
 			} else {
-				performerIdInt, err := strconv.Atoi(performerId)
+				performerIdInt, err := entityid.Local(ctx, models.ArchivePerformer, performerId)
 				if err != nil {
-					return fmt.Errorf("parsing performer id %s: %w", performerId, err)
+					return fmt.Errorf("resolving performer %s: %w", performerId, err)
 				}
 
 				performer, err := performerQuery.Find(ctx, performerIdInt)
@@ -206,6 +213,7 @@ func (j *autoTagJob) autoTagPerformers(ctx context.Context, progress *job.Progre
 
 			return nil
 		}); err != nil {
+			j.errors = append(j.errors, err)
 			logger.Errorf("auto-tag error: %v", err)
 		}
 
@@ -245,9 +253,9 @@ func (j *autoTagJob) autoTagStudios(ctx context.Context, progress *job.Progress,
 					return fmt.Errorf("querying studios: %v", err)
 				}
 			} else {
-				studioIdInt, err := strconv.Atoi(studioId)
+				studioIdInt, err := entityid.Local(ctx, models.ArchiveStudio, studioId)
 				if err != nil {
-					return fmt.Errorf("parsing studio id %s: %s", studioId, err.Error())
+					return fmt.Errorf("resolving studio %s: %w", studioId, err)
 				}
 
 				studio, err := studioQuery.Find(ctx, studioIdInt)
@@ -304,6 +312,7 @@ func (j *autoTagJob) autoTagStudios(ctx context.Context, progress *job.Progress,
 
 			return nil
 		}); err != nil {
+			j.errors = append(j.errors, err)
 			logger.Errorf("auto-tag error: %v", err)
 		}
 
@@ -342,9 +351,9 @@ func (j *autoTagJob) autoTagTags(ctx context.Context, progress *job.Progress, pa
 					return fmt.Errorf("querying tags: %v", err)
 				}
 			} else {
-				tagIdInt, err := strconv.Atoi(tagId)
+				tagIdInt, err := entityid.Local(ctx, models.ArchiveTag, tagId)
 				if err != nil {
-					return fmt.Errorf("parsing tag id %s: %s", tagId, err.Error())
+					return fmt.Errorf("resolving tag %s: %w", tagId, err)
 				}
 
 				tag, err := tagQuery.Find(ctx, tagIdInt)
@@ -401,6 +410,7 @@ func (j *autoTagJob) autoTagTags(ctx context.Context, progress *job.Progress, pa
 
 			return nil
 		}); err != nil {
+			j.errors = append(j.errors, err)
 			logger.Errorf("auto-tag error: %v", err)
 		}
 

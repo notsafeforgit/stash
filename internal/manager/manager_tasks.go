@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/pkg/entityid"
 	"github.com/stashapp/stash/pkg/file"
 	file_image "github.com/stashapp/stash/pkg/file/image"
 	"github.com/stashapp/stash/pkg/file/video"
@@ -326,21 +327,45 @@ func (s *Manager) generateScreenshot(ctx context.Context, sceneId string, at *fl
 type AutoTagMetadataInput struct {
 	// Paths to tag, null for all files
 	Paths []string `json:"paths"`
-	// IDs of performers to tag files with, or "*" for all
+	// Public UUIDs of performers to tag files with, or "*" for all
 	Performers []string `json:"performers"`
-	// IDs of studios to tag files with, or "*" for all
+	// Public UUIDs of studios to tag files with, or "*" for all
 	Studios []string `json:"studios"`
-	// IDs of tags to tag files with, or "*" for all
+	// Public UUIDs of tags to tag files with, or "*" for all
 	Tags []string `json:"tags"`
 }
 
-func (s *Manager) AutoTag(ctx context.Context, input AutoTagMetadataInput) int {
+// AutoTag keeps public UUIDs in the queued request. Validate them before
+// admission, then resolve again during execution so merges and deletions do not
+// leave queued work pointing at a stale or reused repository key.
+func (s *Manager) AutoTag(ctx context.Context, input AutoTagMetadataInput) (int, error) {
+	ctx = entityid.WithRepository(ctx, s.Repository)
+	for _, selection := range []struct {
+		kind models.ArchiveEntityKind
+		ids  []string
+	}{
+		{models.ArchivePerformer, input.Performers},
+		{models.ArchiveStudio, input.Studios},
+		{models.ArchiveTag, input.Tags},
+	} {
+		for _, id := range selection.ids {
+			if id == "*" {
+				if len(selection.ids) != 1 {
+					return 0, fmt.Errorf("auto-tag %s selection must use either UUIDs or a single wildcard", selection.kind)
+				}
+				continue
+			}
+			if _, err := entityid.Local(ctx, selection.kind, id); err != nil {
+				return 0, fmt.Errorf("auto-tag %s: %w", selection.kind, err)
+			}
+		}
+	}
 	j := autoTagJob{
 		repository: s.Repository,
 		input:      input,
 	}
 
-	return s.JobManager.Add(ctx, TaskDescWithPaths("Auto-tagging", input.Paths), &j)
+	return s.JobManager.Add(ctx, TaskDescWithPaths("Auto-tagging", input.Paths), &j), nil
 }
 
 type CleanMetadataInput struct {

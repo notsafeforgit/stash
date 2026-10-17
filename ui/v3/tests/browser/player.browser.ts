@@ -53,7 +53,7 @@ test("mobile Close fits beside playback settings at narrow and landscape sizes",
   await page
     .getByRole("menuitemradio", { name: "MP4 HD (720p)", exact: true })
     .tap();
-  await expect(player.locator("video[data-playback-video]")).toHaveAttribute(
+  await expect(player.locator("video")).toHaveAttribute(
     "src",
     "/player.mp4?quality=720",
   );
@@ -128,10 +128,7 @@ test("tapping a hidden playback button reveals controls without activating it", 
   );
   await expect(playbackControls).not.toHaveAttribute("inert");
   await expect(pause).toBeVisible();
-  await expect(player.locator("video[data-playback-video]")).toHaveJSProperty(
-    "paused",
-    false,
-  );
+  await expect(player.locator("video")).toHaveJSProperty("paused", false);
 });
 
 test("the lightbox remains dismissible at the bottom while a mobile scene loads", async ({

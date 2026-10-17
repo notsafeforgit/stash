@@ -34,22 +34,16 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, webkit]
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
         include:
           - browser: chromium
-            shards: 2
+            shards: 4
           # Use GStreamer 1.28: Noble's 1.24 media backend can deadlock or
           # crash during HLS EOF seeks, including with a bare video element.
           - browser: webkit
             shards: 4
-          # Each WebKit shard runs one worker so media timing checks do not
-          # compete for the same runner. Keep the per-job test count bounded.
-          - browser: webkit
-            shard: 3
-            shards: 4
-          - browser: webkit
-            shard: 4
-            shards: 4
+          # WebKit uses one worker per shard so media timing checks do not
+          # compete on a runner. Chromium retains two workers per shard.
     defaults:
       run:
         shell: bash
@@ -66,7 +60,7 @@ jobs:
           cache-dependency-path: ui/v3/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test:browser --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
-        # Chromium's 327-test shards take more than 20 minutes on these runners.
+        # All four shards run for each engine; no tests are filtered out.
         timeout-minutes: 35
         env:
           # Retain native browser exits/stderr when a media process crashes.

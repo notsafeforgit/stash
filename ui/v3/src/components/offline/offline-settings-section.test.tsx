@@ -57,16 +57,16 @@ function button(text: string, scope: ParentNode = document): HTMLButtonElement {
 it("confirms deletion in the shared dialog and retains it for failure/retry", async () => {
   await act(async () => button("Clear all").click());
   expect(mocks.removeAll).not.toHaveBeenCalled();
-  let dialog = document.querySelector('[role="dialog"]');
-  expect(dialog?.textContent).toContain(
+  const initialDialog = document.querySelector('[role="dialog"]');
+  expect(initialDialog?.textContent).toContain(
     "Delete all offline downloads from this device?",
   );
-  if (!dialog) throw new Error("Missing confirmation dialog");
-  await act(async () => button("Cancel", dialog).click());
+  if (!initialDialog) throw new Error("Missing confirmation dialog");
+  await act(async () => button("Cancel", initialDialog).click());
   expect(mocks.removeAll).not.toHaveBeenCalled();
 
   await act(async () => button("Clear all").click());
-  dialog = document.querySelector('[role="dialog"]');
+  const dialog = document.querySelector('[role="dialog"]');
   if (!dialog) throw new Error("Missing confirmation dialog");
   mocks.removeAll.mockRejectedValueOnce(new Error("storage unavailable"));
   await act(async () => button("Clear all", dialog).click());

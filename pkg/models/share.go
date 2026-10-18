@@ -74,6 +74,7 @@ type ShareReaderWriter interface {
 	Create(context.Context, *ShareRecord) error
 	Update(context.Context, *ShareRecord) error
 	Delete(context.Context, string) error
+	DeleteInactive(context.Context, int64) ([]string, error)
 	PutSession(context.Context, *ShareSession) error
 	FindSession(context.Context, []byte) (*ShareSession, error)
 	DeleteSession(context.Context, []byte) error

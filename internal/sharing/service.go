@@ -157,6 +157,22 @@ func (s *Service) Revoke(ctx context.Context, id string) error {
 	return err
 }
 
+func (s *Service) DeleteInactive(ctx context.Context) (int, error) {
+	var ids []string
+	err := s.Repo.WithTxn(ctx, func(ctx context.Context) error {
+		var err error
+		ids, err = s.Repo.Share.DeleteInactive(ctx, time.Now().Unix())
+		return err
+	})
+	if err != nil {
+		return 0, err
+	}
+	for _, id := range ids {
+		s.Cancel(id)
+	}
+	return len(ids), nil
+}
+
 func (s *Service) Delete(ctx context.Context, id string) error {
 	err := s.Repo.WithTxn(ctx, func(ctx context.Context) error {
 		row, err := s.Repo.Share.Find(ctx, id)

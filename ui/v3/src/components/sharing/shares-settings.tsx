@@ -389,12 +389,24 @@ function ShareCard({
 
 export function SharesSettings() {
   const msg = useMsg();
+  const intl = useIntl();
+  const toast = useToast();
   const [offset, setOffset] = useState(0);
   const [status, setStatus] = useState<GQL.MediaShareStatus>(
     GQL.MediaShareStatus.Active,
   );
   const [creating, setCreating] = useState(false);
+  const [confirmCleanup, setConfirmCleanup] = useState(false);
   const [countRefresh, setCountRefresh] = useState(0);
+  const [deleteInactive, { loading: deletingInactive }] = useMutation(
+    GQL.MediaSharesDeleteInactiveDocument,
+    {
+      update: (cache) => {
+        cache.evict({ id: "ROOT_QUERY", fieldName: "mediaShares" });
+        cache.gc();
+      },
+    },
+  );
   const { data, error, loading, refetch } = useQuery(GQL.MediaSharesDocument, {
     variables: { limit: 50, offset, status },
     fetchPolicy: "cache-and-network",
@@ -405,6 +417,28 @@ export function SharesSettings() {
     setCountRefresh((value) => value + 1);
     if (offset > 0 && result.data?.mediaShares.length === 0)
       setOffset((value) => Math.max(0, value - 50));
+  }
+  async function cleanup() {
+    if (deletingInactive) return;
+    try {
+      const result = await deleteInactive();
+      setConfirmCleanup(false);
+      setOffset(0);
+      await refetch({ offset: 0 });
+      setCountRefresh((value) => value + 1);
+      toast.success(
+        intl.formatMessage(
+          {
+            id: "sharing.inactive_deleted",
+            defaultMessage:
+              "{count, plural, one {Deleted # inactive share} other {Deleted # inactive shares}}",
+          },
+          { count: result.data?.mediaSharesDeleteInactive ?? 0 },
+        ),
+      );
+    } catch (error) {
+      toast.error(error);
+    }
   }
   return (
     <div className="max-w-4xl space-y-8 p-6">
@@ -437,6 +471,18 @@ export function SharesSettings() {
               {msg("sharing.inactive", "Inactive")}
             </ToggleGroupItem>
           </ToggleGroup>
+          {status === GQL.MediaShareStatus.Inactive && (
+            <Button
+              variant="outline"
+              disabled={
+                loading || deletingInactive || !data?.mediaShares.length
+              }
+              onClick={() => setConfirmCleanup(true)}
+            >
+              <Trash2 data-icon="inline-start" />
+              {msg("sharing.delete_inactive", "Delete all inactive shares")}
+            </Button>
+          )}
         </div>
         {error && (
           <QueryError
@@ -508,6 +554,21 @@ export function SharesSettings() {
         </SettingsSection>
       )}
       <ShareDialog open={creating} onOpenChange={setCreating} />
+      <DestructiveConfirmDialog
+        open={confirmCleanup}
+        onOpenChange={setConfirmCleanup}
+        title={msg("sharing.delete_inactive", "Delete all inactive shares")}
+        confirmText={msg("actions.delete", "Delete")}
+        busy={deletingInactive}
+        onConfirm={() => void cleanup()}
+      >
+        <p className="text-sm">
+          {msg(
+            "sharing.delete_inactive_description",
+            "Permanently delete every revoked and expired share and its history, across all pages. Their links will remain unavailable. Active shares and your library media will be kept.",
+          )}
+        </p>
+      </DestructiveConfirmDialog>
     </div>
   );
 }

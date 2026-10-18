@@ -144,6 +144,9 @@ func (r *mutationResolver) MediaShareDelete(ctx context.Context, id string) (boo
 	err := r.shares.Delete(ctx, id)
 	return err == nil, err
 }
+func (r *mutationResolver) MediaSharesDeleteInactive(ctx context.Context) (int, error) {
+	return r.shares.DeleteInactive(ctx)
+}
 func (r *mutationResolver) MediaShareRotate(ctx context.Context, id string) (string, error) {
 	secret, err := r.shares.Rotate(ctx, id)
 	if err != nil {

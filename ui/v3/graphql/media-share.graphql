@@ -45,6 +45,9 @@ mutation MediaShareRevoke($id: ID!) {
 mutation MediaShareDelete($id: ID!) {
   mediaShareDelete(id: $id)
 }
+mutation MediaSharesDeleteInactive {
+  mediaSharesDeleteInactive
+}
 mutation MediaShareRotate($id: ID!) {
   mediaShareRotate(id: $id)
 }

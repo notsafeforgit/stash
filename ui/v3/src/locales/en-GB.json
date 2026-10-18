@@ -3016,7 +3016,10 @@
     "empty_inactive": "No inactive shares",
     "inactive_description": "Revoked and expired shares appear here. Delete them when you no longer need their history.",
     "delete": "Delete share",
-    "delete_description": "Permanently delete this share and its history. The link will remain unavailable. Your library media will be kept."
+    "delete_description": "Permanently delete this share and its history. The link will remain unavailable. Your library media will be kept.",
+    "delete_inactive": "Delete all inactive shares",
+    "delete_inactive_description": "Permanently delete every revoked and expired share and its history, across all pages. Their links will remain unavailable. Active shares and your library media will be kept.",
+    "inactive_deleted": "{count, plural, one {Deleted # inactive share} other {Deleted # inactive shares}}"
   },
   "account_consolidation": {
     "history": "Consolidation history",

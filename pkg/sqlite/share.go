@@ -4,8 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/stashapp/stash/pkg/models"
 	"time"
+
+	"github.com/stashapp/stash/pkg/models"
 )
 
 type ShareStore struct{}
@@ -46,6 +47,18 @@ func (*ShareStore) Delete(ctx context.Context, id string) error {
 	// The foreign key removes guest and preview sessions in the same transaction.
 	_, err := dbWrapper.Exec(ctx, `DELETE FROM shares WHERE id = ?`, id)
 	return err
+}
+
+func (*ShareStore) DeleteInactive(ctx context.Context, now int64) ([]string, error) {
+	if _, err := getTx(ctx); err != nil {
+		return nil, err
+	}
+	// Select eligibility at deletion time, including records beyond any UI page.
+	// RETURNING avoids loading snapshots; the service cancels these grants only
+	// after commit. Sessions cascade in the same transaction.
+	ids := []string{}
+	err := dbWrapper.Select(ctx, &ids, `DELETE FROM shares WHERE revoked_at <> 0 OR expires_at <= ? RETURNING id`, now)
+	return ids, err
 }
 
 func (*ShareStore) Create(ctx context.Context, s *models.ShareRecord) error {

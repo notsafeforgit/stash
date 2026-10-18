@@ -491,3 +491,165 @@ test("persists the public share address without delivery controls", async ({
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(320);
 });
+
+for (const width of [320, 1280]) {
+  test(`cleans inactive shares across pages with cancellation and retry at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 720 });
+    const now = new Date("2026-10-18T12:00:00Z");
+    await page.clock.setFixedTime(now);
+    const active: GQL.MediaShareFieldsFragment = {
+      __typename: "MediaShare",
+      id: "active-share",
+      label: "Keep this active share",
+      created_at: now.toISOString(),
+      expires_at: "2026-10-19T12:00:00Z",
+      revoked_at: null,
+      allow_download: false,
+      show_metadata: false,
+      access_count: 0,
+      last_accessed_at: null,
+      media_count: 1,
+      items: [],
+    };
+    let shares = [
+      active,
+      ...Array.from({ length: 51 }, (_, index) => ({
+        ...active,
+        id: `inactive-${index}`,
+        label: `Inactive share ${index}`,
+        revoked_at: index % 2 === 0 ? now.toISOString() : null,
+        expires_at: index % 2 === 0 ? active.expires_at : now.toISOString(),
+      })),
+    ];
+    const isActive = (share: GQL.MediaShareFieldsFragment) =>
+      !share.revoked_at && Date.parse(share.expires_at) > now.getTime();
+    let cleanupCalls = 0;
+    let finishCleanup: (() => void) | undefined;
+    await page.route("**/api/v3/archive/page-info?**", (route) => {
+      const params = new URL(route.request().url()).searchParams;
+      return route.fulfill({
+        json: {
+          total: shares.filter(
+            (share) => isActive(share) === (params.get("state") === "ACTIVE"),
+          ).length,
+          offset: Number(params.get("cursor") ?? 0),
+        },
+      });
+    });
+    await page.route("**/graphql", async (route) => {
+      const request = z
+        .object({ operationName: z.string(), variables: z.unknown() })
+        .parse(route.request().postDataJSON());
+      if (request.operationName === "MediaShares") {
+        const { status, limit, offset } = z
+          .object({
+            status: z.enum(GQL.MediaShareStatus),
+            limit: z.number(),
+            offset: z.number(),
+          })
+          .parse(request.variables);
+        const data: GQL.MediaSharesQuery = {
+          mediaShares: shares
+            .filter(
+              (share) =>
+                isActive(share) === (status === GQL.MediaShareStatus.Active),
+            )
+            .slice(offset, offset + limit),
+          sharingConfiguration: {
+            __typename: "SharingConfiguration",
+            public_url: "https://shares.test/share",
+            max_days: 30,
+            max_items: 2000,
+          },
+        };
+        return route.fulfill({ json: { data } });
+      }
+      if (request.operationName !== "MediaSharesDeleteInactive")
+        throw new Error(`Unexpected operation ${request.operationName}`);
+      cleanupCalls++;
+      if (cleanupCalls === 1)
+        return route.fulfill({
+          json: { errors: [{ message: "Cleanup interrupted" }] },
+        });
+      await new Promise<void>((resolve) => {
+        finishCleanup = resolve;
+      });
+      const count = shares.filter((share) => !isActive(share)).length;
+      shares = shares.filter(isActive);
+      const data: GQL.MediaSharesDeleteInactiveMutation = {
+        mediaSharesDeleteInactive: count,
+      };
+      return route.fulfill({ json: { data } });
+    });
+    await page.goto("/share-management.html");
+    const cleanup = page.getByRole("button", {
+      name: "Delete all inactive shares",
+      exact: true,
+    });
+    await expect(page.getByText(active.label, { exact: true })).toBeVisible();
+    await expect(cleanup).toHaveCount(0);
+    await page.getByRole("button", { name: "Inactive", exact: true }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(
+      page.getByText("Inactive share 50", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Inactive share 0", { exact: true }),
+    ).toHaveCount(0);
+    await cleanup.click();
+    const dialog = page.getByRole("dialog", {
+      name: "Delete all inactive shares",
+      exact: true,
+    });
+    await expectDialogFits(dialog);
+    await expect(dialog.getByText(/across all pages/)).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath("cleanup-confirmation.png"),
+    });
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    expect(cleanupCalls).toBe(0);
+    expect(shares).toHaveLength(52);
+    await cleanup.click();
+    const confirm = dialog.getByRole("button", { name: "Delete", exact: true });
+    await confirm.click();
+    await expect(
+      page.getByText("Cleanup interrupted", { exact: true }),
+    ).toBeVisible();
+    await expect(dialog).toBeVisible();
+    await expect(confirm).toBeEnabled();
+    expect(shares).toHaveLength(52);
+    await confirm.click();
+    await expect(
+      dialog.getByRole("button", { name: "Loading Delete", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      dialog.getByRole("button", { name: "Cancel", exact: true }),
+    ).toBeDisabled();
+    await expect.poll(() => finishCleanup !== undefined).toBe(true);
+    finishCleanup?.();
+    await expect(dialog).toBeHidden();
+    await expect(
+      page.getByText("No inactive shares", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Deleted 51 inactive shares", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Previous", exact: true }),
+    ).toBeDisabled();
+    await expect(cleanup).toBeDisabled();
+    expect(cleanupCalls).toBe(2);
+    expect(shares).toEqual([active]);
+    await page.getByRole("button", { name: "Active", exact: true }).click();
+    await expect(page.getByText(active.label, { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Inactive", exact: true }).click();
+    await expect(
+      page.getByText("No inactive shares", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Inactive share 50", { exact: true }),
+    ).toHaveCount(0);
+  });
+}

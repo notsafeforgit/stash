@@ -11,6 +11,11 @@ revoked and expired shares; its **Delete share** action permanently removes the
 grant, its history and guest/preview sessions without deleting library media.
 Active shares must be revoked before deletion. Status filtering happens before
 pagination, so inactive history cannot hide active links on later pages.
+**Delete all inactive shares** removes revoked and expired shares across every
+page after confirmation. The server checks eligibility when deleting, keeps
+active shares (including expired shares renewed before cleanup), and reports the
+number removed. Revocation does not depend on retaining this optional history:
+deleted share links remain unavailable. Cleanup never deletes library media.
 
 The default lifetime is 24 hours; presets include one hour and seven days.
 Custom expiry is limited to the next 30 days. The public label is always shown.

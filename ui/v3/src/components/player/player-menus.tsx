@@ -15,6 +15,7 @@ import {
 import { Button } from "src/components/ui/button";
 import { cn } from "src/lib/utils";
 import type { PlayerSource } from "./player-utils";
+import { getQualityMenuSources } from "./player-quality-options";
 
 type PlayerInstance = CreatePlayerResult<VideoPlayerStore>;
 
@@ -112,56 +113,15 @@ export function QualityMenu({
   onOpenChange,
   className,
 }: QualityMenuProps) {
-  // Hide rows that would re-deliver the best-quality non-loss tier at
-  // identical effective quality:
-  //   - When raw direct stream is offered, "HLS (remux)" is redundant
-  //     (codec-copy fMP4 passthrough — same bytes, different container).
-  //   - "HLS (transcode)" / "MP4" / "WEBM" are the bare-format labels
-  //     the backend emits for StreamingResolutionEnum.Original — i.e.
-  //     transcodes targeting the source's own resolution. They buy
-  //     nothing over either direct streaming or the remux. Hidden
-  //     whenever any best-quality non-loss row is available.
-  // Lower-resolution rows ("MP4 HD (720p)", "HLS Full HD (1080p)" etc.)
-  // stay visible — they're genuine smaller-bitrate alternatives.
-  //
-  // The hide is skipped when the active source is one of the otherwise-
-  // hidden rows, so a user who explicitly picked it on a prior scene
-  // still sees their selection highlighted.
-  const hasDirect = sources.some((s) => s.label === "Direct stream");
-  const hasRemux = sources.some((s) => s.label === "HLS (remux)");
-  const activeLabel = activeSource?.label;
-
-  const redundantLabels = new Set<string>();
-  if (hasDirect) redundantLabels.add("HLS (remux)");
-  if (hasDirect || hasRemux) {
-    redundantLabels.add("HLS (transcode)");
-    redundantLabels.add("MP4");
-    redundantLabels.add("WEBM");
-  }
-
-  const visibleSources = sources.filter((s) => {
-    if (!s.label) return true;
-    if (!redundantLabels.has(s.label)) return true;
-    return s.label === activeLabel;
-  });
-
-  // Standard label-dedup for the rest. Order-preserving: first
-  // occurrence wins. Unlabeled sources are always kept.
-  const deduped = visibleSources.filter((s, i) => {
-    if (!s.label) return true;
-    return visibleSources.findIndex((o) => o.label === s.label) === i;
-  });
+  const choices = getQualityMenuSources(sources, activeSource);
 
   // Even a sole source must be selectable if the remembered ceiling left
   // playback unselected and the user needs an explicit override.
-  if (!deduped.length || (deduped.length === 1 && activeSource)) return null;
-
-  // Active-row match: by label when labelled, otherwise fall back to
-  // reference equality via `src`.
-  const activeKey = activeSource?.label ?? activeSource?.src ?? "";
+  if (!choices.length || (choices.length === 1 && activeSource)) return null;
+  const activeKey = activeSource?.src ?? "";
 
   function handleValueChange(key: string) {
-    const next = deduped.find((s) => (s.label ?? s.src) === key) ?? deduped[0];
+    const next = choices.find((s) => s.src === key);
     if (next) onSourceChange(next);
   }
 
@@ -195,8 +155,8 @@ export function QualityMenu({
           value={activeKey}
           onValueChange={handleValueChange}
         >
-          {deduped.map((s) => {
-            const key = s.label ?? s.src;
+          {choices.map((s) => {
+            const key = s.src;
             const isActive = key === activeKey;
             // Source resolution suffix on the best-quality non-loss
             // tier (direct or remux) — both deliver the file at its

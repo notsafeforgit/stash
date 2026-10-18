@@ -13,6 +13,7 @@ import { useCommittedRef } from "@/hooks/use-committed-ref";
 import type { PlayerSource } from "./player-utils";
 import type { PlaybackRange } from "@/core/marker-range";
 import { createBufferedRangesReader } from "./buffered-ranges";
+import { getQualityMenuSources } from "./player-quality-options";
 
 export interface ScenePlayerState {
   paused: boolean;
@@ -234,7 +235,10 @@ export function ScenePlayerControlsProvider({
     };
   }, [store, listeners]);
   const sources = useMemo(
-    () => ({ sources: options.sources, activeSource: options.activeSource }),
+    () => ({
+      sources: getQualityMenuSources(options.sources, options.activeSource),
+      activeSource: options.activeSource,
+    }),
     [options.sources, options.activeSource],
   );
   return (

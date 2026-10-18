@@ -34,6 +34,7 @@ export async function serveSceneMedia(
       });
     } else if (
       url.pathname.endsWith("/stream.master.m3u8") ||
+      url.pathname.endsWith("/stream.hevc.master.m3u8") ||
       url.pathname.endsWith("/stream.scrub.m3u8/video.m3u8")
     ) {
       const session = url.searchParams.get("stream_session");

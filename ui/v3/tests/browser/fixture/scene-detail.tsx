@@ -5,6 +5,7 @@ import { offlineEntryToSceneData } from "@/components/offline/offline-scene-adap
 import { ConfigurationProvider } from "@/hooks/config";
 import { useMediaQuery } from "@/utils/screen";
 import { playerConfiguration } from "./player-configuration";
+import { hdrStreams } from "./hdr-streams";
 
 export function SceneDetailFixture() {
   const [focused, setFocused] = useState(false);
@@ -12,7 +13,7 @@ export function SceneDetailFixture() {
   const desktop = useMediaQuery("(min-width: 1024px)");
   const scene = useMemo(() => {
     const params = new URLSearchParams(location.search);
-    const hls = params.has("hls");
+    const hls = params.has("hls") || params.has("hdr");
     const landscape = hls || params.has("landscape");
     const scene = offlineEntryToSceneData(
       {
@@ -51,6 +52,7 @@ export function SceneDetailFixture() {
         },
       ];
     }
+    if (params.has("hdr")) scene.sceneStreams = hdrStreams("detail");
     return scene;
   }, []);
 

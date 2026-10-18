@@ -353,6 +353,13 @@ HDR video display with HEVC Main 10 support in its active MSE/MMS engine.
 Direct/remux still takes priority, and resolution ceilings apply to both
 transcodes. The H.264 rendition tone maps HDR to SDR for compatibility.
 
+Quality menus in the regular player and TV show one rendition per resolution.
+The capability-filtered catalog selects HDR when available; SDR renditions stay
+in the internal catalog for decoding recovery. If recovery selects SDR, its row
+is shown and checked instead of the HDR row at that resolution. This does not
+change the saved resolution ceiling, rebuild the player or manufacture HDR from
+SDR sources. Direct/remux playback still takes precedence when usable.
+
 `SceneVideo` retains 10 seconds behind playback, targets 30 seconds ahead and
 limits forward buffering to 60 seconds. The 60 MiB byte target is not a strict
 memory limit: hls.js takes the larger byte-derived or minimum-time target.

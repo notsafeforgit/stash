@@ -34,6 +34,7 @@ import { createCache } from "@/core/create-client";
 import { scenes as sourceScenes } from "./scene-lightbox";
 import { markerTag } from "./marker-editor";
 import { playerConfiguration } from "./player-configuration";
+import { hdrStreams } from "./hdr-streams";
 import { RatingStarPrecision, RatingSystemType } from "@/utils/rating";
 import { RatingSystem } from "@/components/ui/rating-system";
 
@@ -118,6 +119,7 @@ const scenes: GQL.SceneDataFragment[] = Array.from(
         },
       ],
     };
+    if (params.has("hdr")) scene.sceneStreams = hdrStreams(id);
     return {
       ...scene,
       scene_markers: scene.scene_markers.map((marker, markerIndex) => ({

@@ -9,6 +9,7 @@ import (
 	"github.com/stashapp/stash/pkg/entityid"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"path"
@@ -53,6 +54,7 @@ const (
 
 type Server struct {
 	http.Server
+	requestCancel  context.CancelFunc
 	displayAddress string
 
 	manager                *manager.Manager
@@ -166,11 +168,14 @@ func Initialize() (*Server, error) {
 
 	r := chi.NewRouter()
 
+	requestContext, requestCancel := context.WithCancel(context.Background())
 	server := &Server{
+		requestCancel: requestCancel,
 		Server: http.Server{
-			Addr:      address,
-			Handler:   r,
-			TLSConfig: tlsConfig,
+			BaseContext: func(net.Listener) context.Context { return requestContext },
+			Addr:        address,
+			Handler:     r,
+			TLSConfig:   tlsConfig,
 			// disable http/2 support by default
 			// when http/2 is enabled, we are unable to hijack and close
 			// the connection/request. This is necessary to stop running
@@ -429,19 +434,34 @@ func (s *Server) Start() error {
 }
 
 // Shutdown gracefully shuts down the server without interrupting any active connections.
-func (s *Server) Shutdown() {
-	err := s.Server.Shutdown(context.TODO())
-	if err != nil {
-		logger.Errorf("Error shutting down http server: %v", err)
+func (s *Server) Shutdown() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return s.ShutdownContext(ctx)
+}
+
+// ShutdownContext cancels workers concurrently with HTTP draining. The caller
+// must keep the database open if any active work exceeds the shutdown deadline.
+func (s *Server) ShutdownContext(ctx context.Context) error {
+	// Also notify upgraded WebSocket subscriptions, which http.Shutdown does not
+	// drain as ordinary HTTP requests.
+	if s.requestCancel != nil {
+		s.requestCancel()
 	}
-	s.ingestWorker.stop()
-	s.albumWorker.stop()
-	s.postMergeNotifications.stop()
-	s.translationWorker.stop()
-	s.enrichmentMaintenance.stop()
-	s.discoveryMaintenance.stop()
-	s.discoveryComparison.stop()
-	s.discoveryPublication.stop()
+	workers := []*archiveWorkerRuntime{s.ingestWorker, s.albumWorker, s.postMergeNotifications,
+		s.translationWorker, s.enrichmentMaintenance, s.discoveryMaintenance, s.discoveryComparison, s.discoveryPublication}
+	results := make(chan error, len(workers))
+	for _, worker := range workers {
+		go func() { results <- worker.shutdown(ctx) }()
+	}
+	err := s.Server.Shutdown(ctx)
+	if err != nil {
+		err = errors.Join(err, s.Server.Close())
+	}
+	for range workers {
+		err = errors.Join(err, <-results)
+	}
+	return err
 }
 
 func (s *Server) getPerformerRoutes() chi.Router {

@@ -39,6 +39,8 @@ type HookExecutor interface {
 }
 
 type JobManager interface {
+	Stop()
+	Shutdown(context.Context) error
 	Add(ctx context.Context, description string, e job.JobExec) int
 	CancelJob(id int)
 	CancelAll()
@@ -420,17 +422,25 @@ func (s *Manager) GetSystemStatus() *SystemStatus {
 	}
 }
 
-// Shutdown gracefully stops the manager
-func (s *Manager) Shutdown() {
-	// TODO: Each part of the manager needs to gracefully stop at some point
-
+// BeginShutdown stops new jobs and cancels media work before HTTP/worker draining.
+func (s *Manager) BeginShutdown() {
+	if s.JobManager != nil {
+		s.JobManager.Stop()
+	}
 	if s.StreamManager != nil {
 		s.StreamManager.Shutdown()
 		s.StreamManager = nil
 	}
+}
 
-	err := s.Database.Close()
-	if err != nil {
-		logger.Errorf("Error closing database: %s", err)
+// ShutdownContext closes the database only after all in-memory jobs exit.
+// Native HTTP/worker shutdown must complete before calling this method.
+func (s *Manager) ShutdownContext(ctx context.Context) error {
+	s.BeginShutdown()
+	if s.JobManager != nil {
+		if err := s.JobManager.Shutdown(ctx); err != nil {
+			return fmt.Errorf("waiting for background jobs: %w", err)
+		}
 	}
+	return s.Database.Close()
 }

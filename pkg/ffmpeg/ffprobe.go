@@ -2,6 +2,7 @@ package ffmpeg
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -221,6 +222,14 @@ func NewFFProbe(path string) *FFProbe {
 
 // NewVideoFile runs ffprobe on the given path and returns a VideoFile.
 func (f *FFProbe) NewVideoFile(videoPath string) (*VideoFile, error) {
+	return f.NewVideoFileContext(context.Background(), videoPath)
+}
+
+// NewVideoFileContext probes a path for cancellable background tasks.
+func (f *FFProbe) NewVideoFileContext(ctx context.Context, videoPath string) (*VideoFile, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	args := []string{
 		"-v",
 		"quiet",
@@ -237,10 +246,14 @@ func (f *FFProbe) NewVideoFile(videoPath string) (*VideoFile, error) {
 
 	args = append(args, videoPath)
 
-	cmd := stashExec.Command(f.path, args...)
+	cmd := stashExec.CommandContext(ctx, f.path, args...)
+	cmd.WaitDelay = 2 * time.Second
 	out, err := cmd.Output()
 
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, fmt.Errorf("FFProbe encountered an error with <%s>.\nError JSON:\n%s\nError: %s", videoPath, string(out), err.Error())
 	}
 
@@ -334,10 +347,23 @@ func (f *FFProbe) MaxGOPSeconds(videoPath string, withinSeconds float64) (float6
 // GetReadFrameCount counts the actual frames of the video file.
 // Used when the frame count is missing or incorrect.
 func (f *FFProbe) GetReadFrameCount(path string) (int64, error) {
+	return f.GetReadFrameCountContext(context.Background(), path)
+}
+
+// GetReadFrameCountContext counts frames without outliving the calling task.
+func (f *FFProbe) GetReadFrameCountContext(ctx context.Context, path string) (int64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	args := []string{"-v", "quiet", "-print_format", "json", "-count_frames", "-show_format", "-show_streams", "-show_error", path}
-	out, err := stashExec.Command(f.path, args...).Output()
+	cmd := stashExec.CommandContext(ctx, f.path, args...)
+	cmd.WaitDelay = 2 * time.Second
+	out, err := cmd.Output()
 
 	if err != nil {
+		if ctx.Err() != nil {
+			return 0, ctx.Err()
+		}
 		return 0, fmt.Errorf("FFProbe encountered an error with <%s>.\nError JSON:\n%s\nError: %s", path, string(out), err.Error())
 	}
 
@@ -347,7 +373,10 @@ func (f *FFProbe) GetReadFrameCount(path string) (int64, error) {
 	}
 
 	fc, err := parse(path, probeJSON)
-	return fc.FrameCount, err
+	if err != nil {
+		return 0, err
+	}
+	return fc.FrameCount, nil
 }
 
 func parse(filePath string, probeJSON *FFProbeJSON) (*VideoFile, error) {

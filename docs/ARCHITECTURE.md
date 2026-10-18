@@ -232,6 +232,16 @@ per-file processing in [task_scan.go](../internal/manager/task_scan.go).
 Probing, hashing, and generation depend on scan options; a scan does not
 unconditionally generate every derivative.
 
+Shutdown stops job admission and cancels media work, HTTP requests (including
+WebSocket subscription contexts), and native workers. The process gives these
+operations a shared 30-second drain deadline before closing SQLite. If draining
+fails, it reports the failure and leaves the database open until process exit;
+unfinished jobs are never marked successful to satisfy the deadline. Serial,
+concurrent and synchronous jobs share the same completion/removal path. Preview,
+sprite, marker and associated probing operations retain their job cancellation
+context through subprocess execution; cancellation does not start a fallback
+encoder process.
+
 For native bulk edits, [bulk resolvers](../internal/api/resolver_mutation_bulk_scene.go)
 commit explicit IDs in one transaction and report the updated IDs. Filter
 selection removes pagination and snapshots the matching IDs before queueing,

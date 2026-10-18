@@ -140,7 +140,7 @@ func TestPostConsolidationHTTPApplyRecoveryNotificationRetryAndShutdown(t *testi
 		return err == nil && current.State == "succeeded"
 	}, 10*time.Second, 20*time.Millisecond)
 	server := &Server{postMergeNotifications: runtime}
-	server.Shutdown()
+	require.NoError(t, server.Shutdown())
 	runtime.start()
 	select {
 	case <-runtime.done:

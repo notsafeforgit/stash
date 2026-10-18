@@ -20,12 +20,15 @@ func (t *GenerateSpriteTask) GetDescription() string {
 }
 
 func (t *GenerateSpriteTask) Start(ctx context.Context) {
+	if ctx.Err() != nil {
+		return
+	}
 	if !t.required() {
 		return
 	}
 
 	ffprobe := instance.FFProbe
-	videoFile, err := ffprobe.NewVideoFile(t.Scene.Path)
+	videoFile, err := ffprobe.NewVideoFileContext(ctx, t.Scene.Path)
 	if err != nil {
 		logger.Errorf("error reading video file: %s", err.Error())
 		return
@@ -44,7 +47,7 @@ func (t *GenerateSpriteTask) Start(ctx context.Context) {
 		cfg.SpriteInterval = instance.Config.GetSpriteInterval()
 	}
 
-	generator, err := NewSpriteGenerator(*videoFile, sceneHash, imagePath, vttPath, cfg)
+	generator, err := NewSpriteGenerator(ctx, *videoFile, sceneHash, imagePath, vttPath, cfg)
 
 	if err != nil {
 		logger.Errorf("error creating sprite generator: %s", err.Error())
@@ -52,7 +55,7 @@ func (t *GenerateSpriteTask) Start(ctx context.Context) {
 	}
 	generator.Overwrite = t.Overwrite
 
-	if err := generator.Generate(); err != nil {
+	if err := generator.Generate(ctx); err != nil {
 		logger.Errorf("error generating sprite: %s", err.Error())
 		logErrorOutput(err)
 		return

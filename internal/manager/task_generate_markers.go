@@ -37,6 +37,9 @@ func (t *GenerateMarkersTask) GetDescription() string {
 }
 
 func (t *GenerateMarkersTask) Start(ctx context.Context) {
+	if ctx.Err() != nil {
+		return
+	}
 	if t.Scene != nil {
 		t.generateSceneMarkers(ctx, t.Scene)
 	}
@@ -110,6 +113,9 @@ func (t *GenerateMarkersTask) generateSceneMarkers(ctx context.Context, scene *m
 	}
 
 	for i, sceneMarker := range sceneMarkers {
+		if ctx.Err() != nil {
+			return
+		}
 		index := i + 1
 		logger.Progressf("[generator] <%s> scene marker %d of %d", sceneHash, index, len(sceneMarkers))
 
@@ -120,6 +126,9 @@ func (t *GenerateMarkersTask) generateSceneMarkers(ctx context.Context, scene *m
 }
 
 func (t *GenerateMarkersTask) generateMarker(ctx context.Context, videoFile *models.VideoFile, scene *models.Scene, sceneMarker *models.SceneMarker) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	sceneHash := scene.GetHash(t.fileNamingAlgorithm)
 	seconds := float64(sceneMarker.Seconds)
 
@@ -131,19 +140,25 @@ func (t *GenerateMarkersTask) generateMarker(ctx context.Context, videoFile *mod
 	g := t.generator
 
 	if t.VideoPreview {
-		if err := g.MarkerPreviewVideo(context.TODO(), videoFile.Path, sceneHash, seconds, sceneMarker.EndSeconds, instance.Config.GetPreviewAudio(), instance.Config.GetMaxMarkerPreviewDuration(), instance.Config.GetDefaultMarkerPreviewDuration()); err != nil {
+		if err := g.MarkerPreviewVideo(ctx, videoFile.Path, sceneHash, seconds, sceneMarker.EndSeconds, instance.Config.GetPreviewAudio(), instance.Config.GetMaxMarkerPreviewDuration(), instance.Config.GetDefaultMarkerPreviewDuration()); err != nil {
 			logger.Errorf("[generator] failed to generate marker video for scene (%d) marker (%d) at %s: %v", scene.ID, sceneMarker.ID, formatSeconds(float64(sceneMarker.Seconds)), err)
 			logErrorOutput(err)
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if t.ImagePreview {
-		if err := g.SceneMarkerWebp(context.TODO(), videoFile.Path, sceneHash, seconds); err != nil {
+		if err := g.SceneMarkerWebp(ctx, videoFile.Path, sceneHash, seconds); err != nil {
 			logger.Errorf("[generator] failed to generate marker image for scene (%d) marker (%d) at %s: %v", scene.ID, sceneMarker.ID, formatSeconds(float64(sceneMarker.Seconds)), err)
 			logErrorOutput(err)
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if t.Screenshot {
 		if err := t.generateMarkerScreenshot(ctx, scene, sceneMarker, videoFile); err != nil {
 			logger.Errorf("[generator] failed to generate marker screenshot for scene (%d) marker (%d) at %s: %v", scene.ID, sceneMarker.ID, formatSeconds(float64(sceneMarker.Seconds)), err)

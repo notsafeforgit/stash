@@ -124,7 +124,7 @@ func TestDiscoveryMaintenanceRuntimeRecoversWithoutProducer(t *testing.T) {
 		})
 		return err == nil && current.State == "queued"
 	}, 5*time.Second, 10*time.Millisecond)
-	(&Server{discoveryMaintenance: runtime}).Shutdown()
+	require.NoError(t, (&Server{discoveryMaintenance: runtime}).Shutdown())
 	require.NoError(t, f.repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		current, err := f.repo.ArchiveJob.Find(ctx, job.UUID)
 		require.NoError(t, err)

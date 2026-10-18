@@ -56,8 +56,12 @@ func (r *archiveWorkerRuntime) start() {
 }
 
 func (r *archiveWorkerRuntime) stop() {
+	_ = r.shutdown(context.Background())
+}
+
+func (r *archiveWorkerRuntime) shutdown(ctx context.Context) error {
 	if r == nil {
-		return
+		return nil
 	}
 	r.mu.Lock()
 	r.closed = true
@@ -65,6 +69,11 @@ func (r *archiveWorkerRuntime) stop() {
 	r.mu.Unlock()
 	if cancel != nil {
 		cancel()
-		<-done
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
+	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 	"syscall"
+	"time"
 
 	// fallback timezone database for systems without tzdata installed
 	_ "time/tzdata"
@@ -110,14 +111,27 @@ func main() {
 		exitError(fmt.Errorf("manager initialization error: %w", err))
 		return
 	}
-	defer mgr.Shutdown()
+	var server *api.Server
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		mgr.BeginShutdown()
+		if server != nil {
+			if err := server.ShutdownContext(ctx); err != nil {
+				logger.Errorf("Server shutdown incomplete; leaving database open until process exit: %v", err)
+				return
+			}
+		}
+		if err := mgr.ShutdownContext(ctx); err != nil {
+			logger.Errorf("Manager shutdown incomplete: %v", err)
+		}
+	}()
 
-	server, err := api.Initialize()
+	server, err = api.Initialize()
 	if err != nil {
 		exitError(fmt.Errorf("api initialization error: %w", err))
 		return
 	}
-	defer server.Shutdown()
 
 	exit := make(chan int)
 

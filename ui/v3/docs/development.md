@@ -167,6 +167,14 @@ omitted and explicitly cleared configuration/API values have different meanings.
 Biome owns formatting, general lint and effect dependencies. It knows that
 `useCommittedRef` has a stable result. `pnpm --dir ui/v3 lint:contracts` adds
 React's `refs`/`purity` rules and rejects `as never` and double assertions.
+It also enforces shared UI component boundaries: application code cannot render
+bare buttons, inputs, selects, textareas or disclosure/dialog controls, import
+Base UI outside `src/components/ui`, import Radix, or call blocking browser
+dialogs. The canonical `ui/textarea.tsx` wrapper is the explicit native-control
+exception. Semantic anchors, forms and media elements remain ordinary HTML.
+The rule's AST regression tests run with Vitest; browser fixtures are outside
+the production rule. Add any future primitive exception narrowly, with its reason
+and a regression case, rather than disabling the rule for a feature directory.
 These checks run through the normal `lint` command. Public browser/plugin
 boundaries should narrow unknown inputs or expose checked capabilities.
 

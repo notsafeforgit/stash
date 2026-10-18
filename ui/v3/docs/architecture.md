@@ -687,6 +687,16 @@ snapshots. See the [backend job flow](../../../docs/ARCHITECTURE.md#editing-and-
 
 ## Interaction and accessibility
 
+Interactive application controls use the shared shadcn/Base UI layer, including
+filter clear/expand/pin controls, pagination and custom lightbox toolbar buttons.
+Folder expansion exposes a localized accessible name and expanded state; removal
+buttons name their selected folder. Offline download deletion uses the shared
+destructive confirmation dialog, stays open on failure for retry, and disables
+confirmation/dismissal during the operation. The production ESLint component
+boundary and its AST tests prevent bare controls, direct primitive imports and
+browser dialogs from silently returning. Native textarea markup lives only in
+its canonical wrapper; semantic links, forms and media elements are intentional.
+
 Detailed motion, mobile layout, and dismissal contracts live in
 [interactions.md](interactions.md).
 

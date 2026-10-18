@@ -1,5 +1,6 @@
 import parser from "@typescript-eslint/parser";
 import reactHooks from "eslint-plugin-react-hooks";
+import uiComponents from "./scripts/eslint-ui-components.mjs";
 
 // Biome owns formatting, general lint and hook dependencies. This narrow pass
 // adds React's compiler-backed purity checks and protects shared type contracts.
@@ -34,5 +35,10 @@ export default [
         },
       ],
     },
+  },
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    plugins: { "stash-ui": { rules: { components: uiComponents } } },
+    rules: { "stash-ui/components": "error" },
   },
 ];

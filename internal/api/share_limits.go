@@ -20,16 +20,17 @@ type shareStreamLease struct {
 	timer            *time.Timer
 }
 type shareBudget struct {
-	mu         sync.Mutex
-	exchanges  map[string]shareWindow
-	streams    map[string]shareStreamLease
-	writes     map[string]time.Time
-	archives   chan struct{}
-	stopStream func(models.FileID, string)
+	mu          sync.Mutex
+	exchanges   map[string]shareWindow
+	streams     map[string]shareStreamLease
+	writes      map[string]time.Time
+	archives    chan struct{}
+	linkEncodes chan struct{}
+	stopStream  func(models.FileID, string)
 }
 
 func newShareBudget() *shareBudget {
-	return &shareBudget{exchanges: make(map[string]shareWindow), streams: make(map[string]shareStreamLease), writes: make(map[string]time.Time), archives: make(chan struct{}, 2)}
+	return &shareBudget{exchanges: make(map[string]shareWindow), streams: make(map[string]shareStreamLease), writes: make(map[string]time.Time), archives: make(chan struct{}, 2), linkEncodes: make(chan struct{}, 2)}
 }
 
 func (b *shareBudget) exchange(peer string) bool {

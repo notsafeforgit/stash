@@ -166,6 +166,9 @@ type DownloadOptions struct {
 	// Filename, sans extension, becomes the suggested name in the
 	// Content-Disposition header. The handler always appends ".mp4".
 	Filename string
+	// Inline is used by capability-authorized link previews. Owner downloads
+	// retain their attachment disposition by default.
+	Inline bool
 	// Optional per-attempt progress identity, scoped to the authenticated scene.
 	SceneID   int
 	RequestID string
@@ -361,6 +364,10 @@ func (sm *StreamManager) ServeDownload(w http.ResponseWriter, r *http.Request, o
 	if !strings.HasSuffix(strings.ToLower(filename), ".mp4") {
 		filename += ".mp4"
 	}
+	disposition := "attachment"
+	if options.Inline {
+		disposition = "inline"
+	}
 
 	// Static-file fast path: when the source already fits MP4 cleanly
 	// (mode resolved to encDownloadCopy, container is mp4-family,
@@ -382,7 +389,7 @@ func (sm *StreamManager) ServeDownload(w http.ResponseWriter, r *http.Request, o
 	// ETag, and handles HEAD itself.
 	if encoding == encDownloadCopy && canServeSourceDirectly(vf) {
 		w.Header().Set("Content-Type", MimeMp4Video)
-		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
+		w.Header().Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": filename}))
 		// Read-lock so a rescan / file move during the download
 		// doesn't pull the rug out. Same lifetime as the ffmpeg path.
 		lockCtx := sm.lockManager.ReadLock(r.Context(), vf.Path)
@@ -392,7 +399,7 @@ func (sm *StreamManager) ServeDownload(w http.ResponseWriter, r *http.Request, o
 	}
 
 	w.Header().Set("Content-Type", MimeMp4Video)
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
+	w.Header().Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": filename}))
 	// Deliberately no Content-Length: a streaming transcode pipe
 	// doesn't know it. Deliberately no Accept-Ranges: a one-shot
 	// ffmpeg pipe can't seek, so advertising byte-ranges would just
@@ -476,7 +483,10 @@ func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, res
 			codec = *hwcodec
 		}
 		maxResolution = resolution.GetMaxResolution()
-		fullhw = sm.config.GetTranscodeHardwareAcceleration() && sm.encoder.hwCanFullHWTranscode(sm.context, codec, vf, maxResolution)
+		// H.264 is the SDR compatibility output. Use the existing software
+		// tonemapper for HDR input while retaining hardware encoding, so HLG/PQ
+		// pixels are not merely relabelled as 8-bit SDR in link previews.
+		fullhw = !srcColor.isHDR() && sm.config.GetTranscodeHardwareAcceleration() && sm.encoder.hwCanFullHWTranscode(sm.context, codec, vf, maxResolution)
 		args = sm.encoder.hwDeviceInit(args, codec, fullhw)
 	case encDownloadHEVC:
 		// HW HEVC if available (VAAPI for now), libx265 otherwise.
@@ -553,6 +563,10 @@ func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, res
 	case encDownloadH264:
 		args = append(args, CodecInit(codec)...)
 		videoFilter := sm.encoder.hwMaxResFilter(codec, vf, maxResolution, fullhw)
+		if srcColor.isHDR() {
+			filter, _ := sm.encoder.hlsHDRFilter(codec, srcColor, false)
+			videoFilter = prependVideoFilter(filter, videoFilter)
+		}
 		args = args.VideoFilter(videoFilter)
 		if videoOnly {
 			args = append(args, "-an")
@@ -597,6 +611,9 @@ func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, res
 	// downloaded — partial downloads still play up to the cut point.
 	args = append(args, "-movflags", "+empty_moov+default_base_moof+frag_keyframe")
 	args = append(args, extraOutputArgs...)
+	if enc == encDownloadH264 && srcColor.isHDR() {
+		args = append(args, hlsSDRColorArgs()...)
+	}
 	args = append(args, "-f", "mp4", "pipe:1")
 
 	return args

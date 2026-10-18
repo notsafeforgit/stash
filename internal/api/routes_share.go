@@ -65,9 +65,18 @@ func (rs *shareRoutes) router() http.Handler {
 	r.Get("/share/", rs.page)
 	r.Get("/share/assets/{asset}", rs.asset)
 	r.Get("/share/{shareID}", rs.page)
+	r.Head("/share/{shareID}", rs.page)
 	r.Route("/share/{shareID}", func(r chi.Router) {
 		r.Get("/", rs.page)
+		r.Head("/", rs.page)
 		r.Post("/exchange", rs.exchange)
+		r.Group(func(r chi.Router) {
+			r.Use(rs.authorizeLink)
+			r.Get("/preview/image", rs.linkImage)
+			r.Head("/preview/image", rs.linkImage)
+			r.Get("/preview/video.mp4", rs.linkVideo)
+			r.Head("/preview/video.mp4", rs.linkVideo)
+		})
 		r.Group(func(r chi.Router) {
 			r.Use(rs.authorize)
 			r.Get("/content", rs.content)
@@ -166,14 +175,26 @@ func (rs *shareRoutes) page(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if r.URL.Query().Has("key") {
+		rs.authorizeLink(http.HandlerFunc(rs.linkPage)).ServeHTTP(w, r)
+		return
+	}
+	rs.servePage(w, r, "")
+}
+
+func (rs *shareRoutes) servePage(w http.ResponseWriter, r *http.Request, metadata string) {
 	data, err := fs.ReadFile(ui.UIBox, "share.html")
 	if err != nil {
 		http.Error(w, "Share viewer unavailable", http.StatusServiceUnavailable)
 		return
 	}
 	data = bytes.Replace(data, []byte(`<base href="/share/"`), []byte(`<base href="`+html.EscapeString(sharePrefix(r))+`"`), 1)
+	data = bytes.Replace(data, []byte("</head>"), []byte(metadata+"</head>"), 1)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write(data)
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	if r.Method != http.MethodHead {
+		_, _ = w.Write(data)
+	}
 }
 
 func (rs *shareRoutes) asset(w http.ResponseWriter, r *http.Request) {
@@ -225,18 +246,29 @@ func (rs *shareRoutes) exchange(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rs *shareRoutes) authorize(next http.Handler) http.Handler {
+	return rs.withGrant(next, false)
+}
+
+func (rs *shareRoutes) authorizeLink(next http.Handler) http.Handler {
+	return rs.withGrant(next, true)
+}
+
+func (rs *shareRoutes) withGrant(next http.Handler, link bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "shareID")
-		if !shareIDPattern.MatchString(id) || !sameShareOrigin(r, false) {
+		if !shareIDPattern.MatchString(id) || (!link && !sameShareOrigin(r, false)) {
 			http.NotFound(w, r)
 			return
 		}
-		cookie, err := r.Cookie(shareCookieName(id))
-		if err != nil {
-			http.NotFound(w, r)
-			return
+		authenticate := rs.service.Authenticate
+		secret := ""
+		if link {
+			authenticate = rs.service.AuthenticateLink
+			secret = r.URL.Query().Get("key")
+		} else if cookie, err := r.Cookie(shareCookieName(id)); err == nil {
+			secret = cookie.Value
 		}
-		row, err := rs.service.Authenticate(r.Context(), id, cookie.Value)
+		row, err := authenticate(r.Context(), id, secret)
 		if err != nil {
 			http.NotFound(w, r)
 			return
@@ -253,7 +285,7 @@ func (rs *shareRoutes) authorize(next http.Handler) http.Handler {
 		stopDeadline := context.AfterFunc(ctx, func() { _ = http.NewResponseController(w).SetWriteDeadline(time.Now()) })
 		defer stopDeadline()
 		// Revalidate after registering the cancellable delivery.
-		row, err = rs.service.Authenticate(ctx, id, cookie.Value)
+		row, err = authenticate(ctx, id, secret)
 		if err != nil {
 			http.NotFound(w, r)
 			return

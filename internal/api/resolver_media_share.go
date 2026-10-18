@@ -44,7 +44,7 @@ func shareLink(ctx context.Context, id, secret string) string {
 		base, _ = ctx.Value(BaseURLCtxKey).(string)
 		base = strings.TrimRight(base, "/") + "/share"
 	}
-	return base + "/" + url.PathEscape(id) + "/#" + secret
+	return base + "/" + url.PathEscape(id) + "/?" + url.Values{"key": {secret}}.Encode()
 }
 
 func (r *queryResolver) MediaShares(ctx context.Context, limit int, offset int, status *MediaShareStatus) ([]*MediaShare, error) {
@@ -156,5 +156,11 @@ func (r *mutationResolver) MediaSharePreview(ctx context.Context, id string) (st
 	if err != nil {
 		return "", err
 	}
-	return shareLink(ctx, id, secret), nil
+	// Owner previews remain one-use browser bootstraps, never crawler grants.
+	link, err := url.Parse(shareLink(ctx, id, secret))
+	if err != nil {
+		return "", err
+	}
+	link.RawQuery, link.Fragment = "", secret
+	return link.String(), nil
 }

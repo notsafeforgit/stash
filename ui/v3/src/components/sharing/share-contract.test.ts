@@ -12,7 +12,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("share capabilities in the browser", () => {
   const id = "abcdefghijklmnopqrstuv";
-  it("keeps the capability in a fragment and resolves mounted share paths", () => {
+  it("accepts older fragment links and resolves mounted share paths", () => {
     const target = shareTarget(
       `https://share.test/mounted/share/${id}/#secret`,
       "https://share.test/mounted/share/",
@@ -37,6 +37,14 @@ describe("share capabilities in the browser", () => {
         "https://share.test/share/",
       ),
     ).toBeNull();
+  });
+  it("reads crawler-compatible links without putting credentials in media base URLs", () => {
+    const target = shareTarget(
+      `https://share.test/mounted/share/${id}/?key=crawler-capability`,
+      "https://share.test/mounted/share/",
+    );
+    expect(target?.secret).toBe("crawler-capability");
+    expect(target?.base.href).toBe(`https://share.test/mounted/share/${id}/`);
   });
   it("uses server time to expire when the recipient clock is wrong", () => {
     expect(

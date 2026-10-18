@@ -102,7 +102,10 @@ export function shareTarget(
     return null;
   const id = location.pathname.slice(root.pathname.length).replace(/\/$/, "");
   if (!/^[A-Za-z0-9_-]{22}$/.test(id)) return null;
-  return { base: new URL(`${id}/`, root), secret: location.hash.slice(1) };
+  return {
+    base: new URL(`${id}/`, root),
+    secret: location.searchParams.get("key") ?? location.hash.slice(1),
+  };
 }
 
 export function shareDeadline(

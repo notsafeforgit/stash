@@ -85,11 +85,41 @@ covers, thumbnails and the normal temporary video-stream cache.
 
 ## Credentials and enforcement
 
-The link is `/share/<random-id>/#<256-bit-secret>`. The fragment is never part of
-an HTTP request URL. The viewer removes it from the address bar, exchanges it
+New recipient links are `/share/<random-id>/?key=<256-bit-secret>`. The server
+can authenticate this URL to render link previews without JavaScript or cookies.
+Older `/#<secret>` links and one-use owner previews still open in the browser,
+but cannot have media cards because crawlers never receive URL fragments.
+The viewer removes the credential from the address bar, exchanges it
 via same-origin JSON POST, and keeps access in a Secure, HttpOnly, SameSite=Strict,
 host-only cookie scoped to that share's path. Only SHA-256 digests of secrets and
 session tokens are persisted. A share credential is never an owner/API session.
+
+### Telegram and other link previews
+
+Single-item shares emit Open Graph image/video and Twitter player-stream tags,
+following the approach used by [FxEmbed](https://github.com/FxEmbed/FxEmbed/blob/main/src/render/video.ts).
+The selected media is counted after deduplication, including shares of galleries.
+Multi-item shares get a text card and continue to open the full share viewer.
+Saved titles are included only when **Show titles** is enabled; otherwise the
+card uses the share label. Bare share IDs reveal no card or media.
+
+Preview assets are restricted to that one pinned item, require the link secret
+on every GET/HEAD/range request, and obey expiry, rotation, revocation and response
+budgets. They do not create guest sessions or increment recipient access counts.
+Compatible AVC/AAC MP4 originals retain byte ranges and content length. Other
+videos use a streamed 720p H.264/AAC MP4 compatibility rendition, with at most two
+concurrent preview encodes, no persistent video copy and no byte-range support
+for the generated stream. Images use compatible originals or a JPEG still.
+The share viewer still offers the ordinary original/remux/HLS playback choices.
+
+Use a newly created or rotated link for preview support. Existing fragment links
+can also be converted by replacing `#` with `?key=` without rotating the secret.
+External preview services may keep a downloaded copy after a link is revoked;
+Stash can prevent future fetches, but cannot remove a copy held by Telegram.
+Treat complete URLs as credentials: omit or redact the `key` query parameter in
+proxy/access logs. The app sends no referrer and strips the key before fetching
+the normal share content. Preview media explicitly permits cross-origin display;
+ordinary share/API endpoints retain their existing cookie and origin checks.
 
 Every content request checks the current grant, session, expiry and version. Every
 thumbnail, generated-preview variant, image, original stream/range, manifest, segment and original
@@ -108,8 +138,8 @@ session lasting at most 15 minutes. It does not change the real link or incremen
 access counts. Counts are successful recipient link exchanges, not distinct
 people, media requests or watch history.
 
-Public responses use no-store, no-referrer, noindex, nosniff, same-origin resource
-policy and a restrictive CSP. Original media documents also receive a sandboxed
+Public responses use no-store, no-referrer, noindex, nosniff and a restrictive CSP.
+The browser viewer uses same-origin resource policy. Original media documents also receive a sandboxed
 CSP that prevents scripts and external resource loading.
 The public router has no GraphQL, plugins, arbitrary files, directory listing,
 CORS exemption or general application fallback. Malformed/encoded traversal

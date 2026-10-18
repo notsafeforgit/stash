@@ -26,7 +26,10 @@ async function openShare(
 ): Promise<SharedContent> {
   if (!target) throw new ShareUnavailableError();
   const secret = target.secret;
-  history.replaceState(history.state, "", location.pathname + location.search);
+  const cleanURL = new URL(location.href);
+  cleanURL.searchParams.delete("key");
+  cleanURL.hash = "";
+  history.replaceState(history.state, "", cleanURL.pathname + cleanURL.search);
   if (secret) {
     const response = await fetch(new URL("exchange", target.base), {
       method: "POST",

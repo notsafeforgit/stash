@@ -304,6 +304,23 @@ func (s *Service) Authenticate(ctx context.Context, id, secret string) (*models.
 	return row, err
 }
 
+// AuthenticateLink is for server-rendered link cards and their media only. It
+// does not mint a browser session, consume owner preview tokens or record a
+// recipient visit. The normal content/API routes still require a guest cookie.
+func (s *Service) AuthenticateLink(ctx context.Context, id, secret string) (*models.ShareRecord, error) {
+	if !validSecret(secret) {
+		return nil, ErrUnavailable
+	}
+	row, err := s.Find(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if !Active(row, time.Now()) || subtle.ConstantTimeCompare(row.TokenHash, Hash(secret)) != 1 {
+		return nil, ErrUnavailable
+	}
+	return row, nil
+}
+
 func Snapshot(row *models.ShareRecord) (models.ShareSnapshot, error) {
 	var ret models.ShareSnapshot
 	err := json.Unmarshal(row.SnapshotJSON, &ret)

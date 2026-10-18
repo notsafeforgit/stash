@@ -185,6 +185,23 @@ test("guest image viewer needs no owner providers and removes the link secret", 
   expect(fixture.requests).not.toContain("graphql");
 });
 
+test("crawler-compatible links open normally and remove the query credential", async ({
+  page,
+}) => {
+  const fixture = await serveShare(page, false);
+  await page.goto(`${base}?key=test-capability`);
+  await expect(
+    page.getByRole("heading", { name: "Shared example" }),
+  ).toBeVisible();
+  expect(new URL(page.url()).search).toBe("");
+  expect(fixture.exchanges()).toBe(1);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Shared example" }),
+  ).toBeVisible();
+  expect(fixture.exchanges()).toBe(1);
+});
+
 test("guest HLS playback reuses the player and stops at expiry", async ({
   page,
 }) => {

@@ -292,6 +292,10 @@ endif
 .PHONY: generate
 generate: generate-backend generate-ui
 
+.PHONY: generate-native-bootstrap
+generate-native-bootstrap:
+	STASH_REGENERATE_NATIVE_BASELINE=1 go test ./pkg/sqlite -run '^TestNativeBootstrapBaselineMatchesMigrations$$' -count=1
+
 .PHONY: generate-ui
 generate-ui:
 	cd ui/v3 && pnpm run gqlgen

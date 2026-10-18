@@ -76,13 +76,18 @@ func newMigrator(db *Database, auditData bool) (*Migrator, error) {
 	m.conn.SetMaxIdleConns(maxReadConnections)
 	m.conn.SetConnMaxIdleTime(dbConnTimeout)
 
+	bootstrapped, err := m.bootstrapNative(context.Background())
+	if err != nil {
+		m.Close()
+		return nil, err
+	}
 	m.m, err = m.getMigrate()
 
 	// if error encountered, close the connection
 	if err != nil {
 		m.Close()
 	} else {
-		m.newDatabase = m.CurrentSchemaVersion() == 0
+		m.newDatabase = bootstrapped || m.CurrentSchemaVersion() == 0
 	}
 
 	return m, err
@@ -92,7 +97,10 @@ func (m *Migrator) Close() {
 	if m.m != nil {
 		m.m.Close()
 		m.m = nil
+	} else if m.conn != nil {
+		_ = m.conn.Close()
 	}
+	m.conn = nil
 }
 
 func (m *Migrator) CurrentSchemaVersion() uint {
@@ -260,19 +268,19 @@ func (m *Migrator) PostMigrate(ctx context.Context) error {
 // no active fork ledger; only historical import inputs need that lookup.
 // Reading versions for a routine open checks schema/lineage and write guards;
 // explicit migration constructors also audit historical rows before writing.
-func (db *Database) getSchemaVersions() (uint, uint, error) {
+func (db *Database) getSchemaVersions() (uint, uint, bool, error) {
 	m, err := newMigrator(db, false)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, false, err
 	}
 	defer m.Close()
 
 	primary := m.CurrentSchemaVersion()
 	if primary >= NativeSchemaBaseline {
-		return primary, 0, nil
+		return primary, 0, m.newDatabase, nil
 	}
 	fork, err := m.CurrentForkSchemaVersion(context.Background())
-	return primary, fork, err
+	return primary, fork, m.newDatabase, err
 }
 
 func (db *Database) ReInitialise() error {

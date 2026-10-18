@@ -108,10 +108,10 @@ durable checkpoint must prevent reimporting over later native edits.
 
 Removal requires retiring the corresponding supported upgrade inputs (or
 providing a separate importer), preserving promised interrupted-upgrade recovery,
-and removing all bootstrap dependencies. Fresh databases currently traverse
-the historical SQL/fork chain before native promotion, so removing upgrade
-support alone does not make those migrations safe to delete. Establish a tested
-native bootstrap baseline first. See the
+and removing all bootstrap dependencies. Fresh databases now install a tested,
+versioned native baseline and apply later native migrations. Historical readers
+remain required for supported upstream/frozen-fork upgrades and interrupted
+historical initialization, independently of this fresh-install optimization. See the
 [migration maintenance notes](pkg/sqlite/migrations/README.md).
 
 ## API, UI, and plugin contracts

@@ -22,34 +22,61 @@ input-specific fixes and recovery fixes covered by historical fixtures; implemen
 new behavior in native code and new numbered migrations. Follow the
 [legacy upgrade policy](../../../FORK.md#legacy-upgrade-code).
 
-Fresh database creation still starts at the historical SQL sequence and runs
-the fork preparation before native promotion. The old readers therefore also
-see empty input during bootstrap. Removing them requires a native bootstrap
-baseline as well as retiring the corresponding upgrade inputs. Preserve
-unfinished configuration publication checkpoints for supported upgrades. Do not
-delete numbered migrations just because the production instance has passed them.
+Fresh database creation uses the native baseline described below. Historical
+readers remain necessary for supported upstream/frozen-fork upgrades and recovery
+of an old migration driver's empty ledger. Preserve unfinished configuration
+publication checkpoints for supported upgrades. Do not delete numbered migrations
+just because the production instance has passed them.
 
-## Follow-up: direct native database bootstrap
+## Completed follow-up: direct native database bootstrap
 
-Planned after the approved 2026-10-18 rewrite merge: create fresh databases
-directly from a versioned native schema baseline instead of replaying the
-historical primary/fork migration chain. This is maintenance work, not another
-production data migration or a prerequisite for using the native application.
+Completed on develop after the approved 2026-10-18 rewrite merge. New databases
+install [`../bootstrap/1000121.sql`](../bootstrap/1000121.sql), then apply 1000122
+and later native migrations normally. The bootstrap version is pinned separately
+from `appSchemaVersion`; adding a native migration does not require regenerating
+the baseline or changing existing databases. This is initialization maintenance,
+not another production data migration.
 
-Before switching the fresh-install path:
+The direct path requires no SQLite schema objects and zero schema, user and
+application versions. Missing files, zero-length files and untouched SQLite files
+qualify. Existing, dirty, incomplete, foreign and newer schemas retain pre-write
+validation. An old driver's empty migration ledger resumes its historical chain;
+it is never overwritten by the native baseline.
 
-- Prove that its tables, constraints, indexes, triggers, defaults and lineage
-  match a database created by the current path, and that subsequent native
-  migrations apply normally.
-- Cover interrupted initialization and reopen/retry behavior without accepting
-  partial, foreign or newer schemas.
-- Keep supported upstream and frozen-fork upgrade readers isolated and tested,
-  including unfinished database/configuration publication. They remain needed
-  for users importing existing libraries even after fresh installs stop using them.
+Initialization rechecks freshness under SQLite's immediate writer lock and commits
+all tables, indexes, constraints, triggers, initial rows, lineage and the clean
+version together. A failed or interrupted transaction leaves an empty database
+that can retry. If interruption occurs after the baseline commits, reopening
+reports the normal migration-needed state until the remaining native migrations
+finish. Dirty later migrations retain their existing recovery requirements.
+
+The baseline is generated from an empty historical schema using the actual SQL
+and Go migration readers. `TestNativeBootstrapBaselineMatchesMigrations` checks
+the exact stored DDL and every initial row, reconstructs the snapshot, and checks
+integrity and foreign keys. Only installation-specific migration timestamps are
+regenerated. Historical migration-history rows are retained for equivalence; they
+do not indicate that the new database imported a library or configuration.
+`TestNativeBootstrapCurrentSchemaMatchesMigrations` compares both paths again at
+the current schema, including subsequent migrations. These tests run in the
+existing develop SQLite CI shards and gate image publication.
+
+To regenerate after an intentional baseline change, run:
+
+```sh
+make generate-native-bootstrap
+```
+
+Review the generated SQL diff; never edit it by hand. Advancing the pinned version
+also requires updating the embedded filename/version and the equivalence fixture,
+while retaining a real subsequent migration test. Tests cover fresh/repeated opens,
+transaction failures, abrupt process exit and retry, unsafe inputs, historical
+upgrades and unfinished database/configuration publication.
 
 Retiring an old input format is a separate support decision. Preserve its
 upgrade path until that decision is made; do not delete readers as part of
-this bootstrap follow-up.
+this bootstrap follow-up. Promotion preparation is isolated in
+`../legacy_native_promotion.go`; its historical reconciliation semantics are
+unchanged.
 
 ## New native migrations
 

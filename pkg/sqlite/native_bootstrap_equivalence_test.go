@@ -50,6 +50,29 @@ func sqlIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
+func bootstrapValues(t *testing.T, raw *sql.DB, query string, args ...any) []string {
+	t.Helper()
+	rows, err := raw.Query(query, args...)
+	require.NoError(t, err)
+	defer rows.Close()
+	var values []string
+	for rows.Next() {
+		var value string
+		require.NoError(t, rows.Scan(&value))
+		values = append(values, value)
+	}
+	require.NoError(t, rows.Err())
+	return values
+}
+
+func bootstrapObjects(t *testing.T, raw *sql.DB) []string {
+	t.Helper()
+	// Include implicit indexes and sqlite_sequence, which cannot be emitted as
+	// standalone DDL. ANALYZE's statistics are the only optimization artifacts.
+	return bootstrapValues(t, raw, `SELECT quote(type)||','||quote(name)||','||quote(tbl_name)||','||quote(sql)
+FROM sqlite_schema WHERE name NOT GLOB 'sqlite_stat[134]' ORDER BY type,name`)
+}
+
 // Preserve SQLite's stored DDL verbatim, including inline constraints, defaults,
 // partial indexes and triggers. Initial rows are emitted before triggers so
 // they cannot accidentally manufacture other initial rows. Only migration
@@ -60,6 +83,7 @@ func bootstrapSnapshot(t *testing.T, raw *sql.DB) string {
 WHERE sql IS NOT NULL AND name NOT GLOB 'sqlite_*'
 ORDER BY CASE type WHEN 'table' THEN 0 WHEN 'index' THEN 1 WHEN 'view' THEN 2 ELSE 3 END, name`)
 	require.NoError(t, err)
+	defer rows.Close()
 	var tables, definitions, afterData []string
 	for rows.Next() {
 		var kind, name, definition string
@@ -74,7 +98,6 @@ ORDER BY CASE type WHEN 'table' THEN 0 WHEN 'index' THEN 1 WHEN 'view' THEN 2 EL
 		}
 	}
 	require.NoError(t, rows.Err())
-	require.NoError(t, rows.Close())
 	// sqlite_sequence is created implicitly by AUTOINCREMENT tables. Its rows
 	// also form part of the historical empty database's initial state.
 	if rawTableExists(t, raw, "sqlite_sequence") {
@@ -82,12 +105,8 @@ ORDER BY CASE type WHEN 'table' THEN 0 WHEN 'index' THEN 1 WHEN 'view' THEN 2 EL
 		definitions = append(definitions, "DELETE FROM sqlite_sequence;\n")
 	}
 	for _, table := range tables {
-		columns, err := raw.Query("SELECT name FROM pragma_table_info(?) ORDER BY cid", table)
-		require.NoError(t, err)
 		var names, values []string
-		for columns.Next() {
-			var column string
-			require.NoError(t, columns.Scan(&column))
+		for _, column := range bootstrapValues(t, raw, "SELECT name FROM pragma_table_info(?) ORDER BY cid", table) {
 			names = append(names, sqlIdentifier(column))
 			if (table == "native_schema" && column == "promoted_at") ||
 				((table == "legacy_schema_history" || table == "native_migration_history") && column == "applied_at") {
@@ -96,18 +115,10 @@ ORDER BY CASE type WHEN 'table' THEN 0 WHEN 'index' THEN 1 WHEN 'view' THEN 2 EL
 				values = append(values, "quote("+sqlIdentifier(column)+")")
 			}
 		}
-		require.NoError(t, columns.Err())
-		require.NoError(t, columns.Close())
-		data, err := raw.Query("SELECT " + strings.Join(values, " || ',' || ") + " FROM " + sqlIdentifier(table))
-		require.NoError(t, err)
 		var inserts []string
-		for data.Next() {
-			var value string
-			require.NoError(t, data.Scan(&value))
+		for _, value := range bootstrapValues(t, raw, "SELECT "+strings.Join(values, " || ',' || ")+" FROM "+sqlIdentifier(table)) {
 			inserts = append(inserts, fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s);\n", sqlIdentifier(table), strings.Join(names, ","), value))
 		}
-		require.NoError(t, data.Err())
-		require.NoError(t, data.Close())
 		sort.Strings(inserts)
 		definitions = append(definitions, inserts...)
 	}
@@ -139,14 +150,32 @@ func TestNativeBootstrapBaselineMatchesMigrations(t *testing.T) {
 	require.NoError(t, err)
 	tx, err := direct.Begin()
 	require.NoError(t, err)
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	_, err = tx.Exec(string(actual))
 	require.NoError(t, err)
 	require.NoError(t, tx.Commit())
 	require.Equal(t, want, bootstrapSnapshot(t, direct))
+	require.Equal(t, bootstrapObjects(t, raw), bootstrapObjects(t, direct))
 	var integrity string
 	require.NoError(t, direct.QueryRow("PRAGMA integrity_check").Scan(&integrity))
 	require.Equal(t, "ok", integrity)
 	var violation any
 	require.ErrorIs(t, direct.QueryRow("SELECT 1 FROM pragma_foreign_key_check LIMIT 1").Scan(&violation), sql.ErrNoRows)
+}
+
+func TestNativeBootstrapCurrentSchemaMatchesMigrations(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "historical.sqlite")
+	replayBootstrapHistory(t, path, sqlite.GetRequiredSchemaVersion())
+	historical := openRawDB(t, path)
+	defer historical.Close()
+	want := bootstrapSnapshot(t, historical)
+
+	path = filepath.Join(t.TempDir(), "direct.sqlite")
+	db := sqlite.NewDatabase()
+	require.NoError(t, db.Open(path))
+	require.NoError(t, db.Close())
+	direct := openRawDB(t, path)
+	defer direct.Close()
+	require.Equal(t, want, bootstrapSnapshot(t, direct), "baseline plus subsequent migrations must equal a complete historical replay")
+	require.Equal(t, bootstrapObjects(t, historical), bootstrapObjects(t, direct))
 }

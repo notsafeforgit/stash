@@ -76,6 +76,21 @@ with `native_schema.lineage = org.notsafeforgit.stash.native-archive`. New
 databases use this lineage. Existing compatible databases require explicit
 migration; normal startup does not silently promote them.
 
+Fresh installations create native schema 1000121 directly from the generated
+[bootstrap baseline](../pkg/sqlite/bootstrap/1000121.sql), then run 1000122 and
+later native migrations normally. The baseline's complete schema and initial
+data are checked against historical migration replay in CI. Its version stays
+pinned independently of the application's current version; new migrations do
+not require another snapshot. See the [completed bootstrap follow-up](../pkg/sqlite/migrations/README.md#completed-follow-up-direct-native-database-bootstrap)
+for regeneration and recovery details.
+
+Only untouched databases qualify: no schema objects and no schema/user/application
+version markers. The baseline, lineage and clean version commit in one SQLite
+transaction after rechecking freshness under the writer lock. Interruption before
+commit permits a fresh retry; after commit, remaining migrations use ordinary
+explicit upgrade/recovery. Existing libraries are never reinitialized. An old
+driver's empty ledger retains historical initialization recovery.
+
 Before a writable migration connection opens, a read-only inspection rejects
 dirty migration state, a foreign or missing native marker, newer native schemas,
 unsupported legacy primary/fork versions, and missing authoritative native
@@ -127,7 +142,8 @@ The `LEGACY-UPGRADE-ONLY` markers, package documentation and caller-boundary tes
 keep these historical codecs separate from native runtime behavior. Their input
 semantics are frozen; new UI/API features must not change historical conversion.
 The [legacy upgrade policy](../FORK.md#legacy-upgrade-code) defines permitted fixes
-and removal prerequisites, including the fresh-database bootstrap dependency.
+and removal prerequisites. Native bootstrap bypasses these readers; supported
+historical database/configuration upgrades still need them.
 The source/provenance services and catalog import remain separate work; the
 implemented native migrations are described below.
 The full [transition plan](native-archive-transition-plan.md) remains the

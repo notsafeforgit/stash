@@ -13,5 +13,6 @@
 // Changes require an explicit historical-input, recovery, or security fix and
 // regression evidence preserving existing inputs. See FORK.md's "Legacy upgrade
 // code" policy and pkg/sqlite/migrations/README.md before removing this package;
-// fresh database creation still traverses the historical migration chain.
+// native bootstrap bypasses these readers, but supported historical upgrades
+// and unfinished configuration publication still require them.
 package filtermigration

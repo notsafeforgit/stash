@@ -1,6 +1,6 @@
 // LEGACY-UPGRADE-ONLY: historical filter conversion for native migration 1000001.
-// Also reached with empty data during fresh database bootstrap; not used by
-// native saved-filter imports. See README.md before changing or removing it.
+// Reached only by historical upgrades, never native bootstrap or saved-filter
+// imports. Retain supported upgrade/recovery semantics; see README.md.
 package migrations
 
 import (

@@ -150,16 +150,15 @@ func (db *Database) Ready() error {
 }
 
 // Open initializes the database. If the database is new, then it
-// performs a full migration to the latest schema version. Otherwise, any
-// necessary migrations must be run separately using RunMigrations.
-// Returns true if the database is new.
+// installs the native baseline and runs subsequent native migrations. Otherwise,
+// necessary migrations must be run separately using RunAllMigrations.
 func (db *Database) Open(dbPath string) error {
 	db.lock()
 	defer db.unlock()
 
 	db.dbPath = dbPath
 
-	databaseSchemaVersion, forkSchemaVersion, err := db.getSchemaVersions()
+	databaseSchemaVersion, forkSchemaVersion, isNew, err := db.getSchemaVersions()
 	if err != nil {
 		return fmt.Errorf("getting database schema versions: %w", err)
 	}
@@ -176,10 +175,9 @@ func (db *Database) Open(dbPath string) error {
 	db.schemaVersion = databaseSchemaVersion
 	db.forkSchemaVersion = forkSchemaVersion
 
-	isNew := databaseSchemaVersion == 0
-
 	if isNew {
-		// new database, just run the migrations
+		// Finish migrations after the baseline (or resume the historical empty
+		// driver's ledger through its original migration chain).
 		if err := db.RunAllMigrations(); err != nil {
 			return fmt.Errorf("error running initial schema migrations: %w", err)
 		}

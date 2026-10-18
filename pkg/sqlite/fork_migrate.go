@@ -1,6 +1,7 @@
 // LEGACY-UPGRADE-ONLY: historical fork migration driver for pre-native inputs.
-// Native databases cannot run these migrations or reconcilers. Fresh bootstrap
-// still uses this chain; see migrations/README.md before removing it.
+// Native databases cannot run these migrations or reconcilers. Retain this
+// chain for supported upgrades and interrupted historical initialization; see
+// migrations/README.md before removing it.
 package sqlite
 
 import (

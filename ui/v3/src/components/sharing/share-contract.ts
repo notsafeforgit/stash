@@ -92,7 +92,7 @@ export async function shareRequest<T>(
 export function shareTarget(
   href: string,
   baseHref: string,
-): { base: URL; secret: string } | null {
+): { base: URL; navigationBase: URL; secret: string } | null {
   const location = new URL(href);
   const root = new URL(baseHref);
   if (
@@ -102,10 +102,13 @@ export function shareTarget(
     return null;
   const id = location.pathname.slice(root.pathname.length).replace(/\/$/, "");
   if (!/^[A-Za-z0-9_-]{22}$/.test(id)) return null;
-  return {
-    base: new URL(`${id}/`, root),
-    secret: location.searchParams.get("key") ?? location.hash.slice(1),
-  };
+  const base = new URL(`${id}/`, root);
+  const navigationBase = new URL(base);
+  const key = location.searchParams.get("key");
+  // Recipient links stay forwardable. Media/API requests use the clean base;
+  // one-use owner previews and older fragment links keep their session-only URL.
+  if (key) navigationBase.searchParams.set("key", key);
+  return { base, navigationBase, secret: key ?? location.hash.slice(1) };
 }
 
 export function shareDeadline(

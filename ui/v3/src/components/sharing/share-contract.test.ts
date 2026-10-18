@@ -18,6 +18,7 @@ describe("share capabilities in the browser", () => {
       "https://share.test/mounted/share/",
     );
     expect(target?.base.href).toBe(`https://share.test/mounted/share/${id}/`);
+    expect(target?.navigationBase.href).toBe(target?.base.href);
     expect(target?.secret).toBe("secret");
     expect(
       shareTarget(
@@ -45,6 +46,9 @@ describe("share capabilities in the browser", () => {
     );
     expect(target?.secret).toBe("crawler-capability");
     expect(target?.base.href).toBe(`https://share.test/mounted/share/${id}/`);
+    expect(target?.navigationBase.href).toBe(
+      `https://share.test/mounted/share/${id}/?key=crawler-capability`,
+    );
   });
   it("uses server time to expire when the recipient clock is wrong", () => {
     expect(

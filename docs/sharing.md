@@ -99,10 +99,15 @@ New recipient links are `/share/<random-id>/?key=<256-bit-secret>`. The server
 can authenticate this URL to render link previews without JavaScript or cookies.
 Older `/#<secret>` links and one-use owner previews still open in the browser,
 but cannot have media cards because crawlers never receive URL fragments.
-The viewer removes the credential from the address bar, exchanges it
-via same-origin JSON POST, and keeps access in a Secure, HttpOnly, SameSite=Strict,
-host-only cookie scoped to that share's path. Only SHA-256 digests of secrets and
-session tokens are persisted. A share credential is never an owner/API session.
+Recipient links keep their `key` in the address bar, including when navigating
+between tabs and item details, so browser Copy/Share and copied item links remain
+usable by another recipient and by link-preview crawlers. The viewer exchanges
+the key via same-origin JSON POST and uses a Secure, HttpOnly, SameSite=Strict,
+host-only cookie scoped to that share's path for content and playback requests.
+Reloading reuses a valid cookie without creating another guest session. One-use
+owner previews and older fragment links still remove their fragment on opening.
+Only SHA-256 digests of secrets and session tokens are persisted. A share
+credential is never an owner/API session.
 
 ### Telegram and other link previews
 
@@ -127,9 +132,10 @@ can also be converted by replacing `#` with `?key=` without rotating the secret.
 External preview services may keep a downloaded copy after a link is revoked;
 Stash can prevent future fetches, but cannot remove a copy held by Telegram.
 Treat complete URLs as credentials: omit or redact the `key` query parameter in
-proxy/access logs. The app sends no referrer and strips the key before fetching
-the normal share content. Preview media explicitly permits cross-origin display;
-ordinary share/API endpoints retain their existing cookie and origin checks.
+proxy/access logs. The app sends no referrer and uses cookie-authenticated URLs
+without the key when fetching normal share content. Preview media explicitly
+permits cross-origin display; ordinary share/API endpoints retain their existing
+cookie and origin checks.
 
 Every content request checks the current grant, session, expiry and version. Every
 thumbnail, generated-preview variant, image, original stream/range, manifest, segment and original

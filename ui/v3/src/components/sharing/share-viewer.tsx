@@ -27,10 +27,20 @@ async function openShare(
   if (!target) throw new ShareUnavailableError();
   const secret = target.secret;
   const cleanURL = new URL(location.href);
-  cleanURL.searchParams.delete("key");
   cleanURL.hash = "";
   history.replaceState(history.state, "", cleanURL.pathname + cleanURL.search);
+  const contentURL = new URL("content", target.base);
   if (secret) {
+    // The address-bar key survives reloads. Reuse a valid guest cookie instead
+    // of creating another session and counting another recipient exchange.
+    // Fragment previews must still consume their one-use bootstrap.
+    if (target.navigationBase.searchParams.has("key")) {
+      try {
+        return await shareRequest(contentURL, shareContentSchema);
+      } catch (error) {
+        if (!(error instanceof ShareUnavailableError)) throw error;
+      }
+    }
     const response = await fetch(new URL("exchange", target.base), {
       method: "POST",
       credentials: "same-origin",
@@ -43,7 +53,7 @@ async function openShare(
     if (!response.ok) throw new Error("Unable to open share");
     target.secret = "";
   }
-  return shareRequest(new URL("content", target.base), shareContentSchema);
+  return shareRequest(contentURL, shareContentSchema);
 }
 
 export function ShareViewer() {
@@ -172,5 +182,11 @@ export function ShareViewer() {
       </main>
     );
 
-  return <ShareBrowser content={state.content} base={target.base} />;
+  return (
+    <ShareBrowser
+      content={state.content}
+      base={target.base}
+      navigationBase={target.navigationBase}
+    />
+  );
 }

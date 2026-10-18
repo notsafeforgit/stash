@@ -175,13 +175,15 @@ function SharedScroll({
 export function ShareBrowser({
   content,
   base,
+  navigationBase,
 }: {
   content: SharedContent;
   base: URL;
+  navigationBase: URL;
 }) {
   const intl = useIntl();
   const collections = useMemo(() => shareCollections(content), [content]);
-  const { location, navigate, back } = useShareNavigation(base);
+  const { location, navigate, back } = useShareNavigation(navigationBase);
   const tabs: ShareTab[] = shareTabSchema.options.filter(
     (tab) => collections[tab].length > 0,
   );
@@ -239,7 +241,7 @@ export function ShareBrowser({
   const grid = (
     <SharedGrid
       items={items}
-      base={base}
+      base={navigationBase}
       location={listLocation}
       navigate={navigate}
       onPreview={openViewer}

@@ -43,6 +43,7 @@ async function serveShare(
   const media = options?.media ?? [sharedMedia(video ? "scene-1" : "image-1")];
   const requests: string[] = [];
   let exchanges = 0;
+  let sessionMisses = 0;
   let expiry = new Date(Date.now() + expiresIn * 1000).toISOString();
   await page.route(`**${base}**`, async (route) => {
     const request = route.request();
@@ -56,14 +57,35 @@ async function serveShare(
       return;
     }
     requests.push(endpoint);
-    expect(request.headers().apikey).toBeUndefined();
+    const headers = await request.allHeaders();
+    expect(headers.apikey).toBeUndefined();
+    expect(url.searchParams.has("key")).toBe(false);
+    expect(headers.referer ?? "").not.toContain("test-capability");
     if (endpoint === "exchange") {
       exchanges++;
       expect(request.method()).toBe("POST");
       expect(request.postDataJSON()).toEqual({ secret: "test-capability" });
       expiry = new Date(Date.now() + expiresIn * 1000).toISOString();
-      await route.fulfill({ status: 204 });
+      await route.fulfill({
+        status: 204,
+        headers: {
+          "Set-Cookie": `share_fixture=guest; Path=${base}; HttpOnly; SameSite=Strict`,
+        },
+      });
     } else if (endpoint === "content") {
+      // WebKit attaches Cookie after interception, even with allHeaders().
+      // Consult its real cookie jar when emulating the authenticated endpoint.
+      const cookies = await page.context().cookies(request.url());
+      if (
+        !cookies.some(
+          (cookie) =>
+            cookie.name === "share_fixture" && cookie.value === "guest",
+        )
+      ) {
+        sessionMisses++;
+        await route.fulfill({ status: 404 });
+        return;
+      }
       await route.fulfill({
         json: {
           label: "Shared example",
@@ -161,10 +183,14 @@ async function serveShare(
       });
     } else throw new Error(`Unexpected share request: ${endpoint}`);
   });
-  return { requests, exchanges: () => exchanges };
+  return {
+    requests,
+    exchanges: () => exchanges,
+    sessionMisses: () => sessionMisses,
+  };
 }
 
-test("guest image viewer needs no owner providers and removes the link secret", async ({
+test("fragment links open without owner providers and remove the bootstrap secret", async ({
   page,
 }) => {
   const fixture = await serveShare(page, false);
@@ -187,17 +213,74 @@ test("guest image viewer needs no owner providers and removes the link secret", 
   await expect(page.locator(".yarl__portal")).toHaveCount(0);
 });
 
-test("crawler-compatible links open normally and remove the query credential", async ({
-  page,
-}) => {
-  const fixture = await serveShare(page, false);
-  await page.goto(`${base}?key=test-capability`);
-  await expect(page.locator(".yarl__portal")).toBeVisible();
-  expect(new URL(page.url()).search).toBe("");
-  expect(fixture.exchanges()).toBe(1);
-  await page.reload();
-  await expect(page.locator(".yarl__portal")).toBeVisible();
-  expect(fixture.exchanges()).toBe(1);
+test.describe("forwardable recipient links", () => {
+  test.use({
+    // A fresh browser has no guest cookie. The viewer checks for a session,
+    // then exchanges the link credential only when that check returns 404.
+    expectedConsoleErrors: [
+      "Failed to load resource: the server responded with a status of 404",
+    ],
+  });
+
+  test("address-bar links survive reload and establish access without an existing cookie", async ({
+    page,
+    context,
+  }) => {
+    const fixture = await serveShare(page, false);
+    await page.goto(`${base}?key=test-capability`);
+    await expect(page.locator(".yarl__portal")).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("key")).toBe("test-capability");
+    expect(fixture.exchanges()).toBe(1);
+    expect(fixture.sessionMisses()).toBe(1);
+    const copiedURL = page.url();
+    await page.reload();
+    await expect(page.locator(".yarl__portal")).toBeVisible();
+    expect(page.url()).toBe(copiedURL);
+    expect(fixture.exchanges()).toBe(1);
+    expect(fixture.sessionMisses()).toBe(1);
+
+    await context.clearCookies();
+    await page.goto(copiedURL);
+    await expect(page.locator(".yarl__portal")).toBeVisible();
+    expect(fixture.exchanges()).toBe(2);
+    expect(fixture.sessionMisses()).toBe(2);
+  });
+
+  test("tabs, copied item links and Back preserve the recipient credential", async ({
+    page,
+    context,
+  }) => {
+    const fixture = await serveShare(page, true, 3600, { media: mixed });
+    await page.goto(`${base}?key=test-capability`);
+    await page.getByRole("tab", { name: "Images (2)" }).click();
+    expect(new URL(page.url()).searchParams.get("key")).toBe("test-capability");
+    const link = page.getByRole("link", { name: "First image", exact: true });
+    const copiedLink = new URL(
+      (await link.getAttribute("href")) ?? "",
+      page.url(),
+    );
+    expect(copiedLink.searchParams.get("key")).toBe("test-capability");
+    expect(copiedLink.searchParams.get("media")).toBe("image-1");
+    await link.press("Enter");
+    await expect(
+      page.getByRole("heading", { name: "First image", exact: true }),
+    ).toBeVisible();
+    expect(page.url()).toBe(copiedLink.href);
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await expect(page.getByRole("tab", { name: "Images (2)" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(new URL(page.url()).searchParams.get("key")).toBe("test-capability");
+    expect(fixture.exchanges()).toBe(1);
+
+    await context.clearCookies();
+    await page.goto(copiedLink.href);
+    await expect(
+      page.getByRole("heading", { name: "First image", exact: true }),
+    ).toBeVisible();
+    expect(fixture.exchanges()).toBe(2);
+  });
 });
 
 test("guest HLS playback reuses the player and stops at expiry", async ({

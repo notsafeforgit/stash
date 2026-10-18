@@ -54,8 +54,10 @@ The baseline is generated from an empty historical schema using the actual SQL
 and Go migration readers. `TestNativeBootstrapBaselineMatchesMigrations` checks
 the exact stored DDL and every initial row, reconstructs the snapshot, and checks
 integrity and foreign keys. Only installation-specific migration timestamps are
-regenerated. Historical migration-history rows are retained for equivalence; they
-do not indicate that the new database imported a library or configuration.
+regenerated. Index and trigger creation order is preserved and checked separately,
+including implicit indexes, because it can affect SQLite's query-plan choices and
+trigger execution. Historical migration-history rows are retained for equivalence;
+they do not indicate that the new database imported a library or configuration.
 `TestNativeBootstrapCurrentSchemaMatchesMigrations` compares both paths again at
 the current schema, including subsequent migrations. These tests run in the
 existing develop SQLite CI shards and gate image publication.

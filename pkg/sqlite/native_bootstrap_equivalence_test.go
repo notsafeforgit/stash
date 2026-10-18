@@ -73,6 +73,15 @@ func bootstrapObjects(t *testing.T, raw *sql.DB) []string {
 FROM sqlite_schema WHERE name NOT GLOB 'sqlite_stat[134]' ORDER BY type,name`)
 }
 
+func bootstrapExecutionOrder(t *testing.T, raw *sql.DB) []string {
+	t.Helper()
+	// SQLite's index-cost ties and same-event trigger execution can depend on
+	// creation order. Identical DDL sorted by name is therefore insufficient.
+	// Include implicit indexes in the per-table ordering comparison as well.
+	return bootstrapValues(t, raw, `SELECT type||','||tbl_name||','||name
+FROM sqlite_schema WHERE type IN ('index','trigger') ORDER BY type,tbl_name,rowid`)
+}
+
 // Preserve SQLite's stored DDL verbatim, including inline constraints, defaults,
 // partial indexes and triggers. Initial rows are emitted before triggers so
 // they cannot accidentally manufacture other initial rows. Only migration
@@ -81,7 +90,7 @@ func bootstrapSnapshot(t *testing.T, raw *sql.DB) string {
 	t.Helper()
 	rows, err := raw.Query(`SELECT type, name, sql FROM sqlite_schema
 WHERE sql IS NOT NULL AND name NOT GLOB 'sqlite_*'
-ORDER BY CASE type WHEN 'table' THEN 0 WHEN 'index' THEN 1 WHEN 'view' THEN 2 ELSE 3 END, name`)
+ORDER BY CASE type WHEN 'table' THEN 0 WHEN 'index' THEN 1 WHEN 'view' THEN 2 ELSE 3 END, rowid`)
 	require.NoError(t, err)
 	defer rows.Close()
 	var tables, definitions, afterData []string
@@ -156,6 +165,7 @@ func TestNativeBootstrapBaselineMatchesMigrations(t *testing.T) {
 	require.NoError(t, tx.Commit())
 	require.Equal(t, want, bootstrapSnapshot(t, direct))
 	require.Equal(t, bootstrapObjects(t, raw), bootstrapObjects(t, direct))
+	require.Equal(t, bootstrapExecutionOrder(t, raw), bootstrapExecutionOrder(t, direct))
 	var integrity string
 	require.NoError(t, direct.QueryRow("PRAGMA integrity_check").Scan(&integrity))
 	require.Equal(t, "ok", integrity)
@@ -178,4 +188,5 @@ func TestNativeBootstrapCurrentSchemaMatchesMigrations(t *testing.T) {
 	defer direct.Close()
 	require.Equal(t, want, bootstrapSnapshot(t, direct), "baseline plus subsequent migrations must equal a complete historical replay")
 	require.Equal(t, bootstrapObjects(t, historical), bootstrapObjects(t, direct))
+	require.Equal(t, bootstrapExecutionOrder(t, historical), bootstrapExecutionOrder(t, direct))
 }

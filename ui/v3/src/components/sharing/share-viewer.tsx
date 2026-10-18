@@ -28,18 +28,16 @@ async function openShare(
   const secret = target.secret;
   const cleanURL = new URL(location.href);
   cleanURL.hash = "";
+  if (secret) cleanURL.searchParams.set("key", secret);
   history.replaceState(history.state, "", cleanURL.pathname + cleanURL.search);
   const contentURL = new URL("content", target.base);
   if (secret) {
     // The address-bar key survives reloads. Reuse a valid guest cookie instead
     // of creating another session and counting another recipient exchange.
-    // Fragment previews must still consume their one-use bootstrap.
-    if (target.navigationBase.searchParams.has("key")) {
-      try {
-        return await shareRequest(contentURL, shareContentSchema);
-      } catch (error) {
-        if (!(error instanceof ShareUnavailableError)) throw error;
-      }
+    try {
+      return await shareRequest(contentURL, shareContentSchema);
+    } catch (error) {
+      if (!(error instanceof ShareUnavailableError)) throw error;
     }
     const response = await fetch(new URL("exchange", target.base), {
       method: "POST",

@@ -3039,3 +3039,17 @@ and commits all associations and membership changes in one transaction. It does
 not merge post identities or silently combine independently created galleries.
 Anonymization removes thread rows before their capture dependencies; native
 backups include the new table and normal gallery records automatically.
+
+## Retrievable share links (1000122)
+
+`shares.token` retains new and regenerated public link keys directly, allowing
+owner management to copy or preview the same URL without rotating it. Existing
+`token_hash` values and guest sessions remain valid; older rows keep an empty
+`token` until explicitly regenerated. The authenticated `MediaShare.url` is null
+for these rows and inactive shares. Public media DTOs never expose the stored key.
+
+Recipient previews use the ordinary link. The migration removes unused
+`share_sessions.exchange_only` bootstraps before dropping that column and
+`preview`; existing open sessions keep their original expiry and version.
+Revocation removes the stored key and all guest sessions. Backups retain active
+link secrets as well as their protected media/library data.

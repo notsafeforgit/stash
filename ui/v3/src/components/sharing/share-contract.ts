@@ -104,11 +104,11 @@ export function shareTarget(
   if (!/^[A-Za-z0-9_-]{22}$/.test(id)) return null;
   const base = new URL(`${id}/`, root);
   const navigationBase = new URL(base);
-  const key = location.searchParams.get("key");
-  // Recipient links stay forwardable. Media/API requests use the clean base;
-  // one-use owner previews and older fragment links keep their session-only URL.
+  const key = location.searchParams.get("key") ?? location.hash.slice(1);
+  // All recipient links stay forwardable, including older fragment URLs.
+  // Media/API requests still use the clean base and a scoped guest cookie.
   if (key) navigationBase.searchParams.set("key", key);
-  return { base, navigationBase, secret: key ?? location.hash.slice(1) };
+  return { base, navigationBase, secret: key };
 }
 
 export function shareDeadline(

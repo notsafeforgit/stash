@@ -44,7 +44,7 @@ func shareListPredicate(options models.ShareListOptions) (string, []any) {
 }
 
 func (*ShareStore) Delete(ctx context.Context, id string) error {
-	// The foreign key removes guest and preview sessions in the same transaction.
+	// The foreign key removes guest sessions in the same transaction.
 	_, err := dbWrapper.Exec(ctx, `DELETE FROM shares WHERE id = ?`, id)
 	return err
 }
@@ -63,13 +63,13 @@ func (*ShareStore) DeleteInactive(ctx context.Context, now int64) ([]string, err
 
 func (*ShareStore) Create(ctx context.Context, s *models.ShareRecord) error {
 	_, err := dbWrapper.Exec(ctx, `INSERT INTO shares
-(id, token_hash, label, created_by, created_at, expires_at, allow_download, show_metadata, version, snapshot)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, s.ID, s.TokenHash, s.Label, s.CreatedBy, s.CreatedAt, s.ExpiresAt, s.AllowDownload, s.ShowMetadata, s.Version, s.SnapshotJSON)
+(id, token_hash, token, label, created_by, created_at, expires_at, allow_download, show_metadata, version, snapshot)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, s.ID, s.TokenHash, s.Token, s.Label, s.CreatedBy, s.CreatedAt, s.ExpiresAt, s.AllowDownload, s.ShowMetadata, s.Version, s.SnapshotJSON)
 	return err
 }
 
 func (*ShareStore) Update(ctx context.Context, s *models.ShareRecord) error {
-	_, err := dbWrapper.Exec(ctx, `UPDATE shares SET token_hash = ?, label = ?, expires_at = ?, revoked_at = ?, allow_download = ?, show_metadata = ?, version = ? WHERE id = ?`, s.TokenHash, s.Label, s.ExpiresAt, s.RevokedAt, s.AllowDownload, s.ShowMetadata, s.Version, s.ID)
+	_, err := dbWrapper.Exec(ctx, `UPDATE shares SET token_hash = ?, token = ?, label = ?, expires_at = ?, revoked_at = ?, allow_download = ?, show_metadata = ?, version = ? WHERE id = ?`, s.TokenHash, s.Token, s.Label, s.ExpiresAt, s.RevokedAt, s.AllowDownload, s.ShowMetadata, s.Version, s.ID)
 	return err
 }
 
@@ -85,7 +85,7 @@ func (*ShareStore) PutSession(ctx context.Context, s *models.ShareSession) error
 	if count >= 1000 {
 		return errors.New("share session limit reached")
 	}
-	_, err := dbWrapper.Exec(ctx, `INSERT INTO share_sessions (token_hash, share_id, version, expires_at, preview, exchange_only) VALUES (?, ?, ?, ?, ?, ?)`, s.TokenHash, s.ShareID, s.Version, s.ExpiresAt, s.Preview, s.ExchangeOnly)
+	_, err := dbWrapper.Exec(ctx, `INSERT INTO share_sessions (token_hash, share_id, version, expires_at) VALUES (?, ?, ?, ?)`, s.TokenHash, s.ShareID, s.Version, s.ExpiresAt)
 	return err
 }
 
@@ -96,11 +96,6 @@ func (*ShareStore) FindSession(ctx context.Context, hash []byte) (*models.ShareS
 		return nil, nil
 	}
 	return &row, err
-}
-
-func (*ShareStore) DeleteSession(ctx context.Context, hash []byte) error {
-	_, err := dbWrapper.Exec(ctx, `DELETE FROM share_sessions WHERE token_hash = ?`, hash)
-	return err
 }
 
 func (*ShareStore) DeleteSessions(ctx context.Context, id string) error {

@@ -63,6 +63,7 @@ func TestShareCapabilitiesAndRevocation(t *testing.T) {
 	require.Len(t, secret, 43)
 	require.Len(t, row.TokenHash, 32)
 	require.Equal(t, Hash(secret), row.TokenHash)
+	require.Equal(t, secret, row.Token)
 	require.NotContains(t, string(row.SnapshotJSON), secret)
 	_, err := s.Authenticate(ctx, row.ID, secret)
 	require.ErrorIs(t, err, ErrUnavailable, "bootstrap secrets are not media credentials")
@@ -85,6 +86,8 @@ func TestShareCapabilitiesAndRevocation(t *testing.T) {
 	require.ErrorIs(t, err, ErrUnavailable)
 	saved, err := s.Find(ctx, row.ID)
 	require.NoError(t, err)
+	require.Empty(t, saved.Token, "revocation discards the saved key")
+	require.Empty(t, SavedLinkSecret(saved))
 	require.Equal(t, 1, saved.AccessCount)
 	require.NotZero(t, saved.LastAccessedAt)
 }
@@ -94,20 +97,21 @@ func TestShareRotationPreviewAndExpiry(t *testing.T) {
 	defer m.AssertExpectations(t)
 	ctx := context.Background()
 	row, secret := createTestShare(t, s)
-	preview, err := s.Preview(ctx, row.ID)
-	require.NoError(t, err)
+	// Recipient preview uses exactly the same reusable link and session rules.
+	preview := SavedLinkSecret(row)
+	require.Equal(t, secret, preview)
 	previewSession, _, err := s.Exchange(ctx, row.ID, preview)
 	require.NoError(t, err)
 	_, _, err = s.Exchange(ctx, row.ID, preview)
-	require.ErrorIs(t, err, ErrUnavailable, "preview bootstrap can only be used once")
+	require.NoError(t, err, "copying a preview URL remains forwardable")
 	saved, err := s.Find(ctx, row.ID)
 	require.NoError(t, err)
-	require.Zero(t, saved.AccessCount)
+	require.Equal(t, 2, saved.AccessCount)
+	require.Equal(t, secret, SavedLinkSecret(saved))
 	require.NoError(t, s.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
 		v, err := s.Repo.Share.FindSession(ctx, Hash(previewSession))
 		require.NoError(t, err)
-		require.True(t, v.Preview)
-		require.LessOrEqual(t, v.ExpiresAt, time.Now().Add(15*time.Minute).Unix())
+		require.Equal(t, row.ExpiresAt, v.ExpiresAt)
 		return nil
 	}))
 	newSecret, err := s.Rotate(ctx, row.ID)
@@ -170,8 +174,14 @@ func TestSharePersistenceAndValidation(t *testing.T) {
 	session, _, err := s.Exchange(ctx, row.ID, secret)
 	require.NoError(t, err)
 	require.NoError(t, db.Close())
-	// Reopen the same database using the configured path, with additive fork tables.
+	// Reopen the same native database; both the link and guest session persist.
 	require.NoError(t, db.Open(db.DatabasePath()))
+	saved, err := s.Find(ctx, row.ID)
+	require.NoError(t, err)
+	require.Equal(t, secret, SavedLinkSecret(saved))
+	encoded, err := json.Marshal(saved)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), secret, "raw records never serialize the saved capability")
 	_, err = s.Authenticate(ctx, row.ID, session)
 	require.NoError(t, err)
 	for _, expiry := range []time.Time{time.Now().Add(-time.Second), time.Now().Add(31 * 24 * time.Hour)} {
@@ -183,4 +193,63 @@ func TestSharePersistenceAndValidation(t *testing.T) {
 	var snapshot map[string]any
 	require.NoError(t, json.Unmarshal(row.SnapshotJSON, &snapshot))
 	require.NotEmpty(t, snapshot)
+}
+
+func TestShareHashOnlyLinksRemainValidUntilExplicitRotation(t *testing.T) {
+	s, m, _, _ := testService(t)
+	defer m.AssertExpectations(t)
+	row, secret := createTestShare(t, s)
+	ctx := t.Context()
+	row.Token = "" // A share created before keys were retained.
+	require.NoError(t, s.Repo.WithTxn(ctx, func(ctx context.Context) error {
+		return s.Repo.Share.Update(ctx, row)
+	}))
+	saved, err := s.Find(ctx, row.ID)
+	require.NoError(t, err)
+	require.Empty(t, SavedLinkSecret(saved))
+	require.Equal(t, 1, saved.Version)
+	session, _, err := s.Exchange(ctx, row.ID, secret)
+	require.NoError(t, err)
+	_, err = s.AuthenticateLink(ctx, row.ID, secret)
+	require.NoError(t, err, "existing link previews remain valid")
+	updated, err := s.Update(ctx, row.ID, Options{Label: "Edited", ExpiresAt: time.Now().Add(time.Hour)})
+	require.NoError(t, err)
+	require.Empty(t, SavedLinkSecret(updated), "editing cannot replace a previously sent link")
+	replacement, err := s.Rotate(ctx, row.ID)
+	require.NoError(t, err)
+	require.NotEqual(t, secret, replacement)
+	saved, err = s.Find(ctx, row.ID)
+	require.NoError(t, err)
+	require.Equal(t, replacement, SavedLinkSecret(saved))
+	require.Equal(t, 2, saved.Version)
+	_, err = s.Authenticate(ctx, row.ID, session)
+	require.ErrorIs(t, err, ErrUnavailable)
+	_, _, err = s.Exchange(ctx, row.ID, secret)
+	require.ErrorIs(t, err, ErrUnavailable)
+	_, _, err = s.Exchange(ctx, row.ID, replacement)
+	require.NoError(t, err)
+}
+
+func TestSavedShareLinkOnlyReturnsTheCurrentActiveCredential(t *testing.T) {
+	s, m, _, _ := testService(t)
+	defer m.AssertExpectations(t)
+	row, secret := createTestShare(t, s)
+	ctx := t.Context()
+	updated, err := s.Update(ctx, row.ID, Options{Label: "Renamed", ExpiresAt: time.Now().Add(time.Hour)})
+	require.NoError(t, err)
+	require.Equal(t, secret, SavedLinkSecret(updated))
+	require.Equal(t, row.Version, updated.Version)
+	require.Zero(t, updated.AccessCount, "retrieving the link is not a recipient visit")
+	require.Empty(t, SavedLinkSecret(nil))
+	for _, change := range []func(*models.ShareRecord){
+		func(r *models.ShareRecord) { r.Token = "" },
+		func(r *models.ShareRecord) { r.Token = "invalid" },
+		func(r *models.ShareRecord) { r.TokenHash = Hash("different") },
+		func(r *models.ShareRecord) { r.RevokedAt = time.Now().Unix() },
+		func(r *models.ShareRecord) { r.ExpiresAt = time.Now().Unix() },
+	} {
+		changed := *updated
+		change(&changed)
+		require.Empty(t, SavedLinkSecret(&changed))
+	}
 }

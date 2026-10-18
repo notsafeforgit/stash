@@ -22,7 +22,7 @@ func TestShareDeleteInactiveAcrossPages(t *testing.T) {
 	require.NoError(t, err)
 	expiredSession, _, err := s.Exchange(ctx, expired.ID, expiredSecret)
 	require.NoError(t, err)
-	preview, err := s.Preview(ctx, expired.ID)
+	secondSession, _, err := s.Exchange(ctx, expired.ID, expiredSecret)
 	require.NoError(t, err)
 	activeDelivery, finishActive, err := s.BeginDelivery(ctx, active)
 	require.NoError(t, err)
@@ -66,7 +66,7 @@ func TestShareDeleteInactiveAcrossPages(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, rows, 2)
 		require.ElementsMatch(t, []string{active.ID, renewed.ID}, []string{rows[0].ID, rows[1].ID})
-		for _, token := range []string{expiredSession, preview} {
+		for _, token := range []string{expiredSession, secondSession} {
 			session, err := s.Repo.Share.FindSession(ctx, Hash(token))
 			require.NoError(t, err)
 			require.Nil(t, session)
@@ -167,7 +167,7 @@ func TestShareDeleteInactiveGrantsAndSessions(t *testing.T) {
 			other, otherSecret := createTestShare(t, s)
 			session, _, err := s.Exchange(ctx, row.ID, secret)
 			require.NoError(t, err)
-			preview, err := s.Preview(ctx, row.ID)
+			secondSession, _, err := s.Exchange(ctx, row.ID, secret)
 			require.NoError(t, err)
 			if status == "revoked" {
 				require.NoError(t, s.Revoke(ctx, row.ID))
@@ -185,7 +185,7 @@ func TestShareDeleteInactiveGrantsAndSessions(t *testing.T) {
 			require.NoError(t, err)
 			require.Nil(t, saved)
 			require.NoError(t, s.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
-				for _, token := range []string{session, preview} {
+				for _, token := range []string{session, secondSession} {
 					saved, err := s.Repo.Share.FindSession(ctx, Hash(token))
 					require.NoError(t, err)
 					require.Nil(t, saved)

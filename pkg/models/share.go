@@ -5,8 +5,10 @@ import "context"
 // ShareRecord is an independent capability. It must never be converted to the
 // owner's session or accepted by the ordinary API authentication middleware.
 type ShareRecord struct {
-	ID             string `db:"id"`
-	TokenHash      []byte `db:"token_hash"`
+	ID        string `db:"id"`
+	TokenHash []byte `db:"token_hash"`
+	// Only authenticated share management returns this stored capability.
+	Token          string `db:"token" json:"-"`
 	Label          string `db:"label"`
 	CreatedBy      string `db:"created_by"`
 	CreatedAt      int64  `db:"created_at"`
@@ -21,12 +23,10 @@ type ShareRecord struct {
 }
 
 type ShareSession struct {
-	TokenHash    []byte `db:"token_hash"`
-	ShareID      string `db:"share_id"`
-	Version      int    `db:"version"`
-	ExpiresAt    int64  `db:"expires_at"`
-	Preview      bool   `db:"preview"`
-	ExchangeOnly bool   `db:"exchange_only"`
+	TokenHash []byte `db:"token_hash"`
+	ShareID   string `db:"share_id"`
+	Version   int    `db:"version"`
+	ExpiresAt int64  `db:"expires_at"`
 }
 
 type ShareListOptions struct {
@@ -77,7 +77,6 @@ type ShareReaderWriter interface {
 	DeleteInactive(context.Context, int64) ([]string, error)
 	PutSession(context.Context, *ShareSession) error
 	FindSession(context.Context, []byte) (*ShareSession, error)
-	DeleteSession(context.Context, []byte) error
 	DeleteSessions(context.Context, string) error
 	RecordAccess(context.Context, string, int64) error
 }

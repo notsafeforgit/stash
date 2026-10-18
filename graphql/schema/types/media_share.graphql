@@ -42,6 +42,8 @@ type MediaShareEntry {
 
 type MediaShare {
   id: ID!
+  "Forwardable URL, available to authenticated management while active. Older hash-only shares require explicit regeneration."
+  url: String
   label: String!
   created_at: Time!
   expires_at: Time!
@@ -56,7 +58,7 @@ type MediaShare {
 
 type MediaShareCreated {
   share: MediaShare!
-  "Only returned on creation or regeneration; secrets are stored as hashes."
+  "Forwardable URL; it can also be retrieved later from the share."
   url: String!
 }
 
@@ -82,7 +84,5 @@ extend type Mutation {
   "Permanently remove all revoked or expired shares and their sessions, returning the number deleted. Active shares and library media are kept."
   mediaSharesDeleteInactive: Int!
   mediaShareRotate(id: ID!): String!
-  "Short-lived, single-use preview link; does not change the recipient's link."
-  mediaSharePreview(id: ID!): String!
   configureSharing(public_url: String!): SharingConfiguration!
 }

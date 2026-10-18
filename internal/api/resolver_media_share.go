@@ -14,12 +14,16 @@ import (
 	"github.com/stashapp/stash/pkg/session"
 )
 
-func shareResult(row *models.ShareRecord) (*MediaShare, error) {
+func shareResult(ctx context.Context, row *models.ShareRecord) (*MediaShare, error) {
 	snapshot, err := sharing.Snapshot(row)
 	if err != nil {
 		return nil, err
 	}
 	ret := &MediaShare{ID: row.ID, Label: row.Label, CreatedAt: time.Unix(row.CreatedAt, 0), ExpiresAt: time.Unix(row.ExpiresAt, 0), AllowDownload: row.AllowDownload, ShowMetadata: row.ShowMetadata, AccessCount: row.AccessCount, MediaCount: len(snapshot.Media), Items: []*MediaShareEntry{}}
+	if secret := sharing.SavedLinkSecret(row); secret != "" {
+		link := shareLink(ctx, row.ID, secret)
+		ret.URL = &link
+	}
 	if row.RevokedAt != 0 {
 		t := time.Unix(row.RevokedAt, 0)
 		ret.RevokedAt = &t
@@ -63,7 +67,7 @@ func (r *queryResolver) MediaShares(ctx context.Context, limit int, offset int, 
 			return err
 		}
 		for _, row := range rows {
-			result, err := shareResult(row)
+			result, err := shareResult(ctx, row)
 			if err != nil {
 				return err
 			}
@@ -79,7 +83,7 @@ func (r *queryResolver) MediaShare(ctx context.Context, id string) (*MediaShare,
 	if err != nil || row == nil {
 		return nil, err
 	}
-	return shareResult(row)
+	return shareResult(ctx, row)
 }
 
 func (r *queryResolver) SharingConfiguration(ctx context.Context) (*SharingConfiguration, error) {
@@ -121,7 +125,7 @@ func (r *mutationResolver) MediaShareCreate(ctx context.Context, input MediaShar
 	if err != nil {
 		return nil, err
 	}
-	result, err := shareResult(row)
+	result, err := shareResult(ctx, row)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +137,7 @@ func (r *mutationResolver) MediaShareUpdate(ctx context.Context, input MediaShar
 	if err != nil {
 		return nil, err
 	}
-	return shareResult(row)
+	return shareResult(ctx, row)
 }
 
 func (r *mutationResolver) MediaShareRevoke(ctx context.Context, id string) (bool, error) {
@@ -153,17 +157,4 @@ func (r *mutationResolver) MediaShareRotate(ctx context.Context, id string) (str
 		return "", err
 	}
 	return shareLink(ctx, id, secret), nil
-}
-func (r *mutationResolver) MediaSharePreview(ctx context.Context, id string) (string, error) {
-	secret, err := r.shares.Preview(ctx, id)
-	if err != nil {
-		return "", err
-	}
-	// Owner previews remain one-use browser bootstraps, never crawler grants.
-	link, err := url.Parse(shareLink(ctx, id, secret))
-	if err != nil {
-		return "", err
-	}
-	link.RawQuery, link.Fragment = "", secret
-	return link.String(), nil
 }

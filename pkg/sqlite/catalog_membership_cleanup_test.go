@@ -16,6 +16,7 @@ import (
 
 func removeMembershipCleanupSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSavedShareLinkSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER IF EXISTS catalog_membership_compaction_guard;
 DROP TABLE IF EXISTS source_post_import_labels; DROP TABLE IF EXISTS source_post_studios;
 DROP INDEX IF EXISTS catalog_membership_records_collection; DROP INDEX IF EXISTS catalog_membership_records_membership;

@@ -146,6 +146,171 @@ async function expectDialogFits(dialog: Locator) {
       .toBeLessThanOrEqual(1);
 }
 
+for (const older of [false, true]) {
+  test(`saved links can be copied and previewed without rotation (${older ? "older" : "current"} share)`, async ({
+    page,
+    context,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    const original =
+      "https://shares.test/share/abcdefghijklmnopqrstuv/?key=original";
+    const replacement =
+      "https://shares.test/share/abcdefghijklmnopqrstuv/?key=replacement";
+    let share: GQL.MediaShareFieldsFragment = {
+      __typename: "MediaShare",
+      id: "abcdefghijklmnopqrstuv",
+      url: older ? null : original,
+      label: "Saved recipient link",
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      revoked_at: null,
+      allow_download: false,
+      show_metadata: false,
+      access_count: 0,
+      last_accessed_at: null,
+      media_count: 1,
+      items: [],
+    };
+    let rotations = 0;
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          writeText: async (value: string) => {
+            sessionStorage.setItem("copied-share-url", value);
+          },
+        },
+      });
+    });
+    await context.route("https://shares.test/share/**", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: "<title>Shared media</title>",
+      }),
+    );
+    await page.route("**/graphql", async (route) => {
+      const request = z
+        .object({ operationName: z.string(), variables: z.unknown() })
+        .parse(route.request().postDataJSON());
+      if (request.operationName === "MediaShares") {
+        const data: GQL.MediaSharesQuery = {
+          mediaShares: [share],
+          sharingConfiguration: {
+            __typename: "SharingConfiguration",
+            public_url: "https://shares.test/share",
+            max_days: 30,
+            max_items: 2000,
+          },
+        };
+        return route.fulfill({ json: { data } });
+      }
+      if (request.operationName === "MediaShareRotate") {
+        expect(request.variables).toEqual({ id: share.id });
+        rotations++;
+        share = { ...share, url: replacement };
+        return route.fulfill({
+          json: { data: { mediaShareRotate: replacement } },
+        });
+      }
+      throw new Error(`Unexpected operation ${request.operationName}`);
+    });
+    const menu = async () => {
+      await page
+        .getByRole("button", { name: "Operations", exact: true })
+        .click();
+    };
+    const copied = () =>
+      page.evaluate(() => sessionStorage.getItem("copied-share-url"));
+    const preview = async (url: string, fromDialog = false) => {
+      if (!fromDialog) await menu();
+      const opened = context.waitForEvent("page");
+      await page
+        .getByRole(fromDialog ? "button" : "menuitem", {
+          name: "Recipient preview",
+          exact: true,
+        })
+        .click();
+      const tab = await opened;
+      await tab.waitForURL(url);
+      expect(await tab.evaluate(() => window.opener === null)).toBe(true);
+      await tab.close();
+    };
+    await page.goto("/share-management.html");
+    await menu();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath("saved-link-menu.png"),
+      animations: "disabled",
+    });
+    if (older) {
+      await expect(
+        page.getByRole("menuitem", { name: "Copy link", exact: true }),
+      ).toBeDisabled();
+      await expect(
+        page.getByRole("menuitem", { name: "Recipient preview", exact: true }),
+      ).toBeDisabled();
+      await expect(
+        page.getByText(/Links you already sent still work/),
+      ).toBeVisible();
+      await page.keyboard.press("Escape");
+    } else {
+      await page
+        .getByRole("menuitem", { name: "Copy link", exact: true })
+        .click();
+      await expect.poll(copied).toBe(original);
+      await preview(original);
+      await page.reload();
+      await menu();
+      await page
+        .getByRole("menuitem", { name: "Copy link", exact: true })
+        .click();
+      await expect.poll(copied).toBe(original);
+    }
+    expect(rotations).toBe(0);
+    await menu();
+    await page
+      .getByRole("menuitem", { name: "Regenerate link", exact: true })
+      .click();
+    await expect(
+      page.getByText(/The old link and every active session will stop working/),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    expect(rotations).toBe(0);
+    await menu();
+    await page
+      .getByRole("menuitem", { name: "Regenerate link", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Confirm", exact: true }).click();
+    const dialog = page.getByRole("dialog", {
+      name: "Your share link is ready",
+    });
+    await expect(dialog.getByLabel("Share link", { exact: true })).toHaveValue(
+      replacement,
+    );
+    await expectDialogFits(dialog);
+    await page.screenshot({
+      path: testInfo.outputPath("saved-link-dialog.png"),
+      animations: "disabled",
+    });
+    await dialog
+      .getByRole("button", { name: "Copy link", exact: true })
+      .click();
+    await expect.poll(copied).toBe(replacement);
+    await preview(replacement, true);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await page.reload();
+    await expect(
+      page.getByText(/Links you already sent still work/),
+    ).toHaveCount(0);
+    await menu();
+    await page
+      .getByRole("menuitem", { name: "Copy link", exact: true })
+      .click();
+    await expect.poll(copied).toBe(replacement);
+    expect(rotations).toBe(1);
+  });
+}
+
 for (const viewport of [
   { width: 320, height: 568 },
   { width: 390, height: 844 },
@@ -261,6 +426,7 @@ for (const viewport of [
         const share: GQL.MediaShareFieldsFragment = {
           __typename: "MediaShare",
           id: "abcdefghijklmnopqrstuv",
+          url: `https://shares.test/share/abcdefghijklmnopqrstuv/?key=${"secret".repeat(30)}`,
           label: input.label,
           created_at: now.toISOString(),
           expires_at: input.expires_at,
@@ -282,7 +448,7 @@ for (const viewport of [
           mediaShareCreate: {
             __typename: "MediaShareCreated",
             share,
-            url: `https://shares.test/share/${share.id}/#${"secret".repeat(30)}`,
+            url: share.url ?? "",
           },
         };
         await route.fulfill({ json: { data } });
@@ -502,6 +668,7 @@ for (const width of [320, 1280]) {
     const active: GQL.MediaShareFieldsFragment = {
       __typename: "MediaShare",
       id: "active-share",
+      url: "https://shares.test/share/active-share/?key=example",
       label: "Keep this active share",
       created_at: now.toISOString(),
       expires_at: "2026-10-19T12:00:00Z",

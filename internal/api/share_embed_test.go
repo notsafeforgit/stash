@@ -76,11 +76,14 @@ func TestShareLinkImageCardWithoutCookies(t *testing.T) {
 	saved, err := rs.service.Find(t.Context(), row.ID)
 	require.NoError(t, err)
 	require.Zero(t, saved.AccessCount, "crawling does not count as a recipient visit")
-	preview, err := rs.service.Preview(t.Context(), row.ID)
+	managed, err := shareResult(t.Context(), saved)
 	require.NoError(t, err)
-	require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, base+"?key="+preview, nil).Code)
-	_, _, err = rs.service.Exchange(t.Context(), row.ID, preview)
-	require.NoError(t, err, "crawlers cannot consume an owner preview")
+	require.NotNil(t, managed.URL)
+	// Management Preview and Copy link receive the same public, crawler-capable URL.
+	parsed, err := url.Parse(*managed.URL)
+	require.NoError(t, err)
+	require.Equal(t, secret, parsed.Query().Get("key"))
+	require.Empty(t, parsed.Fragment)
 	require.NoError(t, rs.service.Revoke(t.Context(), row.ID))
 	for _, target := range []string{link, card["og:image"]} {
 		require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, target, nil).Code)

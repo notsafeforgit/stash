@@ -7,6 +7,13 @@ import type {
   SharedMedia,
 } from "../../src/components/sharing/share-contract";
 
+// A fresh browser checks for its scoped cookie before exchanging any URL form.
+test.use({
+  expectedConsoleErrors: [
+    "Failed to load resource: the server responded with a status of 404",
+  ],
+});
+
 const id = "abcdefghijklmnopqrstuv";
 const base = `/share/${id}/`;
 const png = Buffer.from(
@@ -190,13 +197,14 @@ async function serveShare(
   };
 }
 
-test("fragment links open without owner providers and remove the bootstrap secret", async ({
+test("older fragment links become forwardable URLs without owner providers", async ({
   page,
 }) => {
   const fixture = await serveShare(page, false);
   await page.goto(`${base}#test-capability`);
   await expect(page.locator(".yarl__portal")).toBeVisible();
   expect(new URL(page.url()).hash).toBe("");
+  expect(new URL(page.url()).searchParams.get("key")).toBe("test-capability");
   expect(fixture.exchanges()).toBe(1);
   await expect(
     page.getByRole("link", { name: "Download original" }),

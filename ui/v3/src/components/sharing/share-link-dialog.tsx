@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@apollo/client/react";
 import { Copy, Eye } from "lucide-react";
-import * as GQL from "@/core/generated-graphql";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,35 +14,6 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { useMsg } from "@/hooks/message";
 import { useToast } from "@/hooks/toast";
 
-export function useSharePreview() {
-  const [preview, { loading }] = useMutation(GQL.MediaSharePreviewDocument);
-  const toast = useToast();
-  const msg = useMsg();
-  async function open(id: string) {
-    const tab = window.open("about:blank", "_blank");
-    if (tab) tab.opener = null;
-    try {
-      if (!tab)
-        throw new Error(
-          msg(
-            "sharing.popup_blocked",
-            "Allow pop-ups to open the recipient preview.",
-          ),
-        );
-      const result = await preview({ variables: { id } });
-      if (!result.data)
-        throw new Error(
-          msg("sharing.preview_failed", "Could not open the preview."),
-        );
-      tab.location.replace(result.data.mediaSharePreview);
-    } catch (error) {
-      tab?.close();
-      toast.error(error);
-    }
-  }
-  return { open, loading };
-}
-
 export function ShareLinkDialog({
   link,
   onClose,
@@ -55,7 +24,6 @@ export function ShareLinkDialog({
   const msg = useMsg();
   const toast = useToast();
   const [copied, setCopied] = useState(false);
-  const preview = useSharePreview();
   async function copy() {
     try {
       await navigator.clipboard.writeText(link.url);
@@ -81,7 +49,7 @@ export function ShareLinkDialog({
           <DialogDescription>
             {msg(
               "sharing.link_secret",
-              "Anyone with this link can view the selected media until it expires or you revoke it. Copy it now; the secret is not stored and cannot be shown again.",
+              "Anyone with this link can view the selected media until it expires or you revoke it. You can copy this same link again from Settings → Shares.",
             )}
           </DialogDescription>
           <Field>
@@ -100,8 +68,9 @@ export function ShareLinkDialog({
         <DialogFooter>
           <Button
             variant="outline"
-            disabled={preview.loading}
-            onClick={() => void preview.open(link.id)}
+            onClick={() =>
+              window.open(link.url, "_blank", "noopener,noreferrer")
+            }
           >
             <Eye data-icon="inline-start" />
             {msg("sharing.preview", "Recipient preview")}

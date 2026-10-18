@@ -64,6 +64,15 @@ func Active(s *models.ShareRecord, now time.Time) bool {
 	return s != nil && s.RevokedAt == 0 && now.Unix() < s.ExpiresAt
 }
 
+// SavedLinkSecret is for authenticated management only. Older hash-only shares
+// remain valid but have no retrievable URL until explicitly regenerated.
+func SavedLinkSecret(row *models.ShareRecord) string {
+	if !Active(row, time.Now()) || !validSecret(row.Token) || subtle.ConstantTimeCompare(row.TokenHash, Hash(row.Token)) != 1 {
+		return ""
+	}
+	return row.Token
+}
+
 func validateOptions(o Options) error {
 	if len(strings.TrimSpace(o.Label)) == 0 || utf8.RuneCountInString(o.Label) > 200 {
 		return errors.New("share label must contain 1–200 characters")
@@ -89,7 +98,7 @@ func (s *Service) Create(ctx context.Context, owner string, o Options, targets [
 	if err != nil {
 		return nil, "", err
 	}
-	row := &models.ShareRecord{ID: id, TokenHash: Hash(secret), Label: strings.TrimSpace(o.Label), CreatedBy: owner, CreatedAt: time.Now().Unix(), ExpiresAt: o.ExpiresAt.Unix(), AllowDownload: o.AllowDownload, ShowMetadata: o.ShowMetadata, Version: 1}
+	row := &models.ShareRecord{ID: id, TokenHash: Hash(secret), Token: secret, Label: strings.TrimSpace(o.Label), CreatedBy: owner, CreatedAt: time.Now().Unix(), ExpiresAt: o.ExpiresAt.Unix(), AllowDownload: o.AllowDownload, ShowMetadata: o.ShowMetadata, Version: 1}
 	err = s.Repo.WithTxn(ctx, func(ctx context.Context) error {
 		snapshot, err := s.snapshot(ctx, targets)
 		if err != nil {
@@ -145,6 +154,7 @@ func (s *Service) Revoke(ctx context.Context, id string) error {
 			return ErrUnavailable
 		}
 		row.RevokedAt = time.Now().Unix()
+		row.Token = ""
 		row.Version++
 		if err := s.Repo.Share.Update(ctx, row); err != nil {
 			return err
@@ -207,6 +217,7 @@ func (s *Service) Rotate(ctx context.Context, id string) (string, error) {
 			return ErrUnavailable
 		}
 		row.TokenHash = Hash(secret)
+		row.Token = secret
 		row.Version++
 		if err := s.Repo.Share.Update(ctx, row); err != nil {
 			return err
@@ -217,29 +228,6 @@ func (s *Service) Rotate(ctx context.Context, id string) (string, error) {
 		return "", err
 	}
 	s.Cancel(id)
-	return secret, nil
-}
-
-// Preview issues a short-lived, single-use bootstrap secret. It does not rotate
-// the recipient's link, and preview sessions do not increment access activity.
-func (s *Service) Preview(ctx context.Context, id string) (string, error) {
-	secret, err := token(32)
-	if err != nil {
-		return "", err
-	}
-	err = s.Repo.WithTxn(ctx, func(ctx context.Context) error {
-		row, err := s.Repo.Share.Find(ctx, id)
-		if err != nil {
-			return err
-		}
-		if !Active(row, time.Now()) {
-			return ErrUnavailable
-		}
-		return s.Repo.Share.PutSession(ctx, &models.ShareSession{TokenHash: Hash(secret), ShareID: id, Version: row.Version, ExpiresAt: min(row.ExpiresAt, time.Now().Add(5*time.Minute).Unix()), Preview: true, ExchangeOnly: true})
-	})
-	if err != nil {
-		return "", err
-	}
 	return secret, nil
 }
 
@@ -260,32 +248,13 @@ func (s *Service) Exchange(ctx context.Context, id, secret string) (string, *mod
 		if !Active(row, time.Now()) {
 			return ErrUnavailable
 		}
-		hash := Hash(secret)
-		preview := false
-		if subtle.ConstantTimeCompare(row.TokenHash, hash) != 1 {
-			bootstrap, err := s.Repo.Share.FindSession(ctx, hash)
-			if err != nil {
-				return err
-			}
-			if bootstrap == nil || !bootstrap.ExchangeOnly || !bootstrap.Preview || bootstrap.ShareID != id || bootstrap.Version != row.Version || bootstrap.ExpiresAt <= time.Now().Unix() {
-				return ErrUnavailable
-			}
-			preview = true
-			if err := s.Repo.Share.DeleteSession(ctx, hash); err != nil {
-				return err
-			}
+		if subtle.ConstantTimeCompare(row.TokenHash, Hash(secret)) != 1 {
+			return ErrUnavailable
 		}
-		expiresAt := row.ExpiresAt
-		if preview {
-			expiresAt = min(expiresAt, time.Now().Add(15*time.Minute).Unix())
-		}
-		if err := s.Repo.Share.PutSession(ctx, &models.ShareSession{TokenHash: Hash(sessionToken), ShareID: id, Version: row.Version, ExpiresAt: expiresAt, Preview: preview}); err != nil {
+		if err := s.Repo.Share.PutSession(ctx, &models.ShareSession{TokenHash: Hash(sessionToken), ShareID: id, Version: row.Version, ExpiresAt: row.ExpiresAt}); err != nil {
 			return err
 		}
-		if !preview {
-			return s.Repo.Share.RecordAccess(ctx, id, time.Now().Unix())
-		}
-		return nil
+		return s.Repo.Share.RecordAccess(ctx, id, time.Now().Unix())
 	})
 	if err != nil {
 		return "", nil, err
@@ -303,7 +272,7 @@ func (s *Service) Authenticate(ctx context.Context, id, secret string) (*models.
 		if err != nil {
 			return err
 		}
-		if session == nil || session.ExchangeOnly || session.ShareID != id || session.ExpiresAt <= time.Now().Unix() {
+		if session == nil || session.ShareID != id || session.ExpiresAt <= time.Now().Unix() {
 			return ErrUnavailable
 		}
 		row, err = s.Repo.Share.Find(ctx, id)
@@ -313,7 +282,7 @@ func (s *Service) Authenticate(ctx context.Context, id, secret string) (*models.
 		if !Active(row, time.Now()) || session.Version != row.Version {
 			return ErrUnavailable
 		}
-		// A response cannot outlive its guest session (including previews).
+		// A response cannot outlive its guest session.
 		row.ExpiresAt = min(row.ExpiresAt, session.ExpiresAt)
 		return nil
 	})
@@ -321,8 +290,8 @@ func (s *Service) Authenticate(ctx context.Context, id, secret string) (*models.
 }
 
 // AuthenticateLink is for server-rendered link cards and their media only. It
-// does not mint a browser session, consume owner preview tokens or record a
-// recipient visit. The normal content/API routes still require a guest cookie.
+// does not mint a browser session or record a recipient visit. The normal
+// content/API routes still require a guest cookie.
 func (s *Service) AuthenticateLink(ctx context.Context, id, secret string) (*models.ShareRecord, error) {
 	if !validSecret(secret) {
 		return nil, ErrUnavailable

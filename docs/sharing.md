@@ -8,7 +8,7 @@ options, previewing the recipient view, regenerating a link and revoking access.
 
 The settings list shows **Active** shares by default. **Inactive** contains
 revoked and expired shares; its **Delete share** action permanently removes the
-grant, its history and guest/preview sessions without deleting library media.
+grant, its history and guest sessions without deleting library media.
 Active shares must be revoked before deletion. Status filtering happens before
 pagination, so inactive history cannot hide active links on later pages.
 **Delete all inactive shares** removes revoked and expired shares across every
@@ -19,9 +19,11 @@ deleted share links remain unavailable. Cleanup never deletes library media.
 
 The default lifetime is 24 hours; presets include one hour and seven days.
 Custom expiry is limited to the next 30 days. The public label is always shown.
-Saved titles and the original-download button have separate controls. The link
-secret is displayed once: copy it before closing the result dialog. Regenerating
-the link invalidates the previous link and all its guest sessions.
+Saved titles and the original-download button have separate controls. The same
+link can be copied again from **Settings → Shares**, and **Recipient
+preview** opens that ordinary forwardable URL. Copying or previewing never
+regenerates it. **Regenerate link** explicitly invalidates the previous link and
+all its guest sessions.
 
 ## Scope and privacy
 
@@ -102,17 +104,28 @@ covers, thumbnails and the normal temporary video-stream cache.
 
 New recipient links are `/share/<random-id>/?key=<256-bit-secret>`. The server
 can authenticate this URL to render link previews without JavaScript or cookies.
-Older `/#<secret>` links and one-use owner previews still open in the browser,
-but cannot have media cards because crawlers never receive URL fragments.
+Older `/#<secret>` recipient links still open in the browser and become the
+same `?key=` URL for copying and navigation. Crawlers need that query URL because
+they never receive fragments.
 Recipient links keep their `key` in the address bar, including when navigating
 between tabs and item details, so browser Copy/Share and copied item links remain
 usable by another recipient and by link-preview crawlers. The viewer exchanges
 the key via same-origin JSON POST and uses a Secure, HttpOnly, SameSite=Strict,
 host-only cookie scoped to that share's path for content and playback requests.
-Reloading reuses a valid cookie without creating another guest session. One-use
-owner previews and older fragment links still remove their fragment on opening.
-Only SHA-256 digests of secrets and session tokens are persisted. A share
-credential is never an owner/API session.
+Reloading reuses a valid cookie without creating another guest session.
+
+Share link keys are stored directly in `shares.token`, without application-level
+encryption, so authenticated management can return the same URL later. Validation
+continues to use `token_hash`; guest session tokens remain hash-only. Public
+content responses never return the stored key, and a share credential is never
+an owner/API session. Database files and backups therefore contain usable active
+share links and must be protected accordingly. Revocation clears the saved key.
+
+Schema 1000122 preserves older hash-only shares and their existing guest sessions.
+Their keys cannot be reconstructed: management shows that **Regenerate link** is
+needed to enable Copy link and Preview for these records. No link is automatically
+rotated. Unused temporary preview bootstraps are removed; already-open preview
+sessions retain their original expiry. New previews use ordinary recipient links.
 
 ### Telegram and other link previews
 
@@ -154,10 +167,10 @@ in-flight delivery; downloads disabled by an edit are denied immediately.
 Extending a share does not extend a previously issued cookie: recipients can
 reopen the original link to establish a session with the new expiry.
 
-Recipient preview uses a one-use bootstrap valid for five minutes and a guest
-session lasting at most 15 minutes. It does not change the real link or increment
-access counts. Counts are successful recipient link exchanges, not distinct
-people, media requests or watch history.
+Counts are successful link exchanges, including owner visits through Recipient
+preview, not distinct people, media requests or watch history. Copying a link
+does not count as a visit, and reusing an existing guest cookie does not create
+another exchange. There is no separate owner-preview credential.
 
 Public responses use no-store, no-referrer, noindex, nosniff and a restrictive CSP.
 The browser viewer uses same-origin resource policy. Original media documents also receive a sandboxed

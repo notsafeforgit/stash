@@ -1,5 +1,6 @@
 fragment MediaShareFields on MediaShare {
   id
+  url
   label
   created_at
   expires_at
@@ -50,9 +51,6 @@ mutation MediaSharesDeleteInactive {
 }
 mutation MediaShareRotate($id: ID!) {
   mediaShareRotate(id: $id)
-}
-mutation MediaSharePreview($id: ID!) {
-  mediaSharePreview(id: $id)
 }
 mutation ConfigureSharing($public_url: String!) {
   configureSharing(public_url: $public_url) {

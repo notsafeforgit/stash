@@ -18,7 +18,9 @@ describe("share capabilities in the browser", () => {
       "https://share.test/mounted/share/",
     );
     expect(target?.base.href).toBe(`https://share.test/mounted/share/${id}/`);
-    expect(target?.navigationBase.href).toBe(target?.base.href);
+    expect(target?.navigationBase.href).toBe(
+      `https://share.test/mounted/share/${id}/?key=secret`,
+    );
     expect(target?.secret).toBe("secret");
     expect(
       shareTarget(

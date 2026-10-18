@@ -8,6 +8,7 @@ import { useForm } from "@tanstack/react-form";
 import { useIntl } from "react-intl";
 import { z } from "zod";
 import {
+  Copy,
   Eye,
   Link,
   Pencil,
@@ -50,7 +51,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useMsg } from "@/hooks/message";
 import { useToast } from "@/hooks/toast";
 import { ShareDialog } from "./share-dialog";
-import { ShareLinkDialog, useSharePreview } from "./share-link-dialog";
+import { ShareLinkDialog } from "./share-link-dialog";
 
 function ShareDelivery({
   value,
@@ -131,7 +132,7 @@ function ShareDelivery({
               <FieldDescription>
                 {msg(
                   "sharing.address_description",
-                  "Use the address served by your sharing proxy. Leave blank to use this server’s /share path. Changing this setting affects newly generated links.",
+                  "Use the address served by your sharing proxy. Leave blank to use this server’s /share path. Copy link and Preview use this address.",
                 )}
               </FieldDescription>
               <FieldError errors={field.state.meta.errors} />
@@ -212,7 +213,6 @@ function ShareCard({
       ),
     },
   };
-  const preview = useSharePreview();
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
@@ -262,14 +262,33 @@ function ShareCard({
                   : msg("sharing.expired", "Expired")}
             </Badge>
             <EntityActionsMenu
-              busy={revoking || rotating || deleting || preview.loading}
+              busy={revoking || rotating || deleting}
               items={[
+                {
+                  key: "copy",
+                  icon: Copy,
+                  label: msg("sharing.copy", "Copy link"),
+                  onSelect: async () => {
+                    if (!share.url) return;
+                    try {
+                      await navigator.clipboard.writeText(share.url);
+                      toast.success(msg("sharing.copied", "Copied"));
+                    } catch (error) {
+                      toast.error(error);
+                      setLink({ id: share.id, url: share.url });
+                    }
+                  },
+                  disabled: !active || !share.url,
+                },
                 {
                   key: "preview",
                   icon: Eye,
                   label: msg("sharing.preview", "Recipient preview"),
-                  onSelect: () => void preview.open(share.id),
-                  disabled: !active,
+                  onSelect: () => {
+                    if (share.url)
+                      window.open(share.url, "_blank", "noopener,noreferrer");
+                  },
+                  disabled: !active || !share.url,
                 },
                 {
                   key: "edit",
@@ -309,6 +328,14 @@ function ShareCard({
           </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
+          {active && !share.url && (
+            <p className="text-muted-foreground">
+              {msg(
+                "sharing.link_unavailable",
+                "Regenerate this older share once to enable Copy link and Preview here. Links you already sent still work.",
+              )}
+            </p>
+          )}
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-muted-foreground">
             <span>
               {intl.formatMessage(

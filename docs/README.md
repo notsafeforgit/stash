@@ -61,13 +61,12 @@ provides the frozen fallback for users who do not migrate.
 
 ## Upstream reference and contribution policies
 
-[Building from Source](DEVELOPMENT.md) retains upstream platform setup and v2.5
-build instructions. Use the current development and architecture guides above
-for this branch.
+[Building from Source](DEVELOPMENT.md) contains platform setup for the native
+build. Use the current development and architecture guides above for this branch.
 
 [Contributing](CONTRIBUTING.md) and [AI policy](AI_POLICY.md) describe upstream
-contribution requirements. The [root README](../README.md) retains upstream
-installation and community links; those downloads are mainline releases.
+contribution requirements. The [root README](../README.md) describes this fork's
+installation and release choices and links to upstream separately for attribution.
 
 ## Future plans and historical material
 

@@ -1,130 +1,92 @@
-# Stash
+# Native Stash
 
-> This is an **independent native Stash fork**, developed on `v3-rewrite`.
-> Start with [container setup](docs/container.md) and the
-> [project documentation](docs/README.md). The upstream release and community
-> links below refer to mainline Stash.
+An independent fork of [Stash](https://github.com/stashapp/stash), with a Go
+backend and React/TypeScript v3 application for organizing and playing a local
+media library.
 
-Source tracking is off by default, and S3 backup requires separate host setup.
-Neither is required for a local library or StashDB. See
-[optional integrations](docs/optional-integrations.md).
+[![Native validation and publication](https://github.com/notsafeforgit/stash/actions/workflows/ghcr-publish.yml/badge.svg?branch=v3-rewrite)](https://github.com/notsafeforgit/stash/actions/workflows/ghcr-publish.yml)
+[![Browser tests](https://github.com/notsafeforgit/stash/actions/workflows/v3-browser-tests.yml/badge.svg?branch=v3-rewrite)](https://github.com/notsafeforgit/stash/actions/workflows/v3-browser-tests.yml)
 
-[![Build](https://github.com/stashapp/stash/actions/workflows/build.yml/badge.svg?branch=develop&event=push)](https://github.com/stashapp/stash/actions/workflows/build.yml)
-[![Docker pulls](https://img.shields.io/docker/pulls/stashapp/stash?logo=docker)](https://hub.docker.com/r/stashapp/stash 'DockerHub')
-[![GitHub Sponsors](https://img.shields.io/github/sponsors/stashapp?logo=github)](https://github.com/sponsors/stashapp)
-[![Open Collective backers](https://img.shields.io/opencollective/backers/stashapp?logo=opencollective)](https://opencollective.com/stashapp)
-[![Go Report Card](https://goreportcard.com/badge/github.com/stashapp/stash)](https://goreportcard.com/report/github.com/stashapp/stash)
-[![Discord](https://img.shields.io/discord/559159668438728723.svg?logo=discord)](https://discord.gg/2TsNFKt)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/stashapp/stash?logo=github)](https://github.com/stashapp/stash/releases/latest)
-[![Codeberg Translate](https://img.shields.io/weblate/progress/stash?server=https%3A%2F%2Ftranslate.codeberg.org&logo=weblate)](https://translate.codeberg.org/engage/stash/)
-[![GitHub issues by-label](https://img.shields.io/github/issues-raw/stashapp/stash/bounty?logo=github)](https://github.com/stashapp/stash/labels/bounty)
+Development continues on `v3-rewrite` ahead of its reviewed merge into `develop`.
+The native database and application APIs are independent of upstream; the
+[final compatible release](docs/releases/v2.5-compatible-final.md) remains
+available for installations that choose to stay behind.
 
-<h3>Stash is a self-hosted webapp written in Go which organizes and serves your diverse content collection, catering to both your SFW and NSFW needs.</h3>
+## Install
 
-![Screenshot of Stash web application interface](docs/readme_assets/demo_image.png)
+Use this fork's [Docker Compose example](docker/production/README.md), or follow
+the [rootless Podman and GPU setup](docs/container.md). The published Linux amd64
+image is:
 
-- Stash gathers information about videos in your collection from the internet, and is extensible through the use of community-built plugins for a large number of content producers and sites.
-- Stash supports a wide variety of both video and image formats.
-- You can tag videos and find them later.
-- Stash provides statistics about performers, tags, studios and more.
+```text
+ghcr.io/notsafeforgit/stash:native-preview
+```
 
-You can [watch a SFW demo video](https://vimeo.com/545323354) to see it in action.
+It includes the media tools and hardware runtime; no `stash-s6` wrapper is needed.
+For a production installation, pin a verified image digest using the
+[deployment guide](docs/v3-deployment.md).
 
-For further information see [Support & Resources](#support--resources) section.
+Mount configuration at `/config` and your media at a path such as `/data`.
+Open `http://localhost:9999`, finish setup, add folders in **Settings → Library**,
+and scan them. Keep a backup of the database, configuration and artwork.
 
-## Installing Stash
+Existing compatible installations need an explicit database migration in addition
+to any container path changes. Read [upgrading from the compatible release](docs/container.md#upgrade-from-the-compatible-release)
+before using an existing database with a native image. Preserve a separate
+pre-upgrade copy; upstream and compatible binaries cannot open the native schema.
 
-> [!tip]
-Step-by-step instructions are available at [docs.stashapp.cc/installation](https://docs.stashapp.cc/installation/).
+## Local library features
 
-> [!important]
-> **Windows Users**
->
-> As of version 0.27.0, Stash no longer supports _Windows 7, 8, Server 2008 and Server 2012._  
-> At least Windows 10 or Server 2016 is required.
->
-> **macOS Users**
->
-> As of version 0.29.0, Stash requires _macOS 11 Big Sur_ or later.  
-> As of version 0.32.0, Stash requires _macOS 12 Monterey_ or later.  
-> Older versions can still be run through Docker.
+- Scenes, images, mixed-media galleries, performers, studios, tags and markers.
+- Saved filters, batch editing, TV mode, playback, offline downloads and expiring shares.
+- StashDB/stash-box metadata providers and versioned v3 plugins.
+- UUIDs across application interfaces and native database migrations.
 
-<img src="docs/readme_assets/windows_logo.svg" width="100%" height="75"> Windows | <img src="docs/readme_assets/mac_logo.svg" width="100%" height="75"> macOS | <img src="docs/readme_assets/linux_logo.svg" width="100%" height="75"> Linux | <img src="docs/readme_assets/docker_logo.svg" width="100%" height="75"> Docker
-:---:|:---:|:---:|:---:
-[Latest Release](https://github.com/stashapp/stash/releases/latest/download/stash-win.exe) <br /> <sup><sub>[Development Preview](https://github.com/stashapp/stash/releases/download/latest_develop/stash-win.exe)</sub></sup> | [Latest Release](https://github.com/stashapp/stash/releases/latest/download/Stash.app.zip) <br /> <sup><sub>[Development Preview](https://github.com/stashapp/stash/releases/download/latest_develop/Stash.app.zip)</sub></sup> | [Latest Release (amd64)](https://github.com/stashapp/stash/releases/latest/download/stash-linux) <br /> <sup><sub>[Development Preview (amd64)](https://github.com/stashapp/stash/releases/download/latest_develop/stash-linux)</sub></sup> <br /> [More Architectures...](https://github.com/stashapp/stash/releases/latest) | [Instructions](docker/production/README.md) <br /> <sup><sub>[Sample docker-compose.yml](docker/production/docker-compose.yml)</sub></sup>
+[Source tracking](docs/optional-integrations.md) is off by default. A local
+library and StashDB work without gallery-dl, n8n, FileFlows, AWS credentials or
+cloud backups. The server does not start those external services.
 
-Download links for other platforms and architectures are available on the [Releases](https://github.com/stashapp/stash/releases) page.
+For installations that enable source tracking, core Stash manages accounts,
+posts, media associations, source albums and review. Reusable ingestion and
+portable archive clients are separately released in
+[stash-integrations](https://github.com/notsafeforgit/stash-integrations).
+Personal automation belongs in the deployment's operations repository; an
+operations sidecar can install those clients and communicate with Stash's API.
+See the [gallery-dl quickstart](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/QUICKSTART.md)
+for optional setup.
 
-### First Run
+## Compatibility choices
 
-#### Windows/macOS Users: Security Prompt
+| Choice | What to use |
+| --- | --- |
+| Native fork | This repository's image, v3 UI, native API and `apiVersion: 3` plugins |
+| Stay on the final compatible fork | The immutable tags and digests in the [compatible release manifest](docs/releases/v2.5-compatible-final.json) |
+| Return to upstream | Test a compatible database/configuration copy with the appropriate upstream version **before** native promotion; see the [release guide](docs/releases/v2.5-compatible-final.md) |
 
-On Windows or macOS, running the app might present a security prompt since the application binary isn't yet signed. 
+StashDB compatibility is a network contract and remains supported. Upstream UI,
+API and plugin compatibility is not required for native development. Useful
+upstream fixes can be imported selectively under the [fork policy](FORK.md).
 
-- On Windows, bypass this by clicking "more info" and then the "run anyway" button.
-- On macOS, Control+Click the app, click "Open", and then "Open" again.
+## Develop and contribute
 
-#### ffmpeg
+Start with the [documentation index](docs/README.md),
+[system architecture](docs/ARCHITECTURE.md) and
+[v3 development guide](ui/v3/docs/development.md). The latter lists the required
+Go, Node.js and pnpm versions and the build and validation commands.
 
-Stash requires FFmpeg. If you don't have it installed, Stash will prompt you to download a copy during setup. It is recommended that Linux users install `ffmpeg` from their distro's package manager.
+Core development uses Go and TypeScript. Downloader packages are not required by
+ordinary application validation. The explicit external-client contract suite
+tests the pinned integrations when their API or persistence contracts change.
 
-## Usage
+Report fork issues in [this repository](https://github.com/notsafeforgit/stash/issues).
+Read the [contribution guidance](docs/CONTRIBUTING.md) and [fork policy](FORK.md)
+before proposing changes.
 
-### Quickstart Guide
+## Upstream attribution
 
-Stash is a web-based application. Once the application is running, the interface is available (by default) from `http://localhost:9999`.
-
-On first run, Stash will prompt you for some configuration options and media directories to index, called "Scanning" in Stash. After scanning, your media will be available for browsing, curating, editing, and tagging.
-
-Stash can pull metadata (performers, tags, descriptions, studios, and more) directly from many sites through the use of [scrapers](https://github.com/stashapp/stash/blob/develop/ui/v2.5/src/docs/en/Manual/Scraping.md), which integrate directly into Stash. Identifying an entire collection will typically require a mix of multiple sources:
-- The stashapp team maintains [StashDB](https://stashdb.org/), a crowd-sourced repository of scene, studio, and performer information. Connecting it to Stash will allow you to automatically identify much of a typical media collection. It runs on our stash-box software and is primarily focused on mainstream digital scenes and studios. Instructions, invite codes, and more can be found in this guide to [Accessing StashDB](https://guidelines.stashdb.org/docs/faq_getting-started/stashdb/accessing-stashdb/).
-- Several community-managed stash-box databases can also be connected to Stash in a similar manner. Each one serves a slightly different niche and follows their own methodology. A rundown of each stash-box, their differences, and the information you need to sign up can be found in the [Metadata Sources](https://docs.stashapp.cc/metadata-sources/stash-box-instances/) section of the documentation.
-- Many community-maintained scrapers can also be downloaded, installed, and updated from within Stash, allowing you to pull data from a wide range of other websites and databases. They can be found by navigating to `Settings → Metadata Providers → Available Scrapers → Community (stable)`. These can be trickier to use than a stash-box because every scraper works a little differently. For more information, please visit the [CommunityScrapers repository](https://github.com/stashapp/CommunityScrapers).
-- All of the above methods of scraping data into Stash are also covered in more detail in our [Guide to Scraping](https://docs.stashapp.cc/beginner-guides/guide-to-scraping/).
-
-<sub>[StashDB](http://stashdb.org) is the canonical instance of our open source metadata API, [stash-box](https://github.com/stashapp/stash-box).</sub>
-
-## Support & Resources
-
-Need help or want to get involved? Start with the documentation, then reach out to the community if you need further assistance.
-
-### Documentation
-
-- [Official documentation](https://docs.stashapp.cc) - official guides guides and troubleshooting.
-- [In-app manual](https://docs.stashapp.cc/in-app-manual) press <kbd>Shift</kbd> + <kbd>?</kbd> in the app or view the manual online.
-- [FAQ](https://discourse.stashapp.cc/c/support/faq/28) - common questions and answers.
-- [Community wiki](https://discourse.stashapp.cc/tags/c/community-wiki/22/stash) - guides, how-to’s and tips.
-  
-### Community & Discussion
-
-- [Community forum](https://discourse.stashapp.cc) - community support, feature requests and discussions.
-- [Discord](https://discord.gg/2TsNFKt) - real-time chat and community support.
-- [GitHub discussions](https://github.com/stashapp/stash/discussions) - community support and feature discussions.
-- [Lemmy community](https://discuss.online/c/stashapp) - board-style community space.
-
-### Community Scrapers & Plugins
-
-- [Metadata sources](https://docs.stashapp.cc/metadata-sources/)
-- [Plugins](https://docs.stashapp.cc/plugins/)
-- [Themes](https://docs.stashapp.cc/themes/)
-- [Other projects](https://docs.stashapp.cc/other-projects/)
-
-## Architecture
-
-The [system architecture](docs/ARCHITECTURE.md) describes this branch's runtime,
-backend, storage, and compatibility boundaries. The [v3 frontend architecture](ui/v3/docs/architecture.md)
-maps UI modules, state ownership, and extension points.
-
-## Contributing
-
-We welcome contributions and help from all humans who want to improve the project.
-
-Before contributing, please read the [Contributing](docs/CONTRIBUTING.md) document to understand our guidelines and processes for contributing to the project.
-
-You can learn about setting up a local development environment in the [Development](docs/DEVELOPMENT.md) document. 
-
-## Translation
-
-The widget below shows the current translation status of Stash across all supported languages. If you want to help us translate Stash, you can make an account at [Codeberg Translate](https://translate.codeberg.org/projects/stash/stash/) to contribute to new or existing languages. Thanks!
-
-[![Translation status](https://translate.codeberg.org/widget/stash/stash/multi-auto.svg)](https://translate.codeberg.org/engage/stash/)
+This project derives from [stashapp/stash](https://github.com/stashapp/stash)
+and retains its [AGPL-3.0 license](LICENSE). Upstream's
+[documentation](https://docs.stashapp.cc),
+[releases](https://github.com/stashapp/stash/releases) and
+[community](https://discourse.stashapp.cc) describe mainline Stash. Their binaries
+and plugins are not substitutes for this fork's native releases.

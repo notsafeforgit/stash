@@ -1,6 +1,7 @@
 # Native schema promotion
 
-The development schema is 1000118. See the
+The [versioned migrations](../pkg/sqlite/migrations) define the current native
+schema; this guide describes the individual changes by their version. See the
 [architecture and upgrade boundaries](native-archive-transition-plan.md). New migrations are
 rehearsed on copies before deployment. Schema 1000118 adds a transaction-local
 work set for source galleries to inherit performers from their images and

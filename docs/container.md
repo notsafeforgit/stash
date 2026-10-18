@@ -64,9 +64,28 @@ resolution and 1080p output, checking that the GPU path produces SDR. CI also
 tests actual PQ/HLG pixel conversion, HDR-preserving remux and GPU fallback
 without requiring a GPU.
 
-## Move an existing deployment out of the old layout
+## Upgrade from the compatible release
 
-Do this once when replacing the old wrapper image:
+Changing the container mount layout and upgrading the database are separate
+operations. The instructions below assume an existing **native** database.
+If you are coming from the frozen compatible release or a supported upstream
+schema, first follow the [schema promotion contract](native-schema.md).
+
+Keep the original database, configuration and artwork at one consistent backup
+boundary. Rehearse promotion on a copy and configure the native installation to
+use a separate database path. Startup requires an explicit migration; it does
+not silently promote an upstream database. Preserve any external catalogs and
+producer state until their optional import has been verified. A local library
+without these integrations needs no catalog import or scraper setup.
+
+After native writes begin, switching back to an upstream or frozen binary is
+not a database downgrade. The [final compatible release guide](releases/v2.5-compatible-final.md)
+explains the stay-behind option. Retain the original copy until the native
+installation and its recovery path have been verified.
+
+## Move a native deployment out of the old layout
+
+Do this once when replacing a native deployment's old wrapper image:
 
 1. Stop Stash briefly so it cannot rewrite `config.yml` during the path edit.
 2. Change the **container destination** of the existing config bind mount from

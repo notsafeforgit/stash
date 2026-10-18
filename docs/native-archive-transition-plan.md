@@ -44,6 +44,8 @@ not repeat a completed catalog import or initial cutover.
 
 Gallery-dl, FileFlows, n8n, host ZFS orchestration, S3 and Google Drive publication
 are separately installed automation. The reusable gallery-dl and portable archive
-clients remain in this repository; personal policies and workflows have independent
-releases in `stash-ops`. See [optional integrations](optional-integrations.md),
+clients have independent releases in
+[`stash-integrations`](https://github.com/notsafeforgit/stash-integrations);
+personal policies and workflows live in `stash-ops`. Core retains the APIs and
+focused client contract tests. See [optional integrations](optional-integrations.md),
 [container setup](container.md) and the [portable archive contract](native-archive-format.md).

@@ -130,7 +130,7 @@ Browser → Vite dev server (dev) / embedded HTTP server (prod) → Chi router (
 - **`internal/ingest/`** — Native producer capture validation and atomic receipt/domain transactions. Its HTTP router uses collection/root-scoped Stash access tokens, separate from application sessions and third-party service credentials. See [native ingestion](docs/native-ingestion.md) for the event, receipt, and worker contracts.
 - **Verified file content** — `files.generation` fences location/byte changes; updates require the generation that was read. `media_contents` shares server-verified SHA-256 identities, and `file_content_versions` retains immutable per-generation evidence. Use the shared scanner preparation and `PreparedMedia.RecordContent` with a held descriptor through transaction completion. Content equality does not authorize merging scenes or images. See [native schema](docs/native-schema.md).
 - **File publication** — `ingest.CaptureFileTarget` records an existing file's lifetime and persistent path removal history. `PreparedMedia.PublishFile`/`PublishMedia` reuse concurrent scans and unique verified-byte owners inside the caller's managed transaction. `PublishIntake` adds collection provenance, source attachment evidence and album membership, honoring selected media and explicit unlinks. Keep the descriptor open through commit. Ambiguous owners, removals, and changed generations require review; the durable file worker checkpoints registration before previews and media/gallery hooks; collection policies apply in that checkpoint through `pkg/metadata`. The same service handles explicit folder defaults in ordinary scans; preserve field choices and report ambiguous name/alias matches. Policy definitions and preview/apply endpoints are documented in [native ingestion](docs/native-ingestion.md#native-metadata-policies).
-- **Fclones-backed physical deduplication** — The host client uses `fclones group` for duplicate discovery. `pkg/dedup` previews those exact root-relative pairs and verifies complete bytes before journaled removal; it does not replace fclones with a new library-wide duplicate finder. Both locations must have the same single scene/image owner; retain original source evidence and derived survivor matches. Keep the existing backup/download exclusion in the host caller and recover uncertain requests by their UUID. The catalog-backed host launcher has not switched. See [fclones-backed file deduplication](docs/native-file-deduplication.md).
+- **Fclones-backed physical deduplication** — The external client uses `fclones group` for duplicate discovery. `pkg/dedup` previews those exact root-relative pairs and verifies complete bytes before journaled removal; it does not replace fclones with a new library-wide duplicate finder. Both locations must have the same single scene/image owner; retain original source evidence and derived survivor matches. Keep backup/download exclusion in the external caller and recover uncertain requests by their UUID. Client packages live in `stash-integrations` and personal orchestration in `stash-ops`. See [fclones-backed file deduplication](docs/native-file-deduplication.md).
 - **`pkg/sqlite/`** — SQLite implementation of the repository interfaces, including migrations.
 - **`graphql/schema/`** — GraphQL schema. After editing, run `make generate` to regenerate Go bindings.
 
@@ -256,17 +256,17 @@ For hardware performance diagnosis, `STASH_TRANSCODE_DEBUG=1` logs the selected 
 
 ### Filter AST
 
-The eight native entity list queries and scene/image duplicate queries accept
+The native entity, file/folder and scene/image duplicate queries accept
 only their `*_filter_ast` expressions. `FindFilterType` remains the pagination,
 sorting and search envelope; nonempty string `ids` selects explicit entities.
 List aggregates cover all matching rows independently of pagination. See
 [native queries](docs/native-queries.md).
 
 `FilterAST` and `FilterASTNode` live in `pkg/models/filter_ast*.go`. Historical
-object conversion remains at import boundaries. File/folder nested filters and
-internal repository callers still use object filter types while their separate
-retirement proceeds; do not delete those models
-solely because the entity query arguments have been removed.
+object conversion remains at legacy upgrade boundaries. Internal SQL builders
+and repository callers still use typed condition structures; those are not a
+second public query format. Do not delete these models solely because the old
+GraphQL query arguments have been removed.
 
 Group is the sole native API collection type. Scene inputs, filename parser
 results and notifications use `groups`/`group_id`; the Movie API and duplicate
@@ -287,12 +287,11 @@ Default filters persist in `default_filters` as of native schema 1000003. `inter
 The saved-filter API reads and writes only `filter_ast`. `SavedFilter.filter`,
 `object_filter`, `findDefaultFilter`, `setDefaultFilter` and the obsolete
 `migrateLegacySavedFilters` task are removed. Omitted/null saved criteria clear
-the filter. Historical JSON exports, primary schemas and configuration are
-supported only through their import boundaries; `pkg/models/filter_ast_compat.go`
-retains those conversion/reconciliation helpers and the URL codec. Do not restore
-a live flat projection or silently discard edits to nested filters.
+the filter. Supported historical database/configuration conversion lives in
+`pkg/filtermigration`; new native imports reject flat `object_filter` files.
+Do not restore a live flat projection or silently discard edits to nested filters.
 
-v3 encodes/decodes the persisted shape via `encodeFilterASTNodeToSaved`/`decodeSavedFilterASTNode` (`filter-ast.ts`); `makeFilterAst()` folds non-builder criteria (custom_fields etc.) into the root AND group and `configureFromSavedFilter` splits them back out. The compact encoding (`{k,o,c}`/`{k,f,m,v,cf}`) survives only in URLs (`fa=` param) and its Go decoder (`DecodeCompactFilterAST`); its int tables mirror `COMPACT_OPERATORS`/`COMPACT_MODIFIERS` in `filter-ast.ts` and are append-only.
+v3 encodes/decodes the persisted shape via `encodeFilterASTNodeToSaved`/`decodeSavedFilterASTNode` (`filter-ast.ts`); `makeFilterAst()` folds non-builder criteria (custom_fields etc.) into the root AND group and `configureFromSavedFilter` splits them back out. The compact encoding (`{k,o,c}`/`{k,f,m,v,cf}`) remains in URLs (`fa=` param). Its current `COMPACT_OPERATORS`/`COMPACT_MODIFIERS` tables in `filter-ast.ts` are append-only. The separate Go decoder in `pkg/filtermigration` reads frozen historical inputs; do not update its tables to follow new UI features.
 
 ### Performer names
 
@@ -320,15 +319,17 @@ and gallery membership before durable plugin notifications. Application-only
 preview/apply, status, cancellation and retry routes retain request identities
 and never reapply a committed publication when resuming hooks.
 Admission receipts stay immutable and status reports actual completion. Keep this
-work out of the legacy in-memory queue. Existing scheduled scrapes have not switched. See [native ingestion](docs/native-ingestion.md).
+work out of the legacy in-memory queue. External gallery-dl workers use the
+native API; their packages and deployment state live outside this repository.
+See [native ingestion](docs/native-ingestion.md).
 
 `ingest.RunCoordinator` owns source traversal windows and producer-scoped fenced
 leases. Its native records coalesce equivalent requests, retain missing ranges,
 checkpoint retries, defer repeated failures and exclude overlapping targets and
 destinations. This mutable traversal state is separate from immutable file jobs.
-External workers still need the supported adapter, durable outbox and shared
-filesystem locks before host/n8n launch paths switch to it. Website credentials
-remain in those worker environments.
+External workers use the supported adapter, durable outbox and shared filesystem
+locks. Host, n8n and sidecar launch policies belong to their installation;
+website credentials remain in those worker environments.
 
 `CatalogIdentityImport` imports a frozen performer registry through a reviewed
 plan in native schema 1000028. It adopts saved catalog UUIDs, preserves historical

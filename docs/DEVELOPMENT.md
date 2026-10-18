@@ -10,8 +10,8 @@
 
 * [Go](https://golang.org/dl/)
 * `make lint` runs the CI-pinned [GolangCI](https://golangci-lint.run/) version through `go run`; no separate linter installation is needed.
-* [nodejs](https://nodejs.org/en/download) - nodejs runtime
-  * corepack/[pnpm](https://pnpm.io/installation) - nodejs package manager (included with nodejs)
+* Node.js and pnpm at the versions in the [v3 prerequisites](../ui/v3/docs/development.md#prerequisites).
+  Install pnpm separately and let it honor `ui/v3/package.json`'s `packageManager` version.
 
 ## Environment
 
@@ -70,7 +70,7 @@ NOTE: The `make` command in OpenBSD will be `gmake`. For example, `make pre-ui` 
 * `make validate-ui-quick` - (experimental) Runs tests and checks of changed UI code
 * `make server-start` - Runs a development stash server in the `.local` directory
 * `make server-clean` - Removes the `.local` directory and all of its contents
-* `make ui-start` - Runs the UI in development mode. Requires a running Stash server to connect to - the server URL can be changed from the default of `http://localhost:8010` using the environment variable `VITE_APP_PLATFORM_URL`, but keep in mind that authentication cannot be used since the session authorization cookie cannot be sent cross-origin. The UI runs on port `3002` or the next available port.
+* `make ui-start` - Runs the native UI on port `3002`, with a Vite proxy to the backend selected by `VITE_APP_PLATFORM_URL` (default `http://localhost:8010`). Use the explicit backend URL in the quickstart below.
 
 When building, you can optionally prepend `flags-*` targets to the target list in your `make` command to use different build flags:
 
@@ -82,13 +82,15 @@ When building, you can optionally prepend `flags-*` targets to the target list i
 
 ## Local development quickstart
 
-1. Run `make pre-ui` to install UI dependencies
-2. Run `make generate` to create generated files
-3. In one terminal, run `make server-start` to run the server code
-4. In a separate terminal, run `make ui-start` to run the UI in development mode
-5. Open the UI in a browser: `http://localhost:3000/`
+1. Run `make pre-ui` to install UI dependencies.
+2. Run `make generate` to create generated files, then `make ui` to build the embedded application.
+3. In one terminal, run `STASH_PORT=9999 make server-start` against a test library.
+4. In a separate terminal, run `VITE_APP_PLATFORM_URL=http://127.0.0.1:9999 make ui-start`.
+5. Open `http://localhost:3002/`.
 
-> **⚠️ Note:** Running the UI in development mode does not support sending authentication credentials due to issues with cross-origin requests. Ensure credentials are unset on the server when running the UI in development mode.
+Set the backend URL explicitly: the Vite proxy otherwise defaults to port 8010.
+See the [development guide](../ui/v3/docs/development.md#first-checkout-and-local-development)
+for generated assets, proxy configuration and the local database path.
 
 Changes to the UI code can be seen by reloading the browser page.
 

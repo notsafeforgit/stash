@@ -45,6 +45,10 @@ func (db *Anonymiser) Anonymise(ctx context.Context) error {
 		defer db.Close()
 
 		return utils.Do([]func() error{
+			// Public-link credentials and frozen metadata must never leave the
+			// library in a support export. The final vacuum removes their bytes.
+			func() error { return db.truncateTable("share_sessions") },
+			func() error { return db.truncateTable("shares") },
 			func() error { return db.deleteBlobs() },
 			func() error { return db.deleteStashIDs() },
 			func() error { return db.clearOHistory() },

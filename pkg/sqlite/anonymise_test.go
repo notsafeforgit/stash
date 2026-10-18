@@ -5,6 +5,7 @@ package sqlite_test
 
 import (
 	"context"
+	"crypto/sha256"
 	"os"
 	"path/filepath"
 	"testing"
@@ -75,6 +76,49 @@ UPDATE native_migration_history SET details = '{"private":"private-filter-value"
 	raw = openRawDB(t, path)
 	defer raw.Close()
 	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM default_filter_import_conflicts"))
+}
+
+func TestAnonymiserRemovesShareLinksAndSessions(t *testing.T) {
+	source, repo := archiveTestDatabase(t)
+	const secret = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	hash := sha256.Sum256([]byte(secret))
+	share := &models.ShareRecord{
+		ID: "private-share-id", Token: secret, TokenHash: hash[:],
+		Label: "private-share-label", CreatedBy: "private-share-owner",
+		CreatedAt: 1, ExpiresAt: 9999999999, Version: 1,
+		SnapshotJSON: []byte(`{"media":[{"title":"private-share-caption"}]}`),
+	}
+	session := &models.ShareSession{TokenHash: []byte("private-guest-session-hash"), ShareID: share.ID, Version: 1, ExpiresAt: share.ExpiresAt}
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		if err := repo.Share.Create(ctx, share); err != nil {
+			return err
+		}
+		return repo.Share.PutSession(ctx, session)
+	}))
+	output := filepath.Join(t.TempDir(), "anonymous.sqlite")
+	anonymiser, err := sqlite.NewAnonymiser(source, output)
+	require.NoError(t, err)
+	require.NoError(t, anonymiser.Anonymise(t.Context()))
+	contents, err := os.ReadFile(output)
+	require.NoError(t, err)
+	for _, value := range []string{secret, string(hash[:]), share.ID, share.Label, share.CreatedBy, "private-share-caption", string(session.TokenHash)} {
+		require.NotContains(t, string(contents), value, "deleted share data must also be removed from free pages")
+	}
+	raw := openRawDB(t, output)
+	defer raw.Close()
+	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM shares"))
+	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM share_sessions"))
+	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
+	// Anonymizing an export must not revoke the owner's real share or session.
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		original, err := repo.Share.Find(ctx, share.ID)
+		require.NoError(t, err)
+		require.Equal(t, share, original)
+		originalSession, err := repo.Share.FindSession(ctx, session.TokenHash)
+		require.NoError(t, err)
+		require.Equal(t, session, originalSession)
+		return nil
+	}))
 }
 
 func TestAnonymiserRekeysArchiveUUIDsAndKeepsRedirects(t *testing.T) {

@@ -120,6 +120,8 @@ continues to use `token_hash`; guest session tokens remain hash-only. Public
 content responses never return the stored key, and a share credential is never
 an owner/API session. Database files and backups therefore contain usable active
 share links and must be protected accordingly. Revocation clears the saved key.
+Anonymized support exports remove shares, their frozen metadata and guest
+sessions, including the deleted bytes; the source library remains unchanged.
 
 Schema 1000122 preserves older hash-only shares and their existing guest sessions.
 Their keys cannot be reconstructed: management shows that **Regenerate link** is

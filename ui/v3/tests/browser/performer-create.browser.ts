@@ -27,9 +27,19 @@ for (const width of [320, 1280]) {
         exact: true,
       });
       await expect(form).toBeVisible();
-      await form
-        .getByRole("textbox", { name: "Canonical name", exact: true })
-        .fill("New performer");
+      const name = form.getByRole("textbox", {
+        name: "Canonical name",
+        exact: true,
+      });
+      await name.fill("Unsaved performer");
+      await form.getByRole("button", { name: "Close", exact: true }).tap();
+      await expect(form).toBeHidden();
+      expect(await page.evaluate(() => window.createdPerformerInputs)).toEqual(
+        [],
+      );
+      await create.tap();
+      await expect(name).toHaveValue("");
+      await name.fill("New performer");
       await form.getByRole("button", { name: "Create", exact: true }).tap();
       await expect(page).toHaveURL(
         /\/performers\/00000000-0000-4000-8000-000000000100$/,

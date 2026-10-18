@@ -15,7 +15,8 @@ interface EntityEditSheetProps {
   open: boolean;
   onClose: () => void;
   entityType: string;
-  loading: boolean;
+  mode?: "create" | "edit";
+  loading?: boolean;
   children: ReactNode;
 }
 
@@ -24,7 +25,8 @@ export function EntityEditSheet({
   open,
   onClose,
   entityType,
-  loading,
+  mode = "edit",
+  loading = false,
   children,
 }: EntityEditSheetProps) {
   const intl = useIntl();
@@ -45,7 +47,9 @@ export function EntityEditSheet({
         <SheetHeader className="shrink-0 flex-row items-center justify-between gap-2 border-b px-3 py-2">
           <SheetTitle className="min-w-0">
             {intl.formatMessage(
-              { id: "actions.edit_entity" },
+              mode === "create"
+                ? { id: "actions.create_entity" }
+                : { id: "actions.edit_entity" },
               { entityType: entityType.toLocaleLowerCase() },
             )}
           </SheetTitle>

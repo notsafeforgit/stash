@@ -29,6 +29,28 @@ baseline as well as retiring the corresponding upgrade inputs. Preserve
 unfinished configuration publication checkpoints for supported upgrades. Do not
 delete numbered migrations just because the production instance has passed them.
 
+## Follow-up: direct native database bootstrap
+
+Planned after the approved 2026-10-18 rewrite merge: create fresh databases
+directly from a versioned native schema baseline instead of replaying the
+historical primary/fork migration chain. This is maintenance work, not another
+production data migration or a prerequisite for using the native application.
+
+Before switching the fresh-install path:
+
+- Prove that its tables, constraints, indexes, triggers, defaults and lineage
+  match a database created by the current path, and that subsequent native
+  migrations apply normally.
+- Cover interrupted initialization and reopen/retry behavior without accepting
+  partial, foreign or newer schemas.
+- Keep supported upstream and frozen-fork upgrade readers isolated and tested,
+  including unfinished database/configuration publication. They remain needed
+  for users importing existing libraries even after fresh installs stop using them.
+
+Retiring an old input format is a separate support decision. Preserve its
+upgrade path until that decision is made; do not delete readers as part of
+this bootstrap follow-up.
+
 ## New native migrations
 
 1. Create a migration with the format `NN_description.up.sql`, where `NN` is the

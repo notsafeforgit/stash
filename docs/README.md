@@ -1,6 +1,6 @@
 # Project documentation
 
-This branch is the `v3-rewrite` independent fork of Stash. Active UI development
+This is the independent fork of Stash, developed on `develop`. Active UI development
 is in `ui/v3/`. The [architecture and upgrade boundaries](native-archive-transition-plan.md)
 describe the native application and its supported historical inputs.
 Personal automation and production records are maintained separately.
@@ -21,6 +21,7 @@ provides the frozen fallback for users who do not migrate.
 | [Interaction and layout contracts](../ui/v3/docs/interactions.md) | Motion, dialogs, editing shells, mobile navigation, keyboard layout, and focus |
 | [Feature development plan](../ui/v3/docs/plan.md) | Expectations for new feature work |
 | [Fork maintenance](../FORK.md) | Independent development, upstream imports, native migrations, and release boundaries |
+| [Migration maintenance](../pkg/sqlite/migrations/README.md) | Isolated upgrade readers, native migrations, and the planned direct native database bootstrap |
 | [Native schema promotion](native-schema.md) | Implemented lineage, one-time historical imports, promoted tables, and remaining model conversions |
 | [Native source identity](native-source-identity.md) | Captured account claims, service namespaces, and reviewed performer/account registry import |
 | [Library identities](library-identities.md) | UUIDs across APIs, routes, plugins and saved references; internal database keys |

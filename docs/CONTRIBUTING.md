@@ -3,8 +3,8 @@
 This repository develops an independent native media archive based on Stash.
 Read the [fork policy](../FORK.md), [transition plan](native-archive-transition-plan.md)
 and [architecture and upgrade boundaries](native-archive-transition-plan.md) before proposing
-changes. Implementation continues on `v3-rewrite`; merging into `develop`
-requires verification and the owner's success review.
+changes. Development and pull requests target `develop`; the native rewrite
+has completed its verification and owner review.
 
 The final v2.5-compatible release is frozen at `v2.5-compatible-final` with
 pinned images. Compatibility with its database, GraphQL API, UI or unversioned

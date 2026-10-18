@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Stash is a self-hosted media organizer written in Go (backend) + React/TypeScript (frontend). It exposes a GraphQL API, manages a SQLite database, and wraps FFmpeg for video processing.
 
-This repository is an **independent fork** of upstream stashapp/stash. Work continues on `v3-rewrite`; read [FORK.md](FORK.md) for release and upstream-import policy. V2.5 compatibility is frozen at `v2.5-compatible-final`, not a constraint on new code. A fresh installation is a local media library with source tracking off. Personal FileFlows workflows, host backup orchestration and production records are maintained separately in `notsafeforgit/stash-ops`, not as application build dependencies. The [documentation index](docs/README.md) links current guides.
+This repository is an **independent fork** of upstream stashapp/stash. Work continues on `develop` after the verified, owner-approved native rewrite merge; read [FORK.md](FORK.md) for release and upstream-import policy. V2.5 compatibility is frozen at `v2.5-compatible-final`, not a constraint on new code. A fresh installation is a local media library with source tracking off. Personal FileFlows workflows, host backup orchestration and production records are maintained separately in `notsafeforgit/stash-ops`, not as application build dependencies. The [documentation index](docs/README.md) links current guides.
 
 The owner requires GitHub Actions-built, GHCR-published production images. Do not
 deploy another local-image fallback or treat a Git push as publication. Follow

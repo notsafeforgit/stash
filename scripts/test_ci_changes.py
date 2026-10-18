@@ -32,10 +32,10 @@ class CheckSelectionTest(unittest.TestCase):
 
     @staticmethod
     def run_record(sha, **overrides):
-        return {"head_sha": sha, "event": "push", "conclusion": "success", "head_branch": "v3-rewrite", **overrides}
+        return {"head_sha": sha, "event": "push", "conclusion": "success", "head_branch": "develop", **overrides}
 
     def select(self, event="push", runs=None):
-        return select_checks(event, "v3-rewrite", self.git("rev-parse", "HEAD"), self.runs if runs is None else runs, self.repo)
+        return select_checks(event, "develop", self.git("rev-parse", "HEAD"), self.runs if runs is None else runs, self.repo)
 
     def test_frontend_changes_skip_backend_only_after_success(self):
         self.commit("ui/v3/src/routes/index.tsx")
@@ -71,7 +71,7 @@ class CheckSelectionTest(unittest.TestCase):
 
     def test_other_branch_and_preservation_dispatch_are_not_baselines(self):
         self.commit("ui/v3/src/app.tsx")
-        for overrides in ({"head_branch": "develop"}, {"event": "workflow_dispatch"}, {"head_sha": "missing"}):
+        for overrides in ({"head_branch": "feature/example"}, {"event": "workflow_dispatch"}, {"head_sha": "missing"}):
             self.assertEqual(self.select(runs=[self.run_record(self.base, **overrides)])["backend"], "true")
 
     def test_unrelated_history_and_unavailable_objects_run_full_suite(self):

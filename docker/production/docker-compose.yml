@@ -1,7 +1,7 @@
 services:
   stash:
     # For production, replace the moving tag with the verified release digest.
-    image: ghcr.io/notsafeforgit/stash:native-preview
+    image: ghcr.io/notsafeforgit/stash:develop
     container_name: stash
     restart: unless-stopped
     ports:

@@ -2,9 +2,9 @@
 
 ## Scope & Architecture
 
-`ui/v3/` is the active React 19/TypeScript application. It shares the Go backend and GraphQL API at the Git root. It is the sole embedded UI; its media, share and ingestion routes run without an opt-in flag. The retired v2.5 source is preserved at `v2.5-compatible-final`. The [native archive transition](../../docs/native-archive-transition-plan.md) also tracks the remaining API adapters and production cutover.
+`ui/v3/` is the active React 19/TypeScript application. It shares the Go backend and GraphQL API at the Git root. It is the sole embedded UI; source tracking and producer ingestion are an installation opt-in. The retired v2.5 source is preserved at `v2.5-compatible-final`. The [native archive architecture](../../docs/native-archive-transition-plan.md) describes current application and upgrade boundaries.
 
-This is an independent fork of `stashapp/stash`. Read root-level `CLAUDE.md` and `FORK.md` for current architecture and migration policy. Preserve retained native contracts and convert their consumers together; v2.5 GraphQL and storage compatibility are no longer design requirements. Keep work on `v3-rewrite` until verification and the owner's success review permit merging into `develop`.
+This is an independent fork of `stashapp/stash`. Read root-level `CLAUDE.md` and `FORK.md` for current architecture and migration policy. Preserve retained native contracts and convert their consumers together; v2.5 GraphQL and storage compatibility are no longer design requirements. Continue work on `develop`; the native rewrite has completed verification and the owner's success review.
 
 ## Project Structure
 

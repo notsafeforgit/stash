@@ -1,6 +1,6 @@
 # v3 architecture
 
-This guide describes the implemented frontend on `v3-rewrite`. The
+This guide describes the implemented frontend on `develop`. The
 [system overview](../../../docs/ARCHITECTURE.md) covers backend services, storage,
 and request flows. Use the [development guide](development.md) for setup and
 validation and the [documentation index](../../../docs/README.md) for feature
@@ -21,8 +21,8 @@ stash-box integration remain supported. See [FORK.md](../../../FORK.md) and the
 
 V3 is the sole embedded application. The old UI selector, dependency tree and
 build are removed; media, share and ingestion routes use native behavior by
-default. Production remains on the frozen compatible release until the full
-migration and reviewed cutover are complete.
+default. The native cutover and owner review are complete. The frozen compatible
+release remains available separately for installations that choose not to migrate.
 
 ## Module map
 

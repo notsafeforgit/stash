@@ -1,7 +1,7 @@
-# Native preview builds and deployment
+# Native builds and deployment
 
-Development continues on `v3-rewrite`, and the native application is now running
-in production. Routine updates replace that native application's pinned image;
+Development continues on `develop` after the approved rewrite merge. The native
+application is running in production. Routine updates replace its pinned image;
 they do not repeat the original cutover or open the frozen compatible database.
 Keep build/rehearsal databases separate from the live library. The original
 compatible source and image digests remain preserved in the
@@ -24,14 +24,14 @@ Only install those optional services when needed; see [optional integrations](op
 ## 1. Publish and verify the Stash image
 
 Complete the [development checks](../ui/v3/docs/development.md#validation),
-commit incremental changes, and push `v3-rewrite`:
+commit incremental changes, and push `develop`:
 
 ```bash
 stash_sha="$(git rev-parse HEAD)"
-stash_build_tag="native-preview-$(printf '%s' "$stash_sha" | cut -c 1-7)"
-git push origin v3-rewrite
+stash_build_tag="develop-$(printf '%s' "$stash_sha" | cut -c 1-7)"
+git push origin develop
 gh run list --repo notsafeforgit/stash --workflow ghcr-publish.yml \
-  --branch v3-rewrite --commit "$stash_sha" \
+  --branch develop --commit "$stash_sha" \
   --json databaseId,headSha,status,conclusion,url
 ```
 
@@ -71,7 +71,7 @@ history, and manual dispatches select everything. UI validation, embedded-entry
 tests and Linux compilation always run. Failed, cancelled or unexpectedly skipped
 selected jobs cannot publish; failed intervening pushes do not reset the baseline.
 
-Pushes to native branches no longer repeat this work in the older Build and
+Pushes to `develop` no longer repeat this work in the older Build and
 Lint workflows. Native PRs use the same validation workflow; `develop` retains
 its downloadable development release using the publisher's validated artifacts.
 Browser regressions retain their separate workflow.
@@ -84,8 +84,11 @@ layers, including their package installations, without the cache. Generated
 bindings and embedded UI are fresh artifacts for each run, not reused builds
 with stale revision metadata.
 
-It publishes `ghcr.io/notsafeforgit/stash:native-preview` and the seven-character
+It publishes `ghcr.io/notsafeforgit/stash:develop` and the seven-character
 revision tag above. The moving tag alone is not a deployment identity.
+The immutable `v3.0.0-dev` source tag anchors native development version names;
+`git describe` adds the subsequent commit count and revision. Frozen compatible
+tags remain unchanged.
 Both container and downloadable-binary builds set `UPDATE_REPO` to the current
 GitHub repository, so the application's release check targets this fork.
 
@@ -109,7 +112,7 @@ content manifests are excluded from that cleanup.
 
 ## 2. Deploy the verified native image
 
-The publisher tests the pushed revision digest before promoting `native-preview`.
+The publisher tests the pushed revision digest before promoting `develop`.
 Tests compare the included binary with the validated Actions artifact and exercise
 non-root startup, UID/GID overrides, supplementary groups, command arguments,
 offline operation, image/video tools, health and direct shutdown signals. A

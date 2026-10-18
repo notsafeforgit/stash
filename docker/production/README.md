@@ -1,7 +1,7 @@
 # Native container installation
 
 This fork publishes one complete image at
-`ghcr.io/notsafeforgit/stash:native-preview`, including Jellyfin FFmpeg, hardware
+`ghcr.io/notsafeforgit/stash:develop`, including Jellyfin FFmpeg, hardware
 acceleration support and Python/uv. It does not require a stash-s6 wrapper.
 The current published platform is Linux amd64.
 
@@ -9,7 +9,7 @@ Use Docker with Compose, or rootless Podman. Download this fork's example:
 
 ```sh
 mkdir stash && cd stash
-curl -fLo docker-compose.yml https://raw.githubusercontent.com/notsafeforgit/stash/v3-rewrite/docker/production/docker-compose.yml
+curl -fLo docker-compose.yml https://raw.githubusercontent.com/notsafeforgit/stash/develop/docker/production/docker-compose.yml
 ```
 
 Set your host UID/GID, timezone and bind mounts in that file. Configuration lives

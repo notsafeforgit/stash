@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - develop
-      - v3-rewrite
   workflow_dispatch:
     inputs:
       refresh_container_dependencies:
@@ -50,11 +49,7 @@ jobs:
       id: repository_owner
       run: |
         echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-        if [ "$GITHUB_REF_NAME" = "v3-rewrite" ]; then
-          echo "branch=native-preview" >> "$GITHUB_OUTPUT"
-        else
-          echo "branch=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT"
-        fi
+        echo "branch=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT"
         echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
     - name: Log in to the Container registry

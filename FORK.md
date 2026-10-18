@@ -11,16 +11,20 @@ ordinary application validation must not install gallery-dl.
 
 ## Branch and release policy
 
-- Continue implementation on `v3-rewrite` in incremental, reviewable commits.
-  Merge directly into `develop` only after verification and the owner's success
-  review. Do not rebase published implementation commits or force-push releases.
+- Continue development on `develop` in incremental, reviewable commits. The
+  owner approved the native rewrite merge after verification on 2026-10-18.
+  Do not recreate the retired `v3-rewrite` branch, rebase published implementation
+  commits or force-push releases.
 - `v2.5-compatible-final` identifies the last supported compatible source.
   [Its release manifest](docs/releases/v2.5-compatible-final.json) pins the exact
   existing images. Never rebuild or move these final and dated release tags.
-- Publish development Stash images to `native-preview` and revision tags. The
+- Publish development Stash images to `develop` and `develop-<commit>` tags. The
   image includes the native runtime, Jellyfin FFmpeg, GPU drivers and `uv`.
   Verify the published digest and container checks before deployment; no second
   `stash-s6` build is required. Frozen compatible images remain unchanged.
+- `v3.0.0-dev` anchors native development version names. Subsequent builds use
+  `git describe` from this tag rather than the frozen compatible release. It is
+  a development checkpoint, not a stable release; preserve its tagged revision.
 - Production delivery must use images built and published by the repository's
   GitHub Actions workflows, then deployed from GHCR by verified digest. The owner
   explicitly rejected continued local-image deployments on October 9. Do not use

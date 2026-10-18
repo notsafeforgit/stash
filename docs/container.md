@@ -1,6 +1,6 @@
 # Native Stash container
 
-`ghcr.io/notsafeforgit/stash:native-preview` is the complete Linux amd64 runtime.
+`ghcr.io/notsafeforgit/stash:develop` is the complete Linux amd64 runtime.
 The main repository builds and tests it in one GitHub Actions workflow. There is
 no downstream `stash-s6` build or runtime compatibility mode. Production pins the
 verified registry digest; see [deployment](v3-deployment.md).

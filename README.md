@@ -4,10 +4,10 @@ An independent fork of [Stash](https://github.com/stashapp/stash), with a Go
 backend and React/TypeScript v3 application for organizing and playing a local
 media library.
 
-[![Native validation and publication](https://github.com/notsafeforgit/stash/actions/workflows/ghcr-publish.yml/badge.svg?branch=v3-rewrite)](https://github.com/notsafeforgit/stash/actions/workflows/ghcr-publish.yml)
-[![Browser tests](https://github.com/notsafeforgit/stash/actions/workflows/v3-browser-tests.yml/badge.svg?branch=v3-rewrite)](https://github.com/notsafeforgit/stash/actions/workflows/v3-browser-tests.yml)
+[![Native validation and publication](https://github.com/notsafeforgit/stash/actions/workflows/ghcr-publish.yml/badge.svg?branch=develop)](https://github.com/notsafeforgit/stash/actions/workflows/ghcr-publish.yml)
+[![Browser tests](https://github.com/notsafeforgit/stash/actions/workflows/v3-browser-tests.yml/badge.svg?branch=develop)](https://github.com/notsafeforgit/stash/actions/workflows/v3-browser-tests.yml)
 
-Development continues on `v3-rewrite` ahead of its reviewed merge into `develop`.
+Development continues on `develop` following the reviewed native rewrite merge.
 The native database and application APIs are independent of upstream; the
 [final compatible release](docs/releases/v2.5-compatible-final.md) remains
 available for installations that choose to stay behind.
@@ -19,7 +19,7 @@ the [rootless Podman and GPU setup](docs/container.md). The published Linux amd6
 image is:
 
 ```text
-ghcr.io/notsafeforgit/stash:native-preview
+ghcr.io/notsafeforgit/stash:develop
 ```
 
 It includes the media tools and hardware runtime; no `stash-s6` wrapper is needed.

@@ -1,6 +1,6 @@
-# v3 rewrite architecture
+# Native Stash architecture
 
-This is the system overview for the `v3-rewrite` independent fork. Stash runs one
+This is the system overview for the independent fork on `develop`. Stash runs one
 Go backend with a shared GraphQL API, a SQLite library, filesystem media, and
 the embedded v3 application, including standalone share and offline entries.
 The v2.5 frontend and selector are removed. The

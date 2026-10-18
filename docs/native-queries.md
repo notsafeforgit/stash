@@ -95,5 +95,5 @@ The catalog plugin's native client conversion is staged on its
 `native-api-transition` branch. Its group requests replace movie aliases, and
 its tagged reload queries use expressions without retrying an empty selection
 against the entire library. Keep the installed compatible package until the
-coordinated native cutover. The manual helpers in `integrations/library` already
+coordinated native cutover. The manual helpers in the external `stash-integrations/integrations/library` package already
 use this expression contract.

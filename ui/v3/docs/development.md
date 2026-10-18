@@ -134,7 +134,7 @@ publish. The local full gate always runs all suites.
 | Command | Checks |
 | --- | --- |
 | `make validate-ui-v3` | Biome lint (including accessibility), React purity/type-contract lint, generation, TypeScript, formatting, locales, Vitest, and native contracts |
-| `make validate-fork` | Generation, UI validation/build, all Python suites, Go lint/integration tests, and CI checks; independent work overlaps |
+| `make validate-fork` | Generation, UI validation/build, Go lint/integration tests and CI checks; no downloader dependency |
 | `make ui-ci` | Validate and build embedded UI with a single generation/type-check pass |
 | `make validate-ci` | Check-selection/publication-gate regressions and pinned actionlint workflow lint |
 | `make lint` | CI-pinned golangci-lint via `go run` |

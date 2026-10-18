@@ -12,12 +12,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stashapp/stash/internal/testclients"
 	"github.com/stashapp/stash/pkg/gallery"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPostConsolidationReviewPortableRestoreRecoversRequestAndPendingNotification(t *testing.T) {
+	python, archivePath := testclients.Runtime(t, "archive")
 	db, repo, review := postMergeNotificationFixture(t)
 	service := gallery.NewPostMergeNotifications(repo)
 	parent, err := service.Find(t.Context(), review.Result.NotificationJobUUID)
@@ -29,12 +31,7 @@ func TestPostConsolidationReviewPortableRestoreRecoversRequestAndPendingNotifica
 	require.NoError(t, err)
 	before := identityRows(t, repo, postMergeNotificationDomainTables...)
 	require.NoError(t, db.Close())
-	python := os.Getenv("PRODUCER_PYTHON")
-	if python == "" {
-		python = "python3"
-	}
-	source, err := filepath.Abs("../../integrations/archive/src")
-	require.NoError(t, err)
+	source := filepath.Join(archivePath, "src")
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	command := osexec.CommandContext(ctx, python, "-c", postConsolidationReviewRestore, db.DatabasePath(), t.TempDir())

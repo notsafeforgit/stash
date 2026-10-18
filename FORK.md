@@ -4,7 +4,10 @@ This repository develops an independent media library based on Stash. Its
 [architecture and upgrade boundaries](docs/native-archive-transition-plan.md)
 cover shared application behavior. Personal automation and production records
 live in the separate `notsafeforgit/stash-ops` repository; they are optional API
-clients and do not participate in the Stash application build.
+clients and do not participate in the Stash application build. Reusable Python
+clients live in `notsafeforgit/stash-integrations` with independent releases. Core
+retains its API/data contracts and tests them against pinned external clients;
+ordinary application validation must not install gallery-dl.
 
 ## Branch and release policy
 

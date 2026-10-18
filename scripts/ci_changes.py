@@ -31,6 +31,15 @@ def documentation_path(path):
     return path.startswith("docs/") and PurePosixPath(path).suffix == ".md"
 
 
+def client_independent_path(path):
+    # Deliberately conservative: API, model, DB and unknown changes exercise the
+    # real clients. UI, documentation and standalone media engines do not need
+    # downloader packages to validate their own behavior.
+    return frontend_path(path) or documentation_path(path) or path.startswith((
+        "pkg/ffmpeg/", "pkg/image/", "pkg/autotag/", "pkg/ts/",
+    ))
+
+
 def git(*args, cwd=None):
     return subprocess.run(
         ["git", *args], cwd=cwd, check=True, stdout=subprocess.PIPE,
@@ -39,7 +48,7 @@ def git(*args, cwd=None):
 
 
 def select_checks(event, branch, head, runs, cwd=None):
-    full = {"backend": "true", "baseline": "", "reason": "No successful ancestor publish is available."}
+    full = {"backend": "true", "clients": "true", "baseline": "", "reason": "No successful ancestor publish is available."}
     if event not in {"push", "pull_request"}:
         return {**full, "reason": "Manual and other events run the full suite."}
     for run in runs:
@@ -60,12 +69,13 @@ def select_checks(event, branch, head, runs, cwd=None):
             continue
         if paths and all(frontend_path(path) or documentation_path(path) for path in paths):
             return {
-                "backend": "false", "baseline": baseline,
+                "backend": "false", "clients": "false", "baseline": baseline,
                 "reason": f"Only frontend/Markdown documentation changed since successful publish {baseline[:12]}.",
             }
         return {
             **full, "baseline": baseline,
-            "reason": "Shared, backend, tooling, unknown, or no changed files: run the full suite.",
+            "clients": "false" if paths and all(client_independent_path(path) for path in paths) else "true",
+            "reason": "Backend checks required; external client checks follow their contract dependencies.",
         }
     return full
 
@@ -79,9 +89,15 @@ def gate_failures(needs):
     if backend not in {"true", "false"}:
         failures.append("check selection is missing or invalid")
     expected = "skipped" if backend == "false" else "success"
-    for job in ("backend-tests", "backend-lint", "python"):
+    for job in ("backend-tests", "backend-lint"):
         if needs.get(job, {}).get("result") != expected:
             failures.append(f"{job} must be {expected}")
+    clients = needs.get("changes", {}).get("outputs", {}).get("clients")
+    if clients not in {"true", "false"}:
+        failures.append("client check selection is missing or invalid")
+    client_result = "skipped" if clients == "false" else "success"
+    if needs.get("clients", {}).get("result") != client_result:
+        failures.append(f"clients must be {client_result}")
     return failures
 
 

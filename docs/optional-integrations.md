@@ -20,7 +20,7 @@ are reported separately, so the UI remains consistent until restart.
 
 Enabling source tracking does not install gallery-dl, create subscriptions or
 start host/n8n schedules. Set up the
-[gallery-dl quickstart](../integrations/gallery-dl/QUICKSTART.md) with
+[gallery-dl quickstart](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/QUICKSTART.md) with
 `stash-gallery setup` to provision a folder-scoped token and local worker
 configuration. `stash-gallery download` registers requested sources and imports
 through the existing ingestion API. Website credentials remain with
@@ -74,6 +74,14 @@ the Stash database. Keep download/publication lock directories shared between
 workers when coordinating captures. A FileFlows installation can run its encoder
 separately and submit the finished file through the [local intake API](native-manual-intake.md).
 
-Reusable packages stay in this repository: [gallery-dl integration](../integrations/gallery-dl/QUICKSTART.md)
-and [portable archives](native-archive-format.md). They can be installed on another
-host or in an optional container. Running an ordinary Stash library requires neither.
+Reusable Python packages live in [stash-integrations](https://github.com/notsafeforgit/stash-integrations):
+gallery-dl ingestion, portable archives and library helpers. They have their own
+releases and tests. An operations image such as `stash-ops` installs pinned client
+packages; a third container is not required. API tokens, media mounts and durable
+outboxes stay with the existing workers. FileFlows remains its own service.
+
+Core Stash keeps the APIs, schema and domain services. Ordinary Go/TypeScript
+validation has no downloader dependency. `make pre-clients test-clients` runs the
+explicit compatibility suite against `integration-clients.json`; changes to the
+API or its persistence contract also run that suite in CI. Other installations
+can run the clients on a host or in a container, or install none of them.

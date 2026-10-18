@@ -11,12 +11,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stashapp/stash/internal/testclients"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCanonicalPostBackfillPortableRestoreKeepsCrossOwnerFileProof(t *testing.T) {
+	python, archivePath := testclients.Runtime(t, "archive")
 	f, original, _ := postBackfillFixture(t)
 	current := sourceTestPost(t, f.repo, models.SourcePostIdentifier{Namespace: "legacy:catalog:fixture", Value: "current-copy"}, "").UUID
 	sqlite.ConsolidatePostBackfillFixture(t, f.repo, original, current, "")
@@ -25,12 +27,7 @@ func TestCanonicalPostBackfillPortableRestoreKeepsCrossOwnerFileProof(t *testing
 	require.NoError(t, err)
 	require.Equal(t, 1, result.Selected)
 	require.NoError(t, f.db.Close())
-	python := os.Getenv("PRODUCER_PYTHON")
-	if python == "" {
-		python = "python3"
-	}
-	source, err := filepath.Abs("../../integrations/archive/src")
-	require.NoError(t, err)
+	source := filepath.Join(archivePath, "src")
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	command := exec.CommandContext(ctx, python, "-c", canonicalPostBackfillRestore, f.db.DatabasePath(), t.TempDir())

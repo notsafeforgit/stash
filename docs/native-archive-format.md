@@ -1,6 +1,6 @@
 # Portable native archive format
 
-`integrations/archive` provides the independent `stash-archive` command. It
+The external [stash-native-archive package](https://github.com/notsafeforgit/stash-integrations/tree/main/integrations/archive) provides the independent `stash-archive` command. It
 preserves the complete native SQLite database and original artwork, plus
 explicitly selected configuration and operating-state files. UUIDs, redirects,
 remote IDs, captures, documents, selected metadata, gallery membership, jobs and
@@ -520,7 +520,7 @@ Install into a prepared Python environment:
 
 ```sh
 uv venv .venv
-uv pip install --python .venv/bin/python ./integrations/archive
+uv pip install --python .venv/bin/python ./integrations/archive # from a stash-integrations checkout
 ```
 
 Export a native library and its original artwork:
@@ -685,7 +685,7 @@ See [optional integrations](optional-integrations.md).
 
 ## Validation
 
-`make validate-archive` runs temporary SQLite/WAL, restore, artwork, pending-work,
+`make test-archive` in stash-integrations runs temporary SQLite/WAL, restore, artwork, pending-work,
 corruption, schema refusal, publication failure, path safety and offline-pagination
 tests. It is included in `make validate-fork` and CI. Full-copy rehearsals must
 also reconcile the complete native database and original artwork, measure peak

@@ -24,7 +24,7 @@ Run integrated workflows from the Git root. Follow the [development guide](docs/
 - `make validate-fork` is the pre-push gate for backend generation, Go lint/integration tests, and v3 validation.
 - From `ui/v3`, `pnpm test --run` runs Vitest once and `pnpm gqlgen` refreshes GraphQL types.
 
-Install dependencies with `make pre-ui`, `make pre-producer` and `make pre-backup`. `make validate-fork` generates bindings, validates/builds the UI once and runs independent suites concurrently (`VALIDATION_JOBS=2` by default). Before standalone full Go tests, run `make generate` and `make ui`; embedded-asset tests require real route chunks. Never run Go tests against a concurrently changing UI build. Publishing and Quadlet verification are documented in the [deployment runbook](../../docs/v3-deployment.md).
+Install dependencies with `make pre-ui`. `make validate-fork` generates bindings, validates/builds the UI once and runs independent suites concurrently (`VALIDATION_JOBS=2` by default). Before standalone full Go tests, run `make generate` and `make ui`; embedded-asset tests require real route chunks. Never run Go tests against a concurrently changing UI build. Publishing and Quadlet verification are documented in the [deployment runbook](../../docs/v3-deployment.md).
 
 ## Coding & Testing Conventions
 

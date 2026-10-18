@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/internal/testclients"
 	"github.com/stashapp/stash/pkg/file"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
@@ -33,10 +34,7 @@ func TestNativeBackupCheckpointHTTPAndPortableExport(t *testing.T) {
 }
 
 func testNativeBackupCheckpointHTTP(t *testing.T, boundary bool) {
-	python, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("Python 3 is required for the portable archive interoperability check")
-	}
+	python, archive := testclients.Runtime(t, "archive")
 	cfg := config.InitializeEmpty()
 	t.Cleanup(func() { config.InitializeEmpty() })
 	directory := t.TempDir()
@@ -79,8 +77,6 @@ func testNativeBackupCheckpointHTTP(t *testing.T, boundary bool) {
 			return err
 		}))
 	}
-	archive, err := filepath.Abs("../../integrations/archive")
-	require.NoError(t, err)
 	source := filepath.Join(archive, "src")
 	entries, err := os.ReadDir(filepath.Join(source, "stash_archive"))
 	require.NoError(t, err)

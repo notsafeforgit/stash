@@ -44,7 +44,7 @@ queued work keeps a client-owned completion monitor after the sheet closes.
 The monitor refreshes on success, failure or cancellation. Missing or inconsistent
 acknowledgments produce an error instead of a success callback.
 
-The audited manual host clients have [native replacements](../integrations/library/README.md).
+The audited manual host clients have [native replacements](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/library/README.md).
 Deploy those helpers with the native API at cutover. The compatible production
 scripts remain unchanged until then; passing the new selection to an old server
 fails GraphQL validation before executing a mutation. Installed Catalog Metadata

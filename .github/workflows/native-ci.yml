@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       backend: ${{ steps.changes.outputs.backend }}
+      clients: ${{ steps.changes.outputs.clients }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -19,7 +20,6 @@ jobs:
       - name: Test check selection and publication gate
         run: |
           python3 -m unittest discover -s scripts -p 'test_ci_*.py'
-          python3 -m unittest discover -s scripts -p 'test_split_worker_profiles.py'
       - name: Find successfully published baselines
         uses: actions/github-script@v8
         with:
@@ -97,20 +97,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y ffmpeg libavif-bin
-      # Go integration fixtures execute the real Python producer and archive
-      # clients. A runtime in another job is not available on this runner.
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-        with:
-          version: '0.10.9'
-          enable-cache: true
-          cache-suffix: backend-tests-${{ matrix.suite }}
-          cache-dependency-glob: |
-            integrations/gallery-dl/pyproject.toml
-            integrations/archive/pyproject.toml
-      - run: make pre-producer
       - name: Go unit and integration tests
         env:
           TEST_SUITE: ${{ matrix.suite }}
@@ -132,37 +118,32 @@ jobs:
           name: native-generated
       - run: make lint
 
-  python:
-    needs: changes
-    if: needs.changes.outputs.backend == 'true'
+  clients:
+    needs: [changes, assets]
+    if: needs.changes.outputs.clients == 'true'
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: [producer, library, archive]
     steps:
       - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-native-go
+        with:
+          suite: client-contracts
+      - uses: actions/download-artifact@v8
+        with:
+          name: native-generated
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
-          version: '0.10.9'
-          enable-cache: ${{ matrix.suite != 'library' }}
-          cache-suffix: python-${{ matrix.suite }}
-          cache-dependency-glob: |
-            integrations/gallery-dl/pyproject.toml
-            integrations/archive/pyproject.toml
-      - name: Install media test runtime
-        if: matrix.suite == 'producer'
-        timeout-minutes: 5
+          version: '0.13.0'
+          enable-cache: true
+          cache-suffix: clients
+          cache-dependency-glob: integration-clients.json
+      - name: Install media fixture tools
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y ffmpeg libavif-bin
-      - name: Install producer test dependencies
-        if: matrix.suite == 'producer' || matrix.suite == 'archive'
-        run: make pre-producer
-      - run: make validate-${{ matrix.suite }}
+      - run: make pre-clients test-clients
 
   binary:
     needs: assets
@@ -194,7 +175,7 @@ jobs:
           if-no-files-found: error
 
   gate:
-    needs: [changes, assets, backend-tests, backend-lint, python, binary]
+    needs: [changes, assets, backend-tests, backend-lint, clients, binary]
     if: always()
     runs-on: ubuntu-24.04
     steps:

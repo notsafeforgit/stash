@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/internal/testclients"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
@@ -28,6 +29,7 @@ func TestNativeSnapshotCommandHelper(t *testing.T) {
 }
 
 func TestNativeSnapshotArchiveVerificationProtocol(t *testing.T) {
+	python, archive := testclients.Runtime(t, "archive")
 	config.InitializeEmpty()
 	root := t.TempDir()
 	path := filepath.Join(root, "native.sqlite")
@@ -41,12 +43,6 @@ func TestNativeSnapshotArchiveVerificationProtocol(t *testing.T) {
 		"export STASH_TEST_SNAPSHOT_COMMAND=1\nexport STASH_TEST_SNAPSHOT_PATH=\"$2\"\nexec '" +
 		strings.ReplaceAll(os.Args[0], "'", "'\"'\"'") + "' -test.run='^TestNativeSnapshotCommandHelper$'\n"
 	require.NoError(t, os.WriteFile(validator, []byte(body), 0700))
-	python := os.Getenv("PRODUCER_PYTHON")
-	if python == "" {
-		python = "python3"
-	}
-	archive, err := filepath.Abs(filepath.Join("..", "..", "integrations", "archive"))
-	require.NoError(t, err)
 	entries, err := os.ReadDir(filepath.Join(archive, "src", "stash_archive"))
 	require.NoError(t, err)
 	for _, entry := range entries {

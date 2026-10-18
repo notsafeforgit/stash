@@ -12,10 +12,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stashapp/stash/internal/testclients"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPostSelectionProvenancePortableRestoreRetainsOriginalCaptureOwnership(t *testing.T) {
+	python, archivePath := testclients.Runtime(t, "archive")
 	db, repo := postIdentityFixture(t)
 	a := identityPost(t, repo, "legacy:catalog:fixture", "original")
 	b := identityPost(t, repo, "native:reddit", "one-post")
@@ -32,12 +34,7 @@ func TestPostSelectionProvenancePortableRestoreRetainsOriginalCaptureOwnership(t
 		return err
 	}))
 	require.NoError(t, db.Close())
-	python := os.Getenv("PRODUCER_PYTHON")
-	if python == "" {
-		python = "python3"
-	}
-	source, err := filepath.Abs("../../integrations/archive/src")
-	require.NoError(t, err)
+	source := filepath.Join(archivePath, "src")
 	entries, err := os.ReadDir(filepath.Join(source, "stash_archive"))
 	require.NoError(t, err)
 	for _, entry := range entries {

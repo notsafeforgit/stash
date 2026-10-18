@@ -353,7 +353,7 @@ original post and event. Receipt recovery precedes current-identity checks.
 HTTP responses use snake_case names. Initial title/details/date appear only for
 gallery creation, and dates retain their calendar precision. The API is available
 on the development branch. The supported
-[`stash-backfill-source-albums` command](../integrations/gallery-dl/README.md#historical-source-albums)
+[`stash-backfill-source-albums` command](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#historical-source-albums)
 prepares private immutable plans, applies them, inspects saved submissions and
 prepares explicit retries. Native review controls are also available from
 Match existing media in a post's Source order or a gallery's Source albums
@@ -539,7 +539,7 @@ file linking, preserves carousel slots before filtering/reordering, and treats
 each story as its own post. Only evidenced carousel posts create source galleries.
 Historical metadata without this evidence can retain a regular post identity,
 but cannot establish attachment order from download numbering. See the
-[producer's Instagram contract](../integrations/gallery-dl/README.md#instagram-downloads-and-source-albums).
+[producer's Instagram contract](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#instagram-downloads-and-source-albums).
 
 Coomer/Kemono user, post and posts-listing downloads require `original=true` and
 `mirror_media` version 1. The producer and backend validate the same qualified
@@ -550,7 +550,7 @@ Unsupported audio/archive outputs retain excluded captures without file receipts
 or download-archive acknowledgements. Windows use the source `published` timestamp,
 never the mirror's `added` time. New manifests enable shared post-body storage
 without changing the partition of historical captures. See the
-[mirror contract](../integrations/gallery-dl/README.md#kemonocoomer-downloads-and-source-albums)
+[mirror contract](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#kemonocoomer-downloads-and-source-albums)
 for coverage and container limitations.
 
 Bluesky/TikTok use `bluesky_media`/`tiktok_media` version 1 with source membership
@@ -561,7 +561,7 @@ Missing slots and repeated positions survive file selection. Windows use origina
 `createdAt`/`createTime`, and undated profile/shortlink routes only admit verified
 post-producing child extractors. TikTok extraction failures cannot acknowledge a
 complete source run. See the
-[Bluesky/TikTok contract](../integrations/gallery-dl/README.md#blueskytiktok-downloads-and-source-albums)
+[Bluesky/TikTok contract](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#blueskytiktok-downloads-and-source-albums)
 for supported collections, auxiliary-output choices and preserved historical
 capture partitions.
 
@@ -639,7 +639,7 @@ Worker dispatch, source scheduling and the remaining download
 adapters remain transition work. See [staging release](native-schema.md#completed-enrichment-staging-release),
 [publication](native-schema.md#verified-enrichment-publication),
 [checkpoint storage and lifecycle](native-schema.md#enrichment-jobs-and-checkpoint-ownership)
-and the [producer contract](../integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
+and the [producer contract](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
 
 ### Producer enrichment API
 
@@ -772,15 +772,15 @@ results before checking for late lease loss. An accepted checkpoint and its next
 delivery intent are committed locally together. Exact acknowledgements release
 local bodies; conflicting successor checkpoints or rejected bodies remain in
 review. Delivery-only recovery needs the Stash producer token, with no website
-profile or credentials. See the [profile and CLI contract](../integrations/gallery-dl/README.md#durable-selected-job-execution).
+profile or credentials. See the [profile and CLI contract](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#durable-selected-job-execution).
 The selected-job executor accepts an already admitted UUID. The collection
 dispatcher discovers those jobs before admitting fresh targets; producer schema
 9 persists its cursors and backoff across restarts. It can also deliver saved
-results without loading a profile. See [dispatch and maintenance](../integrations/gallery-dl/README.md#enrichment-dispatch-and-native-maintenance).
+results without loading a profile. See [dispatch and maintenance](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#enrichment-dispatch-and-native-maintenance).
 Producer schema 10 adds persistent rotation across local download/metadata
 profiles and automatically discovered collections. Global pending-delivery
 recovery runs before loading website profiles. See
-[dispatch across local profiles](../integrations/gallery-dl/README.md#dispatch-across-local-profiles).
+[dispatch across local profiles](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#dispatch-across-local-profiles).
 
 ### Legacy enrichment preparation
 
@@ -881,7 +881,7 @@ acknowledgements in a durable local discovery journal. Its capacity reservations
 share the existing download/enrichment budget. Body removal requires a matching
 receipt; a terminal job description cannot discard pending local evidence.
 Source number tokens and Unicode survive native canonical page encoding.
-See [producer discovery](../integrations/gallery-dl/README.md#account-listing-page-collector)
+See [producer discovery](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#account-listing-page-collector)
 for the client contract and dispatch commands.
 
 Collection discovery uses current active source/root definitions and indexed
@@ -983,7 +983,7 @@ bindings were retained. Producer admission, fetched-page receipts, compared
 listing completion and accepted post identity remain distinct states. Historical
 page counts do not become native receipt counts, and activation never certifies
 historical coverage or completed catalog import. The
-[`stash-activate-automation-discovery` operator command](../integrations/gallery-dl/README.md#reviewed-discovery-activation)
+[`stash-activate-automation-discovery` operator command](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#reviewed-discovery-activation)
 saves a private, digest-bound review file and recovers the original operation
 after a lost Apply response. Reviewed recovery of missing-history searches is
 described below. The review UI, detail execution and staging release remain open.
@@ -2629,7 +2629,7 @@ source text and do not fabricate a capture for this policy.
 
 ## Producer delivery queue
 
-The Python package in [integrations/gallery-dl](../integrations/gallery-dl/README.md)
+The external Python package in [stash-integrations/gallery-dl](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md)
 implements a durable producer outbox and the HTTP delivery client. It binds a
 queue to a stable producer UUID and Stash origin, stores exact event bytes before
 delivery, and retains receipts atomically with removing acknowledged payloads.
@@ -2672,15 +2672,15 @@ These cases require no separate metadata fetch. Rendered filenames replace
 backslashes and control characters while retaining the original post text;
 existing files under unsafe names require relocation before retry, rather than
 silently abandoning their bytes. The
-[package guide](../integrations/gallery-dl/README.md) describes supported runtime
+[package guide](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md) describes supported runtime
 paths and remaining caller responsibilities.
 
 The shared Python/Go policy corpus verifies retention before queued persistence.
-`make pre-producer` installs the pinned gallery-dl/yt-dlp test runtime into an
-isolated environment; `make validate-producer` runs delivery and real downloader
-tests. The backend's HTTP tests execute delivery, source leases and the download
-worker against isolated native databases, including a lost completion response
-and file admission after outbox restart. Python 3.12 or newer is required.
+The optional `make pre-clients test-clients` suite installs a pinned external
+release and tests delivery, source leases and downloads against isolated native
+servers, including a lost completion response and delivery after outbox restart.
+The external repository runs its full Python suite independently. Python 3.12+
+is needed for client tests, not the ordinary Go/TypeScript application tests.
 
 The local configuration converter now stages profiles from ordered gallery-dl
 JSON layers, preserving first-match rule order, archive formats and website
@@ -2754,14 +2754,14 @@ Historical import accepts `root_uuid`, a stable input-database `source_uuid`,
 `legacy_backfill_skip` are handled by this importer. Other catalog/journal
 families retain their separate migration requirements. Imported decisions never
 manufacture source windows, and producer tokens cannot submit legacy assertions.
-See the [maintenance importer](../integrations/gallery-dl/README.md#backfill-journal-import)
-for read-only preflight and resumable batches. The [native n8n adapter](../integrations/gallery-dl/README.md#native-n8n-backfills)
+See the [maintenance importer](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#backfill-journal-import)
+for read-only preflight and resumable batches. The [native n8n adapter](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#native-n8n-backfills)
 uses this status/proof API with durable caller snapshots. Its producer schema 7
 commits the first history decision and local source snapshot together, then retains
 the original ticket bindings and submitted proof across retries. Converted graphs
 wait on pending results and inspect the same token. Installed n8n workflows still
 use the old runner until the remaining operational-history and deployment gates pass.
-The [receipt importer](../integrations/gallery-dl/README.md#retaining-old-n8n-result-tokens)
+The [receipt importer](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#retaining-old-n8n-result-tokens)
 preserves historical inspection results separately from this proof API. Importing
 one never assigns an account, launches work or marks native source windows complete.
 
@@ -2784,7 +2784,7 @@ separately through `GET /scan-journal-records/<uuid>`. These routes require
 application access, reject cross-origin mutations, and return `no-store` results.
 Producer ingestion tokens cannot import or inspect this maintenance evidence.
 
-The [journal command](../integrations/gallery-dl/README.md#retaining-the-scan-journal)
+The [journal command](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#retaining-the-scan-journal)
 provides read-only preparation, an explicit reviewed-digest apply and replay after
 a lost response. Retention does not activate jobs; reviewed activation uses the
 separate operation below. Old runtime ownership and historical completion hashes are never substituted
@@ -2838,7 +2838,7 @@ disables archive stopping for that window, including subsequent retries.
 Only a real claim creates an attempt. Activation creates no producer identity,
 access token, historical lease, source-window completion or media-intake proof.
 Manual/unbound checkpoints and historical service handoffs remain separate review
-evidence. The [activation CLI](../integrations/gallery-dl/README.md#activating-retained-scans)
+evidence. The [activation CLI](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#activating-retained-scans)
 uses the same preview/apply contract. Rehearsal bindings are not production
 configuration; final activation follows the common quiesced cutover boundary.
 
@@ -2902,7 +2902,7 @@ claims, exact checkpoint bytes, completion/failure intents and comparison receip
 separately from enrichment publications. `deliver-detail` recovers persisted
 operations without loading website settings. `post.verify_candidate` profiles
 participate in `dispatch-all`, with independent delivery and collection cursors.
-See the [producer commands](../integrations/gallery-dl/README.md#candidate-detail-worker).
+See the [producer commands](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#candidate-detail-worker).
 
 `POST /api/v3/ingest/discovery-details/collections/ready` accepts
 `policy_sha256`, `extractor_version`, `after` (a collection UUID) and `limit`.

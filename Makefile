@@ -333,18 +333,12 @@ test:
 
 # runs all tests - including integration tests
 .PHONY: it
-it: check-producer-runtime
+it:
 	go test -timeout $(GO_TEST_TIMEOUT) -tags "$(GO_BUILD_TAGS) integration" $(GO_TEST_PACKAGES)
 
 .PHONY: list-test-packages
 list-test-packages:
 	@go list -tags "$(GO_BUILD_TAGS) integration" ./...
-
-# Fail before compiling/running the full suite when its subprocess runtime is
-# missing. The Python unit-test jobs do not supply another runner's environment.
-.PHONY: check-producer-runtime
-check-producer-runtime:
-	@"$(PRODUCER_PYTHON)" -I -c "import sys; assert sys.version_info >= (3, 12); import gallery_dl, yt_dlp" || { echo 'Run make pre-producer to prepare the Go integration-test runtime.'; exit 1; }
 
 # generates test mocks
 .PHONY: generate-test-mocks
@@ -452,7 +446,7 @@ validate: validate-fork
 VALIDATION_JOBS ?= 2
 .PHONY: validate-fork validate-fork-backend
 validate-fork:
-	$(MAKE) -j$(VALIDATION_JOBS) validate-fork-backend validate-producer validate-library validate-archive validate-ci
+	$(MAKE) -j$(VALIDATION_JOBS) validate-fork-backend validate-ci
 
 validate-fork-backend: generate-backend ui-ci
 	$(MAKE) validate-backend
@@ -468,25 +462,21 @@ validate-ci:
 
 UV ?= uv
 
-.PHONY: validate-archive
-validate-archive:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=integrations/archive/src:integrations/gallery-dl/src "$(PRODUCER_PYTHON)" -m unittest discover -s integrations/archive/tests -v
+# Optional compatibility checks use independently released API clients. They are
+# not dependencies of make it, validate-fork, or the Stash application build.
+export STASH_INTEGRATIONS_ROOT ?= $(abspath .local/integration-clients)
+export PRODUCER_PYTHON ?= $(STASH_INTEGRATIONS_ROOT)/.venv/bin/python
 
-.PHONY: validate-library
-validate-library:
-	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s integrations/library -p 'test_*.py' -v
+.PHONY: pre-clients check-client-runtime test-clients
+pre-clients:
+	python3 scripts/prepare_integration_clients.py
+	$(MAKE) -C "$(STASH_INTEGRATIONS_ROOT)" setup UV="$(UV)"
 
-.PHONY: validate-producer
-export PRODUCER_PYTHON ?= $(abspath .local/native-producer/bin/python)
+check-client-runtime:
+	@"$(PRODUCER_PYTHON)" -I -c "import sys; assert sys.version_info >= (3, 12); import gallery_dl, yt_dlp, stash_ingest, stash_archive" || { echo 'Run make pre-clients to prepare the optional client compatibility runtime.'; exit 1; }
 
-.PHONY: pre-producer
-pre-producer:
-	$(UV) venv --allow-existing --python python3 .local/native-producer
-	$(UV) pip install --python .local/native-producer/bin/python './integrations/gallery-dl[gallery]'
-	.local/native-producer/bin/python -I -B scripts/verify_producer_install.py
-
-validate-producer:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=integrations/gallery-dl/src "$(PRODUCER_PYTHON)" -m unittest discover -s integrations/gallery-dl/tests -v
+test-clients: check-client-runtime
+	STASH_TEST_CLIENTS=1 go run ./internal/testclients/cmd/run -tags "$(GO_BUILD_TAGS) integration" -timeout "$(GO_TEST_TIMEOUT)"
 
 # locally builds and tags a 'stash/build' docker image
 .PHONY: docker-build

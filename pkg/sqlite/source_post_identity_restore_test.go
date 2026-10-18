@@ -12,10 +12,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stashapp/stash/internal/testclients"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPostIdentityPortableRestoreRetainsChainedReceiptsAndOriginalEvidence(t *testing.T) {
+	python, archivePath := testclients.Runtime(t, "archive")
 	db, repo := postIdentityFixture(t)
 	a := identityPost(t, repo, "legacy:catalog:fixture", "first")
 	b := identityPost(t, repo, "legacy:catalog:fixture", "second")
@@ -26,12 +28,7 @@ func TestPostIdentityPortableRestoreRetainsChainedReceiptsAndOriginalEvidence(t 
 	receipt := publishPostIdentity(t, repo, request)
 	publishPostIdentity(t, repo, identityRequest(t, repo, b, c))
 	require.NoError(t, db.Close())
-	python := os.Getenv("PRODUCER_PYTHON")
-	if python == "" {
-		python = "python3"
-	}
-	source, err := filepath.Abs("../../integrations/archive/src")
-	require.NoError(t, err)
+	source := filepath.Join(archivePath, "src")
 	// Track the Python implementation in Go's test cache, too.
 	entries, err := os.ReadDir(filepath.Join(source, "stash_archive"))
 	require.NoError(t, err)

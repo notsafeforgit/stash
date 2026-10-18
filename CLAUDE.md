@@ -43,7 +43,6 @@ tracks. Do not remove a required caller without converting and testing it.
 
 ```bash
 make pre-ui       # Install v3 dependencies
-make pre-producer # Install the isolated gallery-dl producer test runtime
 make generate     # Generate Go and v3 GraphQL bindings
 make ui           # Build the embedded v3 app and login locales
 # Terminal 1:
@@ -73,14 +72,12 @@ for image publication and Quadlet restarts.
 ```bash
 make validate-fork     # Parallel full gate; includes generation and validated UI build
 make it                # Go unit + integration tests only
-make validate-producer # Python delivery, lease and gallery-dl lifecycle tests
-make validate-library  # Native manual tag/performer helper contracts
-make validate-archive  # Portable archive integrity, restore and offline access
+make pre-clients test-clients # Optional real-server tests of pinned external clients
 make lint              # CI-pinned golangci-lint via go run
 make fmt               # Format Go source
 make validate-ui-v3    # Biome, generation/types, formatting, locales, tests, native contracts
 make fmt-ui-v3         # Format v3 source
-make validate          # Alias for validate-fork, including producer tests
+make validate          # Alias for validate-fork; no downloader dependency
 make validate-ui       # Native UI validation; validate-ui-v3 is an alias
 ```
 
@@ -93,24 +90,19 @@ To run a single Go test: `go test ./pkg/models/... -run TestFilterAST`.
 The shared `make test`/`make it` package timeout is twenty minutes for the growing
 migration suite; override `GO_TEST_TIMEOUT` when needed. Individual operation,
 lease and provider deadlines remain independently tested.
-Native producer tests require Python 3.12 or newer. `make pre-producer` installs
-the pinned gallery-dl/yt-dlp test dependencies into `.local/native-producer`;
-`PRODUCER_PYTHON` can select another prepared environment. The supported package
-in `integrations/gallery-dl` uses only the standard library for delivery.
-Producer environments use `uv venv` and `uv pip --python` with explicit
-interpreter paths. Verify installed modules with Python `-I` so workspace imports
-cannot shadow the package. A staged worker policy fingerprints the installed
-adapter and capture contract; record actual downloader versions/commits separately.
-Tested upstream downloader patches preserve policies. Source-import tests alone
-cannot verify an installed runtime or its compatibility with saved checkpoints.
+Reusable Python clients live in [stash-integrations](https://github.com/notsafeforgit/stash-integrations),
+with independent tests, packages and releases. They are not needed to develop or
+validate the core application. `make pre-clients test-clients` fetches the exact
+commit in `integration-clients.json` and runs focused real-server compatibility
+tests. These tests require Python 3.12+ and uv; ordinary `make it` does not.
+CI selects this suite for API, schema and other contract dependencies, and skips
+it for unrelated UI and standalone media-engine changes. When changing a client
+contract, run this suite locally as well as the normal `make validate-fork` gate.
 
-`integrations/archive` provides the portable `stash-archive` client for native
-SQLite snapshots, original artwork and declared configuration/state. Restore
-verifies contents into a new directory without starting a server or worker.
-See the [archive contract](docs/native-archive-format.md) and
-[ingestion contract](docs/native-ingestion.md) for checkpoint, delivery, retry
-and publication-lock invariants. Website credentials belong to external workers.
-The server never executes ZFS, Podman or S3 commands on behalf of a client.
+The external `stash-native-archive` package provides `stash-archive`. Keep the
+[archive contract](docs/native-archive-format.md), ingestion APIs, domain integrity
+and focused contract fixtures here. Website credentials belong to external
+workers. The server never executes ZFS, Podman or S3 commands for a client.
 
 Installation-specific schedules, destinations, FileFlows code and release records
 belong in the operations repository. Its image and host packages have independent
@@ -376,7 +368,7 @@ input per source; retries use the original manifest and committed chunk position
 The receipt reports all ten families pending and `imported:false`, even when all
 bytes have arrived. Receiving historical rows must not create native jobs, claim
 work completed, or activate providers. Domain mapping and explicit activation
-follow separately. See [frozen automation input](integrations/gallery-dl/README.md#frozen-automation-input).
+follow separately. See [frozen automation input](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#frozen-automation-input).
 Unknown schemas cannot silently disappear from a manifest. Use frozen copies and
 the coordinated cutover boundary; upload does not activate jobs or metadata.
 
@@ -445,7 +437,7 @@ Preserve acknowledgement replay, exact storage accounting and validation before
 opening a writer. Public worker routes, additional post adapters, shared
 cooldown/fairness and stale-job maintenance remain pending. See
 [enrichment work](docs/native-schema.md#post-enrichment-targets-and-completion)
-and [metadata-only extraction](integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
+and [metadata-only extraction](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
 
 Schema 1000071 adds immutable account listing definitions and one-page
 `account.list_page` jobs. Definitions pin account/profile, collection revision,

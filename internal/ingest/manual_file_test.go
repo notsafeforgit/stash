@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/internal/ingest"
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/internal/testclients"
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/file"
 	imagefile "github.com/stashapp/stash/pkg/file/image"
@@ -404,6 +405,7 @@ func TestManualFileAdmissionRechecksFileBeforeCommit(t *testing.T) {
 }
 
 func TestManualFilePortableRestoreKeepsMediaPolicyAndRequestRecovery(t *testing.T) {
+	python, archivePath := testclients.Runtime(t, "archive")
 	f := newManualFileFixture(t, models.ArchiveImage)
 	f.policy(t, 0, map[string]models.MetadataMapping{})
 	request := f.request(t)
@@ -431,13 +433,7 @@ func TestManualFilePortableRestoreKeepsMediaPolicyAndRequestRecovery(t *testing.
 	retry, err := f.service.RetryManualFile(t.Context(), queuedRequest.RequestUUID, queued.Revision, retryID)
 	require.NoError(t, err)
 	directory := t.TempDir()
-	python := os.Getenv("PRODUCER_PYTHON")
-	if python == "" {
-		python, err = exec.LookPath("python3")
-		require.NoError(t, err)
-	}
-	packagePath, err := filepath.Abs(filepath.Join("..", "..", "integrations", "archive", "src"))
-	require.NoError(t, err)
+	packagePath := filepath.Join(archivePath, "src")
 	entries, err := os.ReadDir(filepath.Join(packagePath, "stash_archive"))
 	require.NoError(t, err)
 	for _, entry := range entries {

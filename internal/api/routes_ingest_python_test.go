@@ -10,13 +10,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stashapp/stash/internal/ingest"
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/internal/testclients"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
@@ -24,27 +24,7 @@ import (
 
 func nativeProducerRuntime(t *testing.T) (string, string) {
 	t.Helper()
-	pythonName := os.Getenv("PRODUCER_PYTHON")
-	if pythonName == "" {
-		pythonName = "python3"
-	}
-	python, err := exec.LookPath(pythonName)
-	require.NoError(t, err, "native producer integration tests require Python 3.12 or newer")
-	packagePath, err := filepath.Abs("../../integrations/gallery-dl")
-	require.NoError(t, err)
-	// Register Python inputs with Go's test cache. Files read only by the child
-	// interpreter would otherwise let a changed producer reuse an old result.
-	for _, directory := range []string{"src", "src/stash_ingest", "tests"} {
-		entries, err := os.ReadDir(filepath.Join(packagePath, directory))
-		require.NoError(t, err)
-		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".py") {
-				_, err := os.ReadFile(filepath.Join(packagePath, directory, entry.Name()))
-				require.NoError(t, err)
-			}
-		}
-	}
-	return python, packagePath
+	return testclients.Runtime(t, "gallery-dl")
 }
 
 func TestPythonProducerDurableDeliveryAgainstNativeHTTP(t *testing.T) {

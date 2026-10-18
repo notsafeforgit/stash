@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stashapp/stash/internal/testclients"
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/scrape"
@@ -18,12 +19,7 @@ import (
 )
 
 func TestDiscoveryDetailThroughRealPythonCollector(t *testing.T) {
-	python := os.Getenv("PRODUCER_PYTHON")
-	if python == "" {
-		t.Skip("PRODUCER_PYTHON is required for the producer integration fixture")
-	}
-	root, err := filepath.Abs("../../integrations/gallery-dl")
-	require.NoError(t, err)
+	python, root := testclients.Runtime(t, "gallery-dl")
 	for _, platform := range []string{"reddit", "twitter"} {
 		t.Run(platform, func(t *testing.T) {
 			values, page, detail, selected := detailFixture(t, platform)

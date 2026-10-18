@@ -39,23 +39,19 @@ The [publisher](../.github/workflows/ghcr-publish.yml) calls the shared
 [native validation workflow](../.github/workflows/native-ci.yml). It generates
 bindings and validates/builds the UI once, shares those exact generated files
 and app/share/offline assets with the Go jobs, and compiles Linux amd64 in
-parallel with backend validation. SQLite tests, other Go tests, Go lint, and
-the three Python suites run as separate jobs. Go partitions come from the complete
-tagged package list, so new packages are included automatically. Both Go test
-runners install the Python producer used by cross-language fixtures; `make it`
-checks that runtime before starting the long suite. Publication requires every
-selected check to succeed;
-failed, cancelled, or unexpectedly skipped jobs cannot publish.
+parallel with backend validation. SQLite tests, other Go tests and Go lint run
+as separate jobs without gallery-dl. The external Python packages run their own
+unit tests and release workflow in `stash-integrations`. A separate client job
+runs the focused real-server compatibility tests when API, model, schema or other
+contract dependencies change. It installs the exact client commit pinned in
+`integration-clients.json`; missing runtimes fail explicit compatibility runs.
 
-Frontend-only changes may skip Go lint, the full Go suite and Python suites
-when **every changed path since a successful ancestor publish** is an allowed
-frontend path or Markdown under `docs/`. This includes post-deployment notes
-committed with `[skip ci]`. Executable examples and release manifests are not
-exempt. Failed/cancelled intervening pushes do not reset that baseline.
-Schema, Go embed code, CI/tooling, mixed or unknown paths, missing history/API
-access, and manual dispatches run the full suite. UI validation, embedded-entry
-tests and Linux compilation always run. The check-selection job records the
-baseline and reason in its summary.
+Checks are selected against **every changed path since a successful ancestor
+publish**. Frontend-only/Markdown changes skip backend and client checks; known
+standalone media-engine changes skip client checks. Unknown paths, missing
+history, and manual dispatches select everything. UI validation, embedded-entry
+tests and Linux compilation always run. Failed, cancelled or unexpectedly skipped
+selected jobs cannot publish; failed intervening pushes do not reset the baseline.
 
 Pushes to native branches no longer repeat this work in the older Build and
 Lint workflows. Native PRs use the same validation workflow; `develop` retains

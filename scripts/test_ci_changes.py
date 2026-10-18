@@ -100,13 +100,27 @@ class CheckSelectionTest(unittest.TestCase):
         for path in ("ui/ui.go", "ui/v3/backend.go", "ui/v3/tool.py", "ui/v3/.npmrc", "graphql/schema/type.graphql", "go.sum", "Makefile", "scripts/ci_changes.py", ".github/workflows/native-ci.yml", "docs/guide.md", "new-component/file.ts"):
             self.assertFalse(frontend_path(path), path)
 
+    def test_media_changes_skip_clients_but_api_or_schema_changes_do_not(self):
+        self.commit("pkg/ffmpeg/stream.go")
+        self.assertEqual(self.select()["backend"], "true")
+        self.assertEqual(self.select()["clients"], "false")
+        self.commit("internal/api/routes_ingest.go")
+        self.assertEqual(self.select()["clients"], "true")
+
+    def test_client_dependencies_and_unknown_paths_require_contracts(self):
+        for path in ("integration-clients.json", "pkg/models/source.go", "internal/testclients/runtime.go", "new-package/file.go"):
+            with self.subTest(path=path):
+                self.commit(path)
+                self.assertEqual(self.select()["clients"], "true")
+
+
 
 class PublishGateTest(unittest.TestCase):
     def needs(self, backend):
-        result = {job: {"result": "success"} for job in ("changes", "assets", "binary", "backend-tests", "backend-lint", "python")}
-        result["changes"]["outputs"] = {"backend": backend}
+        result = {job: {"result": "success"} for job in ("changes", "assets", "binary", "backend-tests", "backend-lint", "clients")}
+        result["changes"]["outputs"] = {"backend": backend, "clients": backend}
         if backend == "false":
-            for job in ("backend-tests", "backend-lint", "python"):
+            for job in ("backend-tests", "backend-lint", "clients"):
                 result[job]["result"] = "skipped"
         return result
 
@@ -125,6 +139,18 @@ class PublishGateTest(unittest.TestCase):
                         needs = copy.deepcopy(original)
                         needs[job]["result"] = result
                         self.assertTrue(gate_failures(needs))
+
+    def test_independent_backend_and_client_selection(self):
+        needs = self.needs("true")
+        needs["changes"]["outputs"]["clients"] = "false"
+        needs["clients"]["result"] = "skipped"
+        self.assertEqual(gate_failures(needs), [])
+        needs["clients"]["result"] = "failure"
+        self.assertTrue(gate_failures(needs))
+        for invalid in (None, "", "yes"):
+            needs = self.needs("true")
+            needs["changes"]["outputs"]["clients"] = invalid
+            self.assertTrue(gate_failures(needs))
 
     def test_missing_selection_or_job_blocks_publish(self):
         for backend in ("", "yes", None):

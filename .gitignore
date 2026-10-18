@@ -64,3 +64,6 @@ node_modules
 dist
 .DS_Store
 /.local*
+# Python developer-tool caches
+__pycache__/
+*.py[cod]

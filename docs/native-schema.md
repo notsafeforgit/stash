@@ -1574,7 +1574,7 @@ Application-authenticated operations under `/api/v3/archive` are:
 
 Encoded request bodies are rejected. Producer tokens cannot administer these
 routes. The supported client is `stash-upload-automation`; see
-[preparation and upload](../integrations/gallery-dl/README.md#frozen-automation-input).
+[preparation and upload](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#frozen-automation-input).
 Both interrupted and completed receipts survive ordinary database backups.
 
 `receiving` and `received` describe transport only. Every family remains pending
@@ -1673,7 +1673,7 @@ anonymisation removes them before their referenced source/target histories.
 `stash-activate-automation-translations` saves bounded previews and operation
 identities in a private plan before applying. It validates every saved page,
 inspects existing receipts on resume and reports release separately from
-execution. See the [command and recovery contract](../integrations/gallery-dl/README.md#activate-imported-translation-holds).
+execution. See the [command and recovery contract](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#activate-imported-translation-holds).
 
 ### Automatic source translation policies
 

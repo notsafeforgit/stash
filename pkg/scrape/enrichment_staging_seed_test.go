@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stashapp/stash/internal/testclients"
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/scrape"
@@ -18,14 +19,9 @@ import (
 )
 
 func TestLegacyEnrichmentSeedResumesThroughRealPythonCollector(t *testing.T) {
-	python := os.Getenv("PRODUCER_PYTHON")
-	if python == "" {
-		t.Skip("PRODUCER_PYTHON is required for the producer integration fixture")
-	}
+	python, root := testclients.Runtime(t, "gallery-dl")
 	accepted, body := legacySeedFixture(t, nil)
 	// Obtain the pinned producer runtime rather than duplicating it in Go.
-	root, err := filepath.Abs("../../integrations/gallery-dl")
-	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 	version := exec.CommandContext(ctx, python, "-c", "from stash_ingest.gallery import SUPPORTED_VERSION; print(SUPPORTED_VERSION)")

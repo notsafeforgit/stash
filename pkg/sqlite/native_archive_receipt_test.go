@@ -13,7 +13,7 @@ import (
 // The offline verifier must reconstruct the original normalized request even
 // after the producer releases its HTTP body. Both runtimes consume this corpus.
 func TestNativeArchiveSourceRunDigests(t *testing.T) {
-	body, err := os.ReadFile("../../integrations/archive/tests/fixtures/source-run-digests.json")
+	body, err := os.ReadFile("../archive/testdata/source-run-digests.json")
 	require.NoError(t, err)
 	var cases []struct {
 		Name         string                  `json:"name"`

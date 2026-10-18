@@ -296,7 +296,7 @@ verification of the exact saved manifest after interruption or response loss.
 It performs no native database writes or identity/media decisions. The resulting
 chunks are the input to the native catalog importer, whose domain
 mappings, review outcomes and completion receipts remain separate work. See the
-[snapshot command and format](../integrations/gallery-dl/README.md#individual-catalog-snapshots).
+[snapshot command and format](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#individual-catalog-snapshots).
 
 ## Receiving catalog snapshots
 

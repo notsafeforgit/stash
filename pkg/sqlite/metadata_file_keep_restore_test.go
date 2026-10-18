@@ -11,22 +11,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stashapp/stash/internal/testclients"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMetadataFileKeepPortableRestoreRetainsOriginalRequestAndFieldState(t *testing.T) {
+	python, archivePath := testclients.Runtime(t, "archive")
 	f, input := metadataFileReviewFixture(t, `{"title":"Private retained edit"}`)
 	receipt, _, err := applyFileEdit(f.repo, keepFileEditRequest(t, f.repo, input))
 	require.NoError(t, err)
 	before := metadataState(t, f.repo, input.EntityUUID, "title")
 	require.NoError(t, f.db.Close())
-	python := os.Getenv("PRODUCER_PYTHON")
-	if python == "" {
-		python = "python3"
-	}
-	source, err := filepath.Abs("../../integrations/archive/src")
-	require.NoError(t, err)
+	source := filepath.Join(archivePath, "src")
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	command := exec.CommandContext(ctx, python, "-c", metadataFileKeepRestore, f.db.DatabasePath(), t.TempDir())

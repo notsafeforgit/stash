@@ -27,6 +27,22 @@ export default defineConfig({
       name: "sharing-fixture",
       configureServer(server) {
         server.middlewares.use(async (request, response, next) => {
+          if (request.url === "/share/assets/share-theme.js") {
+            try {
+              response.setHeader("Content-Type", "text/javascript");
+              response.end(
+                await readFile(
+                  new URL(
+                    "../../public/assets/share-theme.js",
+                    import.meta.url,
+                  ),
+                ),
+              );
+            } catch (error) {
+              next(error);
+            }
+            return;
+          }
           if (
             /^\/share\/[A-Za-z0-9_-]{22}\/?$/.test(
               new URL(request.url ?? "/", "http://localhost").pathname,
@@ -41,7 +57,14 @@ export default defineConfig({
               );
               const transformed = await server.transformIndexHtml(
                 "/share.html",
-                html.replace("/src/share-main.tsx", "/sharing.tsx"),
+                html
+                  .replace("/src/share-main.tsx", "/sharing.tsx")
+                  // Production extracts CSS into a head link, so it can paint
+                  // before the React module loads. Reproduce that ordering.
+                  .replace(
+                    "</head>",
+                    `<link rel="stylesheet" href="/@fs${source}/styles/globals.css"></head>`,
+                  ),
               );
               response.setHeader("Content-Type", "text/html");
               response.end(transformed);

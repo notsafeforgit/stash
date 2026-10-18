@@ -6,10 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#ffffff" data-app-theme />
+    <script src="./assets/share-theme.js"></script>
     <style>
-      /* Paint Safari's document canvas before the application stylesheet or
-         React loads. ThemeProvider resolves saved overrides before rendering. */
-      html { color-scheme: light dark; background-color: light-dark(#ffffff, #0a0a0a); }
+      /* Resolve both the canvas and fixed body before Safari samples its bar
+         colors. Keep the system fallback usable with JavaScript disabled. */
+      html { color-scheme: light dark; background-color: #ffffff; }
+      @media (prefers-color-scheme: dark) {
+        html { background-color: #0a0a0a; }
+      }
+      html[data-theme="light"] { background-color: #ffffff; }
+      html[data-theme="dark"] { background-color: #0a0a0a; }
+      body { background-color: inherit; }
     </style>
     <meta name="referrer" content="no-referrer" />
     <meta name="robots" content="noindex, nofollow, noarchive" />

@@ -51,6 +51,12 @@ The existing video player and image viewer are composed with owner activity,
 casting and library actions disabled. The standalone entrypoint loads no plugin
 scripts, custom JavaScript, owner configuration, analytics or service worker.
 
+The public document resolves its saved/system theme with a small same-origin
+script before the application loads. Its canvas and fixed body must paint the
+same color from the first frame: Safari can retain the initial color sampled
+from a viewport-sized fixed element. Keep this script parser-blocking and
+external so the share CSP can continue to prohibit inline JavaScript.
+
 Shares use the library's existing media delivery. Images are served in their
 original format, resolution and animation, and scene covers and thumbnails reuse
 existing artwork, including HDR/adaptive AVIF. There is no metadata-stripping or

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { PreviewImageDynamicRange } from "../../src/core/generated-graphql";
-import type { Page } from "@playwright/test";
+import { errors, type Page } from "@playwright/test";
 import { test, expect } from "./test";
 import type {
   SharedContent,
@@ -230,10 +230,22 @@ test("guest HLS playback reuses the player and stops at expiry", async ({
 async function playSharedVideo(page: Page) {
   const video = page.locator("video");
   await expect(video).toBeVisible();
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.readyState),
+    )
+    .toBeGreaterThanOrEqual(2);
   // Opening a link isn't a user gesture. Respect Safari's audible autoplay
-  // policy and exercise the existing Play control if playback is blocked.
+  // policy and exercise the initial Play control if playback is blocked.
+  // Autoplay may start between checking paused and tapping; in that case the
+  // initial button disappears. Verify playback instead of waiting for its return.
   if (await video.evaluate((element: HTMLVideoElement) => element.paused)) {
-    await page.getByRole("button", { name: "Play", exact: true }).first().tap();
+    try {
+      await page.locator("[data-player-native-button]").tap({ timeout: 2000 });
+    } catch (error) {
+      if (!(error instanceof errors.TimeoutError)) throw error;
+      await expect(video).toHaveJSProperty("paused", false);
+    }
   }
 }
 
@@ -265,7 +277,7 @@ test("single-item shares preserve an explicit overview link", async ({
 });
 
 for (const savedTheme of ["system", "dark", "light"] as const) {
-  test(`share canvas and browser chrome follow the ${savedTheme} theme`, async ({
+  test(`share ${savedTheme} theme resolves before React and follows system changes`, async ({
     page,
   }) => {
     const initialSystem = savedTheme === "dark" ? "light" : "dark";
@@ -277,8 +289,15 @@ for (const savedTheme of ["system", "dark", "light"] as const) {
     await serveShare(page, false, 3600, {
       media: [sharedMedia("image-1"), sharedMedia("image-2")],
     });
-    await page.goto(`${base}#test-capability`);
-    await expect(page.getByRole("tab", { name: "Images (2)" })).toBeVisible();
+    let startApp = () => {};
+    const appReady = new Promise<void>((resolve) => {
+      startApp = resolve;
+    });
+    await page.route("**/sharing.tsx", async (route) => {
+      await appReady;
+      await route.continue();
+    });
+    await page.goto(`${base}#test-capability`, { waitUntil: "commit" });
     const checkTheme = async (dark: boolean) => {
       const scheme = dark ? "dark" : "light";
       await expect(page.locator("html")).toHaveCSS("color-scheme", scheme);
@@ -297,7 +316,21 @@ for (const savedTheme of ["system", "dark", "light"] as const) {
         dark ? "rgb(10, 10, 10)" : "rgb(255, 255, 255)",
       );
       await expect(page.locator("body")).toHaveCSS("color-scheme", scheme);
+      await expect(page.locator("body")).toHaveCSS(
+        "background-color",
+        dark ? "rgb(10, 10, 10)" : "rgb(255, 255, 255)",
+      );
     };
+    // Safari may keep the first sampled fixed-body color. Checking only after
+    // React mounts misses a white first paint that leaves the browser bars white.
+    try {
+      await expect(page.locator("body")).toHaveCSS("position", "fixed");
+      await checkTheme(savedTheme !== "light");
+      await expect(page.locator("#root")).toBeEmpty();
+    } finally {
+      startApp();
+    }
+    await expect(page.getByRole("tab", { name: "Images (2)" })).toBeVisible();
     await checkTheme(savedTheme !== "light");
     await page.emulateMedia({
       colorScheme: initialSystem === "dark" ? "light" : "dark",

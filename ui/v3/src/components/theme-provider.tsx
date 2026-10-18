@@ -32,6 +32,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     root.classList.toggle("dark", dark);
     const resolved = dark ? "dark" : "light";
     root.style.colorScheme = resolved;
+    root.dataset.theme = resolved;
 
     // Opt-in document hints follow the resolved theme, including a saved
     // override. Leave the main app's configured browser color untouched.

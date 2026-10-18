@@ -13,6 +13,8 @@ import { OfflineRecoveryControl } from "./offline-recovery-control";
 import { useCallback, useEffect, useState } from "react";
 import { useIntl } from "react-intl";
 import { Button } from "src/components/ui/button";
+import { DestructiveConfirmDialog } from "@/components/shared/destructive-confirm-dialog";
+import { DialogDescription } from "@/components/ui/dialog";
 import {
   SettingsSection,
   SettingSelect,
@@ -56,6 +58,7 @@ export function OfflineSettingsSection() {
     boolean | null
   >(null);
   const [busy, setBusy] = useState(false);
+  const [clearConfirmation, setClearConfirmation] = useState(false);
   const persistenceSupported = canRequestPersistence();
 
   // Refresh storage figures on mount and after each operation completes
@@ -101,16 +104,10 @@ export function OfflineSettingsSection() {
   };
 
   const onClearAll = async () => {
-    if (
-      !window.confirm(
-        intl.formatMessage({ id: "offline.settings.clear_all_confirm" }),
-      )
-    ) {
-      return;
-    }
     setBusy(true);
     try {
       await downloads.removeAll();
+      setClearConfirmation(false);
     } catch {
       // The shared command reports failure; consume this event handler's promise too.
     } finally {
@@ -178,7 +175,7 @@ export function OfflineSettingsSection() {
             variant="outline"
             size="sm"
             disabled={busy}
-            onClick={onClearAll}
+            onClick={() => setClearConfirmation(true)}
           >
             {intl.formatMessage({ id: "offline.actions.clear_all" })}
           </Button>
@@ -208,6 +205,18 @@ export function OfflineSettingsSection() {
           )
         }
       />
+      <DestructiveConfirmDialog
+        open={clearConfirmation}
+        onOpenChange={setClearConfirmation}
+        title={intl.formatMessage({ id: "offline.actions.clear_all" })}
+        confirmText={intl.formatMessage({ id: "offline.actions.clear_all" })}
+        onConfirm={onClearAll}
+        busy={busy}
+      >
+        <DialogDescription>
+          {intl.formatMessage({ id: "offline.settings.clear_all_confirm" })}
+        </DialogDescription>
+      </DestructiveConfirmDialog>
     </SettingsSection>
   );
 }

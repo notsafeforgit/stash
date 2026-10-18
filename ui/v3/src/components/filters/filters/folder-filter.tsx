@@ -42,6 +42,7 @@ const SelectedList: React.FC<{
   excluded?: boolean;
   onUnselect: (item: FolderItem) => void;
 }> = ({ items, excluded, onUnselect }) => {
+  const intl = useIntl();
   if (!items.length) return null;
 
   return (
@@ -52,6 +53,10 @@ const SelectedList: React.FC<{
           <Button
             variant="ghost"
             size="icon-xs"
+            aria-label={intl.formatMessage(
+              { id: "actions.remove_item" },
+              { name: item.label },
+            )}
             onClick={() => onUnselect(item)}
           >
             <X size={16} />
@@ -83,6 +88,7 @@ const FolderRow: React.FC<{
               })}
             >
               <ExpandCollapseButton
+                label={folder.basename}
                 collapsed={!folder.expanded}
                 setCollapsed={() => toggleExpanded(folder)}
                 collapsedIcon={ChevronRight}

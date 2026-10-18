@@ -666,7 +666,9 @@ function LightboxRotateButton({
   const Icon = isCW ? RotateCwIcon : RotateCcwIcon;
 
   return (
-    <button
+    <Button
+      variant="transparent"
+      size="icon-lg"
       type="button"
       className="yarl__button hidden md:block"
       title={label}
@@ -674,7 +676,7 @@ function LightboxRotateButton({
       onClick={() => onRotate(imageId, direction)}
     >
       <Icon className="yarl__icon" />
-    </button>
+    </Button>
   );
 }
 
@@ -820,7 +822,9 @@ export function LightboxCloseButton() {
   });
 
   return (
-    <button
+    <Button
+      variant="transparent"
+      size="lg"
       type="button"
       className="yarl__button lightbox-close-button"
       title={label}
@@ -829,7 +833,7 @@ export function LightboxCloseButton() {
     >
       <XIcon className="yarl__icon" />
       <span className="lightbox-close-label md:hidden">{label}</span>
-    </button>
+    </Button>
   );
 }
 
@@ -866,7 +870,9 @@ export function OriginalSizeButton({
   const label = intl.formatMessage(originalSizeLabel(atOriginal));
   const Icon = atOriginal ? Minimize2Icon : Maximize2Icon;
   return (
-    <button
+    <Button
+      variant="transparent"
+      size="icon-lg"
       type="button"
       className="yarl__button"
       title={label}
@@ -874,7 +880,7 @@ export function OriginalSizeButton({
       onClick={() => toggleOriginalSize(zoomRef.current, atOriginal)}
     >
       <Icon className="yarl__icon" />
-    </button>
+    </Button>
   );
 }
 

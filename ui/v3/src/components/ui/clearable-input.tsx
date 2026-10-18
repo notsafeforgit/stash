@@ -2,7 +2,12 @@ import type React from "react";
 import { useRef } from "react";
 import { X } from "lucide-react";
 import { useIntl } from "react-intl";
-import { Input } from "src/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 
 export interface IClearableInput {
   className?: string;
@@ -44,27 +49,30 @@ export const ClearableInput: React.FC<IClearableInput> = ({
   }
 
   return (
-    <div className={`clearable-input-group${className ? ` ${className}` : ""}`}>
-      <Input
+    <InputGroup className={className}>
+      <InputGroupInput
         ref={inputRef}
         type="text"
-        className="clearable-text-field"
         placeholder={placeholder}
+        aria-label={placeholder ?? intl.formatMessage({ id: "actions.search" })}
         value={value}
         onChange={(e) => setValue(e.currentTarget.value)}
         onKeyDown={onInputKeyDown}
       />
       {queryClearShowing && (
-        <button
-          type="button"
-          onClick={onClearQuery}
-          title={intl.formatMessage({ id: "actions.clear" })}
-          className="clearable-text-field-clear"
-        >
-          <X className="icon" size={16} />
-        </button>
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            type="button"
+            size="icon-xs"
+            onClick={onClearQuery}
+            title={intl.formatMessage({ id: "actions.clear" })}
+            aria-label={intl.formatMessage({ id: "actions.clear" })}
+          >
+            <X />
+          </InputGroupButton>
+        </InputGroupAddon>
       )}
-    </div>
+    </InputGroup>
   );
 };
 

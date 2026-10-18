@@ -5,7 +5,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useId, useState } from "react";
+import { useIntl } from "react-intl";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   className?: string;
@@ -18,64 +20,72 @@ interface Props {
 export const CollapseButton: React.FC<React.PropsWithChildren<Props>> = (
   props: React.PropsWithChildren<Props>,
 ) => {
-  const [open, setOpen] = useState(props.open ?? false);
+  const [internalOpen, setOpen] = useState(false);
+  const open = props.open ?? internalOpen;
+  const panelId = useId();
 
   function toggleOpen() {
     const nv = !open;
-    setOpen(nv);
+    if (props.open === undefined) setOpen(nv);
     props.onOpenChanged?.(nv);
   }
 
-  useEffect(() => {
-    if (props.open !== undefined) {
-      setOpen(props.open);
-    }
-  }, [props.open]);
-
   return (
     <div className={props.className}>
-      <div className="collapse-header">
-        <button
+      <div>
+        <Button
           type="button"
+          variant="ghost"
+          aria-expanded={open}
+          aria-controls={panelId}
           onClick={() => toggleOpen()}
-          className="minimal collapse-button"
         >
           {open ? (
-            <ChevronDown className="icon" size={16} />
+            <ChevronDown data-icon="inline-start" />
           ) : (
-            <ChevronRight className="icon" size={16} />
+            <ChevronRight data-icon="inline-start" />
           )}
           <span>{props.text}</span>
-        </button>
+        </Button>
       </div>
       {props.outsideCollapse}
-      {open && <div>{props.children}</div>}
+      <div id={panelId} hidden={!open}>
+        {open && props.children}
+      </div>
     </div>
   );
 };
 
 export const ExpandCollapseButton: React.FC<{
+  label: string;
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
   collapsedIcon?: LucideIcon;
   notCollapsedIcon?: LucideIcon;
-}> = ({ collapsedIcon, notCollapsedIcon, collapsed, setCollapsed }) => {
+}> = ({ label, collapsedIcon, notCollapsedIcon, collapsed, setCollapsed }) => {
+  const intl = useIntl();
+  const action = intl.formatMessage(
+    { id: collapsed ? "actions.expand_item" : "actions.collapse_item" },
+    { name: label },
+  );
   const ButtonIcon = collapsed
     ? (collapsedIcon ?? ChevronDown)
     : (notCollapsedIcon ?? ChevronUp);
 
   return (
-    <span className="detail-expand-collapse">
-      <button
-        type="button"
-        className="minimal expand-collapse"
-        onClick={(e) => {
-          setCollapsed(!collapsed);
-          e.stopPropagation();
-        }}
-      >
-        <ButtonIcon className="icon" size={16} />
-      </button>
-    </span>
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      aria-label={action}
+      title={action}
+      aria-expanded={!collapsed}
+      onClick={(e) => {
+        setCollapsed(!collapsed);
+        e.stopPropagation();
+      }}
+    >
+      <ButtonIcon />
+    </Button>
   );
 };

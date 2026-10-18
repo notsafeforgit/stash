@@ -2,6 +2,8 @@ import React from "react";
 import { CheckIcon, Pin } from "lucide-react";
 import { Combobox as ComboboxPrimitive } from "@base-ui/react";
 import { cn } from "@/lib/utils";
+import { useIntl } from "react-intl";
+import { Button } from "@/components/ui/button";
 import {
   Combobox,
   ComboboxContent,
@@ -24,20 +26,21 @@ export interface PinButtonProps {
 export function PinButton({
   pinned,
   onToggle,
-  pinnedTitle = "Unpin",
-  unpinnedTitle = "Pin",
+  pinnedTitle,
+  unpinnedTitle,
 }: PinButtonProps) {
+  const intl = useIntl();
+  const title = pinned
+    ? (pinnedTitle ?? intl.formatMessage({ id: "actions.unpin" }))
+    : (unpinnedTitle ?? intl.formatMessage({ id: "actions.pin" }));
   return (
-    <button
+    <Button
       type="button"
-      className={cn(
-        "inline-flex shrink-0 items-center rounded border-none bg-transparent p-0.5 cursor-pointer transition-colors",
-        pinned
-          ? "text-primary hover:text-primary/70"
-          : "text-foreground/40 hover:text-foreground",
-      )}
-      title={pinned ? pinnedTitle : unpinnedTitle}
-      aria-label={pinned ? pinnedTitle : unpinnedTitle}
+      variant={pinned ? "secondary" : "ghost"}
+      size="icon-xs"
+      title={title}
+      aria-label={title}
+      aria-pressed={pinned}
       onPointerDown={(e) => {
         e.stopPropagation();
         e.preventDefault();
@@ -47,10 +50,8 @@ export function PinButton({
         onToggle();
       }}
     >
-      <Pin
-        className={cn("size-4 transition-transform", !pinned && "rotate-45")}
-      />
-    </button>
+      <Pin className={cn("transition-transform", !pinned && "rotate-45")} />
+    </Button>
   );
 }
 

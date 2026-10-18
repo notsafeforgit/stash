@@ -359,7 +359,16 @@
     "edit_search": "Edit search",
     "clear_search": "Clear search",
     "copy_image": "Copy image",
-    "save_image": "Save image"
+    "save_image": "Save image",
+    "expand_item": "Expand {name}",
+    "collapse_item": "Collapse {name}",
+    "remove_item": "Remove {name} from selection",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pin_sort": "Pin sort",
+    "unpin_sort": "Unpin sort",
+    "pin_field": "Pin field",
+    "unpin_field": "Unpin field"
   },
   "actions_name": "Actions",
   "add_row": "Add row",

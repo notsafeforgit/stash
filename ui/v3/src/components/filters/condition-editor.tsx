@@ -171,8 +171,8 @@ const FieldComboBox: React.FC<{
       renderItemAddon={(v, isPinned) => (
         <PinButton
           pinned={isPinned}
-          pinnedTitle="Unpin field"
-          unpinnedTitle="Pin field"
+          pinnedTitle={intl.formatMessage({ id: "actions.unpin_field" })}
+          unpinnedTitle={intl.formatMessage({ id: "actions.pin_field" })}
           onToggle={() => onTogglePinned(v as CriterionType)}
         />
       )}

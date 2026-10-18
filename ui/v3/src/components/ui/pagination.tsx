@@ -1,8 +1,7 @@
 import * as React from "react";
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button";
-import type { VariantProps } from "class-variance-authority";
+import { Button } from "@/components/ui/button";
 
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
   return (
@@ -38,8 +37,7 @@ type PaginationLinkProps = {
   isActive?: boolean;
   disabled?: boolean;
   onClick?: () => void;
-} & Pick<VariantProps<typeof buttonVariants>, "size"> &
-  Omit<React.ComponentProps<"button">, "size">;
+} & React.ComponentProps<typeof Button>;
 
 const PaginationLink = React.forwardRef<HTMLButtonElement, PaginationLinkProps>(
   function PaginationLink(
@@ -47,20 +45,16 @@ const PaginationLink = React.forwardRef<HTMLButtonElement, PaginationLinkProps>(
     ref,
   ) {
     return (
-      <button
+      <Button
         ref={ref}
         type="button"
         aria-current={isActive ? "page" : undefined}
         disabled={disabled}
         data-slot="pagination-link"
         data-active={isActive}
-        className={cn(
-          buttonVariants({
-            variant: isActive ? "outline" : "ghost",
-            size,
-          }),
-          className,
-        )}
+        variant={isActive ? "outline" : "ghost"}
+        size={size}
+        className={className}
         {...props}
       />
     );

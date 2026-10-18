@@ -261,8 +261,12 @@ export const ListToolbar: React.FC<ListToolbarProps> = ({
                   renderItemAddon={(value, isPinned) => (
                     <PinButton
                       pinned={isPinned}
-                      pinnedTitle="Unpin sort"
-                      unpinnedTitle="Pin sort"
+                      pinnedTitle={intl.formatMessage({
+                        id: "actions.unpin_sort",
+                      })}
+                      unpinnedTitle={intl.formatMessage({
+                        id: "actions.pin_sort",
+                      })}
                       onToggle={() => toggleSortPin(value)}
                     />
                   )}

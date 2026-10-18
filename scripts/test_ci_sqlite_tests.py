@@ -2,6 +2,7 @@ from collections import Counter
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import re
 import shlex
@@ -9,13 +10,36 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from ci_sqlite_tests import (
-    check_coverage, discover_tests, read_results, run_tests, shard_tests, test_command,
+    check_coverage, discover_tests, read_results, run_tests, shard_tests,
+    sqlite_subpackages, test_command,
 )
 
 
 class SQLiteShardingTest(unittest.TestCase):
+    def test_subpackage_discovery_does_not_require_generated_ui(self):
+        makefile = Path(__file__).resolve().parents[1] / "Makefile"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "go.mod").write_text("module example.invalid/archive\n\ngo 1.20\n")
+            (root / "Makefile").write_text(makefile.read_text())
+            for package in ("pkg/sqlite", "pkg/sqlite/blob", "pkg/sqlite/future"):
+                target = root / package
+                target.mkdir(parents=True, exist_ok=True)
+                (target / "package.go").write_text("package fixture\n")
+            (root / "ui").mkdir()
+            (root / "ui/ui.go").write_text(
+                'package ui\nimport _ "embed"\n//go:embed build/app.js\nvar app []byte\n')
+            with contextlib.chdir(root), patch.dict(os.environ, {"GOWORK": "off", "GOTOOLCHAIN": "local"}):
+                unrelated = subprocess.run(["go", "list", "./..."], text=True, capture_output=True)
+                self.assertNotEqual(unrelated.returncode, 0)
+                self.assertIn("no matching files found", unrelated.stderr)
+                self.assertEqual(sqlite_subpackages("example.invalid/archive"), [
+                    "example.invalid/archive/pkg/sqlite/blob", "example.invalid/archive/pkg/sqlite/future",
+                ])
+
     def test_discovery_and_shards_cover_tests_examples_and_fuzz_seeds_once(self):
         names = discover_tests("\n".join([
             "TestWrite", "TestWriteRollback", "TestNewFeature", "ExampleRead",
@@ -68,13 +92,15 @@ class SQLiteShardingTest(unittest.TestCase):
                 {"Package": "sqlite", "Action": "pass", "Test": "TestOne", "Elapsed": 3},
                 {"Package": "other", "Action": "pass", "Test": "TestOther", "Elapsed": 4},
                 {"Package": "sqlite", "Action": "skip", "Test": "TestHelper"},
+                {"Package": "sqlite", "Action": "output", "Output": "ok  \tsqlite\t(cached)\n"},
                 {"Package": "sqlite", "Action": "pass", "Elapsed": 5},
             ]
             path.write_text("\n".join(json.dumps(event) for event in events) + "\n")
-            completed, timings, passed = read_results(path, "sqlite")
+            completed, timings, passed, cached = read_results(path, "sqlite")
             self.assertEqual(completed, Counter(["TestOne", "TestHelper"]))
             self.assertEqual(timings["TestOne"]["seconds"], 3)
             self.assertTrue(passed)
+            self.assertTrue(cached)
             self.assertFalse(read_results(path, "missing")[2])
 
     def test_failed_process_retains_output_and_cannot_be_successful(self):
@@ -84,7 +110,8 @@ class SQLiteShardingTest(unittest.TestCase):
                 status = run_tests([sys.executable, "-c", "print('build failed'); raise SystemExit(2)"], path)
             self.assertEqual(status, 2)
             self.assertEqual(path.read_text(), "build failed\n")
-            completed, timings, passed = read_results(path, "sqlite")
+            completed, timings, passed, cached = read_results(path, "sqlite")
+            self.assertFalse(cached)
             self.assertTrue(check_coverage(["TestOne"], completed, timings, passed))
 
 

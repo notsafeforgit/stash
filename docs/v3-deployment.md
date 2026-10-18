@@ -50,6 +50,10 @@ once. Tests remain sequential within each runner because some share global
 configuration and database fixtures. All four shards must pass the publication
 gate. Each job summary lists its slowest tests; the `sqlite-tests-*` artifacts
 retain complete JSON output and timings for seven days, including on failure.
+Go's normal result cache remains enabled, and summaries distinguish reused
+results from fresh execution. Set `GOFLAGS=-count=1` when measuring uncached
+timings locally; cached results still contain the events needed by the coverage
+check.
 Only the other backend job installs media fixture tools; SQLite tests do not
 launch FFmpeg or image converters.
 

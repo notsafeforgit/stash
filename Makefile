@@ -339,7 +339,7 @@ it:
 
 .PHONY: list-test-packages
 list-test-packages:
-	@go list -tags "$(GO_BUILD_TAGS) integration" ./...
+	@go list -tags "$(GO_BUILD_TAGS) integration" $(GO_TEST_PACKAGES)
 
 # generates test mocks
 .PHONY: generate-test-mocks

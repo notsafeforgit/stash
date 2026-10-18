@@ -46,6 +46,16 @@ def test_command(packages, flags):
             "GO_TEST_FLAGS=" + shlex.join(flags).replace("$", "$$")]
 
 
+def sqlite_subpackages(module):
+    # Listing unrelated packages can require generated UI/API files. SQLite
+    # shards deliberately start before those artifacts exist.
+    package = module + "/pkg/sqlite"
+    packages = subprocess.check_output(
+        ["make", "--no-print-directory", "-s", "list-test-packages",
+         "GO_TEST_PACKAGES=" + package + "/..."], text=True).split()
+    return [p for p in select_packages(packages, module, "sqlite") if p != package]
+
+
 def run_tests(command, path):
     recent = deque(maxlen=100)
     with path.open("w") as output:
@@ -72,6 +82,7 @@ def read_results(path, package):
     completed = Counter()
     timings = {}
     package_passed = False
+    cached = False
     with path.open() as source:
         for line in source:
             try:
@@ -84,10 +95,12 @@ def read_results(path, package):
             if not name:
                 if action == "pass":
                     package_passed = True
+                if action == "output" and re.fullmatch(r"ok\s+\S+\s+\(cached\)\s*", event.get("Output", "")):
+                    cached = True
             elif "/" not in name and action in ("pass", "fail", "skip"):
                 completed[name] += 1
                 timings[name] = {"seconds": event.get("Elapsed", 0), "result": action}
-    return completed, timings, package_passed
+    return completed, timings, package_passed, cached
 
 
 def check_coverage(selected, completed, timings, package_passed):
@@ -126,25 +139,25 @@ def main():
     # of its subtests and all fuzz seed cases. Preserve Go's normal test order.
     pattern = "^(" + "|".join(re.escape(name) for name in selected) + ")$"
     path = args.output / "tests.jsonl"
-    status = run_tests(test_command([package], ["-json", "-count=1", "-run", pattern]), path)
-    completed, timings, passed = read_results(path, package)
+    status = run_tests(test_command([package], ["-json", "-run", pattern]), path)
+    completed, timings, passed, cached = read_results(path, package)
     errors = check_coverage(selected, completed, timings, passed)
     # Include all present/future SQLite subpackages exactly once, without
     # applying the root package's name filter to them.
     if args.shard == 1:
-        packages = subprocess.check_output(
-            ["make", "--no-print-directory", "-s", "list-test-packages"], text=True).split()
-        children = [p for p in select_packages(packages, module, "sqlite") if p != package]
+        children = sqlite_subpackages(module)
         if children:
-            child_status = run_tests(test_command(children, ["-json", "-count=1"]),
+            child_status = run_tests(test_command(children, ["-json"]),
                                      args.output / "subpackages.jsonl")
             if child_status:
                 errors.append("SQLite subpackages failed")
         report["subpackages"] = children
-    report.update(timings=timings, errors=errors, exit_code=1 if status or errors else 0)
+    report.update(timings=timings, cached=cached, errors=errors, exit_code=1 if status or errors else 0)
     report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    timing_source = "Go reused valid cached results; timings describe that recorded execution." if cached else "Fresh test execution."
     summary = [f"### SQLite shard {args.shard}/{args.shards}", "",
                f"Completed {len(completed)} of {len(selected)} selected tests; {len(names)} discovered in total.", "",
+               timing_source, "",
                "| Slowest top-level test | Seconds | Result |", "| --- | ---: | --- |"]
     for name, result in sorted(timings.items(), key=lambda item: (-item[1]["seconds"], item[0]))[:20]:
         summary.append(f"| `{name}` | {result['seconds']:.2f} | {result['result']} |")

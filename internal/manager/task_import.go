@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/stashapp/stash/pkg/file"
@@ -152,30 +154,52 @@ func (t *ImportTask) unzipFile() error {
 	}
 	defer r.Close()
 
+	// Validate the complete archive before creating any output. ZIP names are
+	// slash-separated, relative paths; accept only ordinary files/directories.
+	// Reject Windows separators and drive names on every platform as well.
 	for _, f := range r.File {
-		fn := filepath.Join(t.BaseDir, f.Name)
+		name := strings.TrimSuffix(f.Name, "/")
+		if name == "." || !fs.ValidPath(name) || strings.ContainsAny(name, `\:`) ||
+			(!f.Mode().IsRegular() && !f.Mode().IsDir()) {
+			return fmt.Errorf("unsafe import archive entry %q", f.Name)
+		}
+	}
+
+	// Root resolves paths beneath the opened directory even if a component is
+	// replaced with a symlink between validation and the actual filesystem call.
+	root, err := os.OpenRoot(t.BaseDir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
+	for _, f := range r.File {
+		fn, err := filepath.Localize(strings.TrimSuffix(f.Name, "/"))
+		if err != nil {
+			return fmt.Errorf("invalid import archive entry %q: %w", f.Name, err)
+		}
 
 		if f.FileInfo().IsDir() {
-			if err := os.MkdirAll(fn, os.ModePerm); err != nil {
-				logger.Warnf("couldn't create directory %v while unzipping import file: %v", fn, err)
+			if err := root.MkdirAll(fn, os.ModePerm); err != nil {
+				return fmt.Errorf("creating import directory %q: %w", f.Name, err)
 			}
 			continue
 		}
 
-		if err := t.unzipFileEntry(f, fn); err != nil {
-			return err
+		if err := t.unzipFileEntry(root, f, fn); err != nil {
+			return fmt.Errorf("extracting import entry %q: %w", f.Name, err)
 		}
 	}
 
 	return nil
 }
 
-func (t *ImportTask) unzipFileEntry(f *zip.File, fn string) error {
-	if err := os.MkdirAll(filepath.Dir(fn), os.ModePerm); err != nil {
+func (t *ImportTask) unzipFileEntry(root *os.Root, f *zip.File, fn string) error {
+	if err := root.MkdirAll(filepath.Dir(fn), os.ModePerm); err != nil {
 		return err
 	}
 
-	o, err := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+	o, err := root.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode().Perm())
 	if err != nil {
 		return err
 	}
@@ -188,7 +212,7 @@ func (t *ImportTask) unzipFileEntry(f *zip.File, fn string) error {
 	defer i.Close()
 
 	_, err = io.Copy(o, i)
-	return err
+	return errors.Join(err, o.Close())
 }
 
 func (t *ImportTask) ImportPerformers(ctx context.Context) {

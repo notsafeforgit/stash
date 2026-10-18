@@ -88,7 +88,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-native-go
         with:
-          suite: tests-sqlite
+          suite: tests-sqlite-${{ matrix.shard }}
       - name: SQLite unit and integration tests
         run: >-
           python3 scripts/ci_sqlite_tests.py

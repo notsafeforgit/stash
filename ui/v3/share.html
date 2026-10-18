@@ -5,8 +5,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" data-color-scheme="light" />
-    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" data-color-scheme="dark" />
+    <meta name="theme-color" content="#ffffff" data-app-theme />
+    <style>
+      /* Paint Safari's document canvas before the application stylesheet or
+         React loads. ThemeProvider resolves saved overrides before rendering. */
+      html { color-scheme: light dark; background-color: light-dark(#ffffff, #0a0a0a); }
+    </style>
     <meta name="referrer" content="no-referrer" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <title>Shared media</title>

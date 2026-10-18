@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -25,13 +26,30 @@ export default defineConfig({
     {
       name: "sharing-fixture",
       configureServer(server) {
-        server.middlewares.use((request, _response, next) => {
+        server.middlewares.use(async (request, response, next) => {
           if (
             /^\/share\/[A-Za-z0-9_-]{22}\/?$/.test(
               new URL(request.url ?? "/", "http://localhost").pathname,
             )
-          )
-            request.url = "/share.html";
+          ) {
+            try {
+              // Use the real document head too: Safari's theme and safe-area
+              // behavior cannot be tested with a different fixture shell.
+              const html = await readFile(
+                new URL("../../share.html", import.meta.url),
+                "utf8",
+              );
+              const transformed = await server.transformIndexHtml(
+                "/share.html",
+                html.replace("/src/share-main.tsx", "/sharing.tsx"),
+              );
+              response.setHeader("Content-Type", "text/html");
+              response.end(transformed);
+            } catch (error) {
+              next(error);
+            }
+            return;
+          }
           next();
         });
       },

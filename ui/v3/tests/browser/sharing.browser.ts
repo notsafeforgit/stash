@@ -169,20 +169,22 @@ test("guest image viewer needs no owner providers and removes the link secret", 
 }) => {
   const fixture = await serveShare(page, false);
   await page.goto(`${base}#test-capability`);
-  await expect(
-    page.getByRole("heading", { name: "Shared example" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Preview Image" }),
-  ).toBeVisible();
+  await expect(page.locator(".yarl__portal")).toBeVisible();
   expect(new URL(page.url()).hash).toBe("");
   expect(fixture.exchanges()).toBe(1);
-  await page.getByRole("button", { name: "Preview Image" }).press("Enter");
-  await expect(page.locator(".yarl__portal")).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Download original" }),
   ).toHaveCount(0);
   expect(fixture.requests).not.toContain("graphql");
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.locator(".yarl__portal")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Shared example" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Preview Image" }).press("Enter");
+  await expect(page.locator(".yarl__portal")).toBeVisible();
+  await page.goBack();
+  await expect(page.locator(".yarl__portal")).toHaveCount(0);
 });
 
 test("crawler-compatible links open normally and remove the query credential", async ({
@@ -190,15 +192,11 @@ test("crawler-compatible links open normally and remove the query credential", a
 }) => {
   const fixture = await serveShare(page, false);
   await page.goto(`${base}?key=test-capability`);
-  await expect(
-    page.getByRole("heading", { name: "Shared example" }),
-  ).toBeVisible();
+  await expect(page.locator(".yarl__portal")).toBeVisible();
   expect(new URL(page.url()).search).toBe("");
   expect(fixture.exchanges()).toBe(1);
   await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "Shared example" }),
-  ).toBeVisible();
+  await expect(page.locator(".yarl__portal")).toBeVisible();
   expect(fixture.exchanges()).toBe(1);
 });
 
@@ -207,10 +205,7 @@ test("guest HLS playback reuses the player and stops at expiry", async ({
 }) => {
   const fixture = await serveShare(page, true, 12);
   await page.goto(`${base}#test-capability`);
-  await page
-    .locator('.entity-card[data-id="scene-1"] [data-entity-card-preview]')
-    .click();
-  await expect(page.locator("video")).toBeVisible();
+  await playSharedVideo(page);
   await expect
     .poll(() =>
       page
@@ -230,6 +225,98 @@ test("guest HLS playback reuses the player and stops at expiry", async ({
   expect(fixture.requests.some((request) => request.endsWith(".m4s"))).toBe(
     true,
   );
+});
+
+async function playSharedVideo(page: Page) {
+  const video = page.locator("video");
+  await expect(video).toBeVisible();
+  // Opening a link isn't a user gesture. Respect Safari's audible autoplay
+  // policy and exercise the existing Play control if playback is blocked.
+  if (await video.evaluate((element: HTMLVideoElement) => element.paused)) {
+    await page.getByRole("button", { name: "Play", exact: true }).first().tap();
+  }
+}
+
+test("one distinct item opens directly even when shared through overlapping gallery entries", async ({
+  page,
+}) => {
+  await serveShare(page, false, 3600, {
+    entries: [
+      { kind: "IMAGE", title: "Image", media_keys: ["image-1"] },
+      { kind: "GALLERY", title: "Album", media_keys: ["image-1"] },
+    ],
+  });
+  await page.goto(`${base}#test-capability`);
+  await expect(page.locator(".yarl__portal")).toBeVisible();
+  await expect(
+    page.locator(".yarl__slide_current img.yarl__slide_image"),
+  ).toHaveAttribute("src", `${base}media/image-1/image`);
+});
+
+test("single-item shares preserve an explicit overview link", async ({
+  page,
+}) => {
+  await serveShare(page, false);
+  await page.goto(`${base}?tab=images#test-capability`);
+  await expect(
+    page.getByRole("button", { name: "Preview Image" }),
+  ).toBeVisible();
+  await expect(page.locator(".yarl__portal")).toHaveCount(0);
+});
+
+for (const savedTheme of ["system", "dark", "light"] as const) {
+  test(`share canvas and browser chrome follow the ${savedTheme} theme`, async ({
+    page,
+  }) => {
+    const initialSystem = savedTheme === "dark" ? "light" : "dark";
+    await page.emulateMedia({ colorScheme: initialSystem });
+    await page.addInitScript(
+      (theme) => localStorage.setItem("theme", theme),
+      savedTheme,
+    );
+    await serveShare(page, false, 3600, {
+      media: [sharedMedia("image-1"), sharedMedia("image-2")],
+    });
+    await page.goto(`${base}#test-capability`);
+    await expect(page.getByRole("tab", { name: "Images (2)" })).toBeVisible();
+    const checkTheme = async (dark: boolean) => {
+      const scheme = dark ? "dark" : "light";
+      await expect(page.locator("html")).toHaveCSS("color-scheme", scheme);
+      await expect(page.locator('meta[name="color-scheme"]')).toHaveAttribute(
+        "content",
+        scheme,
+      );
+      const hint = page.locator('meta[name="theme-color"]');
+      await expect(hint).toHaveCount(1);
+      await expect(hint).toHaveAttribute(
+        "content",
+        dark ? "#0a0a0a" : "#ffffff",
+      );
+      await expect(page.locator("html")).toHaveCSS(
+        "background-color",
+        dark ? "rgb(10, 10, 10)" : "rgb(255, 255, 255)",
+      );
+      await expect(page.locator("body")).toHaveCSS("color-scheme", scheme);
+    };
+    await checkTheme(savedTheme !== "light");
+    await page.emulateMedia({
+      colorScheme: initialSystem === "dark" ? "light" : "dark",
+    });
+    await checkTheme(savedTheme === "dark");
+  });
+}
+
+test.describe("share before JavaScript loads", () => {
+  test.use({ javaScriptEnabled: false, colorScheme: "dark" });
+  test("paints the document canvas dark before the app starts", async ({
+    page,
+  }) => {
+    await page.goto(base);
+    await expect(page.locator("html")).toHaveCSS(
+      "background-color",
+      "rgb(10, 10, 10)",
+    );
+  });
 });
 
 const mixed = [
@@ -491,9 +578,7 @@ test("shares prefer playable original video without starting an encoder", async 
     originalVideo: "playable",
   });
   await page.goto(`${base}#test-capability`);
-  await page
-    .locator('.entity-card[data-id="scene-1"] [data-entity-card-preview]')
-    .click();
+  await playSharedVideo(page);
   const video = page.locator("video");
   await expect(video).toBeVisible();
   await expect
@@ -510,6 +595,12 @@ test("shares prefer playable original video without starting an encoder", async 
   await expect(
     page.getByRole("link", { name: "Download original" }),
   ).toHaveCount(0);
+  const bounds = await page.locator(".yarl__portal").boundingBox();
+  expect(bounds?.width).toBe(page.viewportSize()?.width);
+  expect(bounds?.height).toBe(page.viewportSize()?.height);
+  await page.screenshot({
+    path: test.info().outputPath("single-share-viewer.png"),
+  });
   await page.keyboard.press("Escape");
   await expect(page.locator(".yarl__portal")).toHaveCount(0);
   expect(
@@ -528,9 +619,7 @@ for (const originalVideo of ["unsupported", "decode-error"] as const) {
       media: [media],
     });
     await page.goto(`${base}#test-capability`);
-    await page
-      .locator('.entity-card[data-id="scene-1"] [data-entity-card-preview]')
-      .click();
+    await playSharedVideo(page);
     const video = page.locator("video");
     await expect(video).toBeVisible();
     await expect

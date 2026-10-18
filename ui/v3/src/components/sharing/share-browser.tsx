@@ -214,7 +214,17 @@ export function ShareBrowser({
   const [lightbox, setLightbox] = useState<{
     media: SharedMedia[];
     selectedKey: string;
-  } | null>(null);
+  } | null>(() => {
+    // Count distinct media, including a one-item gallery or overlapping entries.
+    // Explicit detail/tab links still open their requested view. Initial state
+    // avoids a grid flash and lets Close return to the overview without reopening.
+    if (location.tab || location.gallery || location.media) return null;
+    const onlyItem =
+      collections.byKey.size === 1
+        ? collections.byKey.values().next().value
+        : undefined;
+    return onlyItem ? { media: [onlyItem], selectedKey: onlyItem.key } : null;
+  });
   const openViewer = useCallback(
     (item: SharedMedia) => {
       const available =

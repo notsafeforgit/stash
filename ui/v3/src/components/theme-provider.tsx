@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useState,
   type PropsWithChildren,
 } from "react";
@@ -29,20 +30,22 @@ export function ThemeProvider({ children }: PropsWithChildren) {
       (t === "system" &&
         window.matchMedia("(prefers-color-scheme: dark)").matches);
     root.classList.toggle("dark", dark);
+    const resolved = dark ? "dark" : "light";
+    root.style.colorScheme = resolved;
 
     // Opt-in document hints follow the resolved theme, including a saved
     // override. Leave the main app's configured browser color untouched.
     for (const meta of document.querySelectorAll<HTMLMetaElement>(
-      'meta[name="theme-color"][data-color-scheme]',
+      'meta[name="theme-color"][data-app-theme]',
     )) {
-      meta.media =
-        meta.dataset.colorScheme === (dark ? "dark" : "light")
-          ? "all"
-          : "not all";
+      meta.content = dark ? "#0a0a0a" : "#ffffff";
     }
+    document
+      .querySelector('meta[name="color-scheme"]')
+      ?.setAttribute("content", resolved);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyTheme(theme);
   }, [theme, applyTheme]);
 

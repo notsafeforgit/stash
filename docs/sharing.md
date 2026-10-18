@@ -32,8 +32,12 @@ source files fail closed. Archive images also pin the archive's identity.
 Titles are a snapshot: subsequent metadata edits do not change an existing share.
 Membership changes require creating a new share.
 
-Recipients browse the normal virtualized entity cards, with tabs for the media
-types present in the share and no filtering, sorting or selection controls.
+Shares containing one distinct image or video open directly in the existing
+full-screen viewer, including a gallery containing only that item. Close returns
+to the overview; explicit tab and detail links still open the requested view.
+Videos respect the browser's autoplay policy and may require tapping Play.
+Multi-item shares use the normal virtualized entity cards, with tabs for the
+media types present and no filtering, sorting or selection controls.
 Previews open the existing image or scene lightbox; card titles open minimal
 detail views with media and the permitted download action. Gallery details show
 their frozen membership. Browser Back closes a lightbox or returns to the

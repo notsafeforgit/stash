@@ -231,7 +231,9 @@ func (m *Manager) executeJob(ctx context.Context, j *Job, done chan struct{}) {
 	progress := m.newProgress(j)
 	if err := j.exec.Execute(ctx, progress); err != nil {
 		logger.Errorf("task failed due to error: %v", err)
+		m.mutex.Lock()
 		j.error(err)
+		m.mutex.Unlock()
 	}
 }
 

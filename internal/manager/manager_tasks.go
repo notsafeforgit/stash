@@ -198,10 +198,7 @@ func (s *Manager) Import(ctx context.Context) (int, error) {
 			MissingRefBehaviour: models.ImportMissingRefEnumFail,
 			fileNamingAlgorithm: config.GetVideoFileNamingAlgorithm(),
 		}
-		task.Start(ctx)
-
-		// TODO - return error from task
-		return nil
+		return task.Start(ctx)
 	})
 
 	return s.JobManager.Add(ctx, "Importing...", j), nil
@@ -215,33 +212,22 @@ func (s *Manager) Export(ctx context.Context) (int, error) {
 	}
 
 	j := job.MakeJobExec(func(ctx context.Context, progress *job.Progress) error {
-		var wg sync.WaitGroup
-		wg.Add(1)
 		task := ExportTask{
 			repository:          s.Repository,
 			full:                true,
 			fileNamingAlgorithm: config.GetVideoFileNamingAlgorithm(),
 		}
-		task.Start(ctx, &wg)
-		// TODO - return error from task
-		return nil
+		return task.Start(ctx)
 	})
 
 	return s.JobManager.Add(ctx, "Exporting...", j), nil
 }
 
-func (s *Manager) RunSingleTask(ctx context.Context, t Task) int {
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	j := job.MakeJobExec(func(ctx context.Context, progress *job.Progress) error {
-		t.Start(ctx)
-		defer wg.Done()
-		// TODO - return error from task
-		return nil
-	})
-
-	return s.JobManager.Add(ctx, t.GetDescription(), j)
+func (s *Manager) RunSingleTask(ctx context.Context, t interface {
+	job.JobExec
+	GetDescription() string
+}) int {
+	return s.JobManager.Add(ctx, t.GetDescription(), t)
 }
 
 func (s *Manager) Generate(ctx context.Context, input GenerateMetadataInput) (int, error) {

@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"context"
 	gojson "encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -34,6 +35,7 @@ import (
 )
 
 type ExportTask struct {
+	failures   taskFailures
 	repository models.Repository
 	full       bool
 
@@ -114,8 +116,12 @@ func CreateExportTask(a models.HashAlgorithm, input ExportObjectsInput) *ExportT
 	}
 }
 
-func (t *ExportTask) Start(ctx context.Context, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (t *ExportTask) Start(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	t.failures = taskFailures{}
+	t.DownloadHash = ""
 	// @manager.total = Scene.count + Gallery.count + Performer.count + Studio.count + Group.count
 	workerCount := runtime.GOMAXPROCS(0) // set worker count to number of cpus available
 
@@ -127,8 +133,7 @@ func (t *ExportTask) Start(ctx context.Context, wg *sync.WaitGroup) {
 		var err error
 		t.baseDir, err = instance.Paths.Generated.TempDir("export")
 		if err != nil {
-			logger.Errorf("error creating temporary directory for export: %v", err)
-			return
+			return fmt.Errorf("creating temporary directory for export: %w", err)
 		}
 
 		defer func() {
@@ -140,16 +145,16 @@ func (t *ExportTask) Start(ctx context.Context, wg *sync.WaitGroup) {
 	}
 
 	if t.baseDir == "" {
-		logger.Errorf("baseDir must not be empty")
-		return
+		return errors.New("export baseDir must not be empty")
 	}
 
 	t.json = jsonUtils{
 		json: *paths.GetJSONPaths(t.baseDir),
 	}
 
-	paths.EmptyJSONDirs(t.baseDir)
-	paths.EnsureJSONDirs(t.baseDir)
+	if err := t.prepareDirectories(); err != nil {
+		return err
+	}
 
 	txnErr := t.repository.WithTxn(ctx, func(ctx context.Context) error {
 		// include group scenes and gallery images
@@ -174,24 +179,36 @@ func (t *ExportTask) Start(ctx context.Context, wg *sync.WaitGroup) {
 		t.ExportTags(ctx, workerCount)
 		t.ExportSavedFilters(ctx, workerCount)
 
-		return nil
+		return errors.Join(ctx.Err(), t.failures.err())
 	})
 	if txnErr != nil {
-		logger.Warnf("error while running export transaction: %v", txnErr)
+		return fmt.Errorf("export transaction: %w", txnErr)
 	}
 
 	if !t.full {
 		err := t.generateDownload()
 		if err != nil {
-			logger.Errorf("error generating download link: %v", err)
-			return
+			return fmt.Errorf("generating download link: %w", err)
 		}
 	}
 	logger.Infof("Export complete in %s.", time.Since(startTime))
+	return nil
+}
+
+func (t *ExportTask) prepareDirectories() error {
+	p := t.json.json
+	for _, dir := range []string{p.Scenes, p.Images, p.Galleries, p.Performers, p.Studios, p.Groups, p.Tags, p.Files, p.SavedFilters} {
+		if err := fsutil.EmptyDir(dir); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("emptying export directory: %w", err)
+		}
+		if err := fsutil.EnsureDir(dir); err != nil {
+			return fmt.Errorf("creating export directory: %w", err)
+		}
+	}
+	return nil
 }
 
 func (t *ExportTask) generateDownload() error {
-	// zip the files and register a download link
 	if err := fsutil.EnsureDir(instance.Paths.Generated.Downloads); err != nil {
 		return err
 	}
@@ -199,16 +216,21 @@ func (t *ExportTask) generateDownload() error {
 	if err != nil {
 		return err
 	}
-	defer z.Close()
-
-	err = t.zipFiles(z)
-	if err != nil {
+	defer func() {
+		z.Close()
+		if t.DownloadHash == "" {
+			_ = os.Remove(z.Name())
+		}
+	}()
+	if err := t.zipFiles(z); err != nil {
 		return err
 	}
-
+	if err := z.Close(); err != nil {
+		return err
+	}
 	t.DownloadHash, err = instance.DownloadStore.RegisterFile(z.Name(), "", false)
 	if err != nil {
-		return fmt.Errorf("error registering file for download: %w", err)
+		return fmt.Errorf("registering export download: %w", err)
 	}
 	logger.Debugf("Generated zip file %s with hash %s", z.Name(), t.DownloadHash)
 	return nil
@@ -217,27 +239,17 @@ func (t *ExportTask) generateDownload() error {
 func (t *ExportTask) zipFiles(w io.Writer) error {
 	z := zip.NewWriter(w)
 	defer z.Close()
-
-	u := jsonUtils{
-		json: *paths.GetJSONPaths(""),
+	u := paths.GetJSONPaths("")
+	p := t.json.json
+	for _, dir := range []struct{ source, destination string }{
+		{p.Tags, u.Tags}, {p.Galleries, u.Galleries}, {p.Performers, u.Performers},
+		{p.Studios, u.Studios}, {p.Groups, u.Groups}, {p.Scenes, u.Scenes}, {p.Images, u.Images},
+	} {
+		if err := filepath.Walk(dir.source, t.zipWalkFunc(dir.destination, z)); err != nil {
+			return fmt.Errorf("archiving export: %w", err)
+		}
 	}
-
-	walkWarn(t.json.json.Tags, t.zipWalkFunc(u.json.Tags, z))
-	walkWarn(t.json.json.Galleries, t.zipWalkFunc(u.json.Galleries, z))
-	walkWarn(t.json.json.Performers, t.zipWalkFunc(u.json.Performers, z))
-	walkWarn(t.json.json.Studios, t.zipWalkFunc(u.json.Studios, z))
-	walkWarn(t.json.json.Groups, t.zipWalkFunc(u.json.Groups, z))
-	walkWarn(t.json.json.Scenes, t.zipWalkFunc(u.json.Scenes, z))
-	walkWarn(t.json.json.Images, t.zipWalkFunc(u.json.Images, z))
-
-	return nil
-}
-
-// like filepath.Walk but issue a warning on error
-func walkWarn(root string, fn filepath.WalkFunc) {
-	if err := filepath.Walk(root, fn); err != nil {
-		logger.Warnf("error walking structure %v: %v", root, err)
-	}
+	return z.Close()
 }
 
 func (t *ExportTask) zipWalkFunc(outDir string, z *zip.Writer) filepath.WalkFunc {
@@ -294,13 +306,13 @@ func (t *ExportTask) populateGroupScenes(ctx context.Context) {
 	}
 
 	if err != nil {
-		logger.Errorf("[groups] failed to fetch groups: %v", err)
+		t.failures.addf("[groups] failed to fetch groups: %v", err)
 	}
 
 	for _, m := range groups {
 		scenes, err := sceneReader.FindByGroupID(ctx, m.ID)
 		if err != nil {
-			logger.Errorf("[groups] <%s> failed to fetch scenes for group: %v", m.Name, err)
+			t.failures.addf("[groups] <%s> failed to fetch scenes for group: %v", m.Name, err)
 			continue
 		}
 
@@ -325,18 +337,18 @@ func (t *ExportTask) populateGalleryImages(ctx context.Context) {
 	}
 
 	if err != nil {
-		logger.Errorf("[galleries] failed to fetch galleries: %v", err)
+		t.failures.addf("[galleries] failed to fetch galleries: %v", err)
 	}
 
 	for _, g := range galleries {
 		if err := g.LoadFiles(ctx, reader); err != nil {
-			logger.Errorf("[galleries] <%s> failed to fetch files for gallery: %v", g.DisplayName(), err)
+			t.failures.addf("[galleries] <%s> failed to fetch files for gallery: %v", g.DisplayName(), err)
 			continue
 		}
 
 		images, err := imageReader.FindByGalleryID(ctx, g.ID)
 		if err != nil {
-			logger.Errorf("[galleries] <%s> failed to fetch images for gallery: %v", g.DisplayName(), err)
+			t.failures.addf("[galleries] <%s> failed to fetch images for gallery: %v", g.DisplayName(), err)
 			continue
 		}
 
@@ -361,7 +373,7 @@ func (t *ExportTask) ExportScenes(ctx context.Context, workers int) {
 	}
 
 	if err != nil {
-		logger.Errorf("[scenes] failed to fetch scenes: %v", err)
+		t.failures.addf("[scenes] failed to fetch scenes: %v", err)
 	}
 
 	jobCh := make(chan *models.Scene, workers*2) // make a buffered channel to feed workers
@@ -395,7 +407,7 @@ func (t *ExportTask) exportFile(f models.File) {
 	fn := newFileJSON.Filename()
 
 	if err := t.json.saveFile(fn, newFileJSON); err != nil {
-		logger.Errorf("[files] <%s> failed to save json: %v", fn, err)
+		t.failures.addf("[files] <%s> failed to save json: %v", fn, err)
 	}
 }
 
@@ -488,7 +500,7 @@ func (t *ExportTask) exportFolder(f models.Folder) {
 	fn := newFileJSON.Filename()
 
 	if err := t.json.saveFile(fn, newFileJSON); err != nil {
-		logger.Errorf("[files] <%s> failed to save json: %v", fn, err)
+		t.failures.addf("[files] <%s> failed to save json: %v", fn, err)
 	}
 }
 
@@ -521,15 +533,18 @@ func (t *ExportTask) exportScene(ctx context.Context, wg *sync.WaitGroup, jobCha
 	sceneMarkerReader := r.SceneMarker
 
 	for s := range jobChan {
+		if ctx.Err() != nil {
+			continue
+		}
 		sceneHash := s.GetHash(t.fileNamingAlgorithm)
 
 		if err := s.LoadRelationships(ctx, sceneReader); err != nil {
-			logger.Errorf("[scenes] <%s> error loading scene relationships: %v", sceneHash, err)
+			t.failures.addf("[scenes] <%s> error loading scene relationships: %v", sceneHash, err)
 		}
 
 		newSceneJSON, err := scene.ToBasicJSON(ctx, sceneReader, s)
 		if err != nil {
-			logger.Errorf("[scenes] <%s> error getting scene JSON: %v", sceneHash, err)
+			t.failures.addf("[scenes] <%s> error getting scene JSON: %v", sceneHash, err)
 			continue
 		}
 
@@ -540,19 +555,19 @@ func (t *ExportTask) exportScene(ctx context.Context, wg *sync.WaitGroup, jobCha
 
 		newSceneJSON.Studio, err = scene.GetStudioName(ctx, studioReader, s)
 		if err != nil {
-			logger.Errorf("[scenes] <%s> error getting scene studio name: %v", sceneHash, err)
+			t.failures.addf("[scenes] <%s> error getting scene studio name: %v", sceneHash, err)
 			continue
 		}
 
 		galleries, err := galleryReader.FindBySceneID(ctx, s.ID)
 		if err != nil {
-			logger.Errorf("[scenes] <%s> error getting scene gallery checksums: %v", sceneHash, err)
+			t.failures.addf("[scenes] <%s> error getting scene gallery checksums: %v", sceneHash, err)
 			continue
 		}
 
 		for _, g := range galleries {
 			if err := g.LoadFiles(ctx, galleryReader); err != nil {
-				logger.Errorf("[scenes] <%s> error getting scene gallery files: %v", sceneHash, err)
+				t.failures.addf("[scenes] <%s> error getting scene gallery files: %v", sceneHash, err)
 				continue
 			}
 		}
@@ -564,7 +579,7 @@ func (t *ExportTask) exportScene(ctx context.Context, wg *sync.WaitGroup, jobCha
 
 		performers, err := performerReader.FindBySceneID(ctx, s.ID)
 		if err != nil {
-			logger.Errorf("[scenes] <%s> error getting scene performer names: %v", sceneHash, err)
+			t.failures.addf("[scenes] <%s> error getting scene performer names: %v", sceneHash, err)
 			continue
 		}
 
@@ -572,19 +587,19 @@ func (t *ExportTask) exportScene(ctx context.Context, wg *sync.WaitGroup, jobCha
 
 		newSceneJSON.Tags, err = scene.GetTagNames(ctx, tagReader, s)
 		if err != nil {
-			logger.Errorf("[scenes] <%s> error getting scene tag names: %v", sceneHash, err)
+			t.failures.addf("[scenes] <%s> error getting scene tag names: %v", sceneHash, err)
 			continue
 		}
 
 		newSceneJSON.Markers, err = scene.GetSceneMarkersJSON(ctx, sceneMarkerReader, tagReader, s)
 		if err != nil {
-			logger.Errorf("[scenes] <%s> error getting scene markers JSON: %v", sceneHash, err)
+			t.failures.addf("[scenes] <%s> error getting scene markers JSON: %v", sceneHash, err)
 			continue
 		}
 
 		newSceneJSON.Groups, err = scene.GetSceneGroupsJSON(ctx, groupReader, s)
 		if err != nil {
-			logger.Errorf("[scenes] <%s> error getting scene groups JSON: %v", sceneHash, err)
+			t.failures.addf("[scenes] <%s> error getting scene groups JSON: %v", sceneHash, err)
 			continue
 		}
 
@@ -597,14 +612,14 @@ func (t *ExportTask) exportScene(ctx context.Context, wg *sync.WaitGroup, jobCha
 
 			tagIDs, err := scene.GetDependentTagIDs(ctx, tagReader, sceneMarkerReader, s)
 			if err != nil {
-				logger.Errorf("[scenes] <%s> error getting scene tags: %v", sceneHash, err)
+				t.failures.addf("[scenes] <%s> error getting scene tags: %v", sceneHash, err)
 				continue
 			}
 			t.tags.IDs = sliceutil.AppendUniques(t.tags.IDs, tagIDs)
 
 			groupIDs, err := scene.GetDependentGroupIDs(ctx, s)
 			if err != nil {
-				logger.Errorf("[scenes] <%s> error getting scene groups: %v", sceneHash, err)
+				t.failures.addf("[scenes] <%s> error getting scene groups: %v", sceneHash, err)
 				continue
 			}
 			t.groups.IDs = sliceutil.AppendUniques(t.groups.IDs, groupIDs)
@@ -618,7 +633,7 @@ func (t *ExportTask) exportScene(ctx context.Context, wg *sync.WaitGroup, jobCha
 		fn := newSceneJSON.Filename(s.ID, basename, hash)
 
 		if err := t.json.saveScene(fn, newSceneJSON); err != nil {
-			logger.Errorf("[scenes] <%s> failed to save json: %v", sceneHash, err)
+			t.failures.addf("[scenes] <%s> failed to save json: %v", sceneHash, err)
 		}
 	}
 }
@@ -639,7 +654,7 @@ func (t *ExportTask) ExportImages(ctx context.Context, workers int) {
 	}
 
 	if err != nil {
-		logger.Errorf("[images] failed to fetch images: %v", err)
+		t.failures.addf("[images] failed to fetch images: %v", err)
 	}
 
 	jobCh := make(chan *models.Image, workers*2) // make a buffered channel to feed workers
@@ -678,21 +693,24 @@ func (t *ExportTask) exportImage(ctx context.Context, wg *sync.WaitGroup, jobCha
 	imageReader := r.Image
 
 	for s := range jobChan {
+		if ctx.Err() != nil {
+			continue
+		}
 		imageHash := s.Checksum
 
 		if err := s.LoadFiles(ctx, r.Image); err != nil {
-			logger.Errorf("[images] <%s> error getting image files: %v", imageHash, err)
+			t.failures.addf("[images] <%s> error getting image files: %v", imageHash, err)
 			continue
 		}
 
 		if err := s.LoadURLs(ctx, r.Image); err != nil {
-			logger.Errorf("[images] <%s> error getting image urls: %v", imageHash, err)
+			t.failures.addf("[images] <%s> error getting image urls: %v", imageHash, err)
 			continue
 		}
 
 		newImageJSON, err := image.ToBasicJSON(ctx, imageReader, s)
 		if err != nil {
-			logger.Errorf("[images] <%s> error converting image to JSON: %v", imageHash, err)
+			t.failures.addf("[images] <%s> error converting image to JSON: %v", imageHash, err)
 			continue
 		}
 
@@ -703,19 +721,19 @@ func (t *ExportTask) exportImage(ctx context.Context, wg *sync.WaitGroup, jobCha
 
 		newImageJSON.Studio, err = image.GetStudioName(ctx, studioReader, s)
 		if err != nil {
-			logger.Errorf("[images] <%s> error getting image studio name: %v", imageHash, err)
+			t.failures.addf("[images] <%s> error getting image studio name: %v", imageHash, err)
 			continue
 		}
 
 		imageGalleries, err := galleryReader.FindByImageID(ctx, s.ID)
 		if err != nil {
-			logger.Errorf("[images] <%s> error getting image galleries: %v", imageHash, err)
+			t.failures.addf("[images] <%s> error getting image galleries: %v", imageHash, err)
 			continue
 		}
 
 		for _, g := range imageGalleries {
 			if err := g.LoadFiles(ctx, galleryReader); err != nil {
-				logger.Errorf("[images] <%s> error getting image gallery files: %v", imageHash, err)
+				t.failures.addf("[images] <%s> error getting image gallery files: %v", imageHash, err)
 				continue
 			}
 		}
@@ -724,7 +742,7 @@ func (t *ExportTask) exportImage(ctx context.Context, wg *sync.WaitGroup, jobCha
 
 		performers, err := performerReader.FindByImageID(ctx, s.ID)
 		if err != nil {
-			logger.Errorf("[images] <%s> error getting image performer names: %v", imageHash, err)
+			t.failures.addf("[images] <%s> error getting image performer names: %v", imageHash, err)
 			continue
 		}
 
@@ -732,7 +750,7 @@ func (t *ExportTask) exportImage(ctx context.Context, wg *sync.WaitGroup, jobCha
 
 		tags, err := tagReader.FindByImageID(ctx, s.ID)
 		if err != nil {
-			logger.Errorf("[images] <%s> error getting image tag names: %v", imageHash, err)
+			t.failures.addf("[images] <%s> error getting image tag names: %v", imageHash, err)
 			continue
 		}
 
@@ -751,7 +769,7 @@ func (t *ExportTask) exportImage(ctx context.Context, wg *sync.WaitGroup, jobCha
 		fn := newImageJSON.Filename(filepath.Base(s.Path), s.Checksum)
 
 		if err := t.json.saveImage(fn, newImageJSON); err != nil {
-			logger.Errorf("[images] <%s> failed to save json: %v", imageHash, err)
+			t.failures.addf("[images] <%s> failed to save json: %v", imageHash, err)
 		}
 	}
 }
@@ -771,7 +789,7 @@ func (t *ExportTask) ExportGalleries(ctx context.Context, workers int) {
 	}
 
 	if err != nil {
-		logger.Errorf("[galleries] failed to fetch galleries: %v", err)
+		t.failures.addf("[galleries] failed to fetch galleries: %v", err)
 	}
 
 	jobCh := make(chan *models.Gallery, workers*2) // make a buffered channel to feed workers
@@ -811,19 +829,22 @@ func (t *ExportTask) exportGallery(ctx context.Context, wg *sync.WaitGroup, jobC
 	galleryChapterReader := r.GalleryChapter
 
 	for g := range jobChan {
+		if ctx.Err() != nil {
+			continue
+		}
 		if err := g.LoadFiles(ctx, r.Gallery); err != nil {
-			logger.Errorf("[galleries] <%s> error getting gallery files: %v", g.DisplayName(), err)
+			t.failures.addf("[galleries] <%s> error getting gallery files: %v", g.DisplayName(), err)
 			continue
 		}
 
 		if err := g.LoadURLs(ctx, r.Gallery); err != nil {
-			logger.Errorf("[galleries] <%s> error getting gallery urls: %v", g.DisplayName(), err)
+			t.failures.addf("[galleries] <%s> error getting gallery urls: %v", g.DisplayName(), err)
 			continue
 		}
 
 		newGalleryJSON, err := gallery.ToBasicJSON(g)
 		if err != nil {
-			logger.Errorf("[galleries] <%s> error getting gallery JSON: %v", g.DisplayName(), err)
+			t.failures.addf("[galleries] <%s> error getting gallery JSON: %v", g.DisplayName(), err)
 			continue
 		}
 
@@ -836,12 +857,12 @@ func (t *ExportTask) exportGallery(ctx context.Context, wg *sync.WaitGroup, jobC
 		if g.FolderID != nil {
 			folder, err := r.Folder.Find(ctx, *g.FolderID)
 			if err != nil {
-				logger.Errorf("[galleries] <%s> error getting gallery folder: %v", g.DisplayName(), err)
+				t.failures.addf("[galleries] <%s> error getting gallery folder: %v", g.DisplayName(), err)
 				continue
 			}
 
 			if folder == nil {
-				logger.Errorf("[galleries] <%s> unable to find gallery folder", g.DisplayName())
+				t.failures.addf("[galleries] <%s> unable to find gallery folder", g.DisplayName())
 				continue
 			}
 
@@ -850,13 +871,13 @@ func (t *ExportTask) exportGallery(ctx context.Context, wg *sync.WaitGroup, jobC
 
 		newGalleryJSON.Studio, err = gallery.GetStudioName(ctx, studioReader, g)
 		if err != nil {
-			logger.Errorf("[galleries] <%s> error getting gallery studio name: %v", g.DisplayName(), err)
+			t.failures.addf("[galleries] <%s> error getting gallery studio name: %v", g.DisplayName(), err)
 			continue
 		}
 
 		performers, err := performerReader.FindByGalleryID(ctx, g.ID)
 		if err != nil {
-			logger.Errorf("[galleries] <%s> error getting gallery performer names: %v", g.DisplayName(), err)
+			t.failures.addf("[galleries] <%s> error getting gallery performer names: %v", g.DisplayName(), err)
 			continue
 		}
 
@@ -864,13 +885,13 @@ func (t *ExportTask) exportGallery(ctx context.Context, wg *sync.WaitGroup, jobC
 
 		tags, err := tagReader.FindByGalleryID(ctx, g.ID)
 		if err != nil {
-			logger.Errorf("[galleries] <%s> error getting gallery tag names: %v", g.DisplayName(), err)
+			t.failures.addf("[galleries] <%s> error getting gallery tag names: %v", g.DisplayName(), err)
 			continue
 		}
 
 		newGalleryJSON.Chapters, err = gallery.GetGalleryChaptersJSON(ctx, galleryChapterReader, g)
 		if err != nil {
-			logger.Errorf("[galleries] <%s> error getting gallery chapters JSON: %v", g.DisplayName(), err)
+			t.failures.addf("[galleries] <%s> error getting gallery chapters JSON: %v", g.DisplayName(), err)
 			continue
 		}
 
@@ -878,7 +899,7 @@ func (t *ExportTask) exportGallery(ctx context.Context, wg *sync.WaitGroup, jobC
 
 		newGalleryJSON.CustomFields, err = galleryReader.GetCustomFields(ctx, g.ID)
 		if err != nil {
-			logger.Errorf("[galleries] <%s> error getting gallery custom fields: %v", g.DisplayName(), err)
+			t.failures.addf("[galleries] <%s> error getting gallery custom fields: %v", g.DisplayName(), err)
 			continue
 		}
 
@@ -905,7 +926,7 @@ func (t *ExportTask) exportGallery(ctx context.Context, wg *sync.WaitGroup, jobC
 		fn := newGalleryJSON.Filename(basename, hash)
 
 		if err := t.json.saveGallery(fn, newGalleryJSON); err != nil {
-			logger.Errorf("[galleries] <%s> failed to save json: %v", g.DisplayName(), err)
+			t.failures.addf("[galleries] <%s> failed to save json: %v", g.DisplayName(), err)
 		}
 	}
 }
@@ -924,7 +945,7 @@ func (t *ExportTask) ExportPerformers(ctx context.Context, workers int) {
 	}
 
 	if err != nil {
-		logger.Errorf("[performers] failed to fetch performers: %v", err)
+		t.failures.addf("[performers] failed to fetch performers: %v", err)
 	}
 	jobCh := make(chan *models.Performer, workers*2) // make a buffered channel to feed workers
 
@@ -956,16 +977,19 @@ func (t *ExportTask) exportPerformer(ctx context.Context, wg *sync.WaitGroup, jo
 	performerReader := r.Performer
 
 	for p := range jobChan {
+		if ctx.Err() != nil {
+			continue
+		}
 		newPerformerJSON, err := performer.ToJSON(ctx, performerReader, p)
 
 		if err != nil {
-			logger.Errorf("[performers] <%s> error getting performer JSON: %v", p.Name, err)
+			t.failures.addf("[performers] <%s> error getting performer JSON: %v", p.Name, err)
 			continue
 		}
 
 		tags, err := r.Tag.FindByPerformerID(ctx, p.ID)
 		if err != nil {
-			logger.Errorf("[performers] <%s> error getting performer tags: %v", p.Name, err)
+			t.failures.addf("[performers] <%s> error getting performer tags: %v", p.Name, err)
 			continue
 		}
 
@@ -978,7 +1002,7 @@ func (t *ExportTask) exportPerformer(ctx context.Context, wg *sync.WaitGroup, jo
 		fn := newPerformerJSON.Filename()
 
 		if err := t.json.savePerformer(fn, newPerformerJSON); err != nil {
-			logger.Errorf("[performers] <%s> failed to save json: %v", p.Name, err)
+			t.failures.addf("[performers] <%s> failed to save json: %v", p.Name, err)
 		}
 	}
 }
@@ -997,7 +1021,7 @@ func (t *ExportTask) ExportStudios(ctx context.Context, workers int) {
 	}
 
 	if err != nil {
-		logger.Errorf("[studios] failed to fetch studios: %v", err)
+		t.failures.addf("[studios] failed to fetch studios: %v", err)
 	}
 
 	logger.Info("[studios] exporting")
@@ -1030,16 +1054,19 @@ func (t *ExportTask) exportStudio(ctx context.Context, wg *sync.WaitGroup, jobCh
 	studioReader := t.repository.Studio
 
 	for s := range jobChan {
+		if ctx.Err() != nil {
+			continue
+		}
 		newStudioJSON, err := studio.ToJSON(ctx, studioReader, s)
 
 		if err != nil {
-			logger.Errorf("[studios] <%s> error getting studio JSON: %v", s.Name, err)
+			t.failures.addf("[studios] <%s> error getting studio JSON: %v", s.Name, err)
 			continue
 		}
 
 		tags, err := r.Tag.FindByStudioID(ctx, s.ID)
 		if err != nil {
-			logger.Errorf("[studios] <%s> error getting studio tags: %s", s.Name, err.Error())
+			t.failures.addf("[studios] <%s> error getting studio tags: %s", s.Name, err.Error())
 			continue
 		}
 
@@ -1052,7 +1079,7 @@ func (t *ExportTask) exportStudio(ctx context.Context, wg *sync.WaitGroup, jobCh
 		fn := newStudioJSON.Filename()
 
 		if err := t.json.saveStudio(fn, newStudioJSON); err != nil {
-			logger.Errorf("[studios] <%s> failed to save json: %v", s.Name, err)
+			t.failures.addf("[studios] <%s> failed to save json: %v", s.Name, err)
 		}
 	}
 }
@@ -1071,7 +1098,7 @@ func (t *ExportTask) ExportTags(ctx context.Context, workers int) {
 	}
 
 	if err != nil {
-		logger.Errorf("[tags] failed to fetch tags: %v", err)
+		t.failures.addf("[tags] failed to fetch tags: %v", err)
 	}
 
 	logger.Info("[tags] exporting")
@@ -1107,7 +1134,7 @@ func (t *ExportTask) ExportTags(ctx context.Context, workers int) {
 
 		newTags, err := reader.FindMany(ctx, t.tags.IDs[tagIdx:])
 		if err != nil {
-			logger.Errorf("[tags] failed to fetch tags: %v", err)
+			t.failures.addf("[tags] failed to fetch tags: %v", err)
 		}
 
 		tags = newTags
@@ -1123,17 +1150,20 @@ func (t *ExportTask) exportTag(ctx context.Context, wg *sync.WaitGroup, jobChan 
 	tagReader := t.repository.Tag
 
 	for thisTag := range jobChan {
+		if ctx.Err() != nil {
+			continue
+		}
 		newTagJSON, err := tag.ToJSON(ctx, tagReader, thisTag)
 
 		if err != nil {
-			logger.Errorf("[tags] <%s> error getting tag JSON: %v", thisTag.Name, err)
+			t.failures.addf("[tags] <%s> error getting tag JSON: %v", thisTag.Name, err)
 			continue
 		}
 
 		if t.includeDependencies {
 			tagIDs, err := tag.GetDependentTagIDs(ctx, tagReader, thisTag)
 			if err != nil {
-				logger.Errorf("[tags] <%s> error getting dependent tags: %v", thisTag.Name, err)
+				t.failures.addf("[tags] <%s> error getting dependent tags: %v", thisTag.Name, err)
 				continue
 			}
 			t.tags.IDs = sliceutil.AppendUniques(t.tags.IDs, tagIDs)
@@ -1142,7 +1172,7 @@ func (t *ExportTask) exportTag(ctx context.Context, wg *sync.WaitGroup, jobChan 
 		fn := newTagJSON.Filename()
 
 		if err := t.json.saveTag(fn, newTagJSON); err != nil {
-			logger.Errorf("[tags] <%s> failed to save json: %v", fn, err)
+			t.failures.addf("[tags] <%s> failed to save json: %v", fn, err)
 		}
 	}
 }
@@ -1161,7 +1191,7 @@ func (t *ExportTask) ExportGroups(ctx context.Context, workers int) {
 	}
 
 	if err != nil {
-		logger.Errorf("[groups] failed to fetch groups: %v", err)
+		t.failures.addf("[groups] failed to fetch groups: %v", err)
 	}
 
 	logger.Info("[groups] exporting")
@@ -1196,25 +1226,28 @@ func (t *ExportTask) exportGroup(ctx context.Context, wg *sync.WaitGroup, jobCha
 	tagReader := r.Tag
 
 	for m := range jobChan {
+		if ctx.Err() != nil {
+			continue
+		}
 		if err := m.LoadURLs(ctx, r.Group); err != nil {
-			logger.Errorf("[groups] <%s> error getting group urls: %v", m.Name, err)
+			t.failures.addf("[groups] <%s> error getting group urls: %v", m.Name, err)
 			continue
 		}
 		if err := m.LoadSubGroupIDs(ctx, r.Group); err != nil {
-			logger.Errorf("[groups] <%s> error getting group sub-groups: %v", m.Name, err)
+			t.failures.addf("[groups] <%s> error getting group sub-groups: %v", m.Name, err)
 			continue
 		}
 
 		newGroupJSON, err := group.ToJSON(ctx, groupReader, studioReader, m)
 
 		if err != nil {
-			logger.Errorf("[groups] <%s> error getting tag JSON: %v", m.Name, err)
+			t.failures.addf("[groups] <%s> error getting tag JSON: %v", m.Name, err)
 			continue
 		}
 
 		tags, err := tagReader.FindByGroupID(ctx, m.ID)
 		if err != nil {
-			logger.Errorf("[groups] <%s> error getting image tag names: %v", m.Name, err)
+			t.failures.addf("[groups] <%s> error getting image tag names: %v", m.Name, err)
 			continue
 		}
 
@@ -1236,7 +1269,7 @@ func (t *ExportTask) exportGroup(ctx context.Context, wg *sync.WaitGroup, jobCha
 			}
 			return nil
 		}(); err != nil {
-			logger.Errorf("[groups] <%s> %v", m.Name, err)
+			t.failures.addf("[groups] <%s> %v", m.Name, err)
 		}
 
 		if t.includeDependencies {
@@ -1248,7 +1281,7 @@ func (t *ExportTask) exportGroup(ctx context.Context, wg *sync.WaitGroup, jobCha
 		fn := newGroupJSON.Filename()
 
 		if err := t.json.saveGroup(fn, newGroupJSON); err != nil {
-			logger.Errorf("[groups] <%s> failed to save json: %v", m.Name, err)
+			t.failures.addf("[groups] <%s> failed to save json: %v", m.Name, err)
 		}
 	}
 }
@@ -1267,7 +1300,7 @@ func (t *ExportTask) ExportSavedFilters(ctx context.Context, workers int) {
 	filters, err = reader.All(ctx)
 
 	if err != nil {
-		logger.Errorf("[saved filters] failed to fetch saved filters: %v", err)
+		t.failures.addf("[saved filters] failed to fetch saved filters: %v", err)
 	}
 
 	logger.Info("[saved filters] exporting")
@@ -1297,17 +1330,20 @@ func (t *ExportTask) exportSavedFilter(ctx context.Context, wg *sync.WaitGroup, 
 	defer wg.Done()
 
 	for thisFilter := range jobChan {
+		if ctx.Err() != nil {
+			continue
+		}
 		newJSON, err := savedfilter.ToJSON(ctx, thisFilter)
 
 		if err != nil {
-			logger.Errorf("[saved filter] <%s> error getting saved filter JSON: %v", thisFilter.Name, err)
+			t.failures.addf("[saved filter] <%s> error getting saved filter JSON: %v", thisFilter.Name, err)
 			continue
 		}
 
 		fn := newJSON.Filename()
 
 		if err := t.json.saveSavedFilter(fn, newJSON); err != nil {
-			logger.Errorf("[saved filter] <%s> failed to save json: %v", fn, err)
+			t.failures.addf("[saved filter] <%s> failed to save json: %v", fn, err)
 		}
 	}
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/stashapp/stash/pkg/gallery"
 	"github.com/stashapp/stash/pkg/group"
 	"github.com/stashapp/stash/pkg/image"
+	"github.com/stashapp/stash/pkg/job"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/models/jsonschema"
@@ -33,6 +34,7 @@ type Resetter interface {
 }
 
 type ImportTask struct {
+	failures   taskFailures
 	repository models.Repository
 	resetter   Resetter
 	json       jsonUtils
@@ -91,7 +93,15 @@ func (t *ImportTask) GetDescription() string {
 	return "Importing..."
 }
 
-func (t *ImportTask) Start(ctx context.Context) {
+func (t *ImportTask) Execute(ctx context.Context, _ *job.Progress) error {
+	return t.Start(ctx)
+}
+
+func (t *ImportTask) Start(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	t.failures = taskFailures{}
 	if t.TmpZip != "" {
 		defer func() {
 			err := fsutil.RemoveDir(t.BaseDir)
@@ -101,8 +111,7 @@ func (t *ImportTask) Start(ctx context.Context) {
 		}()
 
 		if err := t.unzipFile(); err != nil {
-			logger.Errorf("error unzipping provided file for import: %v", err)
-			return
+			return fmt.Errorf("unzipping provided file for import: %w", err)
 		}
 	}
 
@@ -122,21 +131,20 @@ func (t *ImportTask) Start(ctx context.Context) {
 		err := t.resetter.Reset()
 
 		if err != nil {
-			logger.Errorf("Error resetting database: %v", err)
-			return
+			return fmt.Errorf("resetting database: %w", err)
 		}
 	}
 
-	t.ImportSavedFilters(ctx)
-	t.ImportTags(ctx)
-	t.ImportPerformers(ctx)
-	t.ImportStudios(ctx)
-	t.ImportGroups(ctx)
-	t.ImportFiles(ctx)
-	t.ImportGalleries(ctx)
-
-	t.ImportScenes(ctx)
-	t.ImportImages(ctx)
+	for _, phase := range []func(context.Context){
+		t.ImportSavedFilters, t.ImportTags, t.ImportPerformers, t.ImportStudios,
+		t.ImportGroups, t.ImportFiles, t.ImportGalleries, t.ImportScenes, t.ImportImages,
+	} {
+		if ctx.Err() != nil {
+			break
+		}
+		phase(ctx)
+	}
+	return errors.Join(ctx.Err(), t.failures.err())
 }
 
 func (t *ImportTask) unzipFile() error {
@@ -222,7 +230,7 @@ func (t *ImportTask) ImportPerformers(ctx context.Context) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			logger.Errorf("[performers] failed to read performers directory: %v", err)
+			t.failures.addf("[performers] failed to read performers directory: %v", err)
 		}
 
 		return
@@ -231,10 +239,13 @@ func (t *ImportTask) ImportPerformers(ctx context.Context) {
 	r := t.repository
 
 	for i, fi := range files {
+		if ctx.Err() != nil {
+			return
+		}
 		index := i + 1
 		performerJSON, err := jsonschema.LoadPerformerFile(filepath.Join(path, fi.Name()))
 		if err != nil {
-			logger.Errorf("[performers] failed to read json: %v", err)
+			t.failures.addf("[performers] failed to read json: %v", err)
 			continue
 		}
 
@@ -249,7 +260,7 @@ func (t *ImportTask) ImportPerformers(ctx context.Context) {
 
 			return performImport(ctx, importer, t.DuplicateBehaviour)
 		}); err != nil {
-			logger.Errorf("[performers] <%s> import failed: %v", fi.Name(), err)
+			t.failures.addf("[performers] <%s> import failed: %v", fi.Name(), err)
 		}
 	}
 
@@ -265,7 +276,7 @@ func (t *ImportTask) ImportStudios(ctx context.Context) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			logger.Errorf("[studios] failed to read studios directory: %v", err)
+			t.failures.addf("[studios] failed to read studios directory: %v", err)
 		}
 
 		return
@@ -274,10 +285,13 @@ func (t *ImportTask) ImportStudios(ctx context.Context) {
 	r := t.repository
 
 	for i, fi := range files {
+		if ctx.Err() != nil {
+			return
+		}
 		index := i + 1
 		studioJSON, err := jsonschema.LoadStudioFile(filepath.Join(path, fi.Name()))
 		if err != nil {
-			logger.Errorf("[studios] failed to read json: %v", err)
+			t.failures.addf("[studios] failed to read json: %v", err)
 			continue
 		}
 
@@ -294,7 +308,7 @@ func (t *ImportTask) ImportStudios(ctx context.Context) {
 				continue
 			}
 
-			logger.Errorf("[studios] <%s> failed to create: %v", fi.Name(), err)
+			t.failures.addf("[studios] <%s> failed to create: %v", fi.Name(), err)
 			continue
 		}
 	}
@@ -308,7 +322,7 @@ func (t *ImportTask) ImportStudios(ctx context.Context) {
 				if err := r.WithTxn(ctx, func(ctx context.Context) error {
 					return t.importStudio(ctx, orphanStudioJSON, nil)
 				}); err != nil {
-					logger.Errorf("[studios] <%s> failed to create: %v", orphanStudioJSON.Name, err)
+					t.failures.addf("[studios] <%s> failed to create: %v", orphanStudioJSON.Name, err)
 					continue
 				}
 			}
@@ -360,7 +374,7 @@ func (t *ImportTask) ImportGroups(ctx context.Context) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			logger.Errorf("[groups] failed to read movies directory: %v", err)
+			t.failures.addf("[groups] failed to read movies directory: %v", err)
 		}
 
 		return
@@ -369,10 +383,13 @@ func (t *ImportTask) ImportGroups(ctx context.Context) {
 	r := t.repository
 
 	for i, fi := range files {
+		if ctx.Err() != nil {
+			return
+		}
 		index := i + 1
 		groupJSON, err := jsonschema.LoadGroupFile(filepath.Join(path, fi.Name()))
 		if err != nil {
-			logger.Errorf("[groups] failed to read json: %v", err)
+			t.failures.addf("[groups] failed to read json: %v", err)
 			continue
 		}
 
@@ -388,7 +405,7 @@ func (t *ImportTask) ImportGroups(ctx context.Context) {
 				continue
 			}
 
-			logger.Errorf("[groups] <%s> failed to import: %v", fi.Name(), err)
+			t.failures.addf("[groups] <%s> failed to import: %v", fi.Name(), err)
 			continue
 		}
 	}
@@ -398,7 +415,7 @@ func (t *ImportTask) ImportGroups(ctx context.Context) {
 			if err := r.WithTxn(ctx, func(ctx context.Context) error {
 				return t.importGroup(ctx, orphanGroupJSON, nil, true)
 			}); err != nil {
-				logger.Errorf("[groups] <%s> failed to create: %v", orphanGroupJSON.Name, err)
+				t.failures.addf("[groups] <%s> failed to create: %v", orphanGroupJSON.Name, err)
 				continue
 			}
 		}
@@ -452,7 +469,7 @@ func (t *ImportTask) ImportFiles(ctx context.Context) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			logger.Errorf("[files] failed to read files directory: %v", err)
+			t.failures.addf("[files] failed to read files directory: %v", err)
 		}
 
 		return
@@ -463,10 +480,13 @@ func (t *ImportTask) ImportFiles(ctx context.Context) {
 	pendingParent := make(map[string][]jsonschema.DirEntry)
 
 	for i, fi := range files {
+		if ctx.Err() != nil {
+			return
+		}
 		index := i + 1
 		fileJSON, err := jsonschema.LoadFileFile(filepath.Join(path, fi.Name()))
 		if err != nil {
-			logger.Errorf("[files] failed to read json: %v", err)
+			t.failures.addf("[files] failed to read json: %v", err)
 			continue
 		}
 
@@ -483,7 +503,7 @@ func (t *ImportTask) ImportFiles(ctx context.Context) {
 				continue
 			}
 
-			logger.Errorf("[files] <%s> failed to create: %v", fi.Name(), err)
+			t.failures.addf("[files] <%s> failed to create: %v", fi.Name(), err)
 			continue
 		}
 	}
@@ -497,7 +517,7 @@ func (t *ImportTask) ImportFiles(ctx context.Context) {
 				if err := r.WithTxn(ctx, func(ctx context.Context) error {
 					return t.importFile(ctx, orphanFileJSON, nil)
 				}); err != nil {
-					logger.Errorf("[files] <%s> failed to create: %v", orphanFileJSON.DirEntry().Path, err)
+					t.failures.addf("[files] <%s> failed to create: %v", orphanFileJSON.DirEntry().Path, err)
 					continue
 				}
 			}
@@ -543,7 +563,7 @@ func (t *ImportTask) ImportGalleries(ctx context.Context) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			logger.Errorf("[galleries] failed to read galleries directory: %v", err)
+			t.failures.addf("[galleries] failed to read galleries directory: %v", err)
 		}
 
 		return
@@ -552,10 +572,13 @@ func (t *ImportTask) ImportGalleries(ctx context.Context) {
 	r := t.repository
 
 	for i, fi := range files {
+		if ctx.Err() != nil {
+			return
+		}
 		index := i + 1
 		galleryJSON, err := jsonschema.LoadGalleryFile(filepath.Join(path, fi.Name()))
 		if err != nil {
-			logger.Errorf("[galleries] failed to read json: %v", err)
+			t.failures.addf("[galleries] failed to read json: %v", err)
 			continue
 		}
 
@@ -593,7 +616,7 @@ func (t *ImportTask) ImportGalleries(ctx context.Context) {
 
 			return nil
 		}); err != nil {
-			logger.Errorf("[galleries] <%s> import failed to commit: %v", fi.Name(), err)
+			t.failures.addf("[galleries] <%s> import failed to commit: %v", fi.Name(), err)
 			continue
 		}
 	}
@@ -609,7 +632,7 @@ func (t *ImportTask) ImportTags(ctx context.Context) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			logger.Errorf("[tags] failed to read tags directory: %v", err)
+			t.failures.addf("[tags] failed to read tags directory: %v", err)
 		}
 
 		return
@@ -618,10 +641,13 @@ func (t *ImportTask) ImportTags(ctx context.Context) {
 	r := t.repository
 
 	for i, fi := range files {
+		if ctx.Err() != nil {
+			return
+		}
 		index := i + 1
 		tagJSON, err := jsonschema.LoadTagFile(filepath.Join(path, fi.Name()))
 		if err != nil {
-			logger.Errorf("[tags] failed to read json: %v", err)
+			t.failures.addf("[tags] failed to read json: %v", err)
 			continue
 		}
 
@@ -636,7 +662,7 @@ func (t *ImportTask) ImportTags(ctx context.Context) {
 				continue
 			}
 
-			logger.Errorf("[tags] <%s> failed to import: %v", fi.Name(), err)
+			t.failures.addf("[tags] <%s> failed to import: %v", fi.Name(), err)
 			continue
 		}
 	}
@@ -646,7 +672,7 @@ func (t *ImportTask) ImportTags(ctx context.Context) {
 			if err := r.WithTxn(ctx, func(ctx context.Context) error {
 				return t.importTag(ctx, orphanTagJSON, nil, true)
 			}); err != nil {
-				logger.Errorf("[tags] <%s> failed to create: %v", orphanTagJSON.Name, err)
+				t.failures.addf("[tags] <%s> failed to create: %v", orphanTagJSON.Name, err)
 				continue
 			}
 		}
@@ -695,7 +721,7 @@ func (t *ImportTask) ImportScenes(ctx context.Context) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			logger.Errorf("[scenes] failed to read scenes directory: %v", err)
+			t.failures.addf("[scenes] failed to read scenes directory: %v", err)
 		}
 
 		return
@@ -704,6 +730,9 @@ func (t *ImportTask) ImportScenes(ctx context.Context) {
 	r := t.repository
 
 	for i, fi := range files {
+		if ctx.Err() != nil {
+			return
+		}
 		index := i + 1
 
 		logger.Progressf("[scenes] %d of %d", index, len(files))
@@ -756,7 +785,7 @@ func (t *ImportTask) ImportScenes(ctx context.Context) {
 
 			return nil
 		}); err != nil {
-			logger.Errorf("[scenes] <%s> import failed: %v", fi.Name(), err)
+			t.failures.addf("[scenes] <%s> import failed: %v", fi.Name(), err)
 		}
 	}
 
@@ -770,7 +799,7 @@ func (t *ImportTask) ImportImages(ctx context.Context) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			logger.Errorf("[images] failed to read images directory: %v", err)
+			t.failures.addf("[images] failed to read images directory: %v", err)
 		}
 
 		return
@@ -779,6 +808,9 @@ func (t *ImportTask) ImportImages(ctx context.Context) {
 	r := t.repository
 
 	for i, fi := range files {
+		if ctx.Err() != nil {
+			return
+		}
 		index := i + 1
 
 		logger.Progressf("[images] %d of %d", index, len(files))
@@ -805,7 +837,7 @@ func (t *ImportTask) ImportImages(ctx context.Context) {
 
 			return performImport(ctx, imageImporter, t.DuplicateBehaviour)
 		}); err != nil {
-			logger.Errorf("[images] <%s> import failed: %v", fi.Name(), err)
+			t.failures.addf("[images] <%s> import failed: %v", fi.Name(), err)
 		}
 	}
 
@@ -819,7 +851,7 @@ func (t *ImportTask) ImportSavedFilters(ctx context.Context) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			logger.Errorf("[saved filters] failed to read saved filters directory: %v", err)
+			t.failures.addf("[saved filters] failed to read saved filters directory: %v", err)
 		}
 
 		return
@@ -828,10 +860,13 @@ func (t *ImportTask) ImportSavedFilters(ctx context.Context) {
 	r := t.repository
 
 	for i, fi := range files {
+		if ctx.Err() != nil {
+			return
+		}
 		index := i + 1
 		savedFilterJSON, err := jsonschema.LoadSavedFilterFile(filepath.Join(path, fi.Name()))
 		if err != nil {
-			logger.Errorf("[saved filters] failed to read json: %v", err)
+			t.failures.addf("[saved filters] failed to read json: %v", err)
 			continue
 		}
 
@@ -840,7 +875,7 @@ func (t *ImportTask) ImportSavedFilters(ctx context.Context) {
 		if err := r.WithTxn(ctx, func(ctx context.Context) error {
 			return t.importSavedFilter(ctx, savedFilterJSON)
 		}); err != nil {
-			logger.Errorf("[saved filters] <%s> failed to import: %v", fi.Name(), err)
+			t.failures.addf("[saved filters] <%s> failed to import: %v", fi.Name(), err)
 			continue
 		}
 	}

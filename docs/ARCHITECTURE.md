@@ -208,6 +208,16 @@ the affected queries. Other entities can use combined item/count queries.
 
 ### Editing and background jobs
 
+Metadata JSON imports and exports return execution errors to the job manager
+and synchronous export API. Batch processing can retain successful records while
+reporting a failed result; logs contain individual failures and the result carries
+a bounded summary. Export directory, query, serialization and ZIP-finalization
+failures cannot produce a successful download. Import ZIPs accept ordinary files
+and directories with portable relative paths, validate all entries before writing,
+and extract through a directory-scoped filesystem root to prevent traversal and
+symlink escapes. These checks preserve supported JSON layouts and do not change
+historical database/configuration upgrade readers.
+
 A normal edit validates inputs, writes through the appropriate service/store
 in a transaction, and returns data for Apollo normalization. Relationship,
 membership, and count changes use targeted query invalidation; scalar changes

@@ -55,6 +55,7 @@ export interface MobileListControlsProps {
   onSearch: (value: string) => void;
   onViewOptions: () => void;
   selectionActions?: React.ReactNode;
+  pageActions?: React.ReactNode;
 }
 
 /** One row, with explicit replacement modes instead of stacked toolbars. */
@@ -74,6 +75,7 @@ export function MobileListControls({
   onSearch,
   onViewOptions,
   selectionActions,
+  pageActions,
 }: MobileListControlsProps) {
   const intl = useIntl();
   const chrome = useMobileDetailChrome();
@@ -315,6 +317,7 @@ export function MobileListControls({
                   <Tags />
                 </Button>
               )}
+              {pageActions}
             </>
           )}
         </Row>

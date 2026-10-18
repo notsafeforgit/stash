@@ -181,8 +181,9 @@ export interface EntityListPageConfig<
    */
   getWallDimensions?: (item: TItem) => { width: number; height: number };
   /**
-   * Page-level action(s) rendered at the right end of the desktop chrome
-   * bar (e.g. a "+ New" button). Hidden in selection mode.
+   * Page-level actions in the desktop toolbar and mobile browse footer.
+   * Use compact, touch-sized controls on mobile (e.g. ListCreateButton).
+   * Hidden in selection mode and while mobile search is open.
    */
   pageActions?: React.ReactNode;
   /** Delete action shared by the selection toolbar and card/row menus. */

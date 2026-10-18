@@ -130,6 +130,7 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
   selecting,
   selectedCount,
   selectionActions,
+  pageActions,
   onSelectAll,
   onSelectNone,
   onTaggerMode,
@@ -511,6 +512,7 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
         selecting={selecting}
         selectedCount={selectedCount}
         selectionActions={selectionActions}
+        pageActions={pageActions}
         onSelectAll={onSelectAll}
         onSelectNone={onSelectNone}
         onTaggerMode={onTaggerMode}

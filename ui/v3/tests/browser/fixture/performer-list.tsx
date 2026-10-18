@@ -1,15 +1,17 @@
 import { useMemo } from "react";
 import { ApolloClient, ApolloLink, Observable } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
-import { EntityListPage } from "@/components/list/entity-list-page";
-import { usePerformerListConfig } from "@/components/list/entity-list-configs";
+import { Route as performerRoute } from "@/routes/performers/index";
 import { createCache } from "@/core/create-client";
+import type { PerformerCreateInput } from "@/core/generated-graphql";
 import { installVitePreloadErrorHandler } from "@/lib/vite-preload-error-handler";
 import { performers } from "./merge-dialogs";
+import { playerConfiguration } from "./player-configuration";
 
 declare global {
   interface Window {
     performerListRequests: string[];
+    createdPerformerInputs: PerformerCreateInput[];
   }
 }
 
@@ -22,14 +24,13 @@ const items = Array.from({ length: 40 }, (_, index) => ({
   aliases: [],
   urls: [],
 }));
-function List() {
-  const config = usePerformerListConfig(() => {});
-  return <EntityListPage config={config} />;
-}
-
 export function PerformerListFixture() {
   const client = useMemo(() => {
     window.performerListRequests = [];
+    window.createdPerformerInputs = [];
+    const listItems = new URLSearchParams(location.search).has("empty")
+      ? []
+      : items;
     return new ApolloClient({
       cache: createCache(),
       link: new ApolloLink(
@@ -43,13 +44,29 @@ export function PerformerListFixture() {
                 data = {
                   findPerformers: {
                     __typename: "FindPerformersResultType",
-                    count: items.length,
-                    performers: items,
+                    count: listItems.length,
+                    performers: listItems,
                   },
                 };
                 break;
               case "FindSavedFilters":
                 data = { findSavedFilters: [] };
+                break;
+              case "ListPerformerScrapers":
+                data = { listScrapers: [] };
+                break;
+              case "Configuration":
+                data = { configuration: playerConfiguration };
+                break;
+              case "PerformerCreate":
+                window.createdPerformerInputs.push(operation.variables.input);
+                data = {
+                  performerCreate: {
+                    ...items[0],
+                    id: "00000000-0000-4000-8000-000000000100",
+                    name: operation.variables.input.name,
+                  },
+                };
                 break;
               case "BulkCustomFieldSummary":
                 data = {
@@ -70,10 +87,12 @@ export function PerformerListFixture() {
       ),
     });
   }, []);
+  const PerformersPage = performerRoute.options.component;
+  if (!PerformersPage) throw new Error("Missing performer route component");
   return (
     <ApolloProvider client={client}>
       <div data-app-viewport className="flex h-dvh flex-col overflow-hidden">
-        <List />
+        <PerformersPage />
       </div>
     </ApolloProvider>
   );

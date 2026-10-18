@@ -326,6 +326,11 @@ stale-review recovery disables inputs before refreshing/remounting the form.
 error state, and the selected layout. Add a configuration for a new entity rather
 than copying a page implementation.
 
+`pageActions` appear in both the desktop toolbar and the mobile browse footer.
+Use `ListCreateButton` for creation: it keeps a named 44px touch target on mobile
+and a visible New label on desktop. Mobile search and selection replace these
+actions while active.
+
 | Module | Responsibility |
 | --- | --- |
 | [entity-list-types.ts](../src/components/list/entity-list-types.ts) | Configuration and discriminated `source` contract |

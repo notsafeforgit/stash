@@ -2,11 +2,10 @@ import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { useDocumentTitle } from "src/hooks/title";
-import { Plus } from "lucide-react";
+import { ListCreateButton } from "@/components/list/list-create-button";
 import { EntityListPage } from "src/components/list";
 import { usePerformerListConfig } from "src/components/list/entity-list-configs";
 import { View } from "src/components/list/views";
-import { Button } from "src/components/ui/button";
 import { usePerformerTableColumns } from "./-table-columns";
 import {
   PerformerEditSheet,
@@ -31,10 +30,10 @@ function PerformersPage() {
       tableColumns,
       tableVisibilityKey: "performers",
       pageActions: (
-        <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="size-4" />
-          {intl.formatMessage({ id: "actions.new", defaultMessage: "New" })}
-        </Button>
+        <ListCreateButton
+          entityType={intl.formatMessage({ id: "performer" })}
+          onClick={() => setCreating(true)}
+        />
       ),
     }),
     [performerBase, tableColumns, intl],

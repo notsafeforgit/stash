@@ -358,6 +358,11 @@ const router = createRouter({
     }),
     createRoute({
       getParentRoute: () => rootRoute,
+      path: "/performers/$performerId",
+      component: () => <p>Created performer detail</p>,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
       path: "/deferred-list",
       component: DeferredListFixture,
     }),

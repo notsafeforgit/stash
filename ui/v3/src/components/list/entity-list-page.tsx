@@ -386,6 +386,7 @@ export function EntityListPage<
       selecting={listSelect.selecting}
       selectedCount={listSelect.selectedItems.length}
       selectionActions={selectionActions}
+      pageActions={pageActions}
       onSelectAll={listSelect.onSelectAll}
       onSelectNone={listSelect.onSelectNone}
       onTaggerMode={renderTagger ? () => setTaggerActive((v) => !v) : undefined}

@@ -3,13 +3,12 @@ import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { useDocumentTitle } from "src/hooks/title";
-import { Plus } from "lucide-react";
+import { ListCreateButton } from "@/components/list/list-create-button";
 import * as GQL from "src/core/generated-graphql";
 import { EntityListPage, type EntityListPageConfig } from "src/components/list";
 import { StudioCard } from "src/components/cards";
 import { StudioRowContextMenu } from "src/components/cards/use-studio-context-menu";
 import { View } from "src/components/list/views";
-import { Button } from "src/components/ui/button";
 import { useStudioTableColumns } from "./-table-columns";
 import {
   StudioEditSheet,
@@ -75,10 +74,10 @@ function StudiosPage() {
       tableColumns,
       tableVisibilityKey: "studios",
       pageActions: (
-        <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="size-4" />
-          {intl.formatMessage({ id: "actions.new", defaultMessage: "New" })}
-        </Button>
+        <ListCreateButton
+          entityType={intl.formatMessage({ id: "studio" })}
+          onClick={() => setCreating(true)}
+        />
       ),
     }),
     [tableColumns, intl],

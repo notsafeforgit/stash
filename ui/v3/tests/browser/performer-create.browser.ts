@@ -1,0 +1,72 @@
+import { test, expect, expectTouchTargets, holdForContextMenu } from "./test";
+
+for (const width of [320, 1280]) {
+  for (const empty of [false, true]) {
+    test(`creates a performer from the ${empty ? "empty" : "populated"} list at ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto(`/performer-list${empty ? "?empty" : ""}`);
+      const create = page.getByRole("button", {
+        name: "Create performer",
+        exact: true,
+      });
+      await expect(create).toBeVisible();
+      if (width === 320) {
+        const toolbar = page.locator("[data-mobile-toolbar-row]");
+        await expectTouchTargets(toolbar);
+        expect(
+          await toolbar.evaluate(
+            (element) => element.scrollWidth <= element.clientWidth,
+          ),
+        ).toBe(true);
+      }
+      await create.tap();
+      const form = page.getByRole("dialog", {
+        name: "Create performer",
+        exact: true,
+      });
+      await expect(form).toBeVisible();
+      await form
+        .getByRole("textbox", { name: "Canonical name", exact: true })
+        .fill("New performer");
+      await form.getByRole("button", { name: "Create", exact: true }).tap();
+      await expect(page).toHaveURL(
+        /\/performers\/00000000-0000-4000-8000-000000000100$/,
+      );
+      await expect(
+        page.getByText("Created performer detail", { exact: true }),
+      ).toBeVisible();
+      expect(
+        await page.evaluate(() => window.createdPerformerInputs),
+      ).toMatchObject([{ name: "New performer" }]);
+    });
+  }
+}
+
+test("mobile create action stays out of search and selection controls", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto("/performer-list");
+  const create = page.getByRole("button", {
+    name: "Create performer",
+    exact: true,
+  });
+  await expect(create).toBeVisible();
+  const toolbar = page.locator("[data-mobile-toolbar-row]");
+  await toolbar.getByRole("button", { name: "Search…", exact: true }).tap();
+  await expect(create).toBeHidden();
+  await toolbar
+    .getByRole("button", { name: "Close search", exact: true })
+    .tap();
+  await expect(create).toBeVisible();
+  const preview = page
+    .locator("article[data-id] [data-entity-card-preview]")
+    .first();
+  await holdForContextMenu(preview, page.getByRole("menu"));
+  await page.getByRole("menuitem", { name: /^Select all$/i }).tap();
+  await expect(create).toBeHidden();
+  await toolbar.getByRole("button", { name: "Select None", exact: true }).tap();
+  await expect(create).toBeVisible();
+});

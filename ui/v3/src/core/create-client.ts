@@ -97,7 +97,10 @@ export const createClient = () => {
     wsUrl.protocol = "ws:";
   }
 
-  const httpLink = new UploadHttpLink({ uri: url.toString() });
+  const httpLink = new UploadHttpLink({
+    uri: url.toString(),
+    credentials: "same-origin",
+  });
 
   const wsClient = createWSClient({
     url: wsUrl.toString(),
@@ -111,14 +114,6 @@ export const createClient = () => {
 
   const errorLink = onError(({ error }) => {
     if (ServerError.is(error) && error.statusCode === 401) {
-      if (import.meta.env.DEV) {
-        alert(
-          "GraphQL server error: 401 Unauthorized\n" +
-            "Authentication cannot be used with the dev server, since the session authorization cookie cannot be sent cross-origin.\n" +
-            "Please disable it on the server and refresh the page.",
-        );
-        return;
-      }
       const newURL = new URL(
         getPlatformURL("login"),
         window.location.toString(),

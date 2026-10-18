@@ -4,6 +4,7 @@ import viteCompression from "vite-plugin-compression";
 import tailwindcss from "@tailwindcss/vite";
 import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { developmentProxy } from "./scripts/development-proxy.ts";
 import { collectOfflineAssets } from "./scripts/offline-assets.ts";
 
 const sourcemap = process.env.VITE_APP_SOURCEMAPS === "true";
@@ -34,34 +35,10 @@ export default defineConfig({
     port: 3002,
     allowedHosts: ["devstash.ak.codes"],
     cors: false,
-    proxy: (() => {
-      // Forward Go backend routes to the stash server.
-      // Use trailing slashes on path prefixes so e.g. "/scene/" doesn't
-      // accidentally match the SPA route "/scenes/".
-      const backend =
-        process.env.VITE_APP_PLATFORM_URL ?? "http://127.0.0.1:8010";
-      return {
-        // Native administration requires same-origin session requests. Preserve
-        // the browser Host/Origin pair through this development proxy.
-        "/api/v3/": { target: backend, changeOrigin: false },
-        "/graphql": { target: backend, ws: true },
-        "/share": backend,
-        "/scene/": backend,
-        "/image/": backend,
-        "/gallery/": backend,
-        "/performer/": backend,
-        "/studio/": backend,
-        "/group/": backend,
-        "/tag/": backend,
-        "/plugin/": backend,
-        "/css": backend,
-        "/javascript": backend,
-        "/customlocales": backend,
-        "/custom/": backend,
-        "/login": backend,
-        "/logout": backend,
-      };
-    })(),
+    proxy: developmentProxy(
+      process.env.VITE_APP_PLATFORM_URL ??
+        `http://127.0.0.1:${process.env.VITE_APP_PLATFORM_PORT ?? "8010"}`,
+    ),
   },
   publicDir: "public",
   plugins: [

@@ -30,16 +30,9 @@ export function joinPlatformURL(base: URL | string, path = ""): URL {
 }
 
 export function getPlatformURL(path = ""): URL {
-  let base = applicationBaseURL();
-  if (import.meta.env.DEV) {
-    if (import.meta.env.VITE_APP_PLATFORM_URL) {
-      base = new URL(import.meta.env.VITE_APP_PLATFORM_URL);
-    } else {
-      base.port = import.meta.env.VITE_APP_PLATFORM_PORT ?? "8010";
-      base.hostname = "127.0.0.1";
-    }
-  }
-  return joinPlatformURL(base, path);
+  // Development uses Vite's proxy, preserving the browser's session and origin
+  // for GraphQL, subscriptions, native APIs and login alike.
+  return joinPlatformURL(applicationBaseURL(), path);
 }
 
 /** Convert a browser URL to the internal route path TanStack expects. */

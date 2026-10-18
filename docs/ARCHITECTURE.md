@@ -234,7 +234,9 @@ unconditionally generate every derivative.
 
 Shutdown stops job admission and cancels media work, HTTP requests (including
 WebSocket subscription contexts), and native workers. The process gives these
-operations a shared 30-second drain deadline before closing SQLite. If draining
+operations and stream cache cleanup a shared 30-second drain deadline before
+closing SQLite. Stream cancellation keeps the manager reference stable for active
+HTTP handlers; cache cleanup starts after those handlers drain. If draining
 fails, it reports the failure and leaves the database open until process exit;
 unfinished jobs are never marked successful to satisfy the deadline. Serial,
 concurrent and synchronous jobs share the same completion/removal path. Preview,

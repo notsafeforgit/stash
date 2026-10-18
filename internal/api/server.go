@@ -433,7 +433,7 @@ func (s *Server) Start() error {
 	}
 }
 
-// Shutdown gracefully shuts down the server without interrupting any active connections.
+// Shutdown cancels active work and drains the server within the default deadline.
 func (s *Server) Shutdown() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

@@ -28,8 +28,10 @@ type StreamManager struct {
 	config      StreamManagerConfig
 	lockManager *fsutil.ReadLockManager
 
-	context    context.Context
-	cancelFunc context.CancelFunc
+	context      context.Context
+	cancelFunc   context.CancelFunc
+	shutdownOnce sync.Once
+	shutdownDone chan struct{}
 
 	runningStreams   map[string]*runningStream
 	v3RunningStreams map[string]*v3RunningStream
@@ -79,11 +81,36 @@ func NewStreamManager(cacheDir string, encoder *FFMpeg, ffprobe *FFProbe, config
 	return ret
 }
 
-// Shutdown shuts down the stream manager, killing any running transcoding processes and removing all cached files.
+// Stop cancels media processes without removing state still used by HTTP handlers.
+func (sm *StreamManager) Stop() {
+	if sm.cancelFunc != nil {
+		sm.cancelFunc()
+	}
+}
+
+// Shutdown stops media processes and waits for cached stream cleanup.
 func (sm *StreamManager) Shutdown() {
-	sm.cancelFunc()
-	sm.stopAndRemoveAll()
-	sm.stopAndRemoveAllV3()
+	_ = sm.ShutdownContext(context.Background())
+}
+
+// ShutdownContext runs cleanup once and bounds the wait, including when a
+// stream lock or cache filesystem is stalled. HTTP handlers must drain first.
+func (sm *StreamManager) ShutdownContext(ctx context.Context) error {
+	sm.Stop()
+	sm.shutdownOnce.Do(func() {
+		sm.shutdownDone = make(chan struct{})
+		go func() {
+			defer close(sm.shutdownDone)
+			sm.stopAndRemoveAll()
+			sm.stopAndRemoveAllV3()
+		}()
+	})
+	select {
+	case <-sm.shutdownDone:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 type StreamRequestContext struct {

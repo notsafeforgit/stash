@@ -428,8 +428,7 @@ func (s *Manager) BeginShutdown() {
 		s.JobManager.Stop()
 	}
 	if s.StreamManager != nil {
-		s.StreamManager.Shutdown()
-		s.StreamManager = nil
+		s.StreamManager.Stop()
 	}
 }
 
@@ -440,6 +439,11 @@ func (s *Manager) ShutdownContext(ctx context.Context) error {
 	if s.JobManager != nil {
 		if err := s.JobManager.Shutdown(ctx); err != nil {
 			return fmt.Errorf("waiting for background jobs: %w", err)
+		}
+	}
+	if s.StreamManager != nil {
+		if err := s.StreamManager.ShutdownContext(ctx); err != nil {
+			return fmt.Errorf("waiting for media stream cleanup: %w", err)
 		}
 	}
 	return s.Database.Close()

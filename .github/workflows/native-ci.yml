@@ -76,19 +76,42 @@ jobs:
             ui/v3/build/
             ui/login/locales/
 
-  backend-tests:
-    needs: [changes, assets]
+  sqlite-tests:
+    needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        suite: [sqlite, other]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-native-go
         with:
-          suite: tests-${{ matrix.suite }}
+          suite: tests-sqlite
+      - name: SQLite unit and integration tests
+        run: >-
+          python3 scripts/ci_sqlite_tests.py
+          --shard ${{ matrix.shard }} --shards 4
+          --output "$RUNNER_TEMP/sqlite-tests"
+      - name: Retain test timings and failure output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sqlite-tests-${{ matrix.shard }}
+          path: ${{ runner.temp }}/sqlite-tests/
+          retention-days: 7
+          if-no-files-found: warn
+
+  backend-tests:
+    needs: [changes, assets]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-native-go
+        with:
+          suite: tests-other
       - uses: actions/download-artifact@v8
         with:
           name: native-generated
@@ -98,10 +121,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y ffmpeg libavif-bin
       - name: Go unit and integration tests
-        env:
-          TEST_SUITE: ${{ matrix.suite }}
         run: |
-          packages="$(python3 scripts/ci_go_packages.py "$TEST_SUITE")"
+          packages="$(python3 scripts/ci_go_packages.py other)"
           make it GO_TEST_PACKAGES="$packages"
 
   backend-lint:
@@ -175,7 +196,7 @@ jobs:
           if-no-files-found: error
 
   gate:
-    needs: [changes, assets, backend-tests, backend-lint, clients, binary]
+    needs: [changes, assets, sqlite-tests, backend-tests, backend-lint, clients, binary]
     if: always()
     runs-on: ubuntu-24.04
     steps:

@@ -327,14 +327,15 @@ lint:
 # Migration fixtures can exceed Go's default ten-minute package budget.
 GO_TEST_TIMEOUT ?= 20m
 GO_TEST_PACKAGES ?= ./...
+GO_TEST_FLAGS ?=
 .PHONY: test
 test:
-	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_PACKAGES)
+	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_FLAGS) $(GO_TEST_PACKAGES)
 
 # runs all tests - including integration tests
 .PHONY: it
 it:
-	go test -timeout $(GO_TEST_TIMEOUT) -tags "$(GO_BUILD_TAGS) integration" $(GO_TEST_PACKAGES)
+	go test -timeout $(GO_TEST_TIMEOUT) -tags "$(GO_BUILD_TAGS) integration" $(GO_TEST_FLAGS) $(GO_TEST_PACKAGES)
 
 .PHONY: list-test-packages
 list-test-packages:

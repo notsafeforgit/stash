@@ -40,7 +40,20 @@ The [publisher](../.github/workflows/ghcr-publish.yml) calls the shared
 bindings and validates/builds the UI once, shares those exact generated files
 and app/share/offline assets with the Go jobs, and compiles Linux amd64 in
 parallel with backend validation. SQLite tests, other Go tests and Go lint run
-as separate jobs without gallery-dl. The external Python packages run their own
+as separate jobs without gallery-dl. SQLite's main package is split across four
+isolated runners, starting alongside the UI build because they do not depend on
+its generated assets. Each discovers the actual tagged Go test registry and selects
+its share of whole top-level tests, including every subtest and fuzz seed case.
+The first shard also runs every SQLite subpackage. No handwritten test allowlist
+is used, and each shard verifies that all its selected tests finished exactly
+once. Tests remain sequential within each runner because some share global
+configuration and database fixtures. All four shards must pass the publication
+gate. Each job summary lists its slowest tests; the `sqlite-tests-*` artifacts
+retain complete JSON output and timings for seven days, including on failure.
+Only the other backend job installs media fixture tools; SQLite tests do not
+launch FFmpeg or image converters.
+
+The external Python packages run their own
 unit tests and release workflow in `stash-integrations`. A separate client job
 runs the focused real-server compatibility tests when API, model, schema or other
 contract dependencies change. It installs the exact client commit pinned in

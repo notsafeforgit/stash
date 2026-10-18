@@ -89,7 +89,7 @@ def gate_failures(needs):
     if backend not in {"true", "false"}:
         failures.append("check selection is missing or invalid")
     expected = "skipped" if backend == "false" else "success"
-    for job in ("backend-tests", "backend-lint"):
+    for job in ("sqlite-tests", "backend-tests", "backend-lint"):
         if needs.get(job, {}).get("result") != expected:
             failures.append(f"{job} must be {expected}")
     clients = needs.get("changes", {}).get("outputs", {}).get("clients")

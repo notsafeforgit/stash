@@ -117,10 +117,10 @@ class CheckSelectionTest(unittest.TestCase):
 
 class PublishGateTest(unittest.TestCase):
     def needs(self, backend):
-        result = {job: {"result": "success"} for job in ("changes", "assets", "binary", "backend-tests", "backend-lint", "clients")}
+        result = {job: {"result": "success"} for job in ("changes", "assets", "binary", "sqlite-tests", "backend-tests", "backend-lint", "clients")}
         result["changes"]["outputs"] = {"backend": backend, "clients": backend}
         if backend == "false":
-            for job in ("backend-tests", "backend-lint", "clients"):
+            for job in ("sqlite-tests", "backend-tests", "backend-lint", "clients"):
                 result[job]["result"] = "skipped"
         return result
 

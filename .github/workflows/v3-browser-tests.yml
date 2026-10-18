@@ -2,7 +2,7 @@ name: v3 browser tests
 
 on:
   push:
-    branches: [v3-rewrite]
+    branches: [v3-rewrite, develop]
     paths:
       - "ui/v3/**"
       - "graphql/**"

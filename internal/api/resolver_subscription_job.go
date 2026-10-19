@@ -13,12 +13,6 @@ func makeJobStatusUpdate(t JobStatusUpdateType, j job.Job) *JobStatusUpdate {
 	}
 }
 
-// JobsSubscribe retains the legacy combined stream and its buffer size.
-func (r *subscriptionResolver) JobsSubscribe(ctx context.Context) (<-chan *JobStatusUpdate, error) {
-	subscription := r.jobs.Subscribe(ctx)
-	return forwardJobUpdates(ctx, subscription.NewJob, subscription.RemovedJob, subscription.UpdatedJob, 100, false), nil
-}
-
 // JobsLifecycleSubscribe isolates lifecycle events from progress traffic.
 func (r *subscriptionResolver) JobsLifecycleSubscribe(ctx context.Context) (<-chan *JobStatusUpdate, error) {
 	subscription := r.jobs.Subscribe(ctx)

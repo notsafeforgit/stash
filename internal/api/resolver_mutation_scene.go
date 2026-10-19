@@ -191,11 +191,11 @@ func scenePartialFromInput(input models.SceneUpdateInput, translator changesetTr
 	updatedScene.Rating = translator.optionalInt(input.Rating100, "rating100")
 
 	if input.OCounter != nil {
-		logger.Warnf("o_counter is deprecated and no longer supported, use sceneIncrementO/sceneDecrementO instead")
+		logger.Warnf("o_counter is deprecated and no longer supported, use sceneAddO/sceneDeleteO instead")
 	}
 
 	if input.PlayCount != nil {
-		logger.Warnf("play_count is deprecated and no longer supported, use sceneIncrementPlayCount/sceneDecrementPlayCount instead")
+		logger.Warnf("play_count is deprecated and no longer supported, use sceneAddPlay/sceneDeletePlay instead")
 	}
 
 	updatedScene.PlayDuration = translator.optionalFloat64(input.PlayDuration, "play_duration")
@@ -934,28 +934,6 @@ func (r *mutationResolver) SceneResetActivity(ctx context.Context, id string, re
 	return ret, nil
 }
 
-// deprecated
-func (r *mutationResolver) SceneIncrementPlayCount(ctx context.Context, id string) (ret int, err error) {
-	sceneID, err := strconv.Atoi(id)
-	if err != nil {
-		return 0, fmt.Errorf("converting id: %w", err)
-	}
-
-	var updatedTimes []time.Time
-
-	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		qb := r.repository.Scene
-
-		updatedTimes, err = qb.AddViews(ctx, sceneID, nil)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	r.sceneFieldsUpdated(ctx, sceneID, "play_count", "play_history", "last_played_at")
-	return len(updatedTimes), nil
-}
-
 func (r *mutationResolver) SceneAddPlay(ctx context.Context, id string, t []*time.Time) (*HistoryMutationResult, error) {
 	sceneID, err := strconv.Atoi(id)
 	if err != nil {
@@ -1033,52 +1011,6 @@ func (r *mutationResolver) SceneResetPlayCount(ctx context.Context, id string) (
 	}
 
 	r.sceneFieldsUpdated(ctx, sceneID, "play_count", "play_history", "last_played_at")
-	return ret, nil
-}
-
-// deprecated
-func (r *mutationResolver) SceneIncrementO(ctx context.Context, id string) (ret int, err error) {
-	sceneID, err := strconv.Atoi(id)
-	if err != nil {
-		return 0, fmt.Errorf("converting id: %w", err)
-	}
-
-	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		qb := r.repository.Scene
-
-		if _, err := qb.AddO(ctx, sceneID, nil); err != nil {
-			return err
-		}
-		ret, err = qb.GetOCount(ctx, sceneID)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	r.sceneFieldsUpdated(ctx, sceneID, "o_counter", "o_history")
-	return ret, nil
-}
-
-// deprecated
-func (r *mutationResolver) SceneDecrementO(ctx context.Context, id string) (ret int, err error) {
-	sceneID, err := strconv.Atoi(id)
-	if err != nil {
-		return 0, fmt.Errorf("converting id: %w", err)
-	}
-
-	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		qb := r.repository.Scene
-
-		if _, err := qb.DeleteO(ctx, sceneID, nil); err != nil {
-			return err
-		}
-		ret, err = qb.GetOCount(ctx, sceneID)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	r.sceneFieldsUpdated(ctx, sceneID, "o_counter", "o_history")
 	return ret, nil
 }
 

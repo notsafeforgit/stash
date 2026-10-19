@@ -73,7 +73,7 @@ func getTagID(ctx context.Context, client *graphql.Client, create bool) (*graphq
 
 	// see if tag exists already
 	var q struct {
-		AllTags []Tag `graphql:"allTags"`
+		FindTags struct{ Tags []Tag } `graphql:"findTags(filter: {per_page: -1})"`
 	}
 
 	err := client.Query(ctx, &q, nil)
@@ -81,7 +81,7 @@ func getTagID(ctx context.Context, client *graphql.Client, create bool) (*graphq
 		return nil, fmt.Errorf("Error getting tags: %s\n", err.Error())
 	}
 
-	for _, t := range q.AllTags {
+	for _, t := range q.FindTags.Tags {
 		if t.Name == tagName {
 			id := t.ID
 			return &id, nil

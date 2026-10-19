@@ -58,18 +58,3 @@ func (r *queryResolver) FindTags(ctx context.Context, tagFilterAST *models.Filte
 
 	return ret, nil
 }
-
-func (r *queryResolver) AllTags(ctx context.Context) (ret []*models.Tag, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = r.repository.Tag.All(ctx)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-
-	return ret, nil
-}

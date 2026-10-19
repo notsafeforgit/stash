@@ -1,6 +1,7 @@
+import { monitorJobCompletion } from "@/core/monitor-job";
 import { Label } from "@/components/ui/label";
 import type React from "react";
-import { useId, useState, useCallback } from "react";
+import { useId, useState, useCallback, useEffect } from "react";
 import { useIntl } from "react-intl";
 import {
   useApolloClient,
@@ -588,19 +589,27 @@ export const TagTagger: React.FC<ITagTaggerProps> = ({ tags }) => {
   const [tagCreate] = useMutation(GQL.TagCreateDocument);
   const [batchTagTag] = useMutation(GQL.StashBoxBatchTagTagDocument);
 
-  // Track batch job progress
-  useSubscription(GQL.JobsSubscribeDocument, {
+  useEffect(() => {
+    if (!batchJobId) return;
+    return monitorJobCompletion(client, batchJobId, (result) => {
+      setBatchJobId(null);
+      setBatchProgress(null);
+      if (result.kind === "unavailable") {
+        setBatchError(
+          intl.formatMessage({
+            id: "job.outcome_unavailable",
+            defaultMessage: "The job outcome could not be confirmed.",
+          }),
+        );
+      } else if (result.job?.error) setBatchError(result.job.error);
+    });
+  }, [batchJobId, client, intl]);
+  useSubscription(GQL.JobsProgressSubscribeDocument, {
     skip: batchJobId === null,
     onData: ({ data: { data } }) => {
-      const update = data?.jobsSubscribe;
-      if (!update || update.job.id !== batchJobId) return;
-      if (update.type === GQL.JobStatusUpdateType.Remove) {
-        setBatchJobId(null);
-        setBatchProgress(null);
-      } else if (update.type === GQL.JobStatusUpdateType.Update) {
+      const update = data?.jobsProgressSubscribe;
+      if (update?.job.id === batchJobId)
         setBatchProgress(update.job.progress ?? null);
-        if (update.job.error) setBatchError(update.job.error);
-      }
     },
   });
 

@@ -1,19 +1,4 @@
-subscription JobsSubscribe {
-  jobsSubscribe {
-    type
-    job {
-      id
-      status
-      subTasks
-      description
-      progress
-      error
-      startTime
-    }
-  }
-}
-
-# Lifecycle-only subscription — never drops ADD/REMOVE events. Use this in
+# Lifecycle-only subscription; reconcile after disconnects. Use this in
 # any UI that needs to track jobs by id (the task queue, the per-job
 # progress watcher, etc.). Pair with JobsProgressSubscribe for live
 # percentage / subtask updates.

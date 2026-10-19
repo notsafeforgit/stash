@@ -275,20 +275,6 @@ type Query {
 
   dlnaStatus: DLNAStatus!
 
-  # Get everything
-
-  allScenes: [Scene!]! @libraryScope(kind: "scene") @deprecated(reason: "Use findScenes instead")
-  allSceneMarkers: [SceneMarker!]! @libraryScope(kind: "scene_marker")
-    @deprecated(reason: "Use findSceneMarkers instead")
-  allImages: [Image!]! @libraryScope(kind: "image") @deprecated(reason: "Use findImages instead")
-  allGalleries: [Gallery!]! @libraryScope(kind: "gallery") @deprecated(reason: "Use findGalleries instead")
-
-  allPerformers: [Performer!]! @libraryScope(kind: "performer")
-  allTags: [Tag!]! @libraryScope(kind: "tag") @deprecated(reason: "Use findTags instead")
-  allStudios: [Studio!]! @libraryScope(kind: "studio") @deprecated(reason: "Use findStudios instead")
-
-  # Get everything with minimal metadata
-
   # Version
   version: Version!
 
@@ -319,11 +305,6 @@ type Mutation {
   scenesDestroy(input: ScenesDestroyInput!): Boolean! @libraryScope(kind: "scene")
   scenesUpdate(input: [SceneUpdateInput!]!): [Scene] @libraryScope(kind: "scene")
 
-  "Increments the o-counter for a scene. Returns the new value"
-  sceneIncrementO(id: ID! @libraryID(kind: "scene")): Int! @libraryScope(kind: "scene") @deprecated(reason: "Use sceneAddO instead")
-  "Decrements the o-counter for a scene. Returns the new value"
-  sceneDecrementO(id: ID! @libraryID(kind: "scene")): Int! @libraryScope(kind: "scene") @deprecated(reason: "Use sceneRemoveO instead")
-
   "Increments the o-counter for a scene. Uses the current time if none provided."
   sceneAddO(id: ID! @libraryID(kind: "scene"), times: [Timestamp!]): HistoryMutationResult! @libraryScope(kind: "scene")
   "Decrements the o-counter for a scene, removing the last recorded time if specific time not provided. Returns the new value"
@@ -341,10 +322,6 @@ type Mutation {
     reset_resume: Boolean
     reset_duration: Boolean
   ): Boolean! @libraryScope(kind: "scene")
-
-  "Increments the play count for the scene. Returns the new play count value."
-  sceneIncrementPlayCount(id: ID! @libraryID(kind: "scene")): Int! @libraryScope(kind: "scene")
-    @deprecated(reason: "Use sceneAddPlay instead")
 
   "Increments the play count for the scene. Uses the current time if none provided."
   sceneAddPlay(id: ID! @libraryID(kind: "scene"), times: [Timestamp!]): HistoryMutationResult! @libraryScope(kind: "scene")
@@ -647,20 +624,10 @@ type Mutation {
 
 type Subscription {
   """
-  Combined stream of all job-manager events. Retained for backwards
-  compatibility with existing clients; new clients should subscribe to
-  `jobsLifecycleSubscribe` and `jobsProgressSubscribe` separately so a
-  burst of progress UPDATEs cannot crowd out (and cause the server to
-  drop) the rarer-but-correctness-critical ADD / REMOVE events.
-  """
-  jobsSubscribe: JobStatusUpdate!
-
-  """
   Job lifecycle events only — ADD (queued) and REMOVE (finished /
   cancelled / failed). Delivered through a dedicated server-side pipeline
-  with a large buffer, so a client that subscribes to this never misses
-  an ADD even if it's concurrently slow to drain a separate
-  `jobsProgressSubscribe`.
+  with a separate buffer so progress cannot crowd out lifecycle events.
+  Disconnected or slow consumers must reconcile against jobQueue/findJob.
   """
   jobsLifecycleSubscribe: JobStatusUpdate!
 

@@ -58,14 +58,3 @@ func (r *queryResolver) FindStudios(ctx context.Context, studioFilterAST *models
 
 	return ret, nil
 }
-
-func (r *queryResolver) AllStudios(ctx context.Context) (ret []*models.Studio, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = r.repository.Studio.All(ctx)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	return ret, nil
-}

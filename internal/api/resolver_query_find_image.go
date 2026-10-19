@@ -123,17 +123,6 @@ func (r *queryResolver) FindImages(
 	return ret, nil
 }
 
-func (r *queryResolver) AllImages(ctx context.Context) (ret []*models.Image, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = r.repository.Image.All(ctx)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	return ret, nil
-}
-
 func (r *queryResolver) FindDuplicateImages(ctx context.Context, distance int, imageFilterAST *models.FilterAST, filterMode models.DuplicateFilterMode) (ret [][]*models.Image, err error) {
 	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
 		ret, err = r.repository.Image.FindDuplicates(ctx, distance, nil, imageFilterAST, filterMode)

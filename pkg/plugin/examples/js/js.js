@@ -53,14 +53,13 @@ function getTagID(create) {
 	// see if tag exists already
     var query = "\
 query {\
-  allTags {\
-    id\
-    name\
+  findTags(filter: {per_page: -1}) {\
+    tags { id name }\
   }\
 }"
 	
     var result = gql.Do(query);
-    var allTags = result["allTags"];
+    var allTags = result["findTags"]["tags"];
     
     var tag;
 	for (var i = 0; i < allTags.length; ++i) {

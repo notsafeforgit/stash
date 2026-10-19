@@ -82,14 +82,3 @@ func (r *queryResolver) FindGalleries(ctx context.Context, galleryFilterAST *mod
 
 	return ret, nil
 }
-
-func (r *queryResolver) AllGalleries(ctx context.Context) (ret []*models.Gallery, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = r.repository.Gallery.All(ctx)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	return ret, nil
-}

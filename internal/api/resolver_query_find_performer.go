@@ -58,14 +58,3 @@ func (r *queryResolver) FindPerformers(ctx context.Context, performerFilterAST *
 
 	return ret, nil
 }
-
-func (r *queryResolver) AllPerformers(ctx context.Context) (ret []*models.Performer, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = r.repository.Performer.All(ctx)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	return ret, nil
-}

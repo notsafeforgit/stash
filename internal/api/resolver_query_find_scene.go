@@ -273,14 +273,3 @@ func (r *queryResolver) FindDuplicateSceneGroups(ctx context.Context, distance *
 
 	return ret, nil
 }
-
-func (r *queryResolver) AllScenes(ctx context.Context) (ret []*models.Scene, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = r.repository.Scene.All(ctx)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	return ret, nil
-}

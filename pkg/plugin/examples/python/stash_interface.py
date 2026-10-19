@@ -44,16 +44,15 @@ class StashInterface:
 	def findTagIdWithName(self, name):
 		query = """
 query {
-  allTags {
-    id
-    name
+  findTags(filter: {per_page: -1}) {
+    tags { id name }
   }
 }
 		"""
 
 		result = self.__callGraphQL(query)
 		
-		for tag in result["allTags"]:
+		for tag in result["findTags"]["tags"]:
 			if tag["name"] == name:
 				return tag["id"]
 		return None

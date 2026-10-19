@@ -38,7 +38,7 @@ gh run list --repo notsafeforgit/stash --workflow ghcr-publish.yml \
 The [publisher](../.github/workflows/ghcr-publish.yml) calls the shared
 [native validation workflow](../.github/workflows/native-ci.yml). It generates
 bindings and validates/builds the UI once, shares those exact generated files
-and app/share/offline assets with the Go jobs, and compiles Linux amd64 in
+and app/login/share/offline assets with the Go jobs, and compiles Linux amd64 in
 parallel with backend validation. SQLite tests, other Go tests and Go lint run
 as separate jobs without gallery-dl. SQLite's main package is split across four
 isolated runners, starting alongside the UI build because they do not depend on
@@ -71,10 +71,15 @@ history, and manual dispatches select everything. UI validation, embedded-entry
 tests and Linux compilation always run. Failed, cancelled or unexpectedly skipped
 selected jobs cannot publish; failed intervening pushes do not reset the baseline.
 
+The required real-stack browser job runs that Linux binary behind a subpath
+reverse proxy with a temporary library. Chromium and WebKit cover login, failed
+settings writes, in-place session recovery and job history after restart. A
+failure blocks publication. The broader fixture browser regressions retain their
+separate workflow.
+
 Pushes to `develop` no longer repeat this work in the older Build and
 Lint workflows. Native PRs use the same validation workflow; `develop` retains
 its downloadable development release using the publisher's validated artifacts.
-Browser regressions retain their separate workflow.
 
 Dependency caches cover pnpm's actual configured store, uv downloads/builds, Go
 modules, and per-suite incremental Go compilation. BuildKit caches container

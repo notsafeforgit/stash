@@ -13,6 +13,7 @@ import (
 
 func removeSavedShareLinkSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeLibraryJobSchema(t, raw)
 	if queryUint(t, raw, "SELECT count(*) FROM pragma_table_info('shares') WHERE name='token'") == 0 {
 		return
 	}
@@ -42,7 +43,7 @@ INSERT INTO share_sessions(token_hash,share_id,version,expires_at,preview,exchan
 	require.True(t, errors.As(db.Open(path), &needed))
 	require.NoError(t, db.RunAllMigrations())
 	require.NoError(t, db.ReInitialise())
-	require.EqualValues(t, 1000122, queryUint(t, raw, "SELECT version FROM schema_migrations"))
+	require.Equal(t, sqlite.GetRequiredSchemaVersion(), queryUint(t, raw, "SELECT version FROM schema_migrations"))
 	repo := db.Repository()
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		row, err := repo.Share.Find(ctx, "existing")

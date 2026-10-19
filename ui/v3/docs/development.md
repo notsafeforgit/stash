@@ -277,3 +277,13 @@ remain necessary for changes to those interactions.
 Follow the [deployment runbook](../../../docs/v3-deployment.md) after the intended
 source commit is pushed. It covers the two image builds and verifying what the
 local container actually runs.
+
+### Real server browser checks
+
+After `make generate ui`, run `make test-ui-v3-stack` at the repository root.
+This small Chromium/WebKit suite launches the built Go binary behind a reverse
+proxy mounted at `/mounted/`, with a disposable database and configuration.
+It tests real cookies/login, write failures, session recovery and persisted job
+outcomes after restart. It does not use the production server or library.
+The `browser-stack` job is required by the native publication gate; the larger
+fixture suite remains in the existing v3 browser workflow.

@@ -25,7 +25,7 @@
     "test:ci": "vitest run",
     "test:browser": "pnpm run check && playwright test",
     "check-native-contracts": "node scripts/check-native-contracts.mjs",
-    "lint:contracts": "eslint src tests/browser",
+    "lint:contracts": "eslint src tests/browser tests/stack",
     "test:pwa": "pnpm run build && playwright test --config playwright.pwa.config.ts"
   },
   "dependencies": {

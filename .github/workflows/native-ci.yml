@@ -195,8 +195,50 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  browser-stack:
+    needs: [assets, binary]
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-resolute@sha256:b022639ae9197f864040f92eef7b57c6d4b47db2190f77c909d8a5d902dd4b7e
+      options: --ipc=host
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-native-go
+        with:
+          suite: browser-stack
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: ui/v3/package.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: ui/v3/pnpm-lock.yaml
+      - uses: actions/download-artifact@v8
+        with:
+          name: native-linux-amd64
+          path: dist
+      - name: Prepare real stack
+        run: |
+          mv dist/stash-linux dist/stash-browser
+          chmod +x dist/stash-browser
+          go build -o dist/stash-browser-stack ./internal/testbrowser/stack
+          pnpm --dir ui/v3 install --frozen-lockfile
+      - name: Browser tests against the Go server and reverse proxy
+        working-directory: ui/v3
+        run: pnpm exec playwright test --config playwright.stack.config.ts
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: browser-stack-failure
+          path: |
+            ui/v3/stack-report/
+            ui/v3/test-results/
+          retention-days: 7
+
   gate:
-    needs: [changes, assets, sqlite-tests, backend-tests, backend-lint, clients, binary]
+    needs: [changes, assets, sqlite-tests, backend-tests, backend-lint, clients, binary, browser-stack]
     if: always()
     runs-on: ubuntu-24.04
     steps:

@@ -82,7 +82,7 @@ def select_checks(event, branch, head, runs, cwd=None):
 
 def gate_failures(needs):
     failures = []
-    for job in ("changes", "assets", "binary"):
+    for job in ("changes", "assets", "binary", "browser-stack"):
         if needs.get(job, {}).get("result") != "success":
             failures.append(f"{job} did not succeed")
     backend = needs.get("changes", {}).get("outputs", {}).get("backend")

@@ -196,7 +196,9 @@ names. Other API bridges remain until their callers are converted:
   acknowledgment. Duplicate `*UpdateJob` and movie bulk aliases are removed.
   See the [bulk update contract](native-bulk-updates.md) and staged host helpers.
 
-[FORK.md](../FORK.md) documents migration and contract policy.
+[FORK.md](../FORK.md) documents migration and contract policy. The
+[runtime API audit](runtime-api-audit.md) records checked consumers and retired
+endpoints.
 [check-native-contracts.mjs](../ui/v3/scripts/check-native-contracts.mjs) checks
 current v3 operations and the retained plugin API. Runtime protocol behavior,
 shares, and one-time historical database imports have their own tests.
@@ -253,8 +255,8 @@ can propagate through the normalized entity without a full list refetch.
 
 Long-running work goes through `pkg/job.Manager`. `Add` queues jobs for serial
 execution; `Start` explicitly starts a concurrent job. Individual jobs may also
-parallelize their own tasks. The queue is in memory and does not survive a
-server restart. Scan entry points live in
+parallelize their own tasks. Executors and progress are in memory; admission and terminal outcomes
+survive a server restart. Scan entry points live in
 [manager_tasks.go](../internal/manager/manager_tasks.go), with walking and
 per-file processing in [task_scan.go](../internal/manager/task_scan.go).
 Probing, hashing, and generation depend on scan options; a scan does not
@@ -294,13 +296,15 @@ use an explicitly transient queue because the job table may not exist yet.
 
 Job and settings resolvers receive narrow services at server construction;
 authentication/session handlers receive their configuration and session store.
-These boundaries have isolated tests and do not obtain their dependencies from
-the process singleton. The job manager owns admission, draining and subscription
+These boundaries, scene media/preview routes, download serving and public URL
+construction have isolated tests and receive their dependencies explicitly.
+Some older resolver and image-generation code still uses the process singleton;
+this is incremental service isolation rather than a wholesale manager rewrite. The job manager owns admission, draining and subscription
 shutdown; SQLite persistence never holds its queue mutex. Checkpointed archive
 work continues to use its independent durable leases/publication transactions.
 
-[Job subscriptions](../internal/api/resolver_subscription_job.go) retain the
-legacy combined stream and add separate lifecycle/progress streams. The API
+[Job subscriptions](../internal/api/resolver_subscription_job.go) use separate
+lifecycle/progress streams; the redundant combined stream is retired. The API
 forwarder preserves received lifecycle events and may drop progress under
 backpressure. Upstream job-manager buffers and disconnected clients can still
 miss events, so subscriptions are not a durable event log.

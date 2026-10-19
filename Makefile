@@ -515,3 +515,12 @@ else
 	@mkdir -p $(PREFIX)/bin
 	@install -m 755 $(STASH_BINARY) $(PREFIX)/bin/stash
 endif
+
+# Requires generated bindings and the built embedded UI (make generate ui).
+.PHONY: build-browser-stack test-ui-v3-stack
+build-browser-stack:
+	go build -tags "$(GO_BUILD_TAGS)" -o dist/stash-browser ./cmd/stash
+	go build -o dist/stash-browser-stack ./internal/testbrowser/stack
+
+test-ui-v3-stack: build-browser-stack
+	cd ui/v3 && pnpm exec playwright test --config playwright.stack.config.ts

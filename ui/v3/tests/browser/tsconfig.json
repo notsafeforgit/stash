@@ -10,6 +10,8 @@
     "../../playwright.pwa.config.ts",
     "../../vite.config.ts",
     "../../src/vite-env.d.ts",
-    "../../src/hooks/use-smart-back.ts"
+    "../../src/hooks/use-smart-back.ts",
+    "../stack/**/*.ts",
+    "../../playwright.stack.config.ts"
   ]
 }

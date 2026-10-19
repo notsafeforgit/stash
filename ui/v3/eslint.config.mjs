@@ -15,7 +15,11 @@ export default [
     ],
   },
   {
-    files: ["src/**/*.{ts,tsx}", "tests/browser/**/*.{ts,tsx}"],
+    files: [
+      "src/**/*.{ts,tsx}",
+      "tests/browser/**/*.{ts,tsx}",
+      "tests/stack/**/*.{ts,tsx}",
+    ],
     languageOptions: { parser, parserOptions: { ecmaFeatures: { jsx: true } } },
     plugins: { "react-hooks": reactHooks },
     rules: {

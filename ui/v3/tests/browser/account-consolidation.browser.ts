@@ -380,6 +380,12 @@ test.describe("response recovery", () => {
         exact: true,
       }),
     ).toBeVisible();
+    // The pending banner appears when the intent is persisted, before its
+    // first send. Reload only after the fixture has injected the lost reply.
+    await expect.poll(() => remote.writes.length).toBe(1);
+    await expect(
+      page.getByText("Could not complete this step", { exact: true }),
+    ).toBeVisible();
     await page.reload();
     await page
       .getByRole("button", {
@@ -404,6 +410,10 @@ test.describe("response recovery", () => {
       page.getByText("An account consolidation needs confirmation", {
         exact: true,
       }),
+    ).toBeVisible();
+    await expect.poll(() => remote.writes.length).toBe(1);
+    await expect(
+      page.getByText("Could not complete this step", { exact: true }),
     ).toBeVisible();
     await page.reload();
     await expect(

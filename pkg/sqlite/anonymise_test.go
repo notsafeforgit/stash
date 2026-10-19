@@ -4,14 +4,17 @@
 package sqlite_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/pkg/job"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
@@ -76,6 +79,37 @@ UPDATE native_migration_history SET details = '{"private":"private-filter-value"
 	raw = openRawDB(t, path)
 	defer raw.Close()
 	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM default_filter_import_conflicts"))
+}
+
+func TestAnonymiserRemovesLibraryJobHistoryOnlyFromExport(t *testing.T) {
+	source, _ := archiveTestDatabase(t)
+	history := sqlite.NewLibraryJobHistory(source)
+	j := job.Job{
+		ID: uuid.NewString(), Status: job.StatusReady,
+		Description: "Generating /private-library-job/path.mp4", AddTime: time.Now(),
+	}
+	require.NoError(t, history.Create(t.Context(), j))
+	now := time.Now()
+	message := "private-library-job-error-detail"
+	j.Status, j.EndTime, j.Error = job.StatusFailed, &now, &message
+	require.NoError(t, history.Save(t.Context(), j))
+	original, err := history.Find(t.Context(), j.ID)
+	require.NoError(t, err)
+	output := filepath.Join(t.TempDir(), "anonymous.sqlite")
+	anonymiser, err := sqlite.NewAnonymiser(source, output)
+	require.NoError(t, err)
+	require.NoError(t, anonymiser.Anonymise(t.Context()))
+	raw := openRawDB(t, output)
+	defer raw.Close()
+	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM library_jobs"))
+	contents, err := os.ReadFile(output)
+	require.NoError(t, err)
+	for _, value := range []string{j.ID, j.Description, message} {
+		require.False(t, bytes.Contains(contents, []byte(value)), "deleted job history must also be removed from free pages")
+	}
+	retained, err := history.Find(t.Context(), j.ID)
+	require.NoError(t, err)
+	require.Equal(t, original, retained, "support exports must not alter the owner's history")
 }
 
 func TestAnonymiserRemovesShareLinksAndSessions(t *testing.T) {

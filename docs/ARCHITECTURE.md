@@ -291,7 +291,8 @@ replayed automatically. Retain partial results and review them before retrying.
 The last 1,000 terminal records remain queryable through `findJob` and bounded
 `jobHistory` pages in Settings → Tasks; pending rows are never pruned. Missing
 history is an unconfirmed outcome, not successful completion. Progress ticks
-remain in memory. Database initialization/migration and initial FFmpeg setup
+remain in memory. Anonymized support exports remove job history, including its
+descriptions and errors. Database initialization/migration and initial FFmpeg setup
 use an explicitly transient queue because the job table may not exist yet.
 
 Job and settings resolvers receive narrow services at server construction;

@@ -1,19 +1,14 @@
 import { parseUIConfig } from "./config-schema";
 import { getPlatformURL } from "./platform-url";
 export { getPlatformURL } from "./platform-url";
-import {
-  ApolloClient,
-  InMemoryCache,
-  split,
-  from,
-  ServerError,
-} from "@apollo/client";
+import { ApolloClient, InMemoryCache, split, from } from "@apollo/client";
 import type { TypePolicies, FieldReadFunction } from "@apollo/client/cache";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { createClient as createWSClient } from "graphql-ws";
-import { onError } from "@apollo/client/link/error";
 import { getMainDefinition } from "@apollo/client/utilities";
 import UploadHttpLink from "apollo-upload-client/UploadHttpLink.mjs";
+import { sessionFetch } from "./session-recovery";
+import { websocketRecoveryOptions } from "./websocket-recovery";
 
 const readReference = (typename: string): FieldReadFunction => {
   return (existing, { args, canRead, toReference }) =>
@@ -100,28 +95,15 @@ export const createClient = () => {
   const httpLink = new UploadHttpLink({
     uri: url.toString(),
     credentials: "same-origin",
+    fetch: sessionFetch,
   });
 
   const wsClient = createWSClient({
     url: wsUrl.toString(),
-    retryAttempts: Infinity,
-    shouldRetry() {
-      return true;
-    },
+    ...websocketRecoveryOptions(),
   });
 
   const wsLink = new GraphQLWsLink(wsClient);
-
-  const errorLink = onError(({ error }) => {
-    if (ServerError.is(error) && error.statusCode === 401) {
-      const newURL = new URL(
-        getPlatformURL("login"),
-        window.location.toString(),
-      );
-      newURL.searchParams.append("returnURL", window.location.href);
-      window.location.href = newURL.toString();
-    }
-  });
 
   const splitLink = split(
     ({ query }) => {
@@ -135,7 +117,7 @@ export const createClient = () => {
     httpLink,
   );
 
-  const link = from([errorLink, splitLink]);
+  const link = from([splitLink]);
 
   const cache = createCache();
 

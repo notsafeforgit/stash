@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { applicationBaseURL, joinPlatformURL } from "../platform-url";
+import { withSessionRecovery } from "../session-recovery";
 
 export class NativeArchiveError extends Error {
   constructor(
@@ -37,7 +38,8 @@ export function createArchiveRequest(
     signal?: AbortSignal,
     method: "GET" | "POST" | "PUT" = body === undefined ? "GET" : "POST",
   ): Promise<T> {
-    const response = await transport(new URL(path, endpoint), {
+    const target = new URL(path, endpoint);
+    const options: RequestInit = {
       method,
       credentials: "same-origin",
       cache: "no-store",
@@ -48,7 +50,12 @@ export function createArchiveRequest(
           : { Accept: "application/json", "Content-Type": "application/json" },
       body,
       signal,
-    });
+    };
+    const response = await withSessionRecovery(
+      () => transport(target, options),
+      target,
+      signal,
+    );
     if (!response.ok) {
       const result = z
         .object({

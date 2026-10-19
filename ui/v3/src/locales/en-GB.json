@@ -1793,6 +1793,8 @@
     "plugins": "Loading plugins…"
   },
   "login": {
+    "session_expired": "Sign in to continue",
+    "edits_retained": "Your edits are kept while you sign in.",
     "username_required": "Enter your username.",
     "password_required": "Enter your password.",
     "internal_error": "Unexpected internal error. See logs for more details",

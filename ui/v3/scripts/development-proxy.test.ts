@@ -41,7 +41,7 @@ it("forwards login cookies and the same Host/Origin through HTTP and WebSocket p
     const cookie = login.headers.get("set-cookie")?.split(";")[0];
     expect(cookie).toBe("stashSession=fixture");
     const headers = { Cookie: cookie ?? "", Origin: origin };
-    for (const route of ["/graphql", "/api/v3/archive/status"]) {
+    for (const route of ["/graphql", "/api/v3/archive/status", "/session"]) {
       const response = await fetch(`${origin}${route}`, { headers });
       expect(response.status).toBe(200);
       await response.text();
@@ -61,7 +61,7 @@ it("forwards login cookies and the same Host/Origin through HTTP and WebSocket p
       );
       upgrade.end();
     });
-    expect(seen).toHaveLength(3);
+    expect(seen).toHaveLength(4);
     for (const headers of seen) {
       expect(headers).toMatchObject({
         cookie,

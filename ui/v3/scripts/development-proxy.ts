@@ -36,5 +36,6 @@ export function developmentProxy(
       },
     },
     "/logout": backend,
+    "/session": { target: backend, changeOrigin: false },
   };
 }

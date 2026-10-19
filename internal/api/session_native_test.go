@@ -80,3 +80,30 @@ func TestLoginPostUsesInjectedStoreAndSetsUsableSession(t *testing.T) {
 		require.Equal(t, "test", user)
 	}
 }
+
+func TestSessionProbeReturnsAuthenticationStatusWithoutRedirect(t *testing.T) {
+	t.Parallel()
+	c := config.NewEmpty()
+	c.SetString(config.Username, "owner")
+	c.SetPassword("test password")
+	c.SetString(config.SessionStoreKey, strings.Repeat("k", 32))
+	c.SetString(config.ApiKey, "test key")
+	store := session.NewStore(c)
+	handler := authenticateHandler(c, store)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	for _, authenticated := range []bool{false, true} {
+		r := httptest.NewRequest(http.MethodGet, "https://library.test/session", nil)
+		if authenticated {
+			r.Header.Set("ApiKey", "test key")
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		if authenticated {
+			require.Equal(t, http.StatusNoContent, w.Code)
+		} else {
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		}
+		require.Empty(t, w.Header().Get("Location"))
+	}
+}

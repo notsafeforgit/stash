@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "@/app";
+import { SessionRecoveryDialog } from "@/components/auth/session-recovery-dialog";
 import { SceneLightbox } from "@/components/lightbox/deferred-lightboxes";
 import { registerOfflineWorker } from "@/pwa/register";
 import { installPagePinchZoomGuard } from "src/lib/prevent-page-pinch-zoom";
@@ -15,6 +16,7 @@ const root = document.getElementById("root");
 if (!root) throw new Error("Missing application root");
 createRoot(root).render(
   <StrictMode>
+    <SessionRecoveryDialog />
     <App />
   </StrictMode>,
 );

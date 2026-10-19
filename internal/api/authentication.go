@@ -17,7 +17,7 @@ import (
 
 func allowUnauthenticated(r *http.Request) bool {
 	// #2715 - allow access to UI files
-	return strings.HasPrefix(r.URL.Path, loginEndpoint) || r.URL.Path == logoutEndpoint || r.URL.Path == "/css" || strings.HasPrefix(r.URL.Path, "/assets")
+	return r.URL.Path == loginEndpoint || r.URL.Path == loginLocaleEndpoint || strings.HasPrefix(r.URL.Path, loginEndpoint+"/assets/") || r.URL.Path == logoutEndpoint || r.URL.Path == "/css" || strings.HasPrefix(r.URL.Path, "/assets/")
 }
 
 // authenticateSignedRequest checks if the request is a valid signed media request.
@@ -119,7 +119,7 @@ func authenticateHandler(c *config.Config, store *session.Store) func(http.Handl
 				if userID == "" && !allowUnauthenticated(r) {
 					// if graphql or a non-webpage was requested, we just return a forbidden error
 					ext := path.Ext(r.URL.Path)
-					if r.URL.Path == gqlEndpoint || (ext != "" && ext != ".html") {
+					if r.URL.Path == gqlEndpoint || r.URL.Path == "/session" || (ext != "" && ext != ".html") {
 						w.Header().Add("WWW-Authenticate", "FormBased")
 						w.WriteHeader(http.StatusUnauthorized)
 						return

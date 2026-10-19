@@ -107,6 +107,15 @@ caller; existing stored hashes remain valid without conversion. Login redirects
 stay within the application origin and public mount. Login assets are served
 under `/login/assets/` independently of custom UI overrides.
 
+GraphQL and native archive HTTP requests share in-place session recovery. An
+explicit 401 opens one login dialog while preserving the application, form state
+and saved request body. Successful login retries each waiting request once;
+conflicts, server errors and uncertain network outcomes are not replayed.
+Cancellation removes only that caller. Guest shares retain their separate
+capability authentication. WebSocket reconnection probes the private `/session`
+endpoint to distinguish an expired cookie from an opaque network/handshake
+failure, backs off during outages and stops on protocol or permission failures.
+
 `withReadTxn` / `withTxn` in [resolver.go](../internal/api/resolver.go) delegate
 to repository transaction helpers. Use the callback's context for repository
 calls so they share that transaction. Transactions are scoped by individual

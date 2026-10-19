@@ -59,8 +59,10 @@ uses **9999**. `make ui-start` is the same native dev server as `ui-v3-start`.
 
 Keep authentication enabled during development. Browser requests use Vite's
 origin for GraphQL, WebSocket subscriptions, native APIs and login. The proxy
-forwards session cookies and preserves Host/Origin; a GraphQL 401 redirects to
-the proxied login page with the current page as the return URL. Set
+forwards session cookies and preserves Host/Origin. GraphQL and native API 401s
+open the shared login dialog while retaining the page and pending requests.
+The standalone `/login` page uses Vite's login entry; its POST and public locale
+requests still reach the backend. Set
 `VITE_APP_PLATFORM_URL` (or the localhost `VITE_APP_PLATFORM_PORT` fallback)
 on the Vite process to choose its backend, not a cross-origin browser endpoint.
 

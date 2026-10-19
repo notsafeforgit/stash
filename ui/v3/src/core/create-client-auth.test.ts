@@ -3,6 +3,7 @@ import { gql } from "@apollo/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { createClient } from "./create-client";
 import { getPlatformURL } from "./platform-url";
+import { sessionRecovery } from "./session-recovery";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -11,7 +12,7 @@ afterEach(() => {
 });
 
 it.each(["/", "/stash/"])(
-  "uses the browser session and login under %s even with a development backend override",
+  "recovers the browser session in place under %s even with a development backend override",
   async (prefix) => {
     vi.stubEnv("DEV", true);
     vi.stubEnv("VITE_APP_PLATFORM_URL", "http://127.0.0.1:9999");
@@ -38,31 +39,40 @@ it.each(["/", "/stash/"])(
     vi.stubGlobal("alert", alert);
     const fetch = vi
       .fn()
-      .mockResolvedValue(new Response("Unauthorized", { status: 401 }));
+      .mockResolvedValueOnce(new Response("Unauthorized", { status: 401 }))
+      .mockResolvedValueOnce(
+        Response.json({ data: { systemStatus: { status: "OK" } } }),
+      );
     vi.stubGlobal("fetch", fetch);
 
     expect(getPlatformURL("graphql").href).toBe(
       `https://dev.example.test${prefix}graphql`,
     );
     const { client, wsClient } = createClient();
+    const unsubscribe = sessionRecovery.subscribe(() => {});
     try {
-      await expect(
-        client.query({
-          query: gql`query AuthenticatedDevelopment { systemStatus { status } }`,
-          fetchPolicy: "network-only",
-        }),
-      ).rejects.toThrow();
-      expect(fetch).toHaveBeenCalledWith(
+      const query = client.query({
+        query: gql`query AuthenticatedDevelopment { systemStatus { status } }`,
+        fetchPolicy: "network-only",
+      });
+      await vi.waitFor(() => expect(sessionRecovery.getSnapshot()).toBe(true));
+      expect(location.href).toBe(currentPage);
+      sessionRecovery.authenticated();
+      await expect(query).resolves.toMatchObject({
+        data: { systemStatus: { status: "OK" } },
+      });
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(fetch.mock.calls[0]?.[0]).toBe(
         `https://dev.example.test${prefix}graphql`,
-        expect.objectContaining({ credentials: "same-origin" }),
       );
-      const login = new URL(location.href);
-      expect(login.origin + login.pathname).toBe(
-        `https://dev.example.test${prefix}login`,
+      expect(fetch.mock.calls[0]?.[1]?.credentials).toBe("same-origin");
+      expect(fetch.mock.calls[0]?.[1]?.body).toBe(
+        fetch.mock.calls[1]?.[1]?.body,
       );
-      expect(login.searchParams.get("returnURL")).toBe(currentPage);
+      expect(location.href).toBe(currentPage);
       expect(alert).not.toHaveBeenCalled();
     } finally {
+      unsubscribe();
       client.stop();
       await wsClient.dispose();
     }

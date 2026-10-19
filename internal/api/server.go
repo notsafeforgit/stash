@@ -303,6 +303,10 @@ func Initialize() (*Server, error) {
 
 	staticLoginUI := statigz.FileServer(ui.UIBox.(fs.ReadDirFS))
 
+	r.Get("/session", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusNoContent)
+	})
 	r.Get(loginEndpoint, handleLogin(cfg))
 	r.Post(loginEndpoint, handleLoginPost(mgr.SessionStore))
 	r.Get(logoutEndpoint, handleLogout(cfg, mgr.SessionStore))

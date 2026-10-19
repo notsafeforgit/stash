@@ -96,7 +96,12 @@ func (rs *shareRoutes) router() http.Handler {
 				r.Head("/download", rs.download)
 				r.Get("/stream", rs.originalStream)
 				r.Head("/stream", rs.originalStream)
-				scene := sceneRoutes{routes: routes{txnManager: rs.service.Repo.TxnManager}, sceneFinder: rs.service.Repo.Scene, fileGetter: rs.service.Repo.File}
+				scene := sceneRoutes{streamManager: func() *ffmpeg.StreamManager {
+					if rs.server == nil {
+						return nil
+					}
+					return rs.server.manager.StreamManager
+				}, routes: routes{txnManager: rs.service.Repo.TxnManager}, sceneFinder: rs.service.Repo.Scene, fileGetter: rs.service.Repo.File}
 				for endpoint, handler := range map[string]http.HandlerFunc{
 					"/stream.master.m3u8":                         scene.StreamV3HLSMaster,
 					"/stream.hevc.master.m3u8":                    scene.StreamV3HLSHEVCMaster,

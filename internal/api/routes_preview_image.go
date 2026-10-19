@@ -5,19 +5,25 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/previewimage"
 )
 
+type previewImageService interface {
+	PreviewImageStore() previewimage.Store
+	ScenePreviewImage(*models.Scene) *previewimage.Manifest
+	ImagePreviewImage(*models.Image) *previewimage.Manifest
+	MarkerPreviewImage(*models.Scene, *models.SceneMarker) *previewimage.Manifest
+}
+
 func (rs sceneRoutes) PreviewImage(w http.ResponseWriter, r *http.Request) {
 	scene := r.Context().Value(sceneKey).(*models.Scene)
-	rs.servePreviewImage(w, r, scene, "cover", manager.GetInstance().ScenePreviewImage(scene))
+	rs.servePreviewImage(w, r, scene, "cover", rs.previewImages.ScenePreviewImage(scene))
 }
 
 func (rs imageRoutes) PreviewImage(w http.ResponseWriter, r *http.Request) {
 	img := r.Context().Value(imageKey).(*models.Image)
-	mgr := manager.GetInstance()
+	mgr := rs.previewImages
 	servePreviewImage(w, r, mgr.PreviewImageStore(), img.ID, "image", mgr.ImagePreviewImage(img), chi.URLParam(r, "previewFile"))
 }
 
@@ -41,11 +47,11 @@ func (rs sceneRoutes) MarkerPreviewImage(w http.ResponseWriter, r *http.Request)
 		http.NotFound(w, r)
 		return
 	}
-	rs.servePreviewImage(w, r, scene, "marker", manager.GetInstance().MarkerPreviewImage(scene, marker))
+	rs.servePreviewImage(w, r, scene, "marker", rs.previewImages.MarkerPreviewImage(scene, marker))
 }
 
 func (rs sceneRoutes) servePreviewImage(w http.ResponseWriter, r *http.Request, scene *models.Scene, kind string, manifest *previewimage.Manifest) {
-	servePreviewImage(w, r, manager.GetInstance().PreviewImageStore(), scene.ID, kind, manifest, chi.URLParam(r, "previewFile"))
+	servePreviewImage(w, r, rs.previewImages.PreviewImageStore(), scene.ID, kind, manifest, chi.URLParam(r, "previewFile"))
 }
 
 func servePreviewImage(w http.ResponseWriter, r *http.Request, store previewimage.Store, entityID int, kind string, manifest *previewimage.Manifest, file string) {

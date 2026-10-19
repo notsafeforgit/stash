@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
@@ -12,7 +11,7 @@ import (
 
 func (rs sceneRoutes) DownloadProgress(w http.ResponseWriter, r *http.Request) {
 	scene := r.Context().Value(sceneKey).(*models.Scene)
-	serveDownloadProgress(w, r, manager.GetInstance().StreamManager, scene.ID)
+	serveDownloadProgress(w, r, rs.streamManager(), scene.ID)
 }
 
 func serveDownloadProgress(w http.ResponseWriter, r *http.Request, streams *ffmpeg.StreamManager, sceneID int) {

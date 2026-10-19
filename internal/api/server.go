@@ -35,6 +35,7 @@ import (
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/internal/sharing"
+	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/plugin"
@@ -203,7 +204,7 @@ func Initialize() (*Server, error) {
 	r.Use(SecurityHeadersMiddleware)
 	r.Use(middleware.Compress(4))
 	r.Use(middleware.StripSlashes)
-	r.Use(BaseURLMiddleware)
+	r.Use(BaseURLMiddleware(cfg))
 
 	recoverFunc := func(ctx context.Context, err interface{}) error {
 		logger.Error(err)
@@ -233,8 +234,8 @@ func Initialize() (*Server, error) {
 	groupService := mgr.GroupService
 	sourceTracking := cfg.GetSourceTrackingEnabled()
 	resolver := &Resolver{
-		jobs: mgr.JobManager,
-		scanSubscribe: mgr.ScanSubscribe,
+		jobs:                 mgr.JobManager,
+		scanSubscribe:        mgr.ScanSubscribe,
 		settings:             &settingsService{config: cfg, runtime: mgr, setLogLevel: mgr.Logger.SetLogLevel},
 		sourceTrackingActive: sourceTracking,
 		shares:               server.shares,
@@ -481,6 +482,10 @@ func (s *Server) getPerformerRoutes() chi.Router {
 func (s *Server) getSceneRoutes() chi.Router {
 	repo := s.manager.Repository
 	return sceneRoutes{
+		config:            s.manager.Config,
+		paths:             s.manager.Paths,
+		streamManager:     func() *ffmpeg.StreamManager { return s.manager.StreamManager },
+		previewImages:     s.manager,
 		routes:            routes{txnManager: repo.TxnManager},
 		sceneFinder:       repo.Scene,
 		fileGetter:        repo.File,
@@ -504,9 +509,10 @@ func (s *Server) getGalleryRoutes() chi.Router {
 func (s *Server) getImageRoutes() chi.Router {
 	repo := s.manager.Repository
 	return imageRoutes{
-		routes:      routes{txnManager: repo.TxnManager},
-		imageFinder: repo.Image,
-		fileGetter:  repo.File,
+		previewImages: s.manager,
+		routes:        routes{txnManager: repo.TxnManager},
+		imageFinder:   repo.Image,
+		fileGetter:    repo.File,
 	}.Routes()
 }
 
@@ -535,7 +541,7 @@ func (s *Server) getTagRoutes() chi.Router {
 }
 
 func (s *Server) getDownloadsRoutes() chi.Router {
-	return downloadsRoutes{}.Routes()
+	return downloadsRoutes{serve: s.manager.DownloadStore.Serve}.Routes()
 }
 
 func (s *Server) getPluginRoutes() chi.Router {
@@ -702,28 +708,30 @@ var (
 	IPCtxKey      = &contextKey{"requestIP"}
 )
 
-func BaseURLMiddleware(next http.Handler) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
+func BaseURLMiddleware(cfg interface{ GetExternalHost() string }) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
 
-		scheme := "http"
-		if strings.Compare("https", r.URL.Scheme) == 0 || r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
-			scheme = "https"
+			scheme := "http"
+			if strings.Compare("https", r.URL.Scheme) == 0 || r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+				scheme = "https"
+			}
+			prefix := getProxyPrefix(r)
+
+			baseURL := scheme + "://" + r.Host + prefix
+
+			externalHost := cfg.GetExternalHost()
+			if externalHost != "" {
+				baseURL = externalHost + prefix
+			}
+
+			r = r.WithContext(context.WithValue(ctx, BaseURLCtxKey, baseURL))
+
+			next.ServeHTTP(w, r)
 		}
-		prefix := getProxyPrefix(r)
-
-		baseURL := scheme + "://" + r.Host + prefix
-
-		externalHost := config.GetInstance().GetExternalHost()
-		if externalHost != "" {
-			baseURL = externalHost + prefix
-		}
-
-		r = r.WithContext(context.WithValue(ctx, BaseURLCtxKey, baseURL))
-
-		next.ServeHTTP(w, r)
+		return http.HandlerFunc(fn)
 	}
-	return http.HandlerFunc(fn)
 }
 
 func getProxyPrefix(r *http.Request) string {

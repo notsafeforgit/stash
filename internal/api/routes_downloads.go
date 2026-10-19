@@ -5,11 +5,11 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-
-	"github.com/stashapp/stash/internal/manager"
 )
 
-type downloadsRoutes struct{}
+type downloadsRoutes struct {
+	serve func(string, http.ResponseWriter, *http.Request)
+}
 
 func (rs downloadsRoutes) Routes() chi.Router {
 	r := chi.NewRouter()
@@ -29,7 +29,7 @@ func (rs downloadsRoutes) file(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	manager.GetInstance().DownloadStore.Serve(hash, w, r)
+	rs.serve(hash, w, r)
 }
 
 func downloadCtx(next http.Handler) http.Handler {

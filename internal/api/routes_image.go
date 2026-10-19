@@ -26,6 +26,7 @@ type ImageFinder interface {
 }
 
 type imageRoutes struct {
+	previewImages previewImageService
 	routes
 	imageFinder ImageFinder
 	fileGetter  models.FileGetter

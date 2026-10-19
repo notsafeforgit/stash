@@ -188,7 +188,7 @@ func Initialize() (*Server, error) {
 	r.Use(middleware.Heartbeat("/healthz"))
 	r.Use(cors.AllowAll().Handler)
 	r.Use(RequestIPMiddleware)
-	r.Use(authenticateHandler())
+	r.Use(authenticateHandler(cfg, mgr.SessionStore))
 	visitedPluginHandler := mgr.SessionStore.VisitedPluginHandler()
 	r.Use(visitedPluginHandler)
 
@@ -274,7 +274,7 @@ func Initialize() (*Server, error) {
 
 	r.HandleFunc(gqlEndpoint, gqlHandlerFunc)
 	r.HandleFunc(playgroundEndpoint, func(w http.ResponseWriter, r *http.Request) {
-		setPageSecurityHeaders(w, r, pluginCache.ListPlugins())
+		setPageSecurityHeaders(cfg, w, r, pluginCache.ListPlugins())
 		endpoint := getProxyPrefix(r) + gqlEndpoint
 		gqlPlayground.Handler("GraphQL playground", endpoint, gqlPlayground.WithGraphiqlEnablePluginExplorer(true))(w, r)
 	})
@@ -301,13 +301,13 @@ func Initialize() (*Server, error) {
 	r.HandleFunc("/javascript", javascriptHandler(cfg))
 	r.HandleFunc("/customlocales", customLocalesHandler(cfg))
 
-	staticLoginUI := statigz.FileServer(ui.LoginUIBox.(fs.ReadDirFS))
+	staticLoginUI := statigz.FileServer(ui.UIBox.(fs.ReadDirFS))
 
-	r.Get(loginEndpoint, handleLogin())
-	r.Post(loginEndpoint, handleLoginPost())
-	r.Get(logoutEndpoint, handleLogout())
+	r.Get(loginEndpoint, handleLogin(cfg))
+	r.Post(loginEndpoint, handleLoginPost(mgr.SessionStore))
+	r.Get(logoutEndpoint, handleLogout(cfg, mgr.SessionStore))
 	r.Get(loginLocaleEndpoint, handleLoginLocale(cfg))
-	r.HandleFunc(loginEndpoint+"/*", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc(loginEndpoint+"/assets/*", func(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = strings.TrimPrefix(r.URL.Path, loginEndpoint)
 		w.Header().Set("Cache-Control", "no-cache")
 		staticLoginUI.ServeHTTP(w, r)
@@ -341,7 +341,7 @@ func Initialize() (*Server, error) {
 
 		if ext == ".html" || ext == "" {
 			w.Header().Set("Content-Type", "text/html")
-			setPageSecurityHeaders(w, r, pluginCache.ListPlugins())
+			setPageSecurityHeaders(cfg, w, r, pluginCache.ListPlugins())
 		}
 
 		if ext == "" || r.URL.Path == "/" || r.URL.Path == "/index.html" {
@@ -617,8 +617,7 @@ func makeTLSConfig(c *config.Config) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-func setPageSecurityHeaders(w http.ResponseWriter, r *http.Request, plugins []*plugin.Plugin) {
-	c := config.GetInstance()
+func setPageSecurityHeaders(c *config.Config, w http.ResponseWriter, r *http.Request, plugins []*plugin.Plugin) {
 
 	defaultSrc := "data: 'self' 'unsafe-inline'"
 	connectSrcSlice := []string{

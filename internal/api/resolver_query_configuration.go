@@ -123,7 +123,7 @@ func makeConfigGeneralResult(config *config.Config) *ConfigGeneralResult {
 		GalleryCoverRegex:             config.GetGalleryCoverRegex(),
 		APIKey:                        config.GetAPIKey(),
 		Username:                      config.GetUsername(),
-		Password:                      config.GetPasswordHash(),
+		PasswordConfigured:            config.GetPasswordHash() != "",
 		MaxSessionAge:                 config.GetMaxSessionAge(),
 		LogFile:                       &logFile,
 		LogOut:                        config.GetLogOut(),

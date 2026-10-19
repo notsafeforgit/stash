@@ -11,7 +11,7 @@ import (
 var uiBox embed.FS
 var UIBox fs.FS
 
-//go:embed login
+//go:embed login/locales
 var loginUIBox embed.FS
 var LoginUIBox fs.FS
 

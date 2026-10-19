@@ -22,7 +22,19 @@ export function developmentProxy(
     "/javascript": backend,
     "/customlocales": backend,
     "/custom/": backend,
-    "/login": backend,
+    "^/login(?:\\?|$|/)": {
+      target: backend,
+      changeOrigin: false,
+      bypass(request) {
+        const url = new URL(
+          request.url ?? "/login",
+          "http://development.invalid",
+        );
+        if (request.method === "GET" && url.pathname === "/login") {
+          return `/login.html${url.search}`;
+        }
+      },
+    },
     "/logout": backend,
   };
 }

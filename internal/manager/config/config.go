@@ -1297,16 +1297,19 @@ func (i *Config) GetPasswordHash() string {
 }
 
 func (i *Config) GetCredentials() (string, string) {
-	if i.HasCredentials() {
-		return i.getString(Username), i.getString(Password)
+	i.RLock()
+	defer i.RUnlock()
+	username := i.forKey(Username).String(Username)
+	password := i.forKey(Password).String(Password)
+	if username != "" && password != "" {
+		return username, password
 	}
 
 	return "", ""
 }
 
 func (i *Config) HasCredentials() bool {
-	username := i.getString(Username)
-	pwHash := i.getString(Password)
+	username, pwHash := i.GetCredentials()
 
 	return username != "" && pwHash != ""
 }
@@ -1318,12 +1321,11 @@ func hashPassword(password string) string {
 }
 
 func (i *Config) ValidateCredentials(username string, password string) bool {
-	if !i.HasCredentials() {
+	authUser, authPWHash := i.GetCredentials()
+	if authUser == "" || authPWHash == "" {
 		// don't need to authenticate if no credentials saved
 		return true
 	}
-
-	authUser, authPWHash := i.GetCredentials()
 
 	err := bcrypt.CompareHashAndPassword([]byte(authPWHash), []byte(password))
 

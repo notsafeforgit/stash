@@ -19,7 +19,7 @@ func TestUIBoxIncludesUnderscoreRouteChunks(t *testing.T) {
 func TestNativeEmbeddedEntryPoints(t *testing.T) {
 	// All entry points must come from the same build, including when a checkout
 	// has never installed or built the retired application.
-	for _, name := range []string{"index.html", "share.html", "offline.html", "service-worker.js", "manifest.json", "favicon.ico", "favicon.png"} {
+	for _, name := range []string{"index.html", "login.html", "share.html", "offline.html", "service-worker.js", "manifest.json", "favicon.ico", "favicon.png"} {
 		t.Run(name, func(t *testing.T) {
 			data, err := fs.ReadFile(UIBox, name)
 			if err != nil {

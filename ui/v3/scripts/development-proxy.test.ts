@@ -37,7 +37,7 @@ it("forwards login cookies and the same Host/Origin through HTTP and WebSocket p
     await vite.listen();
     const origin = vite.resolvedUrls?.local[0]?.replace(/\/$/, "");
     if (!origin) throw new Error("Missing proxy address");
-    const login = await fetch(`${origin}/login`);
+    const login = await fetch(`${origin}/login`, { method: "POST" });
     const cookie = login.headers.get("set-cookie")?.split(";")[0];
     expect(cookie).toBe("stashSession=fixture");
     const headers = { Cookie: cookie ?? "", Origin: origin };

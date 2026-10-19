@@ -11,11 +11,10 @@ import (
 )
 
 func TestPageSecurityHeadersAllowOfflineWorkerByDefault(t *testing.T) {
-	config.InitializeEmpty()
-	t.Cleanup(func() { config.InitializeEmpty() })
+	cfg := config.NewEmpty()
 	for _, path := range []string{"/", "/offline.html", "/performers/123"} {
 		response := httptest.NewRecorder()
-		setPageSecurityHeaders(response, httptest.NewRequest(http.MethodGet, path, nil), nil)
+		setPageSecurityHeaders(cfg, response, httptest.NewRequest(http.MethodGet, path, nil), nil)
 		directives := strings.Split(response.Header().Get("Content-Security-Policy"), ";")
 		for i := range directives {
 			directives[i] = strings.TrimSpace(directives[i])

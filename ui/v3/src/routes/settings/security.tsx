@@ -1,141 +1,17 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useIntl } from "react-intl";
 import { useMutation } from "@apollo/client/react";
 import * as GQL from "src/core/generated-graphql";
 import { useConfigurationContext, useConfigureGeneral } from "src/hooks/config";
 import { useToast } from "src/hooks/toast";
 import { useMsg } from "src/hooks/message";
 import { Button } from "src/components/ui/button";
-import { Input } from "src/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "src/components/ui/dialog";
-import { Field, FieldDescription, FieldLabel } from "src/components/ui/field";
+import { CredentialsDialog } from "@/components/settings/credentials-dialog";
 import {
   SettingDisplay,
   SettingNumber,
   SettingsSection,
 } from "src/components/settings/setting-row";
-
-function CredentialsDialog({
-  open,
-  onOpenChange,
-  initialUsername,
-  onSave,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  initialUsername: string;
-  onSave: (username: string, password: string) => void;
-}) {
-  const intl = useIntl();
-  const [username, setUsername] = useState(initialUsername);
-  const [password, setPassword] = useState("");
-
-  // Re-seed the draft each time the dialog opens.
-  const [syncedOpen, setSyncedOpen] = useState(open);
-  if (syncedOpen !== open) {
-    setSyncedOpen(open);
-    if (open) {
-      setUsername(initialUsername);
-      setPassword("");
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false}>
-        <DialogHeader>
-          <DialogTitle>
-            {intl.formatMessage({
-              id: "config.general.auth.credentials.heading",
-              defaultMessage: "Credentials",
-            })}
-          </DialogTitle>
-          <DialogDescription>
-            {intl.formatMessage({
-              id: "config.general.auth.credentials.description",
-              defaultMessage:
-                "Username and password to access stash. Leave blank to disable authentication.",
-            })}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <Field>
-            <FieldLabel htmlFor="auth-username">
-              {intl.formatMessage({
-                id: "config.general.auth.username",
-                defaultMessage: "Username",
-              })}
-            </FieldLabel>
-            <Input
-              id="auth-username"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.currentTarget.value)}
-            />
-            <FieldDescription>
-              {intl.formatMessage({
-                id: "config.general.auth.username_desc",
-                defaultMessage:
-                  "Username to access stash. Leave blank to disable user authentication",
-              })}
-            </FieldDescription>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="auth-password">
-              {intl.formatMessage({
-                id: "config.general.auth.password",
-                defaultMessage: "Password",
-              })}
-            </FieldLabel>
-            <Input
-              id="auth-password"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.currentTarget.value)}
-            />
-            <FieldDescription>
-              {intl.formatMessage({
-                id: "config.general.auth.password_desc",
-                defaultMessage:
-                  "Password to access stash. Leave blank to disable user authentication",
-              })}
-            </FieldDescription>
-          </Field>
-        </div>
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
-            {intl.formatMessage({
-              id: "actions.cancel",
-              defaultMessage: "Cancel",
-            })}
-          </Button>
-          <Button
-            type="button"
-            onClick={() => {
-              onSave(username, password);
-              onOpenChange(false);
-            }}
-          >
-            {intl.formatMessage({ id: "actions.save", defaultMessage: "Save" })}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function SettingsSecurityPage() {
   const Toast = useToast();
@@ -194,7 +70,7 @@ function SettingsSecurityPage() {
               <Button
                 type="button"
                 variant="outline"
-                disabled={!general.username || !general.password}
+                disabled={!general.username || !general.passwordConfigured}
                 onClick={() => void onGenerateAPIKey(false)}
               >
                 {msg(
@@ -233,16 +109,16 @@ function SettingsSecurityPage() {
         />
       </SettingsSection>
 
-      <CredentialsDialog
-        open={credentialsOpen}
-        onOpenChange={setCredentialsOpen}
-        initialUsername={general.username}
-        onSave={(username, password) =>
-          void configureGeneral({
-            variables: { input: { username, password } },
-          })
-        }
-      />
+      {credentialsOpen && (
+        <CredentialsDialog
+          onOpenChange={setCredentialsOpen}
+          initialUsername={general.username}
+          passwordConfigured={general.passwordConfigured}
+          onSave={async (input) => {
+            await configureGeneral({ variables: { input } });
+          }}
+        />
+      )}
     </div>
   );
 }

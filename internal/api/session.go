@@ -1,15 +1,16 @@
 package api
 
 import (
-	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
+	"html"
 	"io/fs"
 	"net/http"
+	"net/url"
+	"path"
 	"strings"
 
-	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/session"
@@ -24,42 +25,50 @@ const (
 )
 
 func getLoginPage() []byte {
-	data, err := fs.ReadFile(ui.LoginUIBox, "login.html")
+	data, err := fs.ReadFile(ui.UIBox, "login.html")
 	if err != nil {
 		panic(err)
 	}
 	return data
 }
 
-type loginTemplateData struct {
-	URL   string
-	Error string
-}
-
-func serveLoginPage(w http.ResponseWriter, r *http.Request, returnURL string, loginError string) {
+func serveLoginPage(cfg *config.Config, w http.ResponseWriter, r *http.Request) {
 	loginPage := string(getLoginPage())
 	prefix := getProxyPrefix(r)
-	loginPage = strings.ReplaceAll(loginPage, "/%BASE_URL%", prefix)
+	loginPage = strings.Replace(loginPage, `<base href="/"`, fmt.Sprintf(`<base href="%s/"`, html.EscapeString(prefix)), 1)
+	// Keep the built-in login available with custom UIs and during upgrades.
+	// Its shared chunks load beneath this dedicated unauthenticated asset path.
+	loginPage = strings.ReplaceAll(loginPage, `"./assets/`, `"login/assets/`)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	setPageSecurityHeaders(cfg, w, r, nil)
+	utils.ServeStaticContent(w, r, []byte(loginPage))
+}
 
-	templ, err := template.New("Login").Parse(loginPage)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("error: %s", err), http.StatusInternalServerError)
-		return
+// Login return links are limited to this origin and application mount.
+func safeLoginReturnURL(r *http.Request, value string) string {
+	prefix := getProxyPrefix(r)
+	fallback := prefix + "/"
+	u, err := url.Parse(value)
+	if err != nil || u.User != nil || strings.Contains(value, `\`) || strings.Contains(u.Path, `\`) {
+		return fallback
 	}
-
-	buffer := bytes.Buffer{}
-	err = templ.Execute(&buffer, loginTemplateData{URL: returnURL, Error: loginError})
-	if err != nil {
-		http.Error(w, fmt.Sprintf("error: %s", err), http.StatusInternalServerError)
-		return
+	if u.IsAbs() && ((u.Scheme != "https" && u.Scheme != "http") || u.Host != r.Host) {
+		return fallback
 	}
-
-	w.Header().Set("Content-Type", "text/html")
-
-	// we shouldn't need to set plugin exceptions here
-	setPageSecurityHeaders(w, r, nil)
-
-	utils.ServeStaticContent(w, r, buffer.Bytes())
+	if u.Host != "" && !u.IsAbs() {
+		return fallback
+	}
+	if !strings.HasPrefix(u.Path, "/") || strings.HasPrefix(u.Path, "//") {
+		return fallback
+	}
+	u.Path = path.Clean(u.Path)
+	u.RawPath = ""
+	if !strings.HasPrefix(u.Path, fallback) || u.Path == prefix+loginEndpoint {
+		return fallback
+	}
+	u.Scheme, u.Host = "", ""
+	return u.String()
 }
 
 func handleLoginLocale(cfg *config.Config) http.HandlerFunc {
@@ -75,6 +84,7 @@ func handleLoginLocale(cfg *config.Config) http.HandlerFunc {
 			logger.Debugf("Failed to load login locale file for language %s: %v", lang, err)
 			// try again with the default language
 			if lang != defaultLocale {
+				lang = defaultLocale
 				data, err = getLoginLocale(defaultLocale)
 				if err != nil {
 					logger.Errorf("Failed to load login locale file for default language %s: %v", defaultLocale, err)
@@ -88,10 +98,21 @@ func handleLoginLocale(cfg *config.Config) http.HandlerFunc {
 			}
 		}
 
-		// write a script to set the locale string map as a global variable
-		localeScript := fmt.Sprintf("var localeStrings = %s;", data)
-		w.Header().Set("Content-Type", "application/javascript")
-		_, _ = w.Write([]byte(localeScript))
+		var raw map[string]string
+		if err := json.Unmarshal(data, &raw); err != nil {
+			http.Error(w, "Invalid login locale", http.StatusInternalServerError)
+			return
+		}
+		messages := make(map[string]string, len(raw))
+		for key, value := range raw {
+			messages["login."+key] = value
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(struct {
+			Locale   string            `json:"locale"`
+			Messages map[string]string `json:"messages"`
+		}{lang, messages})
 	}
 }
 
@@ -103,27 +124,22 @@ func getLoginLocale(lang string) ([]byte, error) {
 	return data, nil
 }
 
-func handleLogin() http.HandlerFunc {
+func handleLogin(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		returnURL := r.URL.Query().Get(returnURLParam)
+		returnURL := safeLoginReturnURL(r, r.URL.Query().Get(returnURLParam))
 
-		if !config.GetInstance().HasCredentials() {
-			if returnURL != "" {
-				http.Redirect(w, r, returnURL, http.StatusFound)
-			} else {
-				prefix := getProxyPrefix(r)
-				http.Redirect(w, r, prefix+"/", http.StatusFound)
-			}
+		if !cfg.HasCredentials() {
+			http.Redirect(w, r, returnURL, http.StatusFound)
 			return
 		}
 
-		serveLoginPage(w, r, returnURL, "")
+		serveLoginPage(cfg, w, r)
 	}
 }
 
-func handleLoginPost() http.HandlerFunc {
+func handleLoginPost(store *session.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := manager.GetInstance().SessionStore.Login(w, r)
+		err := store.Login(w, r)
 		if err != nil {
 			// always log the error
 			logger.Errorf("Error logging in: %v from IP: %s", err, r.RemoteAddr)
@@ -146,16 +162,16 @@ func handleLoginPost() http.HandlerFunc {
 	}
 }
 
-func handleLogout() http.HandlerFunc {
+func handleLogout(cfg *config.Config, store *session.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := manager.GetInstance().SessionStore.Logout(w, r); err != nil {
+		if err := store.Logout(w, r); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		// redirect to the login page if credentials are required
 		prefix := getProxyPrefix(r)
-		if config.GetInstance().HasCredentials() {
+		if cfg.HasCredentials() {
 			http.Redirect(w, r, prefix+loginEndpoint, http.StatusFound)
 		} else {
 			http.Redirect(w, r, prefix+"/", http.StatusFound)

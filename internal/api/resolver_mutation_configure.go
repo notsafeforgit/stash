@@ -307,8 +307,16 @@ func (r *mutationResolver) ConfigureGeneral(ctx context.Context, input ConfigGen
 		}
 
 		setConfigString(c, config.Username, input.Username)
-		if input.Password != nil && *input.Password != c.GetPasswordHash() {
-			c.SetPassword(*input.Password)
+		if input.ClearPassword != nil && *input.ClearPassword {
+			if input.NewPassword != nil {
+				return nil, errors.New("newPassword and clearPassword cannot be used together")
+			}
+			c.SetPassword("")
+		} else if input.NewPassword != nil {
+			if len(*input.NewPassword) == 0 || len(*input.NewPassword) > 72 {
+				return nil, errors.New("newPassword must contain 1 to 72 UTF-8 bytes; use clearPassword to remove it")
+			}
+			c.SetPassword(*input.NewPassword)
 		}
 
 		setConfigInt(c, config.MaxSessionAge, input.MaxSessionAge)

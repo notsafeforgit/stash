@@ -2,10 +2,12 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -140,4 +142,42 @@ func TestCustomizationHandlersReadAtomicSavedValues(t *testing.T) {
 		tt.handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/customization", nil))
 		require.Equal(t, tt.want, w.Body.String())
 	}
+}
+
+func TestCredentialsAreWriteOnlyAndExplicit(t *testing.T) {
+	t.Parallel()
+	r, c, _ := newSettingsResolver(t)
+	password, renamed := "first password", "renamed"
+	result, err := r.ConfigureGeneral(t.Context(), ConfigGeneralInput{NewPassword: &password})
+	require.NoError(t, err)
+	require.True(t, result.PasswordConfigured)
+	hash := c.GetPasswordHash()
+	data, err := json.Marshal(result)
+	require.NoError(t, err)
+	require.NotContains(t, string(data), hash)
+	require.NotContains(t, string(data), password)
+	_, err = r.ConfigureGeneral(t.Context(), ConfigGeneralInput{Username: &renamed})
+	require.NoError(t, err)
+	require.Equal(t, hash, c.GetPasswordHash(), "omitting newPassword retains the password")
+	require.True(t, c.ValidateCredentials(renamed, password))
+
+	// A hash-shaped password is ordinary new plaintext, never an unchanged
+	// sentinel. Returning hashes was both unnecessary disclosure and ambiguity.
+	_, err = r.ConfigureGeneral(t.Context(), ConfigGeneralInput{NewPassword: &hash})
+	require.NoError(t, err)
+	require.NotEqual(t, hash, c.GetPasswordHash())
+	require.True(t, c.ValidateCredentials(renamed, hash))
+	for _, invalid := range []string{"", strings.Repeat("a", 73), strings.Repeat("é", 37)} {
+		_, err = r.ConfigureGeneral(t.Context(), ConfigGeneralInput{NewPassword: &invalid})
+		require.ErrorContains(t, err, "1 to 72 UTF-8 bytes")
+		require.True(t, c.ValidateCredentials(renamed, hash))
+	}
+	yes := true
+	_, err = r.ConfigureGeneral(t.Context(), ConfigGeneralInput{NewPassword: &password, ClearPassword: &yes})
+	require.ErrorContains(t, err, "cannot be used together")
+	require.True(t, c.ValidateCredentials(renamed, hash))
+	result, err = r.ConfigureGeneral(t.Context(), ConfigGeneralInput{ClearPassword: &yes})
+	require.NoError(t, err)
+	require.False(t, result.PasswordConfigured)
+	require.False(t, c.HasCredentials())
 }

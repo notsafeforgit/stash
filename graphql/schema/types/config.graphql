@@ -164,8 +164,10 @@ input ConfigGeneralInput {
   bulkUpdateHooks: Boolean
   "Username"
   username: String
-  "Password"
-  password: String
+  """Set a new plaintext password. Omit to retain the current password."""
+  newPassword: String
+  """Explicitly remove the password. Cannot be combined with newPassword."""
+  clearPassword: Boolean
   "Maximum session cookie age"
   maxSessionAge: Int
   "Name of the log file"
@@ -314,8 +316,8 @@ type ConfigGeneralResult {
   apiKey: String!
   "Username"
   username: String!
-  "Password"
-  password: String!
+  """Whether a password is stored. Passwords and hashes are never returned."""
+  passwordConfigured: Boolean!
   "Maximum session cookie age"
   maxSessionAge: Int!
   "Name of the log file"

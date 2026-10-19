@@ -21,6 +21,7 @@ export default defineConfig({
         app: "index.html",
         offline: "offline.html",
         share: "share.html",
+        login: "login.html",
       },
     },
   },

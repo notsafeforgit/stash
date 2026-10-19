@@ -9,7 +9,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/session"
@@ -23,13 +22,11 @@ func allowUnauthenticated(r *http.Request) bool {
 
 // authenticateSignedRequest checks if the request is a valid signed media request.
 // Returns the matched username and true if valid, or empty string and false otherwise.
-func authenticateSignedRequest(r *http.Request) (string, bool) {
+func authenticateSignedRequest(c *config.Config, r *http.Request) (string, bool) {
 	// Only apply to scene stream paths (used by AirPlay/Chromecast devices that can't pass cookies)
 	if !strings.HasPrefix(r.URL.Path, "/scene/") {
 		return "", false
 	}
-
-	c := config.GetInstance()
 
 	// Signed URLs are only relevant when credentials are configured
 	if !c.HasCredentials() {
@@ -72,16 +69,15 @@ func httpError(w http.ResponseWriter, r *http.Request, text string, status int) 
 	}
 }
 
-func authenticateHandler() func(http.Handler) http.Handler {
+func authenticateHandler(c *config.Config, store *session.Store) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			c := config.GetInstance()
 
 			r = session.SetLocalRequest(r)
 			ctx := r.Context()
 
 			// Check for signed media requests
-			if username, ok := authenticateSignedRequest(r); ok {
+			if username, ok := authenticateSignedRequest(c, r); ok {
 				ctx := r.Context()
 				ctx = session.SetCurrentUserID(ctx, username)
 				r = r.WithContext(ctx)
@@ -89,7 +85,7 @@ func authenticateHandler() func(http.Handler) http.Handler {
 				return
 			}
 
-			userID, err := manager.GetInstance().SessionStore.Authenticate(w, r)
+			userID, err := store.Authenticate(w, r)
 			if err != nil {
 				if !errors.Is(err, session.ErrUnauthorized) {
 					http.Error(w, err.Error(), http.StatusInternalServerError)

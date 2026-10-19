@@ -42,7 +42,7 @@ export const playerConfiguration: GQL.ConfigDataFragment = {
     bulkUpdateHooks: false,
     apiKey: "",
     username: "",
-    password: "",
+    passwordConfigured: false,
     maxSessionAge: 0,
     logOut: false,
     logLevel: "",

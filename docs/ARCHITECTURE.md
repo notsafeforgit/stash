@@ -57,8 +57,9 @@ custom UI does not change the backend API or database lineage.
 | [main.tsx](../ui/v3/src/main.tsx) → [app.tsx](../ui/v3/src/app.tsx) | Main v3 app: Apollo, system status, configuration/locales, plugin registration, then TanStack Router |
 | [offline-main.tsx](../ui/v3/src/pwa/offline-main.tsx) | Standalone offline library/player; boots from bundled assets and local downloads without the main app's server or plugin gates |
 | [share-main.tsx](../ui/v3/src/share-main.tsx) | Guest viewer; uses scoped share JSON/media endpoints without owner configuration, plugins, or the owner's Apollo session |
+| [login-main.tsx](../ui/v3/src/login-main.tsx) | Standalone login using the shared Base UI controls, public login translations and the session endpoint; does not load owner configuration or plugins |
 
-[vite.config.ts](../ui/v3/vite.config.ts) builds the three v3 HTML entries and
+[vite.config.ts](../ui/v3/vite.config.ts) builds the four v3 HTML entries and
 their shared chunks. During development, Vite serves the UI on port 3002 and
 proxies backend paths; client URL helpers can also address the configured
 backend directly. In production, the server inserts the public proxy prefix
@@ -96,6 +97,15 @@ their refreshes are serialized; configuration snapshots keep multi-field reads
 consistent. Directory preparation can leave an empty directory after a failed
 save, but does not publish partial settings. Customization text edited in the UI
 is part of the same YAML publication; see [theming](../ui/v3/docs/theming.md).
+
+The credentials API returns `passwordConfigured`, never a password hash. In
+`configureGeneral`, omit `newPassword` to retain the password, send a nonempty
+`newPassword` to replace it, or `clearPassword: true` to remove it. Replacement
+and removal are mutually exclusive. The bcrypt input limit of 72 UTF-8 bytes is
+validated before saving. The removed `password` input/hash sentinel has no native
+caller; existing stored hashes remain valid without conversion. Login redirects
+stay within the application origin and public mount. Login assets are served
+under `/login/assets/` independently of custom UI overrides.
 
 `withReadTxn` / `withTxn` in [resolver.go](../internal/api/resolver.go) delegate
 to repository transaction helpers. Use the callback's context for repository

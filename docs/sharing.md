@@ -232,10 +232,16 @@ nsfw.ak.codes {
         }
     }
     handle {
-        respond 404
+        header Content-Type "text/plain; charset=utf-8"
+        respond "Not found" 404
     }
 }
 ```
+
+Keep a typed response body on the fallback. An empty `404` without a
+`Content-Type` can make Safari offer a download when opening the bare hostname.
+The text response keeps that URL and other non-share paths unavailable while
+giving the browser something it can display.
 
 Do not use `handle_path`: it strips the namespace the backend authorizes. Do not
 forward the entire hostname to Stash or inject an owner API key. The share

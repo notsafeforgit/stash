@@ -6,6 +6,8 @@ import { DataManagementTasks } from "src/components/settings/tasks/data-manageme
 import { PluginTasks } from "src/components/settings/tasks/plugin-tasks";
 import { ScrapeTasks } from "@/components/settings/tasks/scrape-tasks";
 
+import { JobHistory } from "@/components/settings/tasks/job-history";
+
 function TasksPage() {
   const intl = useIntl();
   return (
@@ -19,6 +21,8 @@ function TasksPage() {
         </h2>
         <JobTable />
       </section>
+
+      <JobHistory />
 
       <ScrapeTasks />
 

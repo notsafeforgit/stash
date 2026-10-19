@@ -118,7 +118,10 @@ func TestRegenerateSceneCoverKeepsUnreproducibleArtwork(t *testing.T) {
 			db.Scene.On("Find", mock.Anything, scene.ID).Return(scene, nil)
 			db.Scene.On("GetFiles", mock.Anything, scene.ID).Return(files, nil)
 			db.Scene.On("GetCoverSource", mock.Anything, scene.ID).Return(source, nil)
-			id := mgr.RegenerateSceneCover(context.Background(), "1")
+			id, admissionErr := mgr.RegenerateSceneCover(context.Background(), "1")
+			if admissionErr != nil {
+				t.Fatal(admissionErr)
+			}
 			state := mgr.JobManager.GetJob(id)
 			require.Equal(t, job.StatusFailed, state.Status)
 			require.NotNil(t, state.Error)
@@ -185,7 +188,10 @@ func TestBulkCoverGenerationReportsRetainedCovers(t *testing.T) {
 		db.Scene.On("GetCoverSource", mock.Anything, scene.ID).Return(source, nil)
 	}
 	j := &GenerateJob{repository: db.Repository(), input: GenerateMetadataInput{SceneIDs: []string{"1", "2"}, Covers: true, Overwrite: true}}
-	id := mgr.JobManager.Add(context.Background(), "Regenerate scene covers", j)
+	id, admissionErr := mgr.JobManager.Add(context.Background(), "Regenerate scene covers", j)
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 	state := mgr.JobManager.GetJob(id)
 	require.Equal(t, job.StatusFailed, state.Status)
 	require.NotNil(t, state.Error)
@@ -251,7 +257,10 @@ func TestBulkCoverDefaultSelection(t *testing.T) {
 			}).Return(nil).Once()
 			db.Scene.On("UpdatePartial", mock.Anything, scene.ID, mock.Anything).Return(scene, nil).Once()
 			j := &GenerateJob{repository: db.Repository(), input: GenerateMetadataInput{SceneIDs: []string{"1"}, Covers: true, Overwrite: tc.overwrite, ResetCoversToDefault: tc.reset}}
-			id := mgr.JobManager.Add(context.Background(), "Generate covers", j)
+			id, admissionErr := mgr.JobManager.Add(context.Background(), "Generate covers", j)
+			if admissionErr != nil {
+				t.Fatal(admissionErr)
+			}
 			state := mgr.JobManager.GetJob(id)
 			require.Equal(t, job.StatusFinished, state.Status, "%+v", state.Error)
 			require.NotNil(t, saved)

@@ -58,7 +58,10 @@ func TestBulkFailureIsAtomicAndVisible(t *testing.T) {
 			jobs := job.NewManager()
 			jobs.SetSync(true)
 			mgr := &Manager{Repository: repo, JobManager: jobs}
-			id := mgr.BulkUpdate(context.Background(), "audit failure", []int{scene.ID, successful.ID}, partialBulkFailure{repo.Scene, scene.ID}, hook.SceneUpdatePost, nil, nil)
+			id, admissionErr := mgr.BulkUpdate(context.Background(), "audit failure", []int{scene.ID, successful.ID}, partialBulkFailure{repo.Scene, scene.ID}, hook.SceneUpdatePost, nil, nil)
+			if admissionErr != nil {
+				t.Fatal(admissionErr)
+			}
 			state := jobs.GetJob(id)
 			t.Logf("job reported status: %s", state.Status)
 			if state.Status != job.StatusFailed || state.Error == nil {

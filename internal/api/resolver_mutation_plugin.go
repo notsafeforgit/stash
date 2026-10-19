@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
@@ -61,8 +60,8 @@ func (r *mutationResolver) RunPluginTask(
 	}
 
 	m := manager.GetInstance()
-	jobID := m.RunPluginTask(ctx, pluginID, taskName, description, argsMap)
-	return strconv.Itoa(jobID), nil
+	jobID, err := m.RunPluginTask(ctx, pluginID, taskName, description, argsMap)
+	return jobID, err
 }
 
 func (r *mutationResolver) RunPluginOperation(

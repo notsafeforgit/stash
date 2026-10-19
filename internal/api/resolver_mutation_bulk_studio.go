@@ -128,7 +128,10 @@ func (r *mutationResolver) BulkStudioUpdate(ctx context.Context, input BulkStudi
 		return completedBulkUpdate(ids), nil
 	}
 
-	jobID := r.enqueueBulkUpdate(ctx, "Bulk Studio Update", ids, operation, hook.StudioUpdatePost, input, translator.getFields())
+	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Studio Update", ids, operation, hook.StudioUpdatePost, input, translator.getFields())
+	if err != nil {
+		return nil, err
+	}
 
 	return queuedBulkUpdate(jobID, len(ids)), nil
 }

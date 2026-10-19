@@ -694,8 +694,18 @@ export function PackageManager({
         !found ||
         found.status === GQL.JobStatus.Finished ||
         found.status === GQL.JobStatus.Failed ||
-        found.status === GQL.JobStatus.Cancelled;
-      if (terminal) finishJob(jobID, found?.error);
+        found.status === GQL.JobStatus.Cancelled ||
+        found.status === GQL.JobStatus.Interrupted;
+      if (terminal)
+        finishJob(
+          jobID,
+          found
+            ? found.error
+            : intl.formatMessage({
+                id: "job.outcome_unavailable",
+                defaultMessage: "The job outcome could not be confirmed.",
+              }),
+        );
     } catch (e) {
       Toast.error(e);
     }

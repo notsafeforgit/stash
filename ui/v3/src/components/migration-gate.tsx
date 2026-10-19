@@ -57,6 +57,7 @@ function defaultBackupPath(status: SystemStatus) {
 
 function isTerminalStatus(status: GQL.JobStatus) {
   return (
+    status === GQL.JobStatus.Interrupted ||
     status === GQL.JobStatus.Cancelled ||
     status === GQL.JobStatus.Failed ||
     status === GQL.JobStatus.Finished
@@ -168,6 +169,7 @@ export function MigrationRequiredDialog({
       if (
         finishedJob?.error ||
         finishedJob?.status === GQL.JobStatus.Failed ||
+        finishedJob?.status === GQL.JobStatus.Interrupted ||
         finishedJob?.status === GQL.JobStatus.Cancelled
       ) {
         setMigrationError(

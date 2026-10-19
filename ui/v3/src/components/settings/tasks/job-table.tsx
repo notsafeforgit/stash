@@ -22,6 +22,7 @@ function statusIcon(status: GQL.JobStatus) {
       return <Check className="size-4 shrink-0 text-green-500" />;
     case GQL.JobStatus.Cancelled:
       return <Ban className="size-4 shrink-0 text-muted-foreground" />;
+    case GQL.JobStatus.Interrupted:
     case GQL.JobStatus.Failed:
       return <CircleAlert className="size-4 shrink-0 text-destructive" />;
   }
@@ -39,6 +40,7 @@ function Task({ job }: { job: QueueJob }) {
 
   useEffect(() => {
     if (
+      job.status === GQL.JobStatus.Interrupted ||
       job.status === GQL.JobStatus.Cancelled ||
       job.status === GQL.JobStatus.Failed ||
       job.status === GQL.JobStatus.Finished
@@ -139,9 +141,7 @@ function Task({ job }: { job: QueueJob }) {
           (Earlier they were indented past the X button via `pl-9`, but
           that left the scroll area asymmetric — pl-9 on one side, only
           the li's px-3 on the other — so subtle visual lopsidedness.) */}
-      {(progressPct !== null ||
-        showSubtasks ||
-        (job.status === GQL.JobStatus.Failed && job.error)) && (
+      {(progressPct !== null || showSubtasks || job.error) && (
         <div className="mt-1 space-y-1">
           {progressPct !== null && (
             <div className="flex items-center gap-2">
@@ -171,7 +171,7 @@ function Task({ job }: { job: QueueJob }) {
               </div>
             </ScrollArea>
           )}
-          {job.status === GQL.JobStatus.Failed && job.error && (
+          {job.error && (
             <div className="text-xs text-destructive">{job.error}</div>
           )}
         </div>

@@ -1173,12 +1173,8 @@ func (r *mutationResolver) SceneDeleteO(ctx context.Context, id string, t []*tim
 }
 
 func (r *mutationResolver) SceneGenerateScreenshot(ctx context.Context, id string, at *float64) (string, error) {
-	var jobID int
 	if at != nil {
-		jobID = manager.GetInstance().GenerateScreenshot(ctx, id, *at)
-	} else {
-		jobID = manager.GetInstance().GenerateDefaultScreenshot(ctx, id)
+		return manager.GetInstance().GenerateScreenshot(ctx, id, *at)
 	}
-
-	return strconv.Itoa(jobID), nil
+	return manager.GetInstance().GenerateDefaultScreenshot(ctx, id)
 }

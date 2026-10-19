@@ -29,11 +29,11 @@ type customFieldsBulkUpdater struct {
 	fields    []string
 }
 
-func (u *customFieldsBulkUpdater) BulkUpdate(_ context.Context, _ string, ids []int, operation manager.BulkUpdateOperation, _ hook.TriggerEnum, _ interface{}, fields []string) int {
+func (u *customFieldsBulkUpdater) BulkUpdate(_ context.Context, _ string, ids []int, operation manager.BulkUpdateOperation, _ hook.TriggerEnum, _ interface{}, fields []string) (string, error) {
 	u.ids = append([]int(nil), ids...)
 	u.operation = operation
 	u.fields = fields
-	return 1
+	return "1", nil
 }
 
 func TestBulkCustomFieldsPersistence(t *testing.T) {

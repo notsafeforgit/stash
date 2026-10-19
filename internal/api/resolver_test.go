@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/stashapp/stash/internal/manager"
@@ -25,7 +26,7 @@ type fakeBulkUpdater struct {
 	calls  []bulkUpdateCall
 }
 
-func (f *fakeBulkUpdater) BulkUpdate(ctx context.Context, description string, ids []int, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) int {
+func (f *fakeBulkUpdater) BulkUpdate(ctx context.Context, description string, ids []int, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) (string, error) {
 	if f.nextID == 0 {
 		f.nextID = 1
 	}
@@ -40,7 +41,7 @@ func (f *fakeBulkUpdater) BulkUpdate(ctx context.Context, description string, id
 		inputFields: append([]string(nil), inputFields...),
 	})
 
-	return id
+	return strconv.Itoa(id), nil
 }
 
 // TODO - move this into a common area

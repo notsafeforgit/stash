@@ -144,7 +144,10 @@ export function SceneActionsMenu({
       );
       if (completion.kind === "unavailable") throw completion.error;
       if (completion.job?.status === GQL.JobStatus.Cancelled) return;
-      if (completion.job?.status === GQL.JobStatus.Failed) {
+      if (
+        completion.job?.status === GQL.JobStatus.Failed ||
+        completion.job?.status === GQL.JobStatus.Interrupted
+      ) {
         throw new Error(
           completion.job.error ||
             intl.formatMessage({

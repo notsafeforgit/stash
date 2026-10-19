@@ -47,11 +47,14 @@ func TestAdd(t *testing.T) {
 
 	const jobName = "test job"
 	exec1 := newTestExec(make(chan struct{}))
-	jobID := m.Add(context.Background(), jobName, exec1)
+	jobID, admissionErr := m.Add(context.Background(), jobName, exec1)
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 
-	// expect jobID to be the first ID
+	// IDs are stable UUIDs, not process-local counters
 	assert := assert.New(t)
-	assert.Equal(1, jobID)
+	assert.Len(jobID, 36)
 
 	// wait a tiny bit
 	time.Sleep(sleepTime)
@@ -82,7 +85,10 @@ func TestAdd(t *testing.T) {
 	// add another job to the queue
 	const otherJobName = "other job name"
 	exec2 := newTestExec(make(chan struct{}))
-	job2ID := m.Add(context.Background(), otherJobName, exec2)
+	job2ID, admissionErr := m.Add(context.Background(), otherJobName, exec2)
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 
 	// expect status to be ready
 	j2 := m.GetJob(job2ID)
@@ -132,11 +138,17 @@ func TestCancel(t *testing.T) {
 	// add two jobs
 	const jobName = "test job"
 	exec1 := newTestExec(make(chan struct{}))
-	jobID := m.Add(context.Background(), jobName, exec1)
+	jobID, admissionErr := m.Add(context.Background(), jobName, exec1)
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 
 	const otherJobName = "other job"
 	exec2 := newTestExec(make(chan struct{}))
-	job2ID := m.Add(context.Background(), otherJobName, exec2)
+	job2ID, admissionErr := m.Add(context.Background(), otherJobName, exec2)
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 
 	// wait a tiny bit
 	time.Sleep(sleepTime)
@@ -148,11 +160,8 @@ func TestCancel(t *testing.T) {
 	j := m.GetJob(job2ID)
 	assert.Equal(StatusCancelled, j.Status)
 
-	// expect end time not to be set
-	assert.Nil(j.EndTime)
-
-	// expect job to be removed from the queue
-	assert.Len(m.GetQueue(), 1)
+	// Wait for cancellation to be recorded before retirement.
+	assert.Eventually(func() bool { return m.GetJob(job2ID).EndTime != nil && len(m.GetQueue()) == 1 }, time.Second, time.Millisecond)
 
 	// expect job to have not have been started
 	select {
@@ -200,11 +209,17 @@ func TestCancelAll(t *testing.T) {
 	// add two jobs
 	const jobName = "test job"
 	exec1 := newTestExec(make(chan struct{}))
-	jobID := m.Add(context.Background(), jobName, exec1)
+	jobID, admissionErr := m.Add(context.Background(), jobName, exec1)
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 
 	const otherJobName = "other job"
 	exec2 := newTestExec(make(chan struct{}))
-	job2ID := m.Add(context.Background(), otherJobName, exec2)
+	job2ID, admissionErr := m.Add(context.Background(), otherJobName, exec2)
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 
 	// wait a tiny bit
 	time.Sleep(sleepTime)
@@ -248,7 +263,10 @@ func TestSubscribe(t *testing.T) {
 	// add a job
 	const jobName = "test job"
 	exec1 := newTestExec(make(chan struct{}))
-	jobID := m.Add(context.Background(), jobName, exec1)
+	jobID, admissionErr := m.Add(context.Background(), jobName, exec1)
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 
 	assert := assert.New(t)
 
@@ -328,7 +346,10 @@ func TestSubscribe(t *testing.T) {
 
 	// add another job and cancel it
 	exec2 := newTestExec(make(chan struct{}))
-	jobID = m.Add(context.Background(), jobName, exec2)
+	jobID, admissionErr = m.Add(context.Background(), jobName, exec2)
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 
 	m.CancelJob(jobID)
 
@@ -355,10 +376,13 @@ func TestAddSyncFollowsNormalLifecycle(t *testing.T) {
 
 	const jobName = "sync job"
 	exec := newTestExec(nil)
-	jobID := m.Add(context.Background(), jobName, exec)
+	jobID, admissionErr := m.Add(context.Background(), jobName, exec)
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 
 	assert := assert.New(t)
-	assert.Equal(1, jobID)
+	assert.Len(jobID, 36)
 
 	select {
 	case newJob := <-s.NewJob:

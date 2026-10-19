@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/stashapp/stash/internal/identify"
@@ -20,7 +19,7 @@ func (r *mutationResolver) MetadataScan(ctx context.Context, input manager.ScanM
 		return "", err
 	}
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }
 
 func (r *mutationResolver) MetadataImport(ctx context.Context) (string, error) {
@@ -29,7 +28,7 @@ func (r *mutationResolver) MetadataImport(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }
 
 func (r *mutationResolver) ImportObjects(ctx context.Context, input manager.ImportObjectsInput) (string, error) {
@@ -38,9 +37,9 @@ func (r *mutationResolver) ImportObjects(ctx context.Context, input manager.Impo
 		return "", err
 	}
 
-	jobID := manager.GetInstance().RunSingleTask(ctx, t)
+	jobID, err := manager.GetInstance().RunSingleTask(ctx, t)
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }
 
 func (r *mutationResolver) MetadataExport(ctx context.Context) (string, error) {
@@ -49,7 +48,7 @@ func (r *mutationResolver) MetadataExport(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }
 
 func (r *mutationResolver) ExportObjects(ctx context.Context, input manager.ExportObjectsInput) (*string, error) {
@@ -78,7 +77,7 @@ func (r *mutationResolver) MetadataGenerate(ctx context.Context, input manager.G
 		return "", err
 	}
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }
 
 func (r *mutationResolver) MetadataAutoTag(ctx context.Context, input manager.AutoTagMetadataInput) (string, error) {
@@ -86,19 +85,19 @@ func (r *mutationResolver) MetadataAutoTag(ctx context.Context, input manager.Au
 	if err != nil {
 		return "", err
 	}
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }
 
 func (r *mutationResolver) MetadataIdentify(ctx context.Context, input identify.Options) (string, error) {
 	t := manager.CreateIdentifyJob(input)
-	jobID := manager.GetInstance().JobManager.Add(ctx, manager.TaskDescWithPaths("Identifying", input.Paths), t)
+	jobID, err := manager.GetInstance().JobManager.Add(ctx, manager.TaskDescWithPaths("Identifying", input.Paths), t)
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }
 
 func (r *mutationResolver) MetadataClean(ctx context.Context, input manager.CleanMetadataInput) (string, error) {
-	jobID := manager.GetInstance().Clean(ctx, input)
-	return strconv.Itoa(jobID), nil
+	jobID, err := manager.GetInstance().Clean(ctx, input)
+	return jobID, err
 }
 
 func (r *mutationResolver) MetadataCleanGenerated(ctx context.Context, input task.CleanGeneratedOptions) (string, error) {
@@ -111,14 +110,14 @@ func (r *mutationResolver) MetadataCleanGenerated(ctx context.Context, input tas
 		Repository:               mgr.Repository,
 		BlobCleaner:              mgr.Repository.Blob,
 	}
-	jobID := mgr.JobManager.Add(ctx, "Cleaning generated files...", t)
+	jobID, err := mgr.JobManager.Add(ctx, "Cleaning generated files...", t)
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }
 
 func (r *mutationResolver) MigrateHashNaming(ctx context.Context) (string, error) {
-	jobID := manager.GetInstance().MigrateHash(ctx)
-	return strconv.Itoa(jobID), nil
+	jobID, err := manager.GetInstance().MigrateHash(ctx)
+	return jobID, err
 }
 
 func (r *mutationResolver) BackupDatabase(ctx context.Context, input BackupDatabaseInput) (*string, error) {
@@ -181,6 +180,6 @@ func (r *mutationResolver) AnonymiseDatabase(ctx context.Context, input Anonymis
 }
 
 func (r *mutationResolver) OptimiseDatabase(ctx context.Context) (string, error) {
-	jobID := manager.GetInstance().OptimiseDatabase(ctx)
-	return strconv.Itoa(jobID), nil
+	jobID, err := manager.GetInstance().OptimiseDatabase(ctx)
+	return jobID, err
 }

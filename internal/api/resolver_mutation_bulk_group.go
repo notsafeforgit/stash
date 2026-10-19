@@ -87,7 +87,10 @@ func (r *mutationResolver) BulkGroupUpdate(ctx context.Context, input BulkGroupU
 		return completedBulkUpdate(groupIDs), nil
 	}
 
-	jobID := r.enqueueBulkUpdate(ctx, "Bulk Group Update", groupIDs, operation, hook.GroupUpdatePost, input, translator.getFields())
+	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Group Update", groupIDs, operation, hook.GroupUpdatePost, input, translator.getFields())
+	if err != nil {
+		return nil, err
+	}
 
 	return queuedBulkUpdate(jobID, len(groupIDs)), nil
 }

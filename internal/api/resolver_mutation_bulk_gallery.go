@@ -115,7 +115,10 @@ func (r *mutationResolver) BulkGalleryUpdate(ctx context.Context, input BulkGall
 		return completedBulkUpdate(galleryIDs), nil
 	}
 
-	jobID := r.enqueueBulkUpdate(ctx, "Bulk Gallery Update", galleryIDs, operation, hook.GalleryUpdatePost, input, translator.getFields())
+	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Gallery Update", galleryIDs, operation, hook.GalleryUpdatePost, input, translator.getFields())
+	if err != nil {
+		return nil, err
+	}
 
 	return queuedBulkUpdate(jobID, len(galleryIDs)), nil
 }

@@ -32,7 +32,7 @@ func completedBulkUpdate(ids []int) *BulkUpdateResult {
 	return &BulkUpdateResult{Status: BulkUpdateStatusCompleted, SelectedCount: len(ids), UpdatedIDs: updated}
 }
 
-func queuedBulkUpdate(jobID, selectedCount int) *BulkUpdateResult {
-	id := strconv.Itoa(jobID)
+func queuedBulkUpdate(jobID string, selectedCount int) *BulkUpdateResult {
+	id := jobID
 	return &BulkUpdateResult{Status: BulkUpdateStatusQueued, JobID: &id, SelectedCount: selectedCount, UpdatedIDs: []string{}}
 }

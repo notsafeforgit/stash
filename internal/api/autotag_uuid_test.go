@@ -108,9 +108,8 @@ func TestAutoTagUUIDGraphQL(t *testing.T) {
 			}
 		}
 		require.NoError(t, json.Unmarshal([]byte(result), &response))
-		id, err := strconv.Atoi(response.Data.ID)
-		require.NoError(t, err)
-		return jobs.GetJob(id)
+		require.Len(t, response.Data.ID, 36)
+		return jobs.GetJob(response.Data.ID)
 	}
 	for _, field := range []string{"performers", "studios", "tags"} {
 		t.Run(field, func(t *testing.T) {

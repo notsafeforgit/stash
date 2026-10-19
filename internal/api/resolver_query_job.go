@@ -2,14 +2,12 @@ package api
 
 import (
 	"context"
-	"strconv"
 
-	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/pkg/job"
 )
 
 func (r *queryResolver) JobQueue(ctx context.Context) ([]*Job, error) {
-	queue := manager.GetInstance().JobManager.GetQueue()
+	queue := r.jobs.GetQueue()
 
 	var ret []*Job
 	for _, j := range queue {
@@ -20,11 +18,10 @@ func (r *queryResolver) JobQueue(ctx context.Context) ([]*Job, error) {
 }
 
 func (r *queryResolver) FindJob(ctx context.Context, input FindJobInput) (*Job, error) {
-	jobID, err := strconv.Atoi(input.ID)
+	j, err := r.jobs.Find(ctx, input.ID)
 	if err != nil {
 		return nil, err
 	}
-	j := manager.GetInstance().JobManager.GetJob(jobID)
 	if j == nil {
 		return nil, nil
 	}
@@ -45,7 +42,7 @@ func jobToJobModel(j job.Job) *Job {
 	}
 
 	ret := &Job{
-		ID:          strconv.Itoa(j.ID),
+		ID:          j.ID,
 		Status:      JobStatus(j.Status),
 		Description: sanitiseWebsocketString(j.Description),
 		SubTasks:    subTasks,
@@ -60,4 +57,25 @@ func jobToJobModel(j job.Job) *Job {
 	}
 
 	return ret
+}
+
+func (r *queryResolver) JobHistory(ctx context.Context, limit int, offset int) ([]*Job, error) {
+	history, err := r.jobs.History(ctx, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*Job, 0, len(history))
+	for _, j := range history {
+		result = append(result, jobToJobModel(j))
+	}
+	return result, nil
+}
+
+type jobService interface {
+	Find(context.Context, string) (*job.Job, error)
+	History(context.Context, int, int) ([]job.Job, error)
+	GetQueue() []job.Job
+	CancelJob(string)
+	CancelAll()
+	Subscribe(context.Context) *job.ManagerSubscription
 }

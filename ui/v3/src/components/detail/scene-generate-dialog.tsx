@@ -238,7 +238,10 @@ export function SceneGenerateDialog({
           .then((completion) => {
             if (completion.kind === "unavailable")
               toast.error(completion.error);
-            else if (completion.job?.status === GQL.JobStatus.Failed)
+            else if (
+              completion.job?.status === GQL.JobStatus.Failed ||
+              completion.job?.status === GQL.JobStatus.Interrupted
+            )
               toast.error(completion.job.error);
           })
           .catch((error: unknown) => toast.error(error));

@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"errors"
+	"github.com/google/uuid"
 	"testing"
 
 	"github.com/stashapp/stash/internal/manager/config"
@@ -59,9 +60,13 @@ func TestBulkUpdateJobRunsHooksWhenEnabled(t *testing.T) {
 	}
 
 	var updated []int
-	jobID := mgr.BulkUpdate(context.Background(), "Bulk test", []int{1, 2, 3}, testBulkUpdateOperation{updated: &updated}, hook.TagUpdatePost, nil, []string{"favorite"})
+	jobID, admissionErr := mgr.BulkUpdate(context.Background(), "Bulk test", []int{1, 2, 3}, testBulkUpdateOperation{updated: &updated}, hook.TagUpdatePost, nil, []string{"favorite"})
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 
-	assert.Equal(t, 1, jobID)
+	_, idErr := uuid.Parse(jobID)
+	assert.NoError(t, idErr)
 	assert.Equal(t, []int{1, 2, 3}, updated)
 	assert.Equal(t, []int{1, 2, 3}, hooks.calls)
 
@@ -87,9 +92,13 @@ func TestBulkUpdateJobSkipsHooksWhenDisabled(t *testing.T) {
 	}
 
 	var updated []int
-	jobID := mgr.BulkUpdate(context.Background(), "Bulk test", []int{4, 5}, testBulkUpdateOperation{updated: &updated}, hook.TagUpdatePost, nil, []string{"favorite"})
+	jobID, admissionErr := mgr.BulkUpdate(context.Background(), "Bulk test", []int{4, 5}, testBulkUpdateOperation{updated: &updated}, hook.TagUpdatePost, nil, []string{"favorite"})
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 
-	assert.Equal(t, 1, jobID)
+	_, idErr := uuid.Parse(jobID)
+	assert.NoError(t, idErr)
 	assert.Equal(t, []int{4, 5}, updated)
 	assert.Empty(t, hooks.calls)
 
@@ -114,7 +123,7 @@ func TestBulkUpdateJobContinuesAfterItemErrorsWhenHooksEnabled(t *testing.T) {
 	}
 
 	var attempted []int
-	jobID := mgr.BulkUpdate(
+	jobID, admissionErr := mgr.BulkUpdate(
 		context.Background(),
 		"Bulk test",
 		[]int{1, 2, 3},
@@ -128,8 +137,12 @@ func TestBulkUpdateJobContinuesAfterItemErrorsWhenHooksEnabled(t *testing.T) {
 		nil,
 		[]string{"favorite"},
 	)
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 
-	assert.Equal(t, 1, jobID)
+	_, idErr := uuid.Parse(jobID)
+	assert.NoError(t, idErr)
 	assert.Equal(t, []int{1, 2, 3}, attempted)
 	assert.Equal(t, []int{1, 3}, hooks.calls)
 
@@ -157,7 +170,7 @@ func TestBulkUpdateJobContinuesAfterItemErrorsWhenHooksDisabled(t *testing.T) {
 	}
 
 	var attempted []int
-	jobID := mgr.BulkUpdate(
+	jobID, admissionErr := mgr.BulkUpdate(
 		context.Background(),
 		"Bulk test",
 		[]int{4, 5, 6},
@@ -171,8 +184,12 @@ func TestBulkUpdateJobContinuesAfterItemErrorsWhenHooksDisabled(t *testing.T) {
 		nil,
 		[]string{"favorite"},
 	)
+	if admissionErr != nil {
+		t.Fatal(admissionErr)
+	}
 
-	assert.Equal(t, 1, jobID)
+	_, idErr := uuid.Parse(jobID)
+	assert.NoError(t, idErr)
 	assert.Equal(t, []int{4, 5, 6}, attempted)
 	assert.Empty(t, hooks.calls)
 

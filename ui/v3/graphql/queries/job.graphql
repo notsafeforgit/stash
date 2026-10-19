@@ -9,3 +9,7 @@ query FindJob($input: FindJobInput!) {
     ...JobData
   }
 }
+
+query JobHistory($limit: Int! = 25, $offset: Int! = 0) {
+  jobHistory(limit: $limit, offset: $offset) { ...JobData }
+}

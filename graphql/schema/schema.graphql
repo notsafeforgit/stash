@@ -269,6 +269,8 @@ type Query {
 
   # Job status
   jobQueue: [Job!]
+  "Retained job outcomes, newest first. Limit must be 1–100; offset nonnegative."
+  jobHistory(limit: Int! = 25, offset: Int! = 0): [Job!]!
   findJob(input: FindJobInput!): Job
 
   dlnaStatus: DLNAStatus!

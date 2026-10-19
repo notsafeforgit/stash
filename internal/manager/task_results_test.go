@@ -41,7 +41,10 @@ func TestImportJobReportsFailures(t *testing.T) {
 			t.Cleanup(jobs.Stop)
 			jobs.SetSync(true)
 			manager := Manager{JobManager: jobs}
-			id := manager.RunSingleTask(t.Context(), task)
+			id, admissionErr := manager.RunSingleTask(t.Context(), task)
+			if admissionErr != nil {
+				t.Fatal(admissionErr)
+			}
 			result := jobs.GetJob(id)
 			require.NotNil(t, result)
 			if kind == "success" {

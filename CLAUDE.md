@@ -305,7 +305,7 @@ Agent note for `make validate-ui-v3`: `ui/v3/src/core/generated-graphql.ts` is i
 
 ### Job system
 
-Background tasks (scan, generate, identify, etc.) run through `pkg/job`. Jobs are queued and can be monitored via the GraphQL subscription `jobsSubscribe`.
+Background tasks (scan, generate, identify, etc.) run through `pkg/job`. Ordinary admission/outcomes are durable from schema 1000123; UUID job IDs survive restarts. Pending records become `INTERRUPTED`, never automatically replayed. Query `jobHistory`/`findJob` for retained results; lifecycle/progress subscriptions are only live notifications.
 
 New archive work uses `pkg/job.Durable` with native jobs, stable submission
 acknowledgements, attempt history, and fenced worker leases. Domain writes and
@@ -319,7 +319,7 @@ and gallery membership before durable plugin notifications. Application-only
 preview/apply, status, cancellation and retry routes retain request identities
 and never reapply a committed publication when resuming hooks.
 Admission receipts stay immutable and status reports actual completion. Keep this
-work out of the legacy in-memory queue. External gallery-dl workers use the
+checkpointed work out of the ordinary library task queue. External gallery-dl workers use the
 native API; their packages and deployment state live outside this repository.
 See [native ingestion](docs/native-ingestion.md).
 

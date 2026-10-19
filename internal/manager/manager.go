@@ -41,11 +41,15 @@ type HookExecutor interface {
 type JobManager interface {
 	Stop()
 	Shutdown(context.Context) error
-	Add(ctx context.Context, description string, e job.JobExec) int
-	CancelJob(id int)
+	Add(ctx context.Context, description string, e job.JobExec) (string, error)
+	AddTransient(ctx context.Context, description string, e job.JobExec) (string, error)
+	EnableHistory(context.Context, job.History) error
+	Find(context.Context, string) (*job.Job, error)
+	History(context.Context, int, int) ([]job.Job, error)
+	CancelJob(id string)
 	CancelAll()
 	GetQueue() []job.Job
-	GetJob(id int) *job.Job
+	GetJob(id string) *job.Job
 	Subscribe(ctx context.Context) *job.ManagerSubscription
 }
 

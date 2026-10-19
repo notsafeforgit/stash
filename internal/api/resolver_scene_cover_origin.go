@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/pkg/models"
@@ -25,5 +24,5 @@ func (r *sceneResolver) CoverOrigin(ctx context.Context, obj *models.Scene) (*Sc
 
 func (r *mutationResolver) SceneRegenerateCover(ctx context.Context, id string) (string, error) {
 	s := manager.GetInstance()
-	return strconv.Itoa(s.RegenerateSceneCover(ctx, id)), nil
+	return s.RegenerateSceneCover(ctx, id)
 }

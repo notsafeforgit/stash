@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/stashapp/stash/internal/manager"
@@ -50,9 +49,9 @@ func (r *mutationResolver) DownloadFFMpeg(ctx context.Context) (string, error) {
 		},
 	}
 
-	jobID := mgr.JobManager.Add(ctx, "Downloading ffmpeg...", t)
+	jobID, err := mgr.JobManager.AddTransient(ctx, "Downloading ffmpeg...", t)
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }
 
 func setConfigString(c *config.Config, key string, value *string) {

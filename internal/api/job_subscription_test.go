@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ func TestJobSubscriptionCancelsBlockedSend(t *testing.T) {
 	defer cancel()
 	added := make(chan job.Job)
 	output := forwardJobUpdates(ctx, added, nil, nil, 0, false)
-	added <- job.Job{ID: 1}
+	added <- job.Job{ID: "1"}
 	cancel()
 	// At most the already received event can be delivered before cancellation.
 	for {
@@ -32,9 +33,9 @@ func TestJobSubscriptionCancelsBlockedSend(t *testing.T) {
 
 func TestJobSubscriptionDrainsAndClosesInputs(t *testing.T) {
 	added, removed, updated := make(chan job.Job, 1), make(chan job.Job, 1), make(chan job.Job, 1)
-	added <- job.Job{ID: 1}
-	removed <- job.Job{ID: 2}
-	updated <- job.Job{ID: 3}
+	added <- job.Job{ID: "1"}
+	removed <- job.Job{ID: "2"}
+	updated <- job.Job{ID: "3"}
 	close(added)
 	close(removed)
 	close(updated)
@@ -59,7 +60,7 @@ func TestJobSubscriptionDropsBackpressuredProgress(t *testing.T) {
 	output := forwardJobUpdates(context.Background(), nil, nil, updated, 0, true)
 	for i := range 10 {
 		select {
-		case updated <- job.Job{ID: i + 1}:
+		case updated <- job.Job{ID: strconv.Itoa(i + 1)}:
 		case <-time.After(time.Second):
 			t.Fatal("progress producer was blocked by the consumer")
 		}

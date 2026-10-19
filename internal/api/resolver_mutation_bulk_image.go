@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/pkg/models"
@@ -154,7 +153,7 @@ func (r *mutationResolver) BulkImageUpdate(ctx context.Context, input BulkImageU
 		return completedBulkUpdate(imageIDs), nil
 	}
 
-	jobID := r.enqueueBulkUpdate(ctx, "Bulk Image Update", imageIDs, operation, hook.ImageUpdatePost, input, translator.getFields())
+	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Image Update", imageIDs, operation, hook.ImageUpdatePost, input, translator.getFields())
 
 	return queuedBulkUpdate(jobID, len(imageIDs)), nil
 }
@@ -246,6 +245,6 @@ func (r *mutationResolver) ImagesSetDateFromFileMTime(ctx context.Context, input
 		return "sync", nil
 	}
 
-	jobID := r.enqueueBulkUpdate(ctx, "Set Image Dates From File MTime", imageIDs, operation, hook.ImageUpdatePost, input, []string{"date"})
-	return strconv.Itoa(jobID), nil
+	jobID, err := r.enqueueBulkUpdate(ctx, "Set Image Dates From File MTime", imageIDs, operation, hook.ImageUpdatePost, input, []string{"date"})
+	return jobID, err
 }

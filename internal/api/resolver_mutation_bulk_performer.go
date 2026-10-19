@@ -201,7 +201,10 @@ func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPe
 		return completedBulkUpdate(performerIDs), nil
 	}
 
-	jobID := r.enqueueBulkUpdate(ctx, "Bulk Performer Update", performerIDs, operation, hook.PerformerUpdatePost, input, translator.getFields())
+	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Performer Update", performerIDs, operation, hook.PerformerUpdatePost, input, translator.getFields())
+	if err != nil {
+		return nil, err
+	}
 
 	return queuedBulkUpdate(jobID, len(performerIDs)), nil
 }

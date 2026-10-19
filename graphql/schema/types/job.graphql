@@ -5,6 +5,7 @@ enum JobStatus {
   STOPPING
   CANCELLED
   FAILED
+  INTERRUPTED
 }
 
 type Job {

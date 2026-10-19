@@ -66,7 +66,7 @@ func (j *bulkUpdateJob) Execute(ctx context.Context, progress *job.Progress) err
 	return nil
 }
 
-func (s *Manager) BulkUpdate(ctx context.Context, description string, ids []int, operation BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) int {
+func (s *Manager) BulkUpdate(ctx context.Context, description string, ids []int, operation BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) (string, error) {
 	j := &bulkUpdateJob{
 		repo:         s.Repository,
 		hookExecutor: s.HookExecutor,

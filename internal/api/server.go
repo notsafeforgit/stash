@@ -233,6 +233,8 @@ func Initialize() (*Server, error) {
 	groupService := mgr.GroupService
 	sourceTracking := cfg.GetSourceTrackingEnabled()
 	resolver := &Resolver{
+		jobs: mgr.JobManager,
+		scanSubscribe: mgr.ScanSubscribe,
 		settings:             &settingsService{config: cfg, runtime: mgr, setLogLevel: mgr.Logger.SetLogLevel},
 		sourceTrackingActive: sourceTracking,
 		shares:               server.shares,

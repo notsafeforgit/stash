@@ -65,13 +65,24 @@ export function monitorJobCompletion(
           failed(new Error("Incomplete job response"));
           return;
         }
-        failures = 0;
         const job = result.data.findJob;
+        if (!job) {
+          failed(
+            new Error(
+              "The job outcome is no longer available; completion could not be confirmed.",
+            ),
+          );
+          return;
+        }
+        failures = 0;
         if (
           job &&
-          ![JobStatus.Finished, JobStatus.Failed, JobStatus.Cancelled].includes(
-            job.status,
-          )
+          ![
+            JobStatus.Finished,
+            JobStatus.Failed,
+            JobStatus.Cancelled,
+            JobStatus.Interrupted,
+          ].includes(job.status)
         )
           return;
         settled = true;

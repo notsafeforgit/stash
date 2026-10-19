@@ -44,8 +44,8 @@ func (r *mutationResolver) StashBoxBatchPerformerTag(ctx context.Context, input 
 		return "", err
 	}
 
-	jobID := manager.GetInstance().StashBoxBatchPerformerTag(ctx, b, input)
-	return strconv.Itoa(jobID), nil
+	jobID, err := manager.GetInstance().StashBoxBatchPerformerTag(ctx, b, input)
+	return jobID, err
 }
 
 func (r *mutationResolver) StashBoxBatchStudioTag(ctx context.Context, input manager.StashBoxBatchTagInput) (string, error) {
@@ -54,8 +54,8 @@ func (r *mutationResolver) StashBoxBatchStudioTag(ctx context.Context, input man
 		return "", err
 	}
 
-	jobID := manager.GetInstance().StashBoxBatchStudioTag(ctx, b, input)
-	return strconv.Itoa(jobID), nil
+	jobID, err := manager.GetInstance().StashBoxBatchStudioTag(ctx, b, input)
+	return jobID, err
 }
 
 func (r *mutationResolver) StashBoxBatchTagTag(ctx context.Context, input manager.StashBoxBatchTagInput) (string, error) {
@@ -64,8 +64,8 @@ func (r *mutationResolver) StashBoxBatchTagTag(ctx context.Context, input manage
 		return "", err
 	}
 
-	jobID := manager.GetInstance().StashBoxBatchTagTag(ctx, b, input)
-	return strconv.Itoa(jobID), nil
+	jobID, err := manager.GetInstance().StashBoxBatchTagTag(ctx, b, input)
+	return jobID, err
 }
 
 func (r *mutationResolver) SubmitStashBoxSceneDraft(ctx context.Context, input StashBoxDraftSubmissionInput) (*string, error) {

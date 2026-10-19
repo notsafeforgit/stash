@@ -17,7 +17,8 @@ type ReceivedEvent = { event: JobEvent; receivedAt: number };
 const finished = (job: QueueJob) =>
   job.status === JobStatus.Finished ||
   job.status === JobStatus.Failed ||
-  job.status === JobStatus.Cancelled;
+  job.status === JobStatus.Cancelled ||
+  job.status === JobStatus.Interrupted;
 
 /** Live events provide progress; HTTP snapshots repair missed lifecycle events.
  * This observer belongs to the mounted queue, including all listeners/timers. */

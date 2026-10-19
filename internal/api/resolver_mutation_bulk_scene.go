@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
@@ -160,7 +159,7 @@ func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneU
 		return completedBulkUpdate(sceneIDs), nil
 	}
 
-	jobID := r.enqueueBulkUpdate(ctx, "Bulk Scene Update", sceneIDs, operation, hook.SceneUpdatePost, input, translator.getFields())
+	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Scene Update", sceneIDs, operation, hook.SceneUpdatePost, input, translator.getFields())
 
 	return queuedBulkUpdate(jobID, len(sceneIDs)), nil
 }
@@ -256,8 +255,8 @@ func (r *mutationResolver) ScenesSetDateFromFileMTime(ctx context.Context, input
 		return "sync", nil
 	}
 
-	jobID := r.enqueueBulkUpdate(ctx, "Set Scene Dates From File MTime", sceneIDs, operation, hook.SceneUpdatePost, input, []string{"date"})
-	return strconv.Itoa(jobID), nil
+	jobID, err := r.enqueueBulkUpdate(ctx, "Set Scene Dates From File MTime", sceneIDs, operation, hook.SceneUpdatePost, input, []string{"date"})
+	return jobID, err
 }
 
 func (r *mutationResolver) BulkSceneMarkerUpdate(ctx context.Context, input BulkSceneMarkerUpdateInput) (*BulkUpdateResult, error) {
@@ -333,7 +332,7 @@ func (r *mutationResolver) BulkSceneMarkerUpdate(ctx context.Context, input Bulk
 	}
 
 	jobDescription := fmt.Sprintf("Bulk Scene Marker Update (%d items)", len(ids))
-	jobID := r.enqueueBulkUpdate(ctx, jobDescription, ids, operation, hook.SceneMarkerUpdatePost, input, translator.getFields())
+	jobID, err := r.enqueueBulkUpdate(ctx, jobDescription, ids, operation, hook.SceneMarkerUpdatePost, input, translator.getFields())
 
 	return queuedBulkUpdate(jobID, len(ids)), nil
 }

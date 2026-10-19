@@ -121,12 +121,16 @@ const covers: FindSceneCoversQuery = {
 };
 
 it.each(
-  [JobStatus.Finished, JobStatus.Failed, JobStatus.Cancelled, null].flatMap(
-    (status) => [
-      { status, scope: "selected" },
-      { status, scope: "cached" },
-    ],
-  ),
+  [
+    JobStatus.Finished,
+    JobStatus.Failed,
+    JobStatus.Cancelled,
+    JobStatus.Interrupted,
+    null,
+  ].flatMap((status) => [
+    { status, scope: "selected" },
+    { status, scope: "cached" },
+  ]),
 )(
   "publishes only $scope artwork after $status, even after the initiating view leaves",
   async ({ status, scope }) => {
@@ -197,8 +201,10 @@ it.each(
     await vi.advanceTimersByTimeAsync(0);
     expect(requests).toEqual(["FindJob"]);
     finished = true;
-    await vi.advanceTimersByTimeAsync(1100);
-    expect((await task).kind).toBe("complete");
+    await vi.advanceTimersByTimeAsync(status === null ? 5000 : 1100);
+    expect((await task).kind).toBe(
+      status === null ? "unavailable" : "complete",
+    );
     expect(visible).toEqual(covers);
     const after = client.readQuery({ query: detailQuery })?.findScene;
     expect(after?.sceneStreams).toBe(before?.sceneStreams);
@@ -209,9 +215,13 @@ it.each(
     expect(after?.cover_origin).toEqual(
       covers.findScenes.scenes[0]?.cover_origin,
     );
-    expect(requests).toEqual(["FindJob", "FindJob", "FindSceneCovers"]);
+    expect(requests).toEqual(
+      status === null
+        ? ["FindJob", "FindJob", "FindJob", "FindJob", "FindSceneCovers"]
+        : ["FindJob", "FindJob", "FindSceneCovers"],
+    );
     await vi.advanceTimersByTimeAsync(5000);
-    expect(requests).toHaveLength(3);
+    expect(requests).toHaveLength(status === null ? 5 : 3);
     list.unsubscribe();
     client.stop();
   },

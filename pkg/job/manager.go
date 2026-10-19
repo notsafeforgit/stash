@@ -2,13 +2,18 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime/debug"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stashapp/stash/pkg/logger"
 )
+
+var ErrStopped = errors.New("job manager is stopping")
+var ErrHistoryUnavailable = errors.New("library job history is not ready")
 
 const maxGraveyardSize = 10
 const defaultThrottleLimit = 100 * time.Millisecond
@@ -25,7 +30,9 @@ type Manager struct {
 	active         sync.WaitGroup
 	stopped        bool
 
-	lastID int
+	history         History
+	historyMu       sync.Mutex
+	historyRequired bool
 
 	subscriptions       []*ManagerSubscription
 	updateThrottleLimit time.Duration
@@ -79,48 +86,96 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 	}
 }
 
-// Add queues a job.
-func (m *Manager) Add(ctx context.Context, description string, e JobExec) int {
-	m.mutex.Lock()
-	j := m.addLocked(ctx, description, e)
-	if m.stopped {
-		m.mutex.Unlock()
-		return j.ID
-	}
-	if m.isSync {
-		done := m.dispatch(ctx, j)
-		m.mutex.Unlock()
-		<-done
-	} else {
-		m.notEmpty.Broadcast()
-		m.mutex.Unlock()
-	}
-	return j.ID
-}
-
-// Start adds a job and starts it immediately, concurrently with other jobs.
-func (m *Manager) Start(ctx context.Context, description string, e JobExec) int {
+// RequireHistory gates ordinary task admission until the native database is ready.
+// Setup/migration jobs use AddTransient because their job table is not yet usable.
+func (m *Manager) RequireHistory() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	j := m.addLocked(ctx, description, e)
-	if !m.stopped {
-		m.dispatch(ctx, j)
-	}
-	return j.ID
+	m.historyRequired = true
 }
 
-func (m *Manager) addLocked(ctx context.Context, description string, e JobExec) *Job {
-	j := &Job{ID: m.nextID(), Status: StatusReady, Description: description,
-		AddTime: time.Now(), exec: e, outerCtx: ctx}
+// EnableHistory recovers only this process's first opening of the library.
+// Repeated setup callbacks must not interrupt work submitted in this process.
+func (m *Manager) EnableHistory(ctx context.Context, history History) error {
+	m.historyMu.Lock()
+	defer m.historyMu.Unlock()
+	m.mutex.Lock()
+	enabled := m.history != nil
+	m.mutex.Unlock()
+	if enabled {
+		return nil
+	}
+	if err := history.Interrupt(ctx); err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	m.history = history
+	m.mutex.Unlock()
+	return nil
+}
+
+// Add persists admission before queuing work. A failed admission never executes.
+func (m *Manager) Add(ctx context.Context, description string, e JobExec) (string, error) {
+	return m.add(ctx, description, e, false, false)
+}
+
+// AddTransient is restricted to initialization work that precedes the native
+// database. Its UUID cannot collide with persisted library jobs after setup.
+func (m *Manager) AddTransient(ctx context.Context, description string, e JobExec) (string, error) {
+	return m.add(ctx, description, e, false, true)
+}
+
+// Start persists admission and starts immediately, concurrently with other jobs.
+func (m *Manager) Start(ctx context.Context, description string, e JobExec) (string, error) {
+	return m.add(ctx, description, e, true, false)
+}
+
+func (m *Manager) add(ctx context.Context, description string, e JobExec, immediate, transient bool) (string, error) {
+	m.mutex.Lock()
+	if m.stopped {
+		m.mutex.Unlock()
+		return "", ErrStopped
+	}
+	history := m.history
+	if transient {
+		history = nil
+	}
+	if history == nil && m.historyRequired && !transient {
+		m.mutex.Unlock()
+		return "", ErrHistoryUnavailable
+	}
+	// Admission participates in shutdown even while persistence is in flight.
+	m.active.Add(1)
+	m.mutex.Unlock()
+	defer m.active.Done()
+	j := &Job{ID: uuid.NewString(), Status: StatusReady, Description: description,
+		Progress: ProgressIndefinite, AddTime: time.Now(), exec: e, outerCtx: ctx, history: history}
+	if history != nil {
+		if err := history.Create(ctx, j.statusCopy()); err != nil {
+			return "", fmt.Errorf("persisting job admission: %w", err)
+		}
+	}
+	m.mutex.Lock()
 	m.queue = append(m.queue, j)
-	m.notifyNewJob(j)
 	if m.stopped {
 		j.cancel()
-		t := time.Now()
-		j.EndTime = &t
-		m.removeJob(j)
+		m.mutex.Unlock()
+		m.onJobFinish(j)
+		return "", ErrStopped
 	}
-	return j
+	m.notifyNewJob(j)
+	synchronous := m.isSync
+	var done chan struct{}
+	if immediate || synchronous {
+		done = m.dispatch(ctx, j)
+	} else {
+		m.notEmpty.Broadcast()
+	}
+	m.mutex.Unlock()
+	if synchronous {
+		<-done
+	}
+	return j.ID, nil
 }
 
 func (m *Manager) notifyNewJob(j *Job) {
@@ -132,11 +187,6 @@ func (m *Manager) notifyNewJob(j *Job) {
 		default:
 		}
 	}
-}
-
-func (m *Manager) nextID() int {
-	m.lastID++
-	return m.lastID
 }
 
 func (m *Manager) getReadyJob() *Job {
@@ -203,7 +253,7 @@ func (m *Manager) executeJob(ctx context.Context, j *Job, done chan struct{}) {
 	defer func() {
 		if p := recover(); p != nil {
 			// a panic occurred, log and mark the job as failed
-			logger.Errorf("panic in job %d - %s: %v", j.ID, j.Description, p)
+			logger.Errorf("panic in job %s - %s: %v", j.ID, j.Description, p)
 			logger.Error(string(debug.Stack()))
 
 			m.mutex.Lock()
@@ -211,6 +261,21 @@ func (m *Manager) executeJob(ctx context.Context, j *Job, done chan struct{}) {
 			j.error(fmt.Errorf("panic: %v", p))
 		}
 	}()
+
+	if j.history != nil {
+		m.mutex.Lock()
+		snapshot := j.statusCopy()
+		m.mutex.Unlock()
+		if err := persistJobStatus(j.history, snapshot); err != nil {
+			m.mutex.Lock()
+			j.error(fmt.Errorf("persisting job start: %w", err))
+			m.mutex.Unlock()
+			return
+		}
+	}
+	if ctx.Err() != nil {
+		return
+	}
 
 	progress := m.newProgress(j)
 	if err := j.exec.Execute(ctx, progress); err != nil {
@@ -223,22 +288,59 @@ func (m *Manager) executeJob(ctx context.Context, j *Job, done chan struct{}) {
 	}
 }
 
-func (m *Manager) onJobFinish(job *Job) {
+// Status persistence never holds the queue mutex: jobs may report progress
+// while holding a repository transaction, and shutdown must remain responsive.
+func persistJobStatus(history History, snapshot Job) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return history.Save(ctx, snapshot)
+}
+
+func (m *Manager) onJobFinish(j *Job) {
+	m.mutex.Lock()
+	j.finishing = true
+	final := j.statusCopy()
+	switch final.Status {
+	case StatusStopping, StatusCancelled:
+		final.Status = StatusCancelled
+	case StatusFailed:
+	default:
+		final.Status = StatusFinished
+	}
+	now := time.Now()
+	final.EndTime = &now
+	m.mutex.Unlock()
+	if j.history != nil {
+		if err := persistJobOutcome(j.history, final); err != nil {
+			// Never announce successful durable completion when its outcome
+			// could not be recorded. The pending database row is INTERRUPTED on
+			// restart; retrying this final failed record does not rerun the task.
+			final.Status = StatusFailed
+			message := fmt.Sprintf("Job execution ended, but its outcome could not be persisted: %v", err)
+			final.Error = &message
+			logger.Error(message)
+			if retryErr := persistJobStatus(j.history, final); retryErr != nil {
+				logger.Errorf("persisting failed job outcome: %v", retryErr)
+			}
+		}
+	}
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	j.Status, j.EndTime, j.Error = final.Status, final.EndTime, final.Error
+	if j.cancelFunc != nil {
+		j.cancelFunc()
+		j.cancelFunc = nil
+	}
+	m.removeJob(j)
+}
 
-	if job.Status == StatusStopping {
-		job.Status = StatusCancelled
-	} else if job.Status != StatusFailed {
-		job.Status = StatusFinished
+func (m *Manager) retireCancelledLocked(j *Job) {
+	if j.finishing {
+		return
 	}
-	t := time.Now()
-	job.EndTime = &t
-	if job.cancelFunc != nil {
-		job.cancelFunc()
-		job.cancelFunc = nil
-	}
-	m.removeJob(job)
+	j.finishing = true
+	m.active.Add(1)
+	go func() { defer m.active.Done(); m.onJobFinish(j) }()
 }
 
 func (m *Manager) removeJob(job *Job) {
@@ -271,7 +373,7 @@ func (m *Manager) removeJob(job *Job) {
 	}
 }
 
-func (m *Manager) getJob(list []*Job, id int) (index int, job *Job) {
+func (m *Manager) getJob(list []*Job, id string) (index int, job *Job) {
 	// assumes lock held
 	for i, j := range list {
 		if j.ID == id {
@@ -288,7 +390,7 @@ func (m *Manager) getJob(list []*Job, id int) (index int, job *Job) {
 // are notified that they are stopping. Jobs that have not yet started are
 // removed from the queue. If no job exists with the provided id, then there is
 // no effect. Likewise, if the job is already cancelled, there is no effect.
-func (m *Manager) CancelJob(id int) {
+func (m *Manager) CancelJob(id string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -298,7 +400,7 @@ func (m *Manager) CancelJob(id int) {
 
 		if j.Status == StatusCancelled {
 			// remove from the queue
-			m.removeJob(j)
+			m.retireCancelledLocked(j)
 		}
 	}
 }
@@ -317,7 +419,7 @@ func (m *Manager) cancelAllLocked() {
 		j := m.queue[i]
 		j.cancel()
 		if j.Status == StatusCancelled {
-			m.removeJob(j)
+			m.retireCancelledLocked(j)
 		} else {
 			m.notifyJobUpdate(j)
 		}
@@ -326,7 +428,7 @@ func (m *Manager) cancelAllLocked() {
 
 // GetJob returns a copy of the Job for the provided id. Returns nil if the job
 // does not exist.
-func (m *Manager) GetJob(id int) *Job {
+func (m *Manager) GetJob(id string) *Job {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -338,6 +440,30 @@ func (m *Manager) GetJob(id int) *Job {
 	}
 
 	return nil
+}
+
+// Find returns live state or a retained durable outcome after restart.
+func (m *Manager) Find(ctx context.Context, id string) (*Job, error) {
+	if live := m.GetJob(id); live != nil {
+		return live, nil
+	}
+	m.mutex.Lock()
+	history := m.history
+	m.mutex.Unlock()
+	if history == nil {
+		return nil, nil
+	}
+	return history.Find(ctx, id)
+}
+
+func (m *Manager) History(ctx context.Context, limit, offset int) ([]Job, error) {
+	m.mutex.Lock()
+	history := m.history
+	m.mutex.Unlock()
+	if history == nil {
+		return []Job{}, nil
+	}
+	return history.List(ctx, limit, offset)
 }
 
 // GetQueue returns a copy of the current job queue.
@@ -364,7 +490,10 @@ func (m *Manager) Subscribe(ctx context.Context) *ManagerSubscription {
 	m.subscriptions = append(m.subscriptions, ret)
 
 	go func() {
-		<-ctx.Done()
+		select {
+		case <-ctx.Done():
+		case <-m.drained:
+		}
 		m.mutex.Lock()
 		defer m.mutex.Unlock()
 
@@ -438,4 +567,13 @@ func (u *updater) updateProgress(progress float64, details []string) {
 	} else {
 		u.notifyUpdate()
 	}
+}
+
+// A retry of the identical outcome is safe even if the first commit succeeded
+// but its acknowledgement was lost. Executors are never retried here.
+func persistJobOutcome(history History, final Job) error {
+	if err := persistJobStatus(history, final); err != nil {
+		return persistJobStatus(history, final)
+	}
+	return nil
 }

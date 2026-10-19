@@ -13,7 +13,7 @@ import {
 
 afterEach(() => vi.useRealTimers());
 
-it.each(["FINISHED", "FAILED", "CANCELLED"])(
+it.each(["FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"])(
   "refreshes after a bulk job ends with %s, even when the sheet is gone",
   async (status) => {
     vi.useFakeTimers();
@@ -168,7 +168,11 @@ it.each([1, 10])(
     expect(requests).toBe(0);
     const stop = invalidateAfterEntityJob(client, mutation, "7");
     await vi.advanceTimersByTimeAsync(7000);
-    expect(requests).toBe(failures === 1 ? 2 : 3);
+    expect(requests).toBe(3);
+    expect(errors).toHaveBeenCalledWith(
+      "Could not monitor bulk update",
+      expect.any(Error),
+    );
     expect(refetch).toHaveBeenCalledOnce();
     const completed = requests;
     await vi.advanceTimersByTimeAsync(10000);
@@ -209,7 +213,7 @@ it("explicit disposal cancels a pending job retry", async () => {
   client.stop();
 });
 
-it.each(["FINISHED", "FAILED", "CANCELLED"])(
+it.each(["FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"])(
   "expires inactive dependent searches when a bulk job is %s, not on admission",
   async (status) => {
     vi.useFakeTimers();

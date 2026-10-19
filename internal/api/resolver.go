@@ -34,6 +34,8 @@ type hookExecutor interface {
 }
 
 type Resolver struct {
+	jobs                 jobService
+	scanSubscribe        func(context.Context) <-chan bool
 	settings             *settingsService
 	sourceTrackingActive bool
 	shares               *sharing.Service

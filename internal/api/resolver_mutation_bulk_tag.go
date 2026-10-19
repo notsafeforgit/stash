@@ -106,7 +106,10 @@ func (r *mutationResolver) BulkTagUpdate(ctx context.Context, input BulkTagUpdat
 		return completedBulkUpdate(tagIDs), nil
 	}
 
-	jobID := r.enqueueBulkUpdate(ctx, "Bulk Tag Update", tagIDs, operation, hook.TagUpdatePost, input, translator.getFields())
+	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Tag Update", tagIDs, operation, hook.TagUpdatePost, input, translator.getFields())
+	if err != nil {
+		return nil, err
+	}
 
 	return queuedBulkUpdate(jobID, len(tagIDs)), nil
 }

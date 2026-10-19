@@ -281,6 +281,24 @@ commits each item independently and runs enabled post-hooks after successful
 writes. Failed items roll back and are reported; cancellation or an error does
 not undo already committed items.
 
+Ordinary library tasks now persist UUID admission, start and terminal outcomes in
+`library_jobs` (native schema 1000123), independently of source tracking. Admission
+must commit before execution. Pending records become `INTERRUPTED` on the next
+process start; these executors have no restartable checkpoints and are never
+replayed automatically. Retain partial results and review them before retrying.
+The last 1,000 terminal records remain queryable through `findJob` and bounded
+`jobHistory` pages in Settings → Tasks; pending rows are never pruned. Missing
+history is an unconfirmed outcome, not successful completion. Progress ticks
+remain in memory. Database initialization/migration and initial FFmpeg setup
+use an explicitly transient queue because the job table may not exist yet.
+
+Job and settings resolvers receive narrow services at server construction;
+authentication/session handlers receive their configuration and session store.
+These boundaries have isolated tests and do not obtain their dependencies from
+the process singleton. The job manager owns admission, draining and subscription
+shutdown; SQLite persistence never holds its queue mutex. Checkpointed archive
+work continues to use its independent durable leases/publication transactions.
+
 [Job subscriptions](../internal/api/resolver_subscription_job.go) retain the
 legacy combined stream and add separate lifecycle/progress streams. The API
 forwarder preserves received lifecycle events and may drop progress under

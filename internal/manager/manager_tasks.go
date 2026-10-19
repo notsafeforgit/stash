@@ -134,15 +134,15 @@ type ScanMetaDataFilterInput struct {
 	MinModTime *time.Time `json:"minModTime"`
 }
 
-func (s *Manager) Scan(ctx context.Context, input ScanMetadataInput) (int, error) {
+func (s *Manager) Scan(ctx context.Context, input ScanMetadataInput) (string, error) {
 	if err := s.validateFFmpeg(); err != nil {
-		return 0, err
+		return "", err
 	}
 
 	cfg := config.GetInstance()
 	folders, err := LibraryPaths(ctx, s.Repository)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
 	scanner := &file.Scanner{
@@ -178,14 +178,14 @@ func (s *Manager) Scan(ctx context.Context, input ScanMetadataInput) (int, error
 		subscriptions: s.scanSubs,
 	}
 
-	return s.JobManager.Add(ctx, TaskDescWithPaths("Scanning", input.Paths), &scanJob), nil
+	return s.JobManager.Add(ctx, TaskDescWithPaths("Scanning", input.Paths), &scanJob)
 }
 
-func (s *Manager) Import(ctx context.Context) (int, error) {
+func (s *Manager) Import(ctx context.Context) (string, error) {
 	config := config.GetInstance()
 	metadataPath := config.GetMetadataPath()
 	if metadataPath == "" {
-		return 0, errors.New("metadata path must be set in config")
+		return "", errors.New("metadata path must be set in config")
 	}
 
 	j := job.MakeJobExec(func(ctx context.Context, progress *job.Progress) error {
@@ -201,14 +201,14 @@ func (s *Manager) Import(ctx context.Context) (int, error) {
 		return task.Start(ctx)
 	})
 
-	return s.JobManager.Add(ctx, "Importing...", j), nil
+	return s.JobManager.Add(ctx, "Importing...", j)
 }
 
-func (s *Manager) Export(ctx context.Context) (int, error) {
+func (s *Manager) Export(ctx context.Context) (string, error) {
 	config := config.GetInstance()
 	metadataPath := config.GetMetadataPath()
 	if metadataPath == "" {
-		return 0, errors.New("metadata path must be set in config")
+		return "", errors.New("metadata path must be set in config")
 	}
 
 	j := job.MakeJobExec(func(ctx context.Context, progress *job.Progress) error {
@@ -220,28 +220,28 @@ func (s *Manager) Export(ctx context.Context) (int, error) {
 		return task.Start(ctx)
 	})
 
-	return s.JobManager.Add(ctx, "Exporting...", j), nil
+	return s.JobManager.Add(ctx, "Exporting...", j)
 }
 
 func (s *Manager) RunSingleTask(ctx context.Context, t interface {
 	job.JobExec
 	GetDescription() string
-}) int {
+}) (string, error) {
 	return s.JobManager.Add(ctx, t.GetDescription(), t)
 }
 
-func (s *Manager) Generate(ctx context.Context, input GenerateMetadataInput) (int, error) {
+func (s *Manager) Generate(ctx context.Context, input GenerateMetadataInput) (string, error) {
 	input, err := s.resolveGenerateSceneSelection(ctx, input)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	if input.ResetCoversToDefault {
 		if !input.Covers {
-			return 0, fmt.Errorf("covers must be selected when resetting to default")
+			return "", fmt.Errorf("covers must be selected when resetting to default")
 		}
 	}
 	if err := s.validateFFmpeg(); err != nil {
-		return 0, err
+		return "", err
 	}
 	if err := instance.Paths.Generated.EnsureTmpDir(); err != nil {
 		logger.Warnf("could not generate temporary directory: %v", err)
@@ -252,19 +252,19 @@ func (s *Manager) Generate(ctx context.Context, input GenerateMetadataInput) (in
 		input:      input,
 	}
 
-	return s.JobManager.Add(ctx, TaskDescWithPaths("Generating", input.Paths), j), nil
+	return s.JobManager.Add(ctx, TaskDescWithPaths("Generating", input.Paths), j)
 }
 
-func (s *Manager) GenerateDefaultScreenshot(ctx context.Context, sceneId string) int {
+func (s *Manager) GenerateDefaultScreenshot(ctx context.Context, sceneId string) (string, error) {
 	return s.generateScreenshot(ctx, sceneId, nil, false)
 }
 
-func (s *Manager) GenerateScreenshot(ctx context.Context, sceneId string, at float64) int {
+func (s *Manager) GenerateScreenshot(ctx context.Context, sceneId string, at float64) (string, error) {
 	return s.generateScreenshot(ctx, sceneId, &at, false)
 }
 
 // generate default screenshot if at is nil
-func (s *Manager) generateScreenshot(ctx context.Context, sceneId string, at *float64, preserveSelection bool) int {
+func (s *Manager) generateScreenshot(ctx context.Context, sceneId string, at *float64, preserveSelection bool) (string, error) {
 	if err := instance.Paths.Generated.EnsureTmpDir(); err != nil {
 		logger.Warnf("failure generating screenshot: %v", err)
 	}
@@ -324,7 +324,7 @@ type AutoTagMetadataInput struct {
 // AutoTag keeps public UUIDs in the queued request. Validate them before
 // admission, then resolve again during execution so merges and deletions do not
 // leave queued work pointing at a stale or reused repository key.
-func (s *Manager) AutoTag(ctx context.Context, input AutoTagMetadataInput) (int, error) {
+func (s *Manager) AutoTag(ctx context.Context, input AutoTagMetadataInput) (string, error) {
 	ctx = entityid.WithRepository(ctx, s.Repository)
 	for _, selection := range []struct {
 		kind models.ArchiveEntityKind
@@ -337,12 +337,12 @@ func (s *Manager) AutoTag(ctx context.Context, input AutoTagMetadataInput) (int,
 		for _, id := range selection.ids {
 			if id == "*" {
 				if len(selection.ids) != 1 {
-					return 0, fmt.Errorf("auto-tag %s selection must use either UUIDs or a single wildcard", selection.kind)
+					return "", fmt.Errorf("auto-tag %s selection must use either UUIDs or a single wildcard", selection.kind)
 				}
 				continue
 			}
 			if _, err := entityid.Local(ctx, selection.kind, id); err != nil {
-				return 0, fmt.Errorf("auto-tag %s: %w", selection.kind, err)
+				return "", fmt.Errorf("auto-tag %s: %w", selection.kind, err)
 			}
 		}
 	}
@@ -351,7 +351,7 @@ func (s *Manager) AutoTag(ctx context.Context, input AutoTagMetadataInput) (int,
 		input:      input,
 	}
 
-	return s.JobManager.Add(ctx, TaskDescWithPaths("Auto-tagging", input.Paths), &j), nil
+	return s.JobManager.Add(ctx, TaskDescWithPaths("Auto-tagging", input.Paths), &j)
 }
 
 type CleanMetadataInput struct {
@@ -362,7 +362,7 @@ type CleanMetadataInput struct {
 	IgnoreZipFileContents bool `json:"ignoreZipFileContents"`
 }
 
-func (s *Manager) Clean(ctx context.Context, input CleanMetadataInput) int {
+func (s *Manager) Clean(ctx context.Context, input CleanMetadataInput) (string, error) {
 	cleaner := &file.Cleaner{
 		FS:         &file.OsFS{},
 		Repository: file.NewRepository(s.Repository),
@@ -384,7 +384,7 @@ func (s *Manager) Clean(ctx context.Context, input CleanMetadataInput) int {
 	return s.JobManager.Add(ctx, TaskDescWithPaths("Cleaning", input.Paths), &j)
 }
 
-func (s *Manager) OptimiseDatabase(ctx context.Context) int {
+func (s *Manager) OptimiseDatabase(ctx context.Context) (string, error) {
 	j := OptimiseDatabaseJob{
 		Optimiser: s.Database,
 	}
@@ -392,7 +392,7 @@ func (s *Manager) OptimiseDatabase(ctx context.Context) int {
 	return s.JobManager.Add(ctx, "Optimising database...", &j)
 }
 
-func (s *Manager) MigrateHash(ctx context.Context) int {
+func (s *Manager) MigrateHash(ctx context.Context) (string, error) {
 	j := job.MakeJobExec(func(ctx context.Context, progress *job.Progress) error {
 		fileNamingAlgo := config.GetInstance().GetVideoFileNamingAlgorithm()
 		logger.Infof("Migrating generated files for %s naming hash", fileNamingAlgo.String())
@@ -604,7 +604,7 @@ func (s *Manager) batchTagAllPerformers(ctx context.Context, input StashBoxBatch
 	return tasks, err
 }
 
-func (s *Manager) StashBoxBatchPerformerTag(ctx context.Context, box *models.StashBox, input StashBoxBatchTagInput) int {
+func (s *Manager) StashBoxBatchPerformerTag(ctx context.Context, box *models.StashBox, input StashBoxBatchTagInput) (string, error) {
 	j := job.MakeJobExec(func(ctx context.Context, progress *job.Progress) error {
 		logger.Infof("Initiating stash-box batch performer tag")
 
@@ -738,7 +738,7 @@ func (s *Manager) batchTagAllStudios(ctx context.Context, input StashBoxBatchTag
 	return tasks, err
 }
 
-func (s *Manager) StashBoxBatchStudioTag(ctx context.Context, box *models.StashBox, input StashBoxBatchTagInput) int {
+func (s *Manager) StashBoxBatchStudioTag(ctx context.Context, box *models.StashBox, input StashBoxBatchTagInput) (string, error) {
 	j := job.MakeJobExec(func(ctx context.Context, progress *job.Progress) error {
 		logger.Infof("Initiating stash-box batch studio tag")
 
@@ -872,7 +872,7 @@ func (s *Manager) batchTagAllTags(ctx context.Context, input StashBoxBatchTagInp
 	return tasks, err
 }
 
-func (s *Manager) StashBoxBatchTagTag(ctx context.Context, box *models.StashBox, input StashBoxBatchTagInput) int {
+func (s *Manager) StashBoxBatchTagTag(ctx context.Context, box *models.StashBox, input StashBoxBatchTagInput) (string, error) {
 	j := job.MakeJobExec(func(ctx context.Context, progress *job.Progress) error {
 		logger.Infof("Initiating stash-box batch tag tag")
 

@@ -9,10 +9,10 @@ import (
 )
 
 type bulkUpdater interface {
-	BulkUpdate(ctx context.Context, description string, ids []int, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) int
+	BulkUpdate(ctx context.Context, description string, ids []int, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) (string, error)
 }
 
-func (r *Resolver) enqueueBulkUpdate(ctx context.Context, description string, ids []int, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) int {
+func (r *Resolver) enqueueBulkUpdate(ctx context.Context, description string, ids []int, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) (string, error) {
 	return r.bulkUpdater.BulkUpdate(ctx, description, ids, operation, hookType, input, inputFields)
 }
 

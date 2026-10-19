@@ -158,6 +158,7 @@ func formatDuration(t time.Duration) string {
 
 func initJobManager(cfg *config.Config) *job.Manager {
 	ret := job.NewManager()
+	ret.RequireHistory()
 
 	// desktop notifications
 	ctx := context.Background()
@@ -165,7 +166,10 @@ func initJobManager(cfg *config.Config) *job.Manager {
 	go func() {
 		for {
 			select {
-			case j := <-c.RemovedJob:
+			case j, ok := <-c.RemovedJob:
+				if !ok {
+					return
+				}
 				if cfg.GetNotificationsEnabled() {
 					cleanDesc := strings.TrimRight(j.Description, ".")
 
@@ -240,8 +244,8 @@ func (s *Manager) postInit(ctx context.Context) error {
 		}
 	}
 	if s.Database.Ready() == nil {
-		if err := s.PromoteConfiguration(ctx); err != nil {
-			return fmt.Errorf("promoting configuration: %w", err)
+		if err := s.ReadyLibrary(ctx); err != nil {
+			return fmt.Errorf("preparing library: %w", err)
 		}
 	}
 
@@ -319,4 +323,13 @@ func (s *Manager) RefreshFFMpeg(ctx context.Context) {
 		// initialise hardware support with background context
 		s.FFMpeg.InitHWSupport(context.Background())
 	}
+}
+
+// ReadyLibrary opens ordinary job admission only after configuration promotion
+// and recovery of pending outcomes from the previous process have succeeded.
+func (s *Manager) ReadyLibrary(ctx context.Context) error {
+	if err := s.PromoteConfiguration(ctx); err != nil {
+		return err
+	}
+	return s.JobManager.EnableHistory(ctx, sqlite.NewLibraryJobHistory(s.Database))
 }

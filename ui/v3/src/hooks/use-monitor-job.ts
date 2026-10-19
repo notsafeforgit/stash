@@ -9,6 +9,7 @@ export type MonitoredJob = Pick<
 
 function isTerminalStatus(status: GQL.JobStatus) {
   return (
+    status === GQL.JobStatus.Interrupted ||
     status === GQL.JobStatus.Cancelled ||
     status === GQL.JobStatus.Failed ||
     status === GQL.JobStatus.Finished
@@ -44,7 +45,7 @@ export function useMonitorJob(
   useEffect(() => {
     if (!jobId || loading || !data) return;
     const job = data.findJob;
-    if (!job || isTerminalStatus(job.status)) finish(job ?? undefined);
+    if (job && isTerminalStatus(job.status)) finish(job);
   }, [data, finish, jobId, loading]);
 
   useSubscription(GQL.JobsLifecycleSubscribeDocument, {

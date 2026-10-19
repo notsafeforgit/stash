@@ -129,7 +129,7 @@ func (s *Manager) SceneCoverOrigin(ctx context.Context, scene *models.Scene) (*C
 	return ret, err
 }
 
-func (s *Manager) RegenerateSceneCover(ctx context.Context, sceneID string) int {
+func (s *Manager) RegenerateSceneCover(ctx context.Context, sceneID string) (string, error) {
 	return s.generateScreenshot(ctx, sceneID, nil, true)
 }
 

@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/task"
@@ -21,9 +20,9 @@ func (r *mutationResolver) MigrateSceneScreenshots(ctx context.Context, input Mi
 		SceneRepo:  mgr.Repository.Scene,
 		TxnManager: mgr.Repository.TxnManager,
 	}
-	jobID := mgr.JobManager.Add(ctx, "Migrating scene screenshots to blobs...", t)
+	jobID, err := mgr.JobManager.Add(ctx, "Migrating scene screenshots to blobs...", t)
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }
 
 func (r *mutationResolver) MigrateBlobs(ctx context.Context, input MigrateBlobsInput) (string, error) {
@@ -34,9 +33,9 @@ func (r *mutationResolver) MigrateBlobs(ctx context.Context, input MigrateBlobsI
 		Vacuumer:   mgr.Database,
 		DeleteOld:  utils.IsTrue(input.DeleteOld),
 	}
-	jobID := mgr.JobManager.Add(ctx, "Migrating blobs...", t)
+	jobID, err := mgr.JobManager.Add(ctx, "Migrating blobs...", t)
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }
 
 func (r *mutationResolver) Migrate(ctx context.Context, input manager.MigrateInput) (string, error) {
@@ -45,14 +44,14 @@ func (r *mutationResolver) Migrate(ctx context.Context, input manager.MigrateInp
 		BackupPath:     input.BackupPath,
 		Config:         mgr.Config,
 		Database:       mgr.Database,
-		AfterMigration: mgr.PromoteConfiguration,
+		AfterMigration: mgr.ReadyLibrary,
 	}
 
 	if err := t.PreExecute(); err != nil {
 		return "", err
 	}
 
-	jobID := mgr.JobManager.Add(ctx, "Migrating database...", t)
+	jobID, err := mgr.JobManager.AddTransient(ctx, "Migrating database...", t)
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }

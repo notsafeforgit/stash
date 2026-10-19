@@ -45,11 +45,13 @@ const (
 	StatusCancelled Status = "CANCELLED"
 	// StatusFailed means that the job failed.
 	StatusFailed Status = "FAILED"
+	// StatusInterrupted means a previous process stopped without a durable outcome.
+	StatusInterrupted Status = "INTERRUPTED"
 )
 
 // Job represents the status of a queued or running job.
 type Job struct {
-	ID     int
+	ID     string
 	Status Status
 	// details of the current operations of the job
 	Details     []string
@@ -64,6 +66,8 @@ type Job struct {
 	outerCtx   context.Context
 	exec       JobExec
 	cancelFunc context.CancelFunc
+	history    History
+	finishing  bool
 }
 
 // statusCopy returns a copy of the Job with only the fields needed for
@@ -87,16 +91,22 @@ func (j *Job) statusCopy() Job {
 // If the EndTime is set, then it uses this to calculate the elapsed time, otherwise it uses time.Now.
 func (j *Job) TimeElapsed() time.Duration {
 	var end time.Time
-	if j.EndTime != nil {
+	if j.EndTime == nil {
 		end = time.Now()
 	} else {
 		end = *j.EndTime
 	}
 
+	if j.StartTime == nil {
+		return 0
+	}
 	return end.Sub(*j.StartTime)
 }
 
 func (j *Job) cancel() {
+	if j.finishing {
+		return
+	}
 	switch j.Status {
 	case StatusReady:
 		j.Status = StatusCancelled

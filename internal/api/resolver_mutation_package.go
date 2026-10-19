@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/task"
@@ -34,9 +33,9 @@ func (r *mutationResolver) InstallPackages(ctx context.Context, typeArg PackageT
 		},
 		Packages: packages,
 	}
-	jobID := mgr.JobManager.Add(ctx, "Installing packages...", t)
+	jobID, err := mgr.JobManager.Add(ctx, "Installing packages...", t)
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }
 
 func (r *mutationResolver) UpdatePackages(ctx context.Context, typeArg PackageType, packages []*models.PackageSpecInput) (string, error) {
@@ -53,9 +52,9 @@ func (r *mutationResolver) UpdatePackages(ctx context.Context, typeArg PackageTy
 		},
 		Packages: packages,
 	}
-	jobID := mgr.JobManager.Add(ctx, "Updating packages...", t)
+	jobID, err := mgr.JobManager.Add(ctx, "Updating packages...", t)
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }
 
 func (r *mutationResolver) UninstallPackages(ctx context.Context, typeArg PackageType, packages []*models.PackageSpecInput) (string, error) {
@@ -72,7 +71,7 @@ func (r *mutationResolver) UninstallPackages(ctx context.Context, typeArg Packag
 		},
 		Packages: packages,
 	}
-	jobID := mgr.JobManager.Add(ctx, "Updating packages...", t)
+	jobID, err := mgr.JobManager.Add(ctx, "Updating packages...", t)
 
-	return strconv.Itoa(jobID), nil
+	return jobID, err
 }

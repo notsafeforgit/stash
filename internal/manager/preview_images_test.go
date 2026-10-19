@@ -240,7 +240,10 @@ func TestGenerateScreenshotPublishesPreviewAndReportsWriteFailure(t *testing.T) 
 				scene.CoverChecksum = md5.FromBytes(data)
 			}).Return(nil).Once()
 			db.Scene.On("UpdatePartial", mock.Anything, scene.ID, mock.Anything).Return(&scene, nil).Once()
-			id := mgr.GenerateScreenshot(context.Background(), "1", at)
+			id, admissionErr := mgr.GenerateScreenshot(context.Background(), "1", at)
+			if admissionErr != nil {
+				t.Fatal(admissionErr)
+			}
 			if state := mgr.JobManager.GetJob(id); state.Status != job.StatusFinished {
 				t.Fatalf("regeneration failed: %+v", state)
 			}
@@ -263,7 +266,10 @@ func TestGenerateScreenshotPublishesPreviewAndReportsWriteFailure(t *testing.T) 
 				}
 			}).Return(nil).Once()
 			db.Scene.On("UpdatePartial", mock.Anything, scene.ID, mock.Anything).Return(&scene, nil).Once()
-			id = mgr.RegenerateSceneCover(context.Background(), "1")
+			id, admissionErr = mgr.RegenerateSceneCover(context.Background(), "1")
+			if admissionErr != nil {
+				t.Fatal(admissionErr)
+			}
 			if state := mgr.JobManager.GetJob(id); state.Status != job.StatusFinished {
 				t.Fatalf("saved selection could not be regenerated: %+v", state)
 			}
@@ -273,7 +279,10 @@ func TestGenerateScreenshotPublishesPreviewAndReportsWriteFailure(t *testing.T) 
 			files = []*models.VideoFile{file}
 
 			db.Scene.On("UpdateCover", mock.Anything, scene.ID, mock.Anything).Return(errors.New("cover write failed")).Once()
-			id = mgr.GenerateScreenshot(context.Background(), "1", at)
+			id, admissionErr = mgr.GenerateScreenshot(context.Background(), "1", at)
+			if admissionErr != nil {
+				t.Fatal(admissionErr)
+			}
 			if state := mgr.JobManager.GetJob(id); state.Status != job.StatusFailed || state.Error == nil || !strings.Contains(*state.Error, "cover write failed") {
 				t.Fatalf("cover write failure was reported as success: %+v", state)
 			}
@@ -284,7 +293,10 @@ func TestGenerateScreenshotPublishesPreviewAndReportsWriteFailure(t *testing.T) 
 				scene.CoverChecksum = md5.FromBytes(args.Get(2).([]byte))
 			}).Return(nil).Once()
 			db.Scene.On("UpdatePartial", mock.Anything, scene.ID, mock.Anything).Return(&scene, nil).Once()
-			id = mgr.GenerateDefaultScreenshot(context.Background(), "1")
+			id, admissionErr = mgr.GenerateDefaultScreenshot(context.Background(), "1")
+			if admissionErr != nil {
+				t.Fatal(admissionErr)
+			}
 			if state := mgr.JobManager.GetJob(id); state.Status != job.StatusFinished {
 				t.Fatalf("default generation failed: %+v", state)
 			}
@@ -316,7 +328,10 @@ func TestGenerateScreenshotPublishesPreviewAndReportsWriteFailure(t *testing.T) 
 						}
 					}
 				}
-				id = mgr.RegenerateSceneCover(context.Background(), "1")
+				id, admissionErr = mgr.RegenerateSceneCover(context.Background(), "1")
+				if admissionErr != nil {
+					t.Fatal(admissionErr)
+				}
 				if state := mgr.JobManager.GetJob(id); state.Status != job.StatusFailed || state.Error == nil || !strings.Contains(*state.Error, "kept") {
 					t.Fatalf("concurrent %s was not preserved: %+v", change, state)
 				}

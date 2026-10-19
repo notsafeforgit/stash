@@ -26,7 +26,7 @@ const developmentTag string = "latest_develop"
 const defaultSHLength int = 8 // default length of SHA short hash returned by <git rev-parse --short HEAD>
 
 // apiReleasesURL and apiTagsURL build the GitHub API endpoints for the
-// repository configured via build.UpdateRepo (defaults to stashapp/stash).
+// repository configured via build.UpdateRepo (defaults to notsafeforgit/stash).
 func apiReleasesURL() string {
 	return apiRepoBase + build.UpdateRepo() + "/releases"
 }

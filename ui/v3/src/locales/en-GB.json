@@ -483,6 +483,11 @@
   },
   "config": {
     "about": {
+      "project_description": "Native Stash is a standalone media library, hosted on {repository}.",
+      "support_links": "Guides and support: {documentation} and {issues}.",
+      "documentation": "Documentation",
+      "issues": "Issues",
+      "attribution": "Derived from {upstream}, under the {license} license.",
       "build_hash": "Build hash:",
       "build_time": "Build time:",
       "check_for_new_version": "Check for new version",
@@ -963,7 +968,7 @@
         "option_label": "Custom JavaScript enabled"
       },
       "custom_locales": {
-        "description": "Override individual locale strings. See https://github.com/stashapp/stash/blob/develop/ui/v2.5/src/locales/en-GB.json for the master list. Page must be reloaded for changes to take effect.",
+        "description": "Override individual locale strings. See https://github.com/notsafeforgit/stash/blob/develop/ui/v3/src/locales/en-GB.json for the master list. Page must be reloaded for changes to take effect.",
         "heading": "Custom localisation",
         "option_label": "Custom localisation enabled"
       },

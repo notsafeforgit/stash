@@ -1,6 +1,6 @@
 import { useIntl } from "react-intl";
 import { Link } from "@tanstack/react-router";
-import { BarChart3, Heart, HelpCircle, Settings } from "lucide-react";
+import { BarChart3, HelpCircle, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -61,7 +61,7 @@ export function UserMenu() {
             render={
               <a
                 aria-label={intl.formatMessage({ id: "help" })}
-                href="https://docs.stashapp.cc"
+                href="https://github.com/notsafeforgit/stash/blob/develop/docs/README.md"
                 target="_blank"
                 rel="noopener noreferrer"
               />
@@ -70,20 +70,6 @@ export function UserMenu() {
           >
             <HelpCircle className="size-4" />
             Help
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            render={
-              <a
-                aria-label={intl.formatMessage({ id: "donate" })}
-                href="https://opencollective.com/stashapp"
-                target="_blank"
-                rel="noopener noreferrer"
-              />
-            }
-            className="flex items-center gap-2"
-          >
-            <Heart className="size-4" />
-            Donate
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

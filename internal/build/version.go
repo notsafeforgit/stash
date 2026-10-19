@@ -11,11 +11,11 @@ var githash string
 var officialBuild string
 
 // updateRepo is the GitHub "owner/repo" that the built-in update check queries.
-// It can be overridden at build time via -ldflags, allowing forks to point the
-// update check at their own releases. It defaults to the upstream repository.
+// It can be overridden at build time via -ldflags. Source builds and published
+// images default to this project's releases.
 var updateRepo string
 
-const defaultUpdateRepo = "stashapp/stash"
+const defaultUpdateRepo = "notsafeforgit/stash"
 
 func Version() (string, string, string) {
 	return version, githash, buildstamp

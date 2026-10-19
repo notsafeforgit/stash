@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FormattedMessage } from "react-intl";
 import { useMsg } from "src/hooks/message";
 import { useQuery } from "@apollo/client/react";
 import * as GQL from "src/core/generated-graphql";
@@ -111,37 +112,53 @@ function SettingsAboutPage() {
       <SettingsSection title={msg("config.categories.about", "About")}>
         <div className="space-y-2 text-sm text-muted-foreground">
           <p>
-            Stash is open source, hosted on{" "}
-            <ExternalLink href="https://github.com/stashapp/stash">
-              GitHub
-            </ExternalLink>
-            .
+            <FormattedMessage
+              id="config.about.project_description"
+              defaultMessage="Native Stash is a standalone media library, hosted on {repository}."
+              values={{
+                repository: (
+                  <ExternalLink href="https://github.com/notsafeforgit/stash">
+                    GitHub
+                  </ExternalLink>
+                ),
+              }}
+            />
           </p>
           <p>
-            Guides and support:{" "}
-            <ExternalLink href="https://docs.stashapp.cc">
-              documentation
-            </ExternalLink>
-            ,{" "}
-            <ExternalLink href="https://discourse.stashapp.cc">
-              forum
-            </ExternalLink>{" "}
-            and{" "}
-            <ExternalLink href="https://discord.gg/2TsNFKt">
-              Discord
-            </ExternalLink>
-            .
+            <FormattedMessage
+              id="config.about.support_links"
+              defaultMessage="Guides and support: {documentation} and {issues}."
+              values={{
+                documentation: (
+                  <ExternalLink href="https://github.com/notsafeforgit/stash/blob/develop/docs/README.md">
+                    {msg("config.about.documentation", "Documentation")}
+                  </ExternalLink>
+                ),
+                issues: (
+                  <ExternalLink href="https://github.com/notsafeforgit/stash/issues">
+                    {msg("config.about.issues", "Issues")}
+                  </ExternalLink>
+                ),
+              }}
+            />
           </p>
           <p>
-            Support the project via{" "}
-            <ExternalLink href="https://opencollective.com/stashapp">
-              Open Collective
-            </ExternalLink>{" "}
-            or{" "}
-            <ExternalLink href="https://github.com/sponsors/stashapp">
-              GitHub Sponsors
-            </ExternalLink>
-            .
+            <FormattedMessage
+              id="config.about.attribution"
+              defaultMessage="Derived from {upstream}, under the {license} license."
+              values={{
+                upstream: (
+                  <ExternalLink href="https://github.com/stashapp/stash">
+                    stashapp/stash
+                  </ExternalLink>
+                ),
+                license: (
+                  <ExternalLink href="https://github.com/notsafeforgit/stash/blob/develop/LICENSE">
+                    AGPL-3.0
+                  </ExternalLink>
+                ),
+              }}
+            />
           </p>
         </div>
       </SettingsSection>

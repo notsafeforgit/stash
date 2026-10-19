@@ -179,13 +179,13 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: native-generated
-      # Frontend-only runs still prove that all three entry points and their
+      # Frontend-only runs still prove that all four entry points and their
       # compressed route chunks are embedded in the new binary.
       - name: Test embedded UI
         run: go test ./ui
       - name: Compile Linux amd64
         env:
-          OFFICIAL_BUILD: 'false'
+          OFFICIAL_BUILD: ${{ github.event_name != 'pull_request' && github.repository == 'notsafeforgit/stash' && github.ref == 'refs/heads/develop' }}
           UPDATE_REPO: ${{ github.repository }}
         run: make build-cc-linux
       - uses: actions/upload-artifact@v7

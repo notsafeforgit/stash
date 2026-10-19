@@ -12,11 +12,11 @@ guides. The [original plan](archive/rewrite-plan.md) and
 v3 uses React, TypeScript, TanStack Router, Apollo Client, shadcn components
 built on Base UI, Tailwind, and Video.js. [package.json](../package.json) and
 [pnpm-workspace.yaml](../pnpm-workspace.yaml) own versions and overrides.
-The independent fork owns its native schema and API contracts. Compatibility
+The project owns its native schema and API contracts. Compatibility
 with upstream v2.5 is frozen at `v2.5-compatible-final`, which retains the
 retired application source for migration reference. Convert required callers and validate retained
 native invariants when changing contracts. The independent v3 plugin API and
-stash-box integration remain supported. See [FORK.md](../../../FORK.md) and the
+stash-box integration remain supported. See [PROJECT.md](../../../PROJECT.md) and the
 [transition plan](../../../docs/native-archive-transition-plan.md).
 
 V3 is the sole embedded application. The old UI selector, dependency tree and
@@ -724,16 +724,15 @@ logs, diagnostic messages), not their labels or surrounding controls.
 
 ## Validation
 
-`make validate-ui-v3` runs generation, lint, TypeScript, formatting, locale checks,
-Vitest, and current native/plugin contract checks. `make validate-fork` adds backend
-generation, Go lint, and integration tests. `make ui-v3-only` verifies the bundle.
+`make validate-ui` runs generation, lint, TypeScript, formatting, locale checks,
+Vitest, and current native/plugin contract checks. `make validate` adds backend
+generation, Go lint, and integration tests. `make ui-only` verifies the bundle.
 
-On a clean checkout, run `make pre-ui`, `make generate`, then `make ui`
-**before** `make validate-fork`. Go validation
-inspects the embedded v3 route chunks, so generated placeholder directories are
-not enough. The [development guide](development.md#validation) contains the full
+On a clean checkout, run `make pre-ui` then `make validate`. The full gate
+builds the embedded route chunks before Go checks. For standalone Go tests,
+first run `make generate ui`; generated placeholder directories are not enough. The [development guide](development.md#validation) contains the full
 command sequence; the [deployment runbook](../../../docs/v3-deployment.md) covers
-the Stash publisher, stash-s6 bake, and local Quadlet verification.
+the application publisher and local Quadlet verification.
 
 The contract checker validates current application operations and the retained
 versioned plugin API. SQLite fixtures cover one-time historical imports, native

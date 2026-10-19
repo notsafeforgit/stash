@@ -4,7 +4,7 @@
 
 `ui/v3/` is the active React 19/TypeScript application. It shares the Go backend and GraphQL API at the Git root. It is the sole embedded UI; source tracking and producer ingestion are an installation opt-in. The retired v2.5 source is preserved at `v2.5-compatible-final`. The [native archive architecture](../../docs/native-archive-transition-plan.md) describes current application and upgrade boundaries.
 
-This is an independent fork of `stashapp/stash`. Read root-level `CLAUDE.md` and `FORK.md` for current architecture and migration policy. Preserve retained native contracts and convert their consumers together; v2.5 GraphQL and storage compatibility are no longer design requirements. Continue work on `develop`; the native rewrite has completed verification and the owner's success review.
+Native Stash is a standalone project. Read root-level `CLAUDE.md` and `PROJECT.md` for architecture, selective feature imports and release policy. Preserve native contracts and convert their consumers together; upstream GraphQL, UI and storage compatibility are not design requirements. Continue work on `develop`.
 
 ## Project Structure
 
@@ -14,17 +14,17 @@ File-based TanStack routes live in `src/routes/`; feature components are in `src
 
 Run integrated workflows from the Git root. Follow the [development guide](docs/development.md) for first-checkout setup and generation:
 
-- `make pre-ui-v3` installs locked v3 dependencies.
+- `make pre-ui` installs locked v3 dependencies.
 - `STASH_PORT=9999 make server-start` runs the Go backend on port 9999.
-- `VITE_APP_PLATFORM_URL=http://127.0.0.1:9999 make ui-v3-start` runs Vite on port 3002.
-- `make ui-v3-only` type-checks and builds the embedded v3 assets.
-- `make validate-ui-v3` runs generation, Biome (including accessibility), React purity/type-contract lint, TypeScript, formatting, locale checks, Vitest, and retained native contract checks.
-- `make test-ui-v3-browser` runs the Chromium/WebKit toolbar regression suite; see the development guide for browser installation. The suite starts its own fixture server and needs no backend.
+- `VITE_APP_PLATFORM_URL=http://127.0.0.1:9999 make ui-start` runs Vite on port 3002.
+- `make ui-only` type-checks and builds the embedded v3 assets.
+- `make validate-ui` runs generation, Biome (including accessibility), React purity/type-contract lint, TypeScript, formatting, locale checks, Vitest, and retained native contract checks.
+- `make test-ui-browser` runs the Chromium/WebKit toolbar regression suite; see the development guide for browser installation. The suite starts its own fixture server and needs no backend.
 - `make lint` runs CI-pinned `golangci-lint` through `go run`; no local install is required.
-- `make validate-fork` is the pre-push gate for backend generation, Go lint/integration tests, and v3 validation.
+- `make validate` is the pre-push gate for backend generation, Go lint/integration tests, and v3 validation.
 - From `ui/v3`, `pnpm test --run` runs Vitest once and `pnpm gqlgen` refreshes GraphQL types.
 
-Install dependencies with `make pre-ui`. `make validate-fork` generates bindings, validates/builds the UI once and runs independent suites concurrently (`VALIDATION_JOBS=2` by default). Before standalone full Go tests, run `make generate` and `make ui`; embedded-asset tests require real route chunks. Never run Go tests against a concurrently changing UI build. Publishing and Quadlet verification are documented in the [deployment runbook](../../docs/v3-deployment.md).
+Install dependencies with `make pre-ui`. `make validate` generates bindings, validates/builds the UI once and runs independent suites concurrently (`VALIDATION_JOBS=2` by default). Before standalone full Go tests, run `make generate` and `make ui`; embedded-asset tests require real route chunks. Never run Go tests against a concurrently changing UI build. Publishing and Quadlet verification are documented in the [deployment runbook](../../docs/v3-deployment.md).
 
 ## Coding & Testing Conventions
 
@@ -38,4 +38,4 @@ Preserve the [interaction policy](docs/architecture.md#interaction-and-accessibi
 
 ## Commits & Pull Requests
 
-Use short imperative commit subjects. PRs must address an open issue, stay focused, follow the [root PR template](../../.github/pull_request_template.md), describe manual testing, and include before/after screenshots for UI changes. Read [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) and disclose AI assistance as required by [AI_POLICY.md](../../docs/AI_POLICY.md).
+Use short imperative commit subjects. PRs should link an existing issue when applicable, stay focused, follow the [root PR template](../../.github/pull_request_template.md), describe manual testing, and include before/after screenshots for UI changes. Read [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) and disclose AI assistance as required by [AI_POLICY.md](../../docs/AI_POLICY.md).

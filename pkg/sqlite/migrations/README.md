@@ -4,7 +4,7 @@ Native migrations use the primary sequence beginning at 1000000. Historical
 primary migrations 1–86 and the old fork migration functions are one-time import
 code. Do not add new fork migrations or runtime reconcilers. Read
 [native schema promotion](../../../docs/native-schema.md) and
-[FORK.md](../../../FORK.md) before changing this boundary.
+[PROJECT.md](../../../PROJECT.md) before changing this boundary.
 
 ## Historical code maintenance
 
@@ -20,7 +20,7 @@ These readers support upstream databases and frozen pre-native fork formats.
 Their historical semantics must not follow new native UI/API behavior. Keep
 input-specific fixes and recovery fixes covered by historical fixtures; implement
 new behavior in native code and new numbered migrations. Follow the
-[legacy upgrade policy](../../../FORK.md#legacy-upgrade-code).
+[legacy upgrade policy](../../../PROJECT.md#legacy-upgrade-code).
 
 Fresh database creation uses the native baseline described below. Historical
 readers remain necessary for supported upstream/frozen-fork upgrades and recovery

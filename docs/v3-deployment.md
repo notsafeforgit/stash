@@ -77,9 +77,12 @@ settings writes, in-place session recovery and job history after restart. A
 failure blocks publication. The broader fixture browser regressions retain their
 separate workflow.
 
-Pushes to `develop` no longer repeat this work in the older Build and
-Lint workflows. Native PRs use the same validation workflow; `develop` retains
-its downloadable development release using the publisher's validated artifacts.
+The [PR workflow](../.github/workflows/build.yml) calls the same validation
+workflow for PRs targeting `develop`. The publisher owns branch builds and the
+downloadable development release, using the validated artifacts. There are no
+parallel upstream release or lint workflows. The manual
+[legacy preservation workflow](../.github/workflows/preserve-legacy-release.yml)
+only retains frozen image manifests; it does not build or deploy an application.
 
 Dependency caches cover pnpm's actual configured store, uv downloads/builds, Go
 modules, and per-suite incremental Go compilation. BuildKit caches container
@@ -95,7 +98,9 @@ The immutable `v3.0.0-dev` source tag anchors native development version names;
 `git describe` adds the subsequent commit count and revision. Frozen compatible
 tags remain unchanged.
 Both container and downloadable-binary builds set `UPDATE_REPO` to the current
-GitHub repository, so the application's release check targets this fork.
+GitHub repository. Source builds default to `notsafeforgit/stash` as well.
+Builds from this repository's `develop` publisher are marked official; PR and
+local builds are not.
 
 Select the run with the exact `headSha`, wait for success, then resolve the
 revision tag:
@@ -185,4 +190,4 @@ the migration job finishes.
 If startup fails, inspect that unit's journal and container logs before retrying.
 Never run the frozen binary against a database after native writes begin.
 Rollback follows the coordinated restore/export boundary in
-[FORK.md](../FORK.md) and the full transition plan.
+[PROJECT.md](../PROJECT.md) and the full transition plan.

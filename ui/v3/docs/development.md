@@ -49,13 +49,13 @@ library on first launch. Restart this command after backend changes.
 In a second terminal, start v3:
 
 ```bash
-VITE_APP_PLATFORM_URL=http://127.0.0.1:9999 make ui-v3-start
+VITE_APP_PLATFORM_URL=http://127.0.0.1:9999 make ui-start
 ```
 
 Open `http://localhost:3002/`. Vite regenerates v3 GraphQL types and the settings
 search index before starting, then hot reloads frontend changes. Set the backend
 URL explicitly: v3's Vite proxy defaults to port **8010**, whereas this quickstart
-uses **9999**. `make ui-start` is the same native dev server as `ui-v3-start`.
+uses **9999**. `make ui-start` runs the application dev server.
 
 Keep authentication enabled during development. Browser requests use Vite's
 origin for GraphQL, WebSocket subscriptions, native APIs and login. The proxy
@@ -81,7 +81,7 @@ native deployment. The frozen compatible release retains its original flags.
 | `pnpm --dir ui/v3 check` | v3 GraphQL/settings generation and TypeScript |
 | `pnpm --dir ui/v3 check:watch` | Generate v3 bindings, then watch app types with TypeScript 7 |
 | `make ui` | v3 bundle and login locales |
-| `make ui-v3-only` | v3 generation, TypeScript, and production bundle |
+| `make ui-only` | v3 generation, TypeScript, and production bundle |
 | `make stash` | Main binary, embedding the native build already on disk |
 
 After schema changes, run `make generate`. v3's `dev`,
@@ -121,13 +121,13 @@ Keep these editor settings scoped to the UI workspace.
 
 ## Validation
 
-The full fork gate, after installing dependencies, is:
+The full application gate, after installing dependencies, is:
 
 ```bash
-make validate-fork
+make validate
 ```
 
-`make validate-fork` now generates bindings, validates/builds the UI once and
+`make validate` generates bindings, validates/builds the UI once and
 runs independent suites with two local workers (`VALIDATION_JOBS=1` makes it
 serial; increase the value only when the machine has spare CPU and memory).
 Build the UI **before standalone full Go tests**. In particular,
@@ -142,23 +142,22 @@ publish. The local full gate always runs all suites.
 
 | Command | Checks |
 | --- | --- |
-| `make validate-ui-v3` | Biome lint (including accessibility), React purity/type-contract lint, generation, TypeScript, formatting, locales, Vitest, and native contracts |
-| `make validate-fork` | Generation, UI validation/build, Go lint/integration tests and CI checks; no downloader dependency |
+| `make validate-ui` | Biome lint (including accessibility), React purity/type-contract lint, generation, TypeScript, formatting, locales, Vitest, and native contracts |
+| `make validate` | Generation, UI validation/build, Go lint/integration tests and CI checks; no downloader dependency |
 | `make ui-ci` | Validate and build embedded UI with a single generation/type-check pass |
 | `make validate-ci` | Check-selection/publication-gate regressions and pinned actionlint workflow lint |
 | `make lint` | CI-pinned golangci-lint via `go run` |
 | `make it` | Go tests with `sqlite_stat4 sqlite_math_functions sqlite_fts5 integration` build tags |
 | `pnpm --dir ui/v3 test --run` | Generate v3 GraphQL types and run Vitest once |
-| `make test-ui-v3-browser` | Generate/check v3 and run the Chromium/WebKit toolbar regression suite |
-| `make fmt-ui-v3` | Format v3 source with Biome |
-| `make validate` | Alias for `make validate-fork` |
+| `make test-ui-browser` | Generate/check v3 and run the Chromium/WebKit toolbar regression suite |
+| `make fmt-ui` | Format v3 source with Biome |
 
 During iteration, choose checks for the changed contracts. The
 [native contract checker](../scripts/check-native-contracts.mjs) validates current
 v3 application operations and the retained versioned plugin API. Historical
 database inputs are covered by one-time migration tests; upstream schema and
 client compatibility are no longer release gates. Follow
-[FORK.md](../../../FORK.md) for independent development and cutover policy.
+[PROJECT.md](../../../PROJECT.md) for project development and release policy.
 The retired application is available at `v2.5-compatible-final`.
 
 TypeScript enables `strict` and `noUncheckedIndexedAccess`: check lookup results
@@ -203,7 +202,7 @@ Install the browsers once after installing the locked UI dependencies:
 
 ```bash
 pnpm --dir ui/v3 exec playwright install chromium webkit
-make test-ui-v3-browser
+make test-ui-browser
 ```
 
 The [browser workflow](../../../.github/workflows/v3-browser-tests.yml) runs
@@ -280,7 +279,7 @@ local container actually runs.
 
 ### Real server browser checks
 
-After `make generate ui`, run `make test-ui-v3-stack` at the repository root.
+After `make generate ui`, run `make test-ui-stack` at the repository root.
 This small Chromium/WebKit suite launches the built Go binary behind a reverse
 proxy mounted at `/mounted/`, with a disposable database and configuration.
 It tests real cookies/login, write failures, session recovery and persisted job

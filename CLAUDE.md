@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Stash is a self-hosted media organizer written in Go (backend) + React/TypeScript (frontend). It exposes a GraphQL API, manages a SQLite database, and wraps FFmpeg for video processing.
 
-This repository is an **independent fork** of upstream stashapp/stash. Work continues on `develop` after the verified, owner-approved native rewrite merge; read [FORK.md](FORK.md) for release and upstream-import policy. V2.5 compatibility is frozen at `v2.5-compatible-final`, not a constraint on new code. A fresh installation is a local media library with source tracking off. Personal FileFlows workflows, host backup orchestration and production records are maintained separately in `notsafeforgit/stash-ops`, not as application build dependencies. The [documentation index](docs/README.md) links current guides.
+Native Stash is a standalone project derived from stashapp/stash. Work continues on `develop`; read [PROJECT.md](PROJECT.md) for release policy and selective major-feature imports. There is no routine upstream sync or implementation compatibility target. Historical database readers are supported upgrade inputs only. A fresh installation is a local media library with source tracking off. Personal FileFlows workflows, host backup orchestration and production records are maintained separately in `notsafeforgit/stash-ops`, not as application build dependencies. The [documentation index](docs/README.md) links current guides.
 
 The owner requires GitHub Actions-built, GHCR-published production images. Do not
 deploy another local-image fallback or treat a Git push as publication. Follow
@@ -48,12 +48,11 @@ make ui           # Build the embedded v3 app and login locales
 # Terminal 1:
 STASH_PORT=9999 make server-start
 # Terminal 2:
-VITE_APP_PLATFORM_URL=http://127.0.0.1:9999 make ui-v3-start
+VITE_APP_PLATFORM_URL=http://127.0.0.1:9999 make ui-start
 ```
 
 Open v3 at `http://localhost:3002/`. Set the backend URL explicitly; v3's proxy
-otherwise defaults to port 8010. `make ui-start` and `make ui-v3-start` both
-run the native application on port 3002. See the [v3 development guide](ui/v3/docs/development.md) for setup,
+otherwise defaults to port 8010. `make ui-start` runs the native application on port 3002. See the [v3 development guide](ui/v3/docs/development.md) for setup,
 generation, and validation, and the [deployment runbook](docs/v3-deployment.md)
 for image publication and Quadlet restarts.
 
@@ -61,28 +60,26 @@ for image publication and Quadlet restarts.
 
 | Command | Purpose |
 |---|---|
-| `make build` | Build `stash` and `phasher` binaries |
+| `make build` | Build the `stash` binary (`make phasher` builds the separate utility) |
 | `make build-release` | Release build (stripped debug info + PIE) |
 | `make stash` | Build only the main binary |
 | `make ui` | Generate, type-check and build v3 assets and login locales |
-| `make ui-v3-only` | Generate, type-check, and build v3 embedded assets |
+| `make ui-only` | Generate, type-check, and build v3 embedded assets |
 
 ## Testing and linting
 
 ```bash
-make validate-fork     # Parallel full gate; includes generation and validated UI build
+make validate          # Parallel full gate; includes generation and validated UI build
 make it                # Go unit + integration tests only
 make pre-clients test-clients # Optional real-server tests of pinned external clients
 make lint              # CI-pinned golangci-lint via go run
 make fmt               # Format Go source
-make validate-ui-v3    # Biome, generation/types, formatting, locales, tests, native contracts
-make fmt-ui-v3         # Format v3 source
-make validate          # Alias for validate-fork; no downloader dependency
-make validate-ui       # Native UI validation; validate-ui-v3 is an alias
+make validate-ui       # Biome, generation/types, formatting, locales, tests, native contracts
+make fmt-ui            # Format UI source
 ```
 
 Build the native UI before standalone full Go tests; embedded-asset tests
-require real v3 route chunks. `make validate-fork` builds and validates those
+require real v3 route chunks. `make validate` builds and validates those
 assets itself, then runs Go checks while independent suites overlap, using two
 workers by default (`VALIDATION_JOBS` controls local concurrency). Use the
 [validation sequence](ui/v3/docs/development.md#validation).
@@ -97,7 +94,7 @@ commit in `integration-clients.json` and runs focused real-server compatibility
 tests. These tests require Python 3.12+ and uv; ordinary `make it` does not.
 CI selects this suite for API, schema and other contract dependencies, and skips
 it for unrelated UI and standalone media-engine changes. When changing a client
-contract, run this suite locally as well as the normal `make validate-fork` gate.
+contract, run this suite locally as well as the normal `make validate` gate.
 
 The external `stash-native-archive` package provides `stash-archive`. Keep the
 [archive contract](docs/native-archive-format.md), ingestion APIs, domain integrity
@@ -188,7 +185,7 @@ MIME types, codec/GOP/resolution checks and original-file share behavior intact.
 **Video player — Video.js v10 RC.2 (`@videojs/react`)**
 - `createPlayer({ features: videoFeatures })` is called once at module scope to produce a typed `Player` root plus `usePlayer` / `useMedia` hooks. State lives in the root's internal store; access it via `Player.usePlayer(selector)` from any descendant. Import the shared `Container` separately from `@videojs/react`.
 - `SceneVideo` configures the packaged `<HlsJsVideo>` from `@videojs/react/media/hlsjs-video` for both direct and HLS sources. Its `HlsJsAdapter` retains one native video element while switching playback engines. Pass the direct source MIME type explicitly, including for blob URLs. The playback adapter and casting extension now live in separate, version-aligned `@videojs/hlsjs-video` and `@videojs/google-cast` packages. Compose `<GoogleCast>` from `@videojs/react/extensions/google-cast`.
-- RC.2’s split HLS package pins hls.js 1.6.7. A version-scoped pnpm override retains this fork’s 1.7.3 engine; remove/reassess it when upgrading the adapter rather than silently downgrading playback fixes.
+- RC.2’s split HLS package pins hls.js 1.6.7. A version-scoped pnpm override retains the project’s 1.7.3 engine; remove/reassess it when upgrading the adapter rather than silently downgrading playback fixes.
 - Controls use a renderless `<Controls.Root>` around `<Controls.Content>`, which owns DOM props, styling and layout.
 - Player implementation: `src/components/player/scene-player.tsx` (player shell) and `src/components/player/player-controls.tsx` (controls overlay).
 
@@ -280,7 +277,7 @@ Saved filters persist criteria directly in `saved_filters.filter_ast` as of nati
 
 Default filters persist in `default_filters` as of native schema 1000003. `internal/manager/default_filter_migration.go` imports historical `defaultFilters` and `forkDefaultFilterState` once, retains conflicting alternatives, and uses a durable database/configuration publication checkpoint so interruption cannot overwrite later native edits. The old startup reconciler and persistent compatibility shadow are removed.
 
-`LEGACY-UPGRADE-ONLY` files follow the [frozen historical-input policy](FORK.md#legacy-upgrade-code). Do not update their codecs or ordinal tables to mirror new native UI/API features or add runtime callers. `pkg/filtermigration/boundary_test.go` enforces the conversion entry points. Fresh databases already use the native baseline. Retiring these readers still requires retiring their supported historical inputs (or providing a separate importer) and preserving promised interrupted upgrades.
+`LEGACY-UPGRADE-ONLY` files follow the [frozen historical-input policy](PROJECT.md#legacy-upgrade-code). Do not update their codecs or ordinal tables to mirror new native UI/API features or add runtime callers. `pkg/filtermigration/boundary_test.go` enforces the conversion entry points. Fresh databases already use the native baseline. Retiring these readers still requires retiring their supported historical inputs (or providing a separate importer) and preserving promised interrupted upgrades.
 
 `internal/manager/default_filter_update.go` updates one view transactionally through `configureDefaultFilter`. Choosing an imported alternative or keeping the current criteria requires the reviewed revision. The UI configuration response derives `defaultFilters` and `defaultFilterConflicts` from native records; these fields are not written back to YAML. Clients never replace the full UI configuration to change one default filter. See [native schema promotion](docs/native-schema.md) for import and recovery details.
 
@@ -301,7 +298,7 @@ Native schema 1000002 stores all names in `performer_names`, with ordered positi
 
 Running `make generate` runs gqlgen (Go GraphQL bindings) and graphql-codegen for v3. Run it after modifying `graphql/schema/`. The v3 dev/build/check scripts also regenerate their own bindings. See the [generation guide](ui/v3/docs/development.md#generation-and-builds).
 
-Agent note for `make validate-ui-v3`: `ui/v3/src/core/generated-graphql.ts` is ignored, but `pnpm run gqlgen` still rewrites it. In a read-only sandbox, graphql-codegen can print `[SUCCESS]` for every step and then `pnpm run check` exits 1 with no TypeScript diagnostics because the hidden error is `EROFS: read-only file system, open '.../ui/v3/src/core/generated-graphql.ts'`. When validation fails with that exact shape, rerun `make validate-ui-v3` with workspace write access before chasing TypeScript, package scripts, or generated GraphQL content.
+Agent note for `make validate-ui`: `ui/v3/src/core/generated-graphql.ts` is ignored, but `pnpm run gqlgen` still rewrites it. In a read-only sandbox, graphql-codegen can print `[SUCCESS]` for every step and then `pnpm run check` exits 1 with no TypeScript diagnostics because the hidden error is `EROFS: read-only file system, open '.../ui/v3/src/core/generated-graphql.ts'`. When validation fails with that exact shape, rerun `make validate-ui` with workspace write access before chasing TypeScript, package scripts, or generated GraphQL content.
 
 ### Job system
 

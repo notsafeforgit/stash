@@ -62,7 +62,7 @@ Code and performance contracts were rechecked on **2026-09-14** against:
 
 Read [AGENTS.md](../AGENTS.md), [root guidance](../../../CLAUDE.md),
 [architecture](architecture.md), [development](development.md),
-[feature expectations](plan.md), and [fork policy](../../../FORK.md) first.
+[feature expectations](plan.md), and [project policy](../../../PROJECT.md) first.
 The actual code at implementation time takes precedence over outdated file
 descriptions here. Reconcile relevant changes without repeating the product
 decision or silently reducing the feature matrix.
@@ -1096,21 +1096,21 @@ During iteration, run focused Vitest and browser cases for the changed
 contracts. Before completion, from the repository root:
 
 ~~~sh
-make ui-v3-only
-make validate-ui-v3
-make test-ui-v3-browser
+make ui-only
+make validate-ui
+make test-ui-browser
 ~~~
 
 The build regenerates route information; do not hand-edit generated files to
-make standalone type checks pass. `validate-ui-v3` includes generation, Biome,
+make standalone type checks pass. `make validate-ui` includes generation, Biome,
 purity/type-contract lint, TypeScript, formatting, locales, unit tests and the
-pinned v2.5 compatibility check. Browser tests run Chromium and WebKit; install
+native application/plugin contract checks. Browser tests run Chromium and WebKit; install
 the documented browser prerequisites when necessary.
 
 If backend/schema code changes, also run the affected Go tests and required
 generation/compatibility checks. Before a later push, the repository's complete
-gate is the documented `make generate`, `make ui`, `make ui-v3-only`, then
-`make validate-fork` sequence with both UI dependency trees installed. Publishing
+gate is `make validate` after installing the single application's dependencies
+with `make pre-ui`. Publishing
 and deployment are separate actions governed by the deployment runbook.
 
 Only claim device behavior that was actually exercised. Emulator/desktop WebKit

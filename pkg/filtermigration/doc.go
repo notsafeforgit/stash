@@ -11,7 +11,7 @@
 // old fork's embedded AST, exclusions, and reconciliation projections.
 //
 // Changes require an explicit historical-input, recovery, or security fix and
-// regression evidence preserving existing inputs. See FORK.md's "Legacy upgrade
+// regression evidence preserving existing inputs. See PROJECT.md's "Legacy upgrade
 // code" policy and pkg/sqlite/migrations/README.md before removing this package;
 // native bootstrap bypasses these readers, but supported historical upgrades
 // and unfinished configuration publication still require them.

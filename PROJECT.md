@@ -1,6 +1,7 @@
-# Independent fork maintenance
+# Project policy
 
-This repository develops an independent media library based on Stash. Its
+Native Stash is a standalone media library derived from Stash. This project owns
+its architecture, schema, APIs, UI, plugins and release lifecycle. Its
 [architecture and upgrade boundaries](docs/native-archive-transition-plan.md)
 cover shared application behavior. Personal automation and production records
 live in the separate `notsafeforgit/stash-ops` repository; they are optional API
@@ -31,22 +32,38 @@ ordinary application validation must not install gallery-dl.
   another local build or republish one as a substitute when Actions is blocked;
   report the publication blocker and retain the running service until the
   required registry release is available.
-- Keep live production pinned during development. Exercise migrations and
-  imports against copies before opening the native database for production
-  writes. Preserve the original database, configuration, catalogs, and operating
-  state at a common backup boundary.
+- Keep production pinned to a verified digest. Routine releases update the
+  existing native installation; they do not repeat its completed cutover,
+  catalog imports, reconciliation or backup/restore exercises. Test changed
+  upgrade behavior with isolated fixtures before deployment.
 
-## Upstream changes
+## Selective feature imports
 
-Import useful upstream fixes selectively with their source revision and native
-regression tests. Routine rebasing onto upstream and minimizing merge conflicts
-are no longer architecture requirements. Preserve copyright/license attribution.
-The frozen compatible release is a migration fallback, not an indefinitely
-maintained parallel product.
+Treat `stashapp/stash` as a source of selected major features. There is no routine
+sync, merge, rebase, feature-parity or compatibility target. A remote named
+`upstream`, if configured locally, is only a source lookup; it does not define
+this project's architecture or release schedule.
 
-StashDB/stash-box compatibility remains a network protocol requirement. It does
-not require matching upstream's database schema, GraphQL server, UI, or plugin
-format. Preserve endpoint-qualified remote IDs and fingerprint algorithms.
+For an explicitly selected feature:
+
+1. Record the source commit SHA(s), source repository and the intended behavior
+   in the commit or PR description. Preserve copyright and license attribution.
+2. Review its dependencies and adapt it to this project's models, shared domain
+   services, UUID API and shared UI components. Cherry-pick with `-x` only when
+   the commit fits; otherwise port the behavior with the same source attribution.
+3. Add focused regression coverage for the imported behavior and its native
+   contracts. Run `make validate` and any affected client/browser suites.
+4. Publish through the normal `develop` workflow. Do not import upstream release
+   jobs, migration numbering, old API shims or contribution policy incidentally.
+
+Security fixes are evaluated on their own merits; they do not require adopting
+an upstream release. StashDB/stash-box remains a supported network protocol.
+Preserve endpoint-qualified remote IDs and fingerprint algorithms.
+
+The Go module path `github.com/stashapp/stash` is a retained package identity,
+not an update source or compatibility promise. The `ui/v3` directory and
+versioned API routes identify the current implementation and contracts. Moving
+those paths is not a prerequisite for independent development.
 
 ## Database and domain ownership
 
@@ -65,8 +82,8 @@ Historical primary/fork schemas are supported input formats for one-time
 promotion. Import all completed migration history and retained values before
 removing the sidecars. Enumerate unknown fork objects and fail with a useful
 report. Do not create new compatibility sidecars, live reconcilers, or parallel
-write projections. Existing bridge code may remain temporarily while its
-consumers are converted, but must be removed before the transition is complete.
+write projections. Convert actual consumers when replacing a contract; do not
+add runtime fallback readers for retired upstream formats.
 
 Canonical performer UUIDs, accounts, source posts, shared revisions/captures,
 field decisions, media associations, and durable jobs belong to core services.
@@ -123,8 +140,9 @@ preserve existing source data and undelivered work. S3 publication remains an
 independent opt-in host integration, never an application startup dependency.
 See [optional integrations](docs/optional-integrations.md).
 
-V3 is the application; v2.5 UI/API compatibility is no longer a requirement.
-Version the supported contract, inventory actual callers, and regenerate them
+The native application owns its UI/API contract. Upstream UI, GraphQL and
+plugin compatibility are not design requirements. Version the supported
+contract, inventory actual callers, and regenerate them
 together. Remove old adapters only after converting their consumers, including
 host/n8n jobs, installed plugins, offline/share entry points, and backup tools.
 Preserve intentional public media/share URLs and standalone/offline behavior.
@@ -150,15 +168,17 @@ mapping data without an explicit use case.
 ## Validation and documentation
 
 Never edit generated Go/TypeScript bindings by hand. `make generate` regenerates
-Go and v3 bindings; `make ui` builds the sole embedded application and login
-locales. Build real embedded assets before full Go validation. The retired UI
+Go and UI bindings; `make ui` builds the sole embedded application and login
+locales. `make validate` is the full local gate; it generates and validates the
+assets before Go checks. `make validate-ui`, `make fmt-ui`, `make ui-start` and
+`make test-ui-browser` address that same application. The retired UI
 and its toolchain remain available only at the frozen compatible tag.
 
 Test changed invariants and migration outcomes with real SQLite fixtures. Cover
 restarts, retries, integrity, unknown inputs, lossless promotion, API callers,
-and retained external protocols. Replace v2.5 round-trip/build checks with
-native migration and contract tests as their runtime paths are removed. Keep
-security and dependency checks for the remaining application.
+and retained external protocols. Historical round-trip fixtures belong only to
+legacy upgrade tests; they are not runtime compatibility gates. Keep security
+and dependency checks for the application.
 
 Rehearse supported database upgrades on copies, verify semantic preservation,
 and keep a recoverable backup before changing a production writer. Routine native

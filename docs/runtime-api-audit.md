@@ -2,7 +2,7 @@
 
 The maintained application contract is defined by current callers, not by the
 upstream v2.5 schema. Historical database/configuration conversion remains under
-the frozen legacy-upgrade-only boundary in [FORK.md](../FORK.md).
+the frozen legacy-upgrade-only boundary in [PROJECT.md](../PROJECT.md).
 
 The October audit searched the current UI operations and source, bundled plugin
 examples, the retained `apiVersion: 3` plugin contract, the external clients at
@@ -37,4 +37,4 @@ proxy with a temporary library. It covers login, rejected settings writes,
 in-place session recovery and durable job status after a process restart in
 Chromium and WebKit. It runs as a required publication check alongside the
 existing fixture browser suite. Locally run `make generate ui` then
-`make test-ui-v3-stack` with Playwright's system dependencies installed.
+`make test-ui-stack` with Playwright's system dependencies installed.

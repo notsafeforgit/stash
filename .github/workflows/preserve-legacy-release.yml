@@ -1,0 +1,44 @@
+# Archive maintenance only. Never builds or deploys an application.
+name: Preserve frozen legacy release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preserve-legacy-release
+  cancel-in-progress: false
+
+jobs:
+  preserve-compatible-release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install registry copy tool
+      run: sudo apt-get update && sudo apt-get install -y skopeo
+    - name: Check preservation invariants
+      run: python3 -m unittest discover -s scripts -p test_preserve_compatible_images.py
+    - name: Authenticate registry tools
+      env:
+        GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        printf '%s' "$GHCR_TOKEN" | skopeo login --authfile "$RUNNER_TEMP/registry-auth.json" --username "$GITHUB_ACTOR" --password-stdin ghcr.io
+        printf '%s' "$GHCR_TOKEN" | docker login --username "$GITHUB_ACTOR" --password-stdin ghcr.io
+    - name: Preserve compatible image manifests
+      env:
+        REGISTRY_AUTH_FILE: ${{ runner.temp }}/registry-auth.json
+      run: |
+        python3 scripts/preserve_compatible_images.py \
+          --manifest docs/releases/v2.5-compatible-final.json \
+          --repository ghcr.io/notsafeforgit/stash \
+          --receipt compatible-release-receipt.json
+    - uses: actions/upload-artifact@v4
+      with:
+        name: compatible-stash-release-receipt
+        path: compatible-release-receipt.json
+        if-no-files-found: error

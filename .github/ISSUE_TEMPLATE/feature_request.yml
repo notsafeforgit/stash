@@ -4,7 +4,7 @@ labels: ["feature request"]
 body:
   - type: markdown
     attributes:
-      value: Thank you for taking the time to submit a feature request! Make sure to read [Contributing](https://github.com/stashapp/stash/blob/develop/docs/CONTRIBUTING.md) document before submitting.
+      value: Thank you for taking the time to submit a feature request! Make sure to read [Contributing](https://github.com/notsafeforgit/stash/blob/develop/docs/CONTRIBUTING.md) document before submitting.
   - type: textarea
     id: description
     attributes:
@@ -34,7 +34,7 @@ body:
     attributes:
       label: Have you searched for an existing open/closed issue?
       description: |
-        To help us keep these issues under control, please ensure you have first [searched our issue list](https://github.com/stashapp/stash/issues?q=is%3Aissue) for any existing issues that cover the core request or benefit of your proposal.
+        To help us keep these issues under control, please ensure you have first [searched our issue list](https://github.com/notsafeforgit/stash/issues?q=is%3Aissue) for any existing issues that cover the core request or benefit of your proposal.
       options:
         - label: I have searched for existing issues and none cover the core request of my proposal
           required: true

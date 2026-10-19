@@ -1,22 +1,9 @@
-host=ghcr.io
-user=stashapp
-repo=compiler
-version=14
+# Optional local cross-compiler. Production uses the develop GHCR workflow.
+IMAGE ?= stash-compiler:local
 
-VERSION_IMAGE = ${host}/${user}/${repo}:${version}
-LATEST_IMAGE = ${host}/${user}/${repo}:latest
-
-latest:
-	docker build -t ${LATEST_IMAGE} .
-
+.PHONY: build build-no-cache
 build:
-	docker build -t ${VERSION_IMAGE} -t ${LATEST_IMAGE} .
+	docker build -t "$(IMAGE)" .
 
 build-no-cache:
-	docker build --no-cache -t ${VERSION_IMAGE} -t ${LATEST_IMAGE} .
-
-# requires docker login ghcr.io
-# echo $CR_PAT | docker login ghcr.io -u USERNAME --password-stdin
-push:
-	docker push ${VERSION_IMAGE}
-	docker push ${LATEST_IMAGE}
+	docker build --no-cache -t "$(IMAGE)" .

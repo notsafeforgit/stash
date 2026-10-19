@@ -1,7 +1,7 @@
 // LEGACY-UPGRADE-ONLY: upstream/frozen-fork input preparation for migration
 // 1000000. Reached only from the historical upgrade chain, never native bootstrap.
 // Retirement requires retiring those inputs and interrupted-upgrade recovery;
-// see migrations/README.md and FORK.md.
+// see migrations/README.md and PROJECT.md.
 package sqlite
 
 import (

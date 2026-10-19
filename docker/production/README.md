@@ -1,11 +1,11 @@
 # Native container installation
 
-This fork publishes one complete image at
+Native Stash publishes one complete image at
 `ghcr.io/notsafeforgit/stash:develop`, including Jellyfin FFmpeg, hardware
 acceleration support and Python/uv. It does not require a stash-s6 wrapper.
 The current published platform is Linux amd64.
 
-Use Docker with Compose, or rootless Podman. Download this fork's example:
+Use Docker with Compose, or rootless Podman. Download the project's example:
 
 ```sh
 mkdir stash && cd stash

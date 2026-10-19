@@ -56,8 +56,8 @@ NOTE: The `make` command in OpenBSD will be `gmake`. For example, `make pre-ui` 
 * `make stash` - Builds the `stash` binary (make sure to build the UI as well... see below)
 * `make stash-macapp` - Builds the `Stash.app` macOS app (only works when on macOS, for cross-compilation see below)
 * `make phasher` - Builds the `phasher` binary
-* `make build` - Builds both the `stash` and `phasher` binaries, alias for `make stash phasher`
-* `make build-release` - Builds release versions (debug information removed) of both the `stash` and `phasher` binaries, alias for `make flags-release flags-pie build`
+* `make build` - Builds the main `stash` binary; use `make phasher` for the separate utility
+* `make build-release` - Builds a release `stash` binary with debug information removed, alias for `make flags-release flags-pie build`
 * `make docker-build` - Locally builds and tags a complete 'stash/build' docker image
 * `make docker-cuda-build` - Locally builds and tags a complete 'stash/cuda-build' docker image
 * `make validate` - Runs all of the tests and checks required to submit a PR
@@ -122,13 +122,16 @@ Simply run `make` or `make release`, or equivalently:
 
 ## Cross-compiling
 
-This project uses a modification of the [CI-GoReleaser](https://github.com/bep/dockerfiles/tree/master/ci-goreleaser) Docker container for cross-compilation, defined in `docker/compiler/Dockerfile`.
+The supported publisher builds Linux amd64 directly. Other platform targets
+remain optional local helpers, without a published compiler image or a claim of
+release validation. The [local compiler](../docker/compiler/README.md) retains
+the toolchain derived from [CI-GoReleaser](https://github.com/bep/dockerfiles/tree/master/ci-goreleaser).
 
-To cross-compile the app yourself:
+To use it:
 
 1. Run `make pre-ui`, `make generate` and `make ui` outside the container, to generate files and build the UI.
-2. Pull the latest compiler image from GHCR: `docker pull ghcr.io/stashapp/compiler`
-3. Run `docker run --rm --mount type=bind,source="$(pwd)",target=/stash -w /stash -it ghcr.io/stashapp/compiler /bin/bash` to open a shell inside the container.
+2. Build the local compiler: `make -C docker/compiler build`
+3. Run `docker run --rm --mount type=bind,source="$(pwd)",target=/stash -w /stash -it stash-compiler:local /bin/bash` to open a shell inside the container.
 4. From inside the container, run `make build-cc-all` to build for all platforms, or run `make build-cc-{platform}` to build for a specific platform (have a look at the `Makefile` for the list of targets).
 5. You will find the compiled binaries in `dist/`.
 

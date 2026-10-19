@@ -50,9 +50,9 @@ GO_BUILD_TAGS += sqlite_stat4 sqlite_math_functions sqlite_fts5
 
 export CGO_ENABLED := 1
 
-# define COMPILER_IMAGE for cross-compilation docker container
+# Optional locally built cross-compilation container; see docker/compiler.
 ifndef COMPILER_IMAGE
-  COMPILER_IMAGE := ghcr.io/stashapp/compiler:latest
+  COMPILER_IMAGE := stash-compiler:local
 endif
 
 # cannot really parallelise the release target
@@ -418,16 +418,8 @@ fmt-ui:
 validate-ui:
 	cd ui/v3 && pnpm run validate
 
-# Existing v3 command names refer to the same native application.
-.PHONY: pre-ui-v3 ui-v3-only ui-v3-start fmt-ui-v3 validate-ui-v3
-pre-ui-v3: pre-ui
-ui-v3-only: ui-only
-ui-v3-start: ui-start
-fmt-ui-v3: fmt-ui
-validate-ui-v3: validate-ui
-
-.PHONY: test-ui-v3-browser
-test-ui-v3-browser:
+.PHONY: test-ui-browser
+test-ui-browser:
 	cd ui/v3 && pnpm run test:browser
 
 # Bounded formatting/lint checks for the changed native UI files.
@@ -438,23 +430,18 @@ fmt-ui-quick:
 validate-ui-quick:
 	cd ui/v3 && pnpm exec biome check --changed --since=HEAD --no-errors-on-unmatched
 
-# runs all of the backend PR-acceptance steps
+# Prepare embedded assets before backend validation. These checks must never
+# run against a concurrently changing UI build.
 .PHONY: validate-backend
-validate-backend: lint it
-
-# runs all of the tests and checks required for a PR to be accepted
-.PHONY: validate
-validate: validate-fork
+validate-backend: generate-backend ui-ci
+	$(MAKE) lint it
 
 # Full pre-push gate, including fresh embedded assets. Dependencies keep Go
 # checks behind code generation and the UI build, while other suites overlap.
 VALIDATION_JOBS ?= 2
-.PHONY: validate-fork validate-fork-backend
-validate-fork:
-	$(MAKE) -j$(VALIDATION_JOBS) validate-fork-backend validate-ci
-
-validate-fork-backend: generate-backend ui-ci
-	$(MAKE) validate-backend
+.PHONY: validate
+validate:
+	$(MAKE) -j$(VALIDATION_JOBS) validate-backend validate-ci
 
 ACTIONLINT_VERSION ?= v1.7.12
 .PHONY: validate-ci
@@ -467,8 +454,8 @@ validate-ci:
 
 UV ?= uv
 
-# Optional compatibility checks use independently released API clients. They are
-# not dependencies of make it, validate-fork, or the Stash application build.
+# Optional contract checks use independently released API clients. They are
+# not dependencies of make it, validate, or the Stash application build.
 export STASH_INTEGRATIONS_ROOT ?= $(abspath .local/integration-clients)
 export PRODUCER_PYTHON ?= $(STASH_INTEGRATIONS_ROOT)/.venv/bin/python
 
@@ -494,7 +481,7 @@ docker-cuda-build: build-info
 	docker build --build-arg GITHASH=$(GITHASH) --build-arg STASH_VERSION=$(STASH_VERSION) -t stash/cuda-build -f docker/build/x86_64/Dockerfile-CUDA .
 
 # start the build container - for cross compilation
-# this is adapted from the github actions build.yml file
+# Build the optional local image first; see docker/compiler/README.md.
 .PHONY: start-compiler-container
 start-compiler-container:
 	docker run -d --name build --mount type=bind,source="$(PWD)",target=/stash,consistency=delegated $(EXTRA_CONTAINER_ARGS) -w /stash $(COMPILER_IMAGE) tail -f /dev/null
@@ -517,10 +504,10 @@ else
 endif
 
 # Requires generated bindings and the built embedded UI (make generate ui).
-.PHONY: build-browser-stack test-ui-v3-stack
+.PHONY: build-browser-stack test-ui-stack
 build-browser-stack:
 	go build -tags "$(GO_BUILD_TAGS)" -o dist/stash-browser ./cmd/stash
 	go build -o dist/stash-browser-stack ./internal/testbrowser/stack
 
-test-ui-v3-stack: build-browser-stack
+test-ui-stack: build-browser-stack
 	cd ui/v3 && pnpm exec playwright test --config playwright.stack.config.ts

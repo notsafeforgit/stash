@@ -141,7 +141,7 @@ is restricted to database promotion and checkpointed configuration promotion.
 The `LEGACY-UPGRADE-ONLY` markers, package documentation and caller-boundary test
 keep these historical codecs separate from native runtime behavior. Their input
 semantics are frozen; new UI/API features must not change historical conversion.
-The [legacy upgrade policy](../FORK.md#legacy-upgrade-code) defines permitted fixes
+The [legacy upgrade policy](../PROJECT.md#legacy-upgrade-code) defines permitted fixes
 and removal prerequisites. Native bootstrap bypasses these readers; supported
 historical database/configuration upgrades still need them.
 The source/provenance services and catalog import remain separate work; the

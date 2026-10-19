@@ -4,7 +4,7 @@ labels: ["bug report"]
 body:
   - type: markdown
     attributes:
-      value: Thanks for taking the time to fill out this bug report! Make sure to read [Contributing](https://github.com/stashapp/stash/blob/develop/docs/CONTRIBUTING.md) document before submitting.
+      value: Thanks for taking the time to fill out this bug report! Make sure to read [Contributing](https://github.com/notsafeforgit/stash/blob/develop/docs/CONTRIBUTING.md) document before submitting.
   - type: checkboxes
     id: confirm-troubleshooting
     attributes:
@@ -53,7 +53,7 @@ body:
     attributes:
       label: Stash version
       description: This can be found in Settings > About.
-      placeholder: (e.g. v0.28.1)
+      placeholder: (e.g. v3.0.0-dev-30-g1234567)
     validations:
       required: true
   - type: textarea

@@ -687,7 +687,7 @@ See [optional integrations](optional-integrations.md).
 
 `make test-archive` in stash-integrations runs temporary SQLite/WAL, restore, artwork, pending-work,
 corruption, schema refusal, publication failure, path safety and offline-pagination
-tests. It is included in `make validate-fork` and CI. Full-copy rehearsals must
+tests. It is included in `make validate` and CI. Full-copy rehearsals must
 also reconcile the complete native database and original artwork, measure peak
 space/runtime, reopen with the native binary and exercise the remaining shared
 boundary and media-root cases before production cutover.

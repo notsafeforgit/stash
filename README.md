@@ -1,39 +1,35 @@
 # Native Stash
 
-An independent fork of [Stash](https://github.com/stashapp/stash), with a Go
-backend and React/TypeScript v3 application for organizing and playing a local
-media library.
+A standalone, self-hosted media library with a Go backend and React/TypeScript
+application for organizing and playing local media. Derived from
+[Stash](https://github.com/stashapp/stash), this project owns its database schema,
+APIs, UI, plugins and releases.
 
-[![Native validation and publication](https://github.com/notsafeforgit/stash/actions/workflows/ghcr-publish.yml/badge.svg?branch=develop)](https://github.com/notsafeforgit/stash/actions/workflows/ghcr-publish.yml)
+[![Validation and publication](https://github.com/notsafeforgit/stash/actions/workflows/ghcr-publish.yml/badge.svg?branch=develop)](https://github.com/notsafeforgit/stash/actions/workflows/ghcr-publish.yml)
 [![Browser tests](https://github.com/notsafeforgit/stash/actions/workflows/v3-browser-tests.yml/badge.svg?branch=develop)](https://github.com/notsafeforgit/stash/actions/workflows/v3-browser-tests.yml)
-
-Development continues on `develop` following the reviewed native rewrite merge.
-The native database and application APIs are independent of upstream; the
-[final compatible release](docs/releases/v2.5-compatible-final.md) remains
-available for installations that choose to stay behind.
 
 ## Install
 
-Use this fork's [Docker Compose example](docker/production/README.md), or follow
-the [rootless Podman and GPU setup](docs/container.md). The published Linux amd64
+Use the [Docker Compose example](docker/production/README.md), or follow the
+[rootless Podman and GPU setup](docs/container.md). The published Linux amd64
 image is:
 
 ```text
 ghcr.io/notsafeforgit/stash:develop
 ```
 
-It includes the media tools and hardware runtime; no `stash-s6` wrapper is needed.
-For a production installation, pin a verified image digest using the
-[deployment guide](docs/v3-deployment.md).
+It includes the media tools and hardware runtime. For production, pin a verified
+image digest using the [deployment guide](docs/v3-deployment.md).
 
 Mount configuration at `/config` and your media at a path such as `/data`.
 Open `http://localhost:9999`, finish setup, add folders in **Settings → Library**,
 and scan them. Keep a backup of the database, configuration and artwork.
 
-Existing compatible installations need an explicit database migration in addition
-to any container path changes. Read [upgrading from the compatible release](docs/container.md#upgrade-from-the-compatible-release)
-before using an existing database with a native image. Preserve a separate
-pre-upgrade copy; upstream and compatible binaries cannot open the native schema.
+Fresh installations initialize directly into the native schema. Existing native
+libraries apply later migrations normally. To import a supported upstream or
+pre-native library, read the [legacy upgrade instructions](docs/container.md#upgrade-from-the-compatible-release)
+and preserve a separate pre-upgrade copy. Old binaries cannot open the native
+schema; these are one-time imports, not shared database formats.
 
 ## Local library features
 
@@ -55,38 +51,38 @@ operations sidecar can install those clients and communicate with Stash's API.
 See the [gallery-dl quickstart](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/QUICKSTART.md)
 for optional setup.
 
-## Compatibility choices
-
-| Choice | What to use |
-| --- | --- |
-| Native fork | This repository's image, v3 UI, native API and `apiVersion: 3` plugins |
-| Stay on the final compatible fork | The immutable tags and digests in the [compatible release manifest](docs/releases/v2.5-compatible-final.json) |
-| Return to upstream | Test a compatible database/configuration copy with the appropriate upstream version **before** native promotion; see the [release guide](docs/releases/v2.5-compatible-final.md) |
-
-StashDB compatibility is a network contract and remains supported. Upstream UI,
-API and plugin compatibility is not required for native development. Useful
-upstream fixes can be imported selectively under the [fork policy](FORK.md).
-
 ## Develop and contribute
 
-Start with the [documentation index](docs/README.md),
+Development and pull requests target `develop`. Start with the
+[project policy](PROJECT.md), [documentation index](docs/README.md),
 [system architecture](docs/ARCHITECTURE.md) and
-[v3 development guide](ui/v3/docs/development.md). The latter lists the required
-Go, Node.js and pnpm versions and the build and validation commands.
+[development guide](ui/v3/docs/development.md).
 
-Core development uses Go and TypeScript. Downloader packages are not required by
-ordinary application validation. The explicit external-client contract suite
-tests the pinned integrations when their API or persistence contracts change.
+```bash
+make pre-ui
+make validate
+```
 
-Report fork issues in [this repository](https://github.com/notsafeforgit/stash/issues).
-Read the [contribution guidance](docs/CONTRIBUTING.md) and [fork policy](FORK.md)
-before proposing changes.
+`make validate` generates bindings, validates and builds the application, and
+runs Go lint, integration tests and CI checks. Downloader packages are not a
+core build dependency. Run the pinned external-client contract suite when
+changing its contracts, and browser suites for affected interactions.
 
-## Upstream attribution
+Selected major features may be ported from upstream with source attribution and
+native regression tests. There is no routine upstream synchronization or
+UI/API/plugin compatibility target. StashDB/stash-box remains a supported
+external protocol.
+
+Report issues in [this repository](https://github.com/notsafeforgit/stash/issues)
+and follow the [contribution guidance](docs/CONTRIBUTING.md).
+
+## Provenance and historical upgrades
 
 This project derives from [stashapp/stash](https://github.com/stashapp/stash)
-and retains its [AGPL-3.0 license](LICENSE). Upstream's
-[documentation](https://docs.stashapp.cc),
-[releases](https://github.com/stashapp/stash/releases) and
-[community](https://discourse.stashapp.cc) describe mainline Stash. Their binaries
-and plugins are not substitutes for this fork's native releases.
+and retains its [AGPL-3.0 license](LICENSE) and attribution. Upstream's releases,
+documentation and community describe a separate application.
+
+The immutable [final pre-native release](docs/releases/v2.5-compatible-final.md)
+is retained as historical source and an upgrade recovery boundary. It is not an
+active release line. Its readers are isolated as
+[legacy-upgrade-only code](pkg/sqlite/migrations/README.md).

@@ -1,11 +1,9 @@
 # Project documentation
 
-This is the independent fork of Stash, developed on `develop`. Active UI development
+Native Stash is a standalone project developed on `develop`. Active UI development
 is in `ui/v3/`. The [architecture and upgrade boundaries](native-archive-transition-plan.md)
 describe the native application and its supported historical inputs.
 Personal automation and production records are maintained separately.
-The [final compatible release](releases/v2.5-compatible-final.md)
-provides the frozen fallback for users who do not migrate.
 
 ## Current development guides
 
@@ -20,8 +18,8 @@ provides the frozen fallback for users who do not migrate.
 | [Player architecture](../ui/v3/docs/player.md) | Media lifetime, source/seek policy, recovery, transcode sessions, and backend HLS boundaries |
 | [Interaction and layout contracts](../ui/v3/docs/interactions.md) | Motion, dialogs, editing shells, mobile navigation, keyboard layout, and focus |
 | [Feature development plan](../ui/v3/docs/plan.md) | Expectations for new feature work |
-| [Fork maintenance](../FORK.md) | Independent development, upstream imports, native migrations, and release boundaries |
-| [Migration maintenance](../pkg/sqlite/migrations/README.md) | Isolated upgrade readers, native migrations, and the planned direct native database bootstrap |
+| [Project policy](../PROJECT.md) | Standalone development, selected major-feature imports, contracts and releases |
+| [Migration maintenance](../pkg/sqlite/migrations/README.md) | Isolated upgrade readers, native migrations, and the tested direct native database baseline |
 | [Native schema promotion](native-schema.md) | Implemented lineage, one-time historical imports, promoted tables, and remaining model conversions |
 | [Native source identity](native-source-identity.md) | Captured account claims, service namespaces, and reviewed performer/account registry import |
 | [Library identities](library-identities.md) | UUIDs across APIs, routes, plugins and saved references; internal database keys |
@@ -60,16 +58,22 @@ provides the frozen fallback for users who do not migrate.
 - [Recoverable file deletion](file-deletion.md): staging, crash recovery,
   automatic journal cleanup and trash transfers.
 
-## Upstream reference and contribution policies
+## Build and contribution policies
 
 [Building from Source](DEVELOPMENT.md) contains platform setup for the native
 build. Use the current development and architecture guides above for this branch.
 
-[Contributing](CONTRIBUTING.md) and [AI policy](AI_POLICY.md) describe upstream
-contribution requirements. The [root README](../README.md) describes this fork's
-installation and release choices and links to upstream separately for attribution.
+[Contributing](CONTRIBUTING.md) and [AI policy](AI_POLICY.md) describe this
+project's contribution requirements. The [root README](../README.md) covers
+installation and upstream attribution.
 
 ## Future plans and historical material
+
+The [frozen pre-native release](releases/v2.5-compatible-final.md) and its pinned
+manifest document the supported historical upgrade boundary. Archive maintenance
+uses the separate, manual [preservation workflow](../.github/workflows/preserve-legacy-release.yml);
+it never rebuilds the old application or participates in current publication.
+Recorded old commands and checklists are historical evidence, not current gates.
 
 - [Native architecture and upgrades](native-archive-transition-plan.md)
   describes the shared application scope, upgrade responsibilities and external

@@ -1,6 +1,6 @@
 # Native Stash architecture
 
-This is the system overview for the independent fork on `develop`. Stash runs one
+This is the system overview for Native Stash on `develop`. Stash runs one
 Go backend with a shared GraphQL API, a SQLite library, filesystem media, and
 the embedded v3 application, including standalone share and offline entries.
 The v2.5 frontend and selector are removed. The
@@ -10,8 +10,8 @@ records have a separate repository and release lifecycle.
 
 Start here for runtime and storage boundaries. The [v3 frontend guide](../ui/v3/docs/architecture.md)
 maps UI modules and state ownership; the [development guide](../ui/v3/docs/development.md)
-owns setup and validation commands. [FORK.md](../FORK.md) is authoritative for
-upstream syncs and migration policy. See the [documentation index](README.md)
+owns setup and validation commands. [PROJECT.md](../PROJECT.md) is authoritative for
+selective feature imports and migration policy. See the [documentation index](README.md)
 for feature guides and explicitly labelled future plans.
 
 ## Runtime map
@@ -123,7 +123,7 @@ operations and loaders; a whole GraphQL response is not automatically one
 database snapshot. Filesystem and FFmpeg work have separate lifecycles and are
 not made atomic by a SQLite transaction.
 
-## Data and compatibility
+## Data ownership and upgrades
 
 | Data | Owner and lifetime |
 | --- | --- |
@@ -149,13 +149,15 @@ library database. See [read performance](read-performance.md) for details.
 
 ### Historical bridge and native migration
 
-Upstream SQL migrations in [pkg/sqlite/migrations](../pkg/sqlite/migrations/)
-own `schema_migrations` and `appSchemaVersion`. Fork Go migrations register
-through [fork_migrate.go](../pkg/sqlite/fork_migrate.go) and record their version
-in `fork_schema_migrations`. This was the compatible release's storage boundary.
-New native changes use a separately identified primary schema with normal
-constraints and repositories. Historical fork migrations remain only as
-one-time import steps until promotion coverage is complete.
+Fresh databases install a pinned native baseline atomically, then apply later
+native migrations. [Migration maintenance](../pkg/sqlite/migrations/README.md)
+describes its equivalence checks and initialization guards. Existing native
+libraries use the native primary migration sequence and lineage.
+
+Historical SQL migrations and [fork_migrate.go](../pkg/sqlite/fork_migrate.go)
+interpret supported pre-native inputs and interrupted upgrades only. They retain
+the old `schema_migrations` / `fork_schema_migrations` semantics until one-time
+promotion completes. Runtime code does not use those readers as fallbacks.
 
 The first native schema is 1000000 with lineage
 `org.notsafeforgit.stash.native-archive`. It completes historical sidecars once,
@@ -166,10 +168,9 @@ versions, and unknown fork objects are rejected. See
 [native schema promotion](native-schema.md) for the implemented boundary and
 remaining canonical-model conversions.
 
-An upstream-only binary at the matching upstream schema version can use the
-base representation while ignoring fork sidecars. This does not promise that
-any older Stash release can open the database. Promoted native databases are
-incompatible with old binaries. [FORK.md](../FORK.md) and the
+Before promotion, historical database compatibility is determined by the frozen
+release's documented boundary. Native databases are incompatible with old
+binaries. [PROJECT.md](../PROJECT.md) and the
 [native archive plan](native-archive-transition-plan.md) define the current policy.
 
 ### Native state and remaining API conversion
@@ -196,7 +197,7 @@ names. Other API bridges remain until their callers are converted:
   acknowledgment. Duplicate `*UpdateJob` and movie bulk aliases are removed.
   See the [bulk update contract](native-bulk-updates.md) and staged host helpers.
 
-[FORK.md](../FORK.md) documents migration and contract policy. The
+[PROJECT.md](../PROJECT.md) documents migration and contract policy. The
 [runtime API audit](runtime-api-audit.md) records checked consumers and retired
 endpoints.
 [check-native-contracts.mjs](../ui/v3/scripts/check-native-contracts.mjs) checks
@@ -386,7 +387,7 @@ replica of the server library.
 | Change | Start with |
 | --- | --- |
 | Add or extend a GraphQL field | Schema → gqlgen mapping/resolver → shared service/repository → supported client operations; test retained native contracts |
-| Add persisted data | [FORK.md](../FORK.md), a native migration with constraints, migration fixtures, and restart/restore tests |
+| Add persisted data | [PROJECT.md](../PROJECT.md), a native migration with constraints, migration fixtures, and restart/restore tests |
 | Add a list or detail view | [Frontend module map](../ui/v3/docs/architecture.md#module-map), typed list configuration, and shared detail layouts |
 | Change playback | [Player guide](../ui/v3/docs/player.md), frontend transition tests, and backend stream/timestamp tests |
 | Change navigation, gestures, or overlays | [Interaction guide](../ui/v3/docs/interactions.md) and browser regression fixtures |

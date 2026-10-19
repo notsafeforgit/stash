@@ -1,6 +1,6 @@
 # Native archive architecture and upgrades
 
-Stash is an independent fork with a native SQLite schema, the v3 UI and UUID-based
+Native Stash is a standalone project with a native SQLite schema, the v3 UI and UUID-based
 application interfaces. The complete original installation cutover plan and its
 production verification records are archived in the separate operations repository.
 They are historical deployment evidence, not a checklist for every Stash user.
@@ -33,7 +33,7 @@ The frozen [final compatible release](releases/v2.5-compatible-final.md) identif
 supported historical inputs. Upgrade code must be clearly marked and isolated;
 it does not impose v2.5 runtime compatibility. Preserve UUIDs, metadata, relationships,
 explicit decisions and interrupted-upgrade recovery. See
-[migration maintenance](../pkg/sqlite/migrations/README.md) and [fork policy](../FORK.md).
+[migration maintenance](../pkg/sqlite/migrations/README.md) and [project policy](../PROJECT.md).
 
 Before a production schema upgrade, rehearse the changed migration on a copy and
 retain a consistent recoverable backup. Publication, full restore drills and

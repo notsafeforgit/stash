@@ -223,6 +223,9 @@ jobs:
         run: |
           mv dist/stash-linux dist/stash-browser
           chmod +x dist/stash-browser
+          # checkout's temporary Git config does not cover Go's VCS lookup
+          # when this container's user differs from the workspace owner.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           go build -o dist/stash-browser-stack ./internal/testbrowser/stack
           pnpm --dir ui/v3 install --frozen-lockfile
       - name: Browser tests against the Go server and reverse proxy

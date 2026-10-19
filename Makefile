@@ -301,11 +301,11 @@ generate-ui:
 	cd ui/v3 && pnpm run gqlgen
 
 .PHONY: generate-backend
-generate-backend: touch-ui
+generate-backend: generate-login-locale
 	go generate ./cmd/stash
 
 .PHONY: generate-login-locale
-generate-login-locale:
+generate-login-locale: touch-ui
 	go generate ./ui
 
 .PHONY: generate-dataloaders

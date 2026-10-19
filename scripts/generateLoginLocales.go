@@ -27,7 +27,7 @@ func main() {
 	dirFS := os.DirFS(filepath.Join("v3", "src", "locales"))
 
 	// ensure the login/locales directory exists
-	if err := fsutil.EnsureDir(filepath.Join("login", "locales")); err != nil {
+	if err := fsutil.EnsureDirAll(filepath.Join("login", "locales")); err != nil {
 		panic(err)
 	}
 

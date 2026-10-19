@@ -32,10 +32,9 @@ for (const scenario of cases) {
       await page.route("**/scene/*/stream", async (route) => {
         // Reordered frames exercise the Direct native-loop failure in WebKit.
         // The shorter actual duration also checks EOF before library metadata.
-        const response = await route.fetch({
+        await route.continue({
           url: "http://127.0.0.1:3025/media/loop-bframes.mp4",
         });
-        await route.fulfill({ response });
       });
     await page.addInitScript((background) => {
       localStorage.setItem("stash-lightbox-loop", "true");

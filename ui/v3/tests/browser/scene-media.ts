@@ -17,7 +17,9 @@ export async function serveSceneMedia(
         body: "WEBVTT\n\n00:00.000 --> 00:12.000\nSample caption\n",
       });
     else if (url.pathname.endsWith("/stream")) {
-      const response = await route.fetch({
+      // Keep range handling on the fixture server and request cancellation in
+      // the browser, without a fetch response that can outlive test teardown.
+      await route.continue({
         url: new URL(
           orientation === "portrait"
             ? "/media/portrait.mp4"
@@ -25,7 +27,6 @@ export async function serveSceneMedia(
           url,
         ).href,
       });
-      await route.fulfill({ response });
     } else if (url.pathname.endsWith("/stream.scrub.master.m3u8")) {
       url.pathname = url.pathname.replace(".master.m3u8", ".m3u8/video.m3u8");
       await route.fulfill({

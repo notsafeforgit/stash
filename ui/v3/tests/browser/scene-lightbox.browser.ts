@@ -127,10 +127,9 @@ test.beforeEach(async ({ page }) => {
         body: "WEBVTT\n\n00:00.000 --> 00:12.000\nSample caption\n",
       });
     } else if (url.pathname.endsWith("/stream")) {
-      const response = await route.fetch({
+      await route.continue({
         url: new URL("/media/audio.mp4", url).href,
       });
-      await route.fulfill({ response });
     } else if (url.pathname.endsWith("/stream.master.m3u8")) {
       const clipped = url.searchParams.has("end");
       const first = clipped

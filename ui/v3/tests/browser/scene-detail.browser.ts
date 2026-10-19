@@ -10,10 +10,9 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/scene/detail/**", async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname.endsWith("/stream")) {
-      const response = await route.fetch({
+      await route.continue({
         url: new URL("/media/audio.mp4", url).href,
       });
-      await route.fulfill({ response });
     } else if (/\/streams\.(stop|keepalive)$/.test(url.pathname)) {
       await route.fulfill({ status: 204 });
     } else {

@@ -18,6 +18,7 @@ declare module "apollo-upload-client/UploadHttpLink.mjs" {
       uri?: string;
       headers?: Record<string, string>;
       credentials?: string;
+      fetch?: typeof fetch;
       fetchOptions?: Record<string, unknown>;
     });
   }

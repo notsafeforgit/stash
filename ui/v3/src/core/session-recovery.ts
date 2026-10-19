@@ -112,7 +112,9 @@ export const sessionFetch: typeof fetch = async (input, init) => {
   let body = init?.body;
   if (body instanceof FormData) {
     const copied = new FormData();
-    body.forEach((value, key) => copied.append(key, value));
+    body.forEach((value, key) => {
+      copied.append(key, value);
+    });
     body = copied;
   } else if (body instanceof URLSearchParams) body = new URLSearchParams(body);
   else if (body instanceof ArrayBuffer) body = body.slice(0);

@@ -154,6 +154,9 @@ func (r *mutationResolver) BulkImageUpdate(ctx context.Context, input BulkImageU
 	}
 
 	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Image Update", imageIDs, operation, hook.ImageUpdatePost, input, translator.getFields())
+	if err != nil {
+		return nil, err
+	}
 
 	return queuedBulkUpdate(jobID, len(imageIDs)), nil
 }

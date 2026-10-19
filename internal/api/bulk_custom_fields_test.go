@@ -24,12 +24,16 @@ import (
 // Capture the actual queued operation, then execute it outside the HTTP request
 // using the same transaction boundary as a worker. No live library is involved.
 type customFieldsBulkUpdater struct {
-	ids       []int
-	operation manager.BulkUpdateOperation
-	fields    []string
+	admissionError error
+	ids            []int
+	operation      manager.BulkUpdateOperation
+	fields         []string
 }
 
 func (u *customFieldsBulkUpdater) BulkUpdate(_ context.Context, _ string, ids []int, operation manager.BulkUpdateOperation, _ hook.TriggerEnum, _ interface{}, fields []string) (string, error) {
+	if u.admissionError != nil {
+		return "", u.admissionError
+	}
 	u.ids = append([]int(nil), ids...)
 	u.operation = operation
 	u.fields = fields

@@ -191,7 +191,7 @@ export function CredentialsDialog({
                       {intl.formatMessage({
                         id: "config.general.auth.save_failed",
                         defaultMessage:
-                          "Credentials were not saved. Your changes are still here; try again.",
+                          "Could not confirm that credentials were saved. Your changes are still here; try again.",
                       })}
                     </AlertDescription>
                   </Alert>

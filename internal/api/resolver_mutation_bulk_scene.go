@@ -160,6 +160,9 @@ func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneU
 	}
 
 	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Scene Update", sceneIDs, operation, hook.SceneUpdatePost, input, translator.getFields())
+	if err != nil {
+		return nil, err
+	}
 
 	return queuedBulkUpdate(jobID, len(sceneIDs)), nil
 }
@@ -333,6 +336,9 @@ func (r *mutationResolver) BulkSceneMarkerUpdate(ctx context.Context, input Bulk
 
 	jobDescription := fmt.Sprintf("Bulk Scene Marker Update (%d items)", len(ids))
 	jobID, err := r.enqueueBulkUpdate(ctx, jobDescription, ids, operation, hook.SceneMarkerUpdatePost, input, translator.getFields())
+	if err != nil {
+		return nil, err
+	}
 
 	return queuedBulkUpdate(jobID, len(ids)), nil
 }

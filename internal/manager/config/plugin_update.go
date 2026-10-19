@@ -1,7 +1,9 @@
 package config
 
+import "github.com/stashapp/stash/pkg/fsutil"
+
 // UpdatePluginConfiguration performs a patch and persistence under one lock.
-// Failed writes restore memory; callers never replace unrelated settings.
+// Pre-rename failures restore memory; callers never replace unrelated settings.
 func (i *Config) UpdatePluginConfiguration(pluginID string, input map[string]interface{}, reset []string) (map[string]interface{}, error) {
 	i.Lock()
 	defer i.Unlock()
@@ -20,7 +22,9 @@ func (i *Config) UpdatePluginConfiguration(pluginID string, input map[string]int
 	previous := i.main.Copy()
 	i.set(key, next)
 	if err := i.write(); err != nil {
-		i.main = previous
+		if !fsutil.WasPublished(err) {
+			i.main = previous
+		}
 		return nil, err
 	}
 	return i.forKey(key).Cut(key).Raw(), nil

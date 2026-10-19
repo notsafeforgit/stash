@@ -47,7 +47,7 @@ it("keeps a failed draft open and omits blank passwords on retry", async () => {
   });
   expect(close).not.toHaveBeenCalled();
   expect(document.querySelector('[role="alert"]')?.textContent).toContain(
-    "Credentials were not saved",
+    "Could not confirm that credentials were saved",
   );
   await act(async () => {
     form.dispatchEvent(

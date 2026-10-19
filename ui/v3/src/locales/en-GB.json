@@ -569,7 +569,7 @@
         "password_preserve": "Leave blank to keep the current password.",
         "password_length": "Use at most 72 UTF-8 bytes for the password.",
         "clear_password": "Remove the password and disable password authentication",
-        "save_failed": "Credentials were not saved. Your changes are still here; try again.",
+        "save_failed": "Could not confirm that credentials were saved. Your changes are still here; try again.",
         "stash-box_integration": "Stash-box integration",
         "username": "Username",
         "username_desc": "Username to access Stash. Leave blank to disable user authentication"

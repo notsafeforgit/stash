@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -156,4 +157,21 @@ func TestCustomizationPublicationAndStandaloneFileFallback(t *testing.T) {
 			require.Equal(t, "standalone", string(standalone))
 		})
 	}
+}
+
+func TestUpdateKeepsMemoryAlignedAfterPublishedWriteError(t *testing.T) {
+	c := NewEmpty()
+	c.SetConfigFile(filepath.Join(t.TempDir(), "config.yml"))
+	c.SetString(Username, "before")
+	err := c.update(t.Context(), func(candidate *Config) error { candidate.SetString(Username, "published"); return nil }, func(candidate *Config) error {
+		if err := candidate.write(); err != nil {
+			return err
+		}
+		return &fsutil.PublishedWriteError{Err: errors.New("directory fsync failed")}
+	})
+	require.True(t, fsutil.WasPublished(err))
+	require.Equal(t, "published", c.GetUsername())
+	data, err := os.ReadFile(c.GetConfigFile())
+	require.NoError(t, err)
+	require.Contains(t, string(data), "published")
 }

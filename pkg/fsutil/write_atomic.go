@@ -8,7 +8,24 @@ import (
 
 // WriteFileAtomic publishes a complete, flushed file in the destination
 // directory. Existing permissions and symlink targets are preserved.
+// PublishedWriteError means rename succeeded but directory durability could not
+// be confirmed. Callers must not pretend the previous file is still current.
+type PublishedWriteError struct{ Err error }
+
+func (e *PublishedWriteError) Error() string {
+	return "file saved, but directory durability could not be confirmed: " + e.Err.Error()
+}
+func (e *PublishedWriteError) Unwrap() error { return e.Err }
+func WasPublished(err error) bool {
+	var published *PublishedWriteError
+	return errors.As(err, &published)
+}
+
 func WriteFileAtomic(path string, data []byte, mode os.FileMode) error {
+	return writeFileAtomic(path, data, mode, SyncDir)
+}
+
+func writeFileAtomic(path string, data []byte, mode os.FileMode, syncDirectory func(string) error) error {
 	if info, err := os.Lstat(path); err == nil {
 		if info.Mode()&os.ModeSymlink != 0 {
 			path, err = filepath.EvalSymlinks(path)
@@ -51,5 +68,8 @@ func WriteFileAtomic(path string, data []byte, mode os.FileMode) error {
 	if err := os.Rename(f.Name(), path); err != nil {
 		return err
 	}
-	return SyncDir(dir)
+	if err := syncDirectory(dir); err != nil {
+		return &PublishedWriteError{Err: err}
+	}
+	return nil
 }

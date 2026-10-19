@@ -79,7 +79,7 @@ func (s *Store) Login(w http.ResponseWriter, r *http.Request) error {
 
 	newSession.Values[userIDKey] = username
 
-	err := newSession.Save(r, w)
+	err := saveSession(newSession, r, w)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (s *Store) Logout(w http.ResponseWriter, r *http.Request) error {
 	delete(session.Values, userIDKey)
 	session.Options.MaxAge = -1
 
-	err = session.Save(r, w)
+	err = saveSession(session, r, w)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (s *Store) GetSessionUserID(w http.ResponseWriter, r *http.Request) (string
 		val := session.Values[userIDKey]
 
 		// refresh the cookie
-		err = session.Save(r, w)
+		err = saveSession(session, r, w)
 		if err != nil {
 			return "", err
 		}
@@ -177,4 +177,14 @@ func (s *Store) Authenticate(w http.ResponseWriter, r *http.Request) (userID str
 	}
 
 	return
+}
+
+// Cookie options are per request: one server can serve local HTTP and public
+// HTTPS concurrently. Never mutate CookieStore.Options during a request.
+func saveSession(session *sessions.Session, r *http.Request, w http.ResponseWriter) error {
+	options := *session.Options
+	options.Secure = r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+	options.HttpOnly = true
+	session.Options = &options
+	return session.Save(r, w)
 }

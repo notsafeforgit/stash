@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -90,4 +91,15 @@ func TestNativeBulkUpdateContract(t *testing.T) {
 	require.Equal(t, []int{scene.ID}, updater.ids)
 	require.Equal(t, "Committed", readTitle())
 	require.Empty(t, hooks.calls)
+	// No queue acknowledgement may escape when durable admission failed.
+	updater.admissionError = errors.New("persisting job admission: disk full")
+	for _, entity := range []string{"Scene", "SceneMarker", "Image", "Gallery", "Performer", "Studio", "Tag", "Group"} {
+		query := fmt.Sprintf(`mutation($input: Bulk%sUpdateInput!) { result: bulk%sUpdate(input: $input) { status job_id } }`, entity, entity)
+		response := call(query, map[string]any{"ids": []string{}, "apply_to_items_matching_filters": true, "find_filter": map[string]any{"q": "Committed"}})
+		require.Contains(t, response, "persisting job admission: disk full", entity)
+		require.NotContains(t, response, `"status":"QUEUED"`, entity)
+	}
+	require.Equal(t, "Committed", readTitle())
+	require.Empty(t, hooks.calls)
+
 }

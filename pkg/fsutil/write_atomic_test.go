@@ -1,6 +1,7 @@
 package fsutil
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -47,4 +48,15 @@ func TestWriteFileAtomicPreservesSymlink(t *testing.T) {
 	data, err := os.ReadFile(target)
 	require.NoError(t, err)
 	require.Equal(t, "replacement", string(data))
+}
+
+func TestAtomicWriteReportsPostRenameDurabilityFailure(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yml")
+	failure := errors.New("directory fsync failed")
+	err := writeFileAtomic(path, []byte("published"), 0600, func(string) error { return failure })
+	require.ErrorIs(t, err, failure)
+	require.True(t, WasPublished(err))
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, "published", string(data))
 }

@@ -1,6 +1,9 @@
 package config
 
-import "context"
+import (
+	"context"
+	"github.com/stashapp/stash/pkg/fsutil"
+)
 
 // Snapshot returns a detached, internally consistent configuration. It does not
 // copy locks. Environment/flag overrides and startup-only values are preserved.
@@ -16,8 +19,9 @@ func (i *Config) Snapshot() *Config {
 }
 
 // Update validates a detached candidate, persists it, then publishes it to
-// readers. A rejected candidate or failed write changes neither live values nor
-// the existing file. Callbacks may use the candidate's getters/setters but must
+// readers. Failures before rename change neither live values nor the existing
+// file. A post-rename directory-sync failure publishes the new live values and
+// returns PublishedWriteError so callers can report uncertain durability. Callbacks may use the candidate's getters/setters but must
 // not persist or mutate the candidate after returning. Any preparation outside
 // configuration (such as ensuring directories exist) must be safe to repeat.
 //
@@ -26,6 +30,10 @@ func (i *Config) Snapshot() *Config {
 // retried against its new values. No config lock is held during validation, which
 // may query a repository whose other callers themselves read configuration.
 func (i *Config) Update(ctx context.Context, update func(*Config) error) error {
+	return i.update(ctx, update, func(candidate *Config) error { return candidate.write() })
+}
+
+func (i *Config) update(ctx context.Context, update func(*Config) error, persist func(*Config) error) error {
 	i.updateMu.Lock()
 	defer i.updateMu.Unlock()
 	for {
@@ -44,9 +52,9 @@ func (i *Config) Update(ctx context.Context, update func(*Config) error) error {
 		}
 		err := ctx.Err()
 		if err == nil {
-			err = next.write()
+			err = persist(next)
 		}
-		if err == nil {
+		if err == nil || fsutil.WasPublished(err) {
 			i.main = next.main
 			i.revision++
 		}

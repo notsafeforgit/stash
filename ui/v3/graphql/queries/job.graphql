@@ -11,5 +11,7 @@ query FindJob($input: FindJobInput!) {
 }
 
 query JobHistory($limit: Int! = 25, $offset: Int! = 0) {
-  jobHistory(limit: $limit, offset: $offset) { ...JobData }
+  jobHistory(limit: $limit, offset: $offset) {
+    ...JobData
+  }
 }

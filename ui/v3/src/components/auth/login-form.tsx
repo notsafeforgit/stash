@@ -63,24 +63,20 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     defaultValues: { username: "", password: "" },
     validators: {
       onChange: z.object({
-        username: z
-          .string()
-          .min(
-            1,
-            intl.formatMessage({
-              id: "login.username_required",
-              defaultMessage: "Enter your username.",
-            }),
-          ),
-        password: z
-          .string()
-          .min(
-            1,
-            intl.formatMessage({
-              id: "login.password_required",
-              defaultMessage: "Enter your password.",
-            }),
-          ),
+        username: z.string().min(
+          1,
+          intl.formatMessage({
+            id: "login.username_required",
+            defaultMessage: "Enter your username.",
+          }),
+        ),
+        password: z.string().min(
+          1,
+          intl.formatMessage({
+            id: "login.password_required",
+            defaultMessage: "Enter your password.",
+          }),
+        ),
       }),
     },
     onSubmit: async ({ value }) => {

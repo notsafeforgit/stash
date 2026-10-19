@@ -88,6 +88,15 @@ Resolvers receive their repository and service dependencies from
 resolvers can call a store directly or delegate to an entity service. These
 packages are collaborators, not successive stages every request must traverse.
 
+Settings resolvers receive a configuration and a narrow runtime refresh service.
+Each save validates a detached candidate, atomically publishes the YAML file,
+then exposes the candidate to readers and refreshes affected services. Rejected
+validation and file publication failures leave live settings unchanged. Saves and
+their refreshes are serialized; configuration snapshots keep multi-field reads
+consistent. Directory preparation can leave an empty directory after a failed
+save, but does not publish partial settings. Customization text edited in the UI
+is part of the same YAML publication; see [theming](../ui/v3/docs/theming.md).
+
 `withReadTxn` / `withTxn` in [resolver.go](../internal/api/resolver.go) delegate
 to repository transaction helpers. Use the callback's context for repository
 calls so they share that transaction. Transactions are scoped by individual

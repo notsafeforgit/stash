@@ -14,7 +14,6 @@ import (
 	"github.com/stashapp/stash/internal/manager/task"
 	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/fsutil"
-	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/utils"
 )
@@ -39,13 +38,15 @@ func (r *mutationResolver) DownloadFFMpeg(ctx context.Context) (string, error) {
 
 	t := &task.DownloadFFmpegJob{
 		ConfigDirectory: configDir,
-		OnComplete: func(ctx context.Context) {
-			// clear the ffmpeg and ffprobe paths
-			logger.Infof("Clearing ffmpeg and ffprobe config paths so they are resolved from the config directory")
-			mgr.Config.SetString(config.FFMpegPath, "")
-			mgr.Config.SetString(config.FFProbePath, "")
-			mgr.RefreshFFMpeg(ctx)
-			mgr.RefreshStreamManager()
+		OnComplete: func(ctx context.Context) error {
+			return r.settings.update(ctx, func(c *config.Config) (func(), error) {
+				c.SetString(config.FFMpegPath, "")
+				c.SetString(config.FFProbePath, "")
+				return func() {
+					r.settings.runtime.RefreshFFMpeg(ctx)
+					r.settings.runtime.RefreshStreamManager()
+				}, nil
+			})
 		},
 	}
 
@@ -54,616 +55,604 @@ func (r *mutationResolver) DownloadFFMpeg(ctx context.Context) (string, error) {
 	return strconv.Itoa(jobID), nil
 }
 
-func (r *mutationResolver) setConfigString(key string, value *string) {
-	c := config.GetInstance()
+func setConfigString(c *config.Config, key string, value *string) {
 	if value != nil {
 		c.SetString(key, *value)
 	}
 }
 
-func (r *mutationResolver) setConfigBool(key string, value *bool) {
-	c := config.GetInstance()
+func setConfigBool(c *config.Config, key string, value *bool) {
 	if value != nil {
 		c.SetBool(key, *value)
 	}
 }
 
-func (r *mutationResolver) setConfigInt(key string, value *int) {
-	c := config.GetInstance()
+func setConfigInt(c *config.Config, key string, value *int) {
 	if value != nil {
 		c.SetInt(key, *value)
 	}
 }
 
-func (r *mutationResolver) setConfigFloat(key string, value *float64) {
-	c := config.GetInstance()
+func setConfigFloat(c *config.Config, key string, value *float64) {
 	if value != nil {
 		c.SetFloat(key, *value)
 	}
 }
 
 func (r *mutationResolver) ConfigureGeneral(ctx context.Context, input ConfigGeneralInput) (*ConfigGeneralResult, error) {
-	c := config.GetInstance()
+	err := r.settings.update(ctx, func(c *config.Config) (func(), error) {
+		checkConfigOverride := func(key string) error {
+			if c.HasOverride(key) {
+				return fmt.Errorf("%w: %s", ErrOverriddenConfig, key)
+			}
 
-	checkConfigOverride := func(key string) error {
-		if c.HasOverride(key) {
-			return fmt.Errorf("%w: %s", ErrOverriddenConfig, key)
+			return nil
 		}
 
-		return nil
-	}
-
-	validateDir := func(key string, value string, optional bool) error {
-		if err := checkConfigOverride(key); err != nil {
-			return err
-		}
-
-		if !optional || value != "" {
-			if err := fsutil.EnsureDir(value); err != nil {
+		var directories []string
+		validateDir := func(key string, value string, optional bool) error {
+			if err := checkConfigOverride(key); err != nil {
 				return err
 			}
-		}
 
-		return nil
-	}
-
-	existingDBPath := c.GetDatabasePath()
-	if input.SourceTrackingEnabled != nil {
-		if err := checkConfigOverride(config.SourceTrackingEnabled); err != nil {
-			return makeConfigGeneralResult(), err
-		}
-		c.SetBool(config.SourceTrackingEnabled, *input.SourceTrackingEnabled)
-	}
-
-	if input.DatabasePath != nil && existingDBPath != *input.DatabasePath {
-		if err := checkConfigOverride(config.Database); err != nil {
-			return makeConfigGeneralResult(), err
-		}
-
-		ext := filepath.Ext(*input.DatabasePath)
-		if ext != ".db" && ext != ".sqlite" && ext != ".sqlite3" {
-			return makeConfigGeneralResult(), fmt.Errorf("invalid database path, use extension db, sqlite, or sqlite3")
-		}
-		c.SetString(config.Database, *input.DatabasePath)
-	}
-
-	existingBackupDirectoryPath := c.GetBackupDirectoryPath()
-	if input.BackupDirectoryPath != nil && existingBackupDirectoryPath != *input.BackupDirectoryPath {
-		if err := validateDir(config.BackupDirectoryPath, *input.BackupDirectoryPath, true); err != nil {
-			return makeConfigGeneralResult(), err
-		}
-
-		c.SetString(config.BackupDirectoryPath, *input.BackupDirectoryPath)
-	}
-
-	existingDeleteTrashPath := c.GetDeleteTrashPath()
-	if input.DeleteTrashPath != nil && existingDeleteTrashPath != *input.DeleteTrashPath {
-		if err := validateDir(config.DeleteTrashPath, *input.DeleteTrashPath, true); err != nil {
-			return makeConfigGeneralResult(), err
-		}
-
-		c.SetString(config.DeleteTrashPath, *input.DeleteTrashPath)
-	}
-
-	existingGeneratedPath := c.GetGeneratedPath()
-	if input.GeneratedPath != nil && existingGeneratedPath != *input.GeneratedPath {
-		if err := validateDir(config.Generated, *input.GeneratedPath, false); err != nil {
-			return makeConfigGeneralResult(), err
-		}
-
-		c.SetString(config.Generated, *input.GeneratedPath)
-	}
-
-	refreshScraperCache := false
-	refreshScraperSource := false
-	existingScrapersPath := c.GetScrapersPath()
-	if input.ScrapersPath != nil && existingScrapersPath != *input.ScrapersPath {
-		if err := validateDir(config.ScrapersPath, *input.ScrapersPath, false); err != nil {
-			return makeConfigGeneralResult(), err
-		}
-
-		refreshScraperCache = true
-		refreshScraperSource = true
-		c.SetString(config.ScrapersPath, *input.ScrapersPath)
-	}
-
-	refreshPluginCache := false
-	refreshPluginSource := false
-	existingPluginsPath := c.GetPluginsPath()
-	if input.PluginsPath != nil && existingPluginsPath != *input.PluginsPath {
-		if err := validateDir(config.PluginsPath, *input.PluginsPath, false); err != nil {
-			return makeConfigGeneralResult(), err
-		}
-
-		refreshPluginCache = true
-		refreshPluginSource = true
-		c.SetString(config.PluginsPath, *input.PluginsPath)
-	}
-
-	existingMetadataPath := c.GetMetadataPath()
-	if input.MetadataPath != nil && existingMetadataPath != *input.MetadataPath {
-		if err := validateDir(config.Metadata, *input.MetadataPath, true); err != nil {
-			return makeConfigGeneralResult(), err
-		}
-
-		c.SetString(config.Metadata, *input.MetadataPath)
-	}
-
-	refreshStreamManager := false
-	existingCachePath := c.GetCachePath()
-	if input.CachePath != nil && existingCachePath != *input.CachePath {
-		if err := validateDir(config.Cache, *input.CachePath, true); err != nil {
-			return makeConfigGeneralResult(), err
-		}
-
-		c.SetString(config.Cache, *input.CachePath)
-		refreshStreamManager = true
-	}
-
-	refreshBlobStorage := false
-	existingBlobsPath := c.GetBlobsPath()
-	if input.BlobsPath != nil && existingBlobsPath != *input.BlobsPath {
-		if err := validateDir(config.BlobsPath, *input.BlobsPath, true); err != nil {
-			return makeConfigGeneralResult(), err
-		}
-
-		c.SetString(config.BlobsPath, *input.BlobsPath)
-		refreshBlobStorage = true
-	}
-
-	if input.BlobsStorage != nil && *input.BlobsStorage != c.GetBlobsStorage() {
-		if *input.BlobsStorage == config.BlobStorageTypeFilesystem && c.GetBlobsPath() == "" {
-			return makeConfigGeneralResult(), fmt.Errorf("blobs path must be set when using filesystem storage")
-		}
-
-		c.SetInterface(config.BlobsStorage, *input.BlobsStorage)
-
-		refreshBlobStorage = true
-	}
-
-	refreshFfmpeg := false
-	if input.FfmpegPath != nil && *input.FfmpegPath != c.GetFFMpegPath() {
-		if *input.FfmpegPath != "" {
-			if err := ffmpeg.ValidateFFMpeg(*input.FfmpegPath); err != nil {
-				return makeConfigGeneralResult(), fmt.Errorf("invalid ffmpeg path: %w", err)
+			if !optional || value != "" {
+				directories = append(directories, value)
 			}
+
+			return nil
 		}
 
-		c.SetString(config.FFMpegPath, *input.FfmpegPath)
-		refreshFfmpeg = true
-	}
-
-	if input.FfprobePath != nil && *input.FfprobePath != c.GetFFProbePath() {
-		if *input.FfprobePath != "" {
-			if err := ffmpeg.ValidateFFProbe(*input.FfprobePath); err != nil {
-				return makeConfigGeneralResult(), fmt.Errorf("invalid ffprobe path: %w", err)
+		existingDBPath := c.GetDatabasePath()
+		if input.SourceTrackingEnabled != nil {
+			if err := checkConfigOverride(config.SourceTrackingEnabled); err != nil {
+				return nil, err
 			}
+			c.SetBool(config.SourceTrackingEnabled, *input.SourceTrackingEnabled)
 		}
 
-		c.SetString(config.FFProbePath, *input.FfprobePath)
-		refreshFfmpeg = true
-	}
-
-	if input.VideoFileNamingAlgorithm != nil && *input.VideoFileNamingAlgorithm != c.GetVideoFileNamingAlgorithm() {
-		calculateMD5 := c.IsCalculateMD5()
-		if input.CalculateMd5 != nil {
-			calculateMD5 = *input.CalculateMd5
-		}
-		if !calculateMD5 && *input.VideoFileNamingAlgorithm == models.HashAlgorithmMd5 {
-			return makeConfigGeneralResult(), errors.New("calculateMD5 must be true if using MD5")
-		}
-
-		// validate changing VideoFileNamingAlgorithm
-		if err := r.withTxn(context.TODO(), func(ctx context.Context) error {
-			return manager.ValidateVideoFileNamingAlgorithm(ctx, r.repository.Scene, *input.VideoFileNamingAlgorithm)
-		}); err != nil {
-			return makeConfigGeneralResult(), err
-		}
-
-		c.SetInterface(config.VideoFileNamingAlgorithm, *input.VideoFileNamingAlgorithm)
-	}
-
-	r.setConfigBool(config.CalculateMD5, input.CalculateMd5)
-	r.setConfigInt(config.ParallelTasks, input.ParallelTasks)
-	r.setConfigBool(config.PreviewAudio, input.PreviewAudio)
-	r.setConfigInt(config.PreviewSegments, input.PreviewSegments)
-	r.setConfigFloat(config.PreviewSegmentDuration, input.PreviewSegmentDuration)
-	// Validate both marker-preview durations before applying either: 0 disables
-	// the ceiling, so a negative max is rejected rather than silently treated as
-	// disabled; the default is a fallback length and must be positive.
-	if input.MaxMarkerPreviewDuration != nil && *input.MaxMarkerPreviewDuration < 0 {
-		return makeConfigGeneralResult(), errors.New("maxMarkerPreviewDuration must be 0 (disabled) or a positive value")
-	}
-	if input.DefaultMarkerPreviewDuration != nil && *input.DefaultMarkerPreviewDuration <= 0 {
-		return makeConfigGeneralResult(), errors.New("defaultMarkerPreviewDuration must be a positive value")
-	}
-	r.setConfigInt(config.MaxMarkerPreviewDuration, input.MaxMarkerPreviewDuration)
-	r.setConfigInt(config.DefaultMarkerPreviewDuration, input.DefaultMarkerPreviewDuration)
-	r.setConfigString(config.PreviewExcludeStart, input.PreviewExcludeStart)
-	r.setConfigString(config.PreviewExcludeEnd, input.PreviewExcludeEnd)
-	if input.PreviewPreset != nil {
-		c.SetString(config.PreviewPreset, input.PreviewPreset.String())
-	}
-	r.setConfigBool(config.UseCustomSpriteInterval, input.UseCustomSpriteInterval)
-	r.setConfigFloat(config.SpriteInterval, input.SpriteInterval)
-	r.setConfigInt(config.MinimumSprites, input.MinimumSprites)
-	r.setConfigInt(config.MaximumSprites, input.MaximumSprites)
-	r.setConfigInt(config.SpriteScreenshotSize, input.SpriteScreenshotSize)
-
-	r.setConfigBool(config.TranscodeHardwareAcceleration, input.TranscodeHardwareAcceleration)
-	if input.MaxTranscodeSize != nil {
-		c.SetString(config.MaxTranscodeSize, input.MaxTranscodeSize.String())
-	}
-
-	if input.MaxStreamingTranscodeSize != nil {
-		c.SetString(config.MaxStreamingTranscodeSize, input.MaxStreamingTranscodeSize.String())
-	}
-	r.setConfigBool(config.WriteImageThumbnails, input.WriteImageThumbnails)
-	r.setConfigBool(config.CreateImageClipsFromVideos, input.CreateImageClipsFromVideos)
-	r.setConfigBool(config.BulkUpdateHooks, input.BulkUpdateHooks)
-
-	if input.GalleryCoverRegex != nil {
-		_, err := regexp.Compile(*input.GalleryCoverRegex)
-		if err != nil {
-			return makeConfigGeneralResult(), fmt.Errorf("Gallery cover regex '%v' invalid, '%v'", *input.GalleryCoverRegex, err.Error())
-		}
-
-		c.SetString(config.GalleryCoverRegex, *input.GalleryCoverRegex)
-	}
-
-	if input.Username != nil && *input.Username != c.GetUsername() {
-		c.SetString(config.Username, *input.Username)
-		if *input.Password == "" {
-			logger.Info("Username cleared")
-		} else {
-			logger.Info("Username changed")
-		}
-	}
-
-	if input.Password != nil {
-		// bit of a hack - check if the passed in password is the same as the stored hash
-		// and only set if they are different
-		currentPWHash := c.GetPasswordHash()
-
-		if *input.Password != currentPWHash {
-			if *input.Password == "" {
-				logger.Info("Password cleared")
-			} else {
-				logger.Info("Password changed")
+		if input.DatabasePath != nil && existingDBPath != *input.DatabasePath {
+			if err := checkConfigOverride(config.Database); err != nil {
+				return nil, err
 			}
+
+			ext := filepath.Ext(*input.DatabasePath)
+			if ext != ".db" && ext != ".sqlite" && ext != ".sqlite3" {
+				return nil, fmt.Errorf("invalid database path, use extension db, sqlite, or sqlite3")
+			}
+			c.SetString(config.Database, *input.DatabasePath)
+		}
+
+		existingBackupDirectoryPath := c.GetBackupDirectoryPath()
+		if input.BackupDirectoryPath != nil && existingBackupDirectoryPath != *input.BackupDirectoryPath {
+			if err := validateDir(config.BackupDirectoryPath, *input.BackupDirectoryPath, true); err != nil {
+				return nil, err
+			}
+
+			c.SetString(config.BackupDirectoryPath, *input.BackupDirectoryPath)
+		}
+
+		existingDeleteTrashPath := c.GetDeleteTrashPath()
+		if input.DeleteTrashPath != nil && existingDeleteTrashPath != *input.DeleteTrashPath {
+			if err := validateDir(config.DeleteTrashPath, *input.DeleteTrashPath, true); err != nil {
+				return nil, err
+			}
+
+			c.SetString(config.DeleteTrashPath, *input.DeleteTrashPath)
+		}
+
+		existingGeneratedPath := c.GetGeneratedPath()
+		if input.GeneratedPath != nil && existingGeneratedPath != *input.GeneratedPath {
+			if err := validateDir(config.Generated, *input.GeneratedPath, false); err != nil {
+				return nil, err
+			}
+
+			c.SetString(config.Generated, *input.GeneratedPath)
+		}
+
+		refreshScraperCache := false
+		refreshScraperSource := false
+		existingScrapersPath := c.GetScrapersPath()
+		if input.ScrapersPath != nil && existingScrapersPath != *input.ScrapersPath {
+			if err := validateDir(config.ScrapersPath, *input.ScrapersPath, false); err != nil {
+				return nil, err
+			}
+
+			refreshScraperCache = true
+			refreshScraperSource = true
+			c.SetString(config.ScrapersPath, *input.ScrapersPath)
+		}
+
+		refreshPluginCache := false
+		refreshPluginSource := false
+		existingPluginsPath := c.GetPluginsPath()
+		if input.PluginsPath != nil && existingPluginsPath != *input.PluginsPath {
+			if err := validateDir(config.PluginsPath, *input.PluginsPath, false); err != nil {
+				return nil, err
+			}
+
+			refreshPluginCache = true
+			refreshPluginSource = true
+			c.SetString(config.PluginsPath, *input.PluginsPath)
+		}
+
+		existingMetadataPath := c.GetMetadataPath()
+		if input.MetadataPath != nil && existingMetadataPath != *input.MetadataPath {
+			if err := validateDir(config.Metadata, *input.MetadataPath, true); err != nil {
+				return nil, err
+			}
+
+			c.SetString(config.Metadata, *input.MetadataPath)
+		}
+
+		refreshStreamManager := false
+		existingCachePath := c.GetCachePath()
+		if input.CachePath != nil && existingCachePath != *input.CachePath {
+			if err := validateDir(config.Cache, *input.CachePath, true); err != nil {
+				return nil, err
+			}
+
+			c.SetString(config.Cache, *input.CachePath)
+			refreshStreamManager = true
+		}
+
+		refreshBlobStorage := false
+		existingBlobsPath := c.GetBlobsPath()
+		if input.BlobsPath != nil && existingBlobsPath != *input.BlobsPath {
+			if err := validateDir(config.BlobsPath, *input.BlobsPath, true); err != nil {
+				return nil, err
+			}
+
+			c.SetString(config.BlobsPath, *input.BlobsPath)
+			refreshBlobStorage = true
+		}
+
+		if input.BlobsStorage != nil && *input.BlobsStorage != c.GetBlobsStorage() {
+			if *input.BlobsStorage == config.BlobStorageTypeFilesystem && c.GetBlobsPath() == "" {
+				return nil, fmt.Errorf("blobs path must be set when using filesystem storage")
+			}
+
+			c.SetInterface(config.BlobsStorage, *input.BlobsStorage)
+
+			refreshBlobStorage = true
+		}
+
+		refreshFfmpeg := false
+		if input.FfmpegPath != nil && *input.FfmpegPath != c.GetFFMpegPath() {
+			if *input.FfmpegPath != "" {
+				if err := ffmpeg.ValidateFFMpeg(*input.FfmpegPath); err != nil {
+					return nil, fmt.Errorf("invalid ffmpeg path: %w", err)
+				}
+			}
+
+			c.SetString(config.FFMpegPath, *input.FfmpegPath)
+			refreshFfmpeg = true
+		}
+
+		if input.FfprobePath != nil && *input.FfprobePath != c.GetFFProbePath() {
+			if *input.FfprobePath != "" {
+				if err := ffmpeg.ValidateFFProbe(*input.FfprobePath); err != nil {
+					return nil, fmt.Errorf("invalid ffprobe path: %w", err)
+				}
+			}
+
+			c.SetString(config.FFProbePath, *input.FfprobePath)
+			refreshFfmpeg = true
+		}
+
+		if input.VideoFileNamingAlgorithm != nil && *input.VideoFileNamingAlgorithm != c.GetVideoFileNamingAlgorithm() {
+			calculateMD5 := c.IsCalculateMD5()
+			if input.CalculateMd5 != nil {
+				calculateMD5 = *input.CalculateMd5
+			}
+			if !calculateMD5 && *input.VideoFileNamingAlgorithm == models.HashAlgorithmMd5 {
+				return nil, errors.New("calculateMD5 must be true if using MD5")
+			}
+
+			// validate changing VideoFileNamingAlgorithm
+			if err := r.withReadTxn(ctx, func(ctx context.Context) error {
+				return manager.ValidateVideoFileNamingAlgorithm(ctx, r.repository.Scene, *input.VideoFileNamingAlgorithm)
+			}); err != nil {
+				return nil, err
+			}
+
+			c.SetInterface(config.VideoFileNamingAlgorithm, *input.VideoFileNamingAlgorithm)
+		}
+
+		setConfigBool(c, config.CalculateMD5, input.CalculateMd5)
+		setConfigInt(c, config.ParallelTasks, input.ParallelTasks)
+		setConfigBool(c, config.PreviewAudio, input.PreviewAudio)
+		setConfigInt(c, config.PreviewSegments, input.PreviewSegments)
+		setConfigFloat(c, config.PreviewSegmentDuration, input.PreviewSegmentDuration)
+		// Validate both marker-preview durations before applying either: 0 disables
+		// the ceiling, so a negative max is rejected rather than silently treated as
+		// disabled; the default is a fallback length and must be positive.
+		if input.MaxMarkerPreviewDuration != nil && *input.MaxMarkerPreviewDuration < 0 {
+			return nil, errors.New("maxMarkerPreviewDuration must be 0 (disabled) or a positive value")
+		}
+		if input.DefaultMarkerPreviewDuration != nil && *input.DefaultMarkerPreviewDuration <= 0 {
+			return nil, errors.New("defaultMarkerPreviewDuration must be a positive value")
+		}
+		setConfigInt(c, config.MaxMarkerPreviewDuration, input.MaxMarkerPreviewDuration)
+		setConfigInt(c, config.DefaultMarkerPreviewDuration, input.DefaultMarkerPreviewDuration)
+		setConfigString(c, config.PreviewExcludeStart, input.PreviewExcludeStart)
+		setConfigString(c, config.PreviewExcludeEnd, input.PreviewExcludeEnd)
+		if input.PreviewPreset != nil {
+			c.SetString(config.PreviewPreset, input.PreviewPreset.String())
+		}
+		setConfigBool(c, config.UseCustomSpriteInterval, input.UseCustomSpriteInterval)
+		setConfigFloat(c, config.SpriteInterval, input.SpriteInterval)
+		setConfigInt(c, config.MinimumSprites, input.MinimumSprites)
+		setConfigInt(c, config.MaximumSprites, input.MaximumSprites)
+		setConfigInt(c, config.SpriteScreenshotSize, input.SpriteScreenshotSize)
+
+		setConfigBool(c, config.TranscodeHardwareAcceleration, input.TranscodeHardwareAcceleration)
+		if input.MaxTranscodeSize != nil {
+			c.SetString(config.MaxTranscodeSize, input.MaxTranscodeSize.String())
+		}
+
+		if input.MaxStreamingTranscodeSize != nil {
+			c.SetString(config.MaxStreamingTranscodeSize, input.MaxStreamingTranscodeSize.String())
+		}
+		setConfigBool(c, config.WriteImageThumbnails, input.WriteImageThumbnails)
+		setConfigBool(c, config.CreateImageClipsFromVideos, input.CreateImageClipsFromVideos)
+		setConfigBool(c, config.BulkUpdateHooks, input.BulkUpdateHooks)
+
+		if input.GalleryCoverRegex != nil {
+			_, err := regexp.Compile(*input.GalleryCoverRegex)
+			if err != nil {
+				return nil, fmt.Errorf("Gallery cover regex '%v' invalid, '%v'", *input.GalleryCoverRegex, err.Error())
+			}
+
+			c.SetString(config.GalleryCoverRegex, *input.GalleryCoverRegex)
+		}
+
+		setConfigString(c, config.Username, input.Username)
+		if input.Password != nil && *input.Password != c.GetPasswordHash() {
 			c.SetPassword(*input.Password)
 		}
-	}
 
-	r.setConfigInt(config.MaxSessionAge, input.MaxSessionAge)
-	r.setConfigString(config.LogFile, input.LogFile)
-	r.setConfigBool(config.LogOut, input.LogOut)
-	r.setConfigBool(config.LogAccess, input.LogAccess)
+		setConfigInt(c, config.MaxSessionAge, input.MaxSessionAge)
+		setConfigString(c, config.LogFile, input.LogFile)
+		setConfigBool(c, config.LogOut, input.LogOut)
+		setConfigBool(c, config.LogAccess, input.LogAccess)
 
-	if input.LogLevel != nil && *input.LogLevel != c.GetLogLevel() {
-		c.SetString(config.LogLevel, *input.LogLevel)
-		logger := manager.GetInstance().Logger
-		logger.SetLogLevel(*input.LogLevel)
-	}
+		if input.LogLevel != nil && *input.LogLevel != c.GetLogLevel() {
+			c.SetString(config.LogLevel, *input.LogLevel)
+		}
 
-	if input.LogFileMaxSize != nil && *input.LogFileMaxSize != c.GetLogFileMaxSize() {
-		c.SetInt(config.LogFileMaxSize, *input.LogFileMaxSize)
-	}
+		if input.LogFileMaxSize != nil && *input.LogFileMaxSize != c.GetLogFileMaxSize() {
+			c.SetInt(config.LogFileMaxSize, *input.LogFileMaxSize)
+		}
 
-	if input.Excludes != nil {
-		for _, r := range input.Excludes {
-			_, err := regexp.Compile(r)
-			if err != nil {
-				return makeConfigGeneralResult(), fmt.Errorf("video exclusion pattern '%v' invalid: %w", r, err)
+		if input.Excludes != nil {
+			for _, r := range input.Excludes {
+				_, err := regexp.Compile(r)
+				if err != nil {
+					return nil, fmt.Errorf("video exclusion pattern '%v' invalid: %w", r, err)
+				}
+			}
+			c.SetInterface(config.Exclude, input.Excludes)
+		}
+
+		if input.ImageExcludes != nil {
+			for _, r := range input.ImageExcludes {
+				_, err := regexp.Compile(r)
+				if err != nil {
+					return nil, fmt.Errorf("image/gallery exclusion pattern '%v' invalid: %w", r, err)
+				}
+			}
+			c.SetInterface(config.ImageExclude, input.ImageExcludes)
+		}
+
+		if input.VideoExtensions != nil {
+			c.SetInterface(config.VideoExtensions, input.VideoExtensions)
+		}
+
+		if input.ImageExtensions != nil {
+			c.SetInterface(config.ImageExtensions, input.ImageExtensions)
+		}
+
+		if input.GalleryExtensions != nil {
+			c.SetInterface(config.GalleryExtensions, input.GalleryExtensions)
+		}
+
+		setConfigBool(c, config.CreateGalleriesFromFolders, input.CreateGalleriesFromFolders)
+
+		if input.CustomPerformerImageLocation != nil {
+			c.SetString(config.CustomPerformerImageLocation, *input.CustomPerformerImageLocation)
+		}
+
+		if input.StashBoxes != nil {
+			if err := c.ValidateStashBoxes(input.StashBoxes); err != nil {
+				return nil, err
+			}
+			c.SetInterface(config.StashBoxes, input.StashBoxes)
+		}
+
+		if input.PythonPath != nil {
+			setConfigString(c, config.PythonPath, input.PythonPath)
+		}
+
+		if input.TranscodeInputArgs != nil {
+			c.SetInterface(config.TranscodeInputArgs, input.TranscodeInputArgs)
+		}
+		if input.TranscodeOutputArgs != nil {
+			c.SetInterface(config.TranscodeOutputArgs, input.TranscodeOutputArgs)
+		}
+		if input.LiveTranscodeInputArgs != nil {
+			c.SetInterface(config.LiveTranscodeInputArgs, input.LiveTranscodeInputArgs)
+		}
+		if input.LiveTranscodeOutputArgs != nil {
+			c.SetInterface(config.LiveTranscodeOutputArgs, input.LiveTranscodeOutputArgs)
+		}
+
+		setConfigBool(c, config.DrawFunscriptHeatmapRange, input.DrawFunscriptHeatmapRange)
+
+		if input.ScraperPackageSources != nil {
+			c.SetInterface(config.ScraperPackageSources, input.ScraperPackageSources)
+			refreshScraperSource = true
+		}
+
+		if input.PluginPackageSources != nil {
+			c.SetInterface(config.PluginPackageSources, input.PluginPackageSources)
+			refreshPluginSource = true
+		}
+
+		// Directory preparation is idempotent. A failed save may leave an empty
+		// directory, but never a partially published configuration.
+		for _, directory := range directories {
+			if err := fsutil.EnsureDir(directory); err != nil {
+				return nil, err
 			}
 		}
-		c.SetInterface(config.Exclude, input.Excludes)
-	}
-
-	if input.ImageExcludes != nil {
-		for _, r := range input.ImageExcludes {
-			_, err := regexp.Compile(r)
-			if err != nil {
-				return makeConfigGeneralResult(), fmt.Errorf("image/gallery exclusion pattern '%v' invalid: %w", r, err)
+		return func() {
+			if input.LogLevel != nil {
+				r.settings.setLogLevel(c.GetLogLevel())
 			}
-		}
-		c.SetInterface(config.ImageExclude, input.ImageExcludes)
-	}
+			if input.CustomPerformerImageLocation != nil {
+				initCustomPerformerImages(c.GetCustomPerformerImageLocation())
+			}
 
-	if input.VideoExtensions != nil {
-		c.SetInterface(config.VideoExtensions, input.VideoExtensions)
-	}
+			r.settings.runtime.RefreshConfig()
+			if refreshScraperCache {
+				r.settings.runtime.RefreshScraperCache()
+			}
+			if refreshPluginCache {
+				r.settings.runtime.RefreshPluginCache()
+			}
+			if refreshFfmpeg {
+				r.settings.runtime.RefreshFFMpeg(ctx)
 
-	if input.ImageExtensions != nil {
-		c.SetInterface(config.ImageExtensions, input.ImageExtensions)
-	}
+				// refresh stream manager is required since ffmpeg changed
+				refreshStreamManager = true
+			}
+			if refreshStreamManager {
+				r.settings.runtime.RefreshStreamManager()
+			}
+			if refreshBlobStorage {
+				r.settings.runtime.SetBlobStoreOptions()
+			}
+			if refreshScraperSource {
+				r.settings.runtime.RefreshScraperSourceManager()
+			}
+			if refreshPluginSource {
+				r.settings.runtime.RefreshPluginSourceManager()
+			}
 
-	if input.GalleryExtensions != nil {
-		c.SetInterface(config.GalleryExtensions, input.GalleryExtensions)
+		}, nil
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	r.setConfigBool(config.CreateGalleriesFromFolders, input.CreateGalleriesFromFolders)
-
-	if input.CustomPerformerImageLocation != nil {
-		c.SetString(config.CustomPerformerImageLocation, *input.CustomPerformerImageLocation)
-		initCustomPerformerImages(*input.CustomPerformerImageLocation)
-	}
-
-	if input.StashBoxes != nil {
-		if err := c.ValidateStashBoxes(input.StashBoxes); err != nil {
-			return nil, err
-		}
-		c.SetInterface(config.StashBoxes, input.StashBoxes)
-	}
-
-	if input.PythonPath != nil {
-		r.setConfigString(config.PythonPath, input.PythonPath)
-	}
-
-	if input.TranscodeInputArgs != nil {
-		c.SetInterface(config.TranscodeInputArgs, input.TranscodeInputArgs)
-	}
-	if input.TranscodeOutputArgs != nil {
-		c.SetInterface(config.TranscodeOutputArgs, input.TranscodeOutputArgs)
-	}
-	if input.LiveTranscodeInputArgs != nil {
-		c.SetInterface(config.LiveTranscodeInputArgs, input.LiveTranscodeInputArgs)
-	}
-	if input.LiveTranscodeOutputArgs != nil {
-		c.SetInterface(config.LiveTranscodeOutputArgs, input.LiveTranscodeOutputArgs)
-	}
-
-	r.setConfigBool(config.DrawFunscriptHeatmapRange, input.DrawFunscriptHeatmapRange)
-
-	if input.ScraperPackageSources != nil {
-		c.SetInterface(config.ScraperPackageSources, input.ScraperPackageSources)
-		refreshScraperSource = true
-	}
-
-	if input.PluginPackageSources != nil {
-		c.SetInterface(config.PluginPackageSources, input.PluginPackageSources)
-		refreshPluginSource = true
-	}
-
-	if err := c.Write(); err != nil {
-		return makeConfigGeneralResult(), err
-	}
-
-	manager.GetInstance().RefreshConfig()
-	if refreshScraperCache {
-		manager.GetInstance().RefreshScraperCache()
-	}
-	if refreshPluginCache {
-		manager.GetInstance().RefreshPluginCache()
-	}
-	if refreshFfmpeg {
-		manager.GetInstance().RefreshFFMpeg(ctx)
-
-		// refresh stream manager is required since ffmpeg changed
-		refreshStreamManager = true
-	}
-	if refreshStreamManager {
-		manager.GetInstance().RefreshStreamManager()
-	}
-	if refreshBlobStorage {
-		manager.GetInstance().SetBlobStoreOptions()
-	}
-	if refreshScraperSource {
-		manager.GetInstance().RefreshScraperSourceManager()
-	}
-	if refreshPluginSource {
-		manager.GetInstance().RefreshPluginSourceManager()
-	}
-
-	return makeConfigGeneralResult(), nil
+	return makeConfigGeneralResult(r.settings.config.Snapshot()), nil
 }
 
 func (r *mutationResolver) ConfigureInterface(ctx context.Context, input ConfigInterfaceInput) (*ConfigInterfaceResult, error) {
-	c := config.GetInstance()
+	err := r.settings.update(ctx, func(c *config.Config) (func(), error) {
+		setConfigBool(c, config.SFWContentMode, input.SfwContentMode)
 
-	r.setConfigBool(config.SFWContentMode, input.SfwContentMode)
+		if input.MenuItems != nil {
+			c.SetInterface(config.MenuItems, input.MenuItems)
+		}
 
-	if input.MenuItems != nil {
-		c.SetInterface(config.MenuItems, input.MenuItems)
+		setConfigBool(c, config.SoundOnPreview, input.SoundOnPreview)
+		setConfigBool(c, config.WallShowTitle, input.WallShowTitle)
+
+		setConfigBool(c, config.NoBrowser, input.NoBrowser)
+
+		setConfigBool(c, config.NotificationsEnabled, input.NotificationsEnabled)
+
+		setConfigBool(c, config.ShowScrubber, input.ShowScrubber)
+
+		setConfigString(c, config.WallPlayback, input.WallPlayback)
+		if input.PreviewDefault != nil {
+			c.SetString(config.PreviewDefault, strings.ToLower(input.PreviewDefault.String()))
+		}
+		setConfigBool(c, config.PlayVideoOnHover, input.PlayVideoOnHover)
+		setConfigInt(c, config.MaximumLoopDuration, input.MaximumLoopDuration)
+		setConfigBool(c, config.AutostartVideo, input.AutostartVideo)
+		setConfigBool(c, config.ShowStudioAsText, input.ShowStudioAsText)
+		setConfigBool(c, config.AutostartVideoOnPlaySelected, input.AutostartVideoOnPlaySelected)
+		setConfigBool(c, config.ContinuePlaylistDefault, input.ContinuePlaylistDefault)
+
+		setConfigString(c, config.Language, input.Language)
+
+		if input.ImageLightbox != nil {
+			options := input.ImageLightbox
+
+			setConfigInt(c, config.ImageLightboxSlideshowDelay, options.SlideshowDelay)
+
+			setConfigString(c, config.ImageLightboxDisplayModeKey, (*string)(options.DisplayMode))
+			setConfigBool(c, config.ImageLightboxScaleUp, options.ScaleUp)
+			setConfigBool(c, config.ImageLightboxResetZoomOnNav, options.ResetZoomOnNav)
+			setConfigString(c, config.ImageLightboxScrollModeKey, (*string)(options.ScrollMode))
+
+			setConfigInt(c, config.ImageLightboxScrollAttemptsBeforeChange, options.ScrollAttemptsBeforeChange)
+
+			setConfigBool(c, config.ImageLightboxDisableAnimation, options.DisableAnimation)
+		}
+
+		if input.CSS != nil {
+			c.SetCSS(*input.CSS)
+		}
+
+		setConfigBool(c, config.CSSEnabled, input.CSSEnabled)
+
+		if input.Javascript != nil {
+			c.SetJavascript(*input.Javascript)
+		}
+
+		setConfigBool(c, config.JavascriptEnabled, input.JavascriptEnabled)
+
+		if input.CustomLocales != nil {
+			c.SetCustomLocales(*input.CustomLocales)
+		}
+
+		setConfigBool(c, config.CustomLocalesEnabled, input.CustomLocalesEnabled)
+
+		setConfigBool(c, config.DisableCustomizations, input.DisableCustomizations)
+
+		if input.DisableDropdownCreate != nil {
+			ddc := input.DisableDropdownCreate
+			setConfigBool(c, config.DisableDropdownCreatePerformer, ddc.Performer)
+			setConfigBool(c, config.DisableDropdownCreateStudio, ddc.Studio)
+			setConfigBool(c, config.DisableDropdownCreateTag, ddc.Tag)
+			setConfigBool(c, config.DisableDropdownCreateMovie, ddc.Movie)
+			setConfigBool(c, config.DisableDropdownCreateGallery, ddc.Gallery)
+		}
+
+		setConfigString(c, config.HandyKey, input.HandyKey)
+		setConfigInt(c, config.FunscriptOffset, input.FunscriptOffset)
+		setConfigBool(c, config.UseStashHostedFunscript, input.UseStashHostedFunscript)
+
+		return nil, nil
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	r.setConfigBool(config.SoundOnPreview, input.SoundOnPreview)
-	r.setConfigBool(config.WallShowTitle, input.WallShowTitle)
-
-	r.setConfigBool(config.NoBrowser, input.NoBrowser)
-
-	r.setConfigBool(config.NotificationsEnabled, input.NotificationsEnabled)
-
-	r.setConfigBool(config.ShowScrubber, input.ShowScrubber)
-
-	r.setConfigString(config.WallPlayback, input.WallPlayback)
-	if input.PreviewDefault != nil {
-		c.SetString(config.PreviewDefault, strings.ToLower(input.PreviewDefault.String()))
-	}
-	r.setConfigBool(config.PlayVideoOnHover, input.PlayVideoOnHover)
-	r.setConfigInt(config.MaximumLoopDuration, input.MaximumLoopDuration)
-	r.setConfigBool(config.AutostartVideo, input.AutostartVideo)
-	r.setConfigBool(config.ShowStudioAsText, input.ShowStudioAsText)
-	r.setConfigBool(config.AutostartVideoOnPlaySelected, input.AutostartVideoOnPlaySelected)
-	r.setConfigBool(config.ContinuePlaylistDefault, input.ContinuePlaylistDefault)
-
-	r.setConfigString(config.Language, input.Language)
-
-	if input.ImageLightbox != nil {
-		options := input.ImageLightbox
-
-		r.setConfigInt(config.ImageLightboxSlideshowDelay, options.SlideshowDelay)
-
-		r.setConfigString(config.ImageLightboxDisplayModeKey, (*string)(options.DisplayMode))
-		r.setConfigBool(config.ImageLightboxScaleUp, options.ScaleUp)
-		r.setConfigBool(config.ImageLightboxResetZoomOnNav, options.ResetZoomOnNav)
-		r.setConfigString(config.ImageLightboxScrollModeKey, (*string)(options.ScrollMode))
-
-		r.setConfigInt(config.ImageLightboxScrollAttemptsBeforeChange, options.ScrollAttemptsBeforeChange)
-
-		r.setConfigBool(config.ImageLightboxDisableAnimation, options.DisableAnimation)
-	}
-
-	if input.CSS != nil {
-		c.SetCSS(*input.CSS)
-	}
-
-	r.setConfigBool(config.CSSEnabled, input.CSSEnabled)
-
-	if input.Javascript != nil {
-		c.SetJavascript(*input.Javascript)
-	}
-
-	r.setConfigBool(config.JavascriptEnabled, input.JavascriptEnabled)
-
-	if input.CustomLocales != nil {
-		c.SetCustomLocales(*input.CustomLocales)
-	}
-
-	r.setConfigBool(config.CustomLocalesEnabled, input.CustomLocalesEnabled)
-
-	r.setConfigBool(config.DisableCustomizations, input.DisableCustomizations)
-
-	if input.DisableDropdownCreate != nil {
-		ddc := input.DisableDropdownCreate
-		r.setConfigBool(config.DisableDropdownCreatePerformer, ddc.Performer)
-		r.setConfigBool(config.DisableDropdownCreateStudio, ddc.Studio)
-		r.setConfigBool(config.DisableDropdownCreateTag, ddc.Tag)
-		r.setConfigBool(config.DisableDropdownCreateMovie, ddc.Movie)
-		r.setConfigBool(config.DisableDropdownCreateGallery, ddc.Gallery)
-	}
-
-	r.setConfigString(config.HandyKey, input.HandyKey)
-	r.setConfigInt(config.FunscriptOffset, input.FunscriptOffset)
-	r.setConfigBool(config.UseStashHostedFunscript, input.UseStashHostedFunscript)
-
-	if err := c.Write(); err != nil {
-		return makeConfigInterfaceResult(), err
-	}
-
-	return makeConfigInterfaceResult(), nil
+	return makeConfigInterfaceResult(r.settings.config.Snapshot()), nil
 }
 
 func (r *mutationResolver) ConfigureDlna(ctx context.Context, input ConfigDLNAInput) (*ConfigDLNAResult, error) {
-	c := config.GetInstance()
+	err := r.settings.update(ctx, func(c *config.Config) (func(), error) {
+		setConfigString(c, config.DLNAServerName, input.ServerName)
 
-	r.setConfigString(config.DLNAServerName, input.ServerName)
+		if input.WhitelistedIPs != nil {
+			c.SetInterface(config.DLNADefaultIPWhitelist, input.WhitelistedIPs)
+		}
 
-	if input.WhitelistedIPs != nil {
-		c.SetInterface(config.DLNADefaultIPWhitelist, input.WhitelistedIPs)
+		setConfigString(c, config.DLNAVideoSortOrder, input.VideoSortOrder)
+		setConfigInt(c, config.DLNAPort, input.Port)
+
+		refresh := false
+		if input.Enabled != nil {
+			c.SetBool(config.DLNADefaultEnabled, *input.Enabled)
+			refresh = true
+		}
+
+		if input.Interfaces != nil {
+			c.SetInterface(config.DLNAInterfaces, input.Interfaces)
+		}
+
+		return func() {
+			if refresh {
+				r.settings.runtime.RefreshDLNA()
+			}
+
+		}, nil
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	r.setConfigString(config.DLNAVideoSortOrder, input.VideoSortOrder)
-	r.setConfigInt(config.DLNAPort, input.Port)
-
-	refresh := false
-	if input.Enabled != nil {
-		c.SetBool(config.DLNADefaultEnabled, *input.Enabled)
-		refresh = true
-	}
-
-	if input.Interfaces != nil {
-		c.SetInterface(config.DLNAInterfaces, input.Interfaces)
-	}
-
-	if err := c.Write(); err != nil {
-		return makeConfigDLNAResult(), err
-	}
-
-	if refresh {
-		manager.GetInstance().RefreshDLNA()
-	}
-
-	return makeConfigDLNAResult(), nil
+	return makeConfigDLNAResult(r.settings.config.Snapshot()), nil
 }
 
 func (r *mutationResolver) ConfigureScraping(ctx context.Context, input ConfigScrapingInput) (*ConfigScrapingResult, error) {
-	c := config.GetInstance()
-
-	refreshScraperCache := false
-	if input.ScraperUserAgent != nil {
-		c.SetString(config.ScraperUserAgent, *input.ScraperUserAgent)
-		refreshScraperCache = true
-	}
-
-	if input.ScraperCDPPath != nil {
-		c.SetString(config.ScraperCDPPath, *input.ScraperCDPPath)
-		refreshScraperCache = true
-	}
-
-	if input.ExcludeTagPatterns != nil {
-		for _, r := range input.ExcludeTagPatterns {
-			_, err := regexp.Compile(r)
-			if err != nil {
-				return makeConfigScrapingResult(), fmt.Errorf("tag exclusion pattern '%v' invalid: %w", r, err)
-			}
+	err := r.settings.update(ctx, func(c *config.Config) (func(), error) {
+		refreshScraperCache := false
+		if input.ScraperUserAgent != nil {
+			c.SetString(config.ScraperUserAgent, *input.ScraperUserAgent)
+			refreshScraperCache = true
 		}
-		c.SetInterface(config.ScraperExcludeTagPatterns, input.ExcludeTagPatterns)
-	}
 
-	r.setConfigBool(config.ScraperCertCheck, input.ScraperCertCheck)
+		if input.ScraperCDPPath != nil {
+			c.SetString(config.ScraperCDPPath, *input.ScraperCDPPath)
+			refreshScraperCache = true
+		}
 
-	if refreshScraperCache {
-		manager.GetInstance().RefreshScraperCache()
-	}
-	if err := c.Write(); err != nil {
-		return makeConfigScrapingResult(), err
-	}
+		if input.ExcludeTagPatterns != nil {
+			for _, r := range input.ExcludeTagPatterns {
+				_, err := regexp.Compile(r)
+				if err != nil {
+					return nil, fmt.Errorf("tag exclusion pattern '%v' invalid: %w", r, err)
+				}
+			}
+			c.SetInterface(config.ScraperExcludeTagPatterns, input.ExcludeTagPatterns)
+		}
 
-	return makeConfigScrapingResult(), nil
+		setConfigBool(c, config.ScraperCertCheck, input.ScraperCertCheck)
+
+		return func() {
+			if refreshScraperCache {
+				r.settings.runtime.RefreshScraperCache()
+			}
+
+		}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return makeConfigScrapingResult(r.settings.config.Snapshot()), nil
 }
 
 func (r *mutationResolver) ConfigureDefaults(ctx context.Context, input ConfigDefaultSettingsInput) (*ConfigDefaultSettingsResult, error) {
-	c := config.GetInstance()
+	err := r.settings.update(ctx, func(c *config.Config) (func(), error) {
+		if input.Identify != nil {
+			c.SetInterface(config.DefaultIdentifySettings, input.Identify)
+		}
 
-	if input.Identify != nil {
-		c.SetInterface(config.DefaultIdentifySettings, input.Identify)
+		if input.Scan != nil {
+			// if input.Scan is used then ScanMetadataOptions is included in the config file
+			// this causes the values to not be read correctly
+			c.SetInterface(config.DefaultScanSettings, input.Scan.ScanMetadataOptions)
+		}
+
+		if input.AutoTag != nil {
+			c.SetInterface(config.DefaultAutoTagSettings, input.AutoTag)
+		}
+
+		if input.Generate != nil {
+			c.SetInterface(config.DefaultGenerateSettings, input.Generate)
+		}
+
+		setConfigBool(c, config.DeleteFileDefault, input.DeleteFile)
+		setConfigBool(c, config.DeleteGeneratedDefault, input.DeleteGenerated)
+
+		return nil, nil
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	if input.Scan != nil {
-		// if input.Scan is used then ScanMetadataOptions is included in the config file
-		// this causes the values to not be read correctly
-		c.SetInterface(config.DefaultScanSettings, input.Scan.ScanMetadataOptions)
-	}
-
-	if input.AutoTag != nil {
-		c.SetInterface(config.DefaultAutoTagSettings, input.AutoTag)
-	}
-
-	if input.Generate != nil {
-		c.SetInterface(config.DefaultGenerateSettings, input.Generate)
-	}
-
-	r.setConfigBool(config.DeleteFileDefault, input.DeleteFile)
-	r.setConfigBool(config.DeleteGeneratedDefault, input.DeleteGenerated)
-
-	if err := c.Write(); err != nil {
-		return makeConfigDefaultsResult(), err
-	}
-
-	return makeConfigDefaultsResult(), nil
+	return makeConfigDefaultsResult(r.settings.config.Snapshot()), nil
 }
 
 func (r *mutationResolver) GenerateAPIKey(ctx context.Context, input GenerateAPIKeyInput) (string, error) {
-	c := config.GetInstance()
-
 	var newAPIKey string
-	if input.Clear == nil || !*input.Clear {
-		username := c.GetUsername()
-		if username != "" {
+	err := r.settings.update(ctx, func(c *config.Config) (func(), error) {
+		newAPIKey = ""
+		if (input.Clear == nil || !*input.Clear) && c.GetUsername() != "" {
 			var err error
-			newAPIKey, err = manager.GenerateAPIKey(username)
+			newAPIKey, err = manager.GenerateAPIKey(c.GetUsername(), c.GetJWTSignKey())
 			if err != nil {
-				return "", err
+				return nil, err
 			}
 		}
+		c.SetString(config.ApiKey, newAPIKey)
+		return nil, nil
+	})
+	if err != nil {
+		return "", err
 	}
-
-	c.SetString(config.ApiKey, newAPIKey)
-	if err := c.Write(); err != nil {
-		return newAPIKey, err
-	}
-
 	return newAPIKey, nil
 }
 
@@ -677,7 +666,7 @@ func (r *mutationResolver) ConfigureUI(ctx context.Context, input map[string]int
 			}
 		}
 	}
-	_, err := config.GetInstance().UpdateUIConfiguration(func(existing map[string]interface{}) (map[string]interface{}, error) {
+	_, err := r.settings.config.UpdateUIConfiguration(func(existing map[string]interface{}) (map[string]interface{}, error) {
 		if input != nil {
 			existing = input
 		}
@@ -689,7 +678,7 @@ func (r *mutationResolver) ConfigureUI(ctx context.Context, input map[string]int
 	if err != nil {
 		return nil, err
 	}
-	return manager.GetInstance().UIConfiguration(ctx)
+	return r.settings.runtime.UIConfiguration(ctx)
 }
 
 func (r *mutationResolver) ConfigureUISetting(ctx context.Context, key string, value interface{}) (map[string]interface{}, error) {
@@ -697,14 +686,14 @@ func (r *mutationResolver) ConfigureUISetting(ctx context.Context, key string, v
 		return nil, errors.New("default filters are native records; use configureDefaultFilter")
 	}
 	value = convertJSONNumbers(value)
-	_, err := config.GetInstance().UpdateUIConfiguration(func(existing map[string]interface{}) (map[string]interface{}, error) {
+	_, err := r.settings.config.UpdateUIConfiguration(func(existing map[string]interface{}) (map[string]interface{}, error) {
 		utils.NestedMap(existing).Set(key, value)
 		return existing, manager.ValidateLibraryUIReferences(ctx, existing)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return manager.GetInstance().UIConfiguration(ctx)
+	return r.settings.runtime.UIConfiguration(ctx)
 }
 
 func nativeDefaultFilterConfigKey(key string) bool {
@@ -713,15 +702,12 @@ func nativeDefaultFilterConfigKey(key string) bool {
 }
 
 func (r *mutationResolver) ConfigurePlugin(ctx context.Context, pluginID string, input map[string]interface{}) (map[string]interface{}, error) {
-	c := config.GetInstance()
-
-	// #5483 - convert JSON numbers to float64 or int64
 	input = convertMapJSONNumbers(input)
-	c.SetPluginConfiguration(pluginID, input)
-
-	if err := c.Write(); err != nil {
-		return c.GetPluginConfiguration(pluginID), err
+	if err := r.settings.update(ctx, func(c *config.Config) (func(), error) {
+		c.SetPluginConfiguration(pluginID, input)
+		return nil, nil
+	}); err != nil {
+		return nil, err
 	}
-
-	return c.GetPluginConfiguration(pluginID), nil
+	return r.settings.config.GetPluginConfiguration(pluginID), nil
 }

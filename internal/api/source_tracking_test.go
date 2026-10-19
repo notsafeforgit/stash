@@ -19,15 +19,14 @@ import (
 )
 
 func TestSourceTrackingSavedSettingRequiresRestart(t *testing.T) {
-	cfg := config.InitializeEmpty()
+	cfg := config.NewEmpty()
 	cfg.SetConfigFile(filepath.Join(t.TempDir(), "config.yml"))
 	p := paths.NewPaths(t.TempDir(), t.TempDir())
-	manager.SetInstance(&manager.Manager{Config: cfg, Paths: &p})
-	t.Cleanup(func() { manager.SetInstance(nil); config.InitializeEmpty() })
+	settings := &settingsService{config: cfg, runtime: &manager.Manager{Config: cfg, Paths: &p}}
 	for _, active := range []bool{false, true} {
 		// Starting another server captures the saved setting as its capability.
 		require.Equal(t, active, cfg.GetSourceTrackingEnabled())
-		r := &Resolver{sourceTrackingActive: cfg.GetSourceTrackingEnabled()}
+		r := &Resolver{settings: settings, sourceTrackingActive: cfg.GetSourceTrackingEnabled()}
 		server := handler.New(newLibrarySchema(Config{Resolvers: r}))
 		server.AddTransport(transport.POST{})
 		body, err := json.Marshal(map[string]any{

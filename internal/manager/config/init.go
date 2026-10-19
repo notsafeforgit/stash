@@ -107,12 +107,17 @@ func Initialize() (*Config, error) {
 
 // Called by tests to initialize an empty config
 func InitializeEmpty() *Config {
-	cfg := &Config{
+	instance = NewEmpty()
+	return instance
+}
+
+// NewEmpty constructs an isolated configuration without changing the process
+// default. Callers supply its path and settings explicitly.
+func NewEmpty() *Config {
+	return &Config{
 		main:      koanf.New("."),
 		overrides: koanf.New("."),
 	}
-	instance = cfg
-	return instance
 }
 
 func (i *Config) loadFromCommandLine() {

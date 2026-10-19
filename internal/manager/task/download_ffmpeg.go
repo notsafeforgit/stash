@@ -19,7 +19,7 @@ import (
 
 type DownloadFFmpegJob struct {
 	ConfigDirectory string
-	OnComplete      func(ctx context.Context)
+	OnComplete      func(ctx context.Context) error
 	urls            []string
 	downloaded      int
 }
@@ -33,7 +33,7 @@ func (s *DownloadFFmpegJob) Execute(ctx context.Context, progress *job.Progress)
 	}
 
 	if s.OnComplete != nil {
-		s.OnComplete(ctx)
+		return s.OnComplete(ctx)
 	}
 
 	return nil

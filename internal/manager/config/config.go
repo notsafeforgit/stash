@@ -385,6 +385,8 @@ type Config struct {
 	certFile string
 	keyFile  string
 	sync.RWMutex
+	updateMu sync.Mutex
+	revision uint64
 	// deadlock.RWMutex // for deadlock testing/issues
 
 	// cached values for high-frequency calls
@@ -417,6 +419,7 @@ func (i *Config) SetConfigFile(fn string) {
 	i.Lock()
 	defer i.Unlock()
 	i.filePath = fn
+	i.revision++
 }
 
 type ipWhitelist struct {
@@ -519,6 +522,7 @@ func (i *Config) SetInterface(key string, value interface{}) {
 
 func (i *Config) set(key string, value interface{}) {
 	// assumes lock held
+	i.revision++
 
 	// default behaviour for Set is to merge the value
 	// we want to replace it
@@ -1633,33 +1637,24 @@ func (i *Config) GetCSSPath() string {
 	return fn
 }
 
+// GetCSS reads the saved customization, falling back to the standalone file
+// until its first explicit settings edit. An empty saved value clears that file's
+// effect without rewriting an operator-managed file.
 func (i *Config) GetCSS() string {
-	fn := i.GetCSSPath()
-
-	exists, _ := fsutil.FileExists(fn)
-	if !exists {
-		return ""
+	i.RLock()
+	saved := i.forKey("custom_css")
+	if saved.Exists("custom_css") {
+		value := saved.String("custom_css")
+		i.RUnlock()
+		return value
 	}
-
-	buf, err := os.ReadFile(fn)
-
-	if err != nil {
-		return ""
-	}
-
+	i.RUnlock()
+	buf, _ := os.ReadFile(i.GetCSSPath())
 	return string(buf)
 }
 
 func (i *Config) SetCSS(css string) {
-	fn := i.GetCSSPath()
-	i.Lock()
-	defer i.Unlock()
-
-	buf := []byte(css)
-
-	if err := os.WriteFile(fn, buf, 0777); err != nil {
-		logger.Warnf("error while writing %v bytes to %v: %v", len(buf), fn, err)
-	}
+	i.SetString("custom_css", css)
 }
 
 func (i *Config) GetCSSEnabled() bool {
@@ -1676,33 +1671,24 @@ func (i *Config) GetJavascriptPath() string {
 	return fn
 }
 
+// GetJavascript reads the saved customization, falling back to the standalone file
+// until its first explicit settings edit. An empty saved value clears that file's
+// effect without rewriting an operator-managed file.
 func (i *Config) GetJavascript() string {
-	fn := i.GetJavascriptPath()
-
-	exists, _ := fsutil.FileExists(fn)
-	if !exists {
-		return ""
+	i.RLock()
+	saved := i.forKey("custom_javascript")
+	if saved.Exists("custom_javascript") {
+		value := saved.String("custom_javascript")
+		i.RUnlock()
+		return value
 	}
-
-	buf, err := os.ReadFile(fn)
-
-	if err != nil {
-		return ""
-	}
-
+	i.RUnlock()
+	buf, _ := os.ReadFile(i.GetJavascriptPath())
 	return string(buf)
 }
 
 func (i *Config) SetJavascript(javascript string) {
-	fn := i.GetJavascriptPath()
-	i.Lock()
-	defer i.Unlock()
-
-	buf := []byte(javascript)
-
-	if err := os.WriteFile(fn, buf, 0777); err != nil {
-		logger.Warnf("error while writing %v bytes to %v: %v", len(buf), fn, err)
-	}
+	i.SetString("custom_javascript", javascript)
 }
 
 func (i *Config) GetJavascriptEnabled() bool {
@@ -1719,33 +1705,24 @@ func (i *Config) GetCustomLocalesPath() string {
 	return fn
 }
 
+// GetCustomLocales reads the saved customization, falling back to the standalone file
+// until its first explicit settings edit. An empty saved value clears that file's
+// effect without rewriting an operator-managed file.
 func (i *Config) GetCustomLocales() string {
-	fn := i.GetCustomLocalesPath()
-
-	exists, _ := fsutil.FileExists(fn)
-	if !exists {
-		return ""
+	i.RLock()
+	saved := i.forKey("custom_locales")
+	if saved.Exists("custom_locales") {
+		value := saved.String("custom_locales")
+		i.RUnlock()
+		return value
 	}
-
-	buf, err := os.ReadFile(fn)
-
-	if err != nil {
-		return ""
-	}
-
+	i.RUnlock()
+	buf, _ := os.ReadFile(i.GetCustomLocalesPath())
 	return string(buf)
 }
 
 func (i *Config) SetCustomLocales(customLocales string) {
-	fn := i.GetCustomLocalesPath()
-	i.Lock()
-	defer i.Unlock()
-
-	buf := []byte(customLocales)
-
-	if err := os.WriteFile(fn, buf, 0777); err != nil {
-		logger.Warnf("error while writing %v bytes to %v: %v", len(buf), fn, err)
-	}
+	i.SetString("custom_locales", customLocales)
 }
 
 func (i *Config) GetCustomLocalesEnabled() bool {

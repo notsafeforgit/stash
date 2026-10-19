@@ -17,7 +17,7 @@ type APIKeyClaims struct {
 	jwt.RegisteredClaims
 }
 
-func GenerateAPIKey(userID string) (string, error) {
+func GenerateAPIKey(userID string, signingKey []byte) (string, error) {
 	claims := &APIKeyClaims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -28,7 +28,7 @@ func GenerateAPIKey(userID string) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	ss, err := token.SignedString(config.GetInstance().GetJWTSignKey())
+	ss, err := token.SignedString(signingKey)
 	if err != nil {
 		return "", err
 	}

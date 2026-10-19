@@ -1,13 +1,11 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/stashapp/stash/pkg/entityid"
-	"io"
 	"io/fs"
 	"net"
 	"net/http"
@@ -235,6 +233,7 @@ func Initialize() (*Server, error) {
 	groupService := mgr.GroupService
 	sourceTracking := cfg.GetSourceTrackingEnabled()
 	resolver := &Resolver{
+		settings:             &settingsService{config: cfg, runtime: mgr, setLogLevel: mgr.Logger.SetLogLevel},
 		sourceTrackingActive: sourceTracking,
 		shares:               server.shares,
 		scraperCacheStore:    mgr.ScraperCache,
@@ -539,90 +538,42 @@ func (s *Server) getPluginRoutes() chi.Router {
 	}.Routes()
 }
 
-func copyFile(w io.Writer, path string) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	_, err = io.Copy(w, f)
-
-	return err
-}
-
-func serveFiles(w http.ResponseWriter, r *http.Request, paths []string) {
-	buffer := bytes.Buffer{}
-
-	for _, path := range paths {
-		err := copyFile(&buffer, path)
-		if err != nil {
-			logger.Errorf("error serving file %s: %v", path, err)
-		}
-		buffer.Write([]byte("\n"))
-	}
-
-	utils.ServeStaticContent(w, r, buffer.Bytes())
-}
-
 func cssHandler(c *config.Config) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var paths []string
-
-		if c.GetCSSEnabled() && !c.GetDisableCustomizations() {
-			// search for custom.css in current directory, then $HOME/.stash
-			fn := c.GetCSSPath()
-			exists, _ := fsutil.FileExists(fn)
-			if exists {
-				paths = append(paths, fn)
-			}
+		cfg := c.Snapshot()
+		var content string
+		if cfg.GetCSSEnabled() && !cfg.GetDisableCustomizations() {
+			content = cfg.GetCSS()
 		}
-
 		w.Header().Set("Content-Type", "text/css")
-		serveFiles(w, r, paths)
+		utils.ServeStaticContent(w, r, []byte(content))
 	}
 }
 
 func javascriptHandler(c *config.Config) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var paths []string
-
-		if c.GetJavascriptEnabled() && !c.GetDisableCustomizations() {
-			// search for custom.js in current directory, then $HOME/.stash
-			fn := c.GetJavascriptPath()
-			exists, _ := fsutil.FileExists(fn)
-			if exists {
-				paths = append(paths, fn)
-			}
+		cfg := c.Snapshot()
+		var content string
+		if cfg.GetJavascriptEnabled() && !cfg.GetDisableCustomizations() {
+			content = cfg.GetJavascript()
 		}
-
 		w.Header().Set("Content-Type", "text/javascript")
-		serveFiles(w, r, paths)
+		utils.ServeStaticContent(w, r, []byte(content))
 	}
 }
 
 func customLocalesHandler(c *config.Config) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		buffer := bytes.Buffer{}
-
-		if c.GetCustomLocalesEnabled() && !c.GetDisableCustomizations() {
-			// search for custom-locales.json in current directory, then $HOME/.stash
-			path := c.GetCustomLocalesPath()
-			exists, _ := fsutil.FileExists(path)
-			if exists {
-				err := copyFile(&buffer, path)
-				if err != nil {
-					logger.Errorf("error serving file %s: %v", path, err)
-				}
-			}
+		cfg := c.Snapshot()
+		content := ""
+		if cfg.GetCustomLocalesEnabled() && !cfg.GetDisableCustomizations() {
+			content = cfg.GetCustomLocales()
 		}
-
-		if buffer.Len() == 0 {
-			buffer.Write([]byte("{}"))
+		if content == "" {
+			content = "{}"
 		}
-
 		w.Header().Set("Content-Type", "application/json")
-		utils.ServeStaticContent(w, r, buffer.Bytes())
+		utils.ServeStaticContent(w, r, []byte(content))
 	}
 }
 

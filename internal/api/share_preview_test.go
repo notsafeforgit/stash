@@ -204,7 +204,7 @@ func TestSharedImageThumbnailReuseAndOriginalViewsStayScoped(t *testing.T) {
 func TestSharingPublicAddressConfigurationPersists(t *testing.T) {
 	c := config.InitializeEmpty()
 	c.SetConfigFile(filepath.Join(t.TempDir(), "config.yml"))
-	r := &mutationResolver{}
+	r := &mutationResolver{&Resolver{settings: &settingsService{config: c}}}
 	result, err := r.ConfigureSharing(context.Background(), "https://shares.test/share/")
 	require.NoError(t, err)
 	require.Equal(t, "https://shares.test/share", result.PublicURL)
@@ -213,7 +213,7 @@ func TestSharingPublicAddressConfigurationPersists(t *testing.T) {
 	require.Contains(t, string(data), "sharing_public_url: https://shares.test/share")
 	_, err = r.ConfigureSharing(context.Background(), "http://invalid.test/share")
 	require.Error(t, err)
-	require.Equal(t, "https://shares.test/share", sharingConfiguration().PublicURL)
+	require.Equal(t, "https://shares.test/share", sharingConfiguration(c).PublicURL)
 	result, err = r.ConfigureSharing(context.Background(), "")
 	require.NoError(t, err)
 	require.Empty(t, result.PublicURL)

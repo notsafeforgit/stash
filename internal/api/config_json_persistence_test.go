@@ -86,20 +86,17 @@ func TestConfigurationJSONNumbersPersistAcrossReload(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			// Resolver configuration is process-global; these cases must not run
-			// in parallel. Every write targets a private temporary configuration.
-			cfg := config.InitializeEmpty()
+			cfg := config.NewEmpty()
 			db := sqlite.NewDatabase()
 			require.NoError(t, db.Open(filepath.Join(t.TempDir(), "config.sqlite")))
 			t.Cleanup(func() { require.NoError(t, db.Close()) })
 			repo := db.Repository()
-			manager.SetInstance(&manager.Manager{Config: cfg, Repository: repo})
-			t.Cleanup(func() { manager.SetInstance(nil); config.InitializeEmpty() })
+			settings := &settingsService{config: cfg, runtime: &manager.Manager{Config: cfg, Repository: repo}}
 			path := filepath.Join(t.TempDir(), "config.yml")
 			cfg.SetConfigFile(path)
 			cfg.SetUIConfiguration(map[string]interface{}{"unrelated": "keep"})
 
-			server := handler.New(newLibrarySchema(Config{Resolvers: &Resolver{repository: repo}}))
+			server := handler.New(newLibrarySchema(Config{Resolvers: &Resolver{repository: repo, settings: settings}}))
 			server.AddTransport(transport.POST{})
 			body, err := json.Marshal(map[string]interface{}{"query": tt.query, "variables": tt.variables})
 			require.NoError(t, err)

@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/models"
@@ -14,8 +13,8 @@ import (
 )
 
 func (r *queryResolver) Configuration(ctx context.Context) (*ConfigResult, error) {
-	result := makeConfigResult()
-	ui, err := manager.GetInstance().UIConfiguration(ctx)
+	result := makeConfigResult(r.settings.config.Snapshot())
+	ui, err := r.settings.runtime.UIConfiguration(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -65,19 +64,18 @@ func getParent(path string) *string {
 	}
 }
 
-func makeConfigResult() *ConfigResult {
+func makeConfigResult(config *config.Config) *ConfigResult {
 	return &ConfigResult{
-		General:   makeConfigGeneralResult(),
-		Interface: makeConfigInterfaceResult(),
-		Dlna:      makeConfigDLNAResult(),
-		Scraping:  makeConfigScrapingResult(),
-		Defaults:  makeConfigDefaultsResult(),
-		UI:        makeConfigUIResult(),
+		General:   makeConfigGeneralResult(config),
+		Interface: makeConfigInterfaceResult(config),
+		Dlna:      makeConfigDLNAResult(config),
+		Scraping:  makeConfigScrapingResult(config),
+		Defaults:  makeConfigDefaultsResult(config),
+		UI:        makeConfigUIResult(config),
 	}
 }
 
-func makeConfigGeneralResult() *ConfigGeneralResult {
-	config := config.GetInstance()
+func makeConfigGeneralResult(config *config.Config) *ConfigGeneralResult {
 	logFile := config.GetLogFile()
 
 	maxTranscodeSize := config.GetMaxTranscodeSize()
@@ -164,8 +162,7 @@ func previewDefaultStrToEnum(s string) PreviewDefaultType {
 	}
 }
 
-func makeConfigInterfaceResult() *ConfigInterfaceResult {
-	config := config.GetInstance()
+func makeConfigInterfaceResult(config *config.Config) *ConfigInterfaceResult {
 	menuItems := config.GetMenuItems()
 	soundOnPreview := config.GetSoundOnPreview()
 	wallShowTitle := config.GetWallShowTitle()
@@ -230,8 +227,7 @@ func makeConfigInterfaceResult() *ConfigInterfaceResult {
 	}
 }
 
-func makeConfigDLNAResult() *ConfigDLNAResult {
-	config := config.GetInstance()
+func makeConfigDLNAResult(config *config.Config) *ConfigDLNAResult {
 
 	return &ConfigDLNAResult{
 		ServerName:     config.GetDLNAServerName(),
@@ -243,8 +239,7 @@ func makeConfigDLNAResult() *ConfigDLNAResult {
 	}
 }
 
-func makeConfigScrapingResult() *ConfigScrapingResult {
-	config := config.GetInstance()
+func makeConfigScrapingResult(config *config.Config) *ConfigScrapingResult {
 
 	scraperUserAgent := config.GetScraperUserAgent()
 	scraperCDPPath := config.GetScraperCDPPath()
@@ -257,8 +252,7 @@ func makeConfigScrapingResult() *ConfigScrapingResult {
 	}
 }
 
-func makeConfigDefaultsResult() *ConfigDefaultSettingsResult {
-	config := config.GetInstance()
+func makeConfigDefaultsResult(config *config.Config) *ConfigDefaultSettingsResult {
 	deleteFileDefault := config.GetDeleteFileDefault()
 	deleteGeneratedDefault := config.GetDeleteGeneratedDefault()
 
@@ -272,8 +266,8 @@ func makeConfigDefaultsResult() *ConfigDefaultSettingsResult {
 	}
 }
 
-func makeConfigUIResult() map[string]interface{} {
-	return config.GetInstance().GetUIConfiguration()
+func makeConfigUIResult(config *config.Config) map[string]interface{} {
+	return config.GetUIConfiguration()
 }
 
 func (r *queryResolver) ValidateStashBoxCredentials(ctx context.Context, input config.StashBoxInput) (*StashBoxValidationResult, error) {

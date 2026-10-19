@@ -7,10 +7,15 @@ API and development guides.
 
 ## Files, endpoints, and settings
 
-Place customization files alongside the active config file (`~/.stash/` by
-default, or the directory containing `STASH_CONFIG_FILE`):
+Customization files alongside the active config file (`~/.stash/` by default, or
+the directory containing `STASH_CONFIG_FILE`) remain supported until an explicit
+edit in Settings → Interface. Saving an editor stores its text in `custom_css`,
+`custom_javascript`, or `custom_locales` in the YAML configuration, atomically with
+the rest of the settings. The saved value takes precedence over the standalone
+file, including an empty value. Existing files are never rewritten by the editor.
+Remove the corresponding YAML key to return to a file managed outside Stash.
 
-| File | Endpoint relative to the application base | Purpose |
+| Standalone file | Endpoint relative to the application base | Purpose |
 | --- | --- | --- |
 | `custom.css` | `css` | Plain CSS loaded through a stylesheet link |
 | `custom.js` | `javascript` | Deferred script loaded after the React module script in the HTML |

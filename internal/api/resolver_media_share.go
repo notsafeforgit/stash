@@ -87,11 +87,10 @@ func (r *queryResolver) MediaShare(ctx context.Context, id string) (*MediaShare,
 }
 
 func (r *queryResolver) SharingConfiguration(ctx context.Context) (*SharingConfiguration, error) {
-	return sharingConfiguration(), nil
+	return sharingConfiguration(r.settings.config), nil
 }
 
-func sharingConfiguration() *SharingConfiguration {
-	c := config.GetInstance()
+func sharingConfiguration(c *config.Config) *SharingConfiguration {
 	return &SharingConfiguration{PublicURL: c.GetSharingPublicURL(), MaxItems: sharing.MaxItems, MaxDays: 30}
 }
 
@@ -100,12 +99,13 @@ func (r *mutationResolver) ConfigureSharing(ctx context.Context, publicURL strin
 	if err := config.ValidateSharingPublicURL(publicURL); err != nil {
 		return nil, err
 	}
-	c := config.GetInstance()
-	c.SetString(config.SharingPublicURL, publicURL)
-	if err := c.Write(); err != nil {
+	if err := r.settings.update(ctx, func(c *config.Config) (func(), error) {
+		c.SetString(config.SharingPublicURL, publicURL)
+		return nil, nil
+	}); err != nil {
 		return nil, err
 	}
-	return sharingConfiguration(), nil
+	return sharingConfiguration(r.settings.config), nil
 }
 
 func (r *mutationResolver) MediaShareCreate(ctx context.Context, input MediaShareCreateInput) (*MediaShareCreated, error) {

@@ -34,6 +34,7 @@ type hookExecutor interface {
 }
 
 type Resolver struct {
+	settings             *settingsService
 	sourceTrackingActive bool
 	shares               *sharing.Service
 	scraperCacheStore    *scraper.Cache

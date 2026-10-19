@@ -3,12 +3,10 @@ package api
 import (
 	"context"
 	"sort"
-
-	"github.com/stashapp/stash/internal/manager/config"
 )
 
 func (r *queryResolver) PluginHookOrder(ctx context.Context) ([]*PluginHookOrder, error) {
-	raw := config.GetInstance().GetPluginHookOrder()
+	raw := r.settings.config.GetPluginHookOrder()
 	hooks := make([]string, 0, len(raw))
 	for h := range raw {
 		hooks = append(hooks, h)

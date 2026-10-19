@@ -84,39 +84,37 @@ func (r *mutationResolver) ReloadPlugins(ctx context.Context) (bool, error) {
 }
 
 func (r *mutationResolver) SetPluginsEnabled(ctx context.Context, enabledMap map[string]bool) (bool, error) {
-	c := config.GetInstance()
+	err := r.settings.update(ctx, func(c *config.Config) (func(), error) {
 
-	existingDisabled := c.GetDisabledPlugins()
-	var newDisabled []string
+		existingDisabled := c.GetDisabledPlugins()
+		var newDisabled []string
 
-	// remove plugins that are no longer disabled
-	for _, disabledID := range existingDisabled {
-		if enabled, found := enabledMap[disabledID]; !enabled || !found {
-			newDisabled = append(newDisabled, disabledID)
+		// remove plugins that are no longer disabled
+		for _, disabledID := range existingDisabled {
+			if enabled, found := enabledMap[disabledID]; !enabled || !found {
+				newDisabled = append(newDisabled, disabledID)
+			}
 		}
-	}
 
-	// add plugins that are newly disabled
-	for pluginID, enabled := range enabledMap {
-		if !enabled {
-			newDisabled = sliceutil.AppendUnique(newDisabled, pluginID)
+		// add plugins that are newly disabled
+		for pluginID, enabled := range enabledMap {
+			if !enabled {
+				newDisabled = sliceutil.AppendUnique(newDisabled, pluginID)
+			}
 		}
-	}
 
-	c.SetInterface(config.DisabledPlugins, newDisabled)
+		c.SetInterface(config.DisabledPlugins, newDisabled)
 
-	if err := c.Write(); err != nil {
-		return false, err
-	}
-
-	return true, nil
+		return nil, nil
+	})
+	return err == nil, err
 }
 
 func (r *mutationResolver) SetPluginHookOrder(ctx context.Context, input PluginHookOrderInput) ([]*PluginHookOrder, error) {
-	c := config.GetInstance()
-	c.SetPluginHookOrderForHook(input.Hook, input.PluginIds)
-
-	if err := c.Write(); err != nil {
+	if err := r.settings.update(ctx, func(c *config.Config) (func(), error) {
+		c.SetPluginHookOrderForHook(input.Hook, input.PluginIds)
+		return nil, nil
+	}); err != nil {
 		return nil, err
 	}
 

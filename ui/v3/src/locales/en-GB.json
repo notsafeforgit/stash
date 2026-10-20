@@ -1677,7 +1677,7 @@
   "job": {
     "finalizing": "Finalizing",
     "history": "Recent library tasks",
-    "history_help": "The last 1,000 outcomes are retained. Interrupted tasks are not resumed automatically; review partial results before starting them again.",
+    "history_help": "The last 1,000 outcomes are retained. Bulk edits resume after a server restart. Paused bulk edits retain their progress and can be cancelled. Other interrupted tasks must be reviewed before starting again.",
     "history_empty": "No recorded tasks.",
     "outcome_unavailable": "The job outcome could not be confirmed.",
     "status": {
@@ -1687,7 +1687,8 @@
       "finished": "Completed",
       "cancelled": "Cancelled",
       "failed": "Failed",
-      "interrupted": "Interrupted"
+      "interrupted": "Interrupted",
+      "paused": "Paused"
     }
   },
   "ethnicity": "Ethnicity",

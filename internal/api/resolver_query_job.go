@@ -75,7 +75,7 @@ type jobService interface {
 	Find(context.Context, string) (*job.Job, error)
 	History(context.Context, int, int) ([]job.Job, error)
 	GetQueue() []job.Job
-	CancelJob(string)
-	CancelAll()
+	CancelJob(string) error
+	CancelAll() error
 	Subscribe(context.Context) *job.ManagerSubscription
 }

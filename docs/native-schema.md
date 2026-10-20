@@ -1,5 +1,11 @@
 # Native schema promotion
 
+Schema 1000126 adds bounded durable commands and per-item checkpoints for ordinary
+[bulk edits](native-bulk-updates.md), including fenced recovery and notification
+attempts. Existing ordinary job history is preserved; pending old executors
+without commands retain their interrupted-task behavior. No library entities
+are edited by the migration, and the direct initialization baseline stays pinned.
+
 Schema 1000125 captures historical cover frame selections from generated caches
 into canonical SQLite metadata, with a finite upgrade cohort and bounded
 unresolved evidence. See [cover selection ownership](preview-images.md#storage-and-compatibility-boundary).

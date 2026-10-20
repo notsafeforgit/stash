@@ -3,10 +3,10 @@ package api
 import "context"
 
 func (r *mutationResolver) StopJob(ctx context.Context, jobID string) (bool, error) {
-	r.jobs.CancelJob(jobID)
-	return true, nil
+	err := r.jobs.CancelJob(jobID)
+	return err == nil, err
 }
 func (r *mutationResolver) StopAllJobs(ctx context.Context) (bool, error) {
-	r.jobs.CancelAll()
-	return true, nil
+	err := r.jobs.CancelAll()
+	return err == nil, err
 }

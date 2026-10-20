@@ -4,16 +4,17 @@ import (
 	"context"
 
 	"github.com/stashapp/stash/internal/manager"
+	"github.com/stashapp/stash/pkg/bulkupdate"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
 )
 
 type bulkUpdater interface {
-	BulkUpdate(ctx context.Context, description string, ids []int, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) (string, error)
+	BulkUpdate(ctx context.Context, description string, selectTargets bulkupdate.Selector, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) (string, int, error)
 }
 
-func (r *Resolver) enqueueBulkUpdate(ctx context.Context, description string, ids []int, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) (string, error) {
-	return r.bulkUpdater.BulkUpdate(ctx, description, ids, operation, hookType, input, inputFields)
+func (r *Resolver) enqueueBulkUpdate(ctx context.Context, description string, selectTargets bulkupdate.Selector, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) (string, int, error) {
+	return r.bulkUpdater.BulkUpdate(ctx, description, selectTargets, operation, hookType, input, inputFields)
 }
 
 func sanitizeBulkUpdateFindFilter(findFilter *models.FindFilterType) *models.FindFilterType {

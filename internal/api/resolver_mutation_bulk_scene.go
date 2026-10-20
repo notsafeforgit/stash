@@ -17,6 +17,7 @@ import (
 func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneUpdateInput) (*BulkUpdateResult, error) {
 	var sceneIDs []int
 	var err error
+	var selection bulkupdate.Selector
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if len(input.Ids) > 0 {
 		sceneIDs, err = stringslice.StringSliceToIntSlice(input.Ids)
@@ -29,20 +30,7 @@ func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneU
 			return nil, fmt.Errorf("scene_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
-		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
-		if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-			scenes, _, err := r.repository.Scene.QueryAST(ctx, input.SceneFilterAst, findFilter)
-			if err != nil {
-				return err
-			}
-
-			sceneIDs = idsFromItems(scenes, func(scene *models.Scene) int {
-				return scene.ID
-			})
-			return nil
-		}); err != nil {
-			return nil, fmt.Errorf("querying ids: %w", err)
-		}
+		selection = bulkupdate.SelectAll(r.repository.Scene.QueryAST, input.SceneFilterAst, input.FindFilter, func(item *models.Scene) int { return item.ID })
 	}
 
 	translator := changesetTranslator{
@@ -125,17 +113,18 @@ func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneU
 		return completedBulkUpdate(sceneIDs), nil
 	}
 
-	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Scene Update", sceneIDs, operation, hook.SceneUpdatePost, input, translator.getFields())
+	jobID, selectedCount, err := r.enqueueBulkUpdate(ctx, "Bulk Scene Update", selection, operation, hook.SceneUpdatePost, input, translator.getFields())
 	if err != nil {
 		return nil, err
 	}
 
-	return queuedBulkUpdate(jobID, len(sceneIDs)), nil
+	return queuedBulkUpdate(jobID, selectedCount), nil
 }
 
 func (r *mutationResolver) ScenesSetDateFromFileMTime(ctx context.Context, input ScenesSetDateFromFileMTimeInput) (string, error) {
 	var sceneIDs []int
 	var err error
+	var selection bulkupdate.Selector
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if len(input.Ids) > 0 {
 		sceneIDs, err = stringslice.StringSliceToIntSlice(input.Ids)
@@ -148,20 +137,7 @@ func (r *mutationResolver) ScenesSetDateFromFileMTime(ctx context.Context, input
 			return "", fmt.Errorf("scene_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
-		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
-		if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-			scenes, _, err := r.repository.Scene.QueryAST(ctx, input.SceneFilterAst, findFilter)
-			if err != nil {
-				return err
-			}
-
-			sceneIDs = idsFromItems(scenes, func(scene *models.Scene) int {
-				return scene.ID
-			})
-			return nil
-		}); err != nil {
-			return "", fmt.Errorf("querying ids: %w", err)
-		}
+		selection = bulkupdate.SelectAll(r.repository.Scene.QueryAST, input.SceneFilterAst, input.FindFilter, func(item *models.Scene) int { return item.ID })
 	}
 
 	operation := bulkupdate.SceneDateFromMTime{
@@ -190,7 +166,7 @@ func (r *mutationResolver) ScenesSetDateFromFileMTime(ctx context.Context, input
 		return "sync", nil
 	}
 
-	jobID, err := r.enqueueBulkUpdate(ctx, "Set Scene Dates From File MTime", sceneIDs, operation, hook.SceneUpdatePost, input, []string{"date"})
+	jobID, _, err := r.enqueueBulkUpdate(ctx, "Set Scene Dates From File MTime", selection, operation, hook.SceneUpdatePost, input, []string{"date"})
 	return jobID, err
 }
 
@@ -200,27 +176,14 @@ func (r *mutationResolver) BulkSceneMarkerUpdate(ctx context.Context, input Bulk
 		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
+	var selection bulkupdate.Selector
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
 		if !hasBulkUpdateFilter(input.FindFilter, input.SceneMarkerFilterAst) {
 			return nil, fmt.Errorf("scene_marker_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
-		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
-		err = r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, _, qErr := r.repository.SceneMarker.QueryAST(ctx, input.SceneMarkerFilterAst, findFilter)
-			if qErr != nil {
-				return qErr
-			}
-
-			ids = idsFromItems(result, func(item *models.SceneMarker) int {
-				return item.ID
-			})
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
+		selection = bulkupdate.SelectAll(r.repository.SceneMarker.QueryAST, input.SceneMarkerFilterAst, input.FindFilter, func(item *models.SceneMarker) int { return item.ID })
 	}
 
 	translator := changesetTranslator{
@@ -266,11 +229,11 @@ func (r *mutationResolver) BulkSceneMarkerUpdate(ctx context.Context, input Bulk
 		return completedBulkUpdate(ids), nil
 	}
 
-	jobDescription := fmt.Sprintf("Bulk Scene Marker Update (%d items)", len(ids))
-	jobID, err := r.enqueueBulkUpdate(ctx, jobDescription, ids, operation, hook.SceneMarkerUpdatePost, input, translator.getFields())
+	jobDescription := "Bulk Scene Marker Update"
+	jobID, selectedCount, err := r.enqueueBulkUpdate(ctx, jobDescription, selection, operation, hook.SceneMarkerUpdatePost, input, translator.getFields())
 	if err != nil {
 		return nil, err
 	}
 
-	return queuedBulkUpdate(jobID, len(ids)), nil
+	return queuedBulkUpdate(jobID, selectedCount), nil
 }

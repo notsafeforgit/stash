@@ -15,6 +15,10 @@ import (
 var ErrStopped = errors.New("job manager is stopping")
 var ErrHistoryUnavailable = errors.New("library job history is not ready")
 
+// ErrResumePending keeps durable checkpoints when infrastructure fails. The
+// next opening resumes the accepted command instead of discarding its targets.
+var ErrResumePending = errors.New("job requires recovery on the next server start")
+
 const maxGraveyardSize = 10
 const defaultThrottleLimit = 100 * time.Millisecond
 
@@ -64,7 +68,7 @@ func (m *Manager) Stop() {
 		return
 	}
 	m.stopped = true
-	m.cancelAllLocked()
+	m.stopAllLocked()
 	m.notEmpty.Broadcast()
 	go func() {
 		m.active.Wait()
@@ -73,7 +77,7 @@ func (m *Manager) Stop() {
 	}()
 }
 
-// Shutdown stops admission, cancels queued/running work and waits for every
+// Shutdown stops admission, pauses durable work, cancels other work and waits for every
 // executor (including Start and synchronous jobs) to release its resources.
 // A deadline does not relabel an unfinished executor as completed.
 func (m *Manager) Shutdown(ctx context.Context) error {
@@ -96,7 +100,7 @@ func (m *Manager) RequireHistory() {
 
 // EnableHistory recovers only this process's first opening of the library.
 // Repeated setup callbacks must not interrupt work submitted in this process.
-func (m *Manager) EnableHistory(ctx context.Context, history History) error {
+func (m *Manager) EnableHistory(ctx context.Context, history History, restore func(context.Context) ([]Restoration, error)) error {
 	m.historyMu.Lock()
 	defer m.historyMu.Unlock()
 	m.mutex.Lock()
@@ -108,9 +112,39 @@ func (m *Manager) EnableHistory(ctx context.Context, history History) error {
 	if err := history.Interrupt(ctx); err != nil {
 		return err
 	}
+	var restored []Restoration
+	if restore != nil {
+		var err error
+		restored, err = restore(ctx)
+		if err != nil {
+			return err
+		}
+	}
+	seen := map[string]bool{}
+	for _, pending := range restored {
+		j := pending.Job
+		if _, err := uuid.Parse(j.ID); err != nil || j.Status != StatusReady || j.Generation < 1 ||
+			j.EndTime != nil || pending.Executor == nil || seen[j.ID] {
+			return errors.New("invalid restored library job")
+		}
+		seen[j.ID] = true
+	}
 	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.stopped {
+		return ErrStopped
+	}
+	// Publish admission and the complete restored queue together. New requests
+	// cannot overtake older accepted commands during the recovery window.
+	for _, pending := range restored {
+		j := pending.Job
+		j.exec, j.outerCtx, j.history = pending.Executor, ctx, history
+		j.resumable, j.persistMu = true, &sync.Mutex{}
+		m.queue = append(m.queue, &j)
+		m.notifyNewJob(&j)
+	}
 	m.history = history
-	m.mutex.Unlock()
+	m.notEmpty.Broadcast()
 	return nil
 }
 
@@ -148,9 +182,18 @@ func (m *Manager) add(ctx context.Context, description string, e JobExec, immedi
 	m.active.Add(1)
 	m.mutex.Unlock()
 	defer m.active.Done()
-	j := &Job{ID: uuid.NewString(), Status: StatusReady, Description: description,
-		Progress: ProgressIndefinite, AddTime: time.Now(), exec: e, outerCtx: ctx, history: history}
-	if history != nil {
+	persisted, resumable := e.(PersistedExec)
+	j := &Job{ID: uuid.NewString(), Status: StatusReady, Description: description, Generation: 1,
+		Progress: ProgressIndefinite, AddTime: time.Now(), exec: e, outerCtx: ctx, history: history,
+		resumable: resumable, persistMu: &sync.Mutex{}}
+	if resumable {
+		if history == nil || transient {
+			return "", ErrHistoryUnavailable
+		}
+		if err := persisted.Admit(ctx, j.statusCopy()); err != nil {
+			return "", fmt.Errorf("persisting job admission: %w", err)
+		}
+	} else if history != nil {
 		if err := history.Create(ctx, j.statusCopy()); err != nil {
 			return "", fmt.Errorf("persisting job admission: %w", err)
 		}
@@ -158,9 +201,13 @@ func (m *Manager) add(ctx context.Context, description string, e JobExec, immedi
 	m.mutex.Lock()
 	m.queue = append(m.queue, j)
 	if m.stopped {
+		j.paused = resumable
 		j.cancel()
 		m.mutex.Unlock()
 		m.onJobFinish(j)
+		if resumable {
+			return j.ID, nil // Durable admission committed before shutdown.
+		}
 		return "", ErrStopped
 	}
 	m.notifyNewJob(j)
@@ -230,7 +277,9 @@ func (m *Manager) newProgress(j *Job) *Progress {
 func (m *Manager) dispatch(ctx context.Context, j *Job) (done chan struct{}) {
 	// assumes lock held
 	t := time.Now()
-	j.StartTime = &t
+	if j.StartTime == nil {
+		j.StartTime = &t
+	}
 	j.Status = StatusRunning
 
 	// create a cancellable context for the job that is not canceled by the outer context
@@ -258,17 +307,26 @@ func (m *Manager) executeJob(ctx context.Context, j *Job, done chan struct{}) {
 
 			m.mutex.Lock()
 			defer m.mutex.Unlock()
-			j.error(fmt.Errorf("panic: %v", p))
+			if j.Status != StatusStopping {
+				j.error(fmt.Errorf("panic: %v", p))
+				j.paused = j.resumable
+			}
 		}
 	}()
 
 	if j.history != nil {
+		j.persistMu.Lock()
 		m.mutex.Lock()
 		snapshot := j.statusCopy()
 		m.mutex.Unlock()
-		if err := persistJobStatus(j.history, snapshot); err != nil {
+		err := persistJobStatus(j.history, snapshot)
+		j.persistMu.Unlock()
+		if err != nil {
 			m.mutex.Lock()
-			j.error(fmt.Errorf("persisting job start: %w", err))
+			if j.Status != StatusStopping {
+				j.error(fmt.Errorf("persisting job start: %w", err))
+				j.paused = j.resumable
+			}
 			m.mutex.Unlock()
 			return
 		}
@@ -281,7 +339,10 @@ func (m *Manager) executeJob(ctx context.Context, j *Job, done chan struct{}) {
 	if err := j.exec.Execute(ctx, progress); err != nil {
 		logger.Errorf("task failed due to error: %v", err)
 		m.mutex.Lock()
-		if j.Status != StatusStopping {
+		if j.resumable && errors.Is(err, ErrResumePending) && j.Status != StatusStopping {
+			j.paused = true
+			j.error(err)
+		} else if j.Status != StatusStopping {
 			j.error(err)
 		}
 		m.mutex.Unlock()
@@ -297,6 +358,8 @@ func persistJobStatus(history History, snapshot Job) error {
 }
 
 func (m *Manager) onJobFinish(j *Job) {
+	j.persistMu.Lock()
+	defer j.persistMu.Unlock()
 	m.mutex.Lock()
 	j.finishing = true
 	final := j.statusCopy()
@@ -309,18 +372,29 @@ func (m *Manager) onJobFinish(j *Job) {
 	}
 	now := time.Now()
 	final.EndTime = &now
+	if j.paused {
+		final.Status, final.EndTime = StatusReady, nil
+		if final.Error != nil {
+			final.Status = StatusPaused
+		}
+	}
 	m.mutex.Unlock()
 	if j.history != nil {
 		if err := persistJobOutcome(j.history, final); err != nil {
-			// Never announce successful durable completion when its outcome
-			// could not be recorded. The pending database row is INTERRUPTED on
-			// restart; retrying this final failed record does not rerun the task.
+			// Never announce durable completion without its record. Preserve
+			// checkpoints if a resumable outcome could not commit; recovery
+			// must still be able to finish notification or remaining edits.
 			final.Status = StatusFailed
+			final.EndTime = &now
 			message := fmt.Sprintf("Job execution ended, but its outcome could not be persisted: %v", err)
 			final.Error = &message
 			logger.Error(message)
-			if retryErr := persistJobStatus(j.history, final); retryErr != nil {
-				logger.Errorf("persisting failed job outcome: %v", retryErr)
+			if j.resumable {
+				final.Status = StatusInterrupted
+			} else {
+				if retryErr := persistJobStatus(j.history, final); retryErr != nil {
+					logger.Errorf("persisting failed job outcome: %v", retryErr)
+				}
 			}
 		}
 	}
@@ -330,6 +404,14 @@ func (m *Manager) onJobFinish(j *Job) {
 	if j.cancelFunc != nil {
 		j.cancelFunc()
 		j.cancelFunc = nil
+	}
+	if final.Status == StatusPaused && !m.stopped {
+		// Keep paused work visible and cancellable without retaining the
+		// executor. Only startup reconstructs it from its durable command.
+		j.finishing = false
+		j.exec, j.outerCtx, j.Details = nil, nil, nil
+		m.notifyJobUpdate(j)
+		return
 	}
 	m.removeJob(j)
 }
@@ -390,33 +472,70 @@ func (m *Manager) getJob(list []*Job, id string) (index int, job *Job) {
 // are notified that they are stopping. Jobs that have not yet started are
 // removed from the queue. If no job exists with the provided id, then there is
 // no effect. Likewise, if the job is already cancelled, there is no effect.
-func (m *Manager) CancelJob(id string) {
+func (m *Manager) CancelJob(id string) error {
 	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	_, j := m.getJob(m.queue, id)
-	if j != nil {
-		j.cancel()
-
-		if j.Status == StatusCancelled {
-			// remove from the queue
-			m.retireCancelledLocked(j)
+	m.mutex.Unlock()
+	if j == nil {
+		return nil
+	}
+	j.persistMu.Lock()
+	defer j.persistMu.Unlock()
+	m.mutex.Lock()
+	finishing, stopped := j.finishing, m.stopped
+	m.mutex.Unlock()
+	if finishing {
+		return nil
+	}
+	if stopped {
+		return ErrStopped
+	}
+	if j.history != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err := j.history.Cancel(ctx, j.ID, j.Generation)
+		cancel()
+		if err != nil {
+			return fmt.Errorf("persisting job cancellation: %w", err)
 		}
 	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	j.paused = false
+	j.Error = nil
+	j.cancel()
+	if j.Status == StatusCancelled {
+		m.retireCancelledLocked(j)
+	} else {
+		m.notifyJobUpdate(j)
+	}
+	return nil
 }
 
 // CancelAll cancels all of the jobs in the queue. This is the same as
 // calling CancelJob on all jobs in the queue.
-func (m *Manager) CancelAll() {
+func (m *Manager) CancelAll() error {
 	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	m.cancelAllLocked()
+	ids := make([]string, 0, len(m.queue))
+	for _, j := range m.queue {
+		ids = append(ids, j.ID)
+	}
+	m.mutex.Unlock()
+	var failures []error
+	for _, id := range ids {
+		if err := m.CancelJob(id); err != nil {
+			failures = append(failures, err)
+		}
+	}
+	return errors.Join(failures...)
 }
 
-func (m *Manager) cancelAllLocked() {
+func (m *Manager) stopAllLocked() {
 	// Walk backwards: removing ready jobs must not skip their neighbours.
 	for i := len(m.queue) - 1; i >= 0; i-- {
 		j := m.queue[i]
+		if j.resumable && (j.Status == StatusReady || j.Status == StatusRunning) {
+			j.paused = true
+		}
 		j.cancel()
 		if j.Status == StatusCancelled {
 			m.retireCancelledLocked(j)

@@ -20,27 +20,14 @@ func (r *mutationResolver) BulkTagUpdate(ctx context.Context, input BulkTagUpdat
 		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
+	var selection bulkupdate.Selector
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
 		if !hasBulkUpdateFilter(input.FindFilter, input.TagFilterAst) {
 			return nil, fmt.Errorf("tag_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
-		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
-		err = r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, _, qErr := r.repository.Tag.QueryAST(ctx, input.TagFilterAst, findFilter)
-			if qErr != nil {
-				return qErr
-			}
-
-			tagIDs = idsFromItems(result, func(item *models.Tag) int {
-				return item.ID
-			})
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
+		selection = bulkupdate.SelectAll(r.repository.Tag.QueryAST, input.TagFilterAst, input.FindFilter, func(item *models.Tag) int { return item.ID })
 	}
 
 	translator := changesetTranslator{
@@ -93,10 +80,10 @@ func (r *mutationResolver) BulkTagUpdate(ctx context.Context, input BulkTagUpdat
 		return completedBulkUpdate(tagIDs), nil
 	}
 
-	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Tag Update", tagIDs, operation, hook.TagUpdatePost, input, translator.getFields())
+	jobID, selectedCount, err := r.enqueueBulkUpdate(ctx, "Bulk Tag Update", selection, operation, hook.TagUpdatePost, input, translator.getFields())
 	if err != nil {
 		return nil, err
 	}
 
-	return queuedBulkUpdate(jobID, len(tagIDs)), nil
+	return queuedBulkUpdate(jobID, selectedCount), nil
 }

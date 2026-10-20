@@ -31,11 +31,11 @@ func TestBulkSceneUpdate_ApplyToAll(t *testing.T) {
 	}
 
 	// Mock the query call that fetches all IDs
-	// The resolver clears pagination and uses PerPageAll
+	// Admission scans bounded pages in stable ID order, ignoring UI pagination.
 	expectedFindFilter := *findFilter
-	expectedFindFilter.Page = nil
-	perPageAll := models.PerPageAll
-	expectedFindFilter.PerPage = &perPageAll
+	expectedFindFilter.Page = PtrInt(1)
+	expectedFindFilter.PerPage = PtrInt(500)
+	expectedFindFilter.Sort = PtrString("id")
 
 	db.Scene.On("QueryAST", mock.Anything, sceneFilterAST, &expectedFindFilter).
 		Return([]*models.Scene{{ID: 10}, {ID: 20}, {ID: 30}}, 3, nil).Once()
@@ -79,9 +79,9 @@ func TestBulkSceneUpdate_ApplyToAllSearchOnly(t *testing.T) {
 	}
 
 	expectedFindFilter := *findFilter
-	expectedFindFilter.Page = nil
-	perPageAll := models.PerPageAll
-	expectedFindFilter.PerPage = &perPageAll
+	expectedFindFilter.Page = PtrInt(1)
+	expectedFindFilter.PerPage = PtrInt(500)
+	expectedFindFilter.Sort = PtrString("id")
 
 	db.Scene.On("QueryAST", mock.Anything, (*models.FilterAST)(nil), &expectedFindFilter).
 		Return([]*models.Scene{{ID: 10}, {ID: 20}, {ID: 30}}, 3, nil).Once()

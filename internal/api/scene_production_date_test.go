@@ -27,7 +27,7 @@ func TestBulkSceneProductionDate(t *testing.T) {
 			require.NoError(t, db.Open(filepath.Join(t.TempDir(), "stash.sqlite")))
 			t.Cleanup(func() { require.NoError(t, db.Close()) })
 			repository := db.Repository()
-			updater := &customFieldsBulkUpdater{}
+			updater := &customFieldsBulkUpdater{repo: repository}
 			resolver := &Resolver{repository: repository, hookExecutor: &mockHookExecutor{}, bulkUpdater: updater}
 			server := handler.New(newLibrarySchema(Config{Resolvers: resolver}))
 			server.AddTransport(transport.POST{})
@@ -57,7 +57,7 @@ func TestBulkSceneProductionDate(t *testing.T) {
 				{name: "clear", include: true, clear: true},
 			} {
 				t.Run(change.name, func(t *testing.T) {
-					*updater = customFieldsBulkUpdater{}
+					*updater = customFieldsBulkUpdater{repo: repository}
 					input := map[string]interface{}{"ids": []string{libraryTestUUID(t, repository, models.ArchiveScene, ids[0]), libraryTestUUID(t, repository, models.ArchiveScene, ids[1])}}
 					if change.include {
 						input["production_date"] = change.value

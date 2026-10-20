@@ -3,199 +3,164 @@ package manager
 import (
 	"context"
 	"errors"
-	"github.com/google/uuid"
+	"fmt"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/pkg/bulkupdate"
 	"github.com/stashapp/stash/pkg/job"
-	"github.com/stashapp/stash/pkg/models/mocks"
+	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/plugin/common"
 	"github.com/stashapp/stash/pkg/plugin/hook"
-	"github.com/stretchr/testify/assert"
+	"github.com/stashapp/stash/pkg/sqlite"
+	"github.com/stretchr/testify/require"
 )
 
 type testHookExecutor struct {
-	calls []int
+	calls   []common.HookContext
+	deliver func(context.Context, common.HookContext) error
 }
 
-func (t *testHookExecutor) ExecutePostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) {
-	t.calls = append(t.calls, id)
+func (h *testHookExecutor) ExecutePostHooks(context.Context, int, hook.TriggerEnum, interface{}, []string) {
 }
-
-type testBulkUpdateOperation struct {
-	updated *[]int
+func (h *testHookExecutor) PrepareDurablePostHook(_ context.Context, kind hook.TriggerEnum, input interface{}, fields []string) (common.HookContext, error) {
+	return common.HookContext{Type: string(kind), Input: input, InputFields: fields}, nil
 }
-
-func (o testBulkUpdateOperation) Update(ctx context.Context, id int) error {
-	*o.updated = append(*o.updated, id)
+func (h *testHookExecutor) DeliverPreparedPostHook(ctx context.Context, notice common.HookContext) error {
+	h.calls = append(h.calls, notice)
+	if h.deliver != nil {
+		return h.deliver(ctx, notice)
+	}
 	return nil
 }
 
-type testBulkUpdateOperationWithFailures struct {
-	attempted *[]int
-	failures  map[int]error
+func bulkTestManager(t *testing.T, path string) (*Manager, *job.Manager) {
+	t.Helper()
+	db := sqlite.NewDatabase()
+	require.NoError(t, db.Open(path))
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	jobs := job.NewManager()
+	t.Cleanup(func() { require.NoError(t, jobs.Shutdown(context.Background())) })
+	mgr := &Manager{Database: db, Repository: db.Repository(), JobManager: jobs}
+	history := sqlite.NewLibraryJobHistory(db)
+	require.NoError(t, jobs.EnableHistory(t.Context(), history, func(ctx context.Context) ([]job.Restoration, error) { return mgr.restoreBulkUpdates(ctx, history) }))
+	return mgr, jobs
 }
 
-func (o testBulkUpdateOperationWithFailures) Update(ctx context.Context, id int) error {
-	*o.attempted = append(*o.attempted, id)
-	if err, ok := o.failures[id]; ok {
-		return err
-	}
-
-	return nil
+func bulkSceneFixtures(t *testing.T, repo models.Repository, count int) []int {
+	t.Helper()
+	var ids []int
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		for range count {
+			s := models.NewScene()
+			s.Title = "original"
+			if err := repo.Scene.Create(ctx, &s, nil); err != nil {
+				return err
+			}
+			ids = append(ids, s.ID)
+		}
+		return nil
+	}))
+	return ids
+}
+func bulkIDs(ids ...int) bulkupdate.Selector {
+	return func(context.Context) ([]int, error) { return ids, nil }
+}
+func bulkSceneCommand() bulkupdate.Scene {
+	changes := models.NewScenePartial()
+	changes.Title = models.NewOptionalString("updated")
+	return bulkupdate.Scene{Changes: changes}
 }
 
-func TestBulkUpdateJobRunsHooksWhenEnabled(t *testing.T) {
-	config.InitializeEmpty()
-	config.GetInstance().SetBool(config.BulkUpdateHooks, true)
-
-	db := mocks.NewDatabase()
-	jobMgr := job.NewManager()
-	jobMgr.SetSync(true)
-
-	hooks := &testHookExecutor{}
-	mgr := &Manager{
-		Repository:   db.Repository(),
-		JobManager:   jobMgr,
-		HookExecutor: hooks,
-	}
-
-	var updated []int
-	jobID, admissionErr := mgr.BulkUpdate(context.Background(), "Bulk test", []int{1, 2, 3}, testBulkUpdateOperation{updated: &updated}, hook.TagUpdatePost, nil, []string{"favorite"})
-	if admissionErr != nil {
-		t.Fatal(admissionErr)
-	}
-
-	_, idErr := uuid.Parse(jobID)
-	assert.NoError(t, idErr)
-	assert.Equal(t, []int{1, 2, 3}, updated)
-	assert.Equal(t, []int{1, 2, 3}, hooks.calls)
-
-	jobState := jobMgr.GetJob(jobID)
-	assert.NotNil(t, jobState)
-	assert.Equal(t, job.StatusFinished, jobState.Status)
+type partialBulkFailureStore struct {
+	models.SceneReaderWriter
+	failID int
 }
 
-func TestBulkUpdateJobSkipsHooksWhenDisabled(t *testing.T) {
-	config.InitializeEmpty()
-	config.GetInstance().SetBool(config.BulkUpdateHooks, false)
-	defer config.GetInstance().SetBool(config.BulkUpdateHooks, true)
-
-	db := mocks.NewDatabase()
-	jobMgr := job.NewManager()
-	jobMgr.SetSync(true)
-
-	hooks := &testHookExecutor{}
-	mgr := &Manager{
-		Repository:   db.Repository(),
-		JobManager:   jobMgr,
-		HookExecutor: hooks,
+func (s partialBulkFailureStore) UpdatePartial(ctx context.Context, id int, changes models.ScenePartial) (*models.Scene, error) {
+	updated, err := s.SceneReaderWriter.UpdatePartial(ctx, id, changes)
+	if err == nil && id == s.failID {
+		return nil, errors.New("simulated relationship failure after scalar update")
 	}
-
-	var updated []int
-	jobID, admissionErr := mgr.BulkUpdate(context.Background(), "Bulk test", []int{4, 5}, testBulkUpdateOperation{updated: &updated}, hook.TagUpdatePost, nil, []string{"favorite"})
-	if admissionErr != nil {
-		t.Fatal(admissionErr)
-	}
-
-	_, idErr := uuid.Parse(jobID)
-	assert.NoError(t, idErr)
-	assert.Equal(t, []int{4, 5}, updated)
-	assert.Empty(t, hooks.calls)
-
-	jobState := jobMgr.GetJob(jobID)
-	assert.NotNil(t, jobState)
-	assert.Equal(t, job.StatusFinished, jobState.Status)
+	return updated, err
 }
 
-func TestBulkUpdateJobContinuesAfterItemErrorsWhenHooksEnabled(t *testing.T) {
-	config.InitializeEmpty()
-	config.GetInstance().SetBool(config.BulkUpdateHooks, true)
-
-	db := mocks.NewDatabase()
-	jobMgr := job.NewManager()
-	jobMgr.SetSync(true)
-
-	hooks := &testHookExecutor{}
-	mgr := &Manager{
-		Repository:   db.Repository(),
-		JobManager:   jobMgr,
-		HookExecutor: hooks,
+// Real command admission and SQLite checkpoints preserve the original hook and
+// partial-failure assertions, now also covering durable data and reclamation.
+func TestBulkUpdateJobsCommitItemsAndBoundHooks(t *testing.T) {
+	for _, hooksEnabled := range []bool{true, false} {
+		for _, failItem := range []bool{true, false} {
+			t.Run(fmt.Sprintf("hooks_%t_failure_%t", hooksEnabled, failItem), func(t *testing.T) {
+				config.InitializeEmpty()
+				config.GetInstance().SetBool(config.BulkUpdateHooks, hooksEnabled)
+				t.Cleanup(func() { config.InitializeEmpty() })
+				mgr, jobs := bulkTestManager(t, filepath.Join(t.TempDir(), "bulk.sqlite"))
+				jobs.SetSync(true)
+				ids := bulkSceneFixtures(t, mgr.Repository, 3)
+				if failItem {
+					mgr.Repository.Scene = partialBulkFailureStore{mgr.Repository.Scene, ids[1]}
+				}
+				hooks := &testHookExecutor{}
+				mgr.HookExecutor = hooks
+				id, total, err := mgr.BulkUpdate(t.Context(), "bulk fixture", bulkIDs(ids...), bulkSceneCommand(), hook.SceneUpdatePost, nil, []string{"title"})
+				require.NoError(t, err)
+				require.Equal(t, 3, total)
+				_, err = uuid.Parse(id)
+				require.NoError(t, err)
+				state := jobs.GetJob(id)
+				require.NotNil(t, state)
+				require.Equal(t, 1.0, state.Progress)
+				if failItem {
+					require.Equal(t, job.StatusFailed, state.Status)
+					require.Contains(t, *state.Error, "1 of 3 items failed")
+					require.Contains(t, *state.Error, "simulated relationship failure")
+				} else {
+					require.Equal(t, job.StatusFinished, state.Status)
+				}
+				require.NoError(t, mgr.Repository.WithReadTxn(t.Context(), func(ctx context.Context) error {
+					for i, id := range ids {
+						value, err := mgr.Repository.Scene.Find(ctx, id)
+						if err != nil {
+							return err
+						}
+						want := "updated"
+						if failItem && i == 1 {
+							want = "original"
+						}
+						require.Equal(t, want, value.Title)
+					}
+					saved, err := mgr.Repository.LibraryBulkJob.Find(ctx, id)
+					require.NoError(t, err)
+					require.Nil(t, saved, "terminal jobs release commands and all targets")
+					return nil
+				}))
+				wantHooks := 0
+				if hooksEnabled {
+					wantHooks = 3
+					if failItem {
+						wantHooks--
+					}
+				}
+				require.Len(t, hooks.calls, wantHooks)
+				for _, notice := range hooks.calls {
+					require.NotEmpty(t, notice.UUID)
+					require.NotEmpty(t, notice.EventID)
+					require.Equal(t, string(hook.SceneUpdatePost), notice.Type)
+					if failItem {
+						require.NotEqual(t, ids[1], notice.ID)
+					}
+				}
+			})
+		}
 	}
-
-	var attempted []int
-	jobID, admissionErr := mgr.BulkUpdate(
-		context.Background(),
-		"Bulk test",
-		[]int{1, 2, 3},
-		testBulkUpdateOperationWithFailures{
-			attempted: &attempted,
-			failures: map[int]error{
-				2: errors.New("boom"),
-			},
-		},
-		hook.TagUpdatePost,
-		nil,
-		[]string{"favorite"},
-	)
-	if admissionErr != nil {
-		t.Fatal(admissionErr)
-	}
-
-	_, idErr := uuid.Parse(jobID)
-	assert.NoError(t, idErr)
-	assert.Equal(t, []int{1, 2, 3}, attempted)
-	assert.Equal(t, []int{1, 3}, hooks.calls)
-
-	jobState := jobMgr.GetJob(jobID)
-	assert.NotNil(t, jobState)
-	assert.Equal(t, job.StatusFailed, jobState.Status)
-	assert.Contains(t, *jobState.Error, "1 of 3 items failed: 2: boom")
-	assert.Equal(t, 1.0, jobState.Progress)
 }
 
-func TestBulkUpdateJobContinuesAfterItemErrorsWhenHooksDisabled(t *testing.T) {
-	config.InitializeEmpty()
-	config.GetInstance().SetBool(config.BulkUpdateHooks, false)
-	defer config.GetInstance().SetBool(config.BulkUpdateHooks, true)
-
-	db := mocks.NewDatabase()
-	jobMgr := job.NewManager()
-	jobMgr.SetSync(true)
-
-	hooks := &testHookExecutor{}
-	mgr := &Manager{
-		Repository:   db.Repository(),
-		JobManager:   jobMgr,
-		HookExecutor: hooks,
-	}
-
-	var attempted []int
-	jobID, admissionErr := mgr.BulkUpdate(
-		context.Background(),
-		"Bulk test",
-		[]int{4, 5, 6},
-		testBulkUpdateOperationWithFailures{
-			attempted: &attempted,
-			failures: map[int]error{
-				5: errors.New("boom"),
-			},
-		},
-		hook.TagUpdatePost,
-		nil,
-		[]string{"favorite"},
-	)
-	if admissionErr != nil {
-		t.Fatal(admissionErr)
-	}
-
-	_, idErr := uuid.Parse(jobID)
-	assert.NoError(t, idErr)
-	assert.Equal(t, []int{4, 5, 6}, attempted)
-	assert.Empty(t, hooks.calls)
-
-	jobState := jobMgr.GetJob(jobID)
-	assert.NotNil(t, jobState)
-	assert.Equal(t, job.StatusFailed, jobState.Status)
-	assert.Contains(t, *jobState.Error, "1 of 3 items failed: 5: boom")
-	assert.Equal(t, 1.0, jobState.Progress)
+func waitBulkTerminal(t *testing.T, jobs *job.Manager, id string, want job.Status) {
+	t.Helper()
+	require.Eventually(t, func() bool { state := jobs.GetJob(id); return state != nil && state.EndTime != nil }, 10*time.Second, 10*time.Millisecond)
+	state := jobs.GetJob(id)
+	require.Equal(t, want, state.Status, "%+v", state)
 }

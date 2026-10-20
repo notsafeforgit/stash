@@ -214,6 +214,7 @@ func (db *Database) Repository() models.Repository {
 		Performer:                   db.Performer,
 		Scene:                       db.Scene,
 		SceneCoverUpgrade:           &SceneCoverUpgradeStore{},
+		LibraryBulkJob:              &LibraryBulkJobStore{},
 		SceneMarker:                 db.SceneMarker,
 		Studio:                      db.Studio,
 		Tag:                         db.Tag,

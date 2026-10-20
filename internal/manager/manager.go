@@ -25,6 +25,7 @@ import (
 	"github.com/stashapp/stash/pkg/models/paths"
 	"github.com/stashapp/stash/pkg/pkg"
 	"github.com/stashapp/stash/pkg/plugin"
+	"github.com/stashapp/stash/pkg/plugin/common"
 	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/scraper"
 	"github.com/stashapp/stash/pkg/session"
@@ -36,6 +37,8 @@ import (
 
 type HookExecutor interface {
 	ExecutePostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string)
+	PrepareDurablePostHook(context.Context, hook.TriggerEnum, interface{}, []string) (common.HookContext, error)
+	DeliverPreparedPostHook(context.Context, common.HookContext) error
 }
 
 type JobManager interface {
@@ -43,11 +46,11 @@ type JobManager interface {
 	Shutdown(context.Context) error
 	Add(ctx context.Context, description string, e job.JobExec) (string, error)
 	AddTransient(ctx context.Context, description string, e job.JobExec) (string, error)
-	EnableHistory(context.Context, job.History) error
+	EnableHistory(context.Context, job.History, func(context.Context) ([]job.Restoration, error)) error
 	Find(context.Context, string) (*job.Job, error)
 	History(context.Context, int, int) ([]job.Job, error)
-	CancelJob(id string)
-	CancelAll()
+	CancelJob(id string) error
+	CancelAll() error
 	GetQueue() []job.Job
 	GetJob(id string) *job.Job
 	Subscribe(ctx context.Context) *job.ManagerSubscription

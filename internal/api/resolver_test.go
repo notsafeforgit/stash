@@ -7,6 +7,7 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/pkg/bulkupdate"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/models/mocks"
 	"github.com/stashapp/stash/pkg/plugin/hook"
@@ -24,9 +25,18 @@ type bulkUpdateCall struct {
 type fakeBulkUpdater struct {
 	nextID int
 	calls  []bulkUpdateCall
+	repo   models.Repository
 }
 
-func (f *fakeBulkUpdater) BulkUpdate(ctx context.Context, description string, ids []int, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) (string, error) {
+func (f *fakeBulkUpdater) BulkUpdate(ctx context.Context, description string, selection bulkupdate.Selector, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) (string, int, error) {
+	var ids []int
+	if err := f.repo.WithReadTxn(ctx, func(ctx context.Context) error {
+		var err error
+		ids, err = selection(ctx)
+		return err
+	}); err != nil {
+		return "", 0, err
+	}
 	if f.nextID == 0 {
 		f.nextID = 1
 	}
@@ -41,14 +51,14 @@ func (f *fakeBulkUpdater) BulkUpdate(ctx context.Context, description string, id
 		inputFields: append([]string(nil), inputFields...),
 	})
 
-	return strconv.Itoa(id), nil
+	return strconv.Itoa(id), len(ids), nil
 }
 
 // TODO - move this into a common area
 func newResolver(db *mocks.Database) (*Resolver, *fakeBulkUpdater) {
 	config.InitializeEmpty()
 
-	bulkUpdater := &fakeBulkUpdater{}
+	bulkUpdater := &fakeBulkUpdater{repo: db.Repository()}
 
 	return &Resolver{
 		repository:   db.Repository(),

@@ -82,6 +82,7 @@ export function monitorJobCompletion(
             JobStatus.Failed,
             JobStatus.Cancelled,
             JobStatus.Interrupted,
+            JobStatus.Paused,
           ].includes(job.status)
         )
           return;

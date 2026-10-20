@@ -20,27 +20,14 @@ func (r *mutationResolver) BulkGalleryUpdate(ctx context.Context, input BulkGall
 		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
+	var selection bulkupdate.Selector
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
 		if !hasBulkUpdateFilter(input.FindFilter, input.GalleryFilterAst) {
 			return nil, fmt.Errorf("gallery_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
-		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
-		err = r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, _, qErr := r.repository.Gallery.QueryAST(ctx, input.GalleryFilterAst, findFilter)
-			if qErr != nil {
-				return qErr
-			}
-
-			galleryIDs = idsFromItems(result, func(item *models.Gallery) int {
-				return item.ID
-			})
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
+		selection = bulkupdate.SelectAll(r.repository.Gallery.QueryAST, input.GalleryFilterAst, input.FindFilter, func(item *models.Gallery) int { return item.ID })
 	}
 
 	translator := changesetTranslator{
@@ -107,10 +94,10 @@ func (r *mutationResolver) BulkGalleryUpdate(ctx context.Context, input BulkGall
 		return completedBulkUpdate(galleryIDs), nil
 	}
 
-	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Gallery Update", galleryIDs, operation, hook.GalleryUpdatePost, input, translator.getFields())
+	jobID, selectedCount, err := r.enqueueBulkUpdate(ctx, "Bulk Gallery Update", selection, operation, hook.GalleryUpdatePost, input, translator.getFields())
 	if err != nil {
 		return nil, err
 	}
 
-	return queuedBulkUpdate(jobID, len(galleryIDs)), nil
+	return queuedBulkUpdate(jobID, selectedCount), nil
 }

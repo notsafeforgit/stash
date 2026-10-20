@@ -39,7 +39,7 @@ func TestLibraryJobsReopenRecoversPendingWithoutReplaying(t *testing.T) {
 	history = NewLibraryJobHistory(db)
 	m := job.NewManager()
 	t.Cleanup(func() { require.NoError(t, m.Shutdown(context.Background())) })
-	require.NoError(t, m.EnableHistory(t.Context(), history))
+	require.NoError(t, m.EnableHistory(t.Context(), history, nil))
 	for _, id := range []string{queued.ID, running.ID} {
 		value, err := m.Find(t.Context(), id)
 		require.NoError(t, err)

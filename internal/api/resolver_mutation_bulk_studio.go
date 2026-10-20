@@ -20,27 +20,14 @@ func (r *mutationResolver) BulkStudioUpdate(ctx context.Context, input BulkStudi
 		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
+	var selection bulkupdate.Selector
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
 		if !hasBulkUpdateFilter(input.FindFilter, input.StudioFilterAst) {
 			return nil, fmt.Errorf("studio_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
-		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
-		err = r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, _, qErr := r.repository.Studio.QueryAST(ctx, input.StudioFilterAst, findFilter)
-			if qErr != nil {
-				return qErr
-			}
-
-			ids = idsFromItems(result, func(item *models.Studio) int {
-				return item.ID
-			})
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
+		selection = bulkupdate.SelectAll(r.repository.Studio.QueryAST, input.StudioFilterAst, input.FindFilter, func(item *models.Studio) int { return item.ID })
 	}
 
 	translator := changesetTranslator{
@@ -113,10 +100,10 @@ func (r *mutationResolver) BulkStudioUpdate(ctx context.Context, input BulkStudi
 		return completedBulkUpdate(ids), nil
 	}
 
-	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Studio Update", ids, operation, hook.StudioUpdatePost, input, translator.getFields())
+	jobID, selectedCount, err := r.enqueueBulkUpdate(ctx, "Bulk Studio Update", selection, operation, hook.StudioUpdatePost, input, translator.getFields())
 	if err != nil {
 		return nil, err
 	}
 
-	return queuedBulkUpdate(jobID, len(ids)), nil
+	return queuedBulkUpdate(jobID, selectedCount), nil
 }

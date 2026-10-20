@@ -126,7 +126,7 @@ func TestBulkTagUpdate_ApplyToAll(t *testing.T) {
 
 	// Mock the query call that fetches all IDs
 	db.Tag.On("QueryAST", mock.Anything, tagFilterAST, mock.MatchedBy(func(ff *models.FindFilterType) bool {
-		return ff.Page == nil && ff.PerPage != nil && *ff.PerPage == models.PerPageAll
+		return ff.Page != nil && *ff.Page == 1 && ff.PerPage != nil && *ff.PerPage == 500 && ff.Sort != nil && *ff.Sort == "id" && ff.Direction != nil && *ff.Direction == models.SortDirectionEnumAsc
 	})).Return([]*models.Tag{
 		{ID: 1}, {ID: 2}, {ID: 3},
 	}, 3, nil).Once()

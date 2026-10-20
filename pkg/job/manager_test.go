@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const sleepTime time.Duration = 10 * time.Millisecond
@@ -153,7 +154,7 @@ func TestCancel(t *testing.T) {
 	// wait a tiny bit
 	time.Sleep(sleepTime)
 
-	m.CancelJob(job2ID)
+	require.NoError(t, m.CancelJob(job2ID))
 
 	// expect job to be cancelled
 	assert := assert.New(t)
@@ -171,7 +172,7 @@ func TestCancel(t *testing.T) {
 	}
 
 	// cancel running job
-	m.CancelJob(jobID)
+	require.NoError(t, m.CancelJob(jobID))
 
 	// wait a tiny bit
 	time.Sleep(sleepTime)
@@ -224,7 +225,7 @@ func TestCancelAll(t *testing.T) {
 	// wait a tiny bit
 	time.Sleep(sleepTime)
 
-	m.CancelAll()
+	require.NoError(t, m.CancelAll())
 
 	// allow first job to finish
 	close(exec1.finish)
@@ -351,7 +352,7 @@ func TestSubscribe(t *testing.T) {
 		t.Fatal(admissionErr)
 	}
 
-	m.CancelJob(jobID)
+	require.NoError(t, m.CancelJob(jobID))
 
 	select {
 	case removedJob := <-s.RemovedJob:

@@ -20,7 +20,7 @@ import (
 func TestNativeBulkUpdateContract(t *testing.T) {
 	repo := pluginNotificationRepository(t)
 	hooks := &notificationRecorder{}
-	updater := &customFieldsBulkUpdater{}
+	updater := &customFieldsBulkUpdater{repo: repo}
 	server := handler.New(newLibrarySchema(Config{Resolvers: &Resolver{repository: repo, hookExecutor: hooks, bulkUpdater: updater}}))
 	server.AddTransport(transport.POST{})
 	call := func(query string, input any) string {

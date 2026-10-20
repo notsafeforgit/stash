@@ -15,7 +15,7 @@ import (
 func TestNativeGroupMutationsAndNotifications(t *testing.T) {
 	repo := pluginNotificationRepository(t)
 	hooks := &notificationRecorder{}
-	updater := &customFieldsBulkUpdater{}
+	updater := &customFieldsBulkUpdater{repo: repo}
 	resolver := &Resolver{repository: repo, hookExecutor: hooks, bulkUpdater: updater,
 		groupService: &group.Service{Repository: repo.Group.(group.CreatorUpdater)}}
 	call := nativeResolverCaller(t, resolver)

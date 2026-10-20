@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/txn"
 )
 
 type contextKey struct{}
@@ -99,7 +100,7 @@ func local(ctx context.Context, kind models.ArchiveEntityKind, value string, fil
 		return 0, err
 	}
 	var entity *models.ArchiveEntity
-	err = r.repo.WithReadTxn(ctx, func(ctx context.Context) error {
+	err = r.read(ctx, func(ctx context.Context) error {
 		var err error
 		entity, err = r.repo.ArchiveEntity.Resolve(ctx, value)
 		return err
@@ -143,7 +144,7 @@ func Public(ctx context.Context, kind models.ArchiveEntityKind, id int) (string,
 		return value, nil
 	}
 	var entity *models.ArchiveEntity
-	err = r.repo.WithReadTxn(ctx, func(ctx context.Context) error {
+	err = r.read(ctx, func(ctx context.Context) error {
 		var err error
 		entity, err = r.repo.ArchiveEntity.FindByLocalID(ctx, kind, id)
 		return err
@@ -156,4 +157,13 @@ func Public(ctx context.Context, kind models.ArchiveEntityKind, id int) (string,
 	}
 	r.remember(kind, id, entity.UUID)
 	return entity.UUID, nil
+}
+
+// Identity capture inside a managed transaction must use that same snapshot.
+// Starting a nested transaction would fail (or read a different generation).
+func (r *Resolver) read(ctx context.Context, fn txn.TxnFunc) error {
+	if txn.HasHooks(ctx) {
+		return fn(ctx)
+	}
+	return r.repo.WithReadTxn(ctx, fn)
 }

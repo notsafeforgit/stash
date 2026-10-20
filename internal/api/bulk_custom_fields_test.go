@@ -15,6 +15,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/pkg/bulkupdate"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/sqlite"
@@ -28,16 +29,23 @@ type customFieldsBulkUpdater struct {
 	ids            []int
 	operation      manager.BulkUpdateOperation
 	fields         []string
+	repo           models.Repository
 }
 
-func (u *customFieldsBulkUpdater) BulkUpdate(_ context.Context, _ string, ids []int, operation manager.BulkUpdateOperation, _ hook.TriggerEnum, _ interface{}, fields []string) (string, error) {
+func (u *customFieldsBulkUpdater) BulkUpdate(ctx context.Context, _ string, selection bulkupdate.Selector, operation manager.BulkUpdateOperation, _ hook.TriggerEnum, _ interface{}, fields []string) (string, int, error) {
 	if u.admissionError != nil {
-		return "", u.admissionError
+		return "", 0, u.admissionError
 	}
-	u.ids = append([]int(nil), ids...)
+	if err := u.repo.WithReadTxn(ctx, func(ctx context.Context) error {
+		var err error
+		u.ids, err = selection(ctx)
+		return err
+	}); err != nil {
+		return "", 0, err
+	}
 	u.operation = operation
 	u.fields = fields
-	return "1", nil
+	return "1", len(u.ids), nil
 }
 
 func TestBulkCustomFieldsPersistence(t *testing.T) {
@@ -51,7 +59,7 @@ func TestBulkCustomFieldsPersistence(t *testing.T) {
 				require.NoError(t, db.Open(filepath.Join(t.TempDir(), "stash.sqlite")))
 				t.Cleanup(func() { require.NoError(t, db.Close()) })
 				repository := db.Repository()
-				updater := &customFieldsBulkUpdater{}
+				updater := &customFieldsBulkUpdater{repo: repository}
 				resolver := &Resolver{repository: repository, hookExecutor: &mockHookExecutor{}, bulkUpdater: updater}
 				server := handler.New(newLibrarySchema(Config{Resolvers: resolver}))
 				server.AddTransport(transport.POST{})
@@ -100,7 +108,7 @@ func TestBulkCustomFieldsPersistence(t *testing.T) {
 					{"clear_all", `{"full":{}}`, `{}`},
 				} {
 					t.Run(tt.name, func(t *testing.T) {
-						*updater = customFieldsBulkUpdater{}
+						*updater = customFieldsBulkUpdater{repo: repository}
 						require.NoError(t, repository.WithTxn(testCtx, func(ctx context.Context) error {
 							for i, id := range ids {
 								fields := map[string]interface{}{

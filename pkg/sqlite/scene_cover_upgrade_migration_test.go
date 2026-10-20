@@ -13,6 +13,7 @@ import (
 
 func removeCoverUpgradeSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeDurableBulkSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER IF EXISTS scene_cover_upgrade_artwork;
 DROP TRIGGER IF EXISTS scene_cover_upgrade_selected;
 DROP TRIGGER IF EXISTS scene_cover_upgrade_reselected;

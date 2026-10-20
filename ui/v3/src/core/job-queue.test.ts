@@ -133,6 +133,18 @@ function visibility(value: boolean) {
   document.dispatchEvent(new Event("visibilitychange"));
 }
 
+it("keeps paused bulk work visible and ignores late running ticks", async () => {
+  const f = fixture();
+  await f.reply([job()]);
+  f.event(JobStatusUpdateType.Update, job("1", JobStatus.Paused));
+  f.event(JobStatusUpdateType.Update, job("1", JobStatus.Running));
+  await vi.advanceTimersByTimeAsync(15_000);
+  expect(f.jobs()[0]?.status).toBe(JobStatus.Paused);
+  f.event(JobStatusUpdateType.Remove, job("1", JobStatus.Cancelled));
+  await vi.advanceTimersByTimeAsync(10_001);
+  expect(f.jobs()).toEqual([]);
+});
+
 it("drops a missed completion after Safari resumes and coalesces resume events", async () => {
   const f = fixture();
   await f.reply([job()]);

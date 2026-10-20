@@ -10,6 +10,7 @@ import { cn } from "src/lib/utils";
 import { humanizeSeconds } from "src/utils/duration";
 import type { QueueJob } from "@/core/job-queue";
 import { useJobQueue } from "@/hooks/use-job-queue";
+import { useToast } from "@/hooks/toast";
 
 function statusIcon(status: GQL.JobStatus) {
   switch (status) {
@@ -23,12 +24,14 @@ function statusIcon(status: GQL.JobStatus) {
     case GQL.JobStatus.Cancelled:
       return <Ban className="size-4 shrink-0 text-muted-foreground" />;
     case GQL.JobStatus.Interrupted:
+    case GQL.JobStatus.Paused:
     case GQL.JobStatus.Failed:
       return <CircleAlert className="size-4 shrink-0 text-destructive" />;
   }
 }
 
 function Task({ job }: { job: QueueJob }) {
+  const toast = useToast();
   const [stopping, setStopping] = useState(false);
   const [fadeState, setFadeState] = useState<"in" | "out" | null>(null);
   const [stopJob] = useMutation(GQL.StopJobDocument);
@@ -53,11 +56,17 @@ function Task({ job }: { job: QueueJob }) {
   const canStop =
     !stopping &&
     (job.status === GQL.JobStatus.Ready ||
+      job.status === GQL.JobStatus.Paused ||
       job.status === GQL.JobStatus.Running);
 
   async function onStop() {
     setStopping(true);
-    await stopJob({ variables: { job_id: job.id } });
+    try {
+      await stopJob({ variables: { job_id: job.id } });
+    } catch (error) {
+      setStopping(false);
+      toast.error(error);
+    }
   }
 
   const rawProgress =

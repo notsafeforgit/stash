@@ -56,6 +56,12 @@ func AddVisitedPluginHook(ctx context.Context, pluginID string, hookType hook.Tr
 	return setVisitedPluginHooks(ctx, curVal)
 }
 
+// WithVisitedPluginHooks restores a captured hook chain without appending it to
+// an earlier request's chain. The copy prevents concurrent deliveries sharing it.
+func WithVisitedPluginHooks(ctx context.Context, visited []VisitedPluginHook) context.Context {
+	return setVisitedPluginHooks(ctx, append([]VisitedPluginHook(nil), visited...))
+}
+
 func setVisitedPluginHooks(ctx context.Context, visitedPlugins []VisitedPluginHook) context.Context {
 	return context.WithValue(ctx, contextVisitedPlugins, visitedPlugins)
 }

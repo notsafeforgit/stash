@@ -5,7 +5,6 @@ package manager
 import (
 	"context"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -14,79 +13,56 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/sqlite"
-	_ "github.com/stashapp/stash/pkg/sqlite/migrations"
+	"github.com/stretchr/testify/require"
 )
 
-type partialBulkFailure struct {
-	scenes models.SceneReaderWriter
-	failID int
+type failingBulkCheckpoint struct {
+	models.LibraryBulkJobReaderWriter
 }
 
-func (o partialBulkFailure) Update(ctx context.Context, id int) error {
-	partial := models.NewScenePartial()
-	partial.Title = models.NewOptionalString("partially updated")
-	if _, err := o.scenes.UpdatePartial(ctx, id, partial); err != nil {
-		return err
-	}
-	if id == o.failID {
-		return errors.New("simulated relationship failure after scalar update")
-	}
-	return nil
+func (s failingBulkCheckpoint) Applied(context.Context, string, int, models.LibraryBulkTarget) (int, error) {
+	return 0, errors.New("simulated checkpoint failure")
 }
 
 func TestBulkFailureIsAtomicAndVisible(t *testing.T) {
-	for _, hooks := range []bool{true, false} {
-		t.Run(fmt.Sprintf("hooks_%t", hooks), func(t *testing.T) {
-			config.InitializeEmpty()
-			config.GetInstance().SetBool(config.BulkUpdateHooks, hooks)
-			db := sqlite.NewDatabase()
-			if err := db.Open(filepath.Join(t.TempDir(), "bulk.sqlite")); err != nil {
-				t.Fatal(err)
-			}
-			defer db.Close()
-			repo := db.Repository()
-			scene := models.NewScene()
-			scene.Title = "original"
-			if err := repo.WithTxn(context.Background(), func(ctx context.Context) error { return repo.Scene.Create(ctx, &scene, nil) }); err != nil {
-				t.Fatal(err)
-			}
-			successful := models.NewScene()
-			successful.Title = "original"
-			if err := repo.WithTxn(context.Background(), func(ctx context.Context) error { return repo.Scene.Create(ctx, &successful, nil) }); err != nil {
-				t.Fatal(err)
-			}
-			jobs := job.NewManager()
-			jobs.SetSync(true)
-			mgr := &Manager{Repository: repo, JobManager: jobs}
-			id, admissionErr := mgr.BulkUpdate(context.Background(), "audit failure", []int{scene.ID, successful.ID}, partialBulkFailure{repo.Scene, scene.ID}, hook.SceneUpdatePost, nil, nil)
-			if admissionErr != nil {
-				t.Fatal(admissionErr)
-			}
-			state := jobs.GetJob(id)
-			t.Logf("job reported status: %s", state.Status)
-			if state.Status != job.StatusFailed || state.Error == nil {
-				t.Error("failed item was not reported as a failed job with an error")
-			}
-			if err := repo.WithReadTxn(context.Background(), func(ctx context.Context) error {
-				got, err := repo.Scene.Find(ctx, scene.ID)
-				if err != nil {
-					return err
-				}
-				t.Logf("persisted scene title: %q", got.Title)
-				if got.Title != "original" {
-					t.Errorf("failed item's scalar write was committed: %q", got.Title)
-				}
-				succeeded, err := repo.Scene.Find(ctx, successful.ID)
-				if err != nil {
-					return err
-				}
-				if succeeded.Title != "partially updated" {
-					t.Error("successful item was not committed")
-				}
-				return nil
-			}); err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
+	config.InitializeEmpty()
+	t.Cleanup(func() { config.InitializeEmpty() })
+	mgr, jobs := bulkTestManager(t, filepath.Join(t.TempDir(), "bulk.sqlite"))
+	jobs.SetSync(true)
+	ids := bulkSceneFixtures(t, mgr.Repository, 2)
+	mgr.Repository.LibraryBulkJob = failingBulkCheckpoint{mgr.Repository.LibraryBulkJob}
+	id, _, err := mgr.BulkUpdate(t.Context(), "checkpoint fixture", bulkIDs(ids...), bulkSceneCommand(), hook.SceneUpdatePost, nil, nil)
+	require.NoError(t, err)
+	state := jobs.GetJob(id)
+	require.Equal(t, job.StatusPaused, state.Status)
+	require.Contains(t, *state.Error, "simulated checkpoint failure")
+	require.Nil(t, state.EndTime, "unfinished durable work is not terminal")
+	require.NoError(t, mgr.Repository.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		for _, id := range ids {
+			s, err := mgr.Repository.Scene.Find(ctx, id)
+			require.NoError(t, err)
+			require.Equal(t, "original", s.Title)
+		}
+		saved, err := mgr.Repository.LibraryBulkJob.Find(ctx, id)
+		require.NoError(t, err)
+		require.NotNil(t, saved)
+		require.Zero(t, saved.Processed)
+		return nil
+	}))
+	require.NoError(t, jobs.Shutdown(context.Background()))
+	mgr.Repository = mgr.Database.Repository()
+	resumed := job.NewManager()
+	t.Cleanup(func() { require.NoError(t, resumed.Shutdown(context.Background())) })
+	mgr.JobManager = resumed
+	history := sqlite.NewLibraryJobHistory(mgr.Database)
+	require.NoError(t, resumed.EnableHistory(t.Context(), history, func(ctx context.Context) ([]job.Restoration, error) { return mgr.restoreBulkUpdates(ctx, history) }))
+	waitBulkTerminal(t, resumed, id, job.StatusFinished)
+	require.NoError(t, mgr.Repository.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		for _, id := range ids {
+			s, err := mgr.Repository.Scene.Find(ctx, id)
+			require.NoError(t, err)
+			require.Equal(t, "updated", s.Title)
+		}
+		return nil
+	}))
 }

@@ -451,6 +451,31 @@ func (c Cache) ExecuteDurablePostHooks(ctx context.Context, eventID string, id i
 	}, true)
 }
 
+// PrepareDurablePostHook freezes public relationship identities and the parent
+// hook chain at admission. The caller supplies the target UUID and stable event
+// ID when delivering each item. This runs inside its admission transaction.
+func (c Cache) PrepareDurablePostHook(ctx context.Context, hookType hook.TriggerEnum, input interface{}, inputFields []string) (common.HookContext, error) {
+	return c.publicHookContext(ctx, hookType, common.HookContext{
+		ParentHooks: parentHookSources(ctx), Type: hookType.String(), Input: input, InputFields: inputFields,
+	})
+}
+
+// DeliverPreparedPostHook preserves the accepted UUID payload across restarts
+// and reestablishes cycle detection for plugin calls caused by this event.
+func (c Cache) DeliverPreparedPostHook(ctx context.Context, notice common.HookContext) error {
+	if notice.EventID == "" || notice.UUID == "" {
+		return errors.New("durable hook requires event and target identities")
+	}
+	visited := make([]session.VisitedPluginHook, 0, len(notice.ParentHooks))
+	for _, parent := range notice.ParentHooks {
+		visited = append(visited, session.VisitedPluginHook{PluginID: parent.PluginID, HookType: hook.TriggerEnum(parent.Type)})
+	}
+	ctx = session.WithVisitedPluginHooks(ctx, visited)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	return c.deliverPostHooks(ctx, hook.TriggerEnum(notice.Type), notice, true)
+}
+
 func (c Cache) RegisterPostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) {
 	if !c.HasHooks(hookType) {
 		return

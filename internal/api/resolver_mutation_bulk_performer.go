@@ -22,27 +22,14 @@ func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPe
 		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
+	var selection bulkupdate.Selector
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
 		if !hasBulkUpdateFilter(input.FindFilter, input.PerformerFilterAst) {
 			return nil, fmt.Errorf("performer_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
-		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
-		err = r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, _, qErr := r.repository.Performer.QueryAST(ctx, input.PerformerFilterAst, findFilter)
-			if qErr != nil {
-				return qErr
-			}
-
-			performerIDs = idsFromItems(result, func(item *models.Performer) int {
-				return item.ID
-			})
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
+		selection = bulkupdate.SelectAll(r.repository.Performer.QueryAST, input.PerformerFilterAst, input.FindFilter, func(item *models.Performer) int { return item.ID })
 	}
 
 	translator := changesetTranslator{
@@ -182,10 +169,10 @@ func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPe
 		return completedBulkUpdate(performerIDs), nil
 	}
 
-	jobID, err := r.enqueueBulkUpdate(ctx, "Bulk Performer Update", performerIDs, operation, hook.PerformerUpdatePost, input, translator.getFields())
+	jobID, selectedCount, err := r.enqueueBulkUpdate(ctx, "Bulk Performer Update", selection, operation, hook.PerformerUpdatePost, input, translator.getFields())
 	if err != nil {
 		return nil, err
 	}
 
-	return queuedBulkUpdate(jobID, len(performerIDs)), nil
+	return queuedBulkUpdate(jobID, selectedCount), nil
 }

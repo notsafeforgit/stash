@@ -3,6 +3,7 @@ package job
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -11,6 +12,18 @@ type JobExecFn func(ctx context.Context, progress *Progress) error
 // JobExec represents the implementation of a Job to be executed.
 type JobExec interface {
 	Execute(ctx context.Context, progress *Progress) error
+}
+
+// PersistedExec admits its command and targets in the same transaction as the
+// ordinary job row. Only explicitly restored executors may resume after restart.
+type PersistedExec interface {
+	JobExec
+	Admit(context.Context, Job) error
+}
+
+type Restoration struct {
+	Job      Job
+	Executor PersistedExec
 }
 
 type jobExecImpl struct {
@@ -39,6 +52,9 @@ const (
 	StatusRunning Status = "RUNNING"
 	// StatusStopping means that the job is cancelled but is still running.
 	StatusStopping Status = "STOPPING"
+	// StatusPaused retains a durable command that needs recovery after an
+	// infrastructure failure. It may be cancelled or resumed on server restart.
+	StatusPaused Status = "PAUSED"
 	// StatusFinished means that the job was completed.
 	StatusFinished Status = "FINISHED"
 	// StatusCancelled means that the job was cancelled and is now stopped.
@@ -53,6 +69,8 @@ const (
 type Job struct {
 	ID     string
 	Status Status
+	// Generation fences status writes from a process superseded by recovery.
+	Generation int
 	// details of the current operations of the job
 	Details     []string
 	Description string
@@ -68,6 +86,9 @@ type Job struct {
 	cancelFunc context.CancelFunc
 	history    History
 	finishing  bool
+	resumable  bool
+	paused     bool
+	persistMu  *sync.Mutex
 }
 
 // statusCopy returns a copy of the Job with only the fields needed for
@@ -77,6 +98,7 @@ func (j *Job) statusCopy() Job {
 	return Job{
 		ID:          j.ID,
 		Status:      j.Status,
+		Generation:  j.Generation,
 		Details:     j.Details,
 		Description: j.Description,
 		Progress:    j.Progress,
@@ -108,7 +130,7 @@ func (j *Job) cancel() {
 		return
 	}
 	switch j.Status {
-	case StatusReady:
+	case StatusReady, StatusPaused:
 		j.Status = StatusCancelled
 	case StatusRunning:
 		j.Status = StatusStopping

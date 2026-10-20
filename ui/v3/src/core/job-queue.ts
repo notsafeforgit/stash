@@ -61,7 +61,13 @@ export function observeJobQueue(
     const previous = entries.get(event.job.id);
     if (event.type === JobStatusUpdateType.Update) {
       // The independent progress stream can deliver a late tick after REMOVE.
-      if (!previous || finished(previous.job)) return;
+      if (
+        !previous ||
+        finished(previous.job) ||
+        (previous.job.status === JobStatus.Paused &&
+          event.job.status === JobStatus.Running)
+      )
+        return;
     }
     entries.set(event.job.id, {
       job: event.job,

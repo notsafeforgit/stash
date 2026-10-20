@@ -27,6 +27,7 @@ type Repository struct {
 	Performer                   PerformerReaderWriter
 	Scene                       SceneReaderWriter
 	SceneCoverUpgrade           SceneCoverUpgradeReaderWriter
+	LibraryBulkJob              LibraryBulkJobReaderWriter
 	SceneMarker                 SceneMarkerReaderWriter
 	Studio                      StudioReaderWriter
 	Tag                         TagReaderWriter

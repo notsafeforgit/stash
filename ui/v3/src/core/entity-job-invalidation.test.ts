@@ -15,7 +15,7 @@ const jobID = "f39ae3cc-73ec-4f42-aec1-1b6241c0efc3";
 
 afterEach(() => vi.useRealTimers());
 
-it.each(["FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"])(
+it.each(["FINISHED", "FAILED", "CANCELLED", "INTERRUPTED", "PAUSED"])(
   "refreshes after a bulk job ends with %s, even when the sheet is gone",
   async (status) => {
     vi.useFakeTimers();
@@ -221,7 +221,7 @@ it("explicit disposal cancels a pending job retry", async () => {
   client.stop();
 });
 
-it.each(["FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"])(
+it.each(["FINISHED", "FAILED", "CANCELLED", "INTERRUPTED", "PAUSED"])(
   "expires inactive dependent searches when a bulk job is %s, not on admission",
   async (status) => {
     vi.useFakeTimers();

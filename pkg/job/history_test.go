@@ -15,6 +15,7 @@ type testHistory struct {
 	rows        map[string]Job
 	createError error
 	failStatus  Status
+	cancelError error
 	interrupts  int
 }
 
@@ -40,6 +41,17 @@ func (h *testHistory) Interrupt(context.Context) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.interrupts++
+	return nil
+}
+func (h *testHistory) Cancel(_ context.Context, id string, _ int) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.cancelError != nil {
+		return h.cancelError
+	}
+	j := h.rows[id]
+	j.Status = StatusStopping
+	h.rows[id] = j
 	return nil
 }
 func (h *testHistory) Find(_ context.Context, id string) (*Job, error) {
@@ -74,8 +86,8 @@ func TestDurableAdmissionAndOutcomeFailures(t *testing.T) {
 			case "outcome":
 				history.failStatus = StatusFinished
 			}
-			require.NoError(t, m.EnableHistory(t.Context(), history))
-			require.NoError(t, m.EnableHistory(t.Context(), history))
+			require.NoError(t, m.EnableHistory(t.Context(), history, nil))
+			require.NoError(t, m.EnableHistory(t.Context(), history, nil))
 			require.Equal(t, 1, history.interrupts)
 			id, err = m.Add(t.Context(), "test", exec)
 			if failure == "admission" {

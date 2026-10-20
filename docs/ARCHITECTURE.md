@@ -277,22 +277,27 @@ encoder process.
 
 For native bulk edits, [bulk resolvers](../internal/api/resolver_mutation_bulk_scene.go)
 commit explicit IDs in one transaction and report the updated IDs. Filter
-selection removes pagination and snapshots the matching IDs before queueing,
+selection ignores UI pagination and atomically captures matching UUIDs with its
+versioned command before queueing,
 returning a job ID and selection count without claiming completed edits.
 [task_bulk_update.go](../internal/manager/task_bulk_update.go)
-commits each item independently and runs enabled post-hooks after successful
-writes. Failed items roll back and are reported; cancellation or an error does
-not undo already committed items.
+commits each item with its checkpoint and delivers enabled post-hooks separately.
+Restart resumes remaining work; stable event IDs and bounded retries keep
+notification failures from repeating edits or blocking later items. Command,
+target, relationship and error budgets bound recovery storage, and terminal
+outcomes reclaim heavy records atomically. See [durable bulk edits](native-bulk-updates.md).
 
 Ordinary library tasks now persist UUID admission, start and terminal outcomes in
 `library_jobs` (native schema 1000123), independently of source tracking. Admission
-must commit before execution. Pending records become `INTERRUPTED` on the next
-process start; these executors have no restartable checkpoints and are never
-replayed automatically. Retain partial results and review them before retrying.
+must commit before execution. Bulk commands have restartable checkpoints in
+schema 1000126; other pending tasks become `INTERRUPTED` on the next process
+start and are never replayed automatically. Retain those partial results and
+review them before retrying. Bulk checkpoint failures remain `PAUSED` and
+cancellable until restart; explicit cancellation survives restart.
 The last 1,000 terminal records remain queryable through `findJob` and bounded
 `jobHistory` pages in Settings → Tasks; pending rows are never pruned. Missing
-history is an unconfirmed outcome, not successful completion. Progress ticks
-remain in memory. Anonymized support exports remove job history, including its
+history is an unconfirmed outcome, not successful completion. Bulk item progress
+commits with the edit; other progress ticks remain in memory. Anonymized support exports remove job history, including its
 descriptions and errors. Database initialization/migration and initial FFmpeg setup
 use an explicitly transient queue because the job table may not exist yet.
 

@@ -21,6 +21,7 @@ const statusMessages = {
     defaultMessage: "Cancelled",
   },
   [JobStatus.Failed]: { id: "job.status.failed", defaultMessage: "Failed" },
+  [JobStatus.Paused]: { id: "job.status.paused", defaultMessage: "Paused" },
   [JobStatus.Interrupted]: {
     id: "job.status.interrupted",
     defaultMessage: "Interrupted",
@@ -61,7 +62,7 @@ export function JobHistory() {
         {intl.formatMessage({
           id: "job.history_help",
           defaultMessage:
-            "The last 1,000 outcomes are retained. Interrupted tasks are not resumed automatically; review partial results before starting them again.",
+            "The last 1,000 outcomes are retained. Bulk edits resume after a server restart. Paused bulk edits retain their progress and can be cancelled. Other interrupted tasks must be reviewed before starting again.",
         })}
       </p>
       {error && (

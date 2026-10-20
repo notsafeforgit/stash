@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { test, expect } from "@playwright/test";
 
 test("performer merge uses UUIDs for names, photos, tags and the surviving route", async ({
@@ -19,13 +18,20 @@ test("performer merge uses UUIDs for names, photos, tags and the surviving route
     expect(result.errors).toBeUndefined();
     return result.data;
   };
-  const photo = readFileSync("../../internal/static/performer/NoName06.png");
+  // A valid 1x1 image in the application's canonical stored format. The
+  // browser stack need not install FFmpeg to exercise a byte-preserving copy.
+  const photo = Buffer.from(
+    "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA",
+    "base64",
+  );
   const { performerCreate: source } = await query(
     `mutation($input:PerformerCreateInput!){performerCreate(input:$input){id name image_path}}`,
     {
       input: {
         name: `${prefix} source`,
-        image_input: { data: `data:image/png;base64,${photo.toString("base64")}` },
+        image_input: {
+          data: `data:image/webp;base64,${photo.toString("base64")}`,
+        },
       },
     },
   );
@@ -55,12 +61,17 @@ test("performer merge uses UUIDs for names, photos, tags and the surviving route
     .click({ button: "right" });
   await page.getByRole("menuitem", { name: "Merge into…" }).click();
   const dialog = page.getByRole("dialog");
+  await dialog.getByRole("combobox").click();
   await dialog.getByRole("combobox").fill(destination.name);
   await page
     .getByRole("option", { name: destination.name, exact: true })
     .click();
   await dialog
     .locator("#merge-row-name")
+    .getByRole("button", { name: /^Source/ })
+    .click();
+  await dialog
+    .locator("#merge-row-image_path")
     .getByRole("button", { name: /^Source/ })
     .click();
   const mergedResponse = page.waitForResponse((response) => {

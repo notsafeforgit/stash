@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/pkg/entityid"
 	"github.com/stashapp/stash/pkg/models"
@@ -60,4 +61,29 @@ func TestPluginNotificationRetainsDeletedUUIDAndPreservesOpaqueFields(t *testing
 	actual, err := entityid.Public(entityid.WithRepository(t.Context(), repo), models.ArchiveImage, 7)
 	require.NoError(t, err)
 	require.Equal(t, replacement, actual)
+}
+
+func TestPluginNotificationConvertsNestedImageAndMergeReferences(t *testing.T) {
+	store, repo, sceneID, imageID := pluginLibraryFixture(t)
+	c := NewCache(previewServerConfig{})
+	c.RegisterRepository(repo)
+	ctx := entityid.WithRepository(t.Context(), repo)
+	entityid.Remember(ctx, models.ArchiveImage, 7, imageID)
+	store.rows[imageID].State = models.ArchiveEntityDeleted
+	notice, err := c.publicHookContext(ctx, hook.SceneUpdatePost, common.HookContext{ID: 42, Input: map[string]any{
+		"previous_destination": map[string]any{"id": "42", "name": "Original"},
+		"values":               map[string]any{"id": "42", "image_input": map[string]any{"image_id": "7"}},
+		"front_image_input":    map[string]any{"scene": map[string]any{"id": "42", "at": 7.5}},
+		"back_image_input":     map[string]any{"data": "123"},
+	}})
+	require.NoError(t, err)
+	input := notice.Input.(map[string]any)
+	require.Equal(t, sceneID, input["previous_destination"].(map[string]any)["id"])
+	values := input["values"].(map[string]any)
+	require.Equal(t, sceneID, values["id"])
+	require.Equal(t, imageID, values["image_input"].(map[string]any)["image_id"])
+	frame := input["front_image_input"].(map[string]any)["scene"].(map[string]any)
+	require.Equal(t, sceneID, frame["id"])
+	require.Equal(t, "7.5", frame["at"].(json.Number).String())
+	require.Equal(t, "123", input["back_image_input"].(map[string]any)["data"])
 }

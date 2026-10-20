@@ -1,6 +1,6 @@
 # Public library identities
 
-Schema 1000115 completes UUID adoption at the application's library interfaces.
+Schema 1000115 introduces UUID identities at the application's library interfaces.
 The GraphQL `ID` scalar carries a canonical lowercase UUID for performers,
 scenes, images, galleries, studios, tags, groups, files, folders, scene markers,
 gallery chapters and saved filters. The same UUID identifies the entity in
@@ -55,6 +55,21 @@ trigger restoration, reference conversion and schema-version update commit as
 one transaction. A failure leaves the previous schema intact for retry.
 Configuration references publish atomically before request handling starts.
 Media files are not rewritten.
+
+Inputs marked `@libraryID(preserve: true)` validate the UUID and entity kind but
+retain the public reference for configuration or deferred work. Identify uses
+this for scene and skipped-result tag selections and resolves them again during
+execution. Stored task defaults and per-source Identify overrides participate
+in the atomic configuration reference promotion.
+
+Performer merge photo choices use `image_input: {performer_id: "<UUID>"}`.
+The server copies the stored photo inside the merge transaction; display URLs
+are not parsed as identity references. Merge notifications retain the original
+source UUIDs even after their rows are removed.
+
+The [numeric ID audit](uuid-audit.md) records corrected defects, intentional
+numeric domains and remaining protocol/deferred-task conversions. UUID adoption
+at GraphQL does not by itself prove that every downstream protocol is converted.
 
 Rehearse this upgrade on a database copy. Update the UI and external callers
 together, including installed `stash-gallery` source-management helpers. Once

@@ -54,6 +54,15 @@ func testPerformerMergeUUID(t *testing.T, selection string) {
 	unrelatedUUID := libraryTestUUID(t, repo, models.ArchivePerformer, unrelated.ID)
 	tagUUID := libraryTestUUID(t, repo, models.ArchiveTag, tag.ID)
 	call := nativeResolverCaller(t, &Resolver{repository: repo, hookExecutor: &mockHookExecutor{}})
+	copyResult := call(`mutation($id:ID!,$source:ID!){performerUpdate(input:{id:$id,image_input:{performer_id:$source}}){id}}`,
+		map[string]any{"id": unrelatedUUID, "source": sourceUUID})
+	require.NotContains(t, copyResult, `"errors"`, copyResult)
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		image, err := repo.Performer.GetImage(ctx, unrelated.ID)
+		require.NoError(t, err)
+		require.Equal(t, sourceImage, image)
+		return nil
+	}))
 	const mutation = `mutation($input:PerformerMergeInput!){performerMerge(input:$input){id name details tags{id} aliases{alias}}}`
 	image := map[string]any{"performer_id": sourceUUID}
 	expectedImage := sourceImage

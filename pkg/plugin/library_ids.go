@@ -92,7 +92,7 @@ func publicHookObject(ctx context.Context, kind models.ArchiveEntityKind, raw an
 			switch key {
 			case "id", "ids", "source", "destination", "source_id", "source_ids", "destination_id", "parent_ids", "child_ids":
 				related = kind
-			case "scene_id", "scene_ids":
+			case "scene", "scene_id", "scene_ids":
 				related = models.ArchiveScene
 			case "image_id", "image_ids":
 				related = models.ArchiveImage
@@ -110,7 +110,8 @@ func publicHookObject(ctx context.Context, kind models.ArchiveEntityKind, raw an
 				related = models.ArchiveFile
 			case "parent_folder_id":
 				related = models.ArchiveFolder
-			case "before", "after", "sources", "groups", "movies", "containing_groups", "sub_groups":
+			case "before", "after", "previous_destination", "sources", "values", "groups", "movies", "containing_groups", "sub_groups",
+				"image_input", "front_image_input", "back_image_input":
 				mapped, err := publicHookObject(ctx, kind, item, "")
 				if err != nil {
 					return nil, err

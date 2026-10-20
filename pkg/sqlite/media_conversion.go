@@ -65,6 +65,13 @@ func (s *MediaConversionStore) ConvertImage(ctx context.Context, input models.Im
 	if err := conversionFileOwner(ctx, image, input.OriginalFileUUID, input.OriginalGeneration); err != nil {
 		return nil, err
 	}
+	var originalFileID models.FileID
+	if err := dbWrapper.Get(ctx, &originalFileID, "SELECT file_id FROM archive_entities WHERE uuid=?", input.OriginalFileUUID); err != nil {
+		return nil, err
+	}
+	if err := guardFileMoveIdentity(ctx, originalFileID); err != nil {
+		return nil, err
+	}
 	if err := conversionFileOwner(ctx, scene, input.FileUUID, input.Generation); err != nil {
 		return nil, err
 	}

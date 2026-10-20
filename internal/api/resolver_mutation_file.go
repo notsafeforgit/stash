@@ -14,17 +14,27 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/session"
 	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
+	"github.com/stashapp/stash/pkg/txn"
 )
 
 func (r *mutationResolver) MoveFiles(ctx context.Context, input MoveFilesInput) (bool, error) {
-	if err := r.withTxn(ctx, func(ctx context.Context) error {
+	if len(input.Ids) == 0 || len(input.Ids) > file.MaxMoveBatch {
+		return false, fmt.Errorf("file move requires between 1 and %d files", file.MaxMoveBatch)
+	}
+	if input.DestinationBasename != nil {
+		if err := file.ValidateMoveBasename(*input.DestinationBasename); err != nil {
+			return false, err
+		}
+	}
+	var mover *file.Mover
+	if err := txn.WithTxnUntilComplete(ctx, r.repository.TxnManager, func(ctx context.Context) error {
 		stashPaths, err := manager.ReadLibraryPaths(ctx, r.repository)
 		if err != nil {
 			return err
 		}
 		fileStore := r.repository.File
 		folderStore := r.repository.Folder
-		mover := file.NewMover(fileStore, folderStore, stashPaths.Paths())
+		mover = file.NewMover(fileStore, folderStore, stashPaths.Paths())
 		mover.RegisterHooks(ctx)
 
 		var (
@@ -35,6 +45,13 @@ func (r *mutationResolver) MoveFiles(ctx context.Context, input MoveFilesInput) 
 		fileIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
 		if err != nil {
 			return fmt.Errorf("converting ids: %w", err)
+		}
+		seen := make(map[int]bool, len(fileIDs))
+		for _, id := range fileIDs {
+			if seen[id] {
+				return fmt.Errorf("file %d appears more than once in a move", id)
+			}
+			seen[id] = true
 		}
 
 		switch {
@@ -52,7 +69,7 @@ func (r *mutationResolver) MoveFiles(ctx context.Context, input MoveFilesInput) 
 			}
 
 			if folder == nil {
-				return fmt.Errorf("folder with id %d not found", input.DestinationFolderID)
+				return fmt.Errorf("folder with id %d not found", folderID)
 			}
 
 			if folder.ZipFileID != nil {
@@ -96,6 +113,9 @@ func (r *mutationResolver) MoveFiles(ctx context.Context, input MoveFilesInput) 
 			if err != nil {
 				return fmt.Errorf("finding file %d: %w", fileID, err)
 			}
+			if len(f) != 1 {
+				return fmt.Errorf("file with id %d not found", fileID)
+			}
 
 			// ensure that the file extension matches the existing file type
 			if basename != "" {
@@ -112,6 +132,9 @@ func (r *mutationResolver) MoveFiles(ctx context.Context, input MoveFilesInput) 
 		return nil
 	}); err != nil {
 		return false, err
+	}
+	if err := mover.CompletionError(); err != nil {
+		return false, fmt.Errorf("file paths committed, but move cleanup remains pending: %w", err)
 	}
 
 	return true, nil

@@ -163,6 +163,19 @@ func withNativeCheckpoint(ctx context.Context, database string, capture, afterCa
 	if !validLineage {
 		return errors.New("native checkpoint requires the native database lineage")
 	}
+	// The existing portable archive carries deletion recovery. A move must
+	// finish before capture: omitting its intent could pair old paths with a
+	// database whose transaction has already committed the new location.
+	if err := file.RequireNoPendingMoves((&Database{dbPath: path}).FileMoveJournalPath()); err != nil {
+		return err
+	}
+	var pendingMoves bool
+	if err := guard.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM file_moves)").Scan(&pendingMoves); err != nil {
+		return err
+	}
+	if pendingMoves {
+		return errors.New("file move recovery must finish before a native checkpoint")
+	}
 	committed, err := checkpointDeletionIDs(ctx, guard)
 	if err != nil {
 		return err

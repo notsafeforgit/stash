@@ -14,6 +14,10 @@ import (
 // FileDeletionJournalPath is a bounded-length sibling directory, created only
 // when needed. Completed operations and the empty directory are removed.
 func (db *Database) FileDeletionJournalPath() string {
+	return db.fileJournalPath("deletions")
+}
+
+func (db *Database) fileJournalPath(kind string) string {
 	path, _ := filepath.Abs(db.dbPath)
 	if resolved, err := filepath.EvalSymlinks(path); err == nil {
 		path = resolved
@@ -21,7 +25,7 @@ func (db *Database) FileDeletionJournalPath() string {
 	// Resolve aliases of the database and keep the name stable if its containing
 	// directory moves. Different databases in one directory still stay separate.
 	id := sha256.Sum256([]byte(filepath.Base(path)))
-	return filepath.Join(filepath.Dir(path), fmt.Sprintf(".stash-deletions-%x", id[:8]))
+	return filepath.Join(filepath.Dir(path), fmt.Sprintf(".stash-%s-%x", kind, id[:8]))
 }
 
 func (db *Database) withFileDeletionJournal(ctx context.Context, tx *sqlx.Tx, writable bool) context.Context {

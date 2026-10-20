@@ -174,6 +174,13 @@ func VerifyNativeSnapshot(ctx context.Context, path string) (*NativeSnapshotRepo
 	if err := tx.GetContext(ctx, &pending, "SELECT count(*) FROM file_deletions"); err != nil {
 		return nil, err
 	}
+	var pendingMoves bool
+	if err := tx.GetContext(ctx, &pendingMoves, "SELECT EXISTS(SELECT 1 FROM file_moves)"); err != nil {
+		return nil, err
+	}
+	if pendingMoves {
+		return nil, errors.New("native snapshot contains unfinished file moves; recover the source library before capture")
+	}
 	finalDigest, err := snapshotDigest(ctx, file)
 	if err != nil {
 		return nil, err

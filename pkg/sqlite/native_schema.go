@@ -121,6 +121,19 @@ AND NOT (type='index' AND tbl_name='schema_migrations'))`); err != nil {
 		if present[forkSchemaMigrationsTable] {
 			return errors.New("native database still contains an active fork migration ledger")
 		}
+		if version >= NativeSchemaBaseline+124 {
+			if !present["file_moves"] {
+				return errors.New("native database schema is incomplete: missing file_moves")
+			}
+			var valid bool
+			if err := conn.Get(&valid, `SELECT count(*)=1 AND coalesce(sum(name='id' AND type='TEXT' AND "notnull"=1 AND pk=1),0)=1
+FROM pragma_table_info('file_moves')`); err != nil {
+				return err
+			}
+			if !valid {
+				return errors.New("native database schema is incomplete: invalid file_moves columns")
+			}
+		}
 		if version >= NativeSchemaBaseline+123 {
 			for _, name := range []string{"library_jobs", "library_jobs_recent", "library_jobs_pending"} {
 				var exists bool

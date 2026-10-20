@@ -11,6 +11,7 @@ import (
 
 func removeLibraryJobSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeFileMoveSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE IF EXISTS library_jobs;
 DELETE FROM native_migration_history WHERE version=1000123`)
 	require.NoError(t, err)

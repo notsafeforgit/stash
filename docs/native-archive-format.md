@@ -187,6 +187,12 @@ complete production inventory and publication integration remain required.
 Checkpoint coverage remains
 `database-configuration-deletion-recovery`.
 
+Native [file move recovery](file-moves.md) must finish before capture. The server
+rejects a checkpoint while either a move intent or a move commit marker remains;
+offline snapshot verification also rejects pending move markers. This preserves
+the existing archive component contract rather than omitting recovery state from
+an apparently complete snapshot.
+
 Native artwork writes now publish flushed replacement inodes instead of
 truncating a file that a reader or backup might retain. Orphan cleanup rechecks
 references under a write transaction and uses the deletion journal, sharing the

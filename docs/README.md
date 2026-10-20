@@ -57,6 +57,8 @@ Personal automation and production records are maintained separately.
   diagnosis and repair for affected media files.
 - [Recoverable file deletion](file-deletion.md): staging, crash recovery,
   automatic journal cleanup and trash transfers.
+- [Recoverable file moves](file-moves.md): root confinement, cross-device
+  publication, bounded recovery records and interruption handling.
 
 ## Build and contribution policies
 

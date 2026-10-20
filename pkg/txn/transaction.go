@@ -38,6 +38,28 @@ func WithTxn(ctx context.Context, m Manager, fn TxnFunc) error {
 	return withTxn(ctx, m, fn, writable, execComplete)
 }
 
+// WithTxnUntilComplete retains the transaction's lock until fn has stopped,
+// even if the request is cancelled. Use it for filesystem effects that could
+// race recovery if database/sql automatically rolled back a cancelled Begin.
+// fn still receives request cancellation and must stop its work before returning.
+// A cancelled request never proceeds to commit.
+func WithTxnUntilComplete(ctx context.Context, m Manager, fn TxnFunc) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return WithTxn(context.WithoutCancel(ctx), m, func(txCtx context.Context) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		AddPreCommitHook(txCtx, func(context.Context) error { return ctx.Err() })
+		workCtx, cancel := context.WithCancel(txCtx)
+		stop := context.AfterFunc(ctx, cancel)
+		defer stop()
+		defer cancel()
+		return fn(workCtx)
+	})
+}
+
 // WithReadTxn executes fn in a transaction. If fn returns an error then
 // the transaction is rolled back. Otherwise it is committed.
 // This function will call m.Begin with writable = false.

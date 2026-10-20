@@ -35,7 +35,7 @@ const (
 	cacheSizeEnv = "STASH_SQLITE_CACHE_SIZE"
 )
 
-var appSchemaVersion = NativeSchemaBaseline + 123
+var appSchemaVersion = NativeSchemaBaseline + 124
 
 //go:embed migrations/*.sql
 var migrationsBox embed.FS
@@ -315,6 +315,9 @@ func (db *Database) initialise() error {
 	}
 	if err := db.RecoverFileDeletions(); err != nil {
 		logger.Warnf("File deletion recovery remains pending: %v", err)
+	}
+	if err := db.RecoverFileMoves(); err != nil {
+		logger.Warnf("File move recovery remains pending: %v", err)
 	}
 
 	return nil

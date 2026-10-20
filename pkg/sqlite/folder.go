@@ -124,6 +124,9 @@ func NewFolderStore() *FolderStore {
 }
 
 func (qb *FolderStore) Create(ctx context.Context, f *models.Folder) error {
+	if err := guardFolderMove(ctx, 0, f.Path); err != nil {
+		return err
+	}
 	var r folderRow
 	r.fromFolder(*f)
 
@@ -139,6 +142,9 @@ func (qb *FolderStore) Create(ctx context.Context, f *models.Folder) error {
 }
 
 func (qb *FolderStore) Update(ctx context.Context, updatedObject *models.Folder) error {
+	if err := guardFolderMoveUpdate(ctx, updatedObject); err != nil {
+		return err
+	}
 	var r folderRow
 	r.fromFolder(*updatedObject)
 
@@ -150,6 +156,9 @@ func (qb *FolderStore) Update(ctx context.Context, updatedObject *models.Folder)
 }
 
 func (qb *FolderStore) Destroy(ctx context.Context, id models.FolderID) error {
+	if err := guardFolderMove(ctx, id, ""); err != nil {
+		return err
+	}
 	return qb.tableMgr.destroyExisting(ctx, []int{int(id)})
 }
 

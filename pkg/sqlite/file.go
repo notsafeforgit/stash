@@ -378,6 +378,9 @@ func (qb *FileStore) table() exp.IdentifierExpression {
 }
 
 func (qb *FileStore) Create(ctx context.Context, f models.File) error {
+	if err := guardFileMove(ctx, f.Base()); err != nil {
+		return err
+	}
 	var r basicFileRow
 	r.fromBasicFile(*f.Base())
 
@@ -416,6 +419,9 @@ func (qb *FileStore) Create(ctx context.Context, f models.File) error {
 }
 
 func (qb *FileStore) Update(ctx context.Context, f models.File) error {
+	if err := guardFileMove(ctx, f.Base()); err != nil {
+		return err
+	}
 	if f.Base().Generation < 1 {
 		return models.ErrFileGenerationConflict
 	}
@@ -467,6 +473,9 @@ func (qb *FileStore) DestroyFingerprints(ctx context.Context, fileID models.File
 }
 
 func (qb *FileStore) Destroy(ctx context.Context, id models.FileID) error {
+	if err := guardFileMoveIdentity(ctx, id); err != nil {
+		return err
+	}
 	return qb.tableMgr.destroyExisting(ctx, []int{int(id)})
 }
 

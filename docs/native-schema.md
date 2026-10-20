@@ -1,5 +1,10 @@
 # Native schema promotion
 
+Schema 1000124 adds the empty `file_moves` commit-marker table for
+[recoverable file moves](file-moves.md). Completed moves retain no journal or
+marker history. No existing files or library metadata are changed by this
+migration; the direct fresh-install baseline remains independently pinned.
+
 The [versioned migrations](../pkg/sqlite/migrations) define the current native
 schema; this guide describes the individual changes by their version. See the
 [architecture and upgrade boundaries](native-archive-transition-plan.md). New migrations are

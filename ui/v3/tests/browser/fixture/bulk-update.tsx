@@ -43,7 +43,10 @@ export function BulkUpdateFixture() {
                     bulkTagUpdate: {
                       __typename: "BulkUpdateResult",
                       status: kind === "queued" ? "QUEUED" : "COMPLETED",
-                      job_id: kind === "queued" ? "1" : null,
+                      job_id:
+                        kind === "queued"
+                          ? "f39ae3cc-73ec-4f42-aec1-1b6241c0efc3"
+                          : null,
                       selected_count: kind === "queued" ? 30 : 2,
                       updated_ids:
                         kind === "queued" || kind === "invalid"
@@ -57,7 +60,7 @@ export function BulkUpdateFixture() {
                   data: {
                     findJob: {
                       __typename: "Job",
-                      id: "1",
+                      id: "f39ae3cc-73ec-4f42-aec1-1b6241c0efc3",
                       status: "FINISHED",
                       description: "Bulk edit",
                       progress: 1,

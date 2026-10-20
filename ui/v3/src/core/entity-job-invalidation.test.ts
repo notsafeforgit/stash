@@ -11,6 +11,8 @@ import {
   refetchAfterEntityMutation,
 } from "./entity-job-invalidation";
 
+const jobID = "f39ae3cc-73ec-4f42-aec1-1b6241c0efc3";
+
 afterEach(() => vi.useRealTimers());
 
 it.each(["FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"])(
@@ -31,7 +33,7 @@ it.each(["FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"])(
                 data: {
                   findJob: {
                     __typename: "Job",
-                    id: "1",
+                    id: jobID,
                     status: finished ? status : "RUNNING",
                     description: "Bulk update",
                     progress: 0,
@@ -65,7 +67,7 @@ it.each(["FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"])(
     const result = {
       result: {
         status: "QUEUED",
-        job_id: "1",
+        job_id: jobID,
         selected_count: 2,
         updated_ids: [],
       },
@@ -111,7 +113,7 @@ it("distinguishes committed edits from queue admission and rejects contradiction
   };
   const queued = {
     status: "QUEUED",
-    job_id: "12",
+    job_id: jobID,
     selected_count: 2,
     updated_ids: [],
   };
@@ -120,20 +122,26 @@ it("distinguishes committed edits from queue admission and rejects contradiction
   });
   expect(decodeEntityJobAcknowledgment(queued)).toEqual({
     kind: "scheduled",
-    id: "12",
+    id: jobID,
   });
+  for (const id of [jobID, "12", "opaque-job-id"]) {
+    expect(decodeEntityJobAcknowledgment({ ...queued, job_id: id })).toEqual({
+      kind: "scheduled",
+      id,
+    });
+  }
   for (const value of [
     null,
     "sync",
     "12",
     {},
-    { ...completed, job_id: "12" },
+    { ...completed, job_id: jobID },
     { ...completed, updated_ids: ["1"] },
     { ...completed, selected_count: -1 },
     { ...queued, status: "FAILED" },
     { ...queued, selected_count: 1.5 },
     { ...queued, updated_ids: ["1"] },
-    ...[null, "", "abc", "1.5", "-1", "9007199254740993"].map((job_id) => ({
+    ...[null, "", 12, false, {}, []].map((job_id) => ({
       ...queued,
       job_id,
     })),
@@ -163,10 +171,10 @@ it.each([1, 10])(
     });
     const refetch = vi.spyOn(client, "refetchQueries");
     const mutation = gql`mutation { bulkSceneUpdate(input: {}) { status job_id selected_count updated_ids } }`;
-    invalidateAfterEntityJob(client, mutation, "sync");
+    invalidateAfterEntityJob(client, mutation, "");
     await vi.advanceTimersByTimeAsync(0);
     expect(requests).toBe(0);
-    const stop = invalidateAfterEntityJob(client, mutation, "7");
+    const stop = invalidateAfterEntityJob(client, mutation, jobID);
     await vi.advanceTimersByTimeAsync(7000);
     expect(requests).toBe(3);
     expect(errors).toHaveBeenCalledWith(
@@ -178,7 +186,7 @@ it.each([1, 10])(
     await vi.advanceTimersByTimeAsync(10000);
     expect(requests).toBe(completed);
     // A failed ID is released, so a later operation may monitor it again.
-    const stopAgain = invalidateAfterEntityJob(client, mutation, "7");
+    const stopAgain = invalidateAfterEntityJob(client, mutation, jobID);
     await vi.advanceTimersByTimeAsync(0);
     expect(requests).toBe(completed + 1);
     stopAgain();
@@ -204,7 +212,7 @@ it("explicit disposal cancels a pending job retry", async () => {
   const dispose = invalidateAfterEntityJob(
     client,
     gql`mutation { bulkSceneUpdate(input: {}) { status job_id selected_count updated_ids } }`,
-    "9",
+    jobID,
   );
   await vi.advanceTimersByTimeAsync(0);
   dispose();
@@ -230,7 +238,7 @@ it.each(["FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"])(
                 data: {
                   findJob: {
                     __typename: "Job",
-                    id: "12",
+                    id: jobID,
                     status: finished ? status : "RUNNING",
                     description: "Bulk performer edit",
                     progress: 0,
@@ -258,7 +266,7 @@ it.each(["FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"])(
       refetchAfterEntityMutation(client, mutation, {
         bulkPerformerUpdate: {
           status: "QUEUED",
-          job_id: "12",
+          job_id: jobID,
           selected_count: 2,
           updated_ids: [],
         },

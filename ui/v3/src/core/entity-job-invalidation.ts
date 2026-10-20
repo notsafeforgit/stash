@@ -11,11 +11,9 @@ export type EntityJobAcknowledgment =
   | { kind: "invalid" };
 
 function isJobID(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    /^[1-9]\d*$/.test(value) &&
-    Number.isSafeInteger(Number(value))
-  );
+  // GraphQL IDs are opaque. Ordinary jobs now use UUIDs; parsing them as
+  // process counters would reject committed admission and abandon monitoring.
+  return typeof value === "string" && value.length > 0;
 }
 
 /** Queue admission is distinct from a committed edit. Reject incomplete or

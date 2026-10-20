@@ -158,8 +158,9 @@ refreshes retain the existing player, including when a refresh fails.
   including filters through descendant performer tags. Normalized entities and
   unrelated app data remain cached.
   `core/entity-job-invalidation.ts` refreshes after bulk jobs finish, including
-  partial failures, and survives the edit sheet closing. The legacy `"sync"`
-  acknowledgment causes an immediate refresh; only numeric job IDs are monitored.
+  partial failures, and survives the edit sheet closing. Job IDs are opaque
+  strings, including the server’s UUIDs. Queued acknowledgments start completion
+  monitoring; completed acknowledgments refresh immediately.
   Query failures retry with bounded backoff; three consecutive failures dispose
   the watcher and refresh once. Unrelated configuration,
   plugin, status, and job queries are excluded from library refreshes.

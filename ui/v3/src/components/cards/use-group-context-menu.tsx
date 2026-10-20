@@ -55,7 +55,11 @@ export function useGroupContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions(GroupListItems.useItems());
+    onRemoveSelection,
+  } = useBulkCardActions(
+    GroupListItems.useItems(),
+    GroupListItems.useSelectionGetter(),
+  );
 
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -86,6 +90,7 @@ export function useGroupContextMenu({
           itemsField: "groups",
           ids,
         });
+        onRemoveSelection?.(ids);
       },
     });
   }

@@ -11,6 +11,7 @@ import type { BulkApplyTarget } from "./list-provider";
 
 /** Snapshot of the selection and filter when a delete action is opened. */
 export interface ListDeleteSelection {
+  onDeleted?: (ids: readonly string[]) => void;
   ids: string[];
   matching?: BulkApplyTarget;
   totalCount?: number;
@@ -91,7 +92,10 @@ export interface EntityListPageConfig<
   filterMode: GQL.FilterMode;
   /** Entity-specific item data, checked against this config's TItem. */
   ItemsProvider?: React.ComponentType<
-    React.PropsWithChildren<{ items: readonly TItem[] }>
+    React.PropsWithChildren<{
+      items: readonly TItem[];
+      getSelectedItems?: () => readonly TItem[];
+    }>
   >;
   view?: View;
   defaultSort?: string;

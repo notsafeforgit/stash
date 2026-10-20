@@ -202,7 +202,16 @@ export function EntityListPage<
   }, []);
   if (!firstPaintReady) isLoading = true;
 
-  const listSelect = useListSelect(items);
+  const listSelect = useListSelect(items, {
+    scope: JSON.stringify([
+      source.kind,
+      filterMode,
+      filter.searchTerm,
+      filter.makeFilterAST(),
+    ]),
+    pageKey: JSON.stringify(filter.makeFindFilter()),
+    loading: isLoading,
+  });
   const shareSelection =
     source.kind === "graphql" && sharing && listSelect.hasSelection ? (
       <ShareSelectionButton
@@ -243,9 +252,11 @@ export function EntityListPage<
           ? applyToAllTarget
           : undefined,
       totalCount: count,
+      onDeleted: listSelect.onRemoveSelection,
     });
   }, [
     listSelect.getSelectedIds,
+    listSelect.onRemoveSelection,
     isLoading,
     onDeleteSelection,
     source.kind,
@@ -280,6 +291,7 @@ export function EntityListPage<
       getSelectedIds: listSelect.getSelectedIds,
       onSelectAll: listSelect.onSelectAll,
       onSelectNone: listSelect.onSelectNone,
+      onRemoveSelection: listSelect.onRemoveSelection,
       onDeleteSelection: onDeleteSelection ? deleteSelection : undefined,
     }),
     [
@@ -288,6 +300,7 @@ export function EntityListPage<
       listSelect.getSelectedIds,
       listSelect.onSelectAll,
       listSelect.onSelectNone,
+      listSelect.onRemoveSelection,
       onDeleteSelection,
       deleteSelection,
     ],
@@ -529,7 +542,9 @@ export function EntityListPage<
   );
   const ItemsProvider = config.ItemsProvider;
   return ItemsProvider ? (
-    <ItemsProvider items={items}>{content}</ItemsProvider>
+    <ItemsProvider items={items} getSelectedItems={listSelect.getSelectedItems}>
+      {content}
+    </ItemsProvider>
   ) : (
     content
   );

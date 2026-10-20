@@ -9,10 +9,12 @@ import { removeEntitiesFromCache } from "@/core/client";
 import * as GQL from "@/core/generated-graphql";
 import { affectedActiveQueries } from "@/core/mutation-invalidation";
 import type { DeleteOptions } from "./delete-dialog";
+import { useListContextOptional } from "@/components/list/list-provider";
 
 export function useBulkMediaDelete(kind: "Scene" | "Image") {
   const client = useApolloClient();
   const intl = useIntl();
+  const { onRemoveSelection } = useListContextOptional();
 
   return async (
     ids: readonly string[],
@@ -58,6 +60,7 @@ export function useBulkMediaDelete(kind: "Scene" | "Image") {
       if (error instanceof BulkDeleteError) deletedIds = error.completedIds;
       throw error;
     } finally {
+      onRemoveSelection?.(deletedIds);
       // Keep the card hosting the dialog mounted throughout the operation.
       // Reconcile once at the end (also on a partial/ambiguous failure), rather
       // than unmounting the progress dialog or refetching after every batch.

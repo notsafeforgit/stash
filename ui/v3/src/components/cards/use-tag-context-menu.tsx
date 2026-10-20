@@ -59,7 +59,11 @@ export function useTagContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions(TagListItems.useItems());
+    onRemoveSelection,
+  } = useBulkCardActions(
+    TagListItems.useItems(),
+    TagListItems.useSelectionGetter(),
+  );
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [autoTagOpen, setAutoTagOpen] = useState(false);
@@ -92,6 +96,7 @@ export function useTagContextMenu({
           itemsField: "tags",
           ids,
         });
+        onRemoveSelection?.(ids);
       },
     });
   }

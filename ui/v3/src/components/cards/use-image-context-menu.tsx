@@ -100,7 +100,10 @@ export function useImageContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions(ImageListItems.useItems());
+  } = useBulkCardActions(
+    ImageListItems.useItems(),
+    ImageListItems.useSelectionGetter(),
+  );
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);

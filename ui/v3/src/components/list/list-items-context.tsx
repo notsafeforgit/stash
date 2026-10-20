@@ -5,14 +5,30 @@ import { createContext, useContext, type PropsWithChildren } from "react";
  * context so selecting cards does not republish every list item. */
 export function createListItemsContext<T>() {
   const context = createContext<readonly T[]>([]);
+  const selectionContext = createContext<(() => readonly T[]) | undefined>(
+    undefined,
+  );
   function Provider({
     items,
+    getSelectedItems,
     children,
-  }: PropsWithChildren<{ items: readonly T[] }>) {
-    return <context.Provider value={items}>{children}</context.Provider>;
+  }: PropsWithChildren<{
+    items: readonly T[];
+    getSelectedItems?: () => readonly T[];
+  }>) {
+    return (
+      <context.Provider value={items}>
+        <selectionContext.Provider value={getSelectedItems}>
+          {children}
+        </selectionContext.Provider>
+      </context.Provider>
+    );
   }
   function useItems() {
     return useContext(context);
   }
-  return { Provider, useItems };
+  function useSelectionGetter() {
+    return useContext(selectionContext);
+  }
+  return { Provider, useItems, useSelectionGetter };
 }

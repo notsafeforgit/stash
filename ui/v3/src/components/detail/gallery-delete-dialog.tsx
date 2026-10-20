@@ -6,6 +6,7 @@ import * as GQL from "@/core/generated-graphql";
 import { removeEntitiesFromCache } from "@/core/client";
 import { affectedActiveQueries } from "@/core/mutation-invalidation";
 import { QueryError } from "@/components/query-error";
+import { useListContextOptional } from "@/components/list/list-provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
@@ -37,6 +38,7 @@ function GalleryDeleteConfirmation({
   onDeleted,
 }: GalleryDeleteDialogProps) {
   const intl = useIntl();
+  const { onRemoveSelection } = useListContextOptional();
   const client = useApolloClient();
   const controlID = useId();
   const uniqueIDs = [...new Set(ids)];
@@ -72,6 +74,7 @@ function GalleryDeleteConfirmation({
     if (result.data?.galleryDestroy !== true) {
       throw new Error(intl.formatMessage({ id: "dialogs.delete_unconfirmed" }));
     }
+    onRemoveSelection?.(uniqueIDs);
     removeEntitiesFromCache({
       cache: client.cache,
       typename: "Gallery",

@@ -11,11 +11,13 @@ let selection: ReturnType<typeof useListSelect<Item>>;
 function Probe({
   items,
   suspended,
+  options,
 }: {
   items: Item[];
   suspended?: Promise<void>;
+  options?: Parameters<typeof useListSelect<Item>>[1];
 }) {
-  selection = useListSelect(items);
+  selection = useListSelect(items, options);
   if (suspended) throw suspended;
   return null;
 }
@@ -28,13 +30,17 @@ afterEach(async () => {
   await act(async () => root.unmount());
   vi.unstubAllGlobals();
 });
-async function render(items: Item[], suspended?: Promise<void>) {
+async function render(
+  items: Item[],
+  suspended?: Promise<void>,
+  options?: Parameters<typeof useListSelect<Item>>[1],
+) {
   await act(async () => {
     const update = () =>
       root.render(
         <StrictMode>
           <Suspense>
-            <Probe items={items} suspended={suspended} />
+            <Probe items={items} suspended={suspended} options={options} />
           </Suspense>
         </StrictMode>,
       );
@@ -63,7 +69,7 @@ it("does not publish suspended list data to committed selection callbacks", asyn
   await render(items);
 });
 
-it("supports range, invert, all and none without retaining prior pages", async () => {
+it("supports range, invert, all and none in an unpaginated list", async () => {
   await render(["1", "2", "3", "4"].map((id) => ({ id, title: id })));
   await act(async () => selection.onSelectChange("2", true, false));
   await act(async () => selection.onSelectChange("4", true, true));
@@ -77,4 +83,83 @@ it("supports range, invert, all and none without retaining prior pages", async (
   await act(async () => selection.onSelectAll());
   await render([{ id: "5", title: "next page" }]);
   expect(selection.selectedItems).toEqual([]);
+});
+
+it("accumulates pages, keeps off-page items when inverting, and refreshes selected labels", async () => {
+  const scope = "performer:one";
+  const first = [
+    { id: "1", title: "first" },
+    { id: "2", title: "second" },
+  ];
+  const second = [
+    { id: "3", title: "third" },
+    { id: "4", title: "fourth" },
+  ];
+  await render(first, undefined, { scope, pageKey: "1" });
+  await act(async () => selection.onSelectAll());
+  await render(first, undefined, { scope, pageKey: "2", loading: true });
+  await act(async () => selection.onSelectAll());
+  expect([...selection.getSelectedIds()]).toEqual(["1", "2"]);
+  await render(second, undefined, { scope, pageKey: "2" });
+  await act(async () => selection.onSelectAll());
+  expect([...selection.getSelectedIds()]).toEqual(["1", "2", "3", "4"]);
+  await act(async () => selection.onInvertSelection());
+  expect([...selection.getSelectedIds()]).toEqual(["1", "2"]);
+  await render([{ id: "1", title: "renamed" }, first[1]!], undefined, {
+    scope,
+    pageKey: "1",
+  });
+  expect(selection.getSelectedItems()).toEqual([
+    { id: "1", title: "renamed" },
+    first[1],
+  ]);
+  await render([first[1]!], undefined, { scope, pageKey: "1" });
+  expect([...selection.getSelectedIds()]).toEqual(["2"]);
+  await act(async () => selection.onSelectNone());
+  expect(selection.selecting).toBe(false);
+});
+
+it("clears selection when performer or filter scope changes, even while loading", async () => {
+  const items = [{ id: "1", title: "first" }];
+  await render(items, undefined, { scope: "performer:one", pageKey: "1" });
+  await act(async () => selection.onSelectAll());
+  await render(items, undefined, {
+    scope: "performer:two",
+    pageKey: "1",
+    loading: true,
+  });
+  expect(selection.getSelectedItems()).toEqual([]);
+  await act(async () => selection.onSelectAll());
+  expect(selection.getSelectedItems()).toEqual([]);
+  await render(items, undefined, { scope: "performer:two", pageKey: "1" });
+  await act(async () => selection.onSelectAll());
+  await render(items, undefined, {
+    scope: "performer:two?q=other",
+    pageKey: "1",
+  });
+  expect(selection.hasSelection).toBe(false);
+});
+
+it("keeps selection through page-size and sort changes without pruning off-page IDs", async () => {
+  await render([{ id: "1", title: "first" }], undefined, {
+    pageKey: "1:40:asc",
+  });
+  await act(async () => selection.onSelectAll());
+  await render([{ id: "2", title: "second" }], undefined, {
+    pageKey: "1:20:desc",
+  });
+  expect([...selection.getSelectedIds()]).toEqual(["1"]);
+  await act(async () => selection.onSelectAll());
+  expect([...selection.getSelectedIds()]).toEqual(["1", "2"]);
+});
+
+it("removes confirmed deletions across pages while retaining unsuccessful items", async () => {
+  await render([{ id: "1", title: "first" }], undefined, { pageKey: "1" });
+  await act(async () => selection.onSelectAll());
+  await render([{ id: "2", title: "second" }], undefined, { pageKey: "2" });
+  await act(async () => selection.onSelectAll());
+  await act(async () => selection.onRemoveSelection(["1"]));
+  expect([...selection.getSelectedIds()]).toEqual(["2"]);
+  await act(async () => selection.onRemoveSelection(["2"]));
+  expect(selection.selecting).toBe(false);
 });

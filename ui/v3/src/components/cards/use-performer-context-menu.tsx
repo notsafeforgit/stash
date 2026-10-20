@@ -66,7 +66,11 @@ export function usePerformerContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions(PerformerListItems.useItems());
+    onRemoveSelection,
+  } = useBulkCardActions(
+    PerformerListItems.useItems(),
+    PerformerListItems.useSelectionGetter(),
+  );
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [autoTagOpen, setAutoTagOpen] = useState(false);
@@ -105,6 +109,7 @@ export function usePerformerContextMenu({
           itemsField: "performers",
           ids,
         });
+        onRemoveSelection?.(ids);
       },
     });
   }

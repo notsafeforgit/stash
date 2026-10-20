@@ -81,7 +81,10 @@ export function useSceneContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions(SceneListItems.useItems());
+  } = useBulkCardActions(
+    SceneListItems.useItems(),
+    SceneListItems.useSelectionGetter(),
+  );
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);

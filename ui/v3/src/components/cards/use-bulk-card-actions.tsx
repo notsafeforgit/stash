@@ -10,6 +10,7 @@ import { SelectAllMenuItem } from "./select-all-menu-item";
 
 export function useBulkCardActions<TItem extends { id: string }>(
   items: readonly TItem[],
+  getSelectedItems?: () => readonly TItem[],
 ) {
   const {
     getSelectedIds,
@@ -17,18 +18,16 @@ export function useBulkCardActions<TItem extends { id: string }>(
     applyToAllTarget,
     onSelectAll,
     onSelectNone,
+    onRemoveSelection,
   } = useListContextOptional();
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   // Computed lazily when the context menu opens — avoids subscribing to
   // selectedIds/selectedItems and causing re-renders on every selection change.
-  const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
+  const [selection, setSelection] = useState<readonly TItem[]>([]);
   const selectedItems = useMemo(() => {
     const byId = new Map(items.map((item) => [item.id, item]));
-    return Array.from(selection).flatMap((id) => {
-      const item = byId.get(id);
-      return item ? [item] : [];
-    });
+    return selection.map((item) => byId.get(item.id) ?? item);
   }, [items, selection]);
   const showBulkActions = selectedItems.length > 1;
 
@@ -37,8 +36,11 @@ export function useBulkCardActions<TItem extends { id: string }>(
     // menu — even if the right-clicked item isn't itself in the selection.
     // Without this, a selection that's scrolled off-screen has no way to
     // be acted on without scrolling back to a selected item.
-    setSelection(new Set(getSelectedIds()));
-  }, [getSelectedIds]);
+    const ids = getSelectedIds();
+    setSelection(
+      getSelectedItems?.() ?? items.filter((item) => ids.has(item.id)),
+    );
+  }, [getSelectedIds, getSelectedItems, items]);
 
   return {
     selectedItems,
@@ -57,6 +59,7 @@ export function useBulkCardActions<TItem extends { id: string }>(
     onSelectAll,
     /** Clears all selections — useful for menu items like "Deselect all". */
     onSelectNone,
+    onRemoveSelection,
   };
 }
 

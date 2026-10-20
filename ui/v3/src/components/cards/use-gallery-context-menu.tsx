@@ -57,7 +57,10 @@ export function useGalleryContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions(GalleryListItems.useItems());
+  } = useBulkCardActions(
+    GalleryListItems.useItems(),
+    GalleryListItems.useSelectionGetter(),
+  );
 
   const [deleteOpen, setDeleteOpen] = useState(false);
 

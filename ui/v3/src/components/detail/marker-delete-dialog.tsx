@@ -75,6 +75,7 @@ export function MarkerDeleteDialog({
       if (failure instanceof BulkDeleteError) deletedIds = failure.completedIds;
       throw failure;
     } finally {
+      selection.onDeleted?.(deletedIds);
       removeEntitiesFromCache({
         cache: client.cache,
         typename: "SceneMarker",

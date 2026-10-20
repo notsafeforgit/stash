@@ -59,7 +59,11 @@ export function useStudioContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions(StudioListItems.useItems());
+    onRemoveSelection,
+  } = useBulkCardActions(
+    StudioListItems.useItems(),
+    StudioListItems.useSelectionGetter(),
+  );
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [autoTagOpen, setAutoTagOpen] = useState(false);
@@ -92,6 +96,7 @@ export function useStudioContextMenu({
           itemsField: "studios",
           ids,
         });
+        onRemoveSelection?.(ids);
       },
     });
   }

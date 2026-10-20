@@ -26,6 +26,8 @@ export type ListContextState = {
   onSelectAll: () => void;
   /** Clear all selections. Stable identity. */
   onSelectNone: () => void;
+  /** Forget confirmed removals, including selected items on other pages. */
+  onRemoveSelection?: (ids: readonly string[]) => void;
   /** Open deletion for the current selection, with the current filter scope. */
   onDeleteSelection?: () => void;
 };

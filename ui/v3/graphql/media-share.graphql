@@ -98,3 +98,62 @@ query ShareTargetSearch($q: String!) {
     }
   }
 }
+
+# Resolve a bounded snapshot of the current list, retaining its locked context
+# (e.g. performer) and search criteria without fetching full card/media data.
+query ShareMatchingTargets(
+  $filter: FindFilterType!
+  $filter_ast: FilterASTInput
+  $scenes: Boolean!
+  $images: Boolean!
+  $galleries: Boolean!
+) {
+  sharingConfiguration {
+    max_items
+  }
+  findScenes(filter: $filter, scene_filter_ast: $filter_ast)
+    @include(if: $scenes)
+  {
+    count
+    scenes {
+      id
+      title
+      files {
+        path
+      }
+    }
+  }
+  findImages(filter: $filter, image_filter_ast: $filter_ast)
+    @include(if: $images)
+  {
+    count
+    images {
+      id
+      title
+      visual_files {
+        ... on VideoFile {
+          path
+        }
+        ... on ImageFile {
+          path
+        }
+      }
+    }
+  }
+  findGalleries(filter: $filter, gallery_filter_ast: $filter_ast)
+    @include(if: $galleries)
+  {
+    count
+    galleries {
+      id
+      title
+      folder {
+        path
+        basename
+      }
+      files {
+        path
+      }
+    }
+  }
+}

@@ -110,6 +110,52 @@ export function MobileListControls({
       }}
     />
   );
+  const selectedLabel = intl.formatMessage(
+    { id: "list.selected_count", defaultMessage: "{count} selected" },
+    { count: selectedCount },
+  );
+  const paginationControl = (
+    <Popover open={pagesOpen} onOpenChange={setPagesOpen}>
+      <PopoverTrigger
+        ref={triggerRef}
+        render={
+          <Button
+            variant="ghost"
+            className={cn(
+              "h-11 gap-1 px-2",
+              mode === "selection"
+                ? "min-w-0 flex-1 justify-between"
+                : "w-full justify-between",
+            )}
+            aria-label={intl.formatMessage({
+              id: "pagination.pages",
+              defaultMessage: "Pages",
+            })}
+          />
+        }
+      >
+        <span className="truncate tabular-nums">
+          {mode === "selection"
+            ? selectedLabel
+            : `${intl.formatNumber(filter.currentPage)} / ${intl.formatNumber(pageCount)}`}
+        </span>
+        <ChevronUp data-icon="inline-end" />
+      </PopoverTrigger>
+      <PopoverContent
+        ref={popupRef}
+        side="top"
+        className="w-80 max-w-[calc(100vw-1.5rem)]"
+      >
+        <PopoverTitle>
+          {intl.formatMessage({
+            id: "pagination.pages",
+            defaultMessage: "Pages",
+          })}
+        </PopoverTitle>
+        {pagePicker}
+      </PopoverContent>
+    </Popover>
+  );
   const taggerLabel = intl.formatMessage({
     id: "actions.tagger",
     defaultMessage: "Tagger",
@@ -155,15 +201,13 @@ export function MobileListControls({
         >
           {mode === "selection" ? (
             <>
-              <span className="min-w-0 flex-1 truncate text-sm tabular-nums">
-                {intl.formatMessage(
-                  {
-                    id: "list.selected_count",
-                    defaultMessage: "{count} selected",
-                  },
-                  { count: selectedCount },
-                )}
-              </span>
+              {pageCount > 1 ? (
+                paginationControl
+              ) : (
+                <span className="min-w-0 flex-1 truncate text-sm tabular-nums">
+                  {selectedLabel}
+                </span>
+              )}
               {selectionActions}
               <Button
                 variant="ghost"
@@ -217,40 +261,7 @@ export function MobileListControls({
                   </Button>
                   <div className="min-w-0 flex-1">
                     {pageCount > 1 ? (
-                      <Popover open={pagesOpen} onOpenChange={setPagesOpen}>
-                        <PopoverTrigger
-                          ref={triggerRef}
-                          render={
-                            <Button
-                              variant="ghost"
-                              className="h-11 w-full justify-between px-2"
-                              aria-label={intl.formatMessage({
-                                id: "pagination.pages",
-                                defaultMessage: "Pages",
-                              })}
-                            />
-                          }
-                        >
-                          <span className="truncate tabular-nums">
-                            {intl.formatNumber(filter.currentPage)} /{" "}
-                            {intl.formatNumber(pageCount)}
-                          </span>
-                          <ChevronUp data-icon="inline-end" />
-                        </PopoverTrigger>
-                        <PopoverContent
-                          ref={popupRef}
-                          side="top"
-                          className="w-80 max-w-[calc(100vw-1.5rem)]"
-                        >
-                          <PopoverTitle>
-                            {intl.formatMessage({
-                              id: "pagination.pages",
-                              defaultMessage: "Pages",
-                            })}
-                          </PopoverTitle>
-                          {pagePicker}
-                        </PopoverContent>
-                      </Popover>
+                      paginationControl
                     ) : (
                       <span className="text-sm text-muted-foreground tabular-nums">
                         {countError ? (

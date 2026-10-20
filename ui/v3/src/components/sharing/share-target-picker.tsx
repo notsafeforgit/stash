@@ -14,6 +14,8 @@ import { useDebouncedValue } from "@/hooks/debounce";
 import { useMsg } from "@/hooks/message";
 import { QueryError } from "@/components/query-error";
 
+export const MAX_SHARE_TARGETS = 2000;
+
 export const shareSelectionSchema = z.object({
   kind: z.enum(GQL.ShareEntityKind),
   id: libraryIdSchema,

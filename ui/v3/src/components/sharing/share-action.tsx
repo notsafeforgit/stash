@@ -3,13 +3,17 @@ import { Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { EntityActionItem } from "@/components/detail/entity-actions-menu";
 import { useMsg } from "@/hooks/message";
+import type { MatchingShareSelection } from "./share-matching-button";
 import type { ShareSelection } from "./share-target-picker";
 
 const ShareDialog = lazy(() =>
   import("./share-dialog").then((module) => ({ default: module.ShareDialog })),
 );
 
-export function useShareAction(targets: ShareSelection[]) {
+export function useShareAction(
+  targets: ShareSelection[],
+  matching?: MatchingShareSelection,
+) {
   const msg = useMsg();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -25,7 +29,12 @@ export function useShareAction(targets: ShareSelection[]) {
   };
   const dialog = mounted ? (
     <Suspense>
-      <ShareDialog open={open} onOpenChange={setOpen} targets={targets} />
+      <ShareDialog
+        open={open}
+        onOpenChange={setOpen}
+        targets={targets}
+        matching={matching}
+      />
     </Suspense>
   ) : null;
   return {
@@ -40,21 +49,27 @@ export function useShareAction(targets: ShareSelection[]) {
 
 export function ShareSelectionButton({
   targets,
+  matching,
+  compact = false,
 }: {
   targets: ShareSelection[];
+  matching?: MatchingShareSelection;
+  compact?: boolean;
 }) {
   const msg = useMsg();
-  const share = useShareAction(targets);
+  const share = useShareAction(targets, matching);
   return (
     <>
       <Button
         variant="ghost"
-        size="sm"
+        size={compact ? "icon-lg" : "sm"}
+        className={compact ? "size-11" : undefined}
+        aria-label={msg("sharing.share", "Share…")}
         onClick={share.open}
         disabled={!targets.length}
       >
         <Share2 />
-        {msg("sharing.share", "Share…")}
+        {!compact && msg("sharing.share", "Share…")}
       </Button>
       {share.dialog}
     </>

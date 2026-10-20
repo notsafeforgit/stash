@@ -83,6 +83,7 @@ import { BulkDeletionFixture } from "./bulk-deletion";
 import { DialogDismissalFixture } from "./dialog-dismissal";
 import { EntityCardsFixture } from "./entity-cards";
 import { EmbeddedListFixture } from "./embedded-list";
+import { PerformerSelectionFixture } from "./performer-selection";
 import { DeferredListFixture } from "./deferred-list";
 import { PerformerListFixture } from "./performer-list";
 import { LightboxListFixture } from "./lightbox-list";
@@ -360,6 +361,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/performers/$performerId",
       component: () => <p>Created performer detail</p>,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/performer-selection",
+      component: PerformerSelectionFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

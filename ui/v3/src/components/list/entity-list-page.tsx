@@ -215,6 +215,8 @@ export function EntityListPage<
   const shareSelection =
     source.kind === "graphql" && sharing && listSelect.hasSelection ? (
       <ShareSelectionButton
+        compact={isMobileSidebar}
+        matching={{ kind: sharing.kind, filter }}
         targets={listSelect.selectedItems.map((item) => ({
           kind: sharing.kind,
           id: item.id,

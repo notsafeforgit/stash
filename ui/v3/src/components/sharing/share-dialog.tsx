@@ -32,9 +32,14 @@ import { useMsg } from "@/hooks/message";
 import { useToast } from "@/hooks/toast";
 import {
   shareSelectionSchema,
+  MAX_SHARE_TARGETS,
   ShareTargetPicker,
   type ShareSelection,
 } from "./share-target-picker";
+import {
+  ShareMatchingButton,
+  type MatchingShareSelection,
+} from "./share-matching-button";
 import { ShareLinkDialog } from "./share-link-dialog";
 
 export function localDateTime(date: Date) {
@@ -46,6 +51,7 @@ type ShareDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   targets?: ShareSelection[];
+  matching?: MatchingShareSelection;
   share?: GQL.MediaShareFieldsFragment;
 };
 
@@ -73,6 +79,7 @@ function ShareForm({
   open,
   onOpenChange,
   targets = [],
+  matching,
   share,
   onCreated,
 }: ShareDialogProps & {
@@ -82,6 +89,7 @@ function ShareForm({
   const toast = useToast();
   const id = useId();
   const [now] = useState(Date.now);
+  const [loadingMatching, setLoadingMatching] = useState(false);
   const [preset, setPreset] = useState(share ? "custom" : "24");
   const [create] = useMutation(GQL.MediaShareCreateDocument, {
     refetchQueries: [GQL.MediaSharesDocument],
@@ -132,10 +140,11 @@ function ShareForm({
         targets: z
           .array(shareSelectionSchema)
           .min(1, msg("sharing.select_required", "Select at least one item."))
-          .max(2000),
+          .max(MAX_SHARE_TARGETS),
       }),
     },
     onSubmit: async ({ value }) => {
+      if (loadingMatching) return;
       try {
         const input = {
           label: value.label.trim(),
@@ -232,10 +241,20 @@ function ShareForm({
                       ))}
                     </ul>
                   ) : (
-                    <ShareTargetPicker
-                      value={field.state.value}
-                      onChange={field.handleChange}
-                    />
+                    <>
+                      {matching && (
+                        <ShareMatchingButton
+                          matching={matching}
+                          onSelect={field.handleChange}
+                          onLoadingChange={setLoadingMatching}
+                        />
+                      )}
+                      <ShareTargetPicker
+                        value={field.state.value}
+                        onChange={field.handleChange}
+                        disabled={loadingMatching}
+                      />
+                    </>
                   )}
                   <FieldError errors={field.state.meta.errors} />
                 </Field>
@@ -358,7 +377,7 @@ function ShareForm({
               <Button
                 type="submit"
                 form={`${id}-form`}
-                disabled={!canSubmit || submitting}
+                disabled={!canSubmit || submitting || loadingMatching}
               >
                 {submitting && <Spinner data-icon="inline-start" />}
                 {share

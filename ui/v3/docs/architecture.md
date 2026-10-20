@@ -382,13 +382,29 @@ typing before committing filter state; `useListData` adds no further delay, so
 Enter, clearing, and page changes dispatch immediately.
 
 Layout preferences must not change query variables or flash loading states.
-Only active embedded panels synchronize shared URL parameters. Selection stores
-IDs and derives selected objects from current list data. `list-provider.tsx`
+Only active embedded panels synchronize shared URL parameters. Selection retains
+entities by UUID across pagination, sort and page-size changes; current-page
+results refresh selected entities. Changing search or filters (including a
+locked performer) clears selection. Select-all and invert affect the visible
+page while preserving selections elsewhere; clear-selection clears every page.
+Confirmed deletions remove selected UUIDs even when they are off-page, including
+acknowledged batches from a partially failed deletion. `list-provider.tsx`
 shares selection capabilities; `entity-list-items.ts` binds each item provider
 and consumer to one generated entity projection. Set `ItemsProvider` in a list
 configuration when its bulk menus need selected entity objects. Consumers cannot
 choose a new item type independently of their provider. ID-only actions can use
-the stable selection accessors directly.
+the stable selection accessors directly. Typed item providers expose a stable
+selection getter separately from current-page data, so bulk card menus can
+snapshot all selected entities without subscribing every card to selection.
+The mobile selection count opens the existing page picker.
+
+Share creation can explicitly replace its draft targets with all matching
+scenes, images or galleries. The bounded query retains the current search and
+locked filter AST, starts at page one, and verifies both the complete result
+count and the server's share limit before changing the draft. Failure preserves
+the previous targets; closing the dialog cancels the request. Creation remains
+an explicit confirmation and is disabled until resolution finishes. The server
+still validates deduplicated media membership, including gallery expansion.
 
 `onDeleteSelection` supplies the same action to the desktop/mobile selection
 toolbar and card/row menus. It snapshots selected UUIDs, the current search and

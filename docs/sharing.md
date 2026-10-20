@@ -27,6 +27,17 @@ all its guest sessions.
 
 ## Scope and privacy
 
+List selections persist across pages. On mobile, tap the selected count to open
+the page picker, then select more items on another page. To share all of a
+performer's videos, select an item on their video tab, open **Share…**, and choose
+**Use all matching items across pages**. This respects the current search and
+filters, including the performer. Review the included items and create the
+share. Changing the list's search or filters clears its selection.
+
+Loading all matching items preserves the previous draft on failure and never
+silently truncates the result. The existing 2,000-media-item limit still applies;
+narrow the filters or split the selection if it exceeds the limit.
+
 Shares freeze an explicit selection at creation, including each gallery's
 current image membership and order. Gallery-linked scenes, performers, studios,
 tags and future additions are not included. Overlapping media is deduplicated;

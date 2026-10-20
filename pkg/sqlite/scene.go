@@ -67,8 +67,8 @@ type sceneRow struct {
 	ResumeTime   float64   `db:"resume_time"`
 	PlayDuration float64   `db:"play_duration"`
 
-	// not used in resolutions or updates
-	CoverBlob zero.String `db:"cover_blob"`
+	// Artwork is written only through UpdateCover, never a metadata row update.
+	CoverBlob zero.String `db:"cover_blob" goqu:"skipinsert,skipupdate"`
 }
 
 func (r *sceneRow) fromScene(o models.Scene) {
@@ -1522,6 +1522,11 @@ func (qb *SceneStore) GetManyHasCover(ctx context.Context, ids []int) ([]bool, e
 
 func (qb *SceneStore) UpdateCover(ctx context.Context, sceneID int, image []byte) error {
 	if err := qb.UpdateImage(ctx, sceneID, sceneCoverBlobColumn, image); err != nil {
+		return err
+	}
+	// An explicit cover edit supersedes unresolved old selections, including
+	// when distinct frame choices happen to produce identical pixels.
+	if err := (&SceneCoverUpgradeStore{}).Discard(ctx, sceneID); err != nil {
 		return err
 	}
 	return qb.invalidateCoverSource(ctx, sceneID)

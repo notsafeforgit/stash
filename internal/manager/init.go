@@ -331,5 +331,8 @@ func (s *Manager) ReadyLibrary(ctx context.Context) error {
 	if err := s.PromoteConfiguration(ctx); err != nil {
 		return err
 	}
+	if err := s.UpgradeSceneCoverSelections(ctx); err != nil {
+		return err
+	}
 	return s.JobManager.EnableHistory(ctx, sqlite.NewLibraryJobHistory(s.Database))
 }

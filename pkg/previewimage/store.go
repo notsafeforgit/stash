@@ -61,33 +61,6 @@ func (s Store) ImageDirectory(imageID int) string {
 	return filepath.Join(s.Root, "images", strconv.Itoa(RecipeVersion), strconv.Itoa(imageID))
 }
 
-// LegacyCoverTimestamp recovers the selection from the original v1 manifest
-// only when both its source fingerprint and cover checksum still match. It
-// deliberately ignores missing renditions and the current encoding recipe:
-// those are precisely why a user may need to regenerate the cover.
-func (s Store) LegacyCoverTimestamp(sceneID int, source, checksum string) (float64, error) {
-	key, err := sourceKey(1, source, checksum)
-	if err != nil {
-		return 0, err
-	}
-	data, err := os.ReadFile(filepath.Join(s.Root, "1", strconv.Itoa(sceneID), "cover", key, "manifest.json"))
-	if err != nil {
-		return 0, err
-	}
-	var saved struct {
-		Version int      `json:"version"`
-		Key     string   `json:"key"`
-		At      *float64 `json:"at"`
-	}
-	if err := json.Unmarshal(data, &saved); err != nil {
-		return 0, err
-	}
-	if saved.Version != 1 || saved.Key != key || saved.At == nil || !validTimestamp(*saved.At) {
-		return 0, fmt.Errorf("invalid legacy cover source")
-	}
-	return *saved.At, nil
-}
-
 func (s Store) SceneDirectory(sceneID int) string {
 	return filepath.Join(s.Root, strconv.Itoa(RecipeVersion), strconv.Itoa(sceneID))
 }

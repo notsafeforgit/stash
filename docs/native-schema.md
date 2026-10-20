@@ -1,5 +1,9 @@
 # Native schema promotion
 
+Schema 1000125 captures historical cover frame selections from generated caches
+into canonical SQLite metadata, with a finite upgrade cohort and bounded
+unresolved evidence. See [cover selection ownership](preview-images.md#storage-and-compatibility-boundary).
+
 Schema 1000124 adds the empty `file_moves` commit-marker table for
 [recoverable file moves](file-moves.md). Completed moves retain no journal or
 marker history. No existing files or library metadata are changed by this

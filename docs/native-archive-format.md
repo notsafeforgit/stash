@@ -193,6 +193,12 @@ offline snapshot verification also rejects pending move markers. This preserves
 the existing archive component contract rather than omitting recovery state from
 an apparently complete snapshot.
 
+The [cover selection upgrade](preview-images.md#storage-and-compatibility-boundary)
+must capture old manifest evidence before a checkpoint. Captured unresolved
+claims are authored metadata inside SQLite and remain portable even when their
+source videos are offline. Snapshot verification rejects uncaptured claims,
+whose only surviving timestamp might still be in an excluded generated cache.
+
 Native artwork writes now publish flushed replacement inodes instead of
 truncating a file that a reader or backup might retain. Orphan cleanup rechecks
 references under a write transaction and uses the deletion journal, sharing the

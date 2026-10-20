@@ -2212,6 +2212,7 @@
     "reset_library": "Reset covers for every scene in your library?",
     "reset_selected": "Reset covers for {count, plural, one {# selected scene} other {# selected scenes}}?",
     "unavailable": "The original video is unavailable. The cover is kept; restore the video or select a new frame.",
+    "unresolved": "Saved frame evidence could not be matched to an available video. The cover is kept; restore the original video and restart, or select a new frame.",
     "unknown": "No frame timestamp is recorded. Regeneration uses the default frame at 20% of the primary video."
   },
   "scene": "Scene",

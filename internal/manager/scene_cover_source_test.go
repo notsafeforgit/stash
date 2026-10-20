@@ -134,7 +134,7 @@ func TestRegenerateSceneCoverKeepsUnreproducibleArtwork(t *testing.T) {
 	}
 }
 
-func TestLegacyCoverOriginRecoversWithoutRenditions(t *testing.T) {
+func TestCoverOriginDoesNotImportCacheDuringQueries(t *testing.T) {
 	for _, at := range []float64{0, 12.345} {
 		t.Run(fmt.Sprintf("at_%g", at), func(t *testing.T) {
 			mgr, db := coverTestManager(t)
@@ -148,8 +148,8 @@ func TestLegacyCoverOriginRecoversWithoutRenditions(t *testing.T) {
 			db.Scene.On("GetCoverSource", mock.Anything, scene.ID).Return(nil, nil)
 			origin, err := mgr.SceneCoverOrigin(context.Background(), scene)
 			require.NoError(t, err)
-			require.Equal(t, CoverSourceAvailable, origin.Status)
-			require.Equal(t, at, origin.Source.At)
+			require.Equal(t, CoverSourceUnknown, origin.Status)
+			require.Nil(t, origin.Source, "the explicit startup upgrade owns legacy selection capture")
 			// A replacement source cannot inherit the timestamp from that cache.
 			require.NoError(t, os.WriteFile(scene.Path, []byte("replacement"), 0600))
 			origin, err = mgr.SceneCoverOrigin(context.Background(), scene)

@@ -181,6 +181,13 @@ func VerifyNativeSnapshot(ctx context.Context, path string) (*NativeSnapshotRepo
 	if pendingMoves {
 		return nil, errors.New("native snapshot contains unfinished file moves; recover the source library before capture")
 	}
+	var uncapturedCovers bool
+	if err := tx.GetContext(ctx, &uncapturedCovers, "SELECT EXISTS(SELECT 1 FROM scene_cover_upgrade WHERE captured=0)"); err != nil {
+		return nil, err
+	}
+	if uncapturedCovers {
+		return nil, errors.New("native snapshot contains uncaptured cover selection evidence; finish the source library upgrade before capture")
+	}
 	finalDigest, err := snapshotDigest(ctx, file)
 	if err != nil {
 		return nil, err

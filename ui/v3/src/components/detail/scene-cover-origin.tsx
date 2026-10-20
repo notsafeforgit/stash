@@ -34,6 +34,11 @@ export function SceneCoverOrigin({
       defaultMessage:
         "No frame timestamp is recorded. Regeneration uses the default frame at 20% of the primary video.",
     },
+    [SceneCoverOriginStatus.Unresolved]: {
+      id: "scene_cover.unresolved",
+      defaultMessage:
+        "Saved frame evidence could not be matched to an available video. The cover is kept; restore the original video and restart, or select a new frame.",
+    },
   } satisfies Record<
     SceneCoverOriginStatus,
     { id: string; defaultMessage: string }

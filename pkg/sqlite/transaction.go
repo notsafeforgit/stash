@@ -213,6 +213,7 @@ func (db *Database) Repository() models.Repository {
 		Group:                       db.Group,
 		Performer:                   db.Performer,
 		Scene:                       db.Scene,
+		SceneCoverUpgrade:           &SceneCoverUpgradeStore{},
 		SceneMarker:                 db.SceneMarker,
 		Studio:                      db.Studio,
 		Tag:                         db.Tag,

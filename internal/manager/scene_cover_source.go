@@ -19,6 +19,7 @@ const (
 	CoverSourceAvailable   CoverSourceStatus = "AVAILABLE"
 	CoverSourceChanged     CoverSourceStatus = "CHANGED"
 	CoverSourceUnavailable CoverSourceStatus = "UNAVAILABLE"
+	CoverSourceUnresolved  CoverSourceStatus = "UNRESOLVED"
 	CoverSourceUnknown     CoverSourceStatus = "UNKNOWN"
 )
 
@@ -80,27 +81,16 @@ func coverSourceStatus(scene *models.Scene, source *models.SceneCoverSource) Cov
 	return CoverSourceAvailable
 }
 
-// coverOrigin assumes loaded scene files. Reading a
-// legacy manifest is a compatibility bridge, never a write during a query.
-func (s *Manager) coverOrigin(scene *models.Scene, source *models.SceneCoverSource) *CoverOrigin {
+// coverOrigin assumes loaded scene files. Authored state comes only from SQLite;
+// disposable rendition manifests cannot create or override a selection.
+func (s *Manager) coverOrigin(scene *models.Scene, source *models.SceneCoverSource, pending bool) *CoverOrigin {
 	if scene.CoverChecksum == "" {
 		return nil
 	}
 	if source == nil {
-		for _, file := range scene.Files.List() {
-			fingerprint, err := coverFingerprint(file)
-			if err != nil {
-				continue
-			}
-			at, err := s.PreviewImageStore().LegacyCoverTimestamp(scene.ID, file.Path, scene.CoverChecksum)
-			if err != nil || !validCoverTime(at, file.Duration) {
-				continue
-			}
-			source = &models.SceneCoverSource{CoverChecksum: scene.CoverChecksum, FileID: file.ID, At: at, Fingerprint: fingerprint}
-			break
+		if pending {
+			return &CoverOrigin{Status: CoverSourceUnresolved}
 		}
-	}
-	if source == nil {
 		return &CoverOrigin{Status: CoverSourceUnknown}
 	}
 	return &CoverOrigin{Source: source, Status: coverSourceStatus(scene, source)}
@@ -123,10 +113,22 @@ func (s *Manager) SceneCoverOrigin(ctx context.Context, scene *models.Scene) (*C
 		if err != nil {
 			return err
 		}
-		ret = s.coverOrigin(&resolved, source)
+		pending, err := pendingCoverSelection(ctx, s.Repository, scene.ID, source)
+		if err != nil {
+			return err
+		}
+		ret = s.coverOrigin(&resolved, source, pending)
 		return nil
 	})
 	return ret, err
+}
+
+func pendingCoverSelection(ctx context.Context, r models.Repository, id int, source *models.SceneCoverSource) (bool, error) {
+	// Lightweight test repositories have no historical upgrade cohort.
+	if source != nil || r.SceneCoverUpgrade == nil {
+		return false, nil
+	}
+	return r.SceneCoverUpgrade.Pending(ctx, id)
 }
 
 func (s *Manager) RegenerateSceneCover(ctx context.Context, sceneID string) (string, error) {
@@ -140,6 +142,8 @@ func retainedCoverError(sceneID int, status CoverSourceStatus) error {
 		reason = "the original video has changed or is no longer attached"
 	case CoverSourceUnavailable:
 		reason = "the original video is unavailable"
+	case CoverSourceUnresolved:
+		reason = "the saved frame evidence could not be matched unambiguously to an available source video"
 	}
 	return fmt.Errorf("scene %d: kept existing cover because %s; select a new cover frame", sceneID, reason)
 }
@@ -179,7 +183,11 @@ func (t *GenerateCoverTask) generateWithCoverSource(ctx context.Context) error {
 			}
 		}
 		if t.ScreenshotAt == nil && !t.ResetToDefault && scene.CoverChecksum != "" {
-			origin := s.coverOrigin(&scene, previousSource)
+			pending, err := pendingCoverSelection(ctx, r, scene.ID, previousSource)
+			if err != nil {
+				return err
+			}
+			origin := s.coverOrigin(&scene, previousSource, pending)
 			switch origin.Status {
 			case CoverSourceAvailable:
 				source = *origin.Source

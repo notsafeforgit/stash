@@ -11,6 +11,7 @@ import (
 
 func removeFileMoveSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeCoverUpgradeSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE IF EXISTS file_moves;
 DELETE FROM native_migration_history WHERE version=1000124`)
 	require.NoError(t, err)

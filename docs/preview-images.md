@@ -65,8 +65,12 @@ detached source keeps its existing cover and requires a new selection (or
 restoring an unavailable original). Individual scene IDs are logged; the job
 reports a bounded failure summary after processing the remaining scenes.
 
-Older v3 manifests can supply the timestamp when they still match both the
-source video and saved cover, even when their rendition files are missing.
+The schema 1000125 startup upgrade captures timestamps from original v1 cover
+manifests into SQLite, even when rendition files are missing. A unique match
+to an attached source video and saved cover becomes the canonical selection.
+Offline or ambiguous evidence is shown as unresolved: regeneration preserves
+the cover until the original can be verified at a later startup or the user
+explicitly selects a new frame or resets to the default.
 Legacy, uploaded and scraped covers without a recorded frame are shown as
 unknown. Explicit regeneration with overwrite uses the frame 20% into the
 primary video and records it for future refreshes. Scenes without any cover
@@ -171,8 +175,7 @@ obsolete AVIFs from eligible current entries as described below. Shared renditio
 URLs remain scoped to the grant and its pinned file, with the same authorization
 as the original image.
 
-Fork migration 7 adds `fork_scene_cover_sources`, independently of upstream's
-schema version. It stores the cover checksum, historical source file ID, exact
+Native `scene_cover_sources` stores the cover checksum, historical source file ID, exact
 timestamp and a versioned source fingerprint. File size and modification time
 are checked against the filesystem, plus any MD5/oshash available at selection
 time from a current scan. This avoids hashing entire videos during a backfill;
@@ -185,16 +188,32 @@ used even after another file becomes primary.
 
 Cover and origin writes share a transaction. Generation rechecks the artwork
 and source before committing, so a concurrent cover edit or source replacement
-is preserved. Ordinary cover edits invalidate mismatched provenance, and the
-fork reconciles upstream-only edits when reopening the database. The upstream
-scene schema and JPEG cover remain unchanged; an upstream server at the same
-upstream schema version can continue using the database. The historical file
-ID deliberately survives file deletion so v3 can explain why regeneration is
+is preserved. Ordinary cover edits invalidate mismatched provenance. The historical file
+ID deliberately survives file deletion so the application can explain why regeneration is
 unavailable. No video or lossless-frame duplicate is stored.
 
 The rendition manifest still records its timestamp for inspection, but the
 database record owns future regenerations, independently of image format,
 dimensions, encoder policy or cache lifetime.
+
+Schema 1000125 freezes a finite cohort of existing scenes without canonical
+selections in `scene_cover_upgrade`. Before ordinary job admission, startup
+captures valid historical claims in batches of 50 scenes. Reading the generated
+cache is upgrade-only code in `pkg/covermigration`; runtime queries and cover
+generation never import manifests. Each manifest is capped at 64 KiB, with at
+most 256 compact source-key/timestamp claims per scene. I/O errors and exceeded
+limits stop capture without advancing its transaction; malformed unsupported
+cache entries do not invent a selection.
+
+No new scene or cache observation joins that cohort. Captured offline/ambiguous
+claims survive cache deletion and are retried from SQLite at startup. Successful
+resolution, a new explicit cover/selection, or scene deletion removes the claims
+and checkpoint together. Unresolved authored evidence does not expire by age.
+A completed scene is never reimported over later edits, including identical
+cover pixels selected at another timestamp. Portable checkpoints require all
+remaining claims to have been captured; unresolved captured claims travel with
+the database. A missing generated root prevents capture from assuming an empty
+cache. Already-deleted manifests cannot be reconstructed and remain unknown.
 
 Rendition filenames are content hashes. An atomic manifest publishes only a
 complete generation, and its revision appears in every URL. Regenerating after

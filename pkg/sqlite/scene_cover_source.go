@@ -37,6 +37,9 @@ WHERE source.scene_id = ?`, sceneID)
 
 func (qb *SceneStore) SetCoverSource(ctx context.Context, sceneID int, source *models.SceneCoverSource) error {
 	if source == nil {
+		if err := (&SceneCoverUpgradeStore{}).Discard(ctx, sceneID); err != nil {
+			return err
+		}
 		_, err := dbWrapper.Exec(ctx, "DELETE FROM scene_cover_sources WHERE scene_id = ?", sceneID)
 		return err
 	}

@@ -2,6 +2,8 @@ enum SceneCoverOriginStatus {
   AVAILABLE
   CHANGED
   UNAVAILABLE
+  "Historical frame evidence is retained, but its source cannot yet be identified unambiguously."
+  UNRESOLVED
   UNKNOWN
 }
 

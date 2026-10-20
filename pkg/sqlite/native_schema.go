@@ -121,6 +121,17 @@ AND NOT (type='index' AND tbl_name='schema_migrations'))`); err != nil {
 		if present[forkSchemaMigrationsTable] {
 			return errors.New("native database still contains an active fork migration ledger")
 		}
+		if version >= NativeSchemaBaseline+125 {
+			for _, name := range []string{"scene_cover_upgrade", "scene_cover_claims", "scene_cover_upgrade_uncaptured", "scene_cover_upgrade_artwork", "scene_cover_upgrade_selected", "scene_cover_upgrade_reselected"} {
+				var exists bool
+				if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+					return err
+				}
+				if !exists {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+		}
 		if version >= NativeSchemaBaseline+124 {
 			if !present["file_moves"] {
 				return errors.New("native database schema is incomplete: missing file_moves")

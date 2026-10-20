@@ -26,6 +26,7 @@ type Repository struct {
 	Group                       GroupReaderWriter
 	Performer                   PerformerReaderWriter
 	Scene                       SceneReaderWriter
+	SceneCoverUpgrade           SceneCoverUpgradeReaderWriter
 	SceneMarker                 SceneMarkerReaderWriter
 	Studio                      StudioReaderWriter
 	Tag                         TagReaderWriter

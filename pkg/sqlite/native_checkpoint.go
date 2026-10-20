@@ -176,6 +176,13 @@ func withNativeCheckpoint(ctx context.Context, database string, capture, afterCa
 	if pendingMoves {
 		return errors.New("file move recovery must finish before a native checkpoint")
 	}
+	var uncapturedCovers bool
+	if err := guard.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM scene_cover_upgrade WHERE captured=0)").Scan(&uncapturedCovers); err != nil {
+		return err
+	}
+	if uncapturedCovers {
+		return errors.New("cover selection evidence must be captured before a native checkpoint")
+	}
 	committed, err := checkpointDeletionIDs(ctx, guard)
 	if err != nil {
 		return err

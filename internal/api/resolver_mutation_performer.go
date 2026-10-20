@@ -34,18 +34,6 @@ func (r *mutationResolver) getPerformer(ctx context.Context, id int) (ret *model
 	return ret, nil
 }
 
-func handleLegacyPerformerURLs(ctx context.Context, repository models.PerformerReaderWriter, performerID int, legacyURLs legacyPerformerURLs, updatedPerformer *models.PerformerPartial) error {
-	performer, err := repository.Find(ctx, performerID)
-	if err != nil {
-		return err
-	}
-	if performer == nil {
-		return fmt.Errorf("performer with id %d not found", performerID)
-	}
-
-	return applyLegacyPerformerURLs(performer, legacyURLs, updatedPerformer)
-}
-
 func (r *mutationResolver) PerformerCreate(ctx context.Context, input models.PerformerCreateInput) (*models.Performer, error) {
 	translator := changesetTranslator{
 		inputMap: getUpdateInputMap(ctx),
@@ -198,97 +186,12 @@ func validateNoLegacyURLs(translator changesetTranslator) error {
 	return nil
 }
 
-func (r *mutationResolver) handleLegacyURLs(ctx context.Context, performerID int, legacyURLs legacyPerformerURLs, updatedPerformer *models.PerformerPartial) error {
-	qb := r.repository.Performer
-
-	// we need to be careful with URL/Twitter/Instagram
-	// treat URL as replacing the first non-Twitter/Instagram URL in the list
-	// twitter should replace any existing twitter URL
-	// instagram should replace any existing instagram URL
-	p, err := qb.Find(ctx, performerID)
-	if err != nil {
-		return err
-	}
-
-	if err := p.LoadURLs(ctx, qb); err != nil {
-		return fmt.Errorf("loading performer URLs: %w", err)
-	}
-
-	return applyLegacyPerformerURLs(p, legacyURLs, updatedPerformer)
+func (r *mutationResolver) handleLegacyURLs(ctx context.Context, performerID int, changes performer.URLUpdate, partial *models.PerformerPartial) error {
+	return performer.ApplyUpdateURLs(ctx, r.repository.Performer, performerID, changes, partial)
 }
 
-func applyLegacyPerformerURLs(p *models.Performer, legacyURLs legacyPerformerURLs, updatedPerformer *models.PerformerPartial) error {
-	existingURLs := p.URLs.List()
-
-	// performer partial URLs should be empty
-	if legacyURLs.URL.Set {
-		replaced := false
-		for i, url := range existingURLs {
-			if !performer.IsTwitterURL(url) && !performer.IsInstagramURL(url) {
-				existingURLs[i] = legacyURLs.URL.Value
-				replaced = true
-				break
-			}
-		}
-
-		if !replaced {
-			existingURLs = append(existingURLs, legacyURLs.URL.Value)
-		}
-	}
-
-	if legacyURLs.Twitter.Set {
-		value := utils.URLFromHandle(legacyURLs.Twitter.Value, twitterURL)
-		found := false
-		// find and replace the first twitter URL
-		for i, url := range existingURLs {
-			if performer.IsTwitterURL(url) {
-				existingURLs[i] = value
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			existingURLs = append(existingURLs, value)
-		}
-	}
-	if legacyURLs.Instagram.Set {
-		found := false
-		value := utils.URLFromHandle(legacyURLs.Instagram.Value, instagramURL)
-		// find and replace the first instagram URL
-		for i, url := range existingURLs {
-			if performer.IsInstagramURL(url) {
-				existingURLs[i] = value
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			existingURLs = append(existingURLs, value)
-		}
-	}
-
-	updatedPerformer.URLs = &models.UpdateStrings{
-		Values: existingURLs,
-		Mode:   models.RelationshipUpdateModeSet,
-	}
-
-	return nil
-}
-
-type legacyPerformerURLs struct {
-	URL       models.OptionalString
-	Twitter   models.OptionalString
-	Instagram models.OptionalString
-}
-
-func (u *legacyPerformerURLs) AnySet() bool {
-	return u.URL.Set || u.Twitter.Set || u.Instagram.Set
-}
-
-func legacyPerformerURLsFromInput(input models.PerformerUpdateInput, translator changesetTranslator) legacyPerformerURLs {
-	return legacyPerformerURLs{
+func legacyPerformerURLsFromInput(input models.PerformerUpdateInput, translator changesetTranslator) performer.URLUpdate {
+	return performer.URLUpdate{
 		URL:       translator.optionalString(input.URL, "url"),
 		Twitter:   translator.optionalString(input.Twitter, "twitter"),
 		Instagram: translator.optionalString(input.Instagram, "instagram"),

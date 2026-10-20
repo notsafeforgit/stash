@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+
 	"fmt"
+	"github.com/stashapp/stash/pkg/bulkupdate"
 
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
@@ -11,16 +13,6 @@ import (
 
 // Native bulk edits complete explicit IDs atomically or queue the selected
 // filter results. Both paths return an explicit completion acknowledgment.
-
-type galleryBulkUpdateOperation struct {
-	repository     models.GalleryReaderWriter
-	updatedGallery models.GalleryPartial
-}
-
-func (o galleryBulkUpdateOperation) Update(ctx context.Context, id int) error {
-	_, err := o.repository.UpdatePartial(ctx, id, o.updatedGallery)
-	return err
-}
 
 func (r *mutationResolver) BulkGalleryUpdate(ctx context.Context, input BulkGalleryUpdateInput) (*BulkUpdateResult, error) {
 	galleryIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
@@ -91,9 +83,9 @@ func (r *mutationResolver) BulkGalleryUpdate(ctx context.Context, input BulkGall
 		updatedGallery.CustomFields = handleUpdateCustomFields(*input.CustomFields)
 	}
 
-	operation := galleryBulkUpdateOperation{
-		repository:     r.repository.Gallery,
-		updatedGallery: updatedGallery,
+	operation := bulkupdate.Gallery{
+		Repository: r.repository.Gallery,
+		Changes:    updatedGallery,
 	}
 
 	if !useBackgroundJob {

@@ -2,30 +2,17 @@ package api
 
 import (
 	"context"
+
 	"fmt"
+	"github.com/stashapp/stash/pkg/bulkupdate"
 
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
-	"github.com/stashapp/stash/pkg/tag"
 )
 
 // Native bulk edits complete explicit IDs atomically or queue the selected
 // filter results. Both paths return an explicit completion acknowledgment.
-
-type tagBulkUpdateOperation struct {
-	repository models.TagReaderWriter
-	updatedTag models.TagPartial
-}
-
-func (o tagBulkUpdateOperation) Update(ctx context.Context, id int) error {
-	if err := tag.ValidateUpdate(ctx, id, o.updatedTag, o.repository); err != nil {
-		return err
-	}
-
-	_, err := o.repository.UpdatePartial(ctx, id, o.updatedTag)
-	return err
-}
 
 func (r *mutationResolver) BulkTagUpdate(ctx context.Context, input BulkTagUpdateInput) (*BulkUpdateResult, error) {
 	tagIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
@@ -82,9 +69,9 @@ func (r *mutationResolver) BulkTagUpdate(ctx context.Context, input BulkTagUpdat
 		return nil, fmt.Errorf("converting child tag ids: %w", err)
 	}
 
-	operation := tagBulkUpdateOperation{
-		repository: r.repository.Tag,
-		updatedTag: updatedTag,
+	operation := bulkupdate.Tag{
+		Repository: r.repository.Tag,
+		Changes:    updatedTag,
 	}
 
 	if !useBackgroundJob {

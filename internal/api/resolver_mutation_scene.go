@@ -777,56 +777,6 @@ func (r *mutationResolver) SceneMarkerUpdate(ctx context.Context, input SceneMar
 	return r.getSceneMarker(ctx, markerID)
 }
 
-// adjustMarkerPartialForTagExclusion adjusts the SceneMarkerPartial to exclude the primary tag from tag updates.
-func adjustMarkerPartialForTagExclusion(ctx context.Context, r models.SceneMarkerReader, id int, partial *models.SceneMarkerPartial) error {
-	if partial.TagIDs == nil && !partial.PrimaryTagID.Set {
-		return nil
-	}
-
-	// exclude primary tag from tag updates
-	var primaryTagID int
-	if partial.PrimaryTagID.Set {
-		primaryTagID = partial.PrimaryTagID.Value
-	} else {
-		existing, err := r.Find(ctx, id)
-		if err != nil {
-			return fmt.Errorf("finding existing primary tag id: %w", err)
-		}
-
-		primaryTagID = existing.PrimaryTagID
-	}
-
-	existingTagIDs, err := r.GetTagIDs(ctx, id)
-	if err != nil {
-		return fmt.Errorf("getting existing tag ids: %w", err)
-	}
-
-	tagIDAttr := partial.TagIDs
-
-	if tagIDAttr == nil {
-		tagIDAttr = &models.UpdateIDs{
-			IDs:  existingTagIDs,
-			Mode: models.RelationshipUpdateModeSet,
-		}
-	}
-
-	newTagIDs := tagIDAttr.Apply(existingTagIDs)
-	// Remove primary tag from newTagIDs if present
-	newTagIDs = sliceutil.Exclude(newTagIDs, []int{primaryTagID})
-
-	if len(existingTagIDs) != len(newTagIDs) {
-		partial.TagIDs = &models.UpdateIDs{
-			IDs:  newTagIDs,
-			Mode: models.RelationshipUpdateModeSet,
-		}
-	} else {
-		// no change to tags required
-		partial.TagIDs = nil
-	}
-
-	return nil
-}
-
 func (r *mutationResolver) SceneMarkerDestroy(ctx context.Context, id string) (bool, error) {
 	return r.SceneMarkersDestroy(ctx, []string{id})
 }

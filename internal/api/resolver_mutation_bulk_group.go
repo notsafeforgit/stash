@@ -2,10 +2,10 @@ package api
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/stashapp/stash/internal/manager"
-	"github.com/stashapp/stash/pkg/group"
+	"fmt"
+	"github.com/stashapp/stash/pkg/bulkupdate"
+
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
@@ -13,16 +13,6 @@ import (
 
 // Native bulk edits complete explicit IDs atomically or queue the selected
 // filter results. Both paths return an explicit completion acknowledgment.
-
-type groupBulkUpdateOperation struct {
-	groupService manager.GroupService
-	updatedGroup models.GroupPartial
-}
-
-func (o groupBulkUpdateOperation) Update(ctx context.Context, id int) error {
-	_, err := o.groupService.UpdatePartial(ctx, id, o.updatedGroup, group.ImageInput{}, group.ImageInput{})
-	return err
-}
 
 func (r *mutationResolver) BulkGroupUpdate(ctx context.Context, input BulkGroupUpdateInput) (*BulkUpdateResult, error) {
 	groupIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
@@ -63,9 +53,9 @@ func (r *mutationResolver) BulkGroupUpdate(ctx context.Context, input BulkGroupU
 		return nil, err
 	}
 
-	operation := groupBulkUpdateOperation{
-		groupService: r.groupService,
-		updatedGroup: updatedGroup,
+	operation := bulkupdate.Group{
+		Groups:  r.groupService,
+		Changes: updatedGroup,
 	}
 
 	if !useBackgroundJob {

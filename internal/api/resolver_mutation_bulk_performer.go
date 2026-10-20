@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+
 	"fmt"
+	"github.com/stashapp/stash/pkg/bulkupdate"
 	"strings"
 
 	"github.com/stashapp/stash/pkg/models"
@@ -13,27 +15,6 @@ import (
 
 // Native bulk edits complete explicit IDs atomically or queue the selected
 // filter results. Both paths return an explicit completion acknowledgment.
-
-type performerBulkUpdateOperation struct {
-	repository       models.PerformerReaderWriter
-	updatedPerformer models.PerformerPartial
-	legacyURLs       legacyPerformerURLs
-}
-
-func (o performerBulkUpdateOperation) Update(ctx context.Context, id int) error {
-	if o.legacyURLs.AnySet() {
-		if err := handleLegacyPerformerURLs(ctx, o.repository, id, o.legacyURLs, &o.updatedPerformer); err != nil {
-			return err
-		}
-	}
-
-	if err := performer.ValidateUpdate(ctx, id, o.updatedPerformer, o.repository); err != nil {
-		return err
-	}
-
-	_, err := o.repository.UpdatePartial(ctx, id, o.updatedPerformer)
-	return err
-}
 
 func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPerformerUpdateInput) (*BulkUpdateResult, error) {
 	performerIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
@@ -123,7 +104,7 @@ func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPe
 		updatedPerformer.URLs = translator.updateStringsBulk(input.Urls, "urls")
 	}
 
-	legacyURLs := legacyPerformerURLs{
+	legacyURLs := performer.URLUpdate{
 		URL:       translator.optionalString(input.URL, "url"),
 		Twitter:   translator.optionalString(input.Twitter, "twitter"),
 		Instagram: translator.optionalString(input.Instagram, "instagram"),
@@ -176,10 +157,10 @@ func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPe
 		updatedPerformer.CustomFields = handleUpdateCustomFields(*input.CustomFields)
 	}
 
-	operation := performerBulkUpdateOperation{
-		repository:       r.repository.Performer,
-		updatedPerformer: updatedPerformer,
-		legacyURLs:       legacyURLs,
+	operation := bulkupdate.Performer{
+		Repository: r.repository.Performer,
+		Changes:    updatedPerformer,
+		URLs:       legacyURLs,
 	}
 
 	if !useBackgroundJob {

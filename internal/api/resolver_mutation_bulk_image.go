@@ -2,9 +2,10 @@ package api
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/stashapp/stash/internal/manager"
+	"fmt"
+	"github.com/stashapp/stash/pkg/bulkupdate"
+
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
@@ -12,47 +13,6 @@ import (
 
 // Native bulk edits complete explicit IDs atomically or queue the selected
 // filter results. Both paths return an explicit completion acknowledgment.
-
-type imageBulkUpdateOperation struct {
-	repository     models.ImageReaderWriter
-	galleryService manager.GalleryService
-	updatedImage   models.ImagePartial
-}
-
-func (o imageBulkUpdateOperation) Update(ctx context.Context, id int) error {
-	i, err := o.repository.Find(ctx, id)
-	if err != nil {
-		return err
-	}
-	if i == nil {
-		return fmt.Errorf("image with id %d not found", id)
-	}
-
-	if o.updatedImage.GalleryIDs != nil {
-		if err := i.LoadGalleryIDs(ctx, o.repository); err != nil {
-			return err
-		}
-
-		if err := o.galleryService.ValidateImageGalleryChange(ctx, i, *o.updatedImage.GalleryIDs); err != nil {
-			return err
-		}
-	}
-
-	if _, err := o.repository.UpdatePartial(ctx, id, o.updatedImage); err != nil {
-		return err
-	}
-
-	if o.updatedImage.GalleryIDs != nil {
-		thisUpdatedGalleryIDs := o.updatedImage.GalleryIDs.ImpactedIDs(i.GalleryIDs.List())
-		for _, galleryID := range thisUpdatedGalleryIDs {
-			if err := o.galleryService.Updated(ctx, galleryID); err != nil {
-				return fmt.Errorf("updating gallery %d: %w", galleryID, err)
-			}
-		}
-	}
-
-	return nil
-}
 
 func (r *mutationResolver) BulkImageUpdate(ctx context.Context, input BulkImageUpdateInput) (*BulkUpdateResult, error) {
 	imageIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
@@ -128,10 +88,10 @@ func (r *mutationResolver) BulkImageUpdate(ctx context.Context, input BulkImageU
 		updatedImage.CustomFields.Partial = convertMapJSONNumbers(updatedImage.CustomFields.Partial)
 	}
 
-	operation := imageBulkUpdateOperation{
-		repository:     r.repository.Image,
-		galleryService: r.galleryService,
-		updatedImage:   updatedImage,
+	operation := bulkupdate.Image{
+		Repository: r.repository.Image,
+		Galleries:  r.galleryService,
+		Changes:    updatedImage,
 	}
 
 	if !useBackgroundJob {
@@ -159,38 +119,6 @@ func (r *mutationResolver) BulkImageUpdate(ctx context.Context, input BulkImageU
 	}
 
 	return queuedBulkUpdate(jobID, len(imageIDs)), nil
-}
-
-type imageSetDateFromMTimeOperation struct {
-	repository models.ImageReaderWriter
-	fileGetter models.FileGetter
-}
-
-func (o imageSetDateFromMTimeOperation) Update(ctx context.Context, id int) error {
-	i, err := o.repository.Find(ctx, id)
-	if err != nil {
-		return err
-	}
-	if i == nil {
-		return fmt.Errorf("image with id %d not found", id)
-	}
-
-	if err := i.LoadPrimaryFile(ctx, o.fileGetter); err != nil {
-		return fmt.Errorf("loading primary file: %w", err)
-	}
-	primary := i.Files.Primary()
-	if primary == nil {
-		return nil
-	}
-
-	mtime := primary.Base().ModTime
-	partial := models.NewImagePartial()
-	partial.Date = models.NewOptionalDate(models.Date{Time: mtime, Precision: models.DatePrecisionDay})
-
-	if _, err := o.repository.UpdatePartial(ctx, id, partial); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (r *mutationResolver) ImagesSetDateFromFileMTime(ctx context.Context, input ImagesSetDateFromFileMTimeInput) (string, error) {
@@ -224,9 +152,9 @@ func (r *mutationResolver) ImagesSetDateFromFileMTime(ctx context.Context, input
 		}
 	}
 
-	operation := imageSetDateFromMTimeOperation{
-		repository: r.repository.Image,
-		fileGetter: r.repository.File,
+	operation := bulkupdate.ImageDateFromMTime{
+		Repository: r.repository.Image,
+		Files:      r.repository.File,
 	}
 
 	if !useBackgroundJob {

@@ -2,32 +2,17 @@ package api
 
 import (
 	"context"
+
 	"fmt"
+	"github.com/stashapp/stash/pkg/bulkupdate"
 
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
-	"github.com/stashapp/stash/pkg/studio"
 )
 
 // Native bulk edits complete explicit IDs atomically or queue the selected
 // filter results. Both paths return an explicit completion acknowledgment.
-
-type studioBulkUpdateOperation struct {
-	repository models.StudioReaderWriter
-	partial    models.StudioPartial
-}
-
-func (o studioBulkUpdateOperation) Update(ctx context.Context, id int) error {
-	local := o.partial
-	local.ID = id
-	if err := studio.ValidateModify(ctx, local, o.repository); err != nil {
-		return err
-	}
-
-	_, err := o.repository.UpdatePartial(ctx, local)
-	return err
-}
 
 func (r *mutationResolver) BulkStudioUpdate(ctx context.Context, input BulkStudioUpdateInput) (*BulkUpdateResult, error) {
 	ids, err := stringslice.StringSliceToIntSlice(input.Ids)
@@ -104,9 +89,9 @@ func (r *mutationResolver) BulkStudioUpdate(ctx context.Context, input BulkStudi
 		return nil, fmt.Errorf("converting tag ids: %w", err)
 	}
 
-	operation := studioBulkUpdateOperation{
-		repository: r.repository.Studio,
-		partial:    partial,
+	operation := bulkupdate.Studio{
+		Repository: r.repository.Studio,
+		Changes:    partial,
 	}
 
 	if !useBackgroundJob {

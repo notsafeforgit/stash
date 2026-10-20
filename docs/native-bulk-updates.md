@@ -15,6 +15,14 @@ Explicit IDs execute in one transaction. A failed item rolls back that entire
 request and returns a GraphQL error, without successful-edit notifications.
 An empty explicit selection completes with zero items.
 
+Input translation stays in the API. The shared `pkg/bulkupdate` operations own
+execution for both immediate edits and background workers, including validation,
+relationship handling and custom fields. Its versioned command codec preserves
+omitted fields, explicit clears, empty collections, numeric zero and date
+precision. Unknown versions/fields, invalid relationship modes and oversized
+commands are rejected. Changes to durable command semantics require an explicit
+version change, not reinterpretation of already accepted edits.
+
 Set `apply_to_items_matching_filters: true` with the entity's `*_filter_ast`
 or `find_filter.q` to queue a selection. Pagination is ignored; matching IDs
 are captured before admission. Background work commits each item separately.

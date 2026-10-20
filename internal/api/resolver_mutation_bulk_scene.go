@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+
 	"fmt"
+	"github.com/stashapp/stash/pkg/bulkupdate"
 
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
@@ -11,42 +13,6 @@ import (
 
 // Native bulk edits complete explicit IDs atomically or queue the selected
 // filter results. Both paths return an explicit completion acknowledgment.
-
-type sceneBulkUpdateOperation struct {
-	repository   models.SceneReaderWriter
-	updatedScene models.ScenePartial
-	customFields *models.CustomFieldsInput
-}
-
-func (o sceneBulkUpdateOperation) Update(ctx context.Context, id int) error {
-	scene, err := o.repository.UpdatePartial(ctx, id, o.updatedScene)
-	if err != nil {
-		return err
-	}
-
-	if o.customFields != nil {
-		if err := o.repository.SetCustomFields(ctx, scene.ID, *o.customFields); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-type sceneMarkerBulkUpdateOperation struct {
-	repository models.SceneMarkerReaderWriter
-	partial    models.SceneMarkerPartial
-}
-
-func (o sceneMarkerBulkUpdateOperation) Update(ctx context.Context, id int) error {
-	partial := o.partial
-	if err := adjustMarkerPartialForTagExclusion(ctx, o.repository, id, &partial); err != nil {
-		return err
-	}
-
-	_, err := o.repository.UpdatePartial(ctx, id, partial)
-	return err
-}
 
 func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneUpdateInput) (*BulkUpdateResult, error) {
 	var sceneIDs []int
@@ -134,10 +100,10 @@ func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneU
 		customFields = &cf
 	}
 
-	operation := sceneBulkUpdateOperation{
-		repository:   r.repository.Scene,
-		updatedScene: updatedScene,
-		customFields: customFields,
+	operation := bulkupdate.Scene{
+		Repository:   r.repository.Scene,
+		Changes:      updatedScene,
+		CustomFields: customFields,
 	}
 
 	if !useBackgroundJob {
@@ -165,40 +131,6 @@ func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneU
 	}
 
 	return queuedBulkUpdate(jobID, len(sceneIDs)), nil
-}
-
-type sceneSetDateFromMTimeOperation struct {
-	repository models.SceneReaderWriter
-	fileGetter models.FileGetter
-}
-
-func (o sceneSetDateFromMTimeOperation) Update(ctx context.Context, id int) error {
-	s, err := o.repository.Find(ctx, id)
-	if err != nil {
-		return err
-	}
-	if s == nil {
-		return fmt.Errorf("scene with id %d not found", id)
-	}
-
-	if err := s.LoadPrimaryFile(ctx, o.fileGetter); err != nil {
-		return fmt.Errorf("loading primary file: %w", err)
-	}
-	primary := s.Files.Primary()
-	if primary == nil {
-		// no primary file — nothing to derive from; skip silently so
-		// bulk runs don't abort on isolated cases.
-		return nil
-	}
-
-	mtime := primary.Base().ModTime
-	partial := models.NewScenePartial()
-	partial.Date = models.NewOptionalDate(models.Date{Time: mtime, Precision: models.DatePrecisionDay})
-
-	if _, err := o.repository.UpdatePartial(ctx, id, partial); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (r *mutationResolver) ScenesSetDateFromFileMTime(ctx context.Context, input ScenesSetDateFromFileMTimeInput) (string, error) {
@@ -232,9 +164,9 @@ func (r *mutationResolver) ScenesSetDateFromFileMTime(ctx context.Context, input
 		}
 	}
 
-	operation := sceneSetDateFromMTimeOperation{
-		repository: r.repository.Scene,
-		fileGetter: r.repository.File,
+	operation := bulkupdate.SceneDateFromMTime{
+		Repository: r.repository.Scene,
+		Files:      r.repository.File,
 	}
 
 	if !useBackgroundJob {
@@ -310,9 +242,9 @@ func (r *mutationResolver) BulkSceneMarkerUpdate(ctx context.Context, input Bulk
 		return nil, fmt.Errorf("converting tag ids: %w", err)
 	}
 
-	operation := sceneMarkerBulkUpdateOperation{
-		repository: r.repository.SceneMarker,
-		partial:    partial,
+	operation := bulkupdate.SceneMarker{
+		Repository: r.repository.SceneMarker,
+		Changes:    partial,
 	}
 
 	if !useBackgroundJob {

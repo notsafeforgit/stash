@@ -339,6 +339,15 @@ and embedded JavaScript through Goja, plus configured hooks. Scrapers in
 scripts to retrieve metadata. Identification coordinates these sources and
 stash-box matching.
 
+Script scrapers run through `pkg/exec.RunBounded`: each invocation has a five
+minute deadline, 16 MiB stdout limit and 1 MiB stderr limit. Malformed JSON,
+multiple results, excess output and process failures fail the scrape. Unknown
+JSON fields remain tolerated with a warning. Every started process is reaped
+before returning, including on cancellation or decoding failure. Unix
+cancellation terminates the process group; Windows terminates the direct child.
+Inherited output pipes have a one second shutdown bound. No output spool or
+per-invocation journal is retained.
+
 Plugin manifests must declare `apiVersion: 3`. Unversioned manifests, legacy
 settings/discovery APIs and browser script/CSS injection are retired. Rejected
 manifests stay outside the executable cache, with reasons exposed through

@@ -1,12 +1,88 @@
 package scraper
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestScraperScriptChild(t *testing.T) {
+	mode := os.Getenv("STASH_SCRAPER_SCRIPT_TEST")
+	if mode == "" {
+		t.Skip("subprocess fixture")
+	}
+	switch mode {
+	case "echo":
+		_, _ = io.Copy(os.Stdout, os.Stdin)
+	case "invalid":
+		fmt.Print("not JSON\n")
+		time.Sleep(30 * time.Second)
+	default:
+		os.Exit(8)
+	}
+	os.Exit(0)
+}
+
+func TestScriptOutput(t *testing.T) {
+	executable, err := os.Executable()
+	require.NoError(t, err)
+	command := []string{executable, "-test.run=^TestScraperScriptChild$"}
+	s := scriptScraper{definition: Definition{Name: "test scraper", path: filepath.Join(t.TempDir(), "scraper.yml")}}
+	for _, tc := range []struct {
+		name  string
+		input string
+		ok    bool
+	}{
+		{"metadata", `{"name":"example"}`, true},
+		{"extension fields", `{"name":"example","unknown_extension":true}`, true},
+		{"trailing whitespace", "{\"name\":\"example\"}\n \t", true},
+		{"wrong field type", `{"name":123}`, false},
+		{"two results", `{"name":"example"} {}`, false},
+		{"trailing garbage", `{"name":"example"} broken`, false},
+		{"truncated JSON", `{"name":`, false},
+		{"empty", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("STASH_SCRAPER_SCRIPT_TEST", "echo")
+			var out models.ScrapedPerformer
+			err := s.runScraperScript(context.Background(), command, tc.input, &out)
+			if tc.ok {
+				require.NoError(t, err)
+				require.Equal(t, "example", *out.Name)
+			} else {
+				require.ErrorIs(t, err, ErrScraperScript)
+			}
+		})
+	}
+	t.Run("stop on invalid output", func(t *testing.T) {
+		t.Setenv("STASH_SCRAPER_SCRIPT_TEST", "invalid")
+		var out any
+		start := time.Now()
+		err := s.runScraperScript(context.Background(), command, "", &out)
+		require.ErrorIs(t, err, ErrScraperScript)
+		require.Less(t, time.Since(start), 4*time.Second)
+	})
+	t.Run("empty command", func(t *testing.T) {
+		require.ErrorIs(t, s.runScraperScript(context.Background(), nil, "", nil), ErrScraperScript)
+	})
+	t.Run("caller timeout", func(t *testing.T) {
+		t.Setenv("STASH_SCRAPER_SCRIPT_TEST", "echo")
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		var out any
+		err := s.runScraperScript(ctx, command, strings.Repeat(" ", 4096), &out)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+}
 
 func Test_imageInputFromImage_worksWithMultipleFiles(t *testing.T) {
 

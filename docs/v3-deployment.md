@@ -174,8 +174,11 @@ Recovery may wait for the remaining lease, poll backoff and source cooldowns;
 it is automatic, rather than necessarily immediate. Schema 1000107 makes lease
 expiry independent of failure limits for both source runs and metadata jobs.
 
-Producer-code updates still need a verified runtime and explicit policy upgrades
-for retained work when the execution fingerprint changes. Coordinate that short
+Producer-code updates still need a verified runtime. Compatible repairs preserve
+the explicit execution contract and queued policies; changed contracts or
+reviewed profile behavior require explicit policy upgrades for retained work.
+The first move from source hashes to contract identity also requires that upgrade.
+Coordinate that short
 runtime handoff separately; never wait for a whole profile traversal to complete.
 Keep the worker's durable outbox, download archives and pending requests intact.
 

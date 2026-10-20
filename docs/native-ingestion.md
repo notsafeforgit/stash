@@ -1400,7 +1400,7 @@ lost response is replayed. Admission does not assert scrape completion.
   "collection_uuid": "<configured source collection UUID>",
   "collection_revision": 1,
   "operation": "download",
-  "policy_sha256": "<SHA-256 of effective non-secret scan configuration and adapter version>",
+  "policy_sha256": "<SHA-256 of effective non-secret scan configuration and execution contract>",
   "cooldown_seconds": 30,
   "window": {
     "since": "2026-09-24T00:00:00Z",
@@ -1416,9 +1416,9 @@ revision pinned by the run, including historical status responses. They do not
 expose the server's absolute filesystem binding. The producer must verify its
 local destination against that prefix before writing.
 Policy identity covers effective extraction, archive/skip, original-quality,
-conversion, metadata-only and pacing behavior plus adapter version; omit secrets
+conversion, metadata-only and pacing behavior plus execution/capture contracts; omit secrets
 and the requested date window. The Python worker profile supplies this fingerprint
-from portable settings, reviewed helper assets and the pinned runtime; local path
+from portable settings, reviewed helper assets and explicit compatibility versions; local path
 bindings and website-access values stay in its environment. Claim requires the matching fingerprint.
 No API argument supplies a command line.
 
@@ -1524,8 +1524,13 @@ ownership; it does not undo source evidence or completed-file jobs. Review
 actions and attempt outcomes remain in the database. Producer tokens cannot
 access this administrative route.
 
-Worker updates change the adapter fingerprint. To approve a compatible repair
-for an existing queued or deferred run, the application-authenticated
+Compatible worker repairs preserve policies from integrations v0.5 onward.
+Exact producer source and downloader revisions remain diagnostic provenance.
+The release compatibility check requires a reviewed decision for changed source
+and a contract increment for incompatible command or checkpoint semantics.
+Moving an older source-hash policy to the explicit contract still requires an
+administrative upgrade. To approve a compatible transition for an existing
+queued or deferred run, the application-authenticated
 `POST /api/v3/ingest-admin/run-policy-upgrades` accepts `request_uuid`, `run_uuid`,
 `expected_revision`, `expected_policy_sha256`, the new `policy_sha256`, and a
 nonempty `reason`. Save the exact request before sending. Replay returns the

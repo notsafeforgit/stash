@@ -73,6 +73,34 @@ function combine(
 }
 
 describe("performer merge fields", () => {
+  it("copies the selected photo by UUID and clears it explicitly", () => {
+    const sourceId = "12345678-aaaa-4bbb-8ccc-123456789abc";
+    const destinationId = "abcdef12-1234-4aaa-8bbb-123456789abc";
+    const source = {
+      ...performer,
+      id: sourceId,
+      image_path: `/mounted/performer/${sourceId}/image?t=1`,
+    };
+    const resolve = (image_path: string | null) =>
+      mergeField("image_path").resolve(
+        { ...performer, id: destinationId, image_path },
+        [{ id: sourceId, label: "Source", entity: source }],
+        true,
+      );
+    const row = resolve(`/mounted/performer/${destinationId}/image?t=2`);
+    expect(row).toBeDefined();
+    const update: PerformerUpdateInput = { id: destinationId };
+    row?.apply(update, `source:${sourceId}`);
+    expect(update).toEqual({
+      id: destinationId,
+      image_input: { performer_id: sourceId },
+    });
+    row?.apply(update, "keep");
+    expect(update.image_input).toEqual({ performer_id: destinationId });
+    resolve(null)?.apply(update, "keep");
+    expect(update.image_input).toEqual({ data: "" });
+  });
+
   it("covers every value protected by the safe merge API", () => {
     const keys = new Set(PERFORMER_MERGE_FIELDS.map((field) => field.key));
     for (const key of [

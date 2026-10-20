@@ -31,14 +31,8 @@ func (r *mutationResolver) processEntityImageInputObject(ctx context.Context, in
 		return nil, false, nil
 	}
 
-	sources := 0
-	for _, present := range []bool{input.Data != nil, input.ImageID != nil, input.Scene != nil} {
-		if present {
-			sources++
-		}
-	}
-	if sources != 1 {
-		return nil, false, fmt.Errorf("exactly one of data, image_id or scene must be set")
+	if err := validateEntityImageSource(input); err != nil {
+		return nil, false, err
 	}
 
 	if input.Data != nil {
@@ -55,12 +49,45 @@ func (r *mutationResolver) processEntityImageInputObject(ctx context.Context, in
 		return imageData, true, err
 	}
 
+	if input.PerformerID != nil {
+		id, err := strconv.Atoi(*input.PerformerID)
+		if err != nil {
+			return nil, false, fmt.Errorf("converting performer_id: %w", err)
+		}
+		var data []byte
+		err = r.withReadTxn(ctx, func(ctx context.Context) error {
+			performer, err := r.repository.Performer.Find(ctx, id)
+			if err != nil {
+				return err
+			}
+			if performer == nil {
+				return fmt.Errorf("source performer not found")
+			}
+			data, err = r.repository.Performer.GetImage(ctx, id)
+			return err
+		})
+		return data, true, err
+	}
+
 	imageData, err := r.entityImageDataFromScene(ctx, *input.Scene)
 	if err != nil {
 		return nil, true, err
 	}
 	imageData, err = r.processEntityImageBytes(ctx, imageData, false)
 	return imageData, true, err
+}
+
+func validateEntityImageSource(input *models.EntityImageInput) error {
+	sources := 0
+	for _, present := range []bool{input.Data != nil, input.ImageID != nil, input.PerformerID != nil, input.Scene != nil} {
+		if present {
+			sources++
+		}
+	}
+	if sources != 1 {
+		return fmt.Errorf("exactly one of data, image_id, performer_id or scene must be set")
+	}
+	return nil
 }
 
 func (r *mutationResolver) processEntityImageInput(ctx context.Context, imageInput string, allowHEIC bool) ([]byte, error) {

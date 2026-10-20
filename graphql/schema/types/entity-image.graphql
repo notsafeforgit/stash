@@ -3,6 +3,8 @@ input EntityImageInput {
   data: String
   "Existing image ID to copy into the stored entity image."
   image_id: ID @libraryID(kind: "image")
+  "Copy a performer's stored image directly, without fetching its media URL."
+  performer_id: ID @libraryID(kind: "performer")
   "Copy a scene cover or generate a frame without changing the scene."
   scene: SceneImageInput
 }

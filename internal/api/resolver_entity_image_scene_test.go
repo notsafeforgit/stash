@@ -64,6 +64,9 @@ func TestEntityImageRequiresSingleSource(t *testing.T) {
 		{Data: &data, Scene: scene},
 		{ImageID: &id, Scene: scene},
 		{Data: &data, ImageID: &id, Scene: scene},
+		{Data: &data, PerformerID: &id},
+		{ImageID: &id, PerformerID: &id},
+		{Scene: scene, PerformerID: &id},
 	} {
 		r := &mutationResolver{}
 		_, _, err := r.processEntityImageInputObject(context.Background(), &input)

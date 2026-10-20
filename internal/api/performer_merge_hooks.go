@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
@@ -48,7 +47,11 @@ func (r *mutationResolver) capturePerformerMerge(ctx context.Context, destinatio
 }
 
 func (r *mutationResolver) performerMergeProfile(ctx context.Context, p *models.Performer) (PerformerMergeProfile, error) {
-	ret := PerformerMergeProfile{ID: strconv.Itoa(p.ID), Name: p.Name, Disambiguation: p.Disambiguation, AliasList: []string{}, URLs: []string{}}
+	id, err := r.publicID(ctx, models.ArchivePerformer, p.ID)
+	if err != nil {
+		return PerformerMergeProfile{}, err
+	}
+	ret := PerformerMergeProfile{ID: id, Name: p.Name, Disambiguation: p.Disambiguation, AliasList: []string{}, URLs: []string{}}
 	if err := p.LoadAliases(ctx, r.repository.Performer); err != nil {
 		return ret, err
 	}

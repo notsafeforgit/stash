@@ -9,29 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestPerformerImageSourceFromURL(t *testing.T) {
-	tests := []struct {
-		name   string
-		url    string
-		wantID int
-		wantOK bool
-	}{
-		{name: "absolute", url: "https://stash.example/base/performer/12/image?t=1", wantID: 12, wantOK: true},
-		{name: "relative", url: "/performer/12/image?t=1", wantID: 12, wantOK: true},
-		{name: "unrelated performer", url: "/performer/13/image?t=1"},
-		{name: "external image", url: "https://example.com/image.jpg"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotID, gotOK := performerImageSourceFromURL(tt.url, []int{12})
-			assert.Equal(t, tt.wantID, gotID)
-			assert.Equal(t, tt.wantOK, gotOK)
-		})
-	}
-}
-
-func TestPerformerMergeMovesSourceNameBeforeApplyingValues(t *testing.T) {
+func TestPerformerMergeAppliesSourceNameWithoutTemporaryRename(t *testing.T) {
 	db := mocks.NewDatabase()
 	r, _ := newResolver(db)
 
@@ -57,14 +35,6 @@ func TestPerformerMergeMovesSourceNameBeforeApplyingValues(t *testing.T) {
 		Return(destination, nil).Once()
 	findSources := db.Performer.On("FindMany", mock.Anything, []int{sourceID}).
 		Return([]*models.Performer{source}, nil).Once()
-	prepareSource := db.Performer.On(
-		"UpdatePartial",
-		mock.Anything,
-		sourceID,
-		mock.MatchedBy(func(partial models.PerformerPartial) bool {
-			return partial.Name.Set && partial.Name.Value != sourceName
-		}),
-	).Return(source, nil).Once()
 	applyValues := db.Performer.On(
 		"UpdatePartial",
 		mock.Anything,
@@ -75,7 +45,7 @@ func TestPerformerMergeMovesSourceNameBeforeApplyingValues(t *testing.T) {
 	).Return(updated, nil).Once()
 	mergeSources := db.Performer.On("Merge", mock.Anything, []int{sourceID}, destinationID).
 		Return(nil).Once()
-	mock.InOrder(findDestination, findSources, prepareSource, applyValues, mergeSources)
+	mock.InOrder(findDestination, findSources, applyValues, mergeSources)
 
 	ctx := withGqlContext(testCtx, map[string]interface{}{
 		"input": map[string]interface{}{

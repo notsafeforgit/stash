@@ -438,17 +438,21 @@ export const PERFORMER_MERGE_FIELDS: readonly AnyMergeFieldDef<
       i.custom_fields = { full: v };
     },
   }),
-  defineMergeField<Performer, PerformerUpdate, string | null>({
+  defineMergeField<
+    Performer,
+    PerformerUpdate,
+    { id: string; path: string } | null
+  >({
     key: "image_path",
     labelId: "image",
     defaultLabel: "Image",
-    read: (p) => p.image_path ?? null,
+    read: (p) => (p.image_path ? { id: p.id, path: p.image_path } : null),
     isEmpty: (v) => !v,
-    isEqual: (a, b) => a === b,
+    isEqual: (a, b) => a?.path === b?.path,
     preview: (v) =>
       v ? (
         <img
-          src={v}
+          src={v.path}
           alt=""
           loading="lazy"
           className="max-h-32 rounded object-cover"
@@ -456,12 +460,10 @@ export const PERFORMER_MERGE_FIELDS: readonly AnyMergeFieldDef<
       ) : (
         <MergeEmptyPreview />
       ),
-    // Project as `image` (a URL string the backend resolves and
-    // re-stores as the destination's image). The PerformerUpdateInput
-    // accepts either a URL or a base64 data URL — the existing image
-    // path is a URL the server already trusts.
+    // Copy by identity inside the merge transaction. Media URLs are for
+    // display and may require a browser session or a reverse-proxy prefix.
     toUpdate: (i, v) => {
-      i.image = v;
+      i.image_input = v ? { performer_id: v.id } : { data: "" };
     },
   }),
 ];

@@ -32,6 +32,8 @@ func TestPerformerMergeNotificationPreservesDeletedIdentitiesAfterCommit(t *test
 				}
 				return repo.Performer.Create(ctx, &models.CreatePerformerInput{Performer: &source})
 			}))
+			sourceUUID := libraryTestUUID(t, repo, models.ArchivePerformer, source.ID)
+			destinationUUID := libraryTestUUID(t, repo, models.ArchivePerformer, dest.ID)
 			hooks := &notificationRecorder{}
 			hooks.check = func(ctx context.Context, call notificationCall) {
 				require.Equal(t, hook.PerformerMergePost, call.kind)
@@ -64,12 +66,14 @@ func TestPerformerMergeNotificationPreservesDeletedIdentitiesAfterCommit(t *test
 			require.NoError(t, err)
 			require.Len(t, hooks.calls, 1)
 			notification := hooks.calls[0].input.(PerformerMergeNotification)
+			require.Equal(t, destinationUUID, notification.Destination.ID)
+			require.Equal(t, destinationUUID, notification.PreviousDestination.ID)
 			require.Equal(t, "Canonical", notification.Destination.Name)
 			require.Contains(t, notification.Destination.AliasList, "Other account")
 			require.Empty(t, notification.PreviousDestination.AliasList)
 			require.Equal(t, []string{"https://x.com/canonical"}, notification.PreviousDestination.URLs)
 			require.Len(t, notification.Sources, 1)
-			require.Equal(t, strconv.Itoa(source.ID), notification.Sources[0].ID)
+			require.Equal(t, sourceUUID, notification.Sources[0].ID)
 			require.Equal(t, []string{"Old account"}, notification.Sources[0].AliasList)
 			require.Equal(t, []string{"https://reddit.com/user/other"}, notification.Sources[0].URLs)
 		})

@@ -41,12 +41,44 @@ type MetadataOptions struct {
 	PerformerGenders []models.GenderEnum `json:"performerGenders"`
 	// defaults to true if not provided
 	SkipMultipleMatches *bool `json:"skipMultipleMatches"`
-	// ID of tag to tag skipped multiple matches with
+	// UUID of tag to tag skipped multiple matches with; resolve in the write transaction.
 	SkipMultipleMatchTag *string `json:"skipMultipleMatchTag"`
 	// defaults to true if not provided
 	SkipSingleNamePerformers *bool `json:"skipSingleNamePerformers"`
-	// ID of tag to tag skipped single name performers with
+	// UUID of tag to tag skipped single name performers with.
 	SkipSingleNamePerformerTag *string `json:"skipSingleNamePerformerTag"`
+}
+
+// VisitReferences includes defaults and every source override. Persisted task
+// selections use UUIDs; internal repository keys are resolved only during work.
+func (o *Options) VisitReferences(visit func(models.ArchiveEntityKind, *string) error) error {
+	if o == nil {
+		return nil
+	}
+	for i := range o.SceneIDs {
+		if err := visit(models.ArchiveScene, &o.SceneIDs[i]); err != nil {
+			return err
+		}
+	}
+	options := []*MetadataOptions{o.Options}
+	for _, source := range o.Sources {
+		if source != nil {
+			options = append(options, source.Options)
+		}
+	}
+	for _, option := range options {
+		if option == nil {
+			continue
+		}
+		for _, id := range []*string{option.SkipMultipleMatchTag, option.SkipSingleNamePerformerTag} {
+			if id != nil && *id != "" {
+				if err := visit(models.ArchiveTag, id); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type FieldOptions struct {

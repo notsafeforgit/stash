@@ -635,7 +635,7 @@ func (r *mutationResolver) ConfigureDefaults(ctx context.Context, input ConfigDe
 		setConfigBool(c, config.DeleteFileDefault, input.DeleteFile)
 		setConfigBool(c, config.DeleteGeneratedDefault, input.DeleteGenerated)
 
-		return nil, nil
+		return nil, manager.ValidateLibraryConfigReferences(ctx, c)
 	})
 	if err != nil {
 		return nil, err

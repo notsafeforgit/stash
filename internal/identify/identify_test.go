@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/stashapp/stash/pkg/entityid"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/models/mocks"
 	"github.com/stretchr/testify/assert"
@@ -31,6 +32,19 @@ func (s mockSceneScraper) ScrapeScenes(ctx context.Context, sceneID int) ([]*mod
 type mockHookExecutor struct {
 }
 
+type identifyTestIdentity struct {
+	models.ArchiveEntityReaderWriter
+	id string
+}
+
+func (s identifyTestIdentity) Resolve(_ context.Context, id string) (*models.ArchiveEntity, error) {
+	if id != s.id {
+		return nil, nil
+	}
+	key := 1
+	return &models.ArchiveEntity{UUID: id, Kind: models.ArchiveTag, State: models.ArchiveEntityActive, LocalID: &key}, nil
+}
+
 func (s mockHookExecutor) ExecuteSceneUpdatePostHooks(ctx context.Context, input models.SceneUpdateInput, inputFields []string) {
 }
 
@@ -48,7 +62,7 @@ func TestSceneIdentifier_Identify(t *testing.T) {
 
 	var (
 		skipMultipleTagID    = 1
-		skipMultipleTagIDStr = strconv.Itoa(skipMultipleTagID)
+		skipMultipleTagIDStr = "a07df01a-78b7-4ae3-9a6a-9d603fc57896"
 	)
 
 	var (
@@ -114,6 +128,9 @@ func TestSceneIdentifier_Identify(t *testing.T) {
 	}
 
 	db := mocks.NewDatabase()
+	repo := db.Repository()
+	repo.ArchiveEntity = identifyTestIdentity{id: skipMultipleTagIDStr}
+	ctx := entityid.WithRepository(testCtx, repo)
 
 	db.Scene.On("GetURLs", mock.Anything, mock.Anything).Return(nil, nil)
 	db.Scene.On("UpdatePartial", mock.Anything, mock.MatchedBy(func(id int) bool {
@@ -210,7 +227,7 @@ func TestSceneIdentifier_Identify(t *testing.T) {
 				TagIDs:       models.NewRelatedIDs([]int{}),
 				StashIDs:     models.NewRelatedStashIDs([]models.StashID{}),
 			}
-			if err := identifier.Identify(testCtx, scene); (err != nil) != tt.wantErr {
+			if err := identifier.Identify(ctx, scene); (err != nil) != tt.wantErr {
 				t.Errorf("SceneIdentifier.Identify() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

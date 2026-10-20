@@ -21,7 +21,7 @@ import (
 func MarshalWireID(value string) graphql.ContextMarshaler {
 	return graphql.ContextWriterFunc(func(ctx context.Context, w io.Writer) error {
 		output := value
-		kind, marked, _, err := libraryIDScope(ctx, false)
+		kind, marked, _, _, err := libraryIDScope(ctx, false)
 		if err != nil {
 			return err
 		}
@@ -47,7 +47,7 @@ func MarshalWireID(value string) graphql.ContextMarshaler {
 }
 
 func UnmarshalWireID(ctx context.Context, v any) (string, error) {
-	kind, marked, nullable, err := libraryIDScope(ctx, true)
+	kind, marked, nullable, preserve, err := libraryIDScope(ctx, true)
 	if err != nil {
 		return "", err
 	}
@@ -71,7 +71,9 @@ func UnmarshalWireID(ctx context.Context, v any) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if kind == "" {
+	// Configuration and deferred work retain UUIDs after validation and resolve
+	// them again at use, so a deleted/reused repository key cannot retarget them.
+	if kind == "" || preserve {
 		return value, nil
 	}
 	return strconv.Itoa(id), nil
@@ -254,24 +256,25 @@ func libraryLocation(ctx context.Context, input bool) (wireLocation, error) {
 	return wireLocation{directives: directives, scope: scope, nullable: !typeRef.NonNull, parent: parent}, nil
 }
 
-func libraryIDScope(ctx context.Context, input bool) (models.ArchiveEntityKind, bool, bool, error) {
+func libraryIDScope(ctx context.Context, input bool) (models.ArchiveEntityKind, bool, bool, bool, error) {
 	location, err := libraryLocation(ctx, input)
 	if err != nil {
-		return "", false, false, err
+		return "", false, false, false, err
 	}
 	d := location.directives.ForName("libraryID")
 	if d == nil {
-		return "", false, false, nil
+		return "", false, false, false, nil
 	}
 	kind := d.Arguments.ForName("kind").Value.Raw
 	if kind == "scope" {
 		kind = location.scope
 	}
 	if kind == "" {
-		return "", true, false, errors.New("library ID has no entity kind")
+		return "", true, false, false, errors.New("library ID has no entity kind")
 	}
 	if kind == "any" {
 		kind = ""
 	}
-	return models.ArchiveEntityKind(kind), true, location.nullable, nil
+	preserve := d.Arguments.ForName("preserve")
+	return models.ArchiveEntityKind(kind), true, location.nullable, preserve != nil && preserve.Value.Raw == "true", nil
 }

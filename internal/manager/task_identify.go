@@ -7,13 +7,13 @@ import (
 	"strings"
 
 	"github.com/stashapp/stash/internal/identify"
+	"github.com/stashapp/stash/pkg/entityid"
 	"github.com/stashapp/stash/pkg/job"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/match"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/scene"
 	"github.com/stashapp/stash/pkg/scraper"
-	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
 	"github.com/stashapp/stash/pkg/stashbox"
 	"github.com/stashapp/stash/pkg/txn"
 )
@@ -53,24 +53,23 @@ func (j *IdentifyJob) Execute(ctx context.Context, progress *job.Progress) error
 	// otherwise, batch query for all scenes - ordering by path
 	// don't use a transaction to query scenes
 	r := instance.Repository
+	ctx = entityid.WithRepository(ctx, r)
 	if err := r.WithDB(ctx, func(ctx context.Context) error {
 		if len(j.input.SceneIDs) == 0 {
 			return j.identifyAllScenes(ctx, sources)
 		}
 
-		sceneIDs, err := stringslice.StringSliceToIntSlice(j.input.SceneIDs)
-		if err != nil {
-			return fmt.Errorf("invalid scene IDs: %w", err)
-		}
-
-		progress.SetTotal(len(sceneIDs))
-		for _, id := range sceneIDs {
+		progress.SetTotal(len(j.input.SceneIDs))
+		for _, publicID := range j.input.SceneIDs {
 			if job.IsCancelled(ctx) {
 				break
 			}
+			id, err := entityid.Local(ctx, models.ArchiveScene, publicID)
+			if err != nil {
+				return fmt.Errorf("resolving identify scene: %w", err)
+			}
 
 			// find the scene
-			var err error
 			scene, err := r.Scene.Find(ctx, id)
 			if err != nil {
 				return fmt.Errorf("finding scene id %d: %w", id, err)

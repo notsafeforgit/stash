@@ -1,5 +1,5 @@
 "Library IDs are canonical UUID strings. Numeric repository keys are private."
-directive @libraryID(kind: String!) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION | ARGUMENT_DEFINITION
+directive @libraryID(kind: String!, preserve: Boolean = false) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION | ARGUMENT_DEFINITION
 
 "The entity kind for shared relationship/filter inputs and bulk results."
 directive @libraryScope(kind: String, from: String) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION | ARGUMENT_DEFINITION | INPUT_OBJECT

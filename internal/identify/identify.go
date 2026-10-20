@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strconv"
 
+	"github.com/stashapp/stash/pkg/entityid"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/scene"
@@ -245,13 +245,13 @@ func (t *SceneIdentifier) getSceneUpdater(ctx context.Context, s *models.Scene, 
 	if err != nil {
 		return nil, err
 	}
-	if addSkipSingleNamePerformerTag && options.SkipSingleNamePerformerTag != nil {
-		tagID, err := strconv.ParseInt(*options.SkipSingleNamePerformerTag, 10, 64)
+	if addSkipSingleNamePerformerTag && options.SkipSingleNamePerformerTag != nil && *options.SkipSingleNamePerformerTag != "" {
+		tagID, err := entityid.Local(ctx, models.ArchiveTag, *options.SkipSingleNamePerformerTag)
 		if err != nil {
 			return nil, fmt.Errorf("error converting tag ID %s: %w", *options.SkipSingleNamePerformerTag, err)
 		}
 
-		tagIDs = sliceutil.AppendUnique(tagIDs, int(tagID))
+		tagIDs = sliceutil.AppendUnique(tagIDs, tagID)
 	}
 	if tagIDs != nil {
 		ret.Partial.TagIDs = &models.UpdateIDs{
@@ -345,7 +345,7 @@ func (t *SceneIdentifier) modifyScene(ctx context.Context, s *models.Scene, resu
 
 func (t *SceneIdentifier) addTagToScene(ctx context.Context, s *models.Scene, tagToAdd string) error {
 	if err := txn.WithTxn(ctx, t.TxnManager, func(ctx context.Context) error {
-		tagID, err := strconv.Atoi(tagToAdd)
+		tagID, err := entityid.Local(ctx, models.ArchiveTag, tagToAdd)
 		if err != nil {
 			return fmt.Errorf("error converting tag ID %s: %w", tagToAdd, err)
 		}

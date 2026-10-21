@@ -2,6 +2,92 @@ import { test, expect } from "./test";
 import { serveSceneMedia } from "./scene-media";
 import { dragInput } from "./scrubber-input";
 
+for (const tv of [false, true]) {
+  test(`${tv ? "TV" : "standard"} touch preview waits for streaming before the precision dwell`, async ({
+    page,
+    context,
+    browserName,
+  }) => {
+    await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
+    await serveSceneMedia(page);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let requested = false;
+    await page.route("**/scene/*/stream.scrub.master.m3u8*", async (route) => {
+      requested = true;
+      await gate;
+      await route.fallback();
+    });
+    await page.goto(
+      tv ? "/tv-fixture/tv?paused" : "/scene-detail?landscape&short&hls",
+    );
+    const player = page.locator("[data-scene-player]");
+    const main = player.locator("[data-playback-video]");
+    if (!tv) await player.locator("[data-player-native-button]").click();
+    await expect(player).toHaveAttribute("data-playback-ready", "true");
+    await main.evaluate((video: HTMLVideoElement) => {
+      video.pause();
+      Object.defineProperty(video, "buffered", {
+        configurable: true,
+        get: (): TimeRanges => ({ length: 0, start: () => 0, end: () => 0 }),
+      });
+    });
+    await player.hover();
+    const scrubber = player.getByRole("slider", { name: "Playback position" });
+    await scrubber.focus();
+    const bar = await scrubber.boundingBox();
+    if (!bar) throw new Error("Missing scrubber");
+    await page.clock.pauseAt(new Date("2026-01-01T00:01:00Z"));
+    const drag = await dragInput(
+      page,
+      context,
+      browserName === "chromium",
+      true,
+      {
+        x: bar.x + bar.width / 2,
+        y: bar.y + bar.height - 2,
+      },
+    );
+    try {
+      await page.clock.runFor(800);
+      // React commits the preview request before its stream throttle starts.
+      await expect
+        .poll(async () => {
+          await page.clock.runFor(50);
+          return requested;
+        })
+        .toBe(true);
+      await expect(scrubber).toHaveAttribute("aria-busy", "true");
+      await page.clock.runFor(10_000);
+      await expect(scrubber).not.toHaveAttribute("data-precision");
+      release();
+      await expect
+        .poll(async () => {
+          await page.clock.runFor(50);
+          return scrubber.getAttribute("aria-busy");
+        })
+        .toBeNull();
+      await expect(player.locator("[data-scrub-surface]")).toHaveAttribute(
+        "data-preview-kind",
+        "video",
+      );
+      await page.clock.runFor(1900);
+      await expect(scrubber).not.toHaveAttribute("data-precision");
+      await page.clock.runFor(100);
+      await expect(scrubber).toHaveAttribute("data-precision", "true");
+    } finally {
+      release();
+      await main.evaluate((video) => Reflect.deleteProperty(video, "buffered"));
+      await drag.end();
+      await page.clock.resume();
+    }
+    await expect(scrubber).not.toHaveAttribute("data-precision");
+    await expect(main).toHaveJSProperty("paused", true);
+  });
+}
+
 for (const mode of [
   "scene detail",
   "scene viewer",
@@ -80,6 +166,17 @@ for (const mode of [
         ),
       );
       await page.clock.runFor(650);
+      await expect(scrubber).not.toHaveAttribute("data-precision");
+      // Wait for any remote preview before measuring the hold. A direct-only
+      // fixture has no preview stream and can still use precision seeking.
+      // The gated-stream test above checks the buffering delay separately.
+      await expect
+        .poll(async () => {
+          await page.clock.runFor(50);
+          return scrubber.getAttribute("aria-busy");
+        })
+        .toBeNull();
+      await page.clock.runFor(2000);
       await expect(scrubber).toHaveAttribute("data-precision", "true");
       await expect(video).toHaveJSProperty("paused", true);
       const initialSpan = Math.max(1, Math.min(60, duration / 4));
@@ -107,7 +204,7 @@ for (const mode of [
       }
       await drag.move(point(0.5));
       // A deliberate fresh pause reaches the one-second window in these clips.
-      await page.clock.runFor(1200);
+      await page.clock.runFor(2000);
       expect(Number(await scrubber.getAttribute("aria-valuenow"))).toBeCloseTo(
         duration / 2,
         1,
@@ -205,7 +302,7 @@ for (const condition of ["buffer changes", "preview still seeking"] as const) {
       { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height - 2 },
     );
     try {
-      await page.clock.runFor(700);
+      await page.clock.runFor(2700);
       await expect(scrubber).toHaveAttribute("data-precision", "true");
       await expect(video).toHaveJSProperty("seeking", false);
       await expect

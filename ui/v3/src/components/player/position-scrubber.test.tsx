@@ -140,12 +140,12 @@ for (const direction of ["right", "down", "up"] as const) {
     await pointer(slider, "pointerdown");
     expect(time(slider)).toBe(60);
     expect(preview).not.toHaveBeenCalled();
-    await wait(650);
+    await wait(2650);
     expect(time(slider)).toBe(60);
     expect(slider.hasAttribute("data-precision")).toBe(true);
     expect(preview).toHaveBeenLastCalledWith(60);
     expect(seek).not.toHaveBeenCalled();
-    await wait(1200);
+    await wait(2000);
     // 120 seconds -> 30 -> 7.5. A quarter-width move now seeks 1.875s.
     const x = direction === "right" ? 300 : 200;
     const y = direction === "down" ? 300 : direction === "up" ? 100 : 200;
@@ -162,42 +162,89 @@ for (const direction of ["right", "down", "up"] as const) {
   });
 }
 
+it("starts the stationary preview before counting a deliberate zoom hold", async () => {
+  const slider = await render({ duration: 132 });
+  await pointer(slider, "pointerdown");
+  await wait(649);
+  expect(preview).not.toHaveBeenCalled();
+  await wait(1);
+  expect(preview).toHaveBeenLastCalledWith(66);
+  expect(vibrate).not.toHaveBeenCalled();
+  await wait(1999);
+  expect(slider.hasAttribute("data-precision")).toBe(false);
+  await wait(1);
+  expect(vibrate).toHaveBeenCalledTimes(1);
+  await wait(1999);
+  expect(vibrate).toHaveBeenCalledTimes(1);
+  await wait(1);
+  expect(vibrate).toHaveBeenCalledTimes(2);
+  expect(time(slider)).toBe(66);
+});
+
 it("tolerates jitter but restarts the dwell after cumulative deliberate movement", async () => {
   const slider = await render();
   await pointer(slider, "pointerdown");
-  await wait(400);
-  await pointer(slider, "pointermove", 203);
-  await wait(250);
-  expect(slider.hasAttribute("data-precision")).toBe(true);
-  expect(time(slider)).toBeCloseTo(60.9);
+  await wait(650);
+  await pointer(slider, "pointermove", 202);
+  await wait(2000);
+  expect(time(slider)).toBeCloseTo(60.6);
   expect(vibrate).toHaveBeenCalledTimes(1);
-  await pointer(slider, "pointermove", 206);
-  await wait(400);
-  await pointer(slider, "pointermove", 209);
-  await wait(250);
+  await pointer(slider, "pointermove", 205);
+  await wait(1000);
+  await pointer(slider, "pointermove", 208);
+  await wait(1999);
   expect(vibrate).toHaveBeenCalledTimes(1);
-  await wait(950);
+  await wait(1);
   expect(vibrate).toHaveBeenCalledTimes(2);
 });
 
-it("requires a longer pause before each additional zoom", async () => {
-  const slider = await render({ duration: 132 });
+it("waits for the requested frame and starts a fresh hold after each buffer wait", async () => {
+  const slider = await render();
   await pointer(slider, "pointerdown");
   await wait(650);
+  await render({ previewPending: true });
+  await wait(10_000);
+  expect(preview).toHaveBeenLastCalledWith(60);
+  expect(slider.hasAttribute("data-precision")).toBe(false);
+  await render({ previewPending: false });
+  await wait(1999);
+  expect(vibrate).not.toHaveBeenCalled();
+  await wait(1);
   expect(vibrate).toHaveBeenCalledTimes(1);
-  await wait(650);
+  await wait(1500);
+  await pointer(slider, "pointermove", 300);
+  await render({ previewPending: true });
+  await wait(10_000);
   expect(vibrate).toHaveBeenCalledTimes(1);
-  await wait(550);
+  await render({ previewPending: false });
+  await wait(1999);
+  expect(vibrate).toHaveBeenCalledTimes(1);
+  await wait(1);
   expect(vibrate).toHaveBeenCalledTimes(2);
-  expect(time(slider)).toBe(66);
+  await pointer(slider, "pointerup", 300);
+  expect(seek).toHaveBeenCalledExactlyOnceWith(67.5);
+});
+
+it("does not revive a cancelled gesture when a late preview becomes ready", async () => {
+  const slider = await render();
+  await pointer(slider, "pointerdown");
+  await wait(650);
+  await render({ previewPending: true });
+  await pointer(slider, "pointercancel");
+  await render({ previewPending: false });
+  await wait(10_000);
+  expect(preview).toHaveBeenLastCalledWith(null);
+  expect(vibrate).not.toHaveBeenCalled();
+  expect(seek).not.toHaveBeenCalled();
+  expect(slider.hasAttribute("data-dragging")).toBe(false);
 });
 
 for (const direction of ["right", "down", "up"] as const) {
   it(`keeps the magnified scale while making one-pixel adjustments ${direction}`, async () => {
     const slider = await render({ duration: 132, direction });
     await pointer(slider, "pointerdown");
-    await wait(650);
-    await wait(1200);
+    await wait(2650);
+    await wait(2000);
     // At 16x, small movements are deliberate seeks, not a continuing hold.
     for (let step = 1; step <= 12; step++) {
       await wait(300);
@@ -215,7 +262,7 @@ for (const direction of ["right", "down", "up"] as const) {
       expect(time(slider)).toBeCloseTo(66 + (step / 400) * 8.25);
     }
     // A fresh stationary pause can still request the next level.
-    await wait(1199);
+    await wait(1999);
     expect(vibrate).toHaveBeenCalledTimes(2);
     await wait(1);
     expect(vibrate).toHaveBeenCalledTimes(3);
@@ -225,11 +272,11 @@ for (const direction of ["right", "down", "up"] as const) {
 it("allows subpixel jitter while holding a magnified timeline", async () => {
   const slider = await render({ duration: 132 });
   await pointer(slider, "pointerdown");
-  await wait(650);
-  await wait(1200);
+  await wait(2650);
+  await wait(2000);
   await wait(400);
   await pointer(slider, "pointermove", 200.5);
-  await wait(800);
+  await wait(1600);
   expect(vibrate).toHaveBeenCalledTimes(3);
   expect(time(slider)).toBeCloseTo(66.0103125);
 });
@@ -237,10 +284,10 @@ it("allows subpixel jitter while holding a magnified timeline", async () => {
 it("caps a long scene at a minute initially and a second at maximum precision", async () => {
   const slider = await render({ duration: 7200 });
   await pointer(slider, "pointerdown");
-  await wait(650);
+  await wait(2650);
   await pointer(slider, "pointermove", 300);
   expect(time(slider)).toBe(3615);
-  await wait(1200 * 6);
+  await wait(2000 * 6);
   expect(vibrate).toHaveBeenCalledTimes(4);
   await pointer(slider, "pointermove", 200);
   expect(time(slider)).toBe(3614.75);
@@ -250,7 +297,7 @@ it("zooms short marker clips without requiring vibration support", async () => {
   vi.stubGlobal("navigator", {});
   const slider = await render({ duration: 2, value: 0 });
   await pointer(slider, "pointerdown", 100);
-  await wait(650);
+  await wait(2650);
   expect(time(slider)).toBe(0.5);
   await pointer(slider, "pointermove", 300);
   expect(time(slider)).toBe(1);
@@ -262,7 +309,7 @@ for (const event of ["pointercancel", "lostpointercapture", "blur"]) {
   it(`cancels precision seeking and its pending dwell on ${event}`, async () => {
     const slider = await render();
     await pointer(slider, "pointerdown");
-    await wait(650);
+    await wait(2650);
     if (event === "blur")
       await act(async () => {
         slider.blur();
@@ -282,7 +329,7 @@ it("cleans up an active precision preview when the scrubber is replaced", async 
   const onPreviewChange = vi.fn();
   const slider = await render({ onScrubChange, onPreviewChange });
   await pointer(slider, "pointerdown");
-  await wait(650);
+  await wait(2650);
   await act(async () => {
     root.render(null);
   });
@@ -323,7 +370,7 @@ it("clips buffered intervals to the magnified range in display coordinates", asy
     ],
   });
   await pointer(slider, "pointerdown");
-  await wait(650);
+  await wait(2650);
   // The visible range is 45..75; scene buffers become 30..50 and 60..80.
   const buffers = Array.from(
     slider.querySelectorAll<HTMLDivElement>("[data-position-scrubber-buffer]"),

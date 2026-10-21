@@ -33,6 +33,7 @@ export function TvTimeline({
   const msg = useMsg();
   const position = useScenePlayerValue("displayPosition");
   const bufferedRanges = useScenePlayerValue("bufferedRanges");
+  const previewPending = useScenePlayerValue("previewPending");
   const rotation = useTvRotation();
   const controls = useScenePlayerControls();
   const [draft, setDraft] = useState<number | null>(null);
@@ -119,6 +120,7 @@ export function TvTimeline({
         duration={duration}
         crossAxisPan={crossAxisPan}
         bufferedRanges={bufferedRanges}
+        previewPending={previewPending}
         bufferedOffset={-range.start}
         direction={
           rotation === "normal"

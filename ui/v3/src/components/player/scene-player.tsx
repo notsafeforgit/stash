@@ -670,6 +670,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     ready: sourceReady,
     scrubSource,
     scrubTime,
+    scrubPreviewPending,
+    handleScrubReady,
     handleScrubFailure,
     seekDisplayTarget,
     freezeFrameCanvas,
@@ -1083,6 +1085,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
                   end={clipRange?.end ?? fileDuration}
                   offset={offsetStart}
                   onFailure={handleScrubFailure}
+                  onReady={handleScrubReady}
                 />
               )}
             </VideoFrameZoom>
@@ -1125,6 +1128,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
                 offsetStart={effectiveOffsetStart}
                 onSeek={effectiveOnSeek}
                 onSeekPreview={handleClipSeekPreview}
+                previewPending={scrubPreviewPending}
                 onSeekBy={handleSeekBy}
                 onPause={handlePause}
                 disableSeekArrows={disableSeekArrows}
@@ -1165,6 +1169,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               activeSource={activeSource}
               seek={handleSeek}
               previewSeek={handleSeekPreview}
+              previewPending={scrubPreviewPending}
               seekBy={handleSeekBy}
               play={handlePlay}
               pause={handlePause}

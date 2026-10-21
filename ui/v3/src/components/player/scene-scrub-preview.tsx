@@ -10,6 +10,7 @@ export function SceneScrubPreview({
   end,
   offset,
   onFailure,
+  onReady,
 }: {
   sceneId: string;
   source: string;
@@ -18,6 +19,7 @@ export function SceneScrubPreview({
   end: number;
   offset: number;
   onFailure: () => void;
+  onReady: (time: number | null) => void;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<ReturnType<
@@ -35,19 +37,20 @@ export function SceneScrubPreview({
       end,
       offset,
       onFailure,
+      onReady,
     });
     controllerRef.current = controller;
     return () => {
       controllerRef.current = null;
       controller.dispose();
     };
-  }, [sceneId, source, start, end, offset, onFailure]);
+  }, [sceneId, source, start, end, offset, onFailure, onReady]);
   // The controller is replaced when its owner/source changes, even if the
   // pointer is still at the same timestamp; pass that timestamp to the new one.
   // biome-ignore lint/correctness/useExhaustiveDependencies: synchronize the replacement controller
   useEffect(() => {
     controllerRef.current?.preview(time);
-  }, [time, sceneId, source, start, end, offset, onFailure]);
+  }, [time, sceneId, source, start, end, offset, onFailure, onReady]);
 
   return (
     <div

@@ -135,6 +135,8 @@ interface UseScenePlayerSourcesArgs {
 interface UseScenePlayerSourcesResult {
   scrubSource: string | null;
   scrubTime: number | null;
+  scrubPreviewPending: boolean;
+  handleScrubReady: (time: number | null) => void;
   handleScrubFailure: () => void;
   sources: PlayerSource[];
   activeSource: PlayerSource | null;
@@ -203,8 +205,12 @@ export function useScenePlayerSources({
   clipRange,
 }: UseScenePlayerSourcesArgs): UseScenePlayerSourcesResult {
   const [scrubTime, setScrubTime] = useState<number | null>(null);
+  const [scrubReadyTime, handleScrubReady] = useState<number | null>(null);
   const [seekPreview] = useState(() =>
-    createBufferedSeekPreview(() => setScrubTime(null)),
+    createBufferedSeekPreview(() => {
+      setScrubTime(null);
+      handleScrubReady(null);
+    }),
   );
   const [failedScrubKey, setFailedScrubKey] = useState<string | null>(null);
   const handleScrubFailure = useCallback(
@@ -1076,6 +1082,9 @@ export function useScenePlayerSources({
   return {
     scrubSource,
     scrubTime,
+    scrubPreviewPending:
+      !!scrubSource && scrubTime !== null && scrubReadyTime !== scrubTime,
+    handleScrubReady,
     handleScrubFailure,
     sources,
     activeSource,

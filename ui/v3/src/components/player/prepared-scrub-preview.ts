@@ -12,6 +12,7 @@ export function createPreparedScrubPreview({
   end,
   offset,
   onFailure,
+  onReady,
 }: {
   surface: HTMLDivElement;
   sceneId: string;
@@ -20,6 +21,8 @@ export function createPreparedScrubPreview({
   end: number;
   offset: number;
   onFailure: () => void;
+  /** The exact requested target is decoded, or null when unavailable. */
+  onReady: (time: number | null) => void;
 }) {
   const cache = new ScrubFrameCache();
   const image = document.createElement("img");
@@ -48,6 +51,7 @@ export function createPreparedScrubPreview({
   let next: ReturnType<typeof setTimeout> | undefined;
 
   const hide = () => {
+    onReady(null);
     selection++;
     surface.style.opacity = "0";
     surface.dataset.previewReady = "false";
@@ -156,13 +160,21 @@ export function createPreparedScrubPreview({
             next = setTimeout(tick, 250);
           }
         }
-        if (visible && target !== null) {
+        if (
+          visible &&
+          target !== null &&
+          time !== undefined &&
+          Math.abs(time - target) < 0.05
+        ) {
           selection++;
           image.style.opacity = "0";
           video!.style.opacity = "1";
           surface.style.opacity = "1";
           surface.dataset.previewKind = "video";
           surface.dataset.previewReady = "true";
+          onReady(target);
+        } else if (!visible && target !== null) {
+          onReady(null);
         } else if (target === null) hide();
       },
       () => {
@@ -239,6 +251,7 @@ export function createPreparedScrubPreview({
 
   return {
     preview(time: number | null) {
+      if (time !== target) onReady(null);
       target = time;
       warmTarget = null;
       eligibleSince = 0;

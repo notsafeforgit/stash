@@ -161,6 +161,7 @@ interface PositionSliderProps {
   markers: IMarker[];
   onSeek: (trueTime: number) => void;
   onSeekPreview?: (time: number | null) => void;
+  previewPending?: boolean;
   reloading: boolean;
   seekDisplayTarget: number | null;
   /**
@@ -182,6 +183,7 @@ function PositionSlider({
   markers,
   onSeek,
   onSeekPreview,
+  previewPending,
   reloading,
   seekDisplayTarget,
   clipBoundsEdit,
@@ -226,6 +228,7 @@ function PositionSlider({
       clipBoundsEdit={clipBoundsEdit}
       onSeek={onSeek}
       onSeekPreview={onSeekPreview}
+      previewPending={previewPending}
       onScrubChange={onScrubChange}
     />
   );
@@ -523,6 +526,7 @@ interface ControlBarProps {
   offsetStart: number;
   onSeek: (t: number) => void;
   onSeekPreview?: (time: number | null) => void;
+  previewPending?: boolean;
   onSeekBy: (seconds: number) => void;
   reloading: boolean;
   seekDisplayTarget: number | null;
@@ -567,6 +571,7 @@ function ControlBar({
   offsetStart,
   onSeek,
   onSeekPreview,
+  previewPending,
   onSeekBy,
   reloading,
   seekDisplayTarget,
@@ -724,6 +729,7 @@ function ControlBar({
           markers={markers}
           onSeek={onSeek}
           onSeekPreview={onSeekPreview}
+          previewPending={previewPending}
           onScrubChange={setScrubTime}
           reloading={reloading}
           seekDisplayTarget={seekDisplayTarget}
@@ -886,6 +892,7 @@ export interface PlayerControlsProps {
   offsetStart: number;
   onSeek: (trueTime: number) => void;
   onSeekPreview?: (time: number | null) => void;
+  previewPending?: boolean;
   onSeekBy: (seconds: number) => void;
   onPause: () => void;
   disableSeekArrows?: boolean;
@@ -972,6 +979,7 @@ export function PlayerControls({
   offsetStart,
   onSeek,
   onSeekPreview,
+  previewPending,
   onSeekBy,
   onPause,
   disableSeekArrows,
@@ -1547,6 +1555,7 @@ export function PlayerControls({
           offsetStart={offsetStart}
           onSeek={onSeek}
           onSeekPreview={onSeekPreview}
+          previewPending={previewPending}
           onSeekBy={onSeekBy}
           reloading={reloading}
           seekDisplayTarget={seekDisplayTarget}

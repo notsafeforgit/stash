@@ -81,6 +81,7 @@ function fixture() {
   const surface = document.createElement("div");
   root.append(main, surface);
   document.body.append(root);
+  const onReady = vi.fn();
   const controller = createPreparedScrubPreview({
     surface,
     sceneId: "scene",
@@ -89,10 +90,12 @@ function fixture() {
     end: 120,
     offset: 0,
     onFailure: vi.fn(),
+    onReady,
   });
   cleanup.push(controller.dispose);
   return {
     ...controller,
+    onReady,
     main,
     surface,
     buffer: (seconds: number) => {
@@ -130,10 +133,23 @@ it("shows a prepared frame immediately while the exact seek is still pending", (
   expect(f.surface.dataset.previewKind).toBe("still");
   expect(f.surface.dataset.previewReady).toBe("true");
   expect(stream.preview).toHaveBeenLastCalledWith(61);
+  expect(f.onReady).toHaveBeenLastCalledWith(null);
+  stream.frame(true, 60);
+  expect(f.onReady).toHaveBeenLastCalledWith(null);
   stream.frame(true, 61);
   expect(f.surface.dataset.previewKind).toBe("video");
+  expect(f.onReady).toHaveBeenLastCalledWith(61);
+  f.preview(62);
+  expect(f.onReady).toHaveBeenLastCalledWith(null);
+  stream.frame(true, 61);
+  expect(f.onReady).toHaveBeenLastCalledWith(null);
+  stream.frame(true, 62);
+  expect(f.onReady).toHaveBeenLastCalledWith(62);
   f.preview(null);
   expect(f.surface.style.opacity).toBe("0");
+  expect(f.onReady).toHaveBeenLastCalledWith(null);
+  stream.frame(true, 62);
+  expect(f.onReady).toHaveBeenLastCalledWith(null);
   expect(f.main.currentTime).toBe(0);
 });
 

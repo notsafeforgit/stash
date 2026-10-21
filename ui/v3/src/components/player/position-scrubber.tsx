@@ -1,5 +1,11 @@
 import type React from "react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useMsg } from "@/hooks/message";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { cn } from "@/lib/utils";
@@ -11,8 +17,8 @@ export interface ClipBoundsEdit {
   onChange: (next: { start?: number | null; end?: number | null }) => void;
 }
 
-const DWELL_MS = 650;
-const PRECISION_DWELL_MS = 1200;
+const PREVIEW_HOLD_MS = 650;
+const PRECISION_DWELL_MS = 2000;
 const DWELL_SLOP = 4;
 const MIN_WINDOW_SECONDS = 1;
 
@@ -44,6 +50,7 @@ export function PositionScrubber({
   clipBoundsEdit,
   onSeek,
   onSeekPreview,
+  previewPending = false,
   onScrubChange,
   onPreviewChange,
   crossAxisPan,
@@ -60,6 +67,8 @@ export function PositionScrubber({
   onSeek: (time: number) => void;
   /** Preview a drag position; null cancels and restores the pre-drag position. */
   onSeekPreview?: (time: number | null) => void;
+  /** Waiting for the requested preview frame; loading time is not a zoom hold. */
+  previewPending?: boolean;
   onScrubChange?: (time: number | null) => void;
   onPreviewChange?: (visible: boolean) => void;
   crossAxisPan?: ScrubberCrossAxisPan;
@@ -129,19 +138,35 @@ export function PositionScrubber({
     direction === "right"
       ? event.clientY - origin.current.y
       : (event.clientX - origin.current.x) * (direction === "down" ? -1 : 1);
-  const clearDwell = () => {
+  const clearDwell = useCallback(() => {
     if (dwellTimer.current !== null) clearTimeout(dwellTimer.current);
     dwellTimer.current = null;
-  };
-  const scheduleDwell = () => {
-    clearDwell();
-    const touch = touchScrub.current;
-    if (!touch || touch.range.end - touch.range.start <= MIN_WINDOW_SECONDS)
-      return;
-    touch.dwellOrigin = touch.point;
-    const zoomed = touch.range.end - touch.range.start < duration;
-    dwellTimer.current = setTimeout(
-      () => {
+  }, []);
+  const scheduleDwell = useCallback(
+    function scheduleDwell() {
+      clearDwell();
+      const touch = touchScrub.current;
+      if (!touch) return;
+      touch.dwellOrigin = touch.point;
+      if (!previewing.current) {
+        dwellTimer.current = setTimeout(() => {
+          if (touchScrub.current !== touch) return;
+          gesture.current = "seek";
+          previewing.current = true;
+          callbacks.current.onSeekPreview?.(
+            touch.range.start +
+              touch.ratio * (touch.range.end - touch.range.start),
+          );
+          scheduleDwell();
+        }, PREVIEW_HOLD_MS);
+        return;
+      }
+      if (
+        previewPending ||
+        touch.range.end - touch.range.start <= MIN_WINDOW_SECONDS
+      )
+        return;
+      dwellTimer.current = setTimeout(() => {
         if (touchScrub.current !== touch) return;
         gesture.current = "seek";
         const previousSpan = touch.range.end - touch.range.start;
@@ -155,16 +180,19 @@ export function PositionScrubber({
         const start = time - touch.ratio * nextSpan;
         touch.range = { start, end: start + nextSpan };
         setPrecisionRange(touch.range);
-        // A stationary hold also starts the buffered preview pause. Zooming
-        // changes only the scale: the time under the finger stays anchored.
-        previewing.current = true;
-        callbacks.current.onSeekPreview?.(time);
+        // Zooming changes only the scale; the decoded frame stays anchored.
         navigator.vibrate?.(10);
         scheduleDwell();
-      },
-      zoomed ? PRECISION_DWELL_MS : DWELL_MS,
-    );
-  };
+      }, PRECISION_DWELL_MS);
+    },
+    [clearDwell, previewPending],
+  );
+  useEffect(() => {
+    // Each newly decoded target gets a full deliberate pause. Neither slow
+    // streaming nor a cached coarse still can consume that pause for the user.
+    if (previewing.current) scheduleDwell();
+    return clearDwell;
+  }, [scheduleDwell, clearDwell]);
   const finish = () => {
     clearDwell();
     touchScrub.current = null;
@@ -194,6 +222,7 @@ export function PositionScrubber({
       aria-valuenow={displayTime}
       aria-valuetext={`${precisionRange ? formatDurationMs(displayTime) : formatTime(displayTime)} / ${formatTime(duration)}`}
       aria-disabled={unavailable}
+      aria-busy={previewPending || undefined}
       aria-orientation={direction === "right" ? "horizontal" : "vertical"}
       data-position-scrubber
       data-dragging={dragTime !== null || undefined}
@@ -258,6 +287,15 @@ export function PositionScrubber({
         }
         const next = position(event);
         change(next);
+        const wasPreviewing = previewing.current;
+        // A tap retains uninterrupted playback. An actual drag or stationary
+        // hold starts the preview independently of precision zoom.
+        previewing.current ||=
+          Math.hypot(
+            event.clientX - origin.current.x,
+            event.clientY - origin.current.y,
+          ) >= 3;
+        if (previewing.current) onSeekPreview?.(next);
         const touch = touchScrub.current;
         if (touch) {
           touch.point = { x: event.clientX, y: event.clientY };
@@ -273,19 +311,12 @@ export function PositionScrubber({
             Math.hypot(
               event.clientX - touch.dwellOrigin.x,
               event.clientY - touch.dwellOrigin.y,
-            ) >= slop
+            ) >= slop ||
+            (!wasPreviewing && previewing.current)
           ) {
             scheduleDwell();
           }
         }
-        // A tap retains uninterrupted playback. Only an actual drag starts
-        // the temporary preview pause, after allowing for touch jitter.
-        previewing.current ||=
-          Math.hypot(
-            event.clientX - origin.current.x,
-            event.clientY - origin.current.y,
-          ) >= 3;
-        if (previewing.current) onSeekPreview?.(next);
       }}
       onPointerUp={(event) => {
         if (pointer.current !== event.pointerId) return;

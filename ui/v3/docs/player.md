@@ -215,8 +215,11 @@ Releasing at a preview target still being decoded reuses the pending native seek
 it does not issue a second seek to the same time.
 
 Touch scrubbing supports precision seeking in scene detail, both lightboxes and
-TV (including rotated controls). A 650 ms dwell within a 4 px radius zooms the
-timeline around the time under the finger. Further zooms require a 1200 ms pause;
+TV (including rotated controls). A 650 ms hold starts a preview without changing
+the timeline scale. Precision zoom requires a further 2-second stationary hold.
+When using the small preview stream, that hold starts only after its requested
+frame is decoded; streaming delays and cached coarse stills do not count toward
+it. Each further zoom requires another 2-second pause;
 the movement allowance tightens to 2 px at 4× and 1 px from 16× onward, so fine
 adjustments restart the dwell. Each new window anchors its dwell at the current
 finger position. Each dwell narrows the visible range

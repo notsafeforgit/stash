@@ -26,6 +26,7 @@ export interface ScenePlayerState {
   /** Separate buffered intervals in scene time, including gaps and eviction. */
   bufferedRanges: readonly PlaybackRange[];
   ready: boolean;
+  previewPending: boolean;
   zoomed: boolean;
   error: string | null;
   canPip: boolean;
@@ -97,6 +98,7 @@ export function ScenePlayerControlsProvider({
   duration: number;
   range?: PlaybackRange;
   ready: boolean;
+  previewPending: boolean;
   zoomed: boolean;
   rootRef: RefObject<HTMLDivElement | null>;
   reloading: boolean;
@@ -163,6 +165,7 @@ export function ScenePlayerControlsProvider({
             latest.current.offsetStart,
           ),
           ready: latest.current.ready,
+          previewPending: latest.current.previewPending,
           zoomed: latest.current.zoomed,
           error: store.state.error?.message ?? null,
           canPip: store.state.pictureInPictureAvailability === "available",

@@ -9,7 +9,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/models"
 )
 
@@ -29,7 +28,7 @@ type VerifiedFile struct {
 	relative string
 }
 
-func snapshotOpenFile(file *os.File) (FileSnapshot, error) {
+func snapshotOpenFile(file *os.File, binding models.MediaRootBinding) (FileSnapshot, error) {
 	info, err := file.Stat()
 	if err != nil {
 		return FileSnapshot{}, err
@@ -37,7 +36,7 @@ func snapshotOpenFile(file *os.File) (FileSnapshot, error) {
 	if !info.Mode().IsRegular() {
 		return FileSnapshot{}, errors.New("completion requires a regular file")
 	}
-	identity, err := fsutil.OpenFileIdentity(file)
+	identity, err := mediaFileIdentity(file, binding)
 	if err != nil {
 		return FileSnapshot{}, err
 	}
@@ -85,7 +84,7 @@ func VerifyMediaFile(ctx context.Context, root models.MediaRoot, relative string
 			file.Close()
 		}
 	}()
-	before, err := snapshotOpenFile(file)
+	before, err := snapshotOpenFile(file, *root.Binding)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +95,7 @@ func VerifyMediaFile(ctx context.Context, root models.MediaRoot, relative string
 	if err != nil {
 		return nil, err
 	}
-	after, err := snapshotOpenFile(file)
+	after, err := snapshotOpenFile(file, *root.Binding)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +144,7 @@ func (v *VerifiedFile) Revalidate(ctx context.Context, root models.MediaRoot) er
 	if root.UUID != v.rootUUID || root.Binding == nil || *root.Binding != v.binding {
 		return ErrMediaFileChanged
 	}
-	current, err := snapshotOpenFile(v.File)
+	current, err := snapshotOpenFile(v.File, v.binding)
 	if err != nil {
 		return err
 	}
@@ -159,7 +158,7 @@ func (v *VerifiedFile) Revalidate(ctx context.Context, root models.MediaRoot) er
 		return err
 	}
 	defer file.Close()
-	named, err := snapshotOpenFile(file)
+	named, err := snapshotOpenFile(file, v.binding)
 	if err != nil {
 		return err
 	}
@@ -176,7 +175,7 @@ func (v *VerifiedFile) Revalidate(ctx context.Context, root models.MediaRoot) er
 		if n != named.Size || digest != v.SHA256 {
 			return ErrMediaFileChanged
 		}
-		final, err := snapshotOpenFile(file)
+		final, err := snapshotOpenFile(file, v.binding)
 		if err != nil {
 			return err
 		}
@@ -190,7 +189,7 @@ func (v *VerifiedFile) Revalidate(ctx context.Context, root models.MediaRoot) er
 			return err
 		}
 		defer latest.Close()
-		final, err = snapshotOpenFile(latest)
+		final, err = snapshotOpenFile(latest, v.binding)
 		if err != nil {
 			return err
 		}

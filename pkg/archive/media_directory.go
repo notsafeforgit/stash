@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/models"
 )
 
@@ -75,7 +74,7 @@ func openMediaDirectory(root models.MediaRoot, directory string) (*os.Root, *os.
 	return child, file, nil
 }
 
-func directorySnapshot(file *os.File) (FileSnapshot, error) {
+func directorySnapshot(file *os.File, binding models.MediaRootBinding) (FileSnapshot, error) {
 	info, err := file.Stat()
 	if err != nil {
 		return FileSnapshot{}, err
@@ -83,7 +82,7 @@ func directorySnapshot(file *os.File) (FileSnapshot, error) {
 	if !info.IsDir() {
 		return FileSnapshot{}, ErrMediaDirectoryInput
 	}
-	identity, err := fsutil.OpenFileIdentity(file)
+	identity, err := mediaFileIdentity(file, binding)
 	if err != nil {
 		return FileSnapshot{}, err
 	}
@@ -120,7 +119,7 @@ func ReadMediaDirectory(ctx context.Context, root models.MediaRoot, input MediaD
 	}
 	defer directory.Close()
 	defer pinned.Close()
-	before, err := directorySnapshot(directory)
+	before, err := directorySnapshot(directory, *root.Binding)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +216,7 @@ func ReadMediaDirectory(ctx context.Context, root models.MediaRoot, input MediaD
 	}
 	defer currentRoot.Close()
 	defer current.Close()
-	after, err := directorySnapshot(current)
+	after, err := directorySnapshot(current, *root.Binding)
 	if err != nil || !sameFileSnapshot(before, after) {
 		return nil, ErrMediaDirectoryChanged
 	}

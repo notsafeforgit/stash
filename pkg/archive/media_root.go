@@ -35,7 +35,12 @@ func openPinnedRoot(binding models.MediaRootBinding, check bool) (*os.Root, stri
 		root.Close()
 		return nil, "", err
 	}
-	identity, err := fsutil.OpenFileIdentity(directory)
+	var identity string
+	if check {
+		identity, err = mediaFileIdentity(directory, binding)
+	} else {
+		identity, err = fsutil.OpenPersistentFileIdentity(directory)
+	}
 	directory.Close()
 	if err != nil || (check && identity != binding.DirectoryIdentity) {
 		root.Close()
@@ -45,6 +50,16 @@ func openPinnedRoot(binding models.MediaRootBinding, check bool) (*os.Root, stri
 		return nil, "", err
 	}
 	return root, identity, nil
+}
+
+// A binding chooses the identity format for its file and directory snapshots as
+// well as its mount check. Retained previews, jobs and discovery fingerprints
+// for an older binding must not change merely because Stash was upgraded.
+func mediaFileIdentity(file *os.File, binding models.MediaRootBinding) (string, error) {
+	if strings.HasPrefix(binding.DirectoryIdentity, fsutil.PersistentFileIdentityPrefix) {
+		return fsutil.OpenPersistentFileIdentity(file)
+	}
+	return fsutil.OpenFileIdentity(file)
 }
 
 func ProbeMediaRoot(localPath string) (*models.MediaRootBinding, error) {

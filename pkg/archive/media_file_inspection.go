@@ -23,7 +23,7 @@ func InspectMediaFile(ctx context.Context, root models.MediaRoot, relative strin
 	if err != nil {
 		return nil, err
 	}
-	snapshot, err := snapshotOpenFile(opened)
+	snapshot, err := snapshotOpenFile(opened, *root.Binding)
 	closeErr := opened.Close()
 	if err != nil {
 		return nil, err

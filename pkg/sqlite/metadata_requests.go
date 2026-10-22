@@ -82,7 +82,7 @@ func (s *EnrichmentJobStore) RequestSource(ctx context.Context, lease models.Enr
 	if _, err := dbWrapper.Exec(ctx, "INSERT OR IGNORE INTO source_request_budgets(scope) VALUES(?)", scope); err != nil {
 		return nil, err
 	}
-	wait, err := sourceRequestWait(ctx, scope, input.RequestUUID, now)
+	wait, err := sourceRequestWait(ctx, scope, input.RequestUUID, sourceRequestOwner("metadata", lease.JobUUID, lease.Fence), now)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (s *EnrichmentJobStore) RequestSource(ctx context.Context, lease models.Enr
 		return nil, err
 	}
 	// The same spacing and Retry-After budget governs both producer types.
-	probe, err := sourceRequestGranted(ctx, scope, input.RequestUUID, now)
+	probe, err := sourceRequestGranted(ctx, scope, input.RequestUUID, sourceRequestOwner("metadata", lease.JobUUID, lease.Fence), now)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (s *EnrichmentJobStore) ReportSourceRequest(ctx context.Context, lease mode
  WHERE hour=? AND scope=? AND class='recovery' AND operation=?`, input.Status == 429 || input.BlockReason != "", input.Status == 0 || input.Status >= 400 || input.BlockReason != "", row.GrantedAt/3600000, row.Scope, row.Operation); err != nil {
 		return err
 	}
-	backoff, err := sourceRequestFeedback(ctx, row.Scope, row.GrantedAt, row.Backoff, input, now)
+	backoff, err := sourceRequestFeedback(ctx, row.Scope, sourceRequestOwner("metadata", lease.JobUUID, lease.Fence), row.GrantedAt, row.Backoff, input, now)
 	if err != nil {
 		return err
 	}

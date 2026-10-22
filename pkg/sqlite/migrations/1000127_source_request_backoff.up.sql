@@ -4,6 +4,7 @@ ALTER TABLE source_request_budgets ADD COLUMN backoff_at_ms INTEGER NOT NULL DEF
 ALTER TABLE source_request_budgets ADD COLUMN blocked_until_ms INTEGER NOT NULL DEFAULT 0 CHECK(blocked_until_ms>=0);
 ALTER TABLE source_request_budgets ADD COLUMN probe_uuid TEXT NOT NULL DEFAULT '' CHECK(probe_uuid='' OR length(probe_uuid)=36);
 ALTER TABLE source_request_budgets ADD COLUMN probe_until_ms INTEGER NOT NULL DEFAULT 0 CHECK(probe_until_ms>=0);
+ALTER TABLE source_request_budgets ADD COLUMN probe_owner TEXT NOT NULL DEFAULT '' CHECK(length(probe_owner)<=96);
 ALTER TABLE source_request_permits ADD COLUMN backoff INTEGER NOT NULL DEFAULT 0 CHECK(backoff IN (0,1));
 ALTER TABLE metadata_request_permits ADD COLUMN backoff INTEGER NOT NULL DEFAULT 0 CHECK(backoff IN (0,1));
 DROP TRIGGER archive_job_transition;

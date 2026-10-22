@@ -56,7 +56,7 @@ func TestSourceBackoffRetainsProgressAndUsesOneRecoveryProbe(t *testing.T) {
 	require.True(t, backoffRequest(t, d, r, id).Ready)
 	require.True(t, backoffRequest(t, d, r, id).Ready, "lost permit response reuses the same probe")
 	f.now = f.now.Add(5 * time.Second)
-	secondID := uuid.NewString()
+	secondID := id // Request IDs are scoped to attempts, not globally unique.
 	require.False(t, backoffRequest(t, other, second, secondID).Ready, "normal spacing alone cannot admit another probe")
 	require.NoError(t, d.coordinator.ReportSourceRequest(t.Context(), d.token, r.Lease(), models.SourceRequestResult{RequestUUID: id, Status: 200}))
 	require.True(t, backoffRequest(t, other, second, secondID).Ready, "successful probe restores normal pacing immediately")
@@ -138,6 +138,7 @@ func removeSourceBackoffSchema(t *testing.T, raw *sql.DB) {
  ALTER TABLE source_request_budgets DROP COLUMN blocked_until_ms;
  ALTER TABLE source_request_budgets DROP COLUMN probe_uuid;
  ALTER TABLE source_request_budgets DROP COLUMN probe_until_ms;
+ ALTER TABLE source_request_budgets DROP COLUMN probe_owner;
  DROP TRIGGER archive_job_transition;
  ALTER TABLE source_request_permits DROP COLUMN backoff;
  ALTER TABLE metadata_request_permits DROP COLUMN backoff;

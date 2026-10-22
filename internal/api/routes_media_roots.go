@@ -35,6 +35,38 @@ func rootBindingError(w http.ResponseWriter, err error) {
 	ingestJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_root_binding", "message": err.Error()})
 }
 
+func (rs *nativeArchiveRoutes) upgradeRootIdentity(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		ExpectedRevision int                     `json:"expected_revision"`
+		Binding          models.MediaRootBinding `json:"binding"`
+		Reason           string                  `json:"reason"`
+	}
+	if err := readIngestJSON(w, r, 24576, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	id := chi.URLParam(r, "root")
+	if !ingest.ValidUUID(id) {
+		ingestError(w, ingest.ErrInvalid)
+		return
+	}
+	var result *models.MediaRoot
+	err := rs.repo.WithTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		result, err = rs.repo.MediaRoot.UpgradeIdentity(ctx, id, input.ExpectedRevision, input.Binding, input.Reason)
+		return err
+	})
+	if errors.Is(err, models.ErrMediaRootBindingInvalid) {
+		rootBindingError(w, err)
+		return
+	}
+	if err != nil {
+		nativeArchiveError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, result)
+}
+
 func (rs *nativeArchiveRoutes) putRoot(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		UUID             string                   `json:"uuid"`

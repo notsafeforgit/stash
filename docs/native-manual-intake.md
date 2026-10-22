@@ -248,6 +248,32 @@ a failure retains pending state. Its fifteen-minute runtime limit is recoverable
 on the next invocation. It is independent of dedupe scheduling and performs no
 global `metadataClean` or wildcard autotag operation.
 
+New Linux folder bindings use the opened filesystem ID and inode rather than
+the device number assigned when the filesystem was mounted. Their file previews
+and directory continuations use that same identity format, so ordinary device
+renumbering at reboot does not invalidate an unchanged folder or file. The
+filesystem must expose a nonzero filesystem ID; replacing that filesystem or
+directory still fails the binding check. Other platforms retain their existing
+identity format.
+
+Older bindings keep their original identity checks until explicitly upgraded.
+A device-number mismatch cannot establish that the same filesystem is present.
+After confirming the mount is the original filesystem and directory, probe its
+current identity and submit `POST /media-roots/{root}/identity-upgrade` with
+`expected_revision`, that checked `binding`, and a nonempty review `reason`.
+The path and inode must agree and the filesystem is rechecked at submission.
+The immutable review augments the existing root revision; it cannot relocate a
+root, replace a previous review, or silently authorize another mount.
+
+An upgraded binding exposes `persistent_identity` for the mount check and keeps
+its original `directory_identity` as the namespace for retained file snapshots.
+Only files on that exact reviewed filesystem can use that namespace; nested
+mounts need their own reviewed roots. This preserves queued/leased source runs,
+pending file previews, directory continuations, and intake fingerprints without
+rewriting requests or journals. Never delete discovery state to recover a mount.
+A real root edit/rebind still advances its revision and invalidates stale work;
+the new definition uses the current identity format.
+
 Declare `{"kind":"folder_intake","config":"/private/intake.json"}` in the
 worker inventory's `maintenance` list. The root must be inventoried, and the
 configuration, private key and journal join the same verified backup boundary.

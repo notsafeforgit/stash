@@ -153,6 +153,14 @@ binding and verifies that the directory has not changed since the check.
 Editing the path clears the check. Saving never moves files, starts scans,
 rewrites existing scene/image file paths or grants a worker access.
 
+New Linux checks identify the filesystem and inode, independent of its assigned
+device number. A normal reboot can renumber devices without invalidating these
+bindings. Older device-number bindings remain checked in their original format
+until an explicit identity upgrade records the reviewed filesystem. Stash never
+guesses that a replacement mount is the previous filesystem. The upgrade adds
+immutable evidence without changing the root revision or admitted work. See the
+[intake recovery notes](native-manual-intake.md) for this API and its boundaries.
+
 An unbound root preserves its identity and collection paths but cannot accept
 file ingestion. Disabling a root preserves its binding; reactivation verifies
 the directory again. Labels can be changed and roots disabled while their
@@ -273,6 +281,7 @@ administration. Responses use `Cache-Control: no-store`.
 | `GET /media-roots` | Current root bindings; optional `q`, `state`, UUID `after`, and `limit` |
 | `GET /media-roots/{uuid}` | One root, including its local binding |
 | `POST /media-roots/probe` | Read-only directory check from `server_path`; returns canonical `path` and `directory_identity` |
+| `POST /media-roots/{root}/identity-upgrade` | Record a reviewed persistent identity for the same legacy root, retaining its revision and saved work |
 | `PUT /media-roots/{uuid}` | Create/edit a root with `expected_revision`, `label`, `state`, nullable checked `binding` and `reason`; optional body `uuid` must match the path |
 | `GET /media-roots/{uuid}/history` | Immutable root definitions including bindings, reason/origin and time; integer revision `after` and bounded `limit` |
 | `GET /collections/{uuid}/metadata-policy` | Current saved policy or null |

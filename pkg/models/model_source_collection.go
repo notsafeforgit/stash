@@ -11,6 +11,10 @@ import (
 type MediaRootBinding struct {
 	Path              string `json:"path"`
 	DirectoryIdentity string `json:"directory_identity"`
+	// PersistentIdentity is an explicitly reviewed strengthening of a legacy
+	// device/inode binding. DirectoryIdentity retains the snapshot namespace
+	// used by already admitted work; it no longer authorizes the mount itself.
+	PersistentIdentity string `json:"persistent_identity,omitempty"`
 }
 
 type MediaRootDefinition struct {
@@ -39,8 +43,15 @@ func (r MediaRootDefinition) LocalPath() string {
 type MediaRoot struct {
 	UUID string `json:"uuid"`
 	MediaRootDefinition
-	Revision  int       `json:"revision"`
-	CreatedAt time.Time `json:"created_at"`
+	Revision        int                       `json:"revision"`
+	CreatedAt       time.Time                 `json:"created_at"`
+	IdentityUpgrade *MediaRootIdentityUpgrade `json:"identity_upgrade,omitempty"`
+}
+
+type MediaRootIdentityUpgrade struct {
+	PersistentIdentity string    `json:"persistent_identity"`
+	Reason             string    `json:"reason"`
+	RecordedAt         time.Time `json:"recorded_at"`
 }
 
 type MediaRootRevision struct {
@@ -138,6 +149,7 @@ var (
 
 type MediaRootReaderWriter interface {
 	Put(context.Context, MediaRootInput) (*MediaRoot, error)
+	UpgradeIdentity(context.Context, string, int, MediaRootBinding, string) (*MediaRoot, error)
 	Find(context.Context, string) (*MediaRoot, error)
 	List(context.Context, string, int) ([]*MediaRoot, error)
 	Search(context.Context, SourceDefinitionFilter) ([]*MediaRoot, error)

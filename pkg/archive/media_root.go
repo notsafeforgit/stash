@@ -36,13 +36,18 @@ func openPinnedRoot(binding models.MediaRootBinding, check bool) (*os.Root, stri
 		return nil, "", err
 	}
 	var identity string
-	if check {
+	expected := binding.DirectoryIdentity
+	switch {
+	case check && binding.PersistentIdentity != "":
+		expected = binding.PersistentIdentity
+		identity, err = fsutil.OpenPersistentFileIdentity(directory)
+	case check:
 		identity, err = mediaFileIdentity(directory, binding)
-	} else {
+	default:
 		identity, err = fsutil.OpenPersistentFileIdentity(directory)
 	}
 	directory.Close()
-	if err != nil || (check && identity != binding.DirectoryIdentity) {
+	if err != nil || (check && identity != expected) {
 		root.Close()
 		if err == nil {
 			err = errors.New("media root directory changed or its mount is unavailable; review the binding")
@@ -56,10 +61,30 @@ func openPinnedRoot(binding models.MediaRootBinding, check bool) (*os.Root, stri
 // well as its mount check. Retained previews, jobs and discovery fingerprints
 // for an older binding must not change merely because Stash was upgraded.
 func mediaFileIdentity(file *os.File, binding models.MediaRootBinding) (string, error) {
+	if binding.PersistentIdentity != "" {
+		return fsutil.OpenUpgradedFileIdentity(file, binding.DirectoryIdentity, binding.PersistentIdentity)
+	}
 	if strings.HasPrefix(binding.DirectoryIdentity, fsutil.PersistentFileIdentityPrefix) {
 		return fsutil.OpenPersistentFileIdentity(file)
 	}
 	return fsutil.OpenFileIdentity(file)
+}
+
+// UpgradeMediaRootIdentity requires an explicit review: a legacy binding alone
+// cannot prove which filesystem occupied its device number before a reboot.
+// The path and inode must still agree, and the reviewed persistent identity is
+// checked against the open directory before it can authorize future reads.
+func UpgradeMediaRootIdentity(binding models.MediaRootBinding, reviewed models.MediaRootBinding) (*models.MediaRootBinding, error) {
+	if binding.Path != reviewed.Path || reviewed.PersistentIdentity != "" ||
+		!fsutil.ValidFileIdentityUpgrade(binding.DirectoryIdentity, reviewed.DirectoryIdentity) {
+		return nil, errors.New("identity upgrade requires the same legacy root path and inode")
+	}
+	if err := VerifyMediaRootBinding(reviewed); err != nil {
+		return nil, err
+	}
+	ret := binding
+	ret.PersistentIdentity = reviewed.DirectoryIdentity
+	return &ret, nil
 }
 
 func ProbeMediaRoot(localPath string) (*models.MediaRootBinding, error) {

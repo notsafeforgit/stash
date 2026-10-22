@@ -119,6 +119,15 @@ export const mediaRootScanSchema = z.object({
   exclude_video: z.boolean(),
   exclude_image: z.boolean(),
 });
+export const rootBindingSchema = z
+  .object({
+    path: text(4096).refine((value) => value.length > 0),
+    directory_identity: text(128).refine((value) => value.length > 0),
+    persistent_identity: text(128)
+      .refine((value) => value.startsWith("fsid-v1:"))
+      .optional(),
+  })
+  .strict();
 export const mediaRootSchema = z.object({
   uuid,
   label: z.string(),
@@ -132,9 +141,14 @@ export const mediaRootSchema = z.object({
     exclude_video: false,
     exclude_image: false,
   }),
-  binding: z
-    .object({ path: z.string(), directory_identity: z.string() })
-    .nullable(),
+  binding: rootBindingSchema.nullable(),
+  identity_upgrade: z
+    .object({
+      persistent_identity: z.string(),
+      reason: z.string(),
+      recorded_at: z.string(),
+    })
+    .optional(),
 });
 export type Collection = z.infer<typeof collectionSchema>;
 export type CollectionInput = z.infer<typeof collectionInputSchema>;

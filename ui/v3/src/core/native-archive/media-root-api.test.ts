@@ -3,6 +3,7 @@ import { IDBFactory, IDBObjectStore } from "fake-indexeddb";
 import {
   createMediaRootAPI,
   mediaRootInputSchema,
+  sameRootDefinition,
   type MediaRootInput,
   type MediaRootRevision,
 } from "./media-root-api";
@@ -18,6 +19,77 @@ const input = (): MediaRootInput => ({
   binding: { path: "/media/library", directory_identity: "directory:1" },
   reason: "Checked folder",
 });
+
+it.each([false, true])(
+  "retains reviewed filesystem evidence when editing an upgraded root (lost response: %s)",
+  async (loseResponse) => {
+    const persistent = "fsid-v1:2fc12fc1:15e26930001d8459:780";
+    const current = {
+      ...mediaRoot(),
+      binding: {
+        path: "/media/library",
+        directory_identity: "2c:780",
+        persistent_identity: persistent,
+      },
+      identity_upgrade: {
+        persistent_identity: persistent,
+        reason: "Confirmed same filesystem",
+        recorded_at: "2026-10-22T22:00:00Z",
+      },
+    };
+    const update: MediaRootInput = {
+      ...input(),
+      expected_revision: current.revision,
+      label: "Renamed library",
+      binding: current.binding,
+    };
+    const saved = {
+      ...current,
+      label: update.label,
+      revision: current.revision + 1,
+      binding: { path: current.binding.path, directory_identity: persistent },
+      identity_upgrade: undefined,
+      origin: "review",
+      reason: update.reason,
+      recorded_at: "2026-10-22T22:01:00Z",
+    };
+    let committed = false;
+    const transport = vi.fn<typeof fetch>(async (target, options) => {
+      if (options?.method === "PUT") {
+        expect(JSON.parse(String(options.body))).toEqual(update);
+        committed = true;
+        if (loseResponse) throw new TypeError("lost after save");
+        return Response.json(saved);
+      }
+      if (String(target).includes("/history?"))
+        return Response.json(committed ? [saved] : []);
+      return Response.json(committed ? saved : current);
+    });
+    const api = createMediaRootAPI(endpoint, transport);
+    expect((await api.root(rootID)).binding).toEqual(current.binding);
+    expect(
+      sameRootDefinition(
+        {
+          ...update,
+          label: current.label,
+          binding: { ...current.binding, persistent_identity: undefined },
+        },
+        current,
+      ),
+    ).toBe(false);
+    const outbox = createMediaRootOutbox(api);
+    await outbox.prepare(update);
+    if (loseResponse)
+      await expect(outbox.deliver(rootID)).rejects.toThrow("lost after save");
+    expect(await outbox.deliver(rootID)).toMatchObject({
+      revision: saved.revision,
+      binding: saved.binding,
+    });
+    expect(
+      transport.mock.calls.filter(([, options]) => options?.method === "PUT"),
+    ).toHaveLength(1);
+  },
+);
 beforeEach(() => vi.stubGlobal("indexedDB", new IDBFactory()));
 afterEach(() => {
   vi.unstubAllGlobals();

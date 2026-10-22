@@ -739,6 +739,17 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return errors.New("native database schema is incomplete: source request backoff")
 			}
 		}
+		if version >= NativeSchemaBaseline+128 {
+			for _, name := range []string{"media_root_identity_upgrades", "media_root_identity_upgrade_scope", "media_root_identity_upgrade_immutable", "media_root_identity_upgrade_retained"} {
+				var exists bool
+				if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+					return err
+				}
+				if !exists {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+		}
 		if version >= NativeSchemaBaseline+112 {
 			var found bool
 			if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='metadata_request_permits')"); err != nil {

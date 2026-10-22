@@ -54,6 +54,7 @@ func (rs *nativeArchiveRoutes) routerWithSourceTracking(enabled bool) http.Handl
 	r.Get("/media-roots/{root}", rs.root)
 	r.Get("/media-roots/{root}/history", rs.rootHistory)
 	r.Put("/media-roots/{root}", rs.putRoot)
+	r.Post("/media-roots/{root}/identity-upgrade", rs.upgradeRootIdentity)
 	r.Get("/page-info", func(w http.ResponseWriter, r *http.Request) {
 		resource := r.URL.Query().Get("resource")
 		if !enabled && resource != "media-roots" && resource != "root-history" && resource != "provider-history" && resource != "shares" {

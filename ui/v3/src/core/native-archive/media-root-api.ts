@@ -4,6 +4,7 @@ import {
   mediaRootSchema,
   mediaRootScanSchema,
   definitionStateSchema,
+  rootBindingSchema,
 } from "./collection-api";
 import {
   createArchiveRequest,
@@ -20,12 +21,7 @@ const text = (limit: number) =>
         new TextEncoder().encode(value).length <= limit &&
         !/\p{Cc}/u.test(value),
     );
-export const rootBindingSchema = z
-  .object({
-    path: text(4096).refine((value) => value.length > 0),
-    directory_identity: text(128).refine((value) => value.length > 0),
-  })
-  .strict();
+export { rootBindingSchema } from "./collection-api";
 export const mediaRootInputSchema = z
   .object({
     uuid,
@@ -74,7 +70,9 @@ export function sameRootDefinition(
         input.scan.exclude_video === root.scan?.exclude_video &&
         input.scan.exclude_image === root.scan?.exclude_image)) &&
     input.binding?.path === root.binding?.path &&
-    input.binding?.directory_identity === root.binding?.directory_identity
+    (input.binding?.persistent_identity ??
+      input.binding?.directory_identity) ===
+      (root.binding?.persistent_identity ?? root.binding?.directory_identity)
   );
 }
 

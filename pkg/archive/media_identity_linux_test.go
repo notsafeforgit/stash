@@ -50,4 +50,35 @@ func TestMediaBindingRetainsIdentityFormatForSavedWork(t *testing.T) {
 	require.ErrorContains(t, VerifyMediaRootBinding(*legacy.Binding), "directory changed")
 	_, err = InspectMediaFile(t.Context(), legacy, filepath.Base(path))
 	require.Error(t, err)
+
+	// After an explicit same-root review, use the persistent mount check but
+	// keep the original device namespace for retained snapshots and pagination.
+	reviewed, err := UpgradeMediaRootIdentity(*legacy.Binding, *root.Binding)
+	require.NoError(t, err)
+	legacy.Binding = reviewed
+	inspection, err := InspectMediaFile(t.Context(), legacy, filepath.Base(path))
+	require.NoError(t, err)
+	_, inode, _ := strings.Cut(old.Snapshot.Identity, ":")
+	require.Equal(t, "ffffffffffffffff:"+inode, inspection.Snapshot.Identity)
+	legacy.Binding.DirectoryIdentity = legacyRootID
+	after, err := InspectMediaFile(t.Context(), legacy, filepath.Base(path))
+	require.NoError(t, err)
+	require.Equal(t, old, after, "an upgrade preserves saved file fingerprints exactly")
+	legacy.Binding.PersistentIdentity = ""
+	page, err := ReadMediaDirectory(t.Context(), legacy, MediaDirectoryInput{Directory: ".", Limit: 50})
+	require.NoError(t, err)
+	legacy.Binding.PersistentIdentity = root.Binding.DirectoryIdentity
+	upgradedPage, err := ReadMediaDirectory(t.Context(), legacy, MediaDirectoryInput{Directory: ".", Limit: 50})
+	require.NoError(t, err)
+	require.Equal(t, page, upgradedPage)
+	verified, err = VerifyMediaFile(t.Context(), legacy, filepath.Base(path), nil, "")
+	require.NoError(t, err)
+	defer verified.Close()
+	require.True(t, old.Matches(verified.Snapshot, verified.SHA256))
+	require.NoError(t, verified.Revalidate(t.Context(), legacy))
+
+	// The upgrade does not permit a subsequently replaced directory.
+	require.NoError(t, os.Rename(root.Binding.Path, root.Binding.Path+"-old"))
+	require.NoError(t, os.Mkdir(root.Binding.Path, 0700))
+	require.Error(t, VerifyMediaRootBinding(*legacy.Binding))
 }

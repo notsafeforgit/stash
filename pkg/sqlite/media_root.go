@@ -16,25 +16,30 @@ import (
 type MediaRootStore struct{}
 
 type mediaRootRow struct {
-	UUID              string    `db:"uuid"`
-	Revision          int       `db:"revision"`
-	Label             string    `db:"label"`
-	State             string    `db:"state"`
-	ServerPath        *string   `db:"server_path"`
-	DirectoryIdentity *string   `db:"directory_identity"`
-	UnboundPath       string    `db:"unbound_path"`
-	ScanRevision      int       `db:"scan_revision"`
-	ScanEnabled       bool      `db:"scan_enabled"`
-	ExcludeVideo      bool      `db:"exclude_video"`
-	ExcludeImage      bool      `db:"exclude_image"`
-	Origin            string    `db:"origin"`
-	Reason            string    `db:"reason"`
-	CreatedAt         Timestamp `db:"created_at"`
-	RecordedAt        Timestamp `db:"recorded_at"`
+	UUID               string        `db:"uuid"`
+	Revision           int           `db:"revision"`
+	Label              string        `db:"label"`
+	State              string        `db:"state"`
+	ServerPath         *string       `db:"server_path"`
+	DirectoryIdentity  *string       `db:"directory_identity"`
+	UnboundPath        string        `db:"unbound_path"`
+	ScanRevision       int           `db:"scan_revision"`
+	ScanEnabled        bool          `db:"scan_enabled"`
+	ExcludeVideo       bool          `db:"exclude_video"`
+	ExcludeImage       bool          `db:"exclude_image"`
+	Origin             string        `db:"origin"`
+	Reason             string        `db:"reason"`
+	CreatedAt          Timestamp     `db:"created_at"`
+	RecordedAt         Timestamp     `db:"recorded_at"`
+	PersistentIdentity *string       `db:"persistent_identity"`
+	UpgradeReason      *string       `db:"upgrade_reason"`
+	UpgradeRecordedAt  NullTimestamp `db:"upgrade_recorded_at"`
 }
 
-const mediaRootSelect = `SELECT b.uuid,b.created_at,r.revision,r.label,r.state,r.server_path,r.directory_identity,r.unbound_path,b.scan_revision,b.scan_enabled,b.exclude_video,b.exclude_image,r.origin,r.reason,r.created_at AS recorded_at
-FROM media_roots b JOIN media_root_revisions r ON r.root_uuid=b.uuid`
+const mediaRootSelect = `SELECT b.uuid,b.created_at,r.revision,r.label,r.state,r.server_path,r.directory_identity,r.unbound_path,b.scan_revision,b.scan_enabled,b.exclude_video,b.exclude_image,r.origin,r.reason,r.created_at AS recorded_at,
+u.persistent_identity,u.reason AS upgrade_reason,u.created_at AS upgrade_recorded_at
+FROM media_roots b JOIN media_root_revisions r ON r.root_uuid=b.uuid
+LEFT JOIN media_root_identity_upgrades u ON u.root_uuid=r.root_uuid AND u.root_revision=r.revision`
 
 func (r mediaRootRow) resolve() *models.MediaRoot {
 	ret := &models.MediaRoot{UUID: r.UUID, Revision: r.Revision, CreatedAt: r.CreatedAt.Timestamp,
@@ -42,6 +47,10 @@ func (r mediaRootRow) resolve() *models.MediaRoot {
 			Scan: &models.MediaRootScan{Revision: r.ScanRevision, Enabled: r.ScanEnabled, ExcludeVideo: r.ExcludeVideo, ExcludeImage: r.ExcludeImage}}}
 	if r.ServerPath != nil && r.DirectoryIdentity != nil {
 		ret.Binding = &models.MediaRootBinding{Path: *r.ServerPath, DirectoryIdentity: *r.DirectoryIdentity}
+		if r.PersistentIdentity != nil {
+			ret.Binding.PersistentIdentity = *r.PersistentIdentity
+			ret.IdentityUpgrade = &models.MediaRootIdentityUpgrade{PersistentIdentity: *r.PersistentIdentity, Reason: *r.UpgradeReason, RecordedAt: r.UpgradeRecordedAt.Timestamp}
+		}
 	}
 	return ret
 }
@@ -115,6 +124,13 @@ WHERE b.uuid!=? AND (r.server_path=? OR r.unbound_path=?))`, id, path, path); er
 	// Labels and disabling an offline mount do not need that mount online.
 	// A new binding or reactivation always rechecks the actual open directory.
 	if input.Binding != nil {
+		if current != nil && current.Binding != nil && current.Binding.PersistentIdentity != "" && input.Binding.PersistentIdentity == "" &&
+			input.Binding.Path == current.Binding.Path && input.Binding.DirectoryIdentity == current.Binding.DirectoryIdentity {
+			return nil, models.ErrSourceDefinitionConflict // stale client must not remove the reviewed filesystem proof
+		}
+		if input.Binding.PersistentIdentity != "" && (current == nil || !reflect.DeepEqual(input.Binding, current.Binding)) {
+			return nil, models.ErrMediaRootBindingInvalid
+		}
 		if !validAccountText(input.Binding.DirectoryIdentity, 128, false) || !validAccountText(input.Binding.Path, 4096, false) || !filepath.IsAbs(input.Binding.Path) || filepath.Clean(input.Binding.Path) != input.Binding.Path {
 			return nil, models.ErrMediaRootBindingInvalid
 		}
@@ -138,6 +154,14 @@ WHERE b.uuid!=? AND (r.server_path=? OR r.unbound_path=?))`, id, path, path); er
 		if _, err := dbWrapper.Exec(ctx, "INSERT INTO media_roots(uuid) VALUES(?)", id); err != nil {
 			return nil, err
 		}
+	}
+	// A real definition change already invalidates old admissions. Publish its
+	// binding in the current format instead of carrying a compatibility namespace
+	// into another revision. An identical definition returned above stays intact.
+	if input.Binding != nil && input.Binding.PersistentIdentity != "" {
+		binding := *input.Binding
+		binding.DirectoryIdentity, binding.PersistentIdentity = binding.PersistentIdentity, ""
+		input.Binding = &binding
 	}
 	var serverPath, identity *string
 	if input.Binding != nil {

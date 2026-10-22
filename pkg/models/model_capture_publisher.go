@@ -81,6 +81,7 @@ var (
 type CapturePublisherReaderWriter interface {
 	Preview(context.Context, string, string) (*CapturePublisherPreview, error)
 	Apply(context.Context, CapturePublisherInput) (*CapturePublisherDecision, error)
+	Request(context.Context, string) (*CapturePublisherDecision, error)
 	Current(context.Context, string) (*CapturePublisherDecision, error)
 	History(context.Context, string, int, int) ([]CapturePublisherDecision, error)
 	PostAccounts(context.Context, string, string, int) ([]*SourceAccount, error)

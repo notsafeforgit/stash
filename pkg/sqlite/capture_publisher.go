@@ -43,6 +43,19 @@ func findCapturePublisherRequest(ctx context.Context, id string) (*capturePublis
 	return &row, nil
 }
 
+// Request recovers the original decision, even when a newer choice is current.
+func (s *CapturePublisherStore) Request(ctx context.Context, value string) (*models.CapturePublisherDecision, error) {
+	id, err := archiveUUID(value)
+	if err != nil {
+		return nil, err
+	}
+	row, err := findCapturePublisherRequest(ctx, id)
+	if err != nil || row == nil {
+		return nil, err
+	}
+	return row.resolve(), nil
+}
+
 func (s *CapturePublisherStore) Current(ctx context.Context, value string) (*models.CapturePublisherDecision, error) {
 	id, err := archiveUUID(value)
 	if err != nil {

@@ -4,8 +4,9 @@ The native archive separates captured account identifiers, an account's owner,
 and performers depicted in media. `pkg/archive.ExtractCapturedAccount` implements
 the versioned `captured-account-v1` parser for producer and catalog-import work.
 It returns evidence; it does not allocate accounts, merge them, change ownership,
-or assign scene/image performers. Integration with ingestion and catalog import
-remains pending under the [transition plan](native-archive-transition-plan.md).
+or assign scene/image performers. Ingestion uses the publisher decisions described
+below to select an account from that evidence. Historical catalog identity imports
+have their own explicit review and receipt boundaries.
 
 The input is a reconstructed capture object, bounded by the source JSON limit.
 The output contains a qualified namespace, optional display label, policy version,
@@ -131,10 +132,12 @@ write context prevents a late failure from committing a new account or only
 some claims when a caller ignores an error. Startup also checks publication
 integrity. Anonymised exports remove publisher decisions and evidence references.
 
-This service does not expose a public endpoint yet. Producer authorization,
-ingestion receipts, native review UI, account-profile presentation, and catalog
-import remain required integration work. The migration does not invent publisher
-choices from old paths, names, or existing account ownership.
+Producer ingestion applies unambiguous automatic publisher choices and reports
+unresolved matches in its receipt. The application review API above handles later
+confirmation; producer credentials cannot make explicit review decisions. Original
+ingestion receipts remain immutable after review, while current publisher queries
+reflect the selected decision. The migration does not invent publisher choices
+from old paths, names, or existing account ownership.
 
 ## Performer page identities
 

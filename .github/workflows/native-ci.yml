@@ -116,7 +116,7 @@ jobs:
         with:
           name: native-generated
       - name: Install media test runtime
-        timeout-minutes: 5
+        timeout-minutes: 15
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y ffmpeg libavif-bin

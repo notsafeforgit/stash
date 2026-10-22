@@ -96,10 +96,20 @@ Anonymisation removes the private receipts before source/content evidence.
 file by mtime, with the relative path breaking ties. It never invokes fclones
 removal. The default scraped-folder scope matches the existing host launcher;
 `--all-content` includes other supported media under the reviewed root. Empty
-files, sidecars and partial downloads are not removal candidates. Symlinks,
-escaped paths, different filesystems, changed sizes and repeated report entries
-are rejected before submission. The report is bounded to 64 MiB and 100,000
+files, sidecars and partial downloads are not removal candidates. The client
+decodes fclones' STFU-8 path encoding after JSON decoding, before checking the
+literal filesystem path. Symlinks, root escapes, malformed encodings, different
+filesystems, changed sizes and repeated decoded report entries are rejected
+before submission. The report is bounded to 64 MiB and 100,000
 pairs; discovery has a two-hour deadline.
+
+Valid local filenames containing backslashes, control characters or non-UTF-8
+bytes are outside this API's portable path contract. Their whole duplicate
+group becomes an explicit `unsupported_media_path` review case, retaining the
+original lossless fclones paths. Other groups proceed; names are not rewritten
+and a different survivor is not silently selected. These reviews live in the
+version-2 run manifest in the existing SQLite journal. The reader also recovers
+version-1 pending runs and their original request UUIDs and receipts.
 
 Example after the native cutover, using an application API key supplied through
 `STASH_API_KEY`:
@@ -116,7 +126,8 @@ stash-dedupe --endpoint http://localhost:8009 \
 
 Supply **every** worker lock root from the deployment inventory. The client
 holds its state lock throughout the run to prevent concurrent dedupe callers.
-Read-only fclones discovery does not hold the backup/dedupe lock or worker
+Before new discovery, a held backup/dedupe lock causes a busy skip without
+starting fclones. Read-only discovery then releases that lock and does not hold worker
 publication barriers, so downloads and backups can continue during the scan.
 Each pending pair independently acquires the backup/dedupe lock and all worker
 barriers before preview, receipt recovery or removal, and releases them when
@@ -151,7 +162,10 @@ endpoint/root to bypass a failed recovery. A later completed invocation can
 discover and review current candidates again.
 
 The JSON summary distinguishes `committed`, `review`, `pending`, `finished` and
-`all_removed`. Exit codes are 0 for a run without review cases, 3 for completed
+`all_removed`. Discovery review groups contribute their redundant-copy counts
+to `pairs`, `review` and `review_reasons`, and are counted separately in
+`discovery_review_groups`. They never count as committed removals.
+Exit codes are 0 for a run without review cases, 3 for completed
 processing with review cases, 2 for a busy state/library lock, and 1 for failure
 or uncertainty. `--request-timeout` defaults to 900 seconds; a timeout retains
 the original intent. `--report` accepts a bounded saved fclones JSON report for
@@ -195,8 +209,9 @@ package, so it can use its own versioned virtual environment without changing
 the runtime fingerprints of active scraper jobs. Retain its exact wheel,
 module digests and release selection as backup components alongside the
 launchers; restore that wheel without gallery-dl extras into the recorded path.
-The installed host replacement keeps the existing half-hour timer and daily
-cooldown, and the pre-backup wrapper invokes
+The host deployment owns scheduling. A timer based on thirty minutes after
+service deactivation prevents long failed scans from immediately repeating;
+the client retains its daily successful-maintenance cooldown. The pre-backup wrapper invokes
 `stash-dedupe-host --before-backup` before backup takes the shared library lock.
 It has no catalog writer or global cleanup operation. Native local-file intake
 provides direct-file discovery independently of the dedupe timer.

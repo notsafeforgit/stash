@@ -308,6 +308,11 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 	delay := time.Duration(r.CooldownSeconds) * time.Second
 	// An account can return or become accessible without changing its source
 	// definition. Keep checking it without exhausting the technical retry budget.
+	requestBackoff, err := sourceAttemptBackoff(ctx, r.UUID, r.Fence, false)
+	if err != nil {
+		return nil, err
+	}
+	requestBackoff = requestBackoff && outcome.State == "retry"
 	accessRecheck := outcome.State == "retry" && (outcome.ErrorCode == "not_found" || outcome.ErrorCode == "access_denied")
 	if outcome.State == "succeeded" {
 		r.Completed = scrape.Union(r.Completed, []models.SourceWindow{*r.Window})
@@ -324,6 +329,10 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 	} else {
 		r.Pending = scrape.Union(r.Pending, []models.SourceWindow{*r.Window})
 		switch {
+		case requestBackoff:
+			// The shared HTTP budget owns retry timing; retain progress without
+			// adding a second account delay or consuming a failure allowance.
+			delay = 0
 		case outcome.State == "expired" || outcome.ErrorCode == "worker_interrupted" || outcome.ErrorCode == "worker_publication_busy":
 			// Restarts and local backup/dedupe contention preserve progress and
 			// do not exhaust the source's retry budget.
@@ -341,7 +350,7 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 			delay = max(delay, backoff, time.Duration(outcome.RetryAfterSeconds)*time.Second)
 		}
 	}
-	if pause := sourcePacingDelay(outcome.ErrorCode, now.Add(delay), now); pause > 0 {
+	if pause := sourcePacingDelay(outcome.ErrorCode, now.Add(delay), now); !requestBackoff && pause > 0 {
 		scope := failureScope
 		if scope == "" {
 			scope, err = sourcePacingScope(ctx, r.UUID, false)

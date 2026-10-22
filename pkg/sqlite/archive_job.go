@@ -571,8 +571,15 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 	} else if job.Kind == models.ArchiveJobEnrichPost && outcome.State != "succeeded" {
 		complete = sourcePacingAtomic(ctx)
 	}
+	requestBackoff := false
+	if metadataJobKind(job.Kind) && outcome.State == "retry" {
+		requestBackoff, err = sourceAttemptBackoff(ctx, job.UUID, job.Fence, true)
+		if err != nil {
+			return nil, err
+		}
+	}
 	state, attempt := outcome.State, outcome.State
-	yielded := job.Kind == models.ArchiveJobEnrichPost && outcome.State == "retry" && outcome.ErrorCode == "budget_yield"
+	yielded := requestBackoff || (job.Kind == models.ArchiveJobEnrichPost && outcome.State == "retry" && outcome.ErrorCode == "budget_yield")
 	if job.Kind == models.ArchiveJobEnrichPost && state == "succeeded" {
 		enrichmentJobSuccessGuard(ctx, job.UUID)
 	}
@@ -586,7 +593,10 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 			state, attempt = "failed", "failed"
 		}
 	}
-	if metadataJobKind(job.Kind) && outcome.State != "succeeded" {
+	if requestBackoff {
+		available = now.UnixMilli()
+	}
+	if metadataJobKind(job.Kind) && outcome.State != "succeeded" && !requestBackoff {
 		retry, err := sourcePacingMetadataFailure(ctx, job, outcome.ErrorCode, time.UnixMilli(available), now)
 		if err != nil {
 			return nil, err

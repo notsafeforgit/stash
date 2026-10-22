@@ -188,8 +188,12 @@ func (c *EnrichmentCoordinator) Fail(ctx context.Context, token string, lease mo
 			c.guard(ctx, token, current, nil)
 			return nil
 		}
+		requestBackoff, err := c.Service.Repo.EnrichmentJob.RequestBackoff(ctx, models.EnrichmentJobLease{ArchiveJobLease: lease, ProducerUUID: credential.ProducerUUID}, c.Now())
+		if err != nil {
+			return err
+		}
 		expected := state
-		if code != "budget_yield" && current.Failures+1 >= current.MaxAttempts {
+		if !requestBackoff && code != "budget_yield" && current.Failures+1 >= current.MaxAttempts {
 			expected = "failed"
 		}
 		before, err := c.Service.Repo.EnrichmentJob.CheckLease(ctx, models.EnrichmentJobLease{ArchiveJobLease: lease, ProducerUUID: credential.ProducerUUID}, c.Now())

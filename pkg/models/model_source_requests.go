@@ -19,6 +19,7 @@ type SourceRequestResult struct {
 	RequestUUID       string `json:"request_uuid"`
 	Status            int    `json:"status"`
 	RetryAfterSeconds int    `json:"retry_after_seconds"`
+	BlockReason       string `json:"block_reason,omitempty"`
 }
 type SourceRequestMetric struct {
 	Scope         string `json:"source_scope" db:"scope"`

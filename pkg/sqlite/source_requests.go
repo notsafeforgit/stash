@@ -20,6 +20,7 @@ type sourceRequestRow struct {
 	TouchedAt   int64         `db:"touched_at_ms"`
 	GrantedAt   sql.NullInt64 `db:"granted_at_ms"`
 	Reported    bool          `db:"reported"`
+	Backoff     bool          `db:"backoff"`
 }
 
 func requestInterval(scope string) int64 {
@@ -90,12 +91,12 @@ func (s *SourceRunStore) RequestSource(ctx context.Context, lease models.SourceR
 	if _, err := dbWrapper.Exec(ctx, "UPDATE source_request_permits SET touched_at_ms=? WHERE run_uuid=?", stamp, lease.RunUUID); err != nil {
 		return nil, err
 	}
-	var next int64
-	if err := dbWrapper.Get(ctx, &next, "SELECT next_at_ms FROM source_request_budgets WHERE scope=?", scope); err != nil {
+	wait, err := sourceRequestWait(ctx, scope, input.RequestUUID, now)
+	if err != nil {
 		return nil, err
 	}
-	if next > stamp {
-		result.WaitMS = min(next-stamp, 30000)
+	if wait > 0 {
+		result.WaitMS = wait
 		*complete = true
 		return result, nil
 	}
@@ -110,10 +111,11 @@ func (s *SourceRunStore) RequestSource(ctx context.Context, lease models.SourceR
 			return result, nil
 		}
 	}
-	if _, err := dbWrapper.Exec(ctx, "UPDATE source_request_budgets SET next_at_ms=? WHERE scope=?", stamp+requestInterval(scope), scope); err != nil {
+	probe, err := sourceRequestGranted(ctx, scope, input.RequestUUID, now)
+	if err != nil {
 		return nil, err
 	}
-	if _, err := dbWrapper.Exec(ctx, "UPDATE source_request_permits SET granted_at_ms=? WHERE run_uuid=?", stamp, lease.RunUUID); err != nil {
+	if _, err := dbWrapper.Exec(ctx, "UPDATE source_request_permits SET granted_at_ms=?,backoff=? WHERE run_uuid=?", stamp, probe, lease.RunUUID); err != nil {
 		return nil, err
 	}
 	hour := stamp / 3600000
@@ -150,7 +152,7 @@ func (s *SourceRunStore) ReportSourceRequest(ctx context.Context, lease models.S
 	if err := managedArchiveJobWrite(ctx); err != nil {
 		return err
 	}
-	if input.Status < 0 || input.Status > 599 || (input.Status > 0 && input.Status < 100) || input.RetryAfterSeconds < 0 || input.RetryAfterSeconds > 86400 {
+	if !validSourceRequestResult(input) {
 		return models.ErrSourceRunInvalid
 	}
 	if _, err := s.CheckLease(ctx, lease, now); err != nil {
@@ -163,20 +165,22 @@ func (s *SourceRunStore) ReportSourceRequest(ctx context.Context, lease models.S
 		}
 		return err
 	}
+	if input.BlockReason != "" && row.Scope != "service:reddit" {
+		return models.ErrSourceRunInvalid
+	}
 	if row.Reported {
 		return nil
 	}
 	complete := sourcePacingAtomic(ctx)
 	if _, err := dbWrapper.Exec(ctx, `UPDATE source_request_metrics SET responses=responses+1,rate_limited=rate_limited+?,errors=errors+?
-  WHERE hour=? AND scope=? AND class=? AND operation=?`, input.Status == 429, input.Status == 0 || input.Status >= 400, row.GrantedAt.Int64/3600000, row.Scope, row.Class, row.Operation); err != nil {
+  WHERE hour=? AND scope=? AND class=? AND operation=?`, input.Status == 429 || input.BlockReason != "", input.Status == 0 || input.Status >= 400 || input.BlockReason != "", row.GrantedAt.Int64/3600000, row.Scope, row.Class, row.Operation); err != nil {
 		return err
 	}
-	if input.RetryAfterSeconds > 0 {
-		if _, err := dbWrapper.Exec(ctx, "UPDATE source_request_budgets SET next_at_ms=max(next_at_ms,?) WHERE scope=?", now.Add(time.Duration(input.RetryAfterSeconds)*time.Second).UnixMilli(), row.Scope); err != nil {
-			return err
-		}
+	backoff, err := sourceRequestFeedback(ctx, row.Scope, row.GrantedAt.Int64, row.Backoff, input, now)
+	if err != nil {
+		return err
 	}
-	if _, err := dbWrapper.Exec(ctx, "UPDATE source_request_permits SET reported=1 WHERE run_uuid=?", lease.RunUUID); err != nil {
+	if _, err := dbWrapper.Exec(ctx, "UPDATE source_request_permits SET reported=1,backoff=? WHERE run_uuid=?", backoff, lease.RunUUID); err != nil {
 		return err
 	}
 	*complete = true

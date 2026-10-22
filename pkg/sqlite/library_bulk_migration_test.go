@@ -13,6 +13,7 @@ import (
 
 func removeDurableBulkSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSourceBackoffSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE library_bulk_targets;
 DROP TABLE library_bulk_jobs;
 ALTER TABLE library_jobs RENAME TO library_jobs_with_bulk;

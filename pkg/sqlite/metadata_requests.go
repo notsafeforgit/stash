@@ -19,6 +19,7 @@ type metadataRequestRow struct {
 	Operation   string `db:"operation"`
 	GrantedAt   int64  `db:"granted_at_ms"`
 	Reported    bool   `db:"reported"`
+	Backoff     bool   `db:"backoff"`
 }
 
 // Metadata gets idle capacity only. Recheck downloads on every HTTP attempt,
@@ -54,14 +55,16 @@ func (s *EnrichmentJobStore) RequestSource(ctx context.Context, lease models.Enr
 		return nil, err
 	}
 	if !ready {
-		return result, nil
+		result.WaitMS, err = sourceRequestCoolingWait(ctx, scope, now)
+		return result, err
 	}
 	ready, err = s.ReserveSource(ctx, lease, input.URL, now)
 	if err != nil {
 		return nil, err
 	}
 	if !ready {
-		return result, nil
+		result.WaitMS, err = sourceRequestCoolingWait(ctx, scope, now)
+		return result, err
 	} // zero wait means yield to monitoring
 	var old metadataRequestRow
 	err = dbWrapper.Get(ctx, &old, "SELECT * FROM metadata_request_permits WHERE job_uuid=?", lease.JobUUID)
@@ -79,12 +82,12 @@ func (s *EnrichmentJobStore) RequestSource(ctx context.Context, lease models.Enr
 	if _, err := dbWrapper.Exec(ctx, "INSERT OR IGNORE INTO source_request_budgets(scope) VALUES(?)", scope); err != nil {
 		return nil, err
 	}
-	var next int64
-	if err := dbWrapper.Get(ctx, &next, "SELECT next_at_ms FROM source_request_budgets WHERE scope=?", scope); err != nil {
+	wait, err := sourceRequestWait(ctx, scope, input.RequestUUID, now)
+	if err != nil {
 		return nil, err
 	}
-	if next > now.UnixMilli() {
-		result.WaitMS = min(30000, next-now.UnixMilli())
+	if wait > 0 {
+		result.WaitMS = wait
 		*complete = true
 		return result, nil
 	}
@@ -94,7 +97,11 @@ func (s *EnrichmentJobStore) RequestSource(ctx context.Context, lease models.Enr
 		return nil, err
 	}
 	// The same spacing and Retry-After budget governs both producer types.
-	if _, err := dbWrapper.Exec(ctx, "UPDATE source_request_budgets SET next_at_ms=? WHERE scope=?", now.UnixMilli()+requestInterval(scope), scope); err != nil {
+	probe, err := sourceRequestGranted(ctx, scope, input.RequestUUID, now)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := dbWrapper.Exec(ctx, "UPDATE metadata_request_permits SET backoff=? WHERE job_uuid=?", probe, lease.JobUUID); err != nil {
 		return nil, err
 	}
 	if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_request_metrics(hour,scope,class,operation,requests) VALUES(?,?,'recovery',?,1)
@@ -110,7 +117,7 @@ func (s *EnrichmentJobStore) ReportSourceRequest(ctx context.Context, lease mode
 	if err := managedArchiveJobWrite(ctx); err != nil {
 		return err
 	}
-	if input.Status < 0 || input.Status > 599 || (input.Status > 0 && input.Status < 100) || input.RetryAfterSeconds < 0 || input.RetryAfterSeconds > 86400 {
+	if !validSourceRequestResult(input) {
 		return models.ErrEnrichmentInvalid
 	}
 	if _, err := s.CheckLease(ctx, lease, now); err != nil {
@@ -123,20 +130,22 @@ func (s *EnrichmentJobStore) ReportSourceRequest(ctx context.Context, lease mode
 		}
 		return err
 	}
+	if input.BlockReason != "" && row.Scope != "service:reddit" {
+		return models.ErrEnrichmentInvalid
+	}
 	if row.Reported {
 		return nil
 	}
 	complete := sourcePacingAtomic(ctx)
 	if _, err := dbWrapper.Exec(ctx, `UPDATE source_request_metrics SET responses=responses+1,rate_limited=rate_limited+?,errors=errors+?
- WHERE hour=? AND scope=? AND class='recovery' AND operation=?`, input.Status == 429, input.Status == 0 || input.Status >= 400, row.GrantedAt/3600000, row.Scope, row.Operation); err != nil {
+ WHERE hour=? AND scope=? AND class='recovery' AND operation=?`, input.Status == 429 || input.BlockReason != "", input.Status == 0 || input.Status >= 400 || input.BlockReason != "", row.GrantedAt/3600000, row.Scope, row.Operation); err != nil {
 		return err
 	}
-	if input.RetryAfterSeconds > 0 {
-		if _, err := dbWrapper.Exec(ctx, "UPDATE source_request_budgets SET next_at_ms=max(next_at_ms,?) WHERE scope=?", now.Add(time.Duration(input.RetryAfterSeconds)*time.Second).UnixMilli(), row.Scope); err != nil {
-			return err
-		}
+	backoff, err := sourceRequestFeedback(ctx, row.Scope, row.GrantedAt, row.Backoff, input, now)
+	if err != nil {
+		return err
 	}
-	if _, err := dbWrapper.Exec(ctx, "UPDATE metadata_request_permits SET reported=1 WHERE job_uuid=?", lease.JobUUID); err != nil {
+	if _, err := dbWrapper.Exec(ctx, "UPDATE metadata_request_permits SET reported=1,backoff=? WHERE job_uuid=?", backoff, lease.JobUUID); err != nil {
 		return err
 	}
 	*complete = true

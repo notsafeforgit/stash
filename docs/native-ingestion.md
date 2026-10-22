@@ -692,7 +692,9 @@ and executable under their frozen identity/proof contract. See
 
 Retryable failure codes are `rate_limited`, `extraction_failed`, `timeout`,
 `worker_failed` and `source_busy`. Server backoff starts at five minutes and increases by actual failure;
-the eighth failure becomes terminal. Lease expiry preserves checkpoints and
+the eighth failure becomes terminal. A service outage recorded by the shared
+HTTP backoff protocol preserves the job without consuming this failure allowance
+or adding an account-specific delay. Lease expiry preserves checkpoints and
 requeues the job without consuming that budget or adding a failure backoff. Authentication, access, challenge,
 not-found, unsupported-extractor, malformed-checkpoint, size, runtime and
 post-identity failures require review. Clients cannot report success through
@@ -1358,6 +1360,30 @@ honoring longer provider retry deadlines. They continue retrying after eight
 failures; only explicit `deferred` outcomes require review. Schema 1000116 lifts
 the counter ceiling and preserves existing runs and their attempt histories.
 See [routine boundaries and deleted media](native-source-runs.md#worker-modes).
+
+With `source_request_backoff_protocol: 1` (schema 1000127), HTTP request results
+drive a durable service cooldown shared by all producers and metadata workers.
+Results retain the actual HTTP `status`; a recognized Reddit HTML block may also
+report `block_reason: "network_security"` with status 200 or 403. Other values and
+non-Reddit scopes are rejected. HTTP 429 and these security blocks are classified
+as retryable `rate_limited` failures, never missing accounts or completed coverage.
+Neither response bodies nor credentials are retained by this protocol.
+
+The existing bounded `retry_after_seconds` carries Retry-After or rate-reset hints.
+A positive hint controls the delay, respecting normal request spacing. Without
+a hint, consecutive failed probes wait 1, 2, 4, 8, then at most 15 minutes. The
+request budget grants one recovery probe across workers after the cooldown; its
+two-minute lease makes interruption recoverable. A normal response restores
+ordinary pacing, including account-specific private/missing responses. Another
+block, timeout or server failure during the probe renews the cooldown. Older
+responses and repeated result acknowledgements cannot change newer observations.
+
+A fenced, acknowledged backoff result keeps the unfinished download window and
+pagination or metadata checkpoint, without consuming an account/job failure or
+adding its exponential retry delay. The shared service gate determines when it
+can run again. Other services continue normally. The server must be deployed
+before workers requiring this capability; no producer outbox or policy migration
+is required.
 
 The download executor also requires `source_run_fairness_protocol: 1`. Running
 attempts expose `turn_until`, five minutes after their recorded start, independent

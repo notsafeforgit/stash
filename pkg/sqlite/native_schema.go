@@ -728,6 +728,17 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				}
 			}
 		}
+		if version >= NativeSchemaBaseline+127 {
+			var columns int
+			if err := conn.Get(&columns, `SELECT (SELECT count(*) FROM pragma_table_info('source_request_budgets') WHERE name IN ('backoff_step','backoff_at_ms','blocked_until_ms','probe_uuid','probe_until_ms'))
++ (SELECT count(*) FROM pragma_table_info('source_request_permits') WHERE name='backoff')
++ (SELECT count(*) FROM pragma_table_info('metadata_request_permits') WHERE name='backoff')`); err != nil {
+				return err
+			}
+			if columns != 7 {
+				return errors.New("native database schema is incomplete: source request backoff")
+			}
+		}
 		if version >= NativeSchemaBaseline+112 {
 			var found bool
 			if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='metadata_request_permits')"); err != nil {

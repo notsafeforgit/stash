@@ -95,6 +95,25 @@ truncation. Full candidate paging uses the existing qualified identifier lookup;
 explicit review can select a target directly by UUID. Post-account queries begin
 with the selected post's indexed capture range rather than scanning all decisions.
 
+The application-authenticated `/api/v3/archive` API exposes these reviews:
+
+| Route | Purpose |
+| --- | --- |
+| `POST /capture-publisher/preview` | Inspect a retained `capture_uuid`, optionally selecting an `account_uuid`. Returns the captured identifiers, candidates, conflicts, current decision and `signature`. |
+| `POST /capture-publisher/apply` | Submit `request_uuid`, `capture_uuid`, `signature`, `action`, optional `account_uuid`, and `reason`. Returns `{decision, replayed}`. |
+| `GET /capture-publisher/requests/{request}` | Recover the original decision after a lost response, including its current canonical account resolution. |
+| `GET /captures/{capture}/publisher-history` | Read decisions in revision order, using `after` and `limit` (1–100). |
+
+Actions are `automatic`, `link`, `create`, `unlink`, and `inherit`. Only `link`
+accepts an account UUID. Explicit choices always use review provenance; producer
+credentials cannot perform these reviews. An imported account with only a handle
+can be confirmed by previewing a captured author ID against that account and
+applying `link`. This records the captured ID and handle with their source and
+observation time. Other retained captures can then be previewed and applied with
+`automatic`; future captures use the same confirmed identity. Existing explicit
+choices remain preserved. This operation does not download media, change titles,
+or assign depicted performers.
+
 Apply requires a stable request UUID and the preview signature. Replaying the
 same successful request returns its original decision even after a later unlink
 or account consolidation; it does not reapply the old choice. Changed input

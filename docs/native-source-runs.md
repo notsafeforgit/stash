@@ -28,7 +28,7 @@ also disables Twitter expansion, replies and extra user lookups.
 Reviewed `stash-gallery-worker-v1` profiles have a `scan_mode`:
 
 - `routine`: recent checks. Twitter selects its direct media listing; Reddit
-  checks both the submitted-post listing and newest-first author search daily,
+  checks both the submitted-post listing and newest-first author search,
   under one profile subscription. Search is queued independently even when the
   profile listing is hidden or unavailable. Ordered
   listings stop after the first wholly archived, unpinned post. Every attachment
@@ -46,14 +46,17 @@ Reviewed `stash-gallery-worker-v1` profiles have a `scan_mode`:
   carousel without its attachment list remains an error.
 - `initial` (default): preserve complete initial-import traversal, including the
   profile's explicitly configured historical retrieval strategy.
-- `recovery`: historical traversal at the lowest request priority. Host launchers
-  accept `--recovery` and select `STASH_INGEST_<SITE>_RECOVERY_PROFILE`. Reddit
+- `recovery`: explicitly requested historical traversal at the lowest request
+  priority. Host launchers accept `--recovery` and select
+  `STASH_INGEST_<SITE>_RECOVERY_PROFILE`. Reddit
   traverses the same submitted-post and author-search passes without routine
-  completed-post stopping. Production recovery
-  schedules run weekly, independently of daily routine checks; an existing
-  running service is not started again by its timer. The weekly Twitter profile
-  selects the broader timeline traversal and its search fallbacks, using remote
-  search cursors. Initial profile imports retain one n8n worker per site.
+  completed-post stopping. The Twitter recovery profile selects the broader
+  timeline traversal and its search fallbacks, using remote search cursors.
+  Automatic weekly Reddit and Twitter historical sweeps are disabled in the
+  operations deployment; recovery remains available for an explicit request.
+  Routine retries resume their existing checkpoints without scheduling a new
+  full-history sweep. Initial profile imports retain one n8n worker per site,
+  and metadata gap recovery remains enabled.
 
 Profile files and runtime modules contribute to the execution policy hash.
 Updating existing work requires native policy upgrades that preserve original

@@ -16,12 +16,19 @@ import (
 )
 
 func shareResult(ctx context.Context, repo models.Repository, row *models.ShareRecord) (*MediaShare, error) {
-	var entries []models.ShareEntry
+	var ret *MediaShare
 	err := repo.WithReadTxn(ctx, func(ctx context.Context) error {
 		var err error
-		entries, err = repo.Share.SnapshotEntries(ctx, row.ID, 0, 3, "", "")
+		ret, err = shareResultInTxn(ctx, repo, row)
 		return err
 	})
+	return ret, err
+}
+
+// The list resolver already owns a read transaction. Reuse it so the saved
+// counts and bounded entry summaries come from the same database view.
+func shareResultInTxn(ctx context.Context, repo models.Repository, row *models.ShareRecord) (*MediaShare, error) {
+	entries, err := repo.Share.SnapshotEntries(ctx, row.ID, 0, 3, "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +101,7 @@ func (r *queryResolver) MediaShares(ctx context.Context, limit int, offset int, 
 			return err
 		}
 		for _, row := range rows {
-			result, err := shareResult(ctx, r.repository, row)
+			result, err := shareResultInTxn(ctx, r.repository, row)
 			if err != nil {
 				return err
 			}

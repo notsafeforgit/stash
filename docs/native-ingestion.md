@@ -221,6 +221,15 @@ verification results also include a bounded `failure.stage` and `failure.reason`
 to distinguish inspection, registration, effects and completion failures without
 exposing paths, captured payloads or worker output.
 
+Re-downloaded bytes at a previously deduplicated path may establish a new file
+lifetime on the deduplication's surviving media. Every recorded removal at that
+path must be accounted for by completed equal-byte deduplication receipts. The
+current survivor must still have verified matching content and the same single
+canonical media owner. Other deletions, moves, changed admission fences, changed
+content and conflicting source choices remain review cases. Original file UUIDs,
+redirects, receipts and source history remain intact; intake does not delete the
+new copy. Normal physical deduplication can remove that redundant location later.
+
 ### Durable archive work
 
 Application-authenticated [local-file intake](native-manual-intake.md) uses the
@@ -245,6 +254,19 @@ and work key share queued/running work, provided their arguments, resource key,
 and failure limit agree. A new submission after completion can create a new job.
 These internal submission digests use canonical arguments; the public capture
 protocol retains its separate exact-request-byte digest contract.
+
+Application-authenticated recovery of a failed/cancelled producer verification
+uses `POST /api/v3/archive/file-verifications/{job}/retry` with a saved
+`request_uuid` and the terminal job's `expected_revision`. Recover that retry
+through `GET /api/v3/archive/file-verification-retries/{request}`. Equivalent
+requests coalesce onto one new job; the original terminal job and producer
+receipt remain unchanged. The retry preserves the original event, intake UUID,
+file claim, path fence and metadata policy. A committed registration checkpoint
+resumes effects only. It never refreshes stale evidence, restores deleted media
+or changes ambiguous ownership. New recovery is unavailable when the worker is
+disabled, but already accepted requests remain readable and replayable. These
+routes require source tracking and application authentication, not a producer
+credential. No schema change or whole-library recovery is required.
 
 Work/resource keys are hashes calculated by the admitting domain service. A
 unique running-resource index prevents two jobs owning the same destination at

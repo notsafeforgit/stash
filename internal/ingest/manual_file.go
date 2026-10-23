@@ -58,7 +58,7 @@ type ManualFilePreview struct {
 // Producer file events cannot supply this variant of work.
 type ManualFileWork struct {
 	ScanCollectionRevision int                         `json:"scan_collection_revision,omitempty"`
-	Resume                 *ManualFileResume           `json:"resume,omitempty"`
+	Resume                 *FileResume                 `json:"resume,omitempty"`
 	Request                ManualFileRequest           `json:"request"`
 	RootRevision           int                         `json:"root_revision"`
 	Inspection             archive.MediaFileInspection `json:"inspection"`
@@ -227,17 +227,17 @@ func validFileWork(work FileWork) bool {
 	}
 	if work.Version == 1 {
 		return work.Manual == nil && work.Publication.ManualMetadata == nil && (work.Publication.Transformation == nil || work.Publication.Transformation.ReviewedImageUUID == "") &&
-			ValidUUID(work.ProducerUUID) && ValidUUID(work.EventUUID) && archive.ValidSHA256(work.SHA256)
+			ValidUUID(work.ProducerUUID) && ValidUUID(work.EventUUID) && archive.ValidSHA256(work.SHA256) && validFileResume(work.Resume)
 	}
 	m := work.Manual
-	if work.Version != 2 || m == nil || work.ProducerUUID != "" || work.EventUUID != "" || !work.ObservedAt.IsZero() ||
+	if work.Version != 2 || m == nil || work.Resume != nil || work.ProducerUUID != "" || work.EventUUID != "" || !work.ObservedAt.IsZero() ||
 		!validManualFileInput(m.Request.ManualFileInput) || !ValidUUID(m.Request.RequestUUID) || !archive.ValidSHA256(m.Request.Signature) ||
 		m.RootRevision < 1 || m.Inspection.Snapshot.Identity == "" || m.Inspection.Snapshot.Size != work.Size ||
 		(m.Inspection.Snapshot.ChangeToken == "" && !archive.ValidSHA256(m.Inspection.SHA256)) ||
 		(m.Inspection.SHA256 != "" && !archive.ValidSHA256(m.Inspection.SHA256)) || work.SHA256 != m.Inspection.SHA256 {
 		return false
 	}
-	if !validManualFileResume(m.Resume) {
+	if !validFileResume(m.Resume) {
 		return false
 	}
 	if (m.Request.ScanCollectionUUID == "" && m.ScanCollectionRevision != 0) || (m.Request.ScanCollectionUUID != "" && m.ScanCollectionRevision < 1) {
@@ -260,11 +260,19 @@ func manualIntakeUUID(request string) string {
 }
 
 func decodeManualFileWork(current *models.ArchiveJob) (*FileWork, error) {
+	work, err := decodeFileWork(current)
+	if err != nil || work.Manual == nil {
+		return nil, ErrNotFound
+	}
+	return work, nil
+}
+
+func decodeFileWork(current *models.ArchiveJob) (*FileWork, error) {
 	if current == nil || current.Kind != models.ArchiveJobVerifyMedia {
 		return nil, ErrNotFound
 	}
 	var work FileWork
-	if err := StrictJSON(current.Arguments, 262144, &work); err != nil || !validFileWork(work) || work.Manual == nil {
+	if err := StrictJSON(current.Arguments, 262144, &work); err != nil || !validFileWork(work) {
 		return nil, ErrNotFound
 	}
 	return &work, nil

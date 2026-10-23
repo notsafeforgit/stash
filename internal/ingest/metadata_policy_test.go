@@ -48,6 +48,7 @@ func TestIntakeThreadGalleryGuardUsesFinalMetadataRevisions(t *testing.T) {
 	require.JSONEq(t, `"Source album"`, string(intakeField(t, repo, result.Result.MediaUUID, "title").Value))
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		preview, err := repo.SourceGallery.Preview(ctx, f.receipt.PostUUID)
+		require.NoError(t, err)
 		require.Len(t, preview.ThreadPlans, 2, "exercise the self-reply transaction guard")
 		gallery, err := repo.ArchiveEntity.Find(ctx, result.Result.GalleryUUID)
 		require.NoError(t, err)

@@ -70,6 +70,8 @@ func (rs *nativeArchiveRoutes) routerWithSourceTracking(enabled bool) http.Handl
 	r.Get("/activity/jobs", rs.activityJobs)
 	r.Get("/activity/jobs/{job}", rs.activityJob)
 	r.Get("/activity/jobs/{job}/attempts", rs.activityJobAttempts)
+	r.Post("/file-verifications/{job}/retry", rs.retryFile)
+	r.Get("/file-verification-retries/{request}", rs.fileRetryRequest)
 	r.Get("/activity/runs", rs.activityRuns)
 	r.Get("/activity/scrape-metrics", rs.scrapeMetrics)
 	r.Get("/activity/runs/{run}", rs.activityRun)

@@ -109,9 +109,9 @@ func (w *FileWorker) process(ctx context.Context, claimed *models.ArchiveJob) er
 	if err != nil {
 		return fail(err)
 	}
-	if work.Manual != nil && work.Manual.Resume != nil && work.Manual.Resume.Publication != nil {
+	if resume := fileResume(work); resume != nil && resume.Publication != nil {
 		_, err := w.Durable.Checkpoint(ctx, claimed.Lease(), func(ctx context.Context, _ *models.ArchiveJob) (json.RawMessage, error) {
-			if err := w.Service.validateManualFileResume(ctx, work); err != nil {
+			if _, err := w.authorizeInTxn(ctx, claimed, work); err != nil {
 				return nil, err
 			}
 			return json.Marshal(progress)
@@ -286,9 +286,22 @@ func (w *FileWorker) authorizeProducerFile(ctx context.Context, claimed *models.
 	if err != nil {
 		return err
 	}
-	if receipt == nil || receipt.JobUUID != claimed.UUID || receipt.Kind != "file.completed" || receipt.CollectionUUID != work.Publication.CollectionUUID ||
+	if receipt == nil || receipt.Kind != "file.completed" || receipt.CollectionUUID != work.Publication.CollectionUUID ||
 		receipt.CollectionRevision != work.Publication.CollectionRevision || receipt.RootUUID == nil || *receipt.RootUUID != work.Publication.Target.RootUUID {
 		return ErrForbidden
+	}
+	if work.Resume == nil {
+		if receipt.JobUUID != claimed.UUID {
+			return ErrForbidden
+		}
+	} else {
+		original, err := repo.ArchiveJob.Find(ctx, receipt.JobUUID)
+		if err != nil {
+			return err
+		}
+		if err := w.Service.validateFileResume(ctx, work, original); err != nil {
+			return err
+		}
 	}
 	if (work.Publication.Source == nil && receipt.CaptureUUID != "") || (work.Publication.Source != nil && work.Publication.Source.CaptureUUID != receipt.CaptureUUID) {
 		return ErrForbidden
@@ -392,7 +405,7 @@ func (w *FileWorker) fail(ctx context.Context, claimed *models.ArchiveJob, cause
 		var work FileWork
 		if err := StrictJSON(current.Arguments, 262144, &work); err != nil || !validFileWork(work) {
 			// Invalid arguments still need a terminal failure. Only validated
-			// manual work may supply an inherited registration checkpoint.
+			// work may supply an inherited registration checkpoint.
 			work = FileWork{}
 		}
 		progress, err := fileProgressForWork(current, work)

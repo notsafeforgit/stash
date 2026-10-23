@@ -750,6 +750,15 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				}
 			}
 		}
+		if version >= NativeSchemaBaseline+129 {
+			var complete bool
+			if err := conn.Get(&complete, `SELECT EXISTS(SELECT 1 FROM pragma_table_info('shares') WHERE name='source') AND EXISTS(SELECT 1 FROM sqlite_schema WHERE type='trigger' AND name='share_source_immutable')`); err != nil {
+				return err
+			}
+			if !complete {
+				return errors.New("native database schema is incomplete: share sources")
+			}
+		}
 		if version >= NativeSchemaBaseline+112 {
 			var found bool
 			if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='metadata_request_permits')"); err != nil {

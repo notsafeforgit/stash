@@ -20,6 +20,29 @@ type ShareRecord struct {
 	AccessCount    int    `db:"access_count"`
 	LastAccessedAt int64  `db:"last_accessed_at"`
 	SnapshotJSON   []byte `db:"snapshot"`
+	SourceJSON     []byte `db:"source"`
+}
+
+// ShareSource is immutable owner-only scope. Filter references are library
+// UUIDs, resolved afresh at query time; a deleted/reused local key cannot widen it.
+// A nil source on older grants means an explicitly selected snapshot.
+type ShareSource struct {
+	Mode       string             `json:"mode"`
+	Filter     *ShareFilter       `json:"filter,omitempty"`
+	Entity     *ShareEntitySource `json:"entity,omitempty"`
+	MediaTypes []string           `json:"media_types,omitempty"`
+}
+
+type ShareFilter struct {
+	Kind string     `json:"kind"`
+	Q    string     `json:"q,omitempty"`
+	AST  *FilterAST `json:"ast,omitempty"`
+}
+
+type ShareEntitySource struct {
+	Kind string `json:"kind"`
+	UUID string `json:"uuid"`
+	Name string `json:"name"`
 }
 
 type ShareSession struct {
@@ -46,6 +69,7 @@ type ShareSnapshot struct {
 }
 
 type ShareEntry struct {
+	Key       string   `json:"key,omitempty"`
 	Kind      string   `json:"kind"`
 	ID        int      `json:"id"`
 	UUID      string   `json:"uuid,omitempty"`
@@ -54,6 +78,7 @@ type ShareEntry struct {
 }
 
 type ShareMedia struct {
+	UUID        string                `json:"uuid,omitempty"`
 	Key         string                `json:"key"`
 	Kind        string                `json:"kind"`
 	EntityID    int                   `json:"entity_id"`
@@ -69,6 +94,9 @@ type ShareMedia struct {
 }
 
 type ShareReaderWriter interface {
+	// QueryTargets reuses library filtering, with a stable keyset order and an
+	// optional exact membership check. IDs remain repository-local.
+	QueryTargets(context.Context, ShareFilter, int, int, *int) ([]int, error)
 	Find(context.Context, string) (*ShareRecord, error)
 	List(context.Context, ShareListOptions) ([]*ShareRecord, error)
 	Create(context.Context, *ShareRecord) error

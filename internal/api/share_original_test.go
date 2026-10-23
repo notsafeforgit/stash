@@ -178,7 +178,6 @@ func TestShareOriginalArchiveOnlyServesFrozenGalleryMembers(t *testing.T) {
 	rs.service.Repo.Image = m.Image
 	img := &models.Image{ID: 1, Files: models.NewRelatedFiles([]models.File{f})}
 	m.Image.On("Find", mock.Anything, 1).Return(img, nil)
-	m.Image.On("FindByGalleryID", mock.Anything, 4).Return([]*models.Image{img}, nil)
 	m.Gallery.On("Find", mock.Anything, 4).Return(&models.Gallery{ID: 4}, nil)
 	row, secret, err := rs.service.Create(context.Background(), "owner", sharing.Options{Label: "Gallery", ExpiresAt: time.Now().Add(time.Hour), AllowDownload: true}, []sharing.Target{{Kind: "GALLERY", ID: 4}})
 	require.NoError(t, err)

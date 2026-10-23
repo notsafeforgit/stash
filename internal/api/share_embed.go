@@ -23,13 +23,15 @@ import (
 // A share containing one distinct media file is also a single-item share when
 // it was created by selecting a gallery or overlapping library entities.
 func (rs *shareRoutes) linkItem(r *http.Request) (*models.ShareMedia, models.File, *models.Scene, error) {
+	source, err := sharing.Source(shareGrant(r))
+	if err != nil || (source != nil && source.Mode == "ONGOING") {
+		return nil, nil, nil, sharing.ErrUnavailable
+	}
 	snapshot, err := sharing.Snapshot(shareGrant(r))
 	if err != nil || len(snapshot.Media) != 1 {
 		return nil, nil, nil, sharing.ErrUnavailable
 	}
-	item := snapshot.Media[0]
-	f, scene, err := rs.service.Resolve(r.Context(), item)
-	return &item, f, scene, err
+	return rs.service.Item(r.Context(), shareGrant(r), snapshot.Media[0].Key)
 }
 
 func shareLinkBase(r *http.Request, id string) string {

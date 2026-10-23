@@ -4,12 +4,48 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/stashapp/stash/pkg/models"
 )
 
 type ShareStore struct{}
+
+func (*ShareStore) QueryTargets(ctx context.Context, filter models.ShareFilter, after, limit int, exact *int) ([]int, error) {
+	if after < 0 || limit < 1 || limit > 2001 {
+		return nil, errors.New("invalid share query bounds")
+	}
+	sort := "id"
+	direction := models.SortDirectionEnumAsc
+	find := &models.FindFilterType{Q: &filter.Q, Sort: &sort, Direction: &direction, PerPage: &limit}
+	var query *queryBuilder
+	var table string
+	var err error
+	switch filter.Kind {
+	case "SCENE":
+		table = sceneTable
+		query, err = (&SceneStore{}).makeASTQuery(ctx, filter.AST, find)
+	case "IMAGE":
+		table = imageTable
+		query, err = (&ImageStore{}).makeASTQuery(ctx, filter.AST, find)
+	case "GALLERY":
+		table = galleryTable
+		query, err = (&GalleryStore{}).makeASTQuery(ctx, filter.AST, find)
+	default:
+		return nil, errors.New("unsupported shared media kind")
+	}
+	if err != nil {
+		return nil, err
+	}
+	query.addWhere(fmt.Sprintf("%s.id > ?", table))
+	query.whereArgs = append(query.whereArgs, after)
+	if exact != nil {
+		query.addWhere(fmt.Sprintf("%s.id = ?", table))
+		query.whereArgs = append(query.whereArgs, *exact)
+	}
+	return query.findIDs(ctx)
+}
 
 func (*ShareStore) Find(ctx context.Context, id string) (*models.ShareRecord, error) {
 	var row models.ShareRecord
@@ -62,9 +98,12 @@ func (*ShareStore) DeleteInactive(ctx context.Context, now int64) ([]string, err
 }
 
 func (*ShareStore) Create(ctx context.Context, s *models.ShareRecord) error {
+	if len(s.SourceJSON) == 0 {
+		s.SourceJSON = []byte(`{}`)
+	}
 	_, err := dbWrapper.Exec(ctx, `INSERT INTO shares
-(id, token_hash, token, label, created_by, created_at, expires_at, allow_download, show_metadata, version, snapshot)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, s.ID, s.TokenHash, s.Token, s.Label, s.CreatedBy, s.CreatedAt, s.ExpiresAt, s.AllowDownload, s.ShowMetadata, s.Version, s.SnapshotJSON)
+(id, token_hash, token, label, created_by, created_at, expires_at, allow_download, show_metadata, version, snapshot, source)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, s.ID, s.TokenHash, s.Token, s.Label, s.CreatedBy, s.CreatedAt, s.ExpiresAt, s.AllowDownload, s.ShowMetadata, s.Version, s.SnapshotJSON, s.SourceJSON)
 	return err
 }
 

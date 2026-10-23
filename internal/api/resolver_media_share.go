@@ -10,6 +10,7 @@ import (
 
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/internal/sharing"
+	"github.com/stashapp/stash/pkg/entityid"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/session"
 )
@@ -19,7 +20,28 @@ func shareResult(ctx context.Context, row *models.ShareRecord) (*MediaShare, err
 	if err != nil {
 		return nil, err
 	}
-	ret := &MediaShare{ID: row.ID, Label: row.Label, CreatedAt: time.Unix(row.CreatedAt, 0), ExpiresAt: time.Unix(row.ExpiresAt, 0), AllowDownload: row.AllowDownload, ShowMetadata: row.ShowMetadata, AccessCount: row.AccessCount, MediaCount: len(snapshot.Media), Items: []*MediaShareEntry{}}
+	count := len(snapshot.Media)
+	ret := &MediaShare{ID: row.ID, Label: row.Label, CreatedAt: time.Unix(row.CreatedAt, 0), ExpiresAt: time.Unix(row.ExpiresAt, 0), AllowDownload: row.AllowDownload, ShowMetadata: row.ShowMetadata, AccessCount: row.AccessCount, MediaCount: &count, Items: []*MediaShareEntry{}, Mode: ShareMembershipSnapshot, SourceKind: ShareSourceKindSelection, SelectionCount: len(snapshot.Entries), MediaTypes: []ShareEntityKind{}}
+	source, err := sharing.Source(row)
+	if err != nil {
+		return nil, err
+	}
+	if source != nil {
+		ret.Mode = ShareMembership(source.Mode)
+		if source.Mode == "ONGOING" {
+			ret.MediaCount = nil
+		}
+		if source.Filter != nil {
+			ret.SourceKind = ShareSourceKindFilter
+			ret.MediaTypes = append(ret.MediaTypes, ShareEntityKind(source.Filter.Kind))
+		} else if source.Entity != nil {
+			ret.SourceKind = ShareSourceKind(source.Entity.Kind)
+			ret.SourceName = source.Entity.Name
+			for _, kind := range source.MediaTypes {
+				ret.MediaTypes = append(ret.MediaTypes, ShareEntityKind(kind))
+			}
+		}
+	}
 	if secret := sharing.SavedLinkSecret(row); secret != "" {
 		link := shareLink(ctx, row.ID, secret)
 		ret.URL = &link
@@ -117,11 +139,35 @@ func (r *mutationResolver) MediaShareCreate(ctx context.Context, input MediaShar
 		}
 		targets = append(targets, sharing.Target{Kind: string(target.Kind), ID: id})
 	}
+	var source *models.ShareSource
+	if input.Source != nil {
+		source = &models.ShareSource{Mode: string(input.Source.Mode)}
+		for _, kind := range input.Source.MediaTypes {
+			source.MediaTypes = append(source.MediaTypes, string(kind))
+		}
+		if filter := input.Source.Filter; filter != nil {
+			source.Filter = &models.ShareFilter{Kind: string(filter.Kind), AST: filter.FilterAst}
+			if filter.Q != nil {
+				source.Filter.Q = *filter.Q
+			}
+		}
+		if entity := input.Source.Entity; entity != nil {
+			id, err := strconv.Atoi(entity.ID)
+			if err != nil {
+				return nil, err
+			}
+			uuid, err := entityid.Public(ctx, models.ArchiveEntityKind(strings.ToLower(string(entity.Kind))), id)
+			if err != nil {
+				return nil, err
+			}
+			source.Entity = &models.ShareEntitySource{Kind: string(entity.Kind), UUID: uuid}
+		}
+	}
 	owner := "owner"
 	if user := session.GetCurrentUserID(ctx); user != nil && *user != "" {
 		owner = *user
 	}
-	row, secret, err := r.shares.Create(ctx, owner, sharing.Options{Label: input.Label, ExpiresAt: input.ExpiresAt, AllowDownload: input.AllowDownload, ShowMetadata: input.ShowMetadata}, targets)
+	row, secret, err := r.shares.CreateFromSource(ctx, owner, sharing.Options{Label: input.Label, ExpiresAt: input.ExpiresAt, AllowDownload: input.AllowDownload, ShowMetadata: input.ShowMetadata}, targets, source)
 	if err != nil {
 		return nil, err
 	}

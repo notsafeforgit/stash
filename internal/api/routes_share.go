@@ -302,6 +302,7 @@ func (rs *shareRoutes) withGrant(next http.Handler, link bool) http.Handler {
 }
 
 type publicShareEntry struct {
+	Key       string   `json:"key"`
 	Kind      string   `json:"kind"`
 	Title     string   `json:"title"`
 	MediaKeys []string `json:"media_keys"`
@@ -320,6 +321,7 @@ type publicShareMedia struct {
 	PreviewImage *PreviewImage `json:"preview_image,omitempty"`
 }
 type publicShareContent struct {
+	Next       string             `json:"next"`
 	Label      string             `json:"label"`
 	ExpiresAt  string             `json:"expires_at"`
 	ServerTime string             `json:"server_time"`
@@ -354,18 +356,19 @@ func (rs *shareRoutes) publicMedia(r *http.Request, row *models.ShareRecord, ite
 
 func (rs *shareRoutes) content(w http.ResponseWriter, r *http.Request) {
 	row := shareGrant(r)
-	snapshot, err := sharing.Snapshot(row)
+	snapshot, next, err := rs.service.Content(r.Context(), row, r.URL.Query().Get("cursor"), r.URL.Query().Get("gallery"), r.URL.Query().Get("media"))
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
 	ret := publicShareContent{Label: row.Label, ExpiresAt: time.Unix(row.ExpiresAt, 0).UTC().Format(time.RFC3339), ServerTime: time.Now().UTC().Format(time.RFC3339), Entries: []publicShareEntry{}, Media: []publicShareMedia{}}
+	ret.Next = next
 	for _, entry := range snapshot.Entries {
 		title := ""
 		if row.ShowMetadata {
 			title = entry.Title
 		}
-		ret.Entries = append(ret.Entries, publicShareEntry{Kind: entry.Kind, Title: title, MediaKeys: entry.MediaKeys})
+		ret.Entries = append(ret.Entries, publicShareEntry{Key: entry.Key, Kind: entry.Kind, Title: title, MediaKeys: entry.MediaKeys})
 	}
 	scenes := rs.previewScenes(r.Context(), snapshot.Media)
 	for _, media := range snapshot.Media {
@@ -375,23 +378,14 @@ func (rs *shareRoutes) content(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rs *shareRoutes) item(r *http.Request) (*models.ShareMedia, models.File, *models.Scene, error) {
-	snapshot, err := sharing.Snapshot(shareGrant(r))
-	if err != nil {
-		return nil, nil, nil, err
-	}
 	key := chi.URLParam(r, "mediaKey")
-	for _, item := range snapshot.Media {
-		if item.Key == key {
-			f, scene, err := rs.service.Resolve(r.Context(), item)
-			if scene == nil && err == nil {
-				if vf, ok := f.(*models.VideoFile); ok {
-					scene = &models.Scene{ID: item.EntityID, Files: models.NewRelatedVideoFiles([]*models.VideoFile{vf})}
-				}
-			}
-			return &item, f, scene, err
+	item, f, scene, err := rs.service.Item(r.Context(), shareGrant(r), key)
+	if scene == nil && err == nil {
+		if vf, ok := f.(*models.VideoFile); ok {
+			scene = &models.Scene{ID: item.EntityID, Files: models.NewRelatedVideoFiles([]*models.VideoFile{vf})}
 		}
 	}
-	return nil, nil, nil, sharing.ErrUnavailable
+	return item, f, scene, err
 }
 
 func (rs *shareRoutes) detail(w http.ResponseWriter, r *http.Request) {

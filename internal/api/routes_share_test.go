@@ -32,6 +32,11 @@ func shareHTTPFixture(t *testing.T) (*shareRoutes, http.Handler, *models.ShareRe
 }
 
 func shareHTTPMediaFixture(t *testing.T, video bool) (*shareRoutes, http.Handler, *models.ShareRecord, string) {
+	rs, handler, row, secret, _ := shareHTTPMediaDatabaseFixture(t, video)
+	return rs, handler, row, secret
+}
+
+func shareHTTPMediaDatabaseFixture(t *testing.T, video bool) (*shareRoutes, http.Handler, *models.ShareRecord, string, *sqlite.Database) {
 	t.Helper()
 	config.InitializeEmpty()
 	db := sqlite.NewDatabase()
@@ -41,7 +46,8 @@ func shareHTTPMediaFixture(t *testing.T, video bool) (*shareRoutes, http.Handler
 	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error {
 		_, _, err := db.ExecSQL(ctx, `INSERT INTO images(id,title,created_at,updated_at) VALUES(1,'Share fixture',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
 INSERT INTO scenes(id,title,created_at,updated_at) VALUES(1,'Share fixture',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),(3,'Share preview',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
-INSERT INTO galleries(id,title,created_at,updated_at) VALUES(4,'Share gallery',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);`, nil)
+INSERT INTO galleries(id,title,created_at,updated_at) VALUES(4,'Share gallery',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO galleries_images(gallery_id,image_id) VALUES(4,1);`, nil)
 		return err
 	}))
 	m := mocks.NewDatabase()
@@ -58,7 +64,7 @@ INSERT INTO galleries(id,title,created_at,updated_at) VALUES(4,'Share gallery',C
 	row, secret, err := service.Create(context.Background(), "owner", sharing.Options{Label: "Example share", ExpiresAt: time.Now().Add(time.Hour)}, []sharing.Target{{Kind: "IMAGE", ID: 1}})
 	require.NoError(t, err)
 	rs := &shareRoutes{service: service, budget: newShareBudget()}
-	return rs, rs.router(), row, secret
+	return rs, rs.router(), row, secret, db
 }
 
 func TestShareHLSPlaylistsKeepBrowserSessionAndEncoderLease(t *testing.T) {

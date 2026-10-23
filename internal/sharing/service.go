@@ -84,10 +84,14 @@ func validateOptions(o Options) error {
 }
 
 func (s *Service) Create(ctx context.Context, owner string, o Options, targets []Target) (*models.ShareRecord, string, error) {
+	return s.CreateFromSource(ctx, owner, o, targets, nil)
+}
+
+func (s *Service) CreateFromSource(ctx context.Context, owner string, o Options, targets []Target, source *models.ShareSource) (*models.ShareRecord, string, error) {
 	if err := validateOptions(o); err != nil {
 		return nil, "", err
 	}
-	if len(targets) == 0 || len(targets) > MaxItems {
+	if source == nil && (len(targets) == 0 || len(targets) > MaxItems) {
 		return nil, "", fmt.Errorf("select between 1 and %d items", MaxItems)
 	}
 	id, err := token(16)
@@ -100,6 +104,29 @@ func (s *Service) Create(ctx context.Context, owner string, o Options, targets [
 	}
 	row := &models.ShareRecord{ID: id, TokenHash: Hash(secret), Token: secret, Label: strings.TrimSpace(o.Label), CreatedBy: owner, CreatedAt: time.Now().Unix(), ExpiresAt: o.ExpiresAt.Unix(), AllowDownload: o.AllowDownload, ShowMetadata: o.ShowMetadata, Version: 1}
 	err = s.Repo.WithTxn(ctx, func(ctx context.Context) error {
+		if source != nil {
+			if len(targets) != 0 {
+				return errors.New("choose either selected items or a share source")
+			}
+			if err := s.validateSource(ctx, source); err != nil {
+				return err
+			}
+			row.SourceJSON, err = json.Marshal(source)
+			if err != nil {
+				return err
+			}
+			if source.Mode == "ONGOING" {
+				row.SnapshotJSON = []byte(`{"entries":[],"media":[]}`)
+				return s.Repo.Share.Create(ctx, row)
+			}
+			targets, _, err = s.sourceTargets(ctx, source, "", MaxItems+1)
+			if err != nil {
+				return err
+			}
+			if len(targets) == 0 || len(targets) > MaxItems {
+				return fmt.Errorf("a snapshot must contain between 1 and %d items; narrow the filters or use an ongoing share", MaxItems)
+			}
+		}
 		snapshot, err := s.snapshot(ctx, targets)
 		if err != nil {
 			return err

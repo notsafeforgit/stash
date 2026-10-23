@@ -1,8 +1,32 @@
-"Anonymous shares always freeze the selected media and never grant owner access."
+"Anonymous shares never grant owner access."
 enum ShareEntityKind {
   SCENE
   IMAGE
   GALLERY
+}
+
+enum ShareMembership { SNAPSHOT ONGOING }
+enum ShareSourceKind { SELECTION FILTER PERFORMER STUDIO TAG }
+enum ShareLibraryKind { PERFORMER STUDIO TAG }
+
+input MediaShareFilterInput @libraryScope(from: "kind") {
+  kind: ShareEntityKind!
+  q: String
+  filter_ast: FilterASTInput
+}
+
+input MediaShareEntityInput @libraryScope(from: "kind") {
+  kind: ShareLibraryKind!
+  id: ID! @libraryID(kind: "scope")
+}
+
+"Exactly one filter or entity. Rules are copied into the share, never a mutable saved-filter reference."
+input MediaShareSourceInput {
+  mode: ShareMembership!
+  filter: MediaShareFilterInput
+  entity: MediaShareEntityInput
+  "Required for entity sources; a filter already determines its media type."
+  media_types: [ShareEntityKind!]
 }
 
 enum MediaShareStatus {
@@ -21,7 +45,9 @@ input MediaShareCreateInput {
   expires_at: Time!
   allow_download: Boolean! = false
   show_metadata: Boolean! = false
-  targets: [MediaShareTargetInput!]!
+  "Explicit selections always have snapshot membership. Mutually exclusive with source."
+  targets: [MediaShareTargetInput!]
+  source: MediaShareSourceInput
 }
 
 input MediaShareUpdateInput {
@@ -53,7 +79,13 @@ type MediaShare {
   access_count: Int!
   last_accessed_at: Time
   items: [MediaShareEntry!]!
-  media_count: Int!
+  "Frozen media count; ongoing shares have no fixed count."
+  media_count: Int
+  mode: ShareMembership!
+  source_kind: ShareSourceKind!
+  source_name: String!
+  media_types: [ShareEntityKind!]!
+  selection_count: Int!
 }
 
 type MediaShareCreated {

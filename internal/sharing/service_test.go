@@ -34,7 +34,8 @@ func testService(t *testing.T) (*Service, *mocks.Database, *models.VideoFile, *s
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		_, _, err := db.ExecSQL(ctx, `INSERT INTO scenes(id,title,created_at,updated_at) VALUES(1,'Private title',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
 INSERT INTO images(id,title,created_at,updated_at) VALUES(2,'Shared image',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
-INSERT INTO galleries(id,title,created_at,updated_at) VALUES(7,'Gallery',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);`, nil)
+INSERT INTO galleries(id,title,created_at,updated_at) VALUES(7,'Gallery',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO galleries_images(gallery_id,image_id) VALUES(7,2);`, nil)
 		return err
 	}))
 	repo.Scene, repo.Image, repo.Gallery = m.Scene, m.Image, m.Gallery
@@ -141,7 +142,6 @@ func TestShareFrozenMembershipAndFileIdentity(t *testing.T) {
 	image := &models.Image{ID: 2, Title: "Shared image", Files: models.NewRelatedFiles([]models.File{imageFile})}
 	m.Image.On("Find", mock.Anything, 2).Return(image, nil)
 	m.Gallery.On("Find", mock.Anything, 7).Return(&models.Gallery{ID: 7, Title: "Gallery"}, nil).Once()
-	m.Image.On("FindByGalleryID", mock.Anything, 7).Return([]*models.Image{image}, nil).Once()
 	row, _, err := s.Create(ctx, "owner", Options{Label: "Mixed", ExpiresAt: time.Now().Add(time.Hour)}, []Target{{Kind: "GALLERY", ID: 7}, {Kind: "IMAGE", ID: 2}, {Kind: "SCENE", ID: 1}})
 	require.NoError(t, err)
 	snapshot, err := Snapshot(row)

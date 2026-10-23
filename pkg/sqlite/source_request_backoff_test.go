@@ -133,7 +133,10 @@ func TestMetadataBackoffRetainsJobBeyondFailureLimit(t *testing.T) {
 
 func removeSourceBackoffSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
-	_, err := raw.Exec(`DROP TABLE media_root_identity_upgrades;
+	_, err := raw.Exec(`DROP TRIGGER share_source_immutable;
+ ALTER TABLE shares DROP COLUMN source;
+ DELETE FROM native_migration_history WHERE version=1000129;
+ DROP TABLE media_root_identity_upgrades;
  DELETE FROM native_migration_history WHERE version=1000128;
  ALTER TABLE source_request_budgets DROP COLUMN backoff_step;
  ALTER TABLE source_request_budgets DROP COLUMN backoff_at_ms;

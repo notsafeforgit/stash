@@ -83,5 +83,5 @@ func storingLibraryFilter(ctx context.Context) bool {
 	if field == nil || field.Field.Field == nil {
 		return false
 	}
-	return field.Field.Name == "saveFilter" || field.Field.Name == "configureDefaultFilter"
+	return field.Field.Name == "saveFilter" || field.Field.Name == "configureDefaultFilter" || field.Field.Name == "mediaShareCreate"
 }

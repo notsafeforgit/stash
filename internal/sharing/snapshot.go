@@ -2,6 +2,7 @@ package sharing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -11,14 +12,28 @@ import (
 )
 
 func (s *Service) snapshot(ctx context.Context, targets []Target) (*models.ShareSnapshot, error) {
+	return s.buildSnapshot(ctx, targets, false)
+}
+
+func (s *Service) buildSnapshot(ctx context.Context, targets []Target, ongoing bool) (*models.ShareSnapshot, error) {
 	ret := &models.ShareSnapshot{Entries: []models.ShareEntry{}, Media: []models.ShareMedia{}}
 	seen := make(map[string]bool)
 	add := func(kind string, id int) (string, error) {
 		key := strings.ToLower(kind) + "-" + strconv.Itoa(id)
+		identity, err := s.Repo.ArchiveEntity.FindByLocalID(ctx, models.ArchiveEntityKind(strings.ToLower(kind)), id)
+		if err != nil {
+			return "", err
+		}
+		if identity == nil || identity.State != models.ArchiveEntityActive {
+			return "", ErrUnavailable
+		}
+		if ongoing {
+			key = strings.ToLower(kind) + "-" + identity.UUID
+		}
 		if seen[key] {
 			return key, nil
 		}
-		if len(ret.Media) >= MaxItems {
+		if !ongoing && len(ret.Media) >= MaxItems {
 			return "", fmt.Errorf("a share may contain at most %d media items", MaxItems)
 		}
 		var f models.File
@@ -30,7 +45,7 @@ func (s *Service) snapshot(ctx context.Context, targets []Target) (*models.Share
 				return "", err
 			}
 			if v == nil {
-				return "", fmt.Errorf("scene %d is unavailable", id)
+				return "", fmt.Errorf("scene %d: %w", id, ErrUnavailable)
 			}
 			if err := v.LoadPrimaryFile(ctx, s.Repo.File); err != nil {
 				return "", err
@@ -45,7 +60,7 @@ func (s *Service) snapshot(ctx context.Context, targets []Target) (*models.Share
 				return "", err
 			}
 			if v == nil {
-				return "", fmt.Errorf("image %d is unavailable", id)
+				return "", fmt.Errorf("image %d: %w", id, ErrUnavailable)
 			}
 			if err := v.LoadPrimaryFile(ctx, s.Repo.File); err != nil {
 				return "", err
@@ -56,13 +71,13 @@ func (s *Service) snapshot(ctx context.Context, targets []Target) (*models.Share
 			return "", fmt.Errorf("unsupported share item")
 		}
 		if f == nil {
-			return "", fmt.Errorf("%s %d has no file", strings.ToLower(kind), id)
+			return "", fmt.Errorf("%s %d has no file: %w", strings.ToLower(kind), id, ErrUnavailable)
 		}
 		fp, err := Fingerprint(f)
 		if err != nil {
-			return "", fmt.Errorf("%s %d file is unavailable", strings.ToLower(kind), id)
+			return "", fmt.Errorf("%s %d file is unavailable: %w", strings.ToLower(kind), id, ErrUnavailable)
 		}
-		item := models.ShareMedia{Key: key, Kind: kind, EntityID: id, FileID: f.Base().ID, Fingerprint: fp, Title: title}
+		item := models.ShareMedia{UUID: identity.UUID, Key: key, Kind: kind, EntityID: id, FileID: f.Base().ID, Fingerprint: fp, Title: title}
 		switch f := f.(type) {
 		case *models.VideoFile:
 			item.Width, item.Height, item.Duration, item.FrameRate, item.VideoCodec, item.AudioCodec = f.Width, f.Height, f.DurationFinite(), f.FrameRateFinite(), f.VideoCodec, f.AudioCodec
@@ -93,6 +108,10 @@ func (s *Service) snapshot(ctx context.Context, targets []Target) (*models.Share
 			return nil, fmt.Errorf("share item has no library identity")
 		}
 		entry.UUID = identity.UUID
+		entry.Key = fmt.Sprintf("gallery-%d", len(ret.Entries)+1)
+		if ongoing {
+			entry.Key = strings.ToLower(target.Kind) + "-" + identity.UUID
+		}
 		if target.Kind == "GALLERY" {
 			g, err := s.Repo.Gallery.Find(ctx, target.ID)
 			if err != nil {
@@ -102,23 +121,35 @@ func (s *Service) snapshot(ctx context.Context, targets []Target) (*models.Share
 				return nil, fmt.Errorf("gallery %d is unavailable", target.ID)
 			}
 			entry.Title = g.Title
-			images, err := s.Repo.Image.FindByGalleryID(ctx, target.ID)
-			if err != nil {
-				return nil, err
-			}
-			if len(images) == 0 {
-				return nil, fmt.Errorf("gallery %d has no images", target.ID)
-			}
-			for _, image := range images {
-				key, err := add("IMAGE", image.ID)
+			for offset := 0; ; {
+				page, err := s.Repo.SourceGallery.LibraryMedia(ctx, target.ID, offset, 100)
 				if err != nil {
 					return nil, err
 				}
-				entry.MediaKeys = append(entry.MediaKeys, key)
+				for _, member := range page.Items {
+					key, err := add(strings.ToUpper(string(member.Kind)), member.LocalID)
+					if err != nil {
+						if ongoing && errors.Is(err, ErrUnavailable) {
+							continue
+						}
+						return nil, err
+					}
+					entry.MediaKeys = append(entry.MediaKeys, key)
+				}
+				if page.NextOffset == nil {
+					break
+				}
+				offset = *page.NextOffset
+			}
+			if len(entry.MediaKeys) == 0 && !ongoing {
+				return nil, fmt.Errorf("gallery %d has no media", target.ID)
 			}
 		} else {
 			key, err := add(target.Kind, target.ID)
 			if err != nil {
+				if ongoing && errors.Is(err, ErrUnavailable) {
+					continue
+				}
 				return nil, err
 			}
 			entry.MediaKeys = append(entry.MediaKeys, key)
@@ -129,7 +160,9 @@ func (s *Service) snapshot(ctx context.Context, targets []Target) (*models.Share
 				}
 			}
 		}
-		ret.Entries = append(ret.Entries, entry)
+		if len(entry.MediaKeys) > 0 {
+			ret.Entries = append(ret.Entries, entry)
+		}
 	}
 	return ret, nil
 }
@@ -161,6 +194,26 @@ func (s *Service) Resolve(ctx context.Context, item models.ShareMedia) (models.F
 	var f models.File
 	var scene *models.Scene
 	err := s.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
+		var err error
+		f, scene, err = s.resolve(ctx, item)
+		return err
+	})
+	return f, scene, err
+}
+
+func (s *Service) resolve(ctx context.Context, item models.ShareMedia) (models.File, *models.Scene, error) {
+	var f models.File
+	var scene *models.Scene
+	err := func() error {
+		if item.UUID != "" {
+			identity, err := s.Repo.ArchiveEntity.Find(ctx, item.UUID)
+			if err != nil {
+				return err
+			}
+			if identity == nil || identity.State != models.ArchiveEntityActive || identity.LocalID == nil || *identity.LocalID != item.EntityID || string(identity.Kind) != strings.ToLower(item.Kind) {
+				return ErrUnavailable
+			}
+		}
 		switch item.Kind {
 		case "SCENE":
 			var err error
@@ -193,7 +246,7 @@ func (s *Service) Resolve(ctx context.Context, item models.ShareMedia) (models.F
 			return ErrUnavailable
 		}
 		return nil
-	})
+	}()
 	if err != nil {
 		return nil, nil, err
 	}

@@ -27,6 +27,45 @@ type workerResult struct {
 	RegistrationCommitted bool                            `json:"registration_committed"`
 	MediaIngested         bool                            `json:"media_ingested"`
 	Publication           *ingest.IntakePublicationResult `json:"publication"`
+	Failure               *ingest.FileFailure             `json:"failure"`
+}
+
+type conflictingIntakeGallery struct {
+	models.SourceGalleryReaderWriter
+}
+
+func (f conflictingIntakeGallery) Sync(context.Context, string, string) (*models.SourceGallerySyncResult, error) {
+	return nil, models.ErrSourceGalleryConflict
+}
+
+func TestFileWorkerReportsGalleryConflictWithoutTransientRetry(t *testing.T) {
+	f := newIntakePublicationFixture(t, true)
+	f.linkSecondImage(t)
+	f.service.Repo.SourceGallery = conflictingIntakeGallery{f.service.Repo.SourceGallery}
+	event := f.fileEvent(t)
+	_, err := f.submitFile(t, event)
+	require.NoError(t, err)
+	worker := f.worker(t, func(context.Context, ingest.FileWork, ingest.IntakePublicationResult, ingest.FileEffectGuard) error {
+		t.Fatal("effects cannot run after failed registration")
+		return nil
+	})
+	processed, err := worker.ProcessNext(t.Context())
+	require.NoError(t, err)
+	require.True(t, processed)
+	status, result := f.fileStatus(t, event.EventUUID)
+	require.Equal(t, "failed", status.State)
+	require.Equal(t, "file_album_review", status.ErrorCode)
+	require.Equal(t, &ingest.FileFailure{Stage: "registration", Reason: "gallery_changed"}, result.Failure)
+	require.False(t, result.RegistrationCommitted)
+	require.Nil(t, result.Publication)
+	require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		file, err := f.service.Repo.File.FindByPath(ctx, f.path, true)
+		require.Nil(t, file, "conflicting gallery work rolls back file registration")
+		return err
+	}))
+	processed, err = worker.ProcessNext(t.Context())
+	require.NoError(t, err)
+	require.False(t, processed)
 }
 
 func (f intakePublicationFixture) fileStatus(t *testing.T, event string) (*ingest.ReceiptStatus, workerResult) {

@@ -166,6 +166,21 @@ func (p *PreparedMedia) PublishIntake(ctx context.Context, repo models.Repositor
 	for _, field := range policyResult.ReviewFields() {
 		ret.Result.Review = append(ret.Result.Review, "metadata:"+field)
 	}
+	// Gallery guards include member revisions. Establish them only after this
+	// transaction's media metadata is final, so our own policy writes cannot
+	// invalidate a successfully synchronized self-reply thread at commit.
+	if input.Source != nil {
+		attachment, err := repo.SourceAttachment.Find(ctx, input.Source.AttachmentUUID)
+		if err != nil {
+			return nil, err
+		}
+		if attachment == nil {
+			return nil, models.ErrSourceAttachmentConflict
+		}
+		if err := publishIntakeGallery(ctx, repo, attachment.PostUUID, ret); err != nil {
+			return nil, err
+		}
+	}
 	txn.AddPreCommitHook(ctx, func(ctx context.Context) error { return validatePublicationCollection(ctx, repo, input) })
 	return ret, nil
 }
@@ -269,21 +284,6 @@ func publishIntakeSource(ctx context.Context, repo models.Repository, input Inta
 	if ret.Result.SourceMedia == "review" {
 		ret.Result.Review = append(ret.Result.Review, "attachment_media")
 	}
-	preview, err := repo.SourceGallery.Preview(ctx, attachment.PostUUID)
-	if err != nil {
-		return err
-	}
-	ret.Result.Gallery = preview.Action
-	switch preview.Action {
-	case "create", "sync":
-		gallery, err := repo.SourceGallery.Sync(ctx, attachment.PostUUID, preview.Signature)
-		if err != nil {
-			return err
-		}
-		ret.Result.GalleryUUID, ret.Result.Gallery = gallery.GalleryUUID, gallery.Action
-	case "review":
-		ret.Result.Review = append(ret.Result.Review, "source_album")
-	}
 	expectedStatus := ret.Result.SourceMedia
 	txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
 		post, err := repo.SourceEvidence.FindPost(ctx, attachment.PostUUID)
@@ -328,5 +328,24 @@ func publishIntakeSource(ctx context.Context, repo models.Repository, input Inta
 		}
 		return nil
 	})
+	return nil
+}
+
+func publishIntakeGallery(ctx context.Context, repo models.Repository, post string, ret *PublishedIntake) error {
+	preview, err := repo.SourceGallery.Preview(ctx, post)
+	if err != nil {
+		return err
+	}
+	ret.Result.Gallery = preview.Action
+	switch preview.Action {
+	case "create", "sync":
+		gallery, err := repo.SourceGallery.Sync(ctx, post, preview.Signature)
+		if err != nil {
+			return err
+		}
+		ret.Result.GalleryUUID, ret.Result.Gallery = gallery.GalleryUUID, gallery.Action
+	case "review":
+		ret.Result.Review = append(ret.Result.Review, "source_album")
+	}
 	return nil
 }

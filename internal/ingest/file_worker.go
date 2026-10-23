@@ -50,6 +50,13 @@ type fileCompletion struct {
 	RegistrationCommitted bool                     `json:"registration_committed"`
 	MediaIngested         bool                     `json:"media_ingested"`
 	Publication           *IntakePublicationResult `json:"publication,omitempty"`
+	Failure               *FileFailure             `json:"failure,omitempty"`
+}
+
+// FileFailure contains bounded diagnostic categories, never paths or worker output.
+type FileFailure struct {
+	Stage  string `json:"stage"`
+	Reason string `json:"reason"`
 }
 
 // Run does not start implicitly on submission. The application owns this
@@ -88,17 +95,19 @@ func (w *FileWorker) ProcessNext(ctx context.Context) (bool, error) {
 }
 
 func (w *FileWorker) process(ctx context.Context, claimed *models.ArchiveJob) error {
+	stage := "validation"
+	fail := func(err error) error { return w.fail(ctx, claimed, err, stage) }
 	var work FileWork
 	if err := StrictJSON(claimed.Arguments, 262144, &work); err != nil || !validFileWork(work) {
-		return w.fail(ctx, claimed, ErrInvalid)
+		return fail(ErrInvalid)
 	}
 	progress, err := fileProgressForWork(claimed, work)
 	if err != nil {
-		return w.fail(ctx, claimed, err)
+		return fail(err)
 	}
 	root, err := w.authorize(ctx, claimed, work)
 	if err != nil {
-		return w.fail(ctx, claimed, err)
+		return fail(err)
 	}
 	if work.Manual != nil && work.Manual.Resume != nil && work.Manual.Resume.Publication != nil {
 		_, err := w.Durable.Checkpoint(ctx, claimed.Lease(), func(ctx context.Context, _ *models.ArchiveJob) (json.RawMessage, error) {
@@ -108,14 +117,14 @@ func (w *FileWorker) process(ctx context.Context, claimed *models.ArchiveJob) er
 			return json.Marshal(progress)
 		})
 		if err != nil {
-			return w.fail(ctx, claimed, err)
+			return fail(err)
 		}
 	}
 	if work.Manual != nil && progress.Publication == nil {
 		if err := w.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
 			return w.Service.validateManualFilePublication(ctx, work)
 		}); err != nil {
-			return w.fail(ctx, claimed, err)
+			return fail(err)
 		}
 	}
 	workCtx, cancelWork := context.WithCancelCause(ctx)
@@ -141,17 +150,19 @@ func (w *FileWorker) process(ctx context.Context, claimed *models.ArchiveJob) er
 		}
 	}()
 	defer func() { stopHeartbeat(); <-done }()
+	stage = "inspection"
 	prepared, err := PrepareMedia(workCtx, *root, work.Publication.Target.RelativePath, &work.Size, work.SHA256, w.Scanner(work.Publication.Kind))
 	if err != nil {
 		if workCtx.Err() != nil {
 			return context.Cause(workCtx)
 		}
-		return w.fail(ctx, claimed, err)
+		return fail(err)
 	}
 	defer prepared.Close()
 	if work.Manual != nil && !work.Manual.Inspection.Matches(prepared.Snapshot(), prepared.SHA256()) {
-		return w.fail(ctx, claimed, archive.ErrMediaFileChanged)
+		return fail(archive.ErrMediaFileChanged)
 	}
+	stage = "registration"
 	if progress.Publication == nil {
 		_, err := w.Durable.Checkpoint(workCtx, claimed.Lease(), func(ctx context.Context, _ *models.ArchiveJob) (json.RawMessage, error) {
 			if _, err := w.authorizeInTxn(ctx, claimed, work); err != nil {
@@ -173,11 +184,11 @@ func (w *FileWorker) process(ctx context.Context, claimed *models.ArchiveJob) er
 			return json.Marshal(progress)
 		})
 		if err != nil {
-			return w.fail(ctx, claimed, err)
+			return fail(err)
 		}
 	}
 	if err := w.validatePublished(workCtx, claimed, work, prepared, *progress.Publication); err != nil {
-		return w.fail(ctx, claimed, err)
+		return fail(err)
 	}
 	guard := func(ctx context.Context) error {
 		check := func(ctx context.Context) error {
@@ -192,13 +203,14 @@ func (w *FileWorker) process(ctx context.Context, claimed *models.ArchiveJob) er
 		return w.Service.Repo.WithReadTxn(ctx, check)
 	}
 	if err := guard(workCtx); err != nil {
-		return w.fail(ctx, claimed, err)
+		return fail(err)
 	}
+	stage = "effects"
 	if err := w.Effects(workCtx, work, *progress.Publication, guard); err != nil {
 		if workCtx.Err() != nil {
 			return context.Cause(workCtx)
 		}
-		return w.fail(ctx, claimed, err)
+		return fail(err)
 	}
 	stopHeartbeat()
 	<-done
@@ -208,6 +220,7 @@ func (w *FileWorker) process(ctx context.Context, claimed *models.ArchiveJob) er
 	if _, err := w.Durable.Renew(ctx, claimed.Lease(), w.LeaseDuration); err != nil {
 		return err
 	}
+	stage = "completion"
 	_, err = w.Durable.Publish(ctx, claimed.Lease(), func(ctx context.Context, _ *models.ArchiveJob) (models.ArchiveJobOutcome, error) {
 		if err := w.validatePublishedInTxn(ctx, claimed, work, prepared, *progress.Publication); err != nil {
 			return models.ArchiveJobOutcome{}, err
@@ -219,7 +232,7 @@ func (w *FileWorker) process(ctx context.Context, claimed *models.ArchiveJob) er
 		return models.ArchiveJobOutcome{State: "succeeded", Result: result}, err
 	})
 	if err != nil {
-		return w.fail(ctx, claimed, err)
+		return fail(err)
 	}
 	return nil
 }
@@ -363,7 +376,7 @@ func (w *FileWorker) validatePublishedInTxn(ctx context.Context, claimed *models
 	return nil
 }
 
-func (w *FileWorker) fail(ctx context.Context, claimed *models.ArchiveJob, cause error) error {
+func (w *FileWorker) fail(ctx context.Context, claimed *models.ArchiveJob, cause error, stage string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -386,7 +399,7 @@ func (w *FileWorker) fail(ctx context.Context, claimed *models.ArchiveJob, cause
 		if err != nil {
 			return models.ArchiveJobOutcome{}, err
 		}
-		outcome.Result, err = json.Marshal(fileCompletion{RegistrationCommitted: progress.Publication != nil, Publication: progress.Publication})
+		outcome.Result, err = json.Marshal(fileCompletion{RegistrationCommitted: progress.Publication != nil, Publication: progress.Publication, Failure: &FileFailure{Stage: stage, Reason: fileFailureReason(cause)}})
 		return outcome, err
 	})
 	return err
@@ -402,9 +415,38 @@ func fileFailure(err error) (string, bool) {
 		return "file_digest_mismatch", true
 	case errors.Is(err, archive.ErrMediaFileChanged), errors.Is(err, models.ErrFileGenerationConflict), errors.Is(err, models.ErrFilePathChanged), errors.Is(err, models.ErrFileContentConflict):
 		return "file_changed", true
+	case errors.Is(err, models.ErrSourceGalleryConflict), errors.Is(err, models.ErrSourceAlbumLimit):
+		return "file_album_review", true
 	case errors.Is(err, ErrAmbiguousMedia), errors.Is(err, ErrMediaKindConflict), errors.Is(err, models.ErrSourceAttachmentConflict), errors.Is(err, models.ErrSourcePostMediaConflict), errors.Is(err, models.ErrArchiveIdentityConflict), errors.Is(err, models.ErrSourcePostForgotten):
 		return "file_association_review", true
 	default:
 		return "file_processing_unavailable", false
 	}
+}
+
+func fileFailureReason(err error) string {
+	for _, entry := range []struct {
+		cause  error
+		reason string
+	}{
+		{models.ErrSourceGalleryConflict, "gallery_changed"},
+		{models.ErrSourceAlbumLimit, "album_limit"},
+		{ErrAmbiguousMedia, "multiple_media_owners"},
+		{ErrMediaKindConflict, "media_kind_conflict"},
+		{models.ErrSourceAttachmentConflict, "attachment_changed"},
+		{models.ErrSourcePostMediaConflict, "post_media_changed"},
+		{models.ErrArchiveIdentityConflict, "media_identity_changed"},
+		{models.ErrSourcePostForgotten, "post_forgotten"},
+		{models.ErrFilePathChanged, "path_removed_or_moved"},
+		{models.ErrFileGenerationConflict, "file_generation_changed"},
+		{models.ErrFileContentConflict, "verified_content_changed"},
+		{archive.ErrMediaFileChanged, "file_changed_during_inspection"},
+		{archive.ErrMediaFileDigest, "submitted_digest_mismatch"},
+	} {
+		if errors.Is(err, entry.cause) {
+			return entry.reason
+		}
+	}
+	code, _ := fileFailure(err)
+	return code
 }

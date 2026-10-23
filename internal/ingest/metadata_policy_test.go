@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -13,6 +14,66 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/require"
 )
+
+func TestIntakeThreadGalleryGuardUsesFinalMetadataRevisions(t *testing.T) {
+	f := newIntakePublicationFixture(t, false)
+	repo := f.service.Repo
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		f.collection, err = repo.SourceCollection.Put(ctx, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
+			Label: "Thread", Kind: "feed", Namespace: "native:twitter", State: "active", RootUUID: &f.root.UUID, PathPrefix: ".",
+		}})
+		return err
+	}))
+	var err error
+	f.credential, f.token, err = f.service.IssueCredential(t.Context(), f.producer.UUID, []models.IngestScope{{CollectionUUID: f.collection.UUID, RootUUID: &f.root.UUID}}, nil)
+	require.NoError(t, err)
+	f.input.CollectionUUID, f.input.CollectionRevision = f.collection.UUID, f.collection.Revision
+	policy := f.policy(t, 0, map[string]models.MetadataMapping{"title": {JQ: `.source.metadata.title // empty`}})
+	f.input.PolicyRevision = policy.Revision
+	for _, id := range []string{"102", "103"} {
+		event := f.event(t)
+		event.RootUUID = &f.root.UUID
+		event.Post = ingest.PostReference{Namespace: "native:twitter", Value: id}
+		event.Source = []byte(fmt.Sprintf(`{"category":"twitter","tweet_id":%q,"conversation_id":"100","reply_id":"100","reply_user_id":"99","author":{"id":"99"},"extended_entities":{"media":[{"id":"501","type":"photo"},{"id":"502","type":"photo"}]}}`, id))
+		f.receipt, err = f.submit(t, event)
+		require.NoError(t, err)
+	}
+	f.linkSecondImage(t)
+	f.input.Source = &ingest.IntakeSource{CaptureUUID: f.receipt.CaptureUUID, AttachmentUUID: f.attachment(t, 0).UUID}
+	result := f.publishIntake(t, f.prepared, f.input)
+	require.Equal(t, "create", result.Result.Gallery)
+	require.NotEmpty(t, result.Result.GalleryUUID)
+	require.Contains(t, result.Result.MetadataFields, "title")
+	require.JSONEq(t, `"Source album"`, string(intakeField(t, repo, result.Result.MediaUUID, "title").Value))
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		preview, err := repo.SourceGallery.Preview(ctx, f.receipt.PostUUID)
+		require.Len(t, preview.ThreadPlans, 2, "exercise the self-reply transaction guard")
+		gallery, err := repo.ArchiveEntity.Find(ctx, result.Result.GalleryUUID)
+		require.NoError(t, err)
+		members, err := repo.Gallery.GetImageIDs(ctx, *gallery.LocalID)
+		require.Len(t, members, 2)
+		return err
+	}))
+	// A later change still invalidates the guard and rolls the transaction back.
+	err = repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, err := f.prepared.PublishIntake(ctx, repo, f.input)
+		if err != nil {
+			return err
+		}
+		image, err := repo.Image.Find(ctx, *result.Media.Media.LocalID)
+		if err != nil {
+			return err
+		}
+		image.Title = "Changed after synchronization"
+		return repo.Image.Update(ctx, image)
+	})
+	require.ErrorIs(t, err, models.ErrSourceGalleryConflict)
+	replay := f.publishIntake(t, f.prepared, f.input)
+	require.Equal(t, result.Result.MediaUUID, replay.Result.MediaUUID)
+	require.Equal(t, result.Result.GalleryUUID, replay.Result.GalleryUUID)
+	require.Empty(t, replay.Result.MetadataFields)
+}
 
 func (f intakePublicationFixture) policy(t *testing.T, revision int, mappings map[string]models.MetadataMapping) *models.MetadataPolicy {
 	t.Helper()

@@ -213,6 +213,14 @@ revision; changing it before publication leaves metadata for review while still
 registering the verified media. The result reports `metadata_state`, applied
 `metadata_fields`, and any `metadata:<field>` review requirements.
 
+Media metadata is applied before synchronizing source galleries: the gallery's
+commit guard must describe the final member revisions, including self-reply
+threads. Genuine gallery conflicts remain atomic failures and report
+`file_album_review` rather than consuming the transient retry budget. Failed
+verification results also include a bounded `failure.stage` and `failure.reason`
+to distinguish inspection, registration, effects and completion failures without
+exposing paths, captured payloads or worker output.
+
 ### Durable archive work
 
 Application-authenticated [local-file intake](native-manual-intake.md) uses the

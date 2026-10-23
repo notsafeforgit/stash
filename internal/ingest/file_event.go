@@ -275,7 +275,12 @@ func (s *Service) ReceiptStatus(ctx context.Context, token, event string) (*Rece
 				if err := StrictJSON(job.Progress, 16384, &progress); err != nil {
 					return err
 				}
-				result.Result, err = json.Marshal(fileCompletion{RegistrationCommitted: progress.Publication != nil, Publication: progress.Publication})
+				var completion fileCompletion
+				if err := StrictJSON(job.Result, 16384, &completion); err != nil {
+					return err
+				}
+				completion.RegistrationCommitted, completion.Publication = progress.Publication != nil, progress.Publication
+				result.Result, err = json.Marshal(completion)
 				if err != nil {
 					return err
 				}

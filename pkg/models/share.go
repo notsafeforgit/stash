@@ -91,12 +91,10 @@ type ShareTarget struct {
 
 // SharePreparedMedia is a frozen candidate, not a live library selection.
 type SharePreparedMedia struct {
-	Position       int    `db:"position"`
-	MediaJSON      []byte `db:"media"`
-	FileUUID       string `db:"file_uuid"`
-	FileGeneration int64  `db:"file_generation"`
-	ExpectedSize   int64  `db:"expected_size"`
-	ExpectedMtime  int64  `db:"expected_mtime"`
+	Position      int    `db:"position"`
+	MediaJSON     []byte `db:"media"`
+	ExpectedSize  int64  `db:"expected_size"`
+	ExpectedMtime int64  `db:"expected_mtime"`
 }
 
 type ShareMedia struct {
@@ -124,8 +122,8 @@ type ShareReaderWriter interface {
 	NextPreparation(context.Context, int64) (*ShareRecord, error)
 	CheckpointPreparation(context.Context, *ShareRecord, []ShareMedia, string) (bool, error)
 	RetryPreparation(context.Context, string) error
-	SnapshotEntries(context.Context, string, int, int, string) ([]ShareEntry, error)
-	SnapshotMedia(context.Context, string, int, int, string) ([]SharePreparedMedia, error)
+	SnapshotEntries(context.Context, string, int, int, string, string) ([]ShareEntry, error)
+	SnapshotMedia(context.Context, string, int, int, string, string) ([]SharePreparedMedia, error)
 	SnapshotItem(context.Context, string, string) (*ShareMedia, error)
 	SnapshotEntryKeys(context.Context, string, string, []string) ([]string, error)
 	// QueryTargets reuses library filtering, with a stable keyset order and an

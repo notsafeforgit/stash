@@ -4,7 +4,8 @@ import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
-import { ShareBrowser } from "./share-browser";
+import { ShareBrowserView } from "./share-browser";
+import { useShareNavigation } from "./share-browser-state";
 import { useToast } from "@/hooks/toast";
 import {
   ShareUnavailableError,
@@ -18,7 +19,7 @@ import {
 
 type ViewerState =
   | { kind: "loading" }
-  | { kind: "ready"; content: SharedContent; deadline: number }
+  | { kind: "ready"; content: SharedContent; deadline: number; scope: string }
   | { kind: "unavailable" }
   | { kind: "error" };
 
@@ -62,6 +63,12 @@ export function ShareViewer() {
   const contentRequest = useRef<AbortController | null>(null);
   useEffect(() => () => contentRequest.current?.abort(), []);
   const [target] = useState(() => shareTarget(location.href, document.baseURI));
+  const [navigationBase] = useState(
+    () => target?.navigationBase ?? new URL(document.baseURI),
+  );
+  const navigation = useShareNavigation(navigationBase);
+  const scope = navigation.location.gallery ?? "";
+  const pages = useRef(new Map<string, SharedContent>());
   const [state, setState] = useState<ViewerState>({ kind: "loading" });
   const bootstrap = useRef<{
     attempt: number;
@@ -88,7 +95,8 @@ export function ShareViewer() {
         const content = refresh
           ? page
           : mergeShareContent(current.content, page);
-        return { kind: "ready", content, deadline: shareDeadline(page) };
+        pages.current.set(scope, content);
+        return { kind: "ready", content, deadline: shareDeadline(page), scope };
       });
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -109,12 +117,18 @@ export function ShareViewer() {
       bootstrap.current = { attempt, promise: openShare(target) };
     void bootstrap.current.promise.then(
       (content) => {
-        if (active)
+        if (active) {
+          pages.current.set(
+            new URLSearchParams(location.search).get("gallery") ?? "",
+            content,
+          );
           setState({
             kind: "ready",
             content,
             deadline: shareDeadline(content),
+            scope: new URLSearchParams(location.search).get("gallery") ?? "",
           });
+        }
       },
       (error: unknown) => {
         if (active)
@@ -128,6 +142,69 @@ export function ShareViewer() {
       active = false;
     };
   }, [target, attempt]);
+
+  const ready = state.kind === "ready";
+  const focused = navigation.location.media;
+  useEffect(() => {
+    if (!ready || !target) return;
+    contentRequest.current?.abort();
+    contentRequest.current = null;
+    const cached = pages.current.get(scope);
+    if (
+      cached &&
+      (!focused || cached.media.some((item) => item.key === focused))
+    ) {
+      setState((current) =>
+        current.kind === "ready"
+          ? { ...current, content: cached, scope }
+          : current,
+      );
+      setLoadingMore(false);
+      return;
+    }
+    const controller = new AbortController();
+    contentRequest.current = controller;
+    setLoadingMore(true);
+    void shareRequest(
+      shareContentURL(target.base),
+      shareContentSchema,
+      controller.signal,
+    )
+      .then((page) => {
+        if (controller.signal.aborted) return;
+        // A deep item link may need one focused item without resetting the
+        // overview's existing continuation or forgetting earlier pages.
+        const content = cached
+          ? { ...mergeShareContent(cached, page), next: cached.next }
+          : page;
+        pages.current.set(scope, content);
+        // Retain the overview for Back, plus a few recently visited galleries.
+        for (const key of pages.current.keys()) {
+          if (pages.current.size <= 4) break;
+          if (key && key !== scope) pages.current.delete(key);
+        }
+        setState({
+          kind: "ready",
+          content,
+          deadline: shareDeadline(page),
+          scope,
+        });
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          if (error instanceof ShareUnavailableError)
+            setState({ kind: "unavailable" });
+          else setState({ kind: "error" });
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          contentRequest.current = null;
+          setLoadingMore(false);
+        }
+      });
+    return () => controller.abort();
+  }, [scope, focused, ready, target]);
 
   const deadline = state.kind === "ready" ? state.deadline : null;
   useEffect(() => {
@@ -221,7 +298,14 @@ export function ShareViewer() {
     );
 
   return (
-    <ShareBrowser
+    <ShareBrowserView
+      navigation={navigation}
+      busy={
+        state.scope !== scope ||
+        (loadingMore &&
+          !!focused &&
+          !state.content.media.some((item) => item.key === focused))
+      }
       content={state.content}
       base={target.base}
       navigationBase={target.navigationBase}
@@ -230,7 +314,7 @@ export function ShareViewer() {
           <Button
             variant="ghost"
             size="sm"
-            disabled={loadingMore}
+            disabled={loadingMore || state.scope !== scope}
             onClick={() => void loadContent(true)}
           >
             <RefreshCw data-icon="inline-start" />
@@ -243,7 +327,7 @@ export function ShareViewer() {
             <Button
               variant="outline"
               size="sm"
-              disabled={loadingMore}
+              disabled={loadingMore || state.scope !== scope}
               onClick={() => void loadContent(false)}
             >
               {loadingMore && <Spinner data-icon="inline-start" />}
@@ -273,16 +357,22 @@ export function mergeShareContent(
   current: SharedContent,
   page: SharedContent,
 ): SharedContent {
+  const entries = new Map(
+    current.entries.map((entry, index) => [entry.key ?? String(index), entry]),
+  );
+  for (const [index, entry] of page.entries.entries()) {
+    const key = entry.key ?? String(index);
+    const previous = entries.get(key);
+    entries.set(key, {
+      ...entry,
+      media_keys: [
+        ...new Set([...(previous?.media_keys ?? []), ...entry.media_keys]),
+      ],
+    });
+  }
   return {
     ...page,
-    entries: [
-      ...new Map(
-        [...current.entries, ...page.entries].map((entry, index) => [
-          entry.key ?? String(index),
-          entry,
-        ]),
-      ).values(),
-    ],
+    entries: [...entries.values()],
     media: [
       ...new Map(
         [...current.media, ...page.media].map((item) => [item.key, item]),

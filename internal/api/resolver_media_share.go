@@ -19,7 +19,7 @@ func shareResult(ctx context.Context, repo models.Repository, row *models.ShareR
 	var entries []models.ShareEntry
 	err := repo.WithReadTxn(ctx, func(ctx context.Context) error {
 		var err error
-		entries, err = repo.Share.SnapshotEntries(ctx, row.ID, 0, 3, "")
+		entries, err = repo.Share.SnapshotEntries(ctx, row.ID, 0, 3, "", "")
 		return err
 	})
 	if err != nil {

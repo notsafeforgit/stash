@@ -385,11 +385,3 @@ func (s *Service) Item(ctx context.Context, row *models.ShareRecord, key string)
 	f, scene, err := s.Resolve(ctx, *item)
 	return item, f, scene, err
 }
-
-func (s *Service) entryActive(ctx context.Context, entry models.ShareEntry) (bool, error) {
-	identity, err := s.Repo.ArchiveEntity.FindByLocalID(ctx, models.ArchiveEntityKind(strings.ToLower(entry.Kind)), entry.ID)
-	if err != nil {
-		return false, err
-	}
-	return identity != nil && identity.State == models.ArchiveEntityActive && (entry.UUID == "" || entry.UUID == identity.UUID), nil
-}

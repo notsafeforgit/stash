@@ -41,9 +41,15 @@ studio or tag sources offer **Snapshot** (the default) and **Ongoing**:
 
 - **Snapshot:** resolve the complete selection in the creation transaction and
   freeze membership, titles and file identities. Later additions and metadata
-  changes do not change membership. The existing limits of 2,000 selected items
-  and 2,000 distinct media items apply, including gallery contents; larger or unavailable selections
-  fail without creating a partial grant.
+  changes do not change membership. There is no 2,000-item cap. Indexed membership
+  includes the exact contents and ordering of selected galleries. File verification
+  runs in batches of 50 after that transaction; no filesystem work holds the database
+  write lock. A large selection appears as Preparing in Settings → Shares, with a
+  progress counter. No link or guest access is available until every item is prepared.
+  Preparation resumes from its committed checkpoint after a restart. If an original
+  file is unavailable or changed, the share needs attention: restore the file and
+  retry the same frozen selection, or create a new snapshot. Failed, revoked or
+  expired work cannot block later shares.
 - **Ongoing:** retain immutable rules and query current matches at read time.
   New media and later metadata changes can add matches; items that stop matching
   disappear. There is no fixed media count or 2,000-item lifetime limit. The
@@ -62,7 +68,16 @@ URLs. Deleting a shared gallery also removes access to its contents unless they
 are independently included. Snapshots pin each item's primary file ID and fingerprint (size, mtime and
 available indexed hashes). Deleted objects, changed primary files and changed
 source files fail closed. Archive images also pin the archive's identity.
-Snapshot titles stay frozen. Ongoing shares use current matching entities,
+Snapshot titles stay frozen. Snapshot browsing and gallery contents have separate
+bounded pages (50 media per type on the overview, 50 members per gallery page,
+plus at most one thumbnail per gallery summary). Separate type cursors keep
+images and galleries reachable even in selections with many videos.
+Opening a deep link authorizes its item independently of the currently loaded page.
+The recipient can load more and return to the previous overview without losing it.
+Schema 1000130 normalizes existing snapshot blobs without reselecting media,
+recalculating fingerprints or changing links, sessions, ordering or expiry.
+Management returns up to three entry summaries and persisted counts; it does not
+load a complete snapshot. Ongoing shares use current matching entities,
 titles and primary files; every original/thumbnail/preview/stream request checks
 current membership, UUID identity and the resolved file. Filter/entity references
 are UUIDs, so reusing a deleted local database key cannot widen a grant.

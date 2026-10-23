@@ -14,6 +14,9 @@ fragment MediaShareFields on MediaShare {
   source_kind
   source_name
   media_types
+  preparation_state
+  prepared_count
+  preparation_error
   selection_count
 }
 query MediaShares($limit: Int!, $offset: Int!, $status: MediaShareStatus) {
@@ -22,7 +25,6 @@ query MediaShares($limit: Int!, $offset: Int!, $status: MediaShareStatus) {
   }
   sharingConfiguration {
     public_url
-    max_items
     max_days
   }
 }
@@ -54,7 +56,17 @@ mutation MediaShareRotate($id: ID!) {
 mutation ConfigureSharing($public_url: String!) {
   configureSharing(public_url: $public_url) {
     public_url
-    max_items
     max_days
+  }
+}
+
+query MediaShare($id: ID!) {
+  mediaShare(id: $id) {
+    ...MediaShareFields
+  }
+}
+mutation MediaShareRetry($id: ID!) {
+  mediaShareRetry(id: $id) {
+    ...MediaShareFields
   }
 }

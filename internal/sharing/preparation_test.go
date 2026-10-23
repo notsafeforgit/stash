@@ -159,3 +159,48 @@ INSERT INTO scenes_files(scene_id,file_id,"primary") SELECT id,1,1 FROM scenes W
 	require.NoError(t, err)
 	require.Zero(t, saved.PreparedCount)
 }
+
+func TestSnapshotPagesKeepEveryMediaTypeReachable(t *testing.T) {
+	f := newSourceFixture(t)
+	f.exec(`WITH RECURSIVE ids(id) AS (SELECT 2 UNION ALL SELECT id+1 FROM ids WHERE id<110)
+INSERT INTO scenes(id,title,created_at,updated_at) SELECT id,'Video',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM ids;
+INSERT INTO scenes_files(scene_id,file_id,"primary") SELECT id,1,1 FROM scenes WHERE id>1;`)
+	targets := []Target{}
+	for id := 1; id <= 110; id++ {
+		targets = append(targets, Target{Kind: "SCENE", ID: id})
+	}
+	targets = append(targets, Target{Kind: "IMAGE", ID: 1}, Target{Kind: "GALLERY", ID: 1})
+	row, _, err := f.service.Create(t.Context(), "owner", Options{Label: "Mixed types", ExpiresAt: time.Now().Add(time.Hour)}, targets)
+	require.NoError(t, err)
+	for row.PreparationState == "PREPARING" {
+		require.NoError(t, f.service.PrepareBatch(t.Context(), row))
+		row, err = f.service.Find(t.Context(), row.ID)
+		require.NoError(t, err)
+	}
+	require.Equal(t, "READY", row.PreparationState, row.PreparationError)
+	page, cursor, err := f.service.Content(t.Context(), row, "")
+	require.NoError(t, err)
+	require.NotEmpty(t, cursor)
+	images, galleries := 0, 0
+	for _, item := range page.Media {
+		if item.Kind == "IMAGE" {
+			images++
+		}
+	}
+	for _, entry := range page.Entries {
+		if entry.Kind == "GALLERY" {
+			galleries++
+		}
+	}
+	require.Equal(t, 1, images, "images must not wait behind all the videos")
+	require.Equal(t, 1, galleries, "galleries must appear on the first page")
+	page, _, err = f.service.Content(t.Context(), row, cursor)
+	require.NoError(t, err)
+	for _, item := range page.Media {
+		require.Equal(t, "SCENE", item.Kind, "finished type cursors must not restart")
+	}
+	page, _, err = f.service.Content(t.Context(), row, "", "gallery-missing")
+	require.NoError(t, err)
+	require.Empty(t, page.Media)
+	require.Empty(t, page.Entries)
+}

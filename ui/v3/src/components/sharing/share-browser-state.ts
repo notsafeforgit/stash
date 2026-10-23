@@ -19,6 +19,7 @@ export interface SharedGallery {
   kind: "GALLERY";
   title: string;
   media: SharedMediaItem[];
+  mediaCount: number;
 }
 export type SharedItem = SharedMediaItem | SharedGallery;
 
@@ -32,6 +33,7 @@ export function shareCollections(content: SharedContent) {
             id: entry.key ?? `gallery-${index + 1}`,
             kind: "GALLERY",
             title: entry.title,
+            mediaCount: entry.media_count ?? entry.media_keys.length,
             media: entry.media_keys.flatMap((key) => {
               const item = byKey.get(key);
               return item ? [item] : [];

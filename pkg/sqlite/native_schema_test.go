@@ -127,6 +127,8 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"missing account evidence", "DROP TABLE source_account_identifier_evidence", "missing source_account_identifier_evidence"},
 		{"missing ownership choices", "DROP TABLE account_performer_decisions", "missing account_performer_decisions"},
 		{"missing ownership guard", "DROP TRIGGER account_performer_decision_kind_insert", "missing account_performer_decision_kind_insert"},
+		{"missing snapshot type index", "DROP INDEX share_snapshot_media_kind", "missing share_snapshot_media_kind"},
+		{"missing snapshot admission guard", "DROP TRIGGER share_snapshot_admission_closed", "missing share_snapshot_admission_closed"},
 		{"missing source posts", "DROP TABLE source_posts", "missing source_posts"},
 		{"missing source payloads", "DROP TABLE source_payloads", "missing source_payloads"},
 		{"missing source captures", "DROP TABLE source_captures", "missing source_captures"},

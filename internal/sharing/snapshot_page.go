@@ -1,10 +1,12 @@
 package sharing
 
 import (
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/stashapp/stash/pkg/models"
@@ -13,8 +15,8 @@ import (
 type snapshotCursor struct {
 	Share   string `json:"share"`
 	Gallery string `json:"gallery,omitempty"`
-	Entries int    `json:"entries"`
-	Media   int    `json:"media"`
+	Entries []int  `json:"entries"`
+	Media   []int  `json:"media"`
 }
 
 func (s *Service) snapshotPage(ctx context.Context, row *models.ShareRecord, cursor string, focus []string) (models.ShareSnapshot, string, error) {
@@ -29,7 +31,7 @@ func (s *Service) snapshotPage(ctx context.Context, row *models.ShareRecord, cur
 	if len(focus) > 1 {
 		media = focus[1]
 	}
-	position := snapshotCursor{Share: row.ID, Gallery: gallery}
+	position := snapshotCursor{Share: row.ID, Gallery: gallery, Entries: []int{0, 0, 0}, Media: []int{0, 0}}
 	if cursor != "" {
 		body, err := base64.RawURLEncoding.DecodeString(cursor)
 		if err != nil || len(body) > 256 {
@@ -38,32 +40,48 @@ func (s *Service) snapshotPage(ctx context.Context, row *models.ShareRecord, cur
 		if err = json.Unmarshal(body, &position); err != nil {
 			return ret, "", err
 		}
-		if position.Share != row.ID || position.Gallery != gallery || position.Entries < -1 || position.Media < -1 {
+		if position.Share != row.ID || position.Gallery != gallery || len(position.Entries) != 3 || len(position.Media) != 2 {
+			return ret, "", errors.New("invalid share cursor")
+		}
+	}
+	for _, after := range append(append([]int{}, position.Entries...), position.Media...) {
+		if after < -1 {
 			return ret, "", errors.New("invalid share cursor")
 		}
 	}
 	if gallery != "" {
-		entries, err := s.Repo.Share.SnapshotEntries(ctx, row.ID, 0, 1, gallery)
+		entries, err := s.Repo.Share.SnapshotEntries(ctx, row.ID, 0, 1, gallery, "GALLERY")
 		if err != nil {
 			return ret, "", err
 		}
-		if len(entries) != 1 || entries[0].Kind != "GALLERY" {
-			return ret, "", ErrUnavailable
+		if len(entries) != 1 {
+			return ret, "", nil
 		}
 		ret.Entries = entries
-		position.Entries = -1
-	} else if position.Entries >= 0 {
-		entries, err := s.Repo.Share.SnapshotEntries(ctx, row.ID, position.Entries, PageSize+1, "")
-		if err != nil {
-			return ret, "", err
+		position.Entries = []int{-1, -1, -1}
+		position.Media[1] = -1
+	} else {
+		// Independent type cursors keep images and galleries reachable even
+		// when a selection begins with thousands of videos.
+		for i, kind := range []string{"SCENE", "IMAGE", "GALLERY"} {
+			if position.Entries[i] < 0 {
+				continue
+			}
+			entries, err := s.Repo.Share.SnapshotEntries(ctx, row.ID, position.Entries[i], PageSize+1, "", kind)
+			if err != nil {
+				return ret, "", err
+			}
+			if len(entries) > PageSize {
+				entries = entries[:PageSize]
+				position.Entries[i] = entries[len(entries)-1].Position
+			} else {
+				position.Entries[i] = -1
+			}
+			ret.Entries = append(ret.Entries, entries...)
 		}
-		if len(entries) > PageSize {
-			entries = entries[:PageSize]
-			position.Entries = entries[len(entries)-1].Position
-		} else {
-			position.Entries = -1
-		}
-		ret.Entries = entries
+		// The first page of a small selection still preserves its original
+		// selected-entry order across kinds.
+		slices.SortFunc(ret.Entries, func(a, b models.ShareEntry) int { return cmp.Compare(a.Position, b.Position) })
 	}
 	seen := map[string]bool{}
 	add := func(item models.ShareMedia) error {
@@ -81,16 +99,19 @@ func (s *Service) snapshotPage(ctx context.Context, row *models.ShareRecord, cur
 		ret.Media = append(ret.Media, item)
 		return nil
 	}
-	if position.Media >= 0 {
-		items, err := s.Repo.Share.SnapshotMedia(ctx, row.ID, position.Media, PageSize+1, gallery)
+	for i, kind := range []string{"SCENE", "IMAGE"} {
+		if position.Media[i] < 0 {
+			continue
+		}
+		items, err := s.Repo.Share.SnapshotMedia(ctx, row.ID, position.Media[i], PageSize+1, gallery, kind)
 		if err != nil {
 			return ret, "", err
 		}
 		if len(items) > PageSize {
 			items = items[:PageSize]
-			position.Media = items[len(items)-1].Position
+			position.Media[i] = items[len(items)-1].Position
 		} else {
-			position.Media = -1
+			position.Media[i] = -1
 		}
 		for _, candidate := range items {
 			var item models.ShareMedia
@@ -120,7 +141,7 @@ func (s *Service) snapshotPage(ctx context.Context, row *models.ShareRecord, cur
 			if entry.Kind != "GALLERY" {
 				continue
 			}
-			items, err := s.Repo.Share.SnapshotMedia(ctx, row.ID, 0, 1, entry.Key)
+			items, err := s.Repo.Share.SnapshotMedia(ctx, row.ID, 0, 1, entry.Key, "")
 			if err != nil {
 				return ret, "", err
 			}
@@ -146,7 +167,7 @@ func (s *Service) snapshotPage(ctx context.Context, row *models.ShareRecord, cur
 			return ret, "", err
 		}
 	}
-	if position.Media >= 0 || position.Entries >= 0 {
+	if slices.ContainsFunc(position.Media, func(v int) bool { return v >= 0 }) || slices.ContainsFunc(position.Entries, func(v int) bool { return v >= 0 }) {
 		body, err := json.Marshal(position)
 		return ret, base64.RawURLEncoding.EncodeToString(body), err
 	}

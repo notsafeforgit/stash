@@ -103,7 +103,7 @@ SELECT share_id,key,key,1 FROM share_snapshot_entries WHERE share_id=? AND kind<
 	// Preserve the library's source-aware gallery ordering. Only a bounded page
 	// of gallery headers is held in Go; each membership list is inserted in SQL.
 	for after := 0; ; {
-		entries, err := s.snapshotEntries(ctx, share, after, 50, "", false)
+		entries, err := s.snapshotEntries(ctx, share, after, 50, "", "GALLERY", false)
 		if err != nil {
 			return err
 		}
@@ -147,14 +147,15 @@ func (*ShareStore) FreezeMedia(ctx context.Context, share string) error {
  FROM members JOIN share_snapshot_entries e ON e.share_id=? AND e.position=members.entry_position
  JOIN share_snapshot_members m ON m.share_id=e.share_id AND m.entry_key=e.key AND m.media_key=members.media_key
 )
-INSERT INTO share_snapshot_media(share_id,key,position,media,file_uuid,file_generation,expected_size,expected_mtime)
+INSERT INTO share_snapshot_media(share_id,key,position,media,expected_size,expected_mtime)
 SELECT ?,o.media_key,o.position,json_object(
  'uuid',a.uuid,'key',o.media_key,'kind',upper(a.kind),'entity_id',coalesce(a.scene_id,a.image_id),
  'file_id',coalesce(f.id,0),'file_uuid',coalesce(fa.uuid,''),'file_generation',coalesce(f.generation,0),
  'title',coalesce(s.title,i.title,''),'width',coalesce(v.width,img.width,0),'height',coalesce(v.height,img.height,0),
- 'duration',coalesce(v.duration,0),'frame_rate',coalesce(v.frame_rate,0),
+ 'duration',CASE WHEN abs(v.duration)<=1.7976931348623157e308 THEN v.duration ELSE 0 END,
+ 'frame_rate',CASE WHEN abs(v.frame_rate)<=1.7976931348623157e308 THEN v.frame_rate ELSE 0 END,
  'video_codec',coalesce(v.video_codec,''),'audio_codec',coalesce(v.audio_codec,'')),
- coalesce(fa.uuid,''),coalesce(f.generation,0),coalesce(z.size,f.size,0),coalesce(unixepoch(coalesce(z.mod_time,f.mod_time)),0)
+ coalesce(z.size,f.size,0),coalesce(unixepoch(coalesce(z.mod_time,f.mod_time)),0)
 FROM ordered o JOIN archive_entities a ON a.uuid=substr(o.media_key,instr(o.media_key,'-')+1)
 LEFT JOIN scenes s ON s.id=a.scene_id LEFT JOIN images i ON i.id=a.image_id
 LEFT JOIN scenes_files sf ON sf.scene_id=s.id AND sf."primary"=1
@@ -172,7 +173,7 @@ LEFT JOIN video_files v ON v.file_id=f.id LEFT JOIN image_files img ON img.file_
 
 func (*ShareStore) Preparation(ctx context.Context, share string, limit int) ([]models.SharePreparedMedia, error) {
 	ret := []models.SharePreparedMedia{}
-	err := dbWrapper.Select(ctx, &ret, `SELECT position,media,file_uuid,file_generation,expected_size,expected_mtime FROM share_snapshot_media WHERE share_id=? AND position>(SELECT prepared_count FROM shares WHERE id=?) ORDER BY position LIMIT ?`, share, share, limit)
+	err := dbWrapper.Select(ctx, &ret, `SELECT position,media,expected_size,expected_mtime FROM share_snapshot_media WHERE share_id=? AND position>(SELECT prepared_count FROM shares WHERE id=?) ORDER BY position LIMIT ?`, share, share, limit)
 	return ret, err
 }
 
@@ -223,11 +224,11 @@ const activeSnapshotEntry = `EXISTS(SELECT 1 FROM archive_entities a WHERE a.sta
  AND a.kind=lower(e.kind) AND (e.entity_uuid='' OR a.uuid=e.entity_uuid)
  AND ((e.kind='SCENE' AND a.scene_id=e.entity_id) OR (e.kind='IMAGE' AND a.image_id=e.entity_id) OR (e.kind='GALLERY' AND a.gallery_id=e.entity_id)))`
 
-func (s *ShareStore) SnapshotEntries(ctx context.Context, share string, after, limit int, key string) ([]models.ShareEntry, error) {
-	return s.snapshotEntries(ctx, share, after, limit, key, true)
+func (s *ShareStore) SnapshotEntries(ctx context.Context, share string, after, limit int, key, kind string) ([]models.ShareEntry, error) {
+	return s.snapshotEntries(ctx, share, after, limit, key, kind, true)
 }
 
-func (*ShareStore) snapshotEntries(ctx context.Context, share string, after, limit int, key string, active bool) ([]models.ShareEntry, error) {
+func (*ShareStore) snapshotEntries(ctx context.Context, share string, after, limit int, key, kind string, active bool) ([]models.ShareEntry, error) {
 	var rows []struct {
 		Position               int
 		Key, Kind, UUID, Title string
@@ -236,6 +237,10 @@ func (*ShareStore) snapshotEntries(ctx context.Context, share string, after, lim
 	}
 	query := `SELECT e.position,e.key,e.kind,e.entity_id id,e.entity_uuid uuid,e.title,e.media_count FROM share_snapshot_entries e WHERE e.share_id=? AND e.position>?`
 	args := []any{share, after}
+	if kind != "" {
+		query += ` AND e.kind=?`
+		args = append(args, kind)
+	}
 	if key != "" {
 		query += ` AND e.key=?`
 		args = append(args, key)
@@ -255,14 +260,14 @@ func (*ShareStore) snapshotEntries(ctx context.Context, share string, after, lim
 	return ret, nil
 }
 
-func (*ShareStore) SnapshotMedia(ctx context.Context, share string, after, limit int, gallery string) ([]models.SharePreparedMedia, error) {
+func (*ShareStore) SnapshotMedia(ctx context.Context, share string, after, limit int, gallery, kind string) ([]models.SharePreparedMedia, error) {
 	ret := []models.SharePreparedMedia{}
-	query := `SELECT m.position,m.media,m.file_uuid,m.file_generation,m.expected_size,m.expected_mtime FROM share_snapshot_media m WHERE m.share_id=? AND m.position>? AND EXISTS(
+	query := `SELECT m.position,m.media,m.expected_size,m.expected_mtime FROM share_snapshot_media m WHERE m.share_id=? AND m.position>? AND json_extract(m.media,'$.kind')=? AND EXISTS(
  SELECT 1 FROM share_snapshot_members sm JOIN share_snapshot_entries e ON e.share_id=sm.share_id AND e.key=sm.entry_key
  WHERE sm.share_id=m.share_id AND sm.media_key=m.key AND ` + activeSnapshotEntry + `) ORDER BY m.position LIMIT ?`
-	args := []any{share, after, limit}
+	args := []any{share, after, kind, limit}
 	if gallery != "" {
-		query = `SELECT sm.position,m.media,m.file_uuid,m.file_generation,m.expected_size,m.expected_mtime FROM share_snapshot_members sm
+		query = `SELECT sm.position,m.media,m.expected_size,m.expected_mtime FROM share_snapshot_members sm
  JOIN share_snapshot_entries e ON e.share_id=sm.share_id AND e.key=sm.entry_key
  JOIN share_snapshot_media m ON m.share_id=sm.share_id AND m.key=sm.media_key
  WHERE sm.share_id=? AND sm.entry_key=? AND sm.position>? AND ` + activeSnapshotEntry + ` ORDER BY sm.position LIMIT ?`

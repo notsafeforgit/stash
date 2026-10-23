@@ -50,7 +50,10 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useMsg } from "@/hooks/message";
 import { useToast } from "@/hooks/toast";
 import { ShareDialog } from "./share-dialog";
-import { ShareLinkDialog } from "./share-link-dialog";
+import {
+  ShareResultDialog,
+  type ShareResult,
+} from "./share-preparation-dialog";
 
 function ShareDelivery({
   value,
@@ -173,7 +176,7 @@ function ShareCard({
   const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [confirm, setConfirm] = useState<"revoke" | "rotate" | "delete">();
-  const [link, setLink] = useState<{ id: string; url: string }>();
+  const [link, setLink] = useState<ShareResult>();
   const [revoke, { loading: revoking }] = useMutation(
     GQL.MediaShareRevokeDocument,
   );
@@ -262,7 +265,12 @@ function ShareCard({
               {share.revoked_at
                 ? msg("sharing.revoked", "Revoked")
                 : active
-                  ? msg("sharing.active", "Active")
+                  ? share.preparation_state === GQL.SharePreparationState.Ready
+                    ? msg("sharing.active", "Active")
+                    : share.preparation_state ===
+                        GQL.SharePreparationState.Failed
+                      ? msg("sharing.preparation_failed", "Needs attention")
+                      : msg("sharing.preparing", "Preparing share")
                   : msg("sharing.expired", "Expired")}
             </Badge>
             <EntityActionsMenu
@@ -306,7 +314,9 @@ function ShareCard({
                   icon: RotateCcw,
                   label: msg("sharing.regenerate", "Regenerate link"),
                   onSelect: () => setConfirm("rotate"),
-                  disabled: !active,
+                  disabled:
+                    !active ||
+                    share.preparation_state !== GQL.SharePreparationState.Ready,
                 },
                 {
                   key: "revoke",
@@ -332,14 +342,28 @@ function ShareCard({
           </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          {active && !share.url && (
-            <p className="text-muted-foreground">
-              {msg(
-                "sharing.link_unavailable",
-                "Regenerate this older share once to enable Copy link and Preview here. Links you already sent still work.",
-              )}
-            </p>
-          )}
+          {active &&
+            share.preparation_state !== GQL.SharePreparationState.Ready && (
+              <Button
+                variant="outline"
+                onClick={() => setLink({ id: share.id })}
+              >
+                {share.preparation_state === GQL.SharePreparationState.Failed
+                  ? msg("sharing.review_preparation", "Review preparation")
+                  : msg("sharing.preparing", "Preparing share")}
+                {` · ${intl.formatNumber(share.prepared_count)} / ${intl.formatNumber(share.media_count ?? 0)}`}
+              </Button>
+            )}
+          {active &&
+            !share.url &&
+            share.preparation_state === GQL.SharePreparationState.Ready && (
+              <p className="text-muted-foreground">
+                {msg(
+                  "sharing.link_unavailable",
+                  "Regenerate this older share once to enable Copy link and Preview here. Links you already sent still work.",
+                )}
+              </p>
+            )}
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-muted-foreground">
             <span>
               {intl.formatMessage(
@@ -412,7 +436,7 @@ function ShareCard({
         </DestructiveConfirmDialog>
       )}
       {link && (
-        <ShareLinkDialog link={link} onClose={() => setLink(undefined)} />
+        <ShareResultDialog link={link} onClose={() => setLink(undefined)} />
       )}
     </>
   );

@@ -302,11 +302,11 @@ func (rs *shareRoutes) withGrant(next http.Handler, link bool) http.Handler {
 }
 
 type publicShareEntry struct {
-	Key       string   `json:"key"`
-	Kind      string   `json:"kind"`
-	Title     string   `json:"title"`
-	MediaKeys []string `json:"media_keys"`
- MediaCount int `json:"media_count"`
+	Key        string   `json:"key"`
+	Kind       string   `json:"kind"`
+	Title      string   `json:"title"`
+	MediaKeys  []string `json:"media_keys"`
+	MediaCount int      `json:"media_count"`
 }
 type publicShareMedia struct {
 	Key          string        `json:"key"`

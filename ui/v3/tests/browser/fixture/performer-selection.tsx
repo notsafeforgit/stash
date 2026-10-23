@@ -90,6 +90,9 @@ const client = new ApolloClient({
               url: "https://shares.test/share/ABCDEFGHIJKLMNOPQRSTUV?key=example",
               share: {
                 __typename: "MediaShare",
+                preparation_state: GQL.SharePreparationState.Ready,
+                prepared_count: 0,
+                preparation_error: "",
                 id: "ABCDEFGHIJKLMNOPQRSTUV",
                 url: "https://shares.test/share/ABCDEFGHIJKLMNOPQRSTUV?key=example",
                 label: variables.input.label,

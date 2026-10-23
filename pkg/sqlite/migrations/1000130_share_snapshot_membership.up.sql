@@ -26,13 +26,12 @@ CREATE TABLE share_snapshot_media (
  key TEXT NOT NULL,
  position INTEGER NOT NULL CHECK(position>0),
  media BLOB NOT NULL CHECK(json_valid(media)),
- file_uuid TEXT NOT NULL DEFAULT '',
- file_generation INTEGER NOT NULL DEFAULT 0,
  expected_size INTEGER NOT NULL DEFAULT 0,
  expected_mtime INTEGER NOT NULL DEFAULT 0,
  prepared INTEGER NOT NULL DEFAULT 0 CHECK(prepared IN (0,1)),
  PRIMARY KEY(share_id,key), UNIQUE(share_id,position)
 );
+CREATE INDEX share_snapshot_media_kind ON share_snapshot_media(share_id,json_extract(media,'$.kind'),position);
 CREATE INDEX share_snapshot_media_preparation ON share_snapshot_media(share_id,prepared,position);
 CREATE TABLE share_snapshot_members (
  share_id TEXT NOT NULL,
@@ -92,7 +91,6 @@ CREATE TRIGGER share_snapshot_member_immutable BEFORE UPDATE ON share_snapshot_m
 BEGIN SELECT RAISE(ABORT,'snapshot membership is immutable'); END;
 CREATE TRIGGER share_snapshot_media_immutable BEFORE UPDATE ON share_snapshot_media
 WHEN OLD.prepared=1 OR NEW.share_id<>OLD.share_id OR NEW.key<>OLD.key OR NEW.position<>OLD.position
- OR NEW.file_uuid<>OLD.file_uuid OR NEW.file_generation<>OLD.file_generation
  OR NEW.expected_size<>OLD.expected_size OR NEW.expected_mtime<>OLD.expected_mtime
  OR NEW.prepared<>1 OR json_remove(NEW.media,'$.fingerprint')<>json_remove(OLD.media,'$.fingerprint')
 BEGIN SELECT RAISE(ABORT,'snapshot media is immutable'); END;

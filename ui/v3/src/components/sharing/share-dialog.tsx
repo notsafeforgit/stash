@@ -38,7 +38,10 @@ import {
   type MatchingShareSelection,
   type ShareEntitySource,
 } from "./share-source";
-import { ShareLinkDialog } from "./share-link-dialog";
+import {
+  ShareResultDialog,
+  type ShareResult,
+} from "./share-preparation-dialog";
 
 export function localDateTime(date: Date) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
@@ -55,7 +58,7 @@ type ShareDialogProps = {
 };
 
 export function ShareDialog(props: ShareDialogProps) {
-  const [link, setLink] = useState<{ id: string; url: string }>();
+  const [link, setLink] = useState<ShareResult>();
   return (
     <>
       {props.open && (
@@ -68,7 +71,7 @@ export function ShareDialog(props: ShareDialogProps) {
         />
       )}
       {link && (
-        <ShareLinkDialog link={link} onClose={() => setLink(undefined)} />
+        <ShareResultDialog link={link} onClose={() => setLink(undefined)} />
       )}
     </>
   );
@@ -83,7 +86,7 @@ function ShareForm({
   share,
   onCreated,
 }: ShareDialogProps & {
-  onCreated: (link: { id: string; url: string }) => void;
+  onCreated: (link: ShareResult) => void;
 }) {
   const msg = useMsg();
   const intl = useIntl();
@@ -391,7 +394,7 @@ function ShareForm({
                               GQL.ShareMembership.Snapshot
                                 ? msg(
                                     "sharing.snapshot_description",
-                                    "Include what matches when you create the link. Later additions are not included. Snapshots support up to 2,000 media items.",
+                                    "Include what matches when you create the link. Later additions are not included. Large snapshots prepare in the background.",
                                   )
                                 : msg(
                                     "sharing.ongoing_description",
@@ -405,7 +408,7 @@ function ShareForm({
                       <FieldDescription>
                         {msg(
                           "sharing.selection_description",
-                          "Keep this selection and the current contents of selected galleries. Later additions are not included. Snapshots support up to 2,000 media items.",
+                          "Keep this selection and the current contents of selected galleries. Later additions are not included. Large snapshots prepare in the background.",
                         )}
                       </FieldDescription>
                     )

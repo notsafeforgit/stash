@@ -17,6 +17,7 @@ import { useMediaQuery } from "@/utils/screen";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { DetailTabStrip } from "@/components/detail/detail-tab-strip";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { SharedMediaViewer } from "./shared-media-viewer";
 import { SharedLightbox } from "./shared-lightbox";
@@ -92,7 +93,7 @@ function SharedGrid({
                     defaultMessage:
                       "{count, plural, one {# item} other {# items}}",
                   },
-                  { count: item.media.length },
+                  { count: item.mediaCount },
                 )}
               </EntityCard.Subtitle>
             )}
@@ -172,20 +173,30 @@ function SharedScroll({
   );
 }
 
-export function ShareBrowser({
+type ShareBrowserProps = {
+  content: SharedContent;
+  base: URL;
+  navigationBase: URL;
+  controls?: ReactNode;
+};
+export function ShareBrowser(props: ShareBrowserProps) {
+  const navigation = useShareNavigation(props.navigationBase);
+  return <ShareBrowserView {...props} navigation={navigation} />;
+}
+export function ShareBrowserView({
   content,
   base,
   navigationBase,
   controls,
-}: {
-  content: SharedContent;
-  base: URL;
-  navigationBase: URL;
-  controls?: React.ReactNode;
+  navigation,
+  busy = false,
+}: ShareBrowserProps & {
+  navigation: ReturnType<typeof useShareNavigation>;
+  busy?: boolean;
 }) {
   const intl = useIntl();
   const collections = useMemo(() => shareCollections(content), [content]);
-  const { location, navigate, back } = useShareNavigation(navigationBase);
+  const { location, navigate, back } = navigation;
   const tabs: ShareTab[] = shareTabSchema.options.filter(
     (tab) => collections[tab].length > 0,
   );
@@ -287,7 +298,9 @@ export function ShareBrowser({
             <h2 className="min-w-0 truncate font-medium">{title}</h2>
           </div>
           <SharedScroll key={viewKey} viewKey={viewKey} positions={positions}>
-            {unavailable ? (
+            {busy ? (
+              <Spinner className="m-6" />
+            ) : unavailable ? (
               <Empty>
                 <EmptyHeader>
                   <EmptyTitle>
@@ -334,7 +347,7 @@ export function ShareBrowser({
           />
           <TabsContent value={tab} className="flex min-h-0 flex-1 flex-col">
             <SharedScroll key={viewKey} viewKey={viewKey} positions={positions}>
-              {grid}
+              {busy ? <Spinner className="m-6" /> : grid}
             </SharedScroll>
           </TabsContent>
         </Tabs>

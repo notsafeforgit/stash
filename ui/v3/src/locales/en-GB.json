@@ -3064,9 +3064,16 @@
     "selected_items": "Selected items",
     "filtered_description": "All items matching this list’s current search and filters, across every page.",
     "membership": "Membership",
-    "snapshot_description": "Include what matches when you create the link. Later additions are not included. Snapshots support up to 2,000 media items.",
+    "preparing": "Preparing share",
+    "preparation_description": "Your selection is saved. The link will be available when preparation finishes. You can close this dialog and return from Settings → Shares.",
+    "preparation_connection": "Unable to check preparation. Your saved selection is retained.",
+    "prepared": "Media prepared",
+    "retry_preparation": "Retry preparation",
+    "review_preparation": "Review preparation",
+    "preparation_failed": "Needs attention",
+    "snapshot_description": "Include what matches when you create the link. Later additions are not included. Large snapshots prepare in the background.",
     "ongoing_description": "Keep these rules and include current and future matches. Items disappear when they stop matching. Changing this list’s filters later does not change the share.",
-    "selection_description": "Keep this selection and the current contents of selected galleries. Later additions are not included. Snapshots support up to 2,000 media items.",
+    "selection_description": "Keep this selection and the current contents of selected galleries. Later additions are not included. Large snapshots prepare in the background.",
     "selected_count": "{count, plural, one {# selected item} other {# selected items}}"
   },
   "account_consolidation": {

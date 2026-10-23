@@ -23,7 +23,6 @@ test("share dialog summarizes a large selection without an item picker", async (
           sharingConfiguration: {
             public_url: "",
             max_days: 30,
-            max_items: 2000,
           },
         },
       },
@@ -64,7 +63,6 @@ for (const narrow of [false, true]) {
               sharingConfiguration: {
                 public_url: "",
                 max_days: 30,
-                max_items: 2000,
               },
             },
           },
@@ -147,6 +145,9 @@ for (const older of [false, true]) {
       "https://shares.test/share/abcdefghijklmnopqrstuv/?key=replacement";
     let share: GQL.MediaShareFieldsFragment = {
       __typename: "MediaShare",
+      preparation_state: GQL.SharePreparationState.Ready,
+      preparation_error: "",
+      prepared_count: 0,
       id: "abcdefghijklmnopqrstuv",
       url: older ? null : original,
       label: "Saved recipient link",
@@ -191,7 +192,6 @@ for (const older of [false, true]) {
             __typename: "SharingConfiguration",
             public_url: "https://shares.test/share",
             max_days: 30,
-            max_items: 2000,
           },
         };
         return route.fulfill({ json: { data } });
@@ -359,7 +359,6 @@ for (const viewport of [
             __typename: "SharingConfiguration",
             public_url: "https://shares.test/share",
             max_days: 30,
-            max_items: 2000,
           },
         };
         await route.fulfill({ json: { data } });
@@ -387,6 +386,9 @@ for (const viewport of [
         inputLog.push(input);
         const share: GQL.MediaShareFieldsFragment = {
           __typename: "MediaShare",
+          preparation_state: GQL.SharePreparationState.Ready,
+          preparation_error: "",
+          prepared_count: 0,
           id: "abcdefghijklmnopqrstuv",
           url: `https://shares.test/share/abcdefghijklmnopqrstuv/?key=${"secret".repeat(30)}`,
           label: input.label,
@@ -567,7 +569,6 @@ test("persists the public share address without delivery controls", async ({
     __typename: "SharingConfiguration",
     public_url: "https://shares.test/share",
     max_days: 30,
-    max_items: 2000,
   };
   const updates: GQL.ConfigureSharingMutationVariables[] = [];
   await page.route("**/graphql", async (route) => {
@@ -624,6 +625,9 @@ for (const width of [320, 1280]) {
     await page.clock.setFixedTime(now);
     const active: GQL.MediaShareFieldsFragment = {
       __typename: "MediaShare",
+      preparation_state: GQL.SharePreparationState.Ready,
+      preparation_error: "",
+      prepared_count: 0,
       id: "active-share",
       url: "https://shares.test/share/active-share/?key=example",
       label: "Keep this active share",
@@ -689,7 +693,6 @@ for (const width of [320, 1280]) {
             __typename: "SharingConfiguration",
             public_url: "https://shares.test/share",
             max_days: 30,
-            max_items: 2000,
           },
         };
         return route.fulfill({ json: { data } });
@@ -781,3 +784,130 @@ for (const width of [320, 1280]) {
     ).toHaveCount(0);
   });
 }
+
+test("large snapshots survive closing the dialog and expose a link only after retry completes", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  const now = new Date();
+  const share: GQL.MediaShareFieldsFragment = {
+    __typename: "MediaShare",
+    id: "abcdefghijklmnopqrstuv",
+    url: null,
+    label: "Large selection",
+    created_at: now.toISOString(),
+    expires_at: new Date(now.getTime() + 86400000).toISOString(),
+    revoked_at: null,
+    allow_download: false,
+    show_metadata: false,
+    access_count: 0,
+    last_accessed_at: null,
+    media_count: 4000,
+    selection_count: 4000,
+    mode: GQL.ShareMembership.Snapshot,
+    source_kind: GQL.ShareSourceKind.Selection,
+    source_name: "",
+    media_types: [],
+    preparation_state: GQL.SharePreparationState.Preparing,
+    prepared_count: 1250,
+    preparation_error: "",
+  };
+  let created = false;
+  const operations: string[] = [];
+  await page.route("**/graphql", async (route) => {
+    const { operationName } = z
+      .object({ operationName: z.string() })
+      .parse(route.request().postDataJSON());
+    operations.push(operationName);
+    if (operationName === "MediaShares")
+      return route.fulfill({
+        json: {
+          data: {
+            mediaShares: created ? [share] : [],
+            sharingConfiguration: {
+              __typename: "SharingConfiguration",
+              public_url: "",
+              max_days: 30,
+            },
+          },
+        },
+      });
+    if (operationName === "MediaShareCreate") {
+      created = true;
+      return route.fulfill({
+        json: {
+          data: {
+            mediaShareCreate: {
+              __typename: "MediaShareCreated",
+              share,
+              url: null,
+            },
+          },
+        },
+      });
+    }
+    if (operationName === "MediaShareRetry") {
+      share.preparation_state = GQL.SharePreparationState.Preparing;
+      share.preparation_error = "";
+      share.prepared_count = 2000;
+      return route.fulfill({ json: { data: { mediaShareRetry: share } } });
+    }
+    expect(operationName).toBe("MediaShare");
+    return route.fulfill({ json: { data: { mediaShare: share } } });
+  });
+  await page.goto("/share-management.html?selection=4000");
+  await page
+    .getByRole("button", { name: "Share selection", exact: true })
+    .click();
+  const form = page.getByRole("dialog", { name: "Create share", exact: true });
+  await form.getByRole("button", { name: "Create share", exact: true }).click();
+  let preparing = page.getByRole("dialog", {
+    name: "Preparing share",
+    exact: true,
+  });
+  await expect(preparing.getByRole("progressbar")).toHaveAttribute(
+    "aria-valuenow",
+    "1250",
+  );
+  await expect(
+    preparing.getByRole("button", { name: "Copy link", exact: true }),
+  ).toHaveCount(0);
+  await expectDialogFits(preparing);
+  await preparing
+    .getByRole("button", { name: "Close", exact: true })
+    .last()
+    .click();
+  await page.getByRole("button", { name: /Preparing share · 1,250/ }).click();
+  preparing = page.getByRole("dialog", {
+    name: "Preparing share",
+    exact: true,
+  });
+  share.preparation_state = GQL.SharePreparationState.Failed;
+  share.preparation_error =
+    "The original file is temporarily unavailable. Restore it and retry.";
+  await expect(preparing.getByText(share.preparation_error)).toBeVisible();
+  await preparing
+    .getByRole("button", { name: "Retry preparation", exact: true })
+    .click();
+  await expect(preparing.getByRole("progressbar")).toHaveAttribute(
+    "aria-valuenow",
+    "2000",
+  );
+  share.preparation_state = GQL.SharePreparationState.Ready;
+  share.prepared_count = 4000;
+  share.url = "https://shares.test/share/abcdefghijklmnopqrstuv/?key=completed";
+  const ready = page.getByRole("dialog", {
+    name: "Your share link is ready",
+    exact: true,
+  });
+  await expect(ready.getByLabel("Share link", { exact: true })).toHaveValue(
+    share.url,
+  );
+  await expect(
+    ready.getByRole("button", { name: "Copy link", exact: true }),
+  ).toBeEnabled();
+  expect(operations.filter((name) => name === "MediaShareCreate")).toHaveLength(
+    1,
+  );
+  expect(operations).not.toContain("MediaShareRevoke");
+});

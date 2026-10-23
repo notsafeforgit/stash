@@ -60,6 +60,7 @@ export const shareContentSchema = shareStatusSchema.extend({
       kind,
       title: z.string(),
       media_keys: z.array(z.string()),
+      media_count: z.number().int().nonnegative().optional(),
     }),
   ),
   media: z.array(mediaSchema),

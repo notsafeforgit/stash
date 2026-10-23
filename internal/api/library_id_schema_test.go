@@ -29,7 +29,7 @@ func TestLibraryIDSchemaCoverage(t *testing.T) {
 		},
 		"share": {
 			"Query.mediaShare(id)", "Mutation.mediaShareRevoke(id)", "Mutation.mediaShareDelete(id)",
-			"Mutation.mediaShareRotate(id)", "MediaShareUpdateInput.id", "MediaShare.id",
+			"Mutation.mediaShareRotate(id)", "Mutation.mediaShareRetry(id)", "MediaShareUpdateInput.id", "MediaShare.id",
 		},
 		"remote provider": {"Mutation.submitStashBoxSceneDraft", "Mutation.submitStashBoxPerformerDraft"},
 		"scraper":         {"Scraper.id", "ScraperSourceInput.scraper_id", "ScraperSource.scraper_id"},

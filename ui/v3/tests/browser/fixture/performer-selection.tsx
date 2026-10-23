@@ -29,15 +29,13 @@ declare global {
   interface Window {
     performerSelectionFixture: {
       requests: { name: string; variables: OperationVariables }[];
-      matching: "success" | "error" | "limit" | "partial" | "pending";
-      releaseMatching?: () => void;
+      createError?: string;
       shares: GQL.MediaShareCreateMutationVariables[];
     };
   }
 }
 const state: Window["performerSelectionFixture"] = {
   requests: [],
-  matching: "success",
   shares: [],
 };
 window.performerSelectionFixture = state;
@@ -78,31 +76,13 @@ const client = new ApolloClient({
           respond({
             result: { __typename: "FindScenesResultType", count: items.length },
           });
-        } else if (name === "ShareTargetSearch") {
-          respond({
-            findScenes: { scenes: [] },
-            findImages: { images: [] },
-            findGalleries: { galleries: [] },
-          });
-        } else if (name === "ShareMatchingTargets") {
-          const send = () => {
-            if (state.matching === "error")
-              observer.error(new Error("Matching query failed"));
-            else
-              respond({
-                sharingConfiguration: { max_items: 2000 },
-                findScenes: {
-                  count: state.matching === "limit" ? 2001 : items.length,
-                  scenes:
-                    state.matching === "partial" ? items.slice(0, 40) : items,
-                },
-              });
-          };
-          if (state.matching === "pending") state.releaseMatching = send;
-          else send();
         } else if (name === "MediaShareCreate") {
           const variables =
             operation.variables as GQL.MediaShareCreateMutationVariables;
+          if (state.createError) {
+            observer.error(new Error(state.createError));
+            return;
+          }
           state.shares.push(variables);
           const data: GQL.MediaShareCreateMutation = {
             mediaShareCreate: {
@@ -120,13 +100,15 @@ const client = new ApolloClient({
                 show_metadata: false,
                 access_count: 0,
                 last_accessed_at: null,
-                media_count: variables.input.targets.length,
-                items: variables.input.targets.map((target) => ({
-                  ...target,
-                  __typename: "MediaShareEntry",
-                  title: target.id,
-                  media_count: 1,
-                })),
+                media_count: variables.input.targets?.length ?? null,
+                mode:
+                  variables.input.source?.mode ?? GQL.ShareMembership.Snapshot,
+                source_kind: variables.input.source
+                  ? GQL.ShareSourceKind.Filter
+                  : GQL.ShareSourceKind.Selection,
+                source_name: "",
+                selection_count: variables.input.targets?.length ?? 0,
+                media_types: [GQL.ShareEntityKind.Scene],
               },
             },
           };

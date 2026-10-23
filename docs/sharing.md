@@ -1,9 +1,10 @@
 # Expiring media shares
 
 Sharing is available by default. Create a share from a scene,
-image or gallery's operations menu, from an explicit selection in either list
-toolbar, or in **Settings → Shares**. The settings page can combine scenes,
-images and galleries in one link. It also supports editing expiry and display
+image or gallery's operations menu, from an explicit selection or filtered list
+in either list toolbar, or from a performer, studio or tag's operations menu.
+The dialog summarizes the source without an item picker or a long selection list.
+**Settings → Shares** supports editing expiry and display
 options, previewing the recipient view, regenerating a link and revoking access.
 
 The settings list shows **Active** shares by default. **Inactive** contains
@@ -29,26 +30,44 @@ all its guest sessions.
 
 List selections persist across pages. On mobile, tap the selected count to open
 the page picker, then select more items on another page. To share all of a
-performer's videos, select an item on their video tab, open **Share…**, and choose
-**Use all matching items across pages**. This respects the current search and
-filters, including the performer. Review the included items and create the
-share. Changing the list's search or filters clears its selection.
+performer's videos, open **Share…** on their video tab without selecting items.
+With a selection, the dialog also offers **Filtered list**. The list's complete
+search and filter AST are copied, including locked performer/studio/tag context;
+page number, page size and later edits to the list or saved filter do not affect
+the share. Changing the list's search or filters clears its selection.
 
-Loading all matching items preserves the previous draft on failure and never
-silently truncates the result. The existing 2,000-media-item limit still applies;
-narrow the filters or split the selection if it exceeds the limit.
+Explicit selections always create snapshots. Filtered lists and performer,
+studio or tag sources offer **Snapshot** (the default) and **Ongoing**:
 
-Shares freeze an explicit selection at creation, including each gallery's
-current image membership and order. Gallery-linked scenes, performers, studios,
-tags and future additions are not included. Overlapping media is deduplicated;
-each share can contain at most 2,000 distinct media items. Sharing a performer,
-studio, tag, saved filter or whole library is deliberately outside this release.
+- **Snapshot:** resolve the complete selection in the creation transaction and
+  freeze membership, titles and file identities. Later additions and metadata
+  changes do not change membership. The existing limits of 2,000 selected items
+  and 2,000 distinct media items apply, including gallery contents; larger or unavailable selections
+  fail without creating a partial grant.
+- **Ongoing:** retain immutable rules and query current matches at read time.
+  New media and later metadata changes can add matches; items that stop matching
+  disappear. There is no fixed media count or 2,000-item lifetime limit. The
+  recipient can refresh the results and load more pages, with 50 targets per
+  included type per request. Stable keyset cursors avoid offset shifts after
+  deletions; refreshing restarts the listing to include changes before a cursor.
 
-Each selected item pins its primary file ID and fingerprint (size, mtime and
+Entity sources default to scenes, images and galleries, with controls to choose
+fewer types. These use direct entity relationships; a filtered list can express
+additional conditions such as descendant studios. Galleries include their
+images and linked scenes. Overlapping media is deduplicated. Existing historical
+gallery snapshots retain precisely their original frozen contents.
+
+Deleted media disappears from both modes and cannot be delivered through old
+URLs. Deleting a shared gallery also removes access to its contents unless they
+are independently included. Snapshots pin each item's primary file ID and fingerprint (size, mtime and
 available indexed hashes). Deleted objects, changed primary files and changed
 source files fail closed. Archive images also pin the archive's identity.
-Titles are a snapshot: subsequent metadata edits do not change an existing share.
-Membership changes require creating a new share.
+Snapshot titles stay frozen. Ongoing shares use current matching entities,
+titles and primary files; every original/thumbnail/preview/stream request checks
+current membership, UUID identity and the resolved file. Filter/entity references
+are UUIDs, so reusing a deleted local database key cannot widen a grant.
+Changing a share's rules requires a new link. Expiry, revocation and anonymous
+session rules are identical for both modes; ongoing does not mean permanent.
 
 Shares containing one distinct image or video open directly in the existing
 full-screen viewer, including a gallery containing only that item. Close returns
@@ -58,9 +77,13 @@ Multi-item shares use the normal virtualized entity cards, with tabs for the
 media types present and no filtering, sorting or selection controls.
 Previews open the existing image or scene lightbox; card titles open minimal
 detail views with media and the permitted download action. Gallery details show
-their frozen membership. Browser Back closes a lightbox or returns to the
+their applicable snapshot or ongoing membership. Browser Back closes a lightbox or returns to the
 previous list and scroll position. Detail URLs use query parameters under the
 same share path and still require that share's guest session.
+Ongoing detail links resolve their authorized target independently of the
+currently loaded page. Ongoing sources use generic link cards, even when they
+temporarily contain only one item, so a preview URL cannot change its media as
+membership changes.
 
 The guest response contains only the share label, expiry, selected media,
 dimensions, duration, optional titles and scoped media URLs. It omits filesystem
@@ -94,9 +117,9 @@ Sharing adds no metadata-stripping arguments to the video pipeline.
 Original images and videos stream directly without a copy or rendition cache.
 Archive images decompress only the selected member, with bounded memory and
 unchanged image bytes; the containing archive and unshared members remain
-inaccessible. Scene covers follow the current cover selection. Frozen membership
-and pinned primary-file checks apply to every media request, including generated
-previews, direct streams and HLS segments.
+inaccessible. Scene covers follow the current cover selection. The source's
+membership rules and file checks apply to every media request, including
+generated previews, direct streams and HLS segments.
 
 **Show download button** exposes a convenient original-file download action. Its
 download always uses the original file, regardless of the format used for video

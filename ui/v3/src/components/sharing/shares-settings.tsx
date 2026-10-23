@@ -12,7 +12,6 @@ import {
   Eye,
   Link,
   Pencil,
-  Plus,
   RotateCcw,
   ShieldOff,
   Trash2,
@@ -243,14 +242,19 @@ function ShareCard({
           <div className="min-w-0 space-y-2">
             <CardTitle className="break-words">{share.label}</CardTitle>
             <CardDescription>
-              {intl.formatMessage(
-                {
-                  id: "sharing.media_count",
-                  defaultMessage:
-                    "{count, plural, one {# media item} other {# media items}}",
-                },
-                { count: share.media_count },
-              )}
+              {share.mode === GQL.ShareMembership.Ongoing
+                ? msg("sharing.ongoing", "Ongoing")
+                : intl.formatMessage(
+                    {
+                      id: "sharing.media_count",
+                      defaultMessage:
+                        "{count, plural, one {# media item} other {# media items}}",
+                    },
+                    { count: share.media_count ?? 0 },
+                  )}
+              {share.source_name && ` · ${share.source_name}`}
+              {share.source_kind === GQL.ShareSourceKind.Filter &&
+                ` · ${msg("sharing.filtered_list", "Filtered list")}`}
             </CardDescription>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -422,7 +426,6 @@ export function SharesSettings() {
   const [status, setStatus] = useState<GQL.MediaShareStatus>(
     GQL.MediaShareStatus.Active,
   );
-  const [creating, setCreating] = useState(false);
   const [confirmCleanup, setConfirmCleanup] = useState(false);
   const [countRefresh, setCountRefresh] = useState(0);
   const [deleteInactive, { loading: deletingInactive }] = useMutation(
@@ -477,10 +480,6 @@ export function SharesSettings() {
         )}
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button onClick={() => setCreating(true)}>
-            <Plus data-icon="inline-start" />
-            {msg("sharing.create", "Create share")}
-          </Button>
           <ToggleGroup<GQL.MediaShareStatus>
             variant="outline"
             aria-label={msg("sharing.status", "Share status")}
@@ -535,7 +534,7 @@ export function SharesSettings() {
                 {status === GQL.MediaShareStatus.Active
                   ? msg(
                       "sharing.empty_description",
-                      "Create a share here, from a media page, or from a selection in your library.",
+                      "Share a media selection, a filtered list, or a performer, studio or tag from your library.",
                     )
                   : msg(
                       "sharing.inactive_description",
@@ -580,7 +579,6 @@ export function SharesSettings() {
           />
         </SettingsSection>
       )}
-      <ShareDialog open={creating} onOpenChange={setCreating} />
       <DestructiveConfirmDialog
         open={confirmCleanup}
         onOpenChange={setConfirmCleanup}

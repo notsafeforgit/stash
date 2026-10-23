@@ -10,12 +10,11 @@ fragment MediaShareFields on MediaShare {
   access_count
   last_accessed_at
   media_count
-  items {
-    kind
-    id
-    title
-    media_count
-  }
+  mode
+  source_kind
+  source_name
+  media_types
+  selection_count
 }
 query MediaShares($limit: Int!, $offset: Int!, $status: MediaShareStatus) {
   mediaShares(limit: $limit, offset: $offset, status: $status) {
@@ -57,103 +56,5 @@ mutation ConfigureSharing($public_url: String!) {
     public_url
     max_items
     max_days
-  }
-}
-query ShareTargetSearch($q: String!) {
-  findScenes(filter: { q: $q, per_page: 20 }) {
-    scenes {
-      id
-      title
-      files {
-        path
-      }
-    }
-  }
-  findImages(filter: { q: $q, per_page: 20 }) {
-    images {
-      id
-      title
-      visual_files {
-        ... on VideoFile {
-          path
-        }
-        ... on ImageFile {
-          path
-        }
-      }
-    }
-  }
-  findGalleries(filter: { q: $q, per_page: 20 }) {
-    galleries {
-      id
-      title
-      image_count
-      folder {
-        path
-        basename
-      }
-      files {
-        path
-      }
-    }
-  }
-}
-
-# Resolve a bounded snapshot of the current list, retaining its locked context
-# (e.g. performer) and search criteria without fetching full card/media data.
-query ShareMatchingTargets(
-  $filter: FindFilterType!
-  $filter_ast: FilterASTInput
-  $scenes: Boolean!
-  $images: Boolean!
-  $galleries: Boolean!
-) {
-  sharingConfiguration {
-    max_items
-  }
-  findScenes(filter: $filter, scene_filter_ast: $filter_ast)
-    @include(if: $scenes)
-  {
-    count
-    scenes {
-      id
-      title
-      files {
-        path
-      }
-    }
-  }
-  findImages(filter: $filter, image_filter_ast: $filter_ast)
-    @include(if: $images)
-  {
-    count
-    images {
-      id
-      title
-      visual_files {
-        ... on VideoFile {
-          path
-        }
-        ... on ImageFile {
-          path
-        }
-      }
-    }
-  }
-  findGalleries(filter: $filter, gallery_filter_ast: $filter_ast)
-    @include(if: $galleries)
-  {
-    count
-    galleries {
-      id
-      title
-      folder {
-        path
-        basename
-      }
-      files {
-        path
-      }
-    }
   }
 }

@@ -114,9 +114,10 @@ func (s *Service) validateSource(ctx context.Context, source *models.ShareSource
 func (s *Service) sourceQueries(ctx context.Context, source *models.ShareSource) ([]models.ShareFilter, error) {
 	ctx = entityid.WithRepository(ctx, s.Repo)
 	var queries []models.ShareFilter
-	if source.Filter != nil {
+	switch {
+	case source.Filter != nil:
 		queries = append(queries, *source.Filter)
-	} else if source.Entity != nil {
+	case source.Entity != nil:
 		field := map[string]string{"PERFORMER": "performers", "STUDIO": "studios", "TAG": "tags"}[source.Entity.Kind]
 		if field == "" {
 			return nil, errors.New("unsupported share source")
@@ -128,7 +129,7 @@ func (s *Service) sourceQueries(ctx context.Context, source *models.ShareSource)
 			}
 			queries = append(queries, models.ShareFilter{Kind: kind, AST: &models.FilterAST{Root: &models.FilterASTNode{Condition: &models.FilterASTCondition{Field: field, Value: value}}}})
 		}
-	} else {
+	default:
 		return nil, errors.New("missing share source")
 	}
 	for i := range queries {

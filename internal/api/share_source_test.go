@@ -13,7 +13,7 @@ import (
 )
 
 func TestShareSourceGraphQLRetainsUUIDFilters(t *testing.T) {
-	rs, _, _, _ := shareHTTPFixture(t)
+	rs, _, existing, secret := shareHTTPFixture(t)
 	repo := rs.service.Repo
 	call := nativeResolverCaller(t, &Resolver{repository: repo, shares: rs.service})
 	galleryUUID := libraryTestUUID(t, repo, models.ArchiveGallery, 4)
@@ -44,6 +44,8 @@ func TestShareSourceGraphQLRetainsUUIDFilters(t *testing.T) {
 	require.Empty(t, content.Media)
 	input["targets"] = []map[string]any{{"kind": "IMAGE", "id": libraryTestUUID(t, repo, models.ArchiveImage, 1)}}
 	require.Contains(t, call(query, map[string]any{"input": input}), "choose either selected items or a share source")
+	_, err = rs.service.AuthenticateLink(t.Context(), existing.ID, secret)
+	require.NoError(t, err, "existing links remain independent")
 }
 
 func TestShareOngoingHTTPRechecksEveryDelivery(t *testing.T) {

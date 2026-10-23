@@ -1,22 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import type { SharedContent, SharedMedia } from "./share-contract";
+import { shareGalleryKeySchema, shareMediaKeySchema } from "./share-contract";
 
 export const shareTabSchema = z.enum(["scenes", "images", "galleries"]);
 export type ShareTab = z.infer<typeof shareTabSchema>;
 
 const locationSchema = z.object({
   tab: shareTabSchema.optional().catch(undefined),
-  gallery: z
-    .string()
-    .regex(/^gallery-[1-9][0-9]*$/)
-    .optional()
-    .catch(undefined),
-  media: z
-    .string()
-    .regex(/^(scene|image)-[1-9][0-9]*$/)
-    .optional()
-    .catch(undefined),
+  gallery: shareGalleryKeySchema.optional().catch(undefined),
+  media: shareMediaKeySchema.optional().catch(undefined),
 });
 export type ShareLocation = z.infer<typeof locationSchema>;
 
@@ -36,7 +29,7 @@ export function shareCollections(content: SharedContent) {
     entry.kind === "GALLERY"
       ? [
           {
-            id: `gallery-${index + 1}`,
+            id: entry.key ?? `gallery-${index + 1}`,
             kind: "GALLERY",
             title: entry.title,
             media: entry.media_keys.flatMap((key) => {

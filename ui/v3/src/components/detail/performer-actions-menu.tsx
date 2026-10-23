@@ -10,6 +10,7 @@ import {
 import { AutoTagDialog } from "src/components/detail/auto-tag-dialog";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
 import { PerformerMergeDialog } from "@/components/detail/deferred-overlays";
+import { useShareAction } from "@/components/sharing/share-action";
 
 interface PerformerActionsMenuProps {
   performer: NonNullable<GQL.FindPerformerQuery["findPerformer"]>;
@@ -22,6 +23,11 @@ export function PerformerActionsMenu({
   onDeleted,
 }: PerformerActionsMenuProps) {
   const intl = useIntl();
+  const share = useShareAction([], undefined, {
+    kind: GQL.ShareLibraryKind.Performer,
+    id: performer.id,
+    name: performer.name,
+  });
   const [autoTagOpen, setAutoTagOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -49,6 +55,7 @@ export function PerformerActionsMenu({
   }
 
   const items: EntityActionItem[] = [
+    share.action,
     {
       key: "auto-tag",
       icon: Wand2,
@@ -92,6 +99,7 @@ export function PerformerActionsMenu({
   return (
     <>
       <EntityActionsMenu items={items} />
+      {share.dialog}
 
       <AutoTagDialog
         open={autoTagOpen}

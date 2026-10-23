@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
 import { ShareBrowser } from "./share-browser";
+import { useToast } from "@/hooks/toast";
 import {
   ShareUnavailableError,
   shareContentSchema,
@@ -30,7 +31,7 @@ async function openShare(
   cleanURL.hash = "";
   if (secret) cleanURL.searchParams.set("key", secret);
   history.replaceState(history.state, "", cleanURL.pathname + cleanURL.search);
-  const contentURL = new URL("content", target.base);
+  const contentURL = shareContentURL(target.base);
   if (secret) {
     // The address-bar key survives reloads. Reuse a valid guest cookie instead
     // of creating another session and counting another recipient exchange.
@@ -56,6 +57,10 @@ async function openShare(
 
 export function ShareViewer() {
   const intl = useIntl();
+  const toast = useToast();
+  const [loadingMore, setLoadingMore] = useState(false);
+  const contentRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => contentRequest.current?.abort(), []);
   const [target] = useState(() => shareTarget(location.href, document.baseURI));
   const [state, setState] = useState<ViewerState>({ kind: "loading" });
   const bootstrap = useRef<{
@@ -63,6 +68,41 @@ export function ShareViewer() {
     promise: Promise<SharedContent>;
   } | null>(null);
   const [attempt, setAttempt] = useState(0);
+  async function loadContent(refresh: boolean) {
+    if (!target || state.kind !== "ready" || contentRequest.current) return;
+    const controller = new AbortController();
+    contentRequest.current = controller;
+    setLoadingMore(true);
+    try {
+      const url = shareContentURL(target.base);
+      if (!refresh && state.content.next)
+        url.searchParams.set("cursor", state.content.next);
+      const page = await shareRequest(
+        url,
+        shareContentSchema,
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
+      setState((current) => {
+        if (current.kind !== "ready") return current;
+        const content = refresh
+          ? page
+          : mergeShareContent(current.content, page);
+        return { kind: "ready", content, deadline: shareDeadline(page) };
+      });
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        if (error instanceof ShareUnavailableError)
+          setState({ kind: "unavailable" });
+        else toast.error(error);
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        contentRequest.current = null;
+        setLoadingMore(false);
+      }
+    }
+  }
   useEffect(() => {
     let active = true;
     if (bootstrap.current?.attempt !== attempt)
@@ -185,6 +225,68 @@ export function ShareViewer() {
       content={state.content}
       base={target.base}
       navigationBase={target.navigationBase}
+      controls={
+        <div className="flex shrink-0 items-center gap-2 px-4 pb-2 sm:px-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={loadingMore}
+            onClick={() => void loadContent(true)}
+          >
+            <RefreshCw data-icon="inline-start" />
+            {intl.formatMessage({
+              id: "actions.refresh",
+              defaultMessage: "Refresh",
+            })}
+          </Button>
+          {state.content.next && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={loadingMore}
+              onClick={() => void loadContent(false)}
+            >
+              {loadingMore && <Spinner data-icon="inline-start" />}
+              {intl.formatMessage({
+                id: "actions.load_more",
+                defaultMessage: "Load more",
+              })}
+            </Button>
+          )}
+        </div>
+      }
     />
   );
+}
+
+function shareContentURL(base: URL) {
+  const url = new URL("content", base);
+  const current = new URLSearchParams(location.search);
+  for (const key of ["gallery", "media"]) {
+    const value = current.get(key);
+    if (value) url.searchParams.set(key, value);
+  }
+  return url;
+}
+
+export function mergeShareContent(
+  current: SharedContent,
+  page: SharedContent,
+): SharedContent {
+  return {
+    ...page,
+    entries: [
+      ...new Map(
+        [...current.entries, ...page.entries].map((entry, index) => [
+          entry.key ?? String(index),
+          entry,
+        ]),
+      ).values(),
+    ],
+    media: [
+      ...new Map(
+        [...current.media, ...page.media].map((item) => [item.key, item]),
+      ).values(),
+    ],
+  };
 }

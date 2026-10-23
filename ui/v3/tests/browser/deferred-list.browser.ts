@@ -1,6 +1,6 @@
 import { test, expect } from "./test";
 
-test("bulk sharing keeps selected scene titles and filename labels outside search results", async ({
+test("bulk sharing summarizes selected scene titles and filename labels", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 932 });
@@ -11,13 +11,13 @@ test("bulk sharing keeps selected scene titles and filename labels outside searc
   await page.locator('article[data-id="2"] [data-entity-card-preview]').click();
   await page.getByRole("button", { name: "Share…", exact: true }).click();
   const form = page.getByRole("dialog", { name: "Create share", exact: true });
-  const chips = form.locator('[data-slot="combobox-chip"]');
-  await expect(chips).toHaveText(["Card 1", "Scene file 2"]);
-  await form
-    .getByPlaceholder("Search scenes, images and galleries…")
-    .fill("absent");
-  await expect(page.getByText("No results", { exact: true })).toBeVisible();
-  await expect(chips).toHaveText(["Card 1", "Scene file 2"]);
+  await expect(
+    form.getByText("2 selected items", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    form.getByText("Card 1 · Scene file 2", { exact: true }),
+  ).toBeVisible();
+  await expect(form.getByRole("combobox")).toHaveCount(0);
 });
 
 for (const width of [430, 1280]) {

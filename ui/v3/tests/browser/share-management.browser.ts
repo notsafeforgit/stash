@@ -11,120 +11,109 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
-test("share target search uses library titles, filenames and gallery folders", async ({
+test("share dialog summarizes a large selection without an item picker", async ({
   page,
-}) => {
-  await page.route("**/graphql", async (route) => {
-    const { operationName } = z
-      .object({ operationName: z.string() })
-      .parse(route.request().postDataJSON());
-    if (operationName === "MediaShares") {
-      const data: GQL.MediaSharesQuery = {
-        mediaShares: [],
-        sharingConfiguration: {
-          __typename: "SharingConfiguration",
-          public_url: "https://shares.test/share",
-          max_days: 30,
-          max_items: 2000,
+}, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.route("**/graphql", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          mediaShares: [],
+          sharingConfiguration: {
+            public_url: "",
+            max_days: 30,
+            max_items: 2000,
+          },
         },
-      };
-      await route.fulfill({ json: { data } });
-    } else if (operationName === "ShareTargetSearch") {
-      const data: GQL.ShareTargetSearchQuery = {
-        findScenes: {
-          __typename: "FindScenesResultType",
-          scenes: [
-            {
-              __typename: "Scene",
-              id: libraryID(1),
-              title: "Saved scene title",
-              files: [
-                {
-                  __typename: "VideoFile",
-                  path: "/private/library/Unused filename.mp4",
-                },
-              ],
-            },
-            {
-              __typename: "Scene",
-              id: libraryID(2),
-              title: "",
-              files: [
-                {
-                  __typename: "VideoFile",
-                  path: "/private/library/Scene filename.mp4",
-                },
-              ],
-            },
-          ],
-        },
-        findImages: {
-          __typename: "FindImagesResultType",
-          images: [
-            {
-              __typename: "Image",
-              id: libraryID(3),
-              title: null,
-              visual_files: [
-                {
-                  __typename: "ImageFile",
-                  path: "C:\\private\\Photo filename.jpg",
-                },
-              ],
-            },
-          ],
-        },
-        findGalleries: {
-          __typename: "FindGalleriesResultType",
-          galleries: [
-            {
-              __typename: "Gallery",
-              id: libraryID(4),
-              title: "",
-              image_count: 1,
-              files: [],
-              folder: {
-                __typename: "Folder",
-                path: "/private/library/Album folder",
-                basename: "Album folder",
+      },
+    }),
+  );
+  await page.goto("/share-management.html?selection=1000");
+  await page
+    .getByRole("button", { name: "Share selection", exact: true })
+    .click();
+  const form = page.getByRole("dialog", { name: "Create share", exact: true });
+  await expect(
+    form.getByText("1,000 selected items", { exact: true }),
+  ).toBeVisible();
+  await expect(form.getByRole("combobox")).toHaveCount(0);
+  await expect(form.locator("li")).toHaveCount(0);
+  await expectDialogFits(form);
+  await page.screenshot({ path: testInfo.outputPath("compact-share.png") });
+});
+
+for (const narrow of [false, true]) {
+  test(`performer shares default to all media types and allow narrowing (${narrow})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    const requests: unknown[] = [];
+    await page.route("**/graphql", async (route) => {
+      const request = z
+        .object({
+          operationName: z.string(),
+          variables: z.object({ input: z.unknown().optional() }),
+        })
+        .parse(route.request().postDataJSON());
+      if (request.operationName === "MediaShares")
+        return route.fulfill({
+          json: {
+            data: {
+              mediaShares: [],
+              sharingConfiguration: {
+                public_url: "",
+                max_days: 30,
+                max_items: 2000,
               },
             },
-            {
-              __typename: "Gallery",
-              id: libraryID(5),
-              title: null,
-              image_count: 1,
-              files: [
-                {
-                  __typename: "GalleryFile",
-                  path: "/private/library/Archive filename.zip",
-                },
-              ],
-              folder: null,
-            },
-          ],
-        },
-      };
-      await route.fulfill({ json: { data } });
-    } else throw new Error(`Unexpected operation ${operationName}`);
+          },
+        });
+      expect(request.operationName).toBe("MediaShareCreate");
+      requests.push(request.variables.input);
+      await route.fulfill({
+        json: { errors: [{ message: "Fixture stopped before publication" }] },
+      });
+    });
+    await page.goto("/share-management.html");
+    await page
+      .getByRole("button", { name: "Share performer", exact: true })
+      .click();
+    const form = page.getByRole("dialog", {
+      name: "Create share",
+      exact: true,
+    });
+    await expect(
+      form.getByRole("button", { name: "Snapshot", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    for (const name of ["Scenes", "Images", "Galleries"])
+      await expect(
+        form.getByRole("button", { name, exact: true }),
+      ).toHaveAttribute("aria-pressed", "true");
+    if (narrow) {
+      await form.getByRole("button", { name: "Scenes", exact: true }).click();
+      await form
+        .getByRole("button", { name: "Galleries", exact: true })
+        .click();
+    }
+    await form.getByRole("button", { name: "Ongoing", exact: true }).click();
+    await expectDialogFits(form);
+    await form
+      .getByRole("button", { name: "Create share", exact: true })
+      .click();
+    await expect.poll(() => requests.length).toBe(1);
+    expect(requests[0]).toMatchObject({
+      label: "Example performer",
+      source: {
+        mode: "ONGOING",
+        entity: { kind: "PERFORMER", id: libraryID(999) },
+        media_types: narrow ? ["IMAGE"] : ["SCENE", "IMAGE", "GALLERY"],
+      },
+    });
+    expect(requests[0]).not.toHaveProperty("targets");
+    await expect(form).toBeVisible();
   });
-  await page.goto("/share-management.html");
-  await page.getByRole("button", { name: "Create share", exact: true }).click();
-  const form = page.getByRole("dialog", { name: "Create share", exact: true });
-  const names = [
-    "Scene: Saved scene title",
-    "Scene: Scene filename",
-    "Image: Photo filename",
-    "Gallery: Album folder",
-    "Gallery: Archive filename",
-  ];
-  for (const name of names) {
-    await form.getByPlaceholder("Search scenes, images and galleries…").click();
-    await page.getByRole("option", { name, exact: true }).click();
-  }
-  await page.keyboard.press("Escape");
-  await expect(form.locator('[data-slot="combobox-chip"]')).toHaveText(names);
-});
+}
 
 async function expectDialogFits(dialog: Locator) {
   await expect(dialog).toBeInViewport({ ratio: 1 });
@@ -169,7 +158,11 @@ for (const older of [false, true]) {
       access_count: 0,
       last_accessed_at: null,
       media_count: 1,
-      items: [],
+      mode: GQL.ShareMembership.Snapshot,
+      source_kind: GQL.ShareSourceKind.Selection,
+      source_name: "",
+      media_types: [GQL.ShareEntityKind.Scene],
+      selection_count: 1,
     };
     let rotations = 0;
     await page.addInitScript(() => {
@@ -323,7 +316,6 @@ for (const viewport of [
     await page.setViewportSize(viewport);
     const now = new Date("2026-09-21T12:00:00Z");
     await page.clock.setFixedTime(now);
-    const sceneTitle = `First scene ${"UnbrokenTitle".repeat(30)}`;
     let shares: GQL.MediaShareFieldsFragment[] = [];
     await page.route("**/api/v3/archive/page-info?**", (route) => {
       const status = new URL(route.request().url()).searchParams.get("state");
@@ -371,36 +363,6 @@ for (const viewport of [
           },
         };
         await route.fulfill({ json: { data } });
-      } else if (name === "ShareTargetSearch") {
-        const data: GQL.ShareTargetSearchQuery = {
-          findScenes: {
-            __typename: "FindScenesResultType",
-            scenes: [
-              {
-                __typename: "Scene",
-                id: libraryID(1),
-                title: sceneTitle,
-                files: [],
-              },
-            ],
-          },
-          findImages: {
-            __typename: "FindImagesResultType",
-            images: [
-              {
-                __typename: "Image",
-                id: libraryID(2),
-                title: "Second image",
-                visual_files: [],
-              },
-            ],
-          },
-          findGalleries: {
-            __typename: "FindGalleriesResultType",
-            galleries: [],
-          },
-        };
-        await route.fulfill({ json: { data } });
       } else if (name === "MediaShareCreate") {
         // Validate the network boundary before treating the input as GraphQL data.
         const { z } = await import("zod");
@@ -436,12 +398,11 @@ for (const viewport of [
           access_count: 0,
           last_accessed_at: null,
           media_count: 2,
-          items: input.targets.map((target) => ({
-            __typename: "MediaShareEntry",
-            ...target,
-            title: target.id === libraryID(1) ? sceneTitle : "Second image",
-            media_count: 1,
-          })),
+          mode: GQL.ShareMembership.Snapshot,
+          source_kind: GQL.ShareSourceKind.Selection,
+          source_name: "",
+          media_types: [GQL.ShareEntityKind.Scene, GQL.ShareEntityKind.Image],
+          selection_count: input.targets.length,
         };
         shares = [share];
         const data: GQL.MediaShareCreateMutation = {
@@ -492,20 +453,16 @@ for (const viewport of [
     });
     await page.goto("/share-management.html");
     await page
-      .getByRole("button", { name: "Create share", exact: true })
+      .getByRole("button", { name: "Share selection", exact: true })
       .click();
     const form = page.getByRole("dialog", {
       name: "Create share",
       exact: true,
     });
     await expectDialogFits(form);
-    await form.getByPlaceholder("Search scenes, images and galleries…").click();
-    await page
-      .getByRole("option", { name: `Scene: ${sceneTitle}`, exact: true })
-      .click();
-    await form.getByPlaceholder("Search scenes, images and galleries…").click();
-    await page.getByRole("option", { name: "Image: Second image" }).click();
-    await page.keyboard.press("Escape");
+    await expect(
+      form.getByText("2 selected items", { exact: true }),
+    ).toBeVisible();
     await expectDialogFits(form);
 
     await form.getByLabel("Time", { exact: true }).fill("");
@@ -678,7 +635,11 @@ for (const width of [320, 1280]) {
       access_count: 0,
       last_accessed_at: null,
       media_count: 1,
-      items: [],
+      mode: GQL.ShareMembership.Snapshot,
+      source_kind: GQL.ShareSourceKind.Selection,
+      source_name: "",
+      media_types: [GQL.ShareEntityKind.Scene],
+      selection_count: 1,
     };
     let shares = [
       active,

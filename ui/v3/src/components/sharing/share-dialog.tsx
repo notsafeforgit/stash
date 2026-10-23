@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import { useMutation } from "@apollo/client/react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
+import { useIntl } from "react-intl";
 import { startOfDay } from "date-fns";
 import * as GQL from "@/core/generated-graphql";
 import { Button } from "@/components/ui/button";
@@ -31,15 +32,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { useMsg } from "@/hooks/message";
 import { useToast } from "@/hooks/toast";
 import {
-  shareSelectionSchema,
-  MAX_SHARE_TARGETS,
-  ShareTargetPicker,
+  allShareMediaTypes,
+  matchingShareSource,
   type ShareSelection,
-} from "./share-target-picker";
-import {
-  ShareMatchingButton,
   type MatchingShareSelection,
-} from "./share-matching-button";
+  type ShareEntitySource,
+} from "./share-source";
 import { ShareLinkDialog } from "./share-link-dialog";
 
 export function localDateTime(date: Date) {
@@ -52,6 +50,7 @@ type ShareDialogProps = {
   onOpenChange: (open: boolean) => void;
   targets?: ShareSelection[];
   matching?: MatchingShareSelection;
+  entity?: ShareEntitySource;
   share?: GQL.MediaShareFieldsFragment;
 };
 
@@ -80,16 +79,17 @@ function ShareForm({
   onOpenChange,
   targets = [],
   matching,
+  entity,
   share,
   onCreated,
 }: ShareDialogProps & {
   onCreated: (link: { id: string; url: string }) => void;
 }) {
   const msg = useMsg();
+  const intl = useIntl();
   const toast = useToast();
   const id = useId();
   const [now] = useState(Date.now);
-  const [loadingMatching, setLoadingMatching] = useState(false);
   const [preset, setPreset] = useState(share ? "custom" : "24");
   const [create] = useMutation(GQL.MediaShareCreateDocument, {
     refetchQueries: [GQL.MediaSharesDocument],
@@ -99,18 +99,19 @@ function ShareForm({
   });
   const form = useForm({
     defaultValues: {
-      label: share?.label ?? msg("sharing.default_label", "Shared media"),
+      label:
+        share?.label ??
+        entity?.name ??
+        (targets.length === 1 ? targets[0]?.name : undefined) ??
+        msg("sharing.default_label", "Shared media"),
       expiry: localDateTime(
         share ? new Date(share.expires_at) : new Date(now + 86_400_000),
       ),
       allowDownload: share?.allow_download ?? false,
       showMetadata: share?.show_metadata ?? false,
-      targets:
-        share?.items.map((item) => ({
-          kind: item.kind,
-          id: item.id ?? "",
-          name: item.title || item.id || "",
-        })) ?? targets,
+      scope: targets.length ? "selection" : entity ? "entity" : "filter",
+      mode: GQL.ShareMembership.Snapshot,
+      mediaTypes: allShareMediaTypes,
     },
     validators: {
       onChange: z.object({
@@ -137,14 +138,20 @@ function ShareForm({
         ),
         allowDownload: z.boolean(),
         showMetadata: z.boolean(),
-        targets: z
-          .array(shareSelectionSchema)
-          .min(1, msg("sharing.select_required", "Select at least one item."))
-          .max(MAX_SHARE_TARGETS),
+        scope: z.string(),
+        mode: z.enum(GQL.ShareMembership),
+        mediaTypes: z
+          .array(z.enum(GQL.ShareEntityKind))
+          .min(
+            1,
+            msg(
+              "sharing.media_types_required",
+              "Choose at least one media type.",
+            ),
+          ),
       }),
     },
     onSubmit: async ({ value }) => {
-      if (loadingMatching) return;
       try {
         const input = {
           label: value.label.trim(),
@@ -161,10 +168,23 @@ function ShareForm({
             variables: {
               input: {
                 ...input,
-                targets: value.targets.map(({ kind, id: targetId }) => ({
-                  kind,
-                  id: targetId,
-                })),
+                targets:
+                  value.scope === "selection"
+                    ? targets.map(({ kind, id: targetId }) => ({
+                        kind,
+                        id: targetId,
+                      }))
+                    : undefined,
+                source:
+                  value.scope === "filter" && matching
+                    ? matchingShareSource(matching, value.mode)
+                    : value.scope === "entity" && entity
+                      ? {
+                          mode: value.mode,
+                          entity: { kind: entity.kind, id: entity.id },
+                          media_types: value.mediaTypes,
+                        }
+                      : undefined,
               },
             },
           });
@@ -204,8 +224,8 @@ function ShareForm({
           <FieldGroup>
             <DialogDescription>
               {msg(
-                "sharing.fixed_scope",
-                "Only selected scenes, images and the current images in each gallery are included. Future additions and related entities are never added automatically. Up to 2,000 media items per share.",
+                "sharing.scope_description",
+                "Choose what this link shares. Deleted media disappears from every type of share.",
               )}
             </DialogDescription>
             <form.Field name="label">
@@ -228,38 +248,171 @@ function ShareForm({
                 </Field>
               )}
             </form.Field>
-            <form.Field name="targets">
-              {(field) => (
-                <Field data-invalid={field.state.meta.errors.length > 0}>
-                  <FieldLabel>
-                    {msg("sharing.selection", "Included items")}
-                  </FieldLabel>
-                  {share ? (
-                    <ul className="max-h-32 min-w-0 overflow-y-auto text-sm text-muted-foreground [overflow-wrap:anywhere]">
-                      {field.state.value.map((item) => (
-                        <li key={`${item.kind}:${item.id}`}>{item.name}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <>
-                      {matching && (
-                        <ShareMatchingButton
-                          matching={matching}
-                          onSelect={field.handleChange}
-                          onLoadingChange={setLoadingMatching}
-                        />
-                      )}
-                      <ShareTargetPicker
-                        value={field.state.value}
-                        onChange={field.handleChange}
-                        disabled={loadingMatching}
-                      />
-                    </>
+            {share ? (
+              <Field>
+                <FieldLabel>
+                  {msg("sharing.selection", "Included items")}
+                </FieldLabel>
+                <FieldDescription>
+                  {share.source_name ||
+                    (share.source_kind === GQL.ShareSourceKind.Filter
+                      ? msg("sharing.filtered_list", "Filtered list")
+                      : intl.formatMessage(
+                          {
+                            id: "sharing.selected_count",
+                            defaultMessage:
+                              "{count, plural, one {# selected item} other {# selected items}}",
+                          },
+                          { count: share.selection_count },
+                        ))}
+                  {" · "}
+                  {share.mode === GQL.ShareMembership.Ongoing
+                    ? msg("sharing.ongoing", "Ongoing")
+                    : msg("sharing.snapshot", "Snapshot")}
+                </FieldDescription>
+                <FieldDescription>
+                  {msg(
+                    "sharing.scope_immutable",
+                    "To change what is shared, create a new link.",
                   )}
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
-            </form.Field>
+                </FieldDescription>
+              </Field>
+            ) : (
+              <>
+                <form.Field name="scope">
+                  {(field) => (
+                    <FieldSet>
+                      <FieldLegend variant="label">
+                        {msg("sharing.selection", "Included items")}
+                      </FieldLegend>
+                      {matching && targets.length > 0 && (
+                        <ToggleGroup
+                          variant="outline"
+                          value={[field.state.value]}
+                          onValueChange={([value]) => {
+                            if (value) field.handleChange(value);
+                          }}
+                        >
+                          <ToggleGroupItem value="selection">
+                            {msg("sharing.selected_items", "Selected items")}
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="filter">
+                            {msg("sharing.filtered_list", "Filtered list")}
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      )}
+                      <FieldDescription>
+                        {field.state.value === "selection"
+                          ? intl.formatMessage(
+                              {
+                                id: "sharing.selected_count",
+                                defaultMessage:
+                                  "{count, plural, one {# selected item} other {# selected items}}",
+                              },
+                              { count: targets.length },
+                            )
+                          : (entity?.name ??
+                            msg(
+                              "sharing.filtered_description",
+                              "All items matching this list’s current search and filters, across every page.",
+                            ))}
+                      </FieldDescription>
+                      {field.state.value === "selection" && (
+                        <FieldDescription className="line-clamp-2 [overflow-wrap:anywhere]">
+                          {targets
+                            .slice(0, 3)
+                            .map((item) => item.name)
+                            .join(" · ")}
+                        </FieldDescription>
+                      )}
+                    </FieldSet>
+                  )}
+                </form.Field>
+                {entity && (
+                  <form.Field name="mediaTypes">
+                    {(field) => (
+                      <FieldSet
+                        data-invalid={field.state.meta.errors.length > 0}
+                      >
+                        <FieldLegend variant="label">
+                          {msg("sharing.media_types", "Media types")}
+                        </FieldLegend>
+                        <ToggleGroup
+                          multiple
+                          variant="outline"
+                          value={field.state.value}
+                          onValueChange={field.handleChange}
+                          aria-invalid={field.state.meta.errors.length > 0}
+                        >
+                          <ToggleGroupItem value={GQL.ShareEntityKind.Scene}>
+                            {msg("scenes", "Scenes")}
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value={GQL.ShareEntityKind.Image}>
+                            {msg("images", "Images")}
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value={GQL.ShareEntityKind.Gallery}>
+                            {msg("galleries", "Galleries")}
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                        <FieldError errors={field.state.meta.errors} />
+                      </FieldSet>
+                    )}
+                  </form.Field>
+                )}
+                <form.Subscribe selector={(state) => state.values.scope}>
+                  {(scope) =>
+                    scope !== "selection" ? (
+                      <form.Field name="mode">
+                        {(field) => (
+                          <FieldSet>
+                            <FieldLegend variant="label">
+                              {msg("sharing.membership", "Membership")}
+                            </FieldLegend>
+                            <ToggleGroup
+                              variant="outline"
+                              value={[field.state.value]}
+                              onValueChange={([value]) => {
+                                if (value) field.handleChange(value);
+                              }}
+                            >
+                              <ToggleGroupItem
+                                value={GQL.ShareMembership.Snapshot}
+                              >
+                                {msg("sharing.snapshot", "Snapshot")}
+                              </ToggleGroupItem>
+                              <ToggleGroupItem
+                                value={GQL.ShareMembership.Ongoing}
+                              >
+                                {msg("sharing.ongoing", "Ongoing")}
+                              </ToggleGroupItem>
+                            </ToggleGroup>
+                            <FieldDescription>
+                              {field.state.value ===
+                              GQL.ShareMembership.Snapshot
+                                ? msg(
+                                    "sharing.snapshot_description",
+                                    "Include what matches when you create the link. Later additions are not included. Snapshots support up to 2,000 media items.",
+                                  )
+                                : msg(
+                                    "sharing.ongoing_description",
+                                    "Keep these rules and include current and future matches. Items disappear when they stop matching. Changing this list’s filters later does not change the share.",
+                                  )}
+                            </FieldDescription>
+                          </FieldSet>
+                        )}
+                      </form.Field>
+                    ) : (
+                      <FieldDescription>
+                        {msg(
+                          "sharing.selection_description",
+                          "Keep this selection and the current contents of selected galleries. Later additions are not included. Snapshots support up to 2,000 media items.",
+                        )}
+                      </FieldDescription>
+                    )
+                  }
+                </form.Subscribe>
+              </>
+            )}
             <form.Field name="expiry">
               {(field) => (
                 <FieldSet
@@ -377,7 +530,7 @@ function ShareForm({
               <Button
                 type="submit"
                 form={`${id}-form`}
-                disabled={!canSubmit || submitting || loadingMatching}
+                disabled={!canSubmit || submitting}
               >
                 {submitting && <Spinner data-icon="inline-start" />}
                 {share

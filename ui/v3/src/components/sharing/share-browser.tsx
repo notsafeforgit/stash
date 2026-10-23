@@ -176,10 +176,12 @@ export function ShareBrowser({
   content,
   base,
   navigationBase,
+  controls,
 }: {
   content: SharedContent;
   base: URL;
   navigationBase: URL;
+  controls?: React.ReactNode;
 }) {
   const intl = useIntl();
   const collections = useMemo(() => shareCollections(content), [content]);
@@ -222,7 +224,7 @@ export function ShareBrowser({
     // avoids a grid flash and lets Close return to the overview without reopening.
     if (location.tab || location.gallery || location.media) return null;
     const onlyItem =
-      collections.byKey.size === 1
+      !content.next && collections.byKey.size === 1
         ? collections.byKey.values().next().value
         : undefined;
     return onlyItem ? { media: [onlyItem], selectedKey: onlyItem.key } : null;
@@ -266,6 +268,7 @@ export function ShareBrowser({
           )}
         </p>
       </header>
+      {controls}
       {location.media || location.gallery ? (
         <>
           <div className="flex shrink-0 items-center gap-2 border-y px-2 py-1 sm:px-4">

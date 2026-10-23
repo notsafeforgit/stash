@@ -224,6 +224,18 @@ export function EntityListPage<
         }))}
       />
     ) : undefined;
+  const listPageActions = (
+    <>
+      {source.kind === "graphql" && sharing && (
+        <ShareSelectionButton
+          compact={isMobileSidebar}
+          matching={{ kind: sharing.kind, filter }}
+          targets={[]}
+        />
+      )}
+      {pageActions}
+    </>
+  );
 
   const preserveScrollDuringRefill = useListPageRefill({
     remote: source.kind === "graphql",
@@ -401,7 +413,7 @@ export function EntityListPage<
       selecting={listSelect.selecting}
       selectedCount={listSelect.selectedItems.length}
       selectionActions={selectionActions}
-      pageActions={pageActions}
+      pageActions={listPageActions}
       onSelectAll={listSelect.onSelectAll}
       onSelectNone={listSelect.onSelectNone}
       onTaggerMode={renderTagger ? () => setTaggerActive((v) => !v) : undefined}
@@ -436,7 +448,7 @@ export function EntityListPage<
       cardAspect={supportsCardAspect ? cardAspect : undefined}
       setCardAspect={supportsCardAspect ? setCardAspect : undefined}
       sortOptions={sortOptionsOverride}
-      pageActions={pageActions}
+      pageActions={listPageActions}
       operationComponent={selectionActions}
       mobileGridCols={mobileGridCols}
     >

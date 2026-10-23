@@ -37,7 +37,10 @@ for (const width of [320, 390]) {
       name: "Create share",
       exact: true,
     });
-    await expect(form.locator('[data-slot="combobox-chip"]')).toHaveCount(80);
+    await expect(
+      form.getByText("80 selected items", { exact: true }),
+    ).toBeVisible();
+    await expect(form.getByRole("combobox")).toHaveCount(0);
     await form.getByRole("button", { name: "Create share", exact: true }).tap();
     await expect
       .poll(() =>
@@ -46,7 +49,7 @@ for (const width of [320, 390]) {
       .toBe(1);
     expect(
       await page.evaluate(() =>
-        window.performerSelectionFixture.shares[0]?.input.targets.map(
+        window.performerSelectionFixture.shares[0]?.input.targets?.map(
           (item) => item.id,
         ),
       ),
@@ -54,10 +57,72 @@ for (const width of [320, 390]) {
   });
 }
 
-test("share all matching resolves the complete performer filter and never publishes a partial selection", async ({
+for (const mode of ["Snapshot", "Ongoing"]) {
+  test(`share a filtered performer list as ${mode} without fetching its items`, async ({
+    page,
+  }, testInfo) => {
+    await page.goto("/performer-selection?q=Video");
+    await detailFooter(page)
+      .getByRole("button", { name: "Share…", exact: true })
+      .tap();
+    const form = page.getByRole("dialog", {
+      name: "Create share",
+      exact: true,
+    });
+    await form.getByRole("button", { name: mode, exact: true }).tap();
+    await expect(form.getByRole("combobox")).toHaveCount(0);
+    await page.evaluate(() => {
+      window.performerSelectionFixture.createError =
+        "Unable to create complete snapshot";
+    });
+    await form.getByRole("button", { name: "Create share", exact: true }).tap();
+    await expect(
+      page.locator('[data-sonner-toast][data-front="true"]'),
+    ).toContainText("Unable to create complete snapshot");
+    expect(
+      await page.evaluate(() => window.performerSelectionFixture.shares.length),
+    ).toBe(0);
+    await expect(form).toBeVisible();
+    await expect(
+      form.getByRole("button", { name: mode, exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await page.evaluate(() => {
+      window.performerSelectionFixture.createError = undefined;
+    });
+    await page.screenshot({
+      path: testInfo.outputPath(`share-filter-${mode}.png`),
+    });
+    await form.getByRole("button", { name: "Create share", exact: true }).tap();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.performerSelectionFixture.shares.length),
+      )
+      .toBe(1);
+    const request = await page.evaluate(
+      () => window.performerSelectionFixture.shares[0],
+    );
+    expect(request?.input.targets).toBeUndefined();
+    expect(request?.input.source).toMatchObject({
+      mode: mode.toUpperCase(),
+      filter: { kind: "SCENE", q: "Video" },
+    });
+    expect(JSON.stringify(request?.input.source?.filter?.filter_ast)).toContain(
+      libraryID(999),
+    );
+    expect(
+      await page.evaluate(() =>
+        window.performerSelectionFixture.requests.some(
+          (request) => request.name === "ShareMatchingTargets",
+        ),
+      ),
+    ).toBe(false);
+  });
+}
+
+test("switching from filtered ongoing sharing back to selection keeps explicit snapshot membership", async ({
   page,
-}, testInfo) => {
-  await page.goto("/performer-selection?q=Video");
+}) => {
+  await page.goto("/performer-selection");
   await page
     .locator(`article[data-id="${libraryID(1)}"]`)
     .locator("[data-entity-card-preview]")
@@ -66,98 +131,21 @@ test("share all matching resolves the complete performer filter and never publis
     .getByRole("button", { name: "Share…", exact: true })
     .tap();
   const form = page.getByRole("dialog", { name: "Create share", exact: true });
-  const all = form.getByRole("button", {
-    name: "Use all matching items across pages",
-  });
-  const chips = form.locator('[data-slot="combobox-chip"]');
-  for (const failure of ["error", "partial", "limit"] as const) {
-    await page.evaluate((failure) => {
-      window.performerSelectionFixture.matching = failure;
-    }, failure);
-    await all.tap();
-    await expect(
-      page.locator('[data-sonner-toast][data-front="true"]'),
-    ).toContainText(
-      failure === "error"
-        ? "Matching query failed"
-        : failure === "partial"
-          ? "Unable to load all matching"
-          : "at most 2,000 items",
-    );
-    await expect(chips).toHaveCount(1);
-    await expect
-      .poll(() =>
-        page.evaluate(() => window.performerSelectionFixture.shares.length),
-      )
-      .toBe(0);
-  }
-  await page.evaluate(() => {
-    window.performerSelectionFixture.matching = "pending";
-  });
-  await all.tap();
+  await form.getByRole("button", { name: "Filtered list", exact: true }).tap();
+  await form.getByRole("button", { name: "Ongoing", exact: true }).tap();
+  await form.getByRole("button", { name: "Selected items", exact: true }).tap();
   await expect(
-    form.getByRole("button", { name: "Create share", exact: true }),
-  ).toBeDisabled();
-  await page.evaluate(() =>
-    window.performerSelectionFixture.releaseMatching?.(),
-  );
-  await expect(chips).toHaveCount(80);
-  const request = await page.evaluate(() =>
-    window.performerSelectionFixture.requests.find(
-      (item) => item.name === "ShareMatchingTargets",
-    ),
-  );
-  expect(request?.variables.filter).toMatchObject({
-    page: 1,
-    per_page: 2001,
-    q: "Video",
-  });
-  expect(request?.variables).toMatchObject({
-    scenes: true,
-    images: false,
-    galleries: false,
-  });
-  expect(JSON.stringify(request?.variables.filter_ast)).toContain(
-    libraryID(999),
-  );
-  await page.screenshot({ path: testInfo.outputPath("share-all.png") });
+    form.getByRole("button", { name: "Ongoing", exact: true }),
+  ).toHaveCount(0);
   await form.getByRole("button", { name: "Create share", exact: true }).tap();
   await expect
     .poll(() =>
-      page.evaluate(
-        () => window.performerSelectionFixture.shares[0]?.input.targets.length,
-      ),
+      page.evaluate(() => window.performerSelectionFixture.shares.length),
     )
-    .toBe(80);
-});
-
-test("closing the share dialog cancels a pending matching selection", async ({
-  page,
-}) => {
-  await page.goto("/performer-selection");
-  await page
-    .locator(`article[data-id="${libraryID(1)}"]`)
-    .locator("[data-entity-card-preview]")
-    .click({ modifiers: ["Control"] });
-  const share = detailFooter(page).getByRole("button", {
-    name: "Share…",
-    exact: true,
-  });
-  await share.tap();
-  const form = page.getByRole("dialog", { name: "Create share", exact: true });
-  await page.evaluate(() => {
-    window.performerSelectionFixture.matching = "pending";
-  });
-  await form
-    .getByRole("button", { name: "Use all matching items across pages" })
-    .tap();
-  await form.getByRole("button", { name: "Cancel", exact: true }).tap();
-  await page.evaluate(() =>
-    window.performerSelectionFixture.releaseMatching?.(),
+    .toBe(1);
+  const request = await page.evaluate(
+    () => window.performerSelectionFixture.shares[0],
   );
-  await share.tap();
-  await expect(form.locator('[data-slot="combobox-chip"]')).toHaveCount(1);
-  await expect(
-    form.getByRole("button", { name: "Create share", exact: true }),
-  ).toBeEnabled();
+  expect(request?.input.source).toBeUndefined();
+  expect(request?.input.targets).toEqual([{ kind: "SCENE", id: libraryID(1) }]);
 });

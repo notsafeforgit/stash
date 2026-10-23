@@ -9,6 +9,7 @@ import {
 } from "./entity-actions-menu";
 import { AutoTagDialog } from "src/components/detail/auto-tag-dialog";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
+import { useShareAction } from "@/components/sharing/share-action";
 
 interface StudioActionsMenuProps {
   studio: NonNullable<GQL.FindStudioQuery["findStudio"]>;
@@ -21,6 +22,11 @@ export function StudioActionsMenu({
   onDeleted,
 }: StudioActionsMenuProps) {
   const intl = useIntl();
+  const share = useShareAction([], undefined, {
+    kind: GQL.ShareLibraryKind.Studio,
+    id: studio.id,
+    name: studio.name,
+  });
   const [autoTagOpen, setAutoTagOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -43,6 +49,7 @@ export function StudioActionsMenu({
   }
 
   const items: EntityActionItem[] = [
+    share.action,
     {
       key: "auto-tag",
       icon: Wand2,
@@ -77,6 +84,7 @@ export function StudioActionsMenu({
   return (
     <>
       <EntityActionsMenu items={items} />
+      {share.dialog}
 
       <AutoTagDialog
         open={autoTagOpen}

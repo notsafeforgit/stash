@@ -9,6 +9,16 @@ const localURL = z
   );
 const optionalURL = z.union([z.literal(""), localURL]);
 const kind = z.enum(["SCENE", "IMAGE", "GALLERY"]);
+export const shareMediaKeySchema = z
+  .string()
+  .regex(
+    /^(scene|image)-([1-9][0-9]*|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/,
+  );
+export const shareGalleryKeySchema = z
+  .string()
+  .regex(
+    /^gallery-([1-9][0-9]*|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/,
+  );
 const previewRenditionSchema = z.object({
   fallback: localURL,
   sources: z.array(
@@ -25,7 +35,7 @@ const previewImageSchema = previewRenditionSchema.extend({
   thumbnail: previewRenditionSchema.nullish(),
 });
 const mediaSchema = z.object({
-  key: z.string().regex(/^(scene|image)-[1-9][0-9]*$/),
+  key: shareMediaKeySchema,
   kind: z.enum(["SCENE", "IMAGE"]),
   title: z.string(),
   width: z.number().int().nonnegative(),
@@ -43,8 +53,14 @@ export const shareStatusSchema = z.object({
 });
 export const shareContentSchema = shareStatusSchema.extend({
   label: z.string(),
+  next: z.string().optional(),
   entries: z.array(
-    z.object({ kind, title: z.string(), media_keys: z.array(z.string()) }),
+    z.object({
+      key: z.string().optional(),
+      kind,
+      title: z.string(),
+      media_keys: z.array(z.string()),
+    }),
   ),
   media: z.array(mediaSchema),
 });

@@ -79,6 +79,15 @@ func (f sourceFixture) create(source *models.ShareSource) *models.ShareRecord {
 	return row
 }
 
+func (f sourceFixture) item(row *models.ShareRecord, key string) (*models.ShareMedia, error) {
+	item, file, _, err := f.service.Item(f.t.Context(), row, key)
+	if err == nil {
+		require.NotNil(f.t, item)
+		require.NotNil(f.t, file)
+	}
+	return item, err
+}
+
 func TestShareSourceSnapshotAndOngoingMembership(t *testing.T) {
 	f := newSourceFixture(t)
 	filter := &models.ShareFilter{Kind: "SCENE", Q: "Included"}
@@ -94,9 +103,9 @@ INSERT INTO scenes_files(scene_id,file_id,"primary") VALUES(2,1,1);`)
 	require.NoError(t, err)
 	require.Len(t, live.Media, 2)
 	f.exec(`UPDATE scenes SET title='No longer matching' WHERE id=1`)
-	_, _, _, err = f.service.Item(t.Context(), ongoing, "scene-"+originalUUID)
+	_, err = f.item(ongoing, "scene-"+originalUUID)
 	require.ErrorIs(t, err, ErrUnavailable, "every delivery rechecks the filter")
-	_, _, _, err = f.service.Item(t.Context(), snapshot, "scene-1")
+	_, err = f.item(snapshot, "scene-1")
 	require.NoError(t, err, "snapshot membership survives metadata changes")
 	f.exec(`DELETE FROM scenes WHERE id=1;
 INSERT INTO scenes(id,title,created_at,updated_at) VALUES(1,'Included replacement',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
@@ -104,7 +113,7 @@ INSERT INTO scenes_files(scene_id,file_id,"primary") VALUES(1,1,1);`)
 	fixed, _, err = f.service.Content(t.Context(), snapshot, "")
 	require.NoError(t, err)
 	require.Empty(t, fixed.Media, "reusing both local ID and file cannot revive a deleted selection")
-	_, _, _, err = f.service.Item(t.Context(), ongoing, "scene-"+originalUUID)
+	_, err = f.item(ongoing, "scene-"+originalUUID)
 	require.ErrorIs(t, err, ErrUnavailable)
 	require.NoError(t, f.db.Close())
 	require.NoError(t, f.db.Open(f.db.DatabasePath()))
@@ -132,18 +141,18 @@ func TestShareEntitySourcesAndGalleryMembership(t *testing.T) {
 			source.Mode = "SNAPSHOT"
 			frozenGallery := f.create(source)
 			imageKey := "image-" + f.identity("IMAGE", 1)
-			_, _, _, err = f.service.Item(t.Context(), galleryOnly, imageKey)
+			_, err = f.item(galleryOnly, imageKey)
 			require.NoError(t, err)
 			f.exec(`DELETE FROM galleries_images WHERE gallery_id=1`)
-			_, _, _, err = f.service.Item(t.Context(), galleryOnly, imageKey)
+			_, err = f.item(galleryOnly, imageKey)
 			require.ErrorIs(t, err, ErrUnavailable)
-			_, _, _, err = f.service.Item(t.Context(), frozenGallery, "image-1")
+			_, err = f.item(frozenGallery, "image-1")
 			require.NoError(t, err, "snapshot keeps original gallery membership")
 			f.exec(`DELETE FROM galleries WHERE id=1`)
 			content, _, err = f.service.Content(t.Context(), frozenGallery, "")
 			require.NoError(t, err)
 			require.Empty(t, content.Media)
-			_, _, _, err = f.service.Item(t.Context(), frozenGallery, "image-1")
+			_, err = f.item(frozenGallery, "image-1")
 			require.ErrorIs(t, err, ErrUnavailable, "deleting a gallery revokes its otherwise-unselected media")
 			content, _, err = f.service.Content(t.Context(), row, "")
 			require.NoError(t, err)
@@ -163,7 +172,7 @@ INSERT INTO performers_scenes(performer_id,scene_id) VALUES(1,1);`)
 	content, _, err := f.service.Content(t.Context(), row, "")
 	require.NoError(t, err)
 	require.Empty(t, content.Media)
-	_, _, _, err = f.service.Item(t.Context(), row, "scene-"+f.identity("SCENE", 1))
+	_, err = f.item(row, "scene-"+f.identity("SCENE", 1))
 	require.ErrorIs(t, err, ErrUnavailable)
 	for _, source := range []*models.ShareSource{
 		{Mode: "ONGOING"},

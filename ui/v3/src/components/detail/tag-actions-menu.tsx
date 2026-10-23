@@ -9,6 +9,7 @@ import {
 } from "./entity-actions-menu";
 import { AutoTagDialog } from "src/components/detail/auto-tag-dialog";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
+import { useShareAction } from "@/components/sharing/share-action";
 
 interface TagActionsMenuProps {
   tag: NonNullable<GQL.FindTagQuery["findTag"]>;
@@ -18,6 +19,11 @@ interface TagActionsMenuProps {
 
 export function TagActionsMenu({ tag, onDeleted }: TagActionsMenuProps) {
   const intl = useIntl();
+  const share = useShareAction([], undefined, {
+    kind: GQL.ShareLibraryKind.Tag,
+    id: tag.id,
+    name: tag.name,
+  });
   const [autoTagOpen, setAutoTagOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -40,6 +46,7 @@ export function TagActionsMenu({ tag, onDeleted }: TagActionsMenuProps) {
   }
 
   const items: EntityActionItem[] = [
+    share.action,
     {
       key: "auto-tag",
       icon: Wand2,
@@ -74,6 +81,7 @@ export function TagActionsMenu({ tag, onDeleted }: TagActionsMenuProps) {
   return (
     <>
       <EntityActionsMenu items={items} />
+      {share.dialog}
 
       <AutoTagDialog
         open={autoTagOpen}

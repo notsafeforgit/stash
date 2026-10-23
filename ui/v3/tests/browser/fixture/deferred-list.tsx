@@ -43,20 +43,6 @@ const client = new ApolloClient({
   link: new ApolloLink(
     (operation) =>
       new Observable((observer) => {
-        if (operation.operationName === "ShareTargetSearch") {
-          // Selected cards must retain their names even outside search results.
-          const data: GQL.ShareTargetSearchQuery = {
-            findScenes: { __typename: "FindScenesResultType", scenes: [] },
-            findImages: { __typename: "FindImagesResultType", images: [] },
-            findGalleries: {
-              __typename: "FindGalleriesResultType",
-              galleries: [],
-            },
-          };
-          observer.next({ data });
-          observer.complete();
-          return;
-        }
         const variables: GQL.FindSceneListQueryVariables = operation.variables;
         const page = variables.filter?.page ?? 1;
         const size = variables.filter?.per_page ?? 40;

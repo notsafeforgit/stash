@@ -78,6 +78,14 @@ path-removal fence remain available. Source content claims do not gain a
 retroactive checksum. Files associated with different posts can share the same
 surviving location without collapsing those posts.
 
+If a scraper later downloads the same bytes to the removed path, native intake
+can register that new copy against the surviving media using these receipts.
+It requires the complete removal history to be deduplication, unchanged intake
+fences, current matching verified content and unambiguous surviving ownership.
+A user deletion or move is not excused by an older deduplication receipt.
+The new location gets a new file UUID and can be removed by a subsequent normal
+dedupe pass; the original redirected identities and receipts stay unchanged.
+
 Filesystem removal uses Stash's managed deletion journal and configured trash.
 After staging the redundant entry, the service verifies the staged inode and
 hashes it again: rename changes ctime, so ignoring that change would conceal a

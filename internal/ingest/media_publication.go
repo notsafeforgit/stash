@@ -40,9 +40,15 @@ func (p *PreparedMedia) publishMedia(ctx context.Context, repo models.Repository
 	if selected != nil && (selected.State != models.ArchiveEntityActive || selected.Kind != kind || selected.LocalID == nil) {
 		return nil, ErrMediaKindConflict
 	}
-	published, err := p.PublishFile(ctx, repo, target)
+	published, err := p.publishFile(ctx, repo, target, true)
 	if err != nil {
 		return nil, err
+	}
+	if owner := published.RedownloadOwner; owner != nil {
+		if selected != nil && selected.UUID != owner.UUID {
+			return nil, models.ErrArchiveIdentityConflict
+		}
+		selected = owner
 	}
 	owners, err := repo.FileContent.Owners(ctx, published.Identity.UUID)
 	if err != nil {

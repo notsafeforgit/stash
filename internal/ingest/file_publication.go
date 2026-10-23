@@ -29,6 +29,9 @@ type PublishedFile struct {
 	Identity *models.ArchiveEntity
 	Proof    *models.FileContentVerification
 	Created  bool
+	// A re-downloaded location must remain attached to the deduplication's
+	// surviving media, even if another source decision selects different media.
+	RedownloadOwner *models.ArchiveEntity
 }
 
 // CaptureFileTarget runs in the accepting transaction after collection/root
@@ -68,6 +71,10 @@ func CaptureFileTarget(ctx context.Context, repo models.Repository, root models.
 // while the removal fence is unchanged. Scene/image/provenance/receipt writes
 // belong in this same transaction, and PreparedMedia stays open through commit.
 func (p *PreparedMedia) PublishFile(ctx context.Context, repo models.Repository, target FileTarget) (*PublishedFile, error) {
+	return p.publishFile(ctx, repo, target, false)
+}
+
+func (p *PreparedMedia) publishFile(ctx context.Context, repo models.Repository, target FileTarget, allowRedownload bool) (*PublishedFile, error) {
 	if !txn.HasHooks(ctx) {
 		return nil, errors.New("file publication requires a managed transaction")
 	}
@@ -105,11 +112,34 @@ func (p *PreparedMedia) PublishFile(ctx context.Context, repo models.Repository,
 	media := p.File()
 	base := media.Base()
 	created := existing == nil
+	var redownloadOwner *models.ArchiveEntity
 	if created {
-		// A newly delivered completion cannot recreate a removed path. An
-		// explicit restore or ordinary scan must establish its new file lifetime.
 		if target.PathFence.Revision != 0 {
-			return nil, models.ErrFilePathChanged
+			if !allowRedownload {
+				return nil, models.ErrFilePathChanged
+			}
+			// Only completed equal-byte deduplication can authorize a new file
+			// lifetime at a removed path. Ordinary deletions and moves still need
+			// explicit restoration or an ordinary scan.
+			input := models.FileRedownload{RootUUID: target.RootUUID, RelativePath: target.RelativePath,
+				Fence: target.PathFence, SHA256: p.SHA256(), Size: p.Snapshot().Size}
+			redownloadOwner, err = repo.FileDeduplication.RedownloadOwner(ctx, input)
+			if err != nil {
+				return nil, err
+			}
+			if redownloadOwner == nil {
+				return nil, models.ErrFilePathChanged
+			}
+			txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
+				current, err := repo.FileDeduplication.RedownloadOwner(ctx, input)
+				if err != nil {
+					return err
+				}
+				if current == nil || current.UUID != redownloadOwner.UUID {
+					return models.ErrArchiveIdentityConflict
+				}
+				return nil
+			})
 		}
 		folder, err := file.GetOrCreateFolderHierarchy(ctx, repo.Folder, filepath.Dir(base.Path), []string{root.Binding.Path})
 		if err != nil {
@@ -169,5 +199,5 @@ func (p *PreparedMedia) PublishFile(ctx context.Context, repo models.Repository,
 		return nil, err
 	}
 	txn.AddPreCommitHook(ctx, func(ctx context.Context) error { return repo.FilePath.Check(ctx, target.PathFence) })
-	return &PublishedFile{File: media, Identity: identity, Proof: proof, Created: created}, nil
+	return &PublishedFile{File: media, Identity: identity, Proof: proof, Created: created, RedownloadOwner: redownloadOwner}, nil
 }

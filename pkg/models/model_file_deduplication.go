@@ -58,9 +58,21 @@ var ErrFileDeduplicationInvalid = errors.New("invalid file deduplication request
 var ErrFileDeduplicationConflict = errors.New("file deduplication preview changed or requires review")
 var ErrFileDeduplicationReplay = errors.New("file deduplication UUID names a different request")
 
+// FileRedownload describes already verified bytes at a removed location. Every
+// removal must be accounted for by completed equal-byte deduplication, with a
+// current surviving file and the same single canonical media owner.
+type FileRedownload struct {
+	RootUUID     string
+	RelativePath string
+	Fence        FilePathFence
+	SHA256       string
+	Size         int64
+}
+
 type FileDeduplicationReaderWriter interface {
 	Inspect(context.Context, FileDeduplicationInput) (*FileDeduplicationState, error)
 	Find(context.Context, string) (*FileDeduplicationReceipt, error)
+	RedownloadOwner(context.Context, FileRedownload) (*ArchiveEntity, error)
 	// Record preserves verified provenance and redirects the removed identity.
 	// The caller must remove its library file row in this managed transaction,
 	// after guarding and staging the actual filesystem deletion.

@@ -256,6 +256,14 @@ filesystem must expose a nonzero filesystem ID; replacing that filesystem or
 directory still fails the binding check. Other platforms retain their existing
 identity format.
 
+These are storage implementation details. Intake clients use root UUIDs,
+relative paths and opaque server-issued file-version/preview signatures. They
+must not reconstruct signatures from device numbers or interpret a mount check
+as a media identity. Per-operation descriptor, size, change-token and digest
+checks still detect replacement or mutation while a file is being inspected.
+Worker storage registries are separate from this server-owned intake contract;
+adopting one does not alter existing intake signatures or observations.
+
 Older bindings keep their original identity checks until explicitly upgraded.
 A device-number mismatch cannot establish that the same filesystem is present.
 After confirming the mount is the original filesystem and directory, probe its

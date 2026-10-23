@@ -145,6 +145,14 @@ relative folders, so a root can be restored or relocated without changing their
 portable paths. Search root names and current server paths, filter by state,
 and inspect one root at a time. Lists and history use pages of 25.
 
+The root UUID is the application identity. Directory verification tokens belong
+to local storage bindings; clients must treat them as opaque rather than derive
+UUIDs, scrape policies or request IDs from them. External worker v2 profiles
+resolve root UUIDs through a shared local storage registry. Updating a worker's
+mount configuration does not edit the server root or its revision, move media,
+or rewrite admitted scrape instructions. See the integrations project's
+[storage configuration](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#worker-profiles-and-execution).
+
 To bind a new folder, enable **Associate a folder on this server**, enter its
 absolute path as seen by Stash (including container mounts), then choose
 **Check folder**. The check returns the canonical path and opened directory's

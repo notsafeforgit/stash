@@ -86,4 +86,13 @@ func TestGallerySetupConnectsLibraryAndRegistersDownload(t *testing.T) {
 	require.Equal(t, "recorded", queued["state"])
 	resumed := command("resume", queued["call_uuid"].(string), "--queue-only")
 	require.Equal(t, queued, resumed, "resume keeps the same durable call and target registration")
+	// Worker-local registry setup must not rebind the server's logical root or
+	// invalidate the root revision already used by admitted requests.
+	require.NoError(t, service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		current, err := service.Repo.MediaRoot.Find(ctx, root.UUID)
+		if err == nil {
+			require.Equal(t, root, current)
+		}
+		return err
+	}))
 }

@@ -42,6 +42,16 @@ for (const kind of ["image", "scene"] as const) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(`/lightbox-list?kind=${kind}`);
       await page.getByRole("button", { name: "Filters", exact: true }).tap();
+      if (width >= 768) {
+        // The sidebar clips its fixed-width contents while opening. Tapping
+        // early can make Playwright scroll it horizontally, then miss the
+        // button as that scroll offset shrinks before the touch is released.
+        await page.getByRole("complementary").evaluate(async (sidebar) => {
+          await Promise.all(
+            sidebar.getAnimations().map((animation) => animation.finished),
+          );
+        });
+      }
       await page.getByRole("button", { name: "Add first condition" }).tap();
       const conditions = page.locator(".filter-condition-shell");
       await expect(conditions).toHaveCount(1);

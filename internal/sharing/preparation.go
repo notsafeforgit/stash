@@ -3,6 +3,7 @@ package sharing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -71,6 +72,9 @@ func (s *Service) PrepareBatch(ctx context.Context, row *models.ShareRecord) err
 		}
 		var file models.File
 		err := s.Repo.WithReadTxn(ctx, func(ctx context.Context) error { var err error; file, _, err = s.currentFile(ctx, item); return err })
+		if err != nil && !errors.Is(err, ErrUnavailable) {
+			return err
+		}
 		if err == nil {
 			item.Fingerprint, err = Fingerprint(file)
 			if err == nil {

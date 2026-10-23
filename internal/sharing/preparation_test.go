@@ -2,6 +2,9 @@ package sharing
 
 import (
 	"context"
+	"errors"
+	"github.com/stashapp/stash/pkg/models/mocks"
+	"github.com/stretchr/testify/mock"
 	"os"
 	"testing"
 	"time"
@@ -203,4 +206,28 @@ INSERT INTO scenes_files(scene_id,file_id,"primary") SELECT id,1,1 FROM scenes W
 	require.NoError(t, err)
 	require.Empty(t, page.Media)
 	require.Empty(t, page.Entries)
+}
+
+func TestPreparationRepositoryFailureKeepsPendingWork(t *testing.T) {
+	f := newSourceFixture(t)
+	f.exec(`WITH RECURSIVE ids(id) AS (SELECT 2 UNION ALL SELECT id+1 FROM ids WHERE id<60)
+INSERT INTO scenes(id,title,created_at,updated_at) SELECT id,'Included',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM ids;
+INSERT INTO scenes_files(scene_id,file_id,"primary") SELECT id,1,1 FROM scenes WHERE id>1;`)
+	row := f.create(&models.ShareSource{Mode: "SNAPSHOT", Filter: &models.ShareFilter{Kind: "SCENE"}})
+	temporary := errors.New("temporary repository failure")
+	mockDB := mocks.NewDatabase()
+	mockDB.Scene.On("Find", mock.Anything, 1).Return((*models.Scene)(nil), temporary).Once()
+	f.service.Repo.Scene = mockDB.Scene
+	require.ErrorIs(t, f.service.PrepareBatch(t.Context(), row), temporary)
+	saved, err := f.service.Find(t.Context(), row.ID)
+	require.NoError(t, err)
+	require.Equal(t, "PREPARING", saved.PreparationState)
+	require.Empty(t, saved.PreparationError)
+	require.Zero(t, saved.PreparedCount)
+	f.service.Repo.Scene = f.db.Repository().Scene
+	require.NoError(t, f.service.PrepareBatch(t.Context(), saved))
+	saved, err = f.service.Find(t.Context(), row.ID)
+	require.NoError(t, err)
+	require.Equal(t, PreparationBatchSize, saved.PreparedCount)
+	mockDB.Scene.AssertExpectations(t)
 }

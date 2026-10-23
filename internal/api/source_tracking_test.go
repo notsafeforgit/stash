@@ -53,7 +53,7 @@ func TestSourceTrackingDisabledDoesNotConstructWorkers(t *testing.T) {
 	service, routes := server.configureSourceTracking(cfg.GetSourceTrackingEnabled())
 	require.Nil(t, service)
 	require.False(t, routes.fileIngestion)
-	for _, worker := range []*archiveWorkerRuntime{
+	for _, worker := range []*backgroundWorkerRuntime{
 		server.ingestWorker, server.albumWorker, server.postMergeNotifications,
 		server.translationWorker, server.enrichmentMaintenance,
 		server.discoveryMaintenance, server.discoveryComparison, server.discoveryPublication,

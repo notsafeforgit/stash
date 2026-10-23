@@ -6,7 +6,7 @@ import (
 	"github.com/stashapp/stash/pkg/translation"
 )
 
-func newTranslationWorkerRuntime(conf *config.Config, service *translation.Service) *archiveWorkerRuntime {
+func newTranslationWorkerRuntime(conf *config.Config, service *translation.Service) *backgroundWorkerRuntime {
 	if !conf.GetTranslationWorkerEnabled() {
 		return nil
 	}
@@ -15,5 +15,5 @@ func newTranslationWorkerRuntime(conf *config.Config, service *translation.Servi
 		logger.Warn("Native translation worker could not start: configured translate-shell provider unavailable")
 		return nil
 	}
-	return &archiveWorkerRuntime{worker: translation.NewWorker(service, provider)}
+	return &backgroundWorkerRuntime{worker: translation.NewWorker(service, provider)}
 }

@@ -14,6 +14,7 @@ func TestShareSourcesMigrationPreservesSnapshotsAndCapabilities(t *testing.T) {
 	require.NoError(t, db.Close())
 	raw := openRawDB(t, path)
 	defer raw.Close()
+	removeSnapshotMembershipSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER share_source_immutable;
 ALTER TABLE shares DROP COLUMN source;
 DELETE FROM native_migration_history WHERE version=1000129;
@@ -26,10 +27,10 @@ INSERT INTO share_sessions(token_hash,share_id,version,expires_at) VALUES(X'0033
 	require.True(t, errors.As(db.Open(path), &needed))
 	require.NoError(t, db.RunAllMigrations())
 	require.NoError(t, db.ReInitialise())
-	var snapshot, source, token string
+	var source, token string
 	var version int
-	require.NoError(t, raw.QueryRow(`SELECT snapshot,source,token,version FROM shares WHERE id='existing'`).Scan(&snapshot, &source, &token, &version))
-	require.Equal(t, `{"entries":[],"media":[],"retained":"opaque historical data"}`, snapshot)
+	require.NoError(t, raw.QueryRow(`SELECT source,token,version FROM shares WHERE id='existing'`).Scan(&source, &token, &version))
+	require.Zero(t, queryUint(t, raw, `SELECT count(*) FROM share_snapshot_media`))
 	require.Equal(t, `{}`, source)
 	require.Equal(t, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", token)
 	require.Equal(t, 3, version)

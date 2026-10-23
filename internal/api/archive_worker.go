@@ -13,7 +13,7 @@ import (
 // The HTTP server owns this worker's lifetime. main shuts the server down before
 // the manager/database. Cancellation waits for the active attempt to stop;
 // committed phase checkpoints remain available to the next process.
-type archiveWorkerRuntime struct {
+type backgroundWorkerRuntime struct {
 	worker interface{ Run(context.Context) error }
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -21,7 +21,7 @@ type archiveWorkerRuntime struct {
 	closed bool
 }
 
-func (r *archiveWorkerRuntime) start() {
+func (r *backgroundWorkerRuntime) start() {
 	if r == nil {
 		return
 	}
@@ -42,7 +42,7 @@ func (r *archiveWorkerRuntime) start() {
 			if !errors.Is(err, models.ErrArchiveJobLease) && !errors.Is(err, models.ErrArchiveJobConflict) {
 				// Persisted attempts have machine-readable failure codes. Raw
 				// arguments, paths and plugin output do not belong in this log.
-				logger.Warn("Native archive worker interrupted; retrying")
+				logger.Warn("Background worker interrupted; retrying")
 			}
 			timer := time.NewTimer(time.Second)
 			select {
@@ -55,11 +55,11 @@ func (r *archiveWorkerRuntime) start() {
 	}()
 }
 
-func (r *archiveWorkerRuntime) stop() {
+func (r *backgroundWorkerRuntime) stop() {
 	_ = r.shutdown(context.Background())
 }
 
-func (r *archiveWorkerRuntime) shutdown(ctx context.Context) error {
+func (r *backgroundWorkerRuntime) shutdown(ctx context.Context) error {
 	if r == nil {
 		return nil
 	}

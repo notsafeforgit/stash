@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"html"
 	"net/http"
 	"net/http/httptest"
@@ -69,14 +68,14 @@ func TestShareLinkImageCardWithoutCookies(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, base+"preview/image?key="+invalid, nil).Code)
 	}
 	require.NotEqual(t, row.ID, other.ID)
-	for _, endpoint := range []string{"content", "status", "media/image-1/image", "media/image-1/download", "preview/video.mp4"} {
+	for _, endpoint := range []string{"content", "status", "media/" + shareTestKey(t, rs, "image", 1) + "/image", "media/" + shareTestKey(t, rs, "image", 1) + "/download", "preview/video.mp4"} {
 		w := sharedPreviewRequest(handler, http.MethodGet, base+endpoint+"?key="+secret, nil)
 		require.Equal(t, http.StatusNotFound, w.Code, endpoint)
 	}
 	saved, err := rs.service.Find(t.Context(), row.ID)
 	require.NoError(t, err)
 	require.Zero(t, saved.AccessCount, "crawling does not count as a recipient visit")
-	managed, err := shareResult(t.Context(), saved)
+	managed, err := shareResult(t.Context(), rs.service.Repo, saved)
 	require.NoError(t, err)
 	require.NotNil(t, managed.URL)
 	// Management Preview and Copy link receive the same public, crawler-capable URL.
@@ -91,38 +90,33 @@ func TestShareLinkImageCardWithoutCookies(t *testing.T) {
 }
 
 func TestShareLinkMetadataScopeAndRotation(t *testing.T) {
-	rs, handler, row, secret := shareHTTPFixture(t)
-	base := "https://shares.test/share/" + row.ID + "/"
-	snapshot, err := sharing.Snapshot(row)
+	rs, handler, _, _, db := shareHTTPMediaDatabaseFixture(t, false)
+	title := `A "title" <script>alert(1)</script> & more`
+	require.NoError(t, rs.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, _, err := db.ExecSQL(ctx, `UPDATE images SET title=? WHERE id=1`, []any{title})
+		return err
+	}))
+	options := sharing.Options{Label: "Metadata scope", ExpiresAt: time.Now().Add(time.Hour), ShowMetadata: true}
+	row, secret, err := rs.service.Create(t.Context(), "owner", options, []sharing.Target{{Kind: "IMAGE", ID: 1}})
 	require.NoError(t, err)
-	update := func() {
-		t.Helper()
-		row.SnapshotJSON, err = json.Marshal(snapshot)
-		require.NoError(t, err)
-		require.NoError(t, rs.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
-			// Membership is immutable in production; replace only this fixture.
-			if err := rs.service.Repo.Share.Delete(ctx, row.ID); err != nil {
-				return err
-			}
-			return rs.service.Repo.Share.Create(ctx, row)
-		}))
-	}
-	snapshot.Media[0].Title = `A "title" <script>alert(1)</script> & more`
-	row.ShowMetadata = true
-	update()
+	base := "https://shares.test/share/" + row.ID + "/"
 	card := linkCard(t, handler, base+"?key="+secret)
-	require.Equal(t, snapshot.Media[0].Title, card["og:title"])
+	require.Equal(t, title, card["og:title"])
 	w := sharedPreviewRequest(handler, http.MethodGet, base+"?key="+secret, nil)
 	require.NotContains(t, w.Body.String(), "<script>alert(1)")
-	snapshot.Media = append(snapshot.Media, models.ShareMedia{Key: "image-2"})
-	update()
-	card = linkCard(t, handler, base+"?key="+secret)
+	require.NoError(t, rs.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, _, err := db.ExecSQL(ctx, `INSERT INTO images(id,title,created_at,updated_at) VALUES(2,'Second image',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP); INSERT INTO images_files(image_id,file_id,"primary") VALUES(2,2,1);`, nil)
+		return err
+	}))
+	rs.service.Repo.Image = db.Repository().Image
+	multi, multiSecret, err := rs.service.Create(t.Context(), "owner", options, []sharing.Target{{Kind: "IMAGE", ID: 1}, {Kind: "IMAGE", ID: 2}})
+	require.NoError(t, err)
+	multiBase := "https://shares.test/share/" + multi.ID + "/"
+	card = linkCard(t, handler, multiBase+"?key="+multiSecret)
 	require.Equal(t, "summary", card["twitter:card"])
 	require.Empty(t, card["og:image"])
-	require.Equal(t, row.Label, card["og:title"])
-	require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, base+"preview/image?key="+secret, nil).Code)
-	snapshot.Media = snapshot.Media[:1]
-	update()
+	require.Equal(t, multi.Label, card["og:title"])
+	require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, multiBase+"preview/image?key="+multiSecret, nil).Code)
 	newSecret, err := rs.service.Rotate(t.Context(), row.ID)
 	require.NoError(t, err)
 	for _, endpoint := range []string{"", "preview/image"} {
@@ -141,7 +135,7 @@ func TestShareLinkMetadataScopeAndRotation(t *testing.T) {
 
 func TestShareLinkVideoCardAndFilePinning(t *testing.T) {
 	rs, handler, row, secret := shareHTTPMediaFixture(t, true)
-	snapshot, err := sharing.Snapshot(row)
+	snapshot, err := shareTestSnapshot(t, rs, row)
 	require.NoError(t, err)
 	f, _, err := rs.service.Resolve(t.Context(), snapshot.Media[0])
 	require.NoError(t, err)

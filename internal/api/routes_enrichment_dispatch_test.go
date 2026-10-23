@@ -84,7 +84,7 @@ func TestEnrichmentMaintenanceRuntimeRecoversWithoutOtherWorkers(t *testing.T) {
 	worker := ingest.NewEnrichmentMaintenance(f.service)
 	worker.Now = func() time.Time { return running.LeaseUntil.Add(time.Second) }
 	worker.PollInterval = 10 * time.Millisecond
-	runtime := &archiveWorkerRuntime{worker: worker}
+	runtime := &backgroundWorkerRuntime{worker: worker}
 	runtime.start()
 	t.Cleanup(runtime.stop)
 	require.Eventually(t, func() bool {

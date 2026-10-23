@@ -58,14 +58,15 @@ type Server struct {
 
 	manager                *manager.Manager
 	shares                 *sharing.Service
-	ingestWorker           *archiveWorkerRuntime
-	albumWorker            *archiveWorkerRuntime
-	postMergeNotifications *archiveWorkerRuntime
-	translationWorker      *archiveWorkerRuntime
-	enrichmentMaintenance  *archiveWorkerRuntime
-	discoveryMaintenance   *archiveWorkerRuntime
-	discoveryComparison    *archiveWorkerRuntime
-	discoveryPublication   *archiveWorkerRuntime
+	sharePreparation       *backgroundWorkerRuntime
+	ingestWorker           *backgroundWorkerRuntime
+	albumWorker            *backgroundWorkerRuntime
+	postMergeNotifications *backgroundWorkerRuntime
+	translationWorker      *backgroundWorkerRuntime
+	enrichmentMaintenance  *backgroundWorkerRuntime
+	discoveryMaintenance   *backgroundWorkerRuntime
+	discoveryComparison    *backgroundWorkerRuntime
+	discoveryPublication   *backgroundWorkerRuntime
 }
 
 // TODO - os.DirFS doesn't implement ReadDir, so re-implement it here
@@ -186,6 +187,7 @@ func Initialize() (*Server, error) {
 		shares:         sharing.New(mgr.Repository),
 	}
 
+	server.sharePreparation = &backgroundWorkerRuntime{worker: server.shares}
 	r.Use(middleware.Heartbeat("/healthz"))
 	r.Use(cors.AllowAll().Handler)
 	r.Use(RequestIPMiddleware)
@@ -413,6 +415,8 @@ func handleFavicon(staticUI http.Handler) func(w http.ResponseWriter, r *http.Re
 // It calls ListenAndServeTLS if TLS is configured, otherwise it calls ListenAndServe.
 // Calls to Start are blocked until the server is shutdown.
 func (s *Server) Start() error {
+	s.sharePreparation.start()
+	defer s.sharePreparation.stop()
 	s.ingestWorker.start()
 	s.albumWorker.start()
 	s.postMergeNotifications.start()
@@ -454,7 +458,7 @@ func (s *Server) ShutdownContext(ctx context.Context) error {
 	if s.requestCancel != nil {
 		s.requestCancel()
 	}
-	workers := []*archiveWorkerRuntime{s.ingestWorker, s.albumWorker, s.postMergeNotifications,
+	workers := []*backgroundWorkerRuntime{s.sharePreparation, s.ingestWorker, s.albumWorker, s.postMergeNotifications,
 		s.translationWorker, s.enrichmentMaintenance, s.discoveryMaintenance, s.discoveryComparison, s.discoveryPublication}
 	results := make(chan error, len(workers))
 	for _, worker := range workers {

@@ -5,21 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func (s *Service) snapshot(ctx context.Context, targets []Target) (*models.ShareSnapshot, error) {
-	return s.buildSnapshot(ctx, targets, false)
-}
-
-func (s *Service) buildSnapshot(ctx context.Context, targets []Target, ongoing bool) (*models.ShareSnapshot, error) {
+func (s *Service) buildSnapshot(ctx context.Context, targets []Target) (*models.ShareSnapshot, error) {
 	ret := &models.ShareSnapshot{Entries: []models.ShareEntry{}, Media: []models.ShareMedia{}}
 	seen := make(map[string]bool)
 	add := func(kind string, id int) (string, error) {
-		key := strings.ToLower(kind) + "-" + strconv.Itoa(id)
+		var key string
 		identity, err := s.Repo.ArchiveEntity.FindByLocalID(ctx, models.ArchiveEntityKind(strings.ToLower(kind)), id)
 		if err != nil {
 			return "", err
@@ -27,14 +22,9 @@ func (s *Service) buildSnapshot(ctx context.Context, targets []Target, ongoing b
 		if identity == nil || identity.State != models.ArchiveEntityActive {
 			return "", ErrUnavailable
 		}
-		if ongoing {
-			key = strings.ToLower(kind) + "-" + identity.UUID
-		}
+		key = strings.ToLower(kind) + "-" + identity.UUID
 		if seen[key] {
 			return key, nil
-		}
-		if !ongoing && len(ret.Media) >= MaxItems {
-			return "", fmt.Errorf("a share may contain at most %d media items", MaxItems)
 		}
 		var f models.File
 		var title string
@@ -109,9 +99,7 @@ func (s *Service) buildSnapshot(ctx context.Context, targets []Target, ongoing b
 		}
 		entry.UUID = identity.UUID
 		entry.Key = fmt.Sprintf("gallery-%d", len(ret.Entries)+1)
-		if ongoing {
-			entry.Key = strings.ToLower(target.Kind) + "-" + identity.UUID
-		}
+		entry.Key = strings.ToLower(target.Kind) + "-" + identity.UUID
 		if target.Kind == "GALLERY" {
 			g, err := s.Repo.Gallery.Find(ctx, target.ID)
 			if err != nil {
@@ -129,7 +117,7 @@ func (s *Service) buildSnapshot(ctx context.Context, targets []Target, ongoing b
 				for _, member := range page.Items {
 					key, err := add(strings.ToUpper(string(member.Kind)), member.LocalID)
 					if err != nil {
-						if ongoing && errors.Is(err, ErrUnavailable) {
+						if errors.Is(err, ErrUnavailable) {
 							continue
 						}
 						return nil, err
@@ -141,13 +129,11 @@ func (s *Service) buildSnapshot(ctx context.Context, targets []Target, ongoing b
 				}
 				offset = *page.NextOffset
 			}
-			if len(entry.MediaKeys) == 0 && !ongoing {
-				return nil, fmt.Errorf("gallery %d has no media", target.ID)
-			}
+
 		} else {
 			key, err := add(target.Kind, target.ID)
 			if err != nil {
-				if ongoing && errors.Is(err, ErrUnavailable) {
+				if errors.Is(err, ErrUnavailable) {
 					continue
 				}
 				return nil, err
@@ -161,6 +147,7 @@ func (s *Service) buildSnapshot(ctx context.Context, targets []Target, ongoing b
 			}
 		}
 		if len(entry.MediaKeys) > 0 {
+			entry.MediaCount = len(entry.MediaKeys)
 			ret.Entries = append(ret.Entries, entry)
 		}
 	}
@@ -201,7 +188,7 @@ func (s *Service) Resolve(ctx context.Context, item models.ShareMedia) (models.F
 	return f, scene, err
 }
 
-func (s *Service) resolve(ctx context.Context, item models.ShareMedia) (models.File, *models.Scene, error) {
+func (s *Service) currentFile(ctx context.Context, item models.ShareMedia) (models.File, *models.Scene, error) {
 	var f models.File
 	var scene *models.Scene
 	err := func() error {
@@ -252,6 +239,23 @@ func (s *Service) resolve(ctx context.Context, item models.ShareMedia) (models.F
 	}
 	if f == nil || f.Base().ID != item.FileID {
 		return nil, nil, ErrUnavailable
+	}
+	if item.FileUUID != "" {
+		identity, err := s.Repo.ArchiveEntity.FindByLocalID(ctx, models.ArchiveFile, int(f.Base().ID))
+		if err != nil {
+			return nil, nil, err
+		}
+		if identity == nil || identity.UUID != item.FileUUID || identity.State != models.ArchiveEntityActive || f.Base().Generation != item.FileGeneration {
+			return nil, nil, ErrUnavailable
+		}
+	}
+	return f, scene, nil
+}
+
+func (s *Service) resolve(ctx context.Context, item models.ShareMedia) (models.File, *models.Scene, error) {
+	f, scene, err := s.currentFile(ctx, item)
+	if err != nil {
+		return nil, nil, err
 	}
 	current, err := Fingerprint(f)
 	if err != nil {

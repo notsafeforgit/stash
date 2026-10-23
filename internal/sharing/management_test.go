@@ -219,7 +219,6 @@ func TestShareListFiltersBeforePagination(t *testing.T) {
 	require.NoError(t, repo.WithTxn(ctx, func(ctx context.Context) error {
 		for _, row := range rows {
 			row.TokenHash = Hash(row.ID)
-			row.SnapshotJSON = []byte(`{"entries":[],"media":[]}`)
 			require.NoError(t, repo.Share.Create(ctx, &row))
 			require.NoError(t, repo.Share.Update(ctx, &row))
 		}

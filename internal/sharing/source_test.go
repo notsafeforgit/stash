@@ -105,7 +105,7 @@ INSERT INTO scenes_files(scene_id,file_id,"primary") VALUES(2,1,1);`)
 	f.exec(`UPDATE scenes SET title='No longer matching' WHERE id=1`)
 	_, err = f.item(ongoing, "scene-"+originalUUID)
 	require.ErrorIs(t, err, ErrUnavailable, "every delivery rechecks the filter")
-	_, err = f.item(snapshot, "scene-1")
+	_, err = f.item(snapshot, "scene-"+originalUUID)
 	require.NoError(t, err, "snapshot membership survives metadata changes")
 	f.exec(`DELETE FROM scenes WHERE id=1;
 INSERT INTO scenes(id,title,created_at,updated_at) VALUES(1,'Included replacement',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
@@ -146,13 +146,13 @@ func TestShareEntitySourcesAndGalleryMembership(t *testing.T) {
 			f.exec(`DELETE FROM galleries_images WHERE gallery_id=1`)
 			_, err = f.item(galleryOnly, imageKey)
 			require.ErrorIs(t, err, ErrUnavailable)
-			_, err = f.item(frozenGallery, "image-1")
+			_, err = f.item(frozenGallery, imageKey)
 			require.NoError(t, err, "snapshot keeps original gallery membership")
 			f.exec(`DELETE FROM galleries WHERE id=1`)
 			content, _, err = f.service.Content(t.Context(), frozenGallery, "")
 			require.NoError(t, err)
 			require.Empty(t, content.Media)
-			_, err = f.item(frozenGallery, "image-1")
+			_, err = f.item(frozenGallery, imageKey)
 			require.ErrorIs(t, err, ErrUnavailable, "deleting a gallery revokes its otherwise-unselected media")
 			content, _, err = f.service.Content(t.Context(), row, "")
 			require.NoError(t, err)
@@ -190,19 +190,25 @@ INSERT INTO performers_scenes(performer_id,scene_id) VALUES(1,1);`)
 	}))
 }
 
-func TestShareSourcePaginationAndAtomicSnapshotLimit(t *testing.T) {
+func TestShareSourcePaginationAndLargeSnapshot(t *testing.T) {
 	f := newSourceFixture(t)
 	f.exec(`WITH RECURSIVE ids(id) AS (SELECT 2 UNION ALL SELECT id+1 FROM ids WHERE id<2051)
 INSERT INTO scenes(id,title,created_at,updated_at) SELECT id,'Included scene',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM ids;
 INSERT INTO scenes_files(scene_id,file_id,"primary") SELECT id,1,1 FROM scenes WHERE id>1;`)
 	filter := &models.ShareFilter{Kind: "SCENE", Q: "Included"}
-	_, _, err := f.service.CreateFromSource(t.Context(), "owner", Options{Label: "Too many", ExpiresAt: time.Now().Add(time.Hour)}, nil, &models.ShareSource{Mode: "SNAPSHOT", Filter: filter})
-	require.ErrorContains(t, err, "2000")
-	require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
-		rows, err := f.service.Repo.Share.List(ctx, models.ShareListOptions{Limit: 100})
-		require.Empty(t, rows)
-		return err
-	}))
+	fixed := f.create(&models.ShareSource{Mode: "SNAPSHOT", Filter: filter})
+	require.Equal(t, "PREPARING", fixed.PreparationState)
+	require.Equal(t, 2051, fixed.MediaCount)
+	require.Empty(t, SavedLinkSecret(fixed))
+	_, _, err := f.service.Content(t.Context(), fixed, "")
+	require.ErrorIs(t, err, ErrUnavailable)
+	for fixed.PreparationState == "PREPARING" {
+		require.NoError(t, f.service.PrepareBatch(t.Context(), fixed))
+		fixed, err = f.service.Find(t.Context(), fixed.ID)
+		require.NoError(t, err)
+	}
+	require.Equal(t, "READY", fixed.PreparationState, fixed.PreparationError)
+	require.NotEmpty(t, SavedLinkSecret(fixed))
 	row := f.create(&models.ShareSource{Mode: "ONGOING", Filter: filter})
 	keys := map[string]bool{}
 	cursor := ""

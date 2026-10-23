@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -243,10 +242,7 @@ func (s *Service) Content(ctx context.Context, row *models.ShareRecord, cursor s
 			return errors.New("too many focused share items")
 		}
 		if source == nil || source.Mode == "SNAPSHOT" {
-			if cursor != "" {
-				return errors.New("snapshot has no continuation")
-			}
-			ret, err = s.visibleSnapshot(ctx, row)
+			ret, next, err = s.snapshotPage(ctx, row, cursor, focus)
 			return err
 		}
 		targets, continuation, err := s.sourceTargets(ctx, source, cursor, PageSize)
@@ -275,7 +271,7 @@ func (s *Service) Content(ctx context.Context, row *models.ShareRecord, cursor s
 				targets = append(targets, target)
 			}
 		}
-		snapshot, err := s.buildSnapshot(ctx, targets, true)
+		snapshot, err := s.buildSnapshot(ctx, targets)
 		if err != nil {
 			return err
 		}
@@ -350,35 +346,14 @@ func (s *Service) Item(ctx context.Context, row *models.ShareRecord, key string)
 	var item *models.ShareMedia
 	err = s.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
 		if source == nil || source.Mode == "SNAPSHOT" {
-			snapshot, err := Snapshot(row)
+			item, err = s.Repo.Share.SnapshotItem(ctx, row.ID, key)
 			if err != nil {
 				return err
 			}
-			// Check the original entry too: deleting a shared gallery must not
-			// keep its otherwise-unselected images accessible through old URLs.
-			allowed := false
-			for _, entry := range snapshot.Entries {
-				if slices.Contains(entry.MediaKeys, key) {
-					active, err := s.entryActive(ctx, entry)
-					if err != nil {
-						return err
-					}
-					if active {
-						allowed = true
-						break
-					}
-				}
-			}
-			if !allowed {
+			if item == nil {
 				return ErrUnavailable
 			}
-			for _, media := range snapshot.Media {
-				if media.Key == key {
-					item = &media
-					return nil
-				}
-			}
-			return ErrUnavailable
+			return nil
 		}
 		target, err := s.targetFromKey(ctx, key)
 		if err != nil {
@@ -394,7 +369,7 @@ func (s *Service) Item(ctx context.Context, row *models.ShareRecord, key string)
 		if !matched {
 			return ErrUnavailable
 		}
-		snapshot, err := s.buildSnapshot(ctx, []Target{target}, true)
+		snapshot, err := s.buildSnapshot(ctx, []Target{target})
 		if err != nil {
 			return err
 		}
@@ -417,53 +392,4 @@ func (s *Service) entryActive(ctx context.Context, entry models.ShareEntry) (boo
 		return false, err
 	}
 	return identity != nil && identity.State == models.ArchiveEntityActive && (entry.UUID == "" || entry.UUID == identity.UUID), nil
-}
-
-func (s *Service) visibleSnapshot(ctx context.Context, row *models.ShareRecord) (models.ShareSnapshot, error) {
-	saved, err := Snapshot(row)
-	if err != nil {
-		return saved, err
-	}
-	ret := models.ShareSnapshot{Entries: []models.ShareEntry{}, Media: []models.ShareMedia{}}
-	allowed := map[string]bool{}
-	for index, entry := range saved.Entries {
-		active, err := s.entryActive(ctx, entry)
-		if err != nil {
-			return ret, err
-		}
-		if !active {
-			continue
-		}
-		if entry.Key == "" {
-			entry.Key = fmt.Sprintf("gallery-%d", index+1)
-		}
-		ret.Entries = append(ret.Entries, entry)
-		for _, key := range entry.MediaKeys {
-			allowed[key] = true
-		}
-	}
-	visible := map[string]bool{}
-	for _, media := range saved.Media {
-		if !allowed[media.Key] {
-			continue
-		}
-		_, _, err := s.resolve(ctx, media)
-		if errors.Is(err, ErrUnavailable) {
-			continue
-		}
-		if err != nil {
-			return ret, err
-		}
-		visible[media.Key] = true
-		ret.Media = append(ret.Media, media)
-	}
-	entries := ret.Entries[:0]
-	for _, entry := range ret.Entries {
-		entry.MediaKeys = slices.DeleteFunc(entry.MediaKeys, func(key string) bool { return !visible[key] })
-		if len(entry.MediaKeys) > 0 {
-			entries = append(entries, entry)
-		}
-	}
-	ret.Entries = entries
-	return ret, nil
 }

@@ -15,13 +15,18 @@ import (
 	"github.com/stashapp/stash/pkg/session"
 )
 
-func shareResult(ctx context.Context, row *models.ShareRecord) (*MediaShare, error) {
-	snapshot, err := sharing.Snapshot(row)
+func shareResult(ctx context.Context, repo models.Repository, row *models.ShareRecord) (*MediaShare, error) {
+	var entries []models.ShareEntry
+	err := repo.WithReadTxn(ctx, func(ctx context.Context) error {
+		var err error
+		entries, err = repo.Share.SnapshotEntries(ctx, row.ID, 0, 3, "")
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
-	count := len(snapshot.Media)
-	ret := &MediaShare{ID: row.ID, Label: row.Label, CreatedAt: time.Unix(row.CreatedAt, 0), ExpiresAt: time.Unix(row.ExpiresAt, 0), AllowDownload: row.AllowDownload, ShowMetadata: row.ShowMetadata, AccessCount: row.AccessCount, MediaCount: &count, Items: []*MediaShareEntry{}, Mode: ShareMembershipSnapshot, SourceKind: ShareSourceKindSelection, SelectionCount: len(snapshot.Entries), MediaTypes: []ShareEntityKind{}}
+	count := row.MediaCount
+	ret := &MediaShare{ID: row.ID, Label: row.Label, CreatedAt: time.Unix(row.CreatedAt, 0), ExpiresAt: time.Unix(row.ExpiresAt, 0), AllowDownload: row.AllowDownload, ShowMetadata: row.ShowMetadata, AccessCount: row.AccessCount, MediaCount: &count, Items: []*MediaShareEntry{}, Mode: ShareMembershipSnapshot, SourceKind: ShareSourceKindSelection, PreparationState: SharePreparationState(row.PreparationState), PreparedCount: row.PreparedCount, PreparationError: row.PreparationError, SelectionCount: row.SelectionCount, MediaTypes: []ShareEntityKind{}}
 	source, err := sharing.Source(row)
 	if err != nil {
 		return nil, err
@@ -54,12 +59,12 @@ func shareResult(ctx context.Context, row *models.ShareRecord) (*MediaShare, err
 		t := time.Unix(row.LastAccessedAt, 0)
 		ret.LastAccessedAt = &t
 	}
-	for _, entry := range snapshot.Entries {
+	for _, entry := range entries {
 		var id *string
 		if entry.UUID != "" {
 			id = &entry.UUID
 		}
-		ret.Items = append(ret.Items, &MediaShareEntry{Kind: ShareEntityKind(entry.Kind), ID: id, Title: entry.Title, MediaCount: len(entry.MediaKeys)})
+		ret.Items = append(ret.Items, &MediaShareEntry{Kind: ShareEntityKind(entry.Kind), ID: id, Title: entry.Title, MediaCount: entry.MediaCount})
 	}
 	return ret, nil
 }
@@ -89,7 +94,7 @@ func (r *queryResolver) MediaShares(ctx context.Context, limit int, offset int, 
 			return err
 		}
 		for _, row := range rows {
-			result, err := shareResult(ctx, row)
+			result, err := shareResult(ctx, r.repository, row)
 			if err != nil {
 				return err
 			}
@@ -105,7 +110,7 @@ func (r *queryResolver) MediaShare(ctx context.Context, id string) (*MediaShare,
 	if err != nil || row == nil {
 		return nil, err
 	}
-	return shareResult(ctx, row)
+	return shareResult(ctx, r.repository, row)
 }
 
 func (r *queryResolver) SharingConfiguration(ctx context.Context) (*SharingConfiguration, error) {
@@ -113,7 +118,7 @@ func (r *queryResolver) SharingConfiguration(ctx context.Context) (*SharingConfi
 }
 
 func sharingConfiguration(c *config.Config) *SharingConfiguration {
-	return &SharingConfiguration{PublicURL: c.GetSharingPublicURL(), MaxItems: sharing.MaxItems, MaxDays: 30}
+	return &SharingConfiguration{PublicURL: c.GetSharingPublicURL(), MaxDays: 30}
 }
 
 func (r *mutationResolver) ConfigureSharing(ctx context.Context, publicURL string) (*SharingConfiguration, error) {
@@ -167,15 +172,15 @@ func (r *mutationResolver) MediaShareCreate(ctx context.Context, input MediaShar
 	if user := session.GetCurrentUserID(ctx); user != nil && *user != "" {
 		owner = *user
 	}
-	row, secret, err := r.shares.CreateFromSource(ctx, owner, sharing.Options{Label: input.Label, ExpiresAt: input.ExpiresAt, AllowDownload: input.AllowDownload, ShowMetadata: input.ShowMetadata}, targets, source)
+	row, _, err := r.shares.CreateFromSource(ctx, owner, sharing.Options{Label: input.Label, ExpiresAt: input.ExpiresAt, AllowDownload: input.AllowDownload, ShowMetadata: input.ShowMetadata}, targets, source)
 	if err != nil {
 		return nil, err
 	}
-	result, err := shareResult(ctx, row)
+	result, err := shareResult(ctx, r.repository, row)
 	if err != nil {
 		return nil, err
 	}
-	return &MediaShareCreated{Share: result, URL: shareLink(ctx, row.ID, secret)}, nil
+	return &MediaShareCreated{Share: result, URL: result.URL}, nil
 }
 
 func (r *mutationResolver) MediaShareUpdate(ctx context.Context, input MediaShareUpdateInput) (*MediaShare, error) {
@@ -183,7 +188,7 @@ func (r *mutationResolver) MediaShareUpdate(ctx context.Context, input MediaShar
 	if err != nil {
 		return nil, err
 	}
-	return shareResult(ctx, row)
+	return shareResult(ctx, r.repository, row)
 }
 
 func (r *mutationResolver) MediaShareRevoke(ctx context.Context, id string) (bool, error) {
@@ -203,4 +208,12 @@ func (r *mutationResolver) MediaShareRotate(ctx context.Context, id string) (str
 		return "", err
 	}
 	return shareLink(ctx, id, secret), nil
+}
+
+func (r *mutationResolver) MediaShareRetry(ctx context.Context, id string) (*MediaShare, error) {
+	row, err := r.shares.Retry(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return shareResult(ctx, r.repository, row)
 }

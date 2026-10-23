@@ -120,11 +120,15 @@ func TestAnonymiserRemovesShareLinksAndSessions(t *testing.T) {
 		ID: "private-share-id", Token: secret, TokenHash: hash[:],
 		Label: "private-share-label", CreatedBy: "private-share-owner",
 		CreatedAt: 1, ExpiresAt: 9999999999, Version: 1,
-		SnapshotJSON: []byte(`{"media":[{"title":"private-share-caption"}]}`),
+		PreparationState: "PREPARING",
 	}
 	session := &models.ShareSession{TokenHash: []byte("private-guest-session-hash"), ShareID: share.ID, Version: 1, ExpiresAt: share.ExpiresAt}
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		if err := repo.Share.Create(ctx, share); err != nil {
+			return err
+		}
+		_, _, err := source.ExecSQL(ctx, `INSERT INTO share_snapshot_media(share_id,key,position,media) VALUES(?, 'image-private',1,'{"title":"private-share-caption"}')`, []any{share.ID})
+		if err != nil {
 			return err
 		}
 		return repo.Share.PutSession(ctx, session)

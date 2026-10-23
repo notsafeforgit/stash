@@ -5,6 +5,8 @@ enum ShareEntityKind {
   GALLERY
 }
 
+enum SharePreparationState { PREPARING READY FAILED }
+
 enum ShareMembership { SNAPSHOT ONGOING }
 enum ShareSourceKind { SELECTION FILTER PERFORMER STUDIO TAG }
 enum ShareLibraryKind { PERFORMER STUDIO TAG }
@@ -78,7 +80,11 @@ type MediaShare {
   show_metadata: Boolean!
   access_count: Int!
   last_accessed_at: Time
+  "At most three frozen entries for a compact management summary."
   items: [MediaShareEntry!]!
+  preparation_state: SharePreparationState!
+  prepared_count: Int!
+  preparation_error: String!
   "Frozen media count; ongoing shares have no fixed count."
   media_count: Int
   mode: ShareMembership!
@@ -90,14 +96,13 @@ type MediaShare {
 
 type MediaShareCreated {
   share: MediaShare!
-  "Forwardable URL; it can also be retrieved later from the share."
-  url: String!
+  "Available only when preparation is complete; retrieve it later from mediaShare."
+  url: String
 }
 
 type SharingConfiguration {
   "Absolute HTTPS URL ending in /share, or empty to use this application's URL."
   public_url: String!
-  max_items: Int!
   max_days: Int!
 }
 
@@ -110,6 +115,8 @@ extend type Query {
 extend type Mutation {
   mediaShareCreate(input: MediaShareCreateInput!): MediaShareCreated!
   mediaShareUpdate(input: MediaShareUpdateInput!): MediaShare!
+  "Resume the same frozen snapshot after resolving a preparation failure."
+  mediaShareRetry(id: ID!): MediaShare!
   mediaShareRevoke(id: ID!): Boolean!
   "Permanently remove a revoked or expired share and its sessions. Media is kept."
   mediaShareDelete(id: ID!): Boolean!

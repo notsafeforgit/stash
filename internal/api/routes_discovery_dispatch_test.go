@@ -111,7 +111,7 @@ func TestDiscoveryMaintenanceRuntimeRecoversWithoutProducer(t *testing.T) {
 	worker := ingest.NewDiscoveryMaintenance(f.service)
 	worker.Now = func() time.Time { return f.now }
 	worker.PollInterval = time.Millisecond
-	runtime := &archiveWorkerRuntime{worker: worker}
+	runtime := &backgroundWorkerRuntime{worker: worker}
 	t.Cleanup(runtime.stop)
 	runtime.start()
 	runtime.start()

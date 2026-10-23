@@ -16,6 +16,20 @@ func (*ShareStore) QueryTargets(ctx context.Context, filter models.ShareFilter, 
 	if after < 0 || limit < 1 || limit > 2001 {
 		return nil, errors.New("invalid share query bounds")
 	}
+	query, table, err := shareTargetQuery(ctx, filter, limit)
+	if err != nil {
+		return nil, err
+	}
+	query.addWhere(fmt.Sprintf("%s.id > ?", table))
+	query.whereArgs = append(query.whereArgs, after)
+	if exact != nil {
+		query.addWhere(fmt.Sprintf("%s.id = ?", table))
+		query.whereArgs = append(query.whereArgs, *exact)
+	}
+	return query.findIDs(ctx)
+}
+
+func shareTargetQuery(ctx context.Context, filter models.ShareFilter, limit int) (*queryBuilder, string, error) {
 	sort := "id"
 	direction := models.SortDirectionEnumAsc
 	find := &models.FindFilterType{Q: &filter.Q, Sort: &sort, Direction: &direction, PerPage: &limit}
@@ -33,18 +47,12 @@ func (*ShareStore) QueryTargets(ctx context.Context, filter models.ShareFilter, 
 		table = galleryTable
 		query, err = (&GalleryStore{}).makeASTQuery(ctx, filter.AST, find)
 	default:
-		return nil, errors.New("unsupported shared media kind")
+		return nil, "", errors.New("unsupported shared media kind")
 	}
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	query.addWhere(fmt.Sprintf("%s.id > ?", table))
-	query.whereArgs = append(query.whereArgs, after)
-	if exact != nil {
-		query.addWhere(fmt.Sprintf("%s.id = ?", table))
-		query.whereArgs = append(query.whereArgs, *exact)
-	}
-	return query.findIDs(ctx)
+	return query, table, nil
 }
 
 func (*ShareStore) Find(ctx context.Context, id string) (*models.ShareRecord, error) {
@@ -98,12 +106,15 @@ func (*ShareStore) DeleteInactive(ctx context.Context, now int64) ([]string, err
 }
 
 func (*ShareStore) Create(ctx context.Context, s *models.ShareRecord) error {
+	if s.PreparationState == "" {
+		s.PreparationState = "READY"
+	}
 	if len(s.SourceJSON) == 0 {
 		s.SourceJSON = []byte(`{}`)
 	}
 	_, err := dbWrapper.Exec(ctx, `INSERT INTO shares
-(id, token_hash, token, label, created_by, created_at, expires_at, allow_download, show_metadata, version, snapshot, source)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, s.ID, s.TokenHash, s.Token, s.Label, s.CreatedBy, s.CreatedAt, s.ExpiresAt, s.AllowDownload, s.ShowMetadata, s.Version, s.SnapshotJSON, s.SourceJSON)
+(id, token_hash, token, label, created_by, created_at, expires_at, allow_download, show_metadata, version, source, preparation_state, preparation_revision)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, s.ID, s.TokenHash, s.Token, s.Label, s.CreatedBy, s.CreatedAt, s.ExpiresAt, s.AllowDownload, s.ShowMetadata, s.Version, s.SourceJSON, s.PreparationState, s.PreparationRevision)
 	return err
 }
 

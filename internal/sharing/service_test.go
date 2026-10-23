@@ -42,6 +42,19 @@ INSERT INTO galleries_images(gallery_id,image_id) VALUES(7,2);`, nil)
 	filePath := filepath.Join(t.TempDir(), "private-filename.mp4")
 	require.NoError(t, os.WriteFile(filePath, []byte("original video"), 0o600))
 	f := &models.VideoFile{BaseFile: &models.BaseFile{ID: 42, Path: filePath}, Width: 640, Height: 360, Duration: 60, FrameRate: 30}
+	stat, err := os.Stat(filePath)
+	require.NoError(t, err)
+	f.Generation = 1
+	f.Size = stat.Size()
+	f.ModTime = stat.ModTime()
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, _, err := db.ExecSQL(ctx, `INSERT INTO folders(id,path,basename,mod_time,created_at,updated_at) VALUES(1,?,'media',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO files(id,parent_folder_id,basename,size,mod_time,created_at,updated_at) VALUES(42,1,?, ?, ?, CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO video_files(file_id,duration,video_codec,format,audio_codec,width,height,frame_rate,bit_rate) VALUES(42,60,'h264','mp4','aac',640,360,30,100);
+INSERT INTO scenes_files(scene_id,file_id,"primary") VALUES(1,42,1);
+INSERT INTO images_files(image_id,file_id,"primary") VALUES(2,42,1);`, []any{filepath.Dir(filePath), filepath.Base(filePath), stat.Size(), stat.ModTime().UTC().Format(time.RFC3339)})
+		return err
+	}))
 	scene := &models.Scene{ID: 1, Title: "Private title", Files: models.NewRelatedVideoFiles([]*models.VideoFile{f})}
 	m.Scene.On("Find", mock.Anything, 1).Return(scene, nil)
 	return New(repo), m, f, db
@@ -65,7 +78,7 @@ func TestShareCapabilitiesAndRevocation(t *testing.T) {
 	require.Len(t, row.TokenHash, 32)
 	require.Equal(t, Hash(secret), row.TokenHash)
 	require.Equal(t, secret, row.Token)
-	require.NotContains(t, string(row.SnapshotJSON), secret)
+	require.NotContains(t, testSnapshotJSON(t, s, row), secret)
 	_, err := s.Authenticate(ctx, row.ID, secret)
 	require.ErrorIs(t, err, ErrUnavailable, "bootstrap secrets are not media credentials")
 	_, _, err = s.Exchange(ctx, row.ID, otherSecret)
@@ -141,15 +154,14 @@ func TestShareFrozenMembershipAndFileIdentity(t *testing.T) {
 	imageFile := &models.ImageFile{BaseFile: f.BaseFile, Width: 400, Height: 300}
 	image := &models.Image{ID: 2, Title: "Shared image", Files: models.NewRelatedFiles([]models.File{imageFile})}
 	m.Image.On("Find", mock.Anything, 2).Return(image, nil)
-	m.Gallery.On("Find", mock.Anything, 7).Return(&models.Gallery{ID: 7, Title: "Gallery"}, nil).Once()
 	row, _, err := s.Create(ctx, "owner", Options{Label: "Mixed", ExpiresAt: time.Now().Add(time.Hour)}, []Target{{Kind: "GALLERY", ID: 7}, {Kind: "IMAGE", ID: 2}, {Kind: "SCENE", ID: 1}})
 	require.NoError(t, err)
-	snapshot, err := Snapshot(row)
+	snapshot, err := testSnapshot(t, s, row)
 	require.NoError(t, err)
 	require.Len(t, snapshot.Entries, 3)
 	require.Len(t, snapshot.Media, 2, "overlapping selections are deduplicated")
-	require.Equal(t, []string{"image-2"}, snapshot.Entries[0].MediaKeys)
-	require.NotContains(t, string(row.SnapshotJSON), f.Path)
+	require.Equal(t, snapshot.Entries[1].MediaKeys, snapshot.Entries[0].MediaKeys)
+	require.NotContains(t, testSnapshotJSON(t, s, row), f.Path)
 	for _, item := range snapshot.Media {
 		_, _, err := s.Resolve(ctx, item)
 		require.NoError(t, err)
@@ -158,7 +170,7 @@ func TestShareFrozenMembershipAndFileIdentity(t *testing.T) {
 	image.Title = "Changed private title"
 	updated, err := s.Update(ctx, row.ID, Options{Label: "Renamed", ExpiresAt: time.Now().Add(2 * time.Hour), AllowDownload: true, ShowMetadata: true})
 	require.NoError(t, err)
-	require.JSONEq(t, string(row.SnapshotJSON), string(updated.SnapshotJSON))
+	require.JSONEq(t, testSnapshotJSON(t, s, row), testSnapshotJSON(t, s, updated))
 	require.NoError(t, os.WriteFile(f.Path, []byte("replacement file with another length"), 0o600))
 	for _, item := range snapshot.Media {
 		_, _, err := s.Resolve(ctx, item)
@@ -191,7 +203,7 @@ func TestSharePersistenceAndValidation(t *testing.T) {
 	_, _, err = s.Create(ctx, "owner", Options{Label: "Invalid scope", ExpiresAt: time.Now().Add(time.Hour)}, []Target{{Kind: "PERFORMER", ID: 1}})
 	require.Error(t, err)
 	var snapshot map[string]any
-	require.NoError(t, json.Unmarshal(row.SnapshotJSON, &snapshot))
+	require.NoError(t, json.Unmarshal([]byte(testSnapshotJSON(t, s, row)), &snapshot))
 	require.NotEmpty(t, snapshot)
 }
 
@@ -252,4 +264,18 @@ func TestSavedShareLinkOnlyReturnsTheCurrentActiveCredential(t *testing.T) {
 		change(&changed)
 		require.Empty(t, SavedLinkSecret(&changed))
 	}
+}
+
+func testSnapshot(t *testing.T, s *Service, row *models.ShareRecord) (models.ShareSnapshot, error) {
+	t.Helper()
+	ret, _, err := s.Content(t.Context(), row, "")
+	return ret, err
+}
+func testSnapshotJSON(t *testing.T, s *Service, row *models.ShareRecord) string {
+	t.Helper()
+	value, err := testSnapshot(t, s, row)
+	require.NoError(t, err)
+	body, err := json.Marshal(value)
+	require.NoError(t, err)
+	return string(body)
 }

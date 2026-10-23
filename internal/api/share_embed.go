@@ -27,8 +27,8 @@ func (rs *shareRoutes) linkItem(r *http.Request) (*models.ShareMedia, models.Fil
 	if err != nil || (source != nil && source.Mode == "ONGOING") {
 		return nil, nil, nil, sharing.ErrUnavailable
 	}
-	snapshot, err := sharing.Snapshot(shareGrant(r))
-	if err != nil || len(snapshot.Media) != 1 {
+	snapshot, _, err := rs.service.Content(r.Context(), shareGrant(r), "")
+	if err != nil || shareGrant(r).MediaCount != 1 || len(snapshot.Media) != 1 {
 		return nil, nil, nil, sharing.ErrUnavailable
 	}
 	return rs.service.Item(r.Context(), shareGrant(r), snapshot.Media[0].Key)
@@ -48,11 +48,6 @@ func shareLinkBase(r *http.Request, id string) string {
 
 func (rs *shareRoutes) linkPage(w http.ResponseWriter, r *http.Request) {
 	row := shareGrant(r)
-	snapshot, err := sharing.Snapshot(row)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
 	base := shareLinkBase(r, row.ID)
 	query := "?" + url.Values{"key": {r.URL.Query().Get("key")}}.Encode()
 	title := row.Label
@@ -61,7 +56,7 @@ func (rs *shareRoutes) linkPage(w http.ResponseWriter, r *http.Request) {
 	meta := func(property, value string) {
 		fmt.Fprintf(&tags, `<meta property="%s" content="%s"/>`+"\n", property, html.EscapeString(value))
 	}
-	if len(snapshot.Media) == 1 {
+	if row.MediaCount == 1 {
 		item, f, _, err := rs.linkItem(r)
 		if err != nil {
 			http.NotFound(w, r)

@@ -48,7 +48,7 @@ func sharedPreviewRequest(handler http.Handler, method, url string, cookie *http
 func TestShareGeneratedPreviewsStayScoped(t *testing.T) {
 	rs, handler, other, otherSecret := shareHTTPMediaFixture(t, true)
 	mgr := sharedPreviewManager(t, rs)
-	snapshot, err := sharing.Snapshot(other)
+	snapshot, err := shareTestSnapshot(t, rs, other)
 	require.NoError(t, err)
 	f, _, err := rs.service.Resolve(context.Background(), snapshot.Media[0])
 	require.NoError(t, err)
@@ -65,7 +65,7 @@ func TestShareGeneratedPreviewsStayScoped(t *testing.T) {
 	cookie := exchangeShareHTTP(t, handler, row, secret)
 	otherCookie := exchangeShareHTTP(t, handler, other, otherSecret)
 	base := "/share/" + row.ID + "/"
-	mediaBase := base + "media/scene-3/"
+	mediaBase := base + "media/" + shareTestKey(t, rs, "scene", 3) + "/"
 	get := func(url string) *httptest.ResponseRecorder {
 		return sharedPreviewRequest(handler, http.MethodGet, url, cookie)
 	}
@@ -122,8 +122,8 @@ func TestShareGeneratedPreviewsStayScoped(t *testing.T) {
 	require.Empty(t, head.Body.String())
 	for _, url := range []string{
 		mediaBase + "preview-image/manifest.json", assetURL + "-stale",
-		strings.Replace(assetURL, "scene-3", "scene-4", 1),
-		strings.Replace(assetURL, "scene-3", "image-1", 1), mediaBase + "download",
+		strings.Replace(assetURL, shareTestKey(t, rs, "scene", 3), "scene-4", 1),
+		strings.Replace(assetURL, shareTestKey(t, rs, "scene", 3), shareTestKey(t, rs, "image", 1), 1), mediaBase + "download",
 	} {
 		require.Equal(t, http.StatusNotFound, get(url).Code, url)
 	}
@@ -144,7 +144,7 @@ func TestShareGeneratedPreviewsStayScoped(t *testing.T) {
 func TestSharedImageThumbnailReuseAndOriginalViewsStayScoped(t *testing.T) {
 	rs, handler, row, secret := shareHTTPFixture(t)
 	mgr := sharedPreviewManager(t, rs)
-	snapshot, err := sharing.Snapshot(row)
+	snapshot, err := shareTestSnapshot(t, rs, row)
 	require.NoError(t, err)
 	f, _, err := rs.service.Resolve(context.Background(), snapshot.Media[0])
 	require.NoError(t, err)
@@ -160,7 +160,7 @@ func TestSharedImageThumbnailReuseAndOriginalViewsStayScoped(t *testing.T) {
 	row, secret, err = rs.service.Create(context.Background(), "owner", sharing.Options{Label: "HDR image share", ExpiresAt: time.Now().Add(time.Hour)}, []sharing.Target{{Kind: "IMAGE", ID: 1}})
 	require.NoError(t, err)
 	cookie := exchangeShareHTTP(t, handler, row, secret)
-	base := "/share/" + row.ID + "/media/image-1/"
+	base := "/share/" + row.ID + "/media/" + shareTestKey(t, rs, "image", 1) + "/"
 	store := mgr.PreviewImageStore()
 	stage := t.TempDir()
 	result := &previewimage.Result{Directory: stage, Variants: []previewimage.Variant{
@@ -184,7 +184,7 @@ func TestSharedImageThumbnailReuseAndOriginalViewsStayScoped(t *testing.T) {
 	require.Equal(t, "image/avif", w.Header().Get("Content-Type"))
 	require.Equal(t, "preview.avif", w.Body.String())
 	require.Contains(t, w.Header().Get("Cache-Control"), "no-store")
-	for _, invalid := range []string{asset + "stale", strings.Replace(asset, "image-1", "image-2", 1), strings.Replace(asset, "image-1", "scene-1", 1)} {
+	for _, invalid := range []string{asset + "stale", strings.Replace(asset, shareTestKey(t, rs, "image", 1), "image-2", 1), strings.Replace(asset, shareTestKey(t, rs, "image", 1), shareTestKey(t, rs, "scene", 1), 1)} {
 		require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, invalid, cookie).Code)
 	}
 	require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, asset, nil).Code)

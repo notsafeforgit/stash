@@ -750,6 +750,24 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				}
 			}
 		}
+		if version >= NativeSchemaBaseline+130 {
+			for _, name := range []string{"share_snapshot_entries", "share_snapshot_media", "share_snapshot_members", "shares_preparing", "share_snapshot_entries_kind", "share_snapshot_members_media", "share_snapshot_entry_immutable", "share_snapshot_member_immutable", "share_snapshot_media_immutable", "share_snapshot_ready", "share_snapshot_sealed", "share_snapshot_entry_insert", "share_snapshot_member_insert", "share_snapshot_media_insert", "share_snapshot_entry_delete", "share_snapshot_member_delete", "share_snapshot_media_delete", "share_snapshot_admission_closed", "share_snapshot_counts_immutable", "share_snapshot_checkpoint", "share_snapshot_media_preparation"} {
+				var found bool
+				if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+					return err
+				}
+				if !found {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+			var complete bool
+			if err := conn.Get(&complete, `SELECT (SELECT count(*) FROM pragma_table_info('shares') WHERE name IN ('preparation_state','preparation_revision','preparation_error','prepared_count','media_count','selection_count'))=6 AND NOT EXISTS(SELECT 1 FROM pragma_table_info('shares') WHERE name='snapshot')`); err != nil {
+				return err
+			}
+			if !complete {
+				return errors.New("native database schema is incomplete: snapshot preparation")
+			}
+		}
 		if version >= NativeSchemaBaseline+129 {
 			var complete bool
 			if err := conn.Get(&complete, `SELECT EXISTS(SELECT 1 FROM pragma_table_info('shares') WHERE name='source') AND EXISTS(SELECT 1 FROM sqlite_schema WHERE type='trigger' AND name='share_source_immutable')`); err != nil {

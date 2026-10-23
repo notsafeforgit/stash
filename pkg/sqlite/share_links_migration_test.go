@@ -52,7 +52,8 @@ INSERT INTO share_sessions(token_hash,share_id,version,expires_at,preview,exchan
 		require.Equal(t, []byte{0, 0x11, 0x22}, row.TokenHash)
 		require.Equal(t, 3, row.Version)
 		require.Equal(t, 12, row.AccessCount)
-		require.JSONEq(t, `{"media":[]}`, string(row.SnapshotJSON))
+		require.Zero(t, row.MediaCount)
+		require.Equal(t, "READY", row.PreparationState)
 		for _, expected := range []models.ShareSession{
 			{TokenHash: []byte{0, 0x33, 0x44}, ShareID: "existing", Version: 3, ExpiresAt: 9999999999},
 			{TokenHash: []byte{0, 0x55, 0x66}, ShareID: "existing", Version: 3, ExpiresAt: 9999999000},

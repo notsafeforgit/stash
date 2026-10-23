@@ -133,6 +133,7 @@ func TestMetadataBackoffRetainsJobBeyondFailureLimit(t *testing.T) {
 
 func removeSourceBackoffSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSnapshotMembershipSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER share_source_immutable;
  ALTER TABLE shares DROP COLUMN source;
  DELETE FROM native_migration_history WHERE version=1000129;

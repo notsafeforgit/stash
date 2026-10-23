@@ -306,6 +306,7 @@ type publicShareEntry struct {
 	Kind      string   `json:"kind"`
 	Title     string   `json:"title"`
 	MediaKeys []string `json:"media_keys"`
+ MediaCount int `json:"media_count"`
 }
 type publicShareMedia struct {
 	Key          string        `json:"key"`
@@ -368,7 +369,7 @@ func (rs *shareRoutes) content(w http.ResponseWriter, r *http.Request) {
 		if row.ShowMetadata {
 			title = entry.Title
 		}
-		ret.Entries = append(ret.Entries, publicShareEntry{Key: entry.Key, Kind: entry.Kind, Title: title, MediaKeys: entry.MediaKeys})
+		ret.Entries = append(ret.Entries, publicShareEntry{Key: entry.Key, Kind: entry.Kind, Title: title, MediaKeys: entry.MediaKeys, MediaCount: entry.MediaCount})
 	}
 	scenes := rs.previewScenes(r.Context(), snapshot.Media)
 	for _, media := range snapshot.Media {

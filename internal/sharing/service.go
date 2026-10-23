@@ -9,7 +9,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -18,15 +17,10 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-const MaxItems = 2000
-
 var ErrUnavailable = errors.New("share unavailable")
 var ErrActive = errors.New("revoke an active share before deleting it")
 
-type Target struct {
-	Kind string
-	ID   int
-}
+type Target = models.ShareTarget
 type Options struct {
 	Label                       string
 	ExpiresAt                   time.Time
@@ -36,13 +30,14 @@ type Service struct {
 	Repo   models.Repository
 	mu     sync.Mutex
 	active map[string]map[*delivery]struct{}
+	wake   chan struct{}
 	// Set once during server construction. Releases only this grant's encoders.
 	OnInvalidate func(string)
 }
 type delivery struct{ cancel context.CancelFunc }
 
 func New(repo models.Repository) *Service {
-	return &Service{Repo: repo, active: make(map[string]map[*delivery]struct{})}
+	return &Service{Repo: repo, active: make(map[string]map[*delivery]struct{}), wake: make(chan struct{}, 1)}
 }
 
 func token(size int) (string, error) {
@@ -66,8 +61,12 @@ func Active(s *models.ShareRecord, now time.Time) bool {
 
 // SavedLinkSecret is for authenticated management only. Older hash-only shares
 // remain valid but have no retrievable URL until explicitly regenerated.
+func Ready(row *models.ShareRecord, now time.Time) bool {
+	return Active(row, now) && row.PreparationState == "READY"
+}
+
 func SavedLinkSecret(row *models.ShareRecord) string {
-	if !Active(row, time.Now()) || !validSecret(row.Token) || subtle.ConstantTimeCompare(row.TokenHash, Hash(row.Token)) != 1 {
+	if !Ready(row, time.Now()) || !validSecret(row.Token) || subtle.ConstantTimeCompare(row.TokenHash, Hash(row.Token)) != 1 {
 		return ""
 	}
 	return row.Token
@@ -91,8 +90,8 @@ func (s *Service) CreateFromSource(ctx context.Context, owner string, o Options,
 	if err := validateOptions(o); err != nil {
 		return nil, "", err
 	}
-	if source == nil && (len(targets) == 0 || len(targets) > MaxItems) {
-		return nil, "", fmt.Errorf("select between 1 and %d items", MaxItems)
+	if source == nil && len(targets) == 0 {
+		return nil, "", errors.New("select at least one item")
 	}
 	id, err := token(16)
 	if err != nil {
@@ -102,7 +101,7 @@ func (s *Service) CreateFromSource(ctx context.Context, owner string, o Options,
 	if err != nil {
 		return nil, "", err
 	}
-	row := &models.ShareRecord{ID: id, TokenHash: Hash(secret), Token: secret, Label: strings.TrimSpace(o.Label), CreatedBy: owner, CreatedAt: time.Now().Unix(), ExpiresAt: o.ExpiresAt.Unix(), AllowDownload: o.AllowDownload, ShowMetadata: o.ShowMetadata, Version: 1}
+	row := &models.ShareRecord{ID: id, TokenHash: Hash(secret), Token: secret, Label: strings.TrimSpace(o.Label), CreatedBy: owner, CreatedAt: time.Now().Unix(), ExpiresAt: o.ExpiresAt.Unix(), AllowDownload: o.AllowDownload, ShowMetadata: o.ShowMetadata, Version: 1, PreparationState: "PREPARING"}
 	err = s.Repo.WithTxn(ctx, func(ctx context.Context) error {
 		if source != nil {
 			if len(targets) != 0 {
@@ -116,31 +115,44 @@ func (s *Service) CreateFromSource(ctx context.Context, owner string, o Options,
 				return err
 			}
 			if source.Mode == "ONGOING" {
-				row.SnapshotJSON = []byte(`{"entries":[],"media":[]}`)
+				row.PreparationState = "READY"
 				return s.Repo.Share.Create(ctx, row)
 			}
-			targets, _, err = s.sourceTargets(ctx, source, "", MaxItems+1)
+		}
+		var filters []models.ShareFilter
+		if source != nil {
+			filters, err = s.sourceQueries(ctx, source)
 			if err != nil {
 				return err
 			}
-			if len(targets) == 0 || len(targets) > MaxItems {
-				return fmt.Errorf("a snapshot must contain between 1 and %d items; narrow the filters or use an ongoing share", MaxItems)
-			}
 		}
-		snapshot, err := s.snapshot(ctx, targets)
-		if err != nil {
+		if err := s.Repo.Share.Create(ctx, row); err != nil {
 			return err
 		}
-		row.SnapshotJSON, err = json.Marshal(snapshot)
-		if err != nil {
+		if err := s.Repo.Share.FreezeTargets(ctx, row.ID, targets, filters); err != nil {
 			return err
 		}
-		return s.Repo.Share.Create(ctx, row)
+		return s.Repo.Share.FreezeMedia(ctx, row.ID)
 	})
 	if err != nil {
 		return nil, "", err
 	}
-	return row, secret, nil
+	row, err = s.Find(ctx, row.ID)
+	if err != nil {
+		return nil, "", err
+	}
+	// Small selections use the same durable checkpoint path as the worker.
+	if row.PreparationState == "PREPARING" && row.MediaCount <= PreparationBatchSize {
+		if err := s.PrepareBatch(ctx, row); err != nil {
+			return nil, "", err
+		}
+		row, err = s.Find(ctx, row.ID)
+		if err != nil {
+			return nil, "", err
+		}
+	}
+	s.Wake()
+	return row, SavedLinkSecret(row), nil
 }
 
 func (s *Service) Find(ctx context.Context, id string) (ret *models.ShareRecord, err error) {
@@ -240,7 +252,7 @@ func (s *Service) Rotate(ctx context.Context, id string) (string, error) {
 		if err != nil {
 			return err
 		}
-		if !Active(row, time.Now()) {
+		if !Ready(row, time.Now()) {
 			return ErrUnavailable
 		}
 		row.TokenHash = Hash(secret)
@@ -272,7 +284,7 @@ func (s *Service) Exchange(ctx context.Context, id, secret string) (string, *mod
 		if err != nil {
 			return err
 		}
-		if !Active(row, time.Now()) {
+		if !Ready(row, time.Now()) {
 			return ErrUnavailable
 		}
 		if subtle.ConstantTimeCompare(row.TokenHash, Hash(secret)) != 1 {
@@ -306,7 +318,7 @@ func (s *Service) Authenticate(ctx context.Context, id, secret string) (*models.
 		if err != nil {
 			return err
 		}
-		if !Active(row, time.Now()) || session.Version != row.Version {
+		if !Ready(row, time.Now()) || session.Version != row.Version {
 			return ErrUnavailable
 		}
 		// A response cannot outlive its guest session.
@@ -327,16 +339,10 @@ func (s *Service) AuthenticateLink(ctx context.Context, id, secret string) (*mod
 	if err != nil {
 		return nil, err
 	}
-	if !Active(row, time.Now()) || subtle.ConstantTimeCompare(row.TokenHash, Hash(secret)) != 1 {
+	if !Ready(row, time.Now()) || subtle.ConstantTimeCompare(row.TokenHash, Hash(secret)) != 1 {
 		return nil, ErrUnavailable
 	}
 	return row, nil
-}
-
-func Snapshot(row *models.ShareRecord) (models.ShareSnapshot, error) {
-	var ret models.ShareSnapshot
-	err := json.Unmarshal(row.SnapshotJSON, &ret)
-	return ret, err
 }
 
 // BeginDelivery bounds concurrency and makes revocation interrupt responses

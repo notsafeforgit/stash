@@ -23,7 +23,7 @@ func (w *heldShutdownWorker) Run(context.Context) error {
 
 func TestServerShutdownDeadlinePreservesUnfinishedWorker(t *testing.T) {
 	w := &heldShutdownWorker{started: make(chan struct{}), release: make(chan struct{})}
-	runtime := &archiveWorkerRuntime{worker: w}
+	runtime := &backgroundWorkerRuntime{worker: w}
 	runtime.start()
 	<-w.started
 	server := &Server{ingestWorker: runtime}

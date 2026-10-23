@@ -318,7 +318,7 @@ INSERT INTO fork_file_deletions VALUES ('pending-filesystem-operation');
 		"SELECT count(*) FROM video_file_metadata WHERE file_id = 21 AND frame_count = 300 AND bit_depth = 10 AND color_transfer = 'smpte2084'",
 		"SELECT count(*) FROM image_file_metadata WHERE file_id = 22 AND bit_depth = 16",
 		"SELECT count(*) FROM scene_cover_sources WHERE scene_id = 31 AND source_file_id = 9999 AND at = 12.5",
-		"SELECT count(*) FROM shares WHERE id = 'kept-share' AND token_hash = X'001122' AND snapshot = '{\"scenes\":[31]}'",
+		"SELECT count(*) FROM shares WHERE id = 'kept-share' AND token_hash = X'001122' AND media_count=0 AND preparation_state='READY'",
 		"SELECT count(*) FROM share_sessions WHERE share_id = 'kept-share' AND token_hash = X'003344'",
 		"SELECT count(*) FROM file_deletions WHERE id = 'pending-filesystem-operation'",
 	} {

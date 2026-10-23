@@ -51,7 +51,7 @@ func TestShareSourceGraphQLRetainsUUIDFilters(t *testing.T) {
 func TestShareOngoingHTTPRechecksEveryDelivery(t *testing.T) {
 	rs, handler, _, _, db := shareHTTPMediaDatabaseFixture(t, false)
 	sharedPreviewManager(t, rs)
-	row, secret, err := rs.service.CreateFromSource(t.Context(), "owner", sharing.Options{Label: "Live", ExpiresAt: time.Now().Add(time.Hour)}, nil, &models.ShareSource{Mode: "ONGOING", Filter: &models.ShareFilter{Kind: "IMAGE", Q: "Share fixture"}})
+	row, secret, err := rs.service.CreateFromSource(t.Context(), "owner", sharing.Options{Label: "Live", ExpiresAt: time.Now().Add(time.Hour)}, nil, &models.ShareSource{Mode: "ONGOING", Filter: &models.ShareFilter{Kind: "IMAGE", Q: "Private title"}})
 	require.NoError(t, err)
 	cookie := exchangeShareHTTP(t, handler, row, secret)
 	base := "/share/" + row.ID + "/"

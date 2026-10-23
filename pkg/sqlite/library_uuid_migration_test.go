@@ -36,7 +36,7 @@ func TestLibraryUUIDMigrationPreservesKeysAndUserReferences(t *testing.T) {
  INSERT INTO saved_filters(id,mode,name,filter_ast) VALUES(104,'SCENES','Folder selection','{"root":{"condition":{"field":"folder","value":{"modifier":"INCLUDES","value":{"items":[{"id":"1","label":"Folder"}],"excluded":[],"depth":0}}}}}');
  INSERT INTO default_filters(view,mode,filter_ast) SELECT 'scenes',mode,filter_ast FROM saved_filters WHERE id=101;
  DELETE FROM metadata_field_pending;
- INSERT INTO shares(id,token_hash,label,created_by,created_at,expires_at,snapshot) VALUES('share',X'01','Frozen','owner',1,2,'{"entries":[{"kind":"SCENE","id":31,"title":"Kept title","media_keys":["scene-31"],"extra":"kept"}],"media":[],"extra":9007199254740993}');
+ INSERT INTO shares(id,token_hash,label,created_by,created_at,expires_at,snapshot) VALUES('share',X'01','Frozen','owner',1,2,'{"entries":[{"kind":"SCENE","id":31,"title":"Kept title","media_keys":["scene-31"],"extra":"kept"}],"media":[{"key":"scene-31","kind":"SCENE","entity_id":31,"file_id":1}],"extra":9007199254740993}');
  `)
 	require.NoError(t, err)
 	var oldScene string
@@ -56,6 +56,15 @@ func TestLibraryUUIDMigrationPreservesKeysAndUserReferences(t *testing.T) {
 	require.EqualValues(t, 1, queryUint(t, raw, "SELECT count(*) FROM sqlite_schema WHERE name='metadata_reference_retiring'"))
 	_, err = raw.Exec("UPDATE saved_filters SET filter_ast=? WHERE id=101", originalFilter)
 	require.NoError(t, err)
+	require.NoError(t, raw.Close())
+	migrator, err = sqlite.NewMigrator(db)
+	require.NoError(t, err)
+	require.NoError(t, migrator.RunMigration(t.Context(), 1000115))
+	migrator.Close()
+	raw = openRawDB(t, filename)
+	var sharedExtra string
+	require.NoError(t, raw.QueryRow(`SELECT json_extract(snapshot,'$.entries[0].extra') || ':' || json_extract(snapshot,'$.extra') FROM shares WHERE id='share'`).Scan(&sharedExtra))
+	require.Equal(t, "kept:9007199254740993", sharedExtra, "the historical UUID conversion preserves unknown JSON without precision loss")
 	require.NoError(t, raw.Close())
 	require.NoError(t, db.RunAllMigrations())
 	require.NoError(t, db.ReInitialise())
@@ -88,12 +97,9 @@ func TestLibraryUUIDMigrationPreservesKeysAndUserReferences(t *testing.T) {
 	require.NoError(t, raw.QueryRow(`SELECT json_extract(filter_ast,'$.root.condition.value.value.items[0].id') FROM saved_filters WHERE id=104`).Scan(&folderID))
 	require.Equal(t, archiveFind(t, repo, models.ArchiveFolder, 1).UUID, folderID)
 
-	require.NoError(t, raw.QueryRow(`SELECT json_extract(snapshot,'$.entries[0].uuid'),json_extract(snapshot,'$.entries[0].media_keys[0]') FROM shares WHERE id='share'`).Scan(&shareID, &capability))
+	require.NoError(t, raw.QueryRow(`SELECT e.entity_uuid,m.media_key FROM share_snapshot_entries e JOIN share_snapshot_members m ON m.share_id=e.share_id AND m.entry_key=e.key WHERE e.share_id='share'`).Scan(&shareID, &capability))
 	require.Equal(t, oldScene, shareID)
 	require.Equal(t, "scene-31", capability)
-	var sharedExtra string
-	require.NoError(t, raw.QueryRow(`SELECT json_extract(snapshot,'$.entries[0].extra') || ':' || json_extract(snapshot,'$.extra') FROM shares WHERE id='share'`).Scan(&sharedExtra))
-	require.Equal(t, "kept:9007199254740993", sharedExtra)
 	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error { return repo.SavedFilter.Destroy(ctx, 101) }))
 	require.NoError(t, db.Close())
 	require.NoError(t, db.Open(filename))

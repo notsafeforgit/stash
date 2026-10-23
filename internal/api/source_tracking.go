@@ -20,17 +20,17 @@ func (s *Server) configureSourceTracking(enabled bool) (*ingest.Service, *native
 	}
 
 	service := ingest.New(repo)
-	s.enrichmentMaintenance = &archiveWorkerRuntime{worker: ingest.NewEnrichmentMaintenance(service)}
-	s.discoveryMaintenance = &archiveWorkerRuntime{worker: ingest.NewDiscoveryMaintenance(service)}
-	s.discoveryComparison = &archiveWorkerRuntime{worker: ingest.NewDiscoveryComparisonWorker(service)}
-	s.discoveryPublication = &archiveWorkerRuntime{worker: ingest.NewDiscoveryPublicationWorker(service)}
+	s.enrichmentMaintenance = &backgroundWorkerRuntime{worker: ingest.NewEnrichmentMaintenance(service)}
+	s.discoveryMaintenance = &backgroundWorkerRuntime{worker: ingest.NewDiscoveryMaintenance(service)}
+	s.discoveryComparison = &backgroundWorkerRuntime{worker: ingest.NewDiscoveryComparisonWorker(service)}
+	s.discoveryPublication = &backgroundWorkerRuntime{worker: ingest.NewDiscoveryPublicationWorker(service)}
 	if worker := mgr.NewIngestFileWorker(service); worker != nil {
-		s.ingestWorker = &archiveWorkerRuntime{worker: worker}
+		s.ingestWorker = &backgroundWorkerRuntime{worker: worker}
 	}
 	routes.fileIngestion = s.ingestWorker != nil
 	routes.albums = gallery.NewAlbumBackfill(repo)
-	s.albumWorker = &archiveWorkerRuntime{worker: mgr.NewAlbumBackfillWorker(routes.albums)}
-	s.postMergeNotifications = &archiveWorkerRuntime{worker: mgr.NewPostMergeNotificationWorker(gallery.NewPostMergeNotifications(repo))}
+	s.albumWorker = &backgroundWorkerRuntime{worker: mgr.NewAlbumBackfillWorker(routes.albums)}
+	s.postMergeNotifications = &backgroundWorkerRuntime{worker: mgr.NewPostMergeNotificationWorker(gallery.NewPostMergeNotifications(repo))}
 	routes.translations = translation.New(repo)
 	s.translationWorker = newTranslationWorkerRuntime(mgr.Config, routes.translations)
 	return service, routes

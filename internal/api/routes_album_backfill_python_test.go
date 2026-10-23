@@ -93,7 +93,7 @@ func TestPythonAlbumBackfillResumesLostAdmissionCancelAndRetry(t *testing.T) {
 	worker := gallery.NewAlbumWorker(service, func(ctx context.Context, _ gallery.AlbumPublication, guard gallery.AlbumEffectGuard) error {
 		return guard(ctx)
 	})
-	runtime := &archiveWorkerRuntime{worker: worker}
+	runtime := &backgroundWorkerRuntime{worker: worker}
 	t.Cleanup(runtime.stop)
 	runtime.start()
 	require.Eventually(t, func() bool {

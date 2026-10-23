@@ -32,19 +32,20 @@ func TestShareOriginalImagesKeepBytesAndScope(t *testing.T) {
 		{".html", "application/octet-stream", `<script>alert(document.cookie)</script>`},
 	} {
 		t.Run(test.ext, func(t *testing.T) {
-			rs, handler, old, oldSecret := shareHTTPFixture(t)
+			rs, handler, old, oldSecret, db := shareHTTPMediaDatabaseFixture(t, false)
 			mgr := sharedPreviewManager(t, rs)
-			snapshot, err := sharing.Snapshot(old)
+			snapshot, err := shareTestSnapshot(t, rs, old)
 			require.NoError(t, err)
 			f, _, err := rs.service.Resolve(context.Background(), snapshot.Media[0])
 			require.NoError(t, err)
 			f.Base().Basename = "private-name" + test.ext
 			require.NoError(t, os.WriteFile(f.Base().Path, []byte(test.data), 0o600))
+			refreshShareTestFile(t, rs, db, f)
 			row, secret, err := rs.service.Create(context.Background(), "owner", sharing.Options{Label: "Original", ExpiresAt: time.Now().Add(time.Hour)}, []sharing.Target{{Kind: "IMAGE", ID: 1}})
 			require.NoError(t, err)
 			cookie := exchangeShareHTTP(t, handler, row, secret)
 			otherCookie := exchangeShareHTTP(t, handler, old, oldSecret)
-			base := "/share/" + row.ID + "/media/image-1/"
+			base := "/share/" + row.ID + "/media/" + shareTestKey(t, rs, "image", 1) + "/"
 			for _, endpoint := range []string{"image", "thumbnail"} {
 				url := base + endpoint
 				w := sharedPreviewRequest(handler, http.MethodGet, url, cookie)
@@ -62,7 +63,7 @@ func TestShareOriginalImagesKeepBytesAndScope(t *testing.T) {
 				require.Empty(t, head.Body.String())
 			}
 			require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, base+"download", cookie).Code)
-			require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, strings.Replace(base, "image-1", "image-2", 1)+"image", cookie).Code)
+			require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, strings.Replace(base, shareTestKey(t, rs, "image", 1), "image-2", 1)+"image", cookie).Code)
 			// Generated thumbnails still take precedence, without changing full views.
 			f.Base().Fingerprints = models.Fingerprints{{Type: models.FingerprintTypeMD5, Fingerprint: strings.Repeat("a", 32)}}
 			thumbnail := mgr.Paths.Generated.GetThumbnailPath(strings.Repeat("a", 32), models.DefaultGthumbWidth)
@@ -86,7 +87,7 @@ func TestShareOriginalVideoAndCompatibilityStreamsStayScoped(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			rs, handler, old, _ := shareHTTPMediaFixture(t, true)
 			sharedPreviewManager(t, rs)
-			snapshot, err := sharing.Snapshot(old)
+			snapshot, err := shareTestSnapshot(t, rs, old)
 			require.NoError(t, err)
 			f, _, err := rs.service.Resolve(context.Background(), snapshot.Media[0])
 			require.NoError(t, err)
@@ -101,7 +102,7 @@ func TestShareOriginalVideoAndCompatibilityStreamsStayScoped(t *testing.T) {
 			row, secret, err := rs.service.Create(context.Background(), "owner", sharing.Options{Label: "Original video", ExpiresAt: time.Now().Add(time.Hour)}, []sharing.Target{{Kind: kind, ID: 1}})
 			require.NoError(t, err)
 			cookie := exchangeShareHTTP(t, handler, row, secret)
-			base := "/share/" + row.ID + "/media/" + strings.ToLower(kind) + "-1/"
+			base := "/share/" + row.ID + "/media/" + shareTestKey(t, rs, strings.ToLower(kind), 1) + "/"
 			get := func(endpoint string) *httptest.ResponseRecorder {
 				return sharedPreviewRequest(handler, http.MethodGet, base+endpoint, cookie)
 			}
@@ -151,9 +152,9 @@ func TestShareOriginalVideoAndCompatibilityStreamsStayScoped(t *testing.T) {
 }
 
 func TestShareOriginalArchiveOnlyServesFrozenGalleryMembers(t *testing.T) {
-	rs, handler, old, _ := shareHTTPFixture(t)
+	rs, handler, old, _, db := shareHTTPMediaDatabaseFixture(t, false)
 	sharedPreviewManager(t, rs)
-	snapshot, err := sharing.Snapshot(old)
+	snapshot, err := shareTestSnapshot(t, rs, old)
 	require.NoError(t, err)
 	f, _, err := rs.service.Resolve(context.Background(), snapshot.Media[0])
 	require.NoError(t, err)
@@ -173,6 +174,7 @@ func TestShareOriginalArchiveOnlyServesFrozenGalleryMembers(t *testing.T) {
 	f.Base().DirEntry = models.DirEntry{ZipFileID: &zipFile.ID, ZipFile: zipFile}
 	f.Base().Path = filepath.Join(zipPath, "shared.jpg")
 	f.Base().Size = int64(len(data))
+	refreshShareTestFile(t, rs, db, f)
 	m := mocks.NewDatabase()
 	rs.service.Repo.Gallery = m.Gallery
 	rs.service.Repo.Image = m.Image
@@ -182,7 +184,7 @@ func TestShareOriginalArchiveOnlyServesFrozenGalleryMembers(t *testing.T) {
 	row, secret, err := rs.service.Create(context.Background(), "owner", sharing.Options{Label: "Gallery", ExpiresAt: time.Now().Add(time.Hour), AllowDownload: true}, []sharing.Target{{Kind: "GALLERY", ID: 4}})
 	require.NoError(t, err)
 	cookie := exchangeShareHTTP(t, handler, row, secret)
-	base := "/share/" + row.ID + "/media/image-1/"
+	base := "/share/" + row.ID + "/media/" + shareTestKey(t, rs, "image", 1) + "/"
 	for _, endpoint := range []string{"image", "thumbnail", "download"} {
 		w := sharedPreviewRequest(handler, http.MethodGet, base+endpoint, cookie)
 		require.Equal(t, http.StatusOK, w.Code)
@@ -209,7 +211,7 @@ func TestShareOriginalArchiveOnlyServesFrozenGalleryMembers(t *testing.T) {
 		handler.ServeHTTP(w, request)
 		require.Equal(t, http.StatusRequestedRangeNotSatisfiable, w.Code, "multipart ranges must not amplify archive decompression")
 	}
-	for _, url := range []string{base + "private.jpg", base + "../private.jpg", strings.Replace(base, "image-1", "gallery-4", 1) + "download", strings.Replace(base, "image-1", "image-2", 1) + "image"} {
+	for _, url := range []string{base + "private.jpg", base + "../private.jpg", strings.Replace(base, shareTestKey(t, rs, "image", 1), "gallery-4", 1) + "download", strings.Replace(base, shareTestKey(t, rs, "image", 1), "image-2", 1) + "image"} {
 		require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, url, cookie).Code)
 	}
 	require.NoError(t, os.WriteFile(zipPath, []byte("replaced archive"), 0o600))

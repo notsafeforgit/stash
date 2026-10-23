@@ -125,7 +125,7 @@ func TestPostConsolidationHTTPApplyRecoveryNotificationRetryAndShutdown(t *testi
 		events <- review.Request.RequestUUID
 		return nil
 	})
-	runtime := &archiveWorkerRuntime{worker: worker}
+	runtime := &backgroundWorkerRuntime{worker: worker}
 	t.Cleanup(runtime.stop)
 	runtime.start()
 	runtime.start()

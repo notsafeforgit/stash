@@ -59,6 +59,27 @@ INSERT INTO galleries_images(gallery_id,image_id) VALUES(4,1);`, nil)
 	if video {
 		f = &models.VideoFile{BaseFile: base, Width: 100, Height: 80, Duration: 10, FrameRate: 30, VideoCodec: "h264"}
 	}
+	stat, err := os.Stat(filePath)
+	require.NoError(t, err)
+	base.Generation = 1
+	base.Size = stat.Size()
+	base.ModTime = stat.ModTime()
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, _, err := db.ExecSQL(ctx, `INSERT INTO folders(id,path,basename,mod_time,created_at,updated_at) VALUES(1,?,'media',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO files(id,parent_folder_id,basename,size,mod_time,created_at,updated_at) VALUES(2,1,?, ?, ?, CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO scenes_files(scene_id,file_id,"primary") VALUES(1,2,1),(3,2,1);
+INSERT INTO images_files(image_id,file_id,"primary") VALUES(1,2,1);
+UPDATE images SET title='Private title' WHERE id=1;`, []any{filepath.Dir(filePath), filepath.Base(filePath), stat.Size(), stat.ModTime().UTC().Format(time.RFC3339)})
+		if err != nil {
+			return err
+		}
+		if video {
+			_, _, err = db.ExecSQL(ctx, `INSERT INTO video_files(file_id,duration,video_codec,format,audio_codec,width,height,frame_rate,bit_rate) VALUES(2,10,'h264','mp4','aac',100,80,30,100)`, nil)
+		} else {
+			_, _, err = db.ExecSQL(ctx, `INSERT INTO image_files(file_id,format,width,height) VALUES(2,'jpeg',100,80)`, nil)
+		}
+		return err
+	}))
 	m.Image.On("Find", mock.Anything, 1).Return(&models.Image{ID: 1, Title: "Private title", Files: models.NewRelatedFiles([]models.File{f})}, nil)
 	service := sharing.New(repo)
 	row, secret, err := service.Create(context.Background(), "owner", sharing.Options{Label: "Example share", ExpiresAt: time.Now().Add(time.Hour)}, []sharing.Target{{Kind: "IMAGE", ID: 1}})
@@ -89,13 +110,13 @@ func TestShareHLSPlaylistsKeepBrowserSessionAndEncoderLease(t *testing.T) {
 		r.AddCookie(cookie)
 		params := chi.NewRouteContext()
 		params.URLParams.Add("shareID", row.ID)
-		params.URLParams.Add("mediaKey", "image-1")
+		params.URLParams.Add("mediaKey", shareTestKey(t, rs, "image", 1))
 		r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, params))
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, r)
 		return w
 	}
-	base := "/share/" + row.ID + "/media/image-1/"
+	base := "/share/" + row.ID + "/media/" + shareTestKey(t, rs, "image", 1) + "/"
 	master := request(base + "stream.master.m3u8?stream_session=browser-a")
 	require.Equal(t, http.StatusOK, master.Code)
 	lines := strings.Split(strings.TrimSpace(master.Body.String()), "\n")
@@ -133,10 +154,10 @@ func TestShareHTTPScopesEveryMediaRoute(t *testing.T) {
 	base := "/share/" + row.ID + "/"
 	cookie := exchangeShareHTTP(t, handler, row, secret)
 	for _, endpoint := range []string{
-		"content", "status", "media/image-1/", "media/image-1/image", "media/image-1/thumbnail", "media/image-1/download",
-		"media/image-1/stream", "media/image-1/stream.master.m3u8", "media/image-1/stream.m3u8/video.m3u8", "media/image-1/stream.m3u8/video/init.mp4", "media/image-1/stream.m3u8/video/0.m4s",
-		"media/image-1/stream.fmp4.master.m3u8", "media/image-1/stream.fmp4.m3u8/audio/init.mp4", "media/image-1/stream.fmp4.aac.m3u8/audio/0.m4s",
-		"media/image-1/stream.hevc.master.m3u8", "media/image-1/stream.hevc.m3u8/audio.m3u8", "media/image-1/stream.hevc.m3u8/video/init.mp4", "media/image-1/stream.hevc.m3u8/video/0.m4s",
+		"content", "status", "media/" + shareTestKey(t, rs, "image", 1) + "/", "media/" + shareTestKey(t, rs, "image", 1) + "/image", "media/" + shareTestKey(t, rs, "image", 1) + "/thumbnail", "media/" + shareTestKey(t, rs, "image", 1) + "/download",
+		"media/" + shareTestKey(t, rs, "image", 1) + "/stream", "media/" + shareTestKey(t, rs, "image", 1) + "/stream.master.m3u8", "media/" + shareTestKey(t, rs, "image", 1) + "/stream.m3u8/video.m3u8", "media/" + shareTestKey(t, rs, "image", 1) + "/stream.m3u8/video/init.mp4", "media/" + shareTestKey(t, rs, "image", 1) + "/stream.m3u8/video/0.m4s",
+		"media/" + shareTestKey(t, rs, "image", 1) + "/stream.fmp4.master.m3u8", "media/" + shareTestKey(t, rs, "image", 1) + "/stream.fmp4.m3u8/audio/init.mp4", "media/" + shareTestKey(t, rs, "image", 1) + "/stream.fmp4.aac.m3u8/audio/0.m4s",
+		"media/" + shareTestKey(t, rs, "image", 1) + "/stream.hevc.master.m3u8", "media/" + shareTestKey(t, rs, "image", 1) + "/stream.hevc.m3u8/audio.m3u8", "media/" + shareTestKey(t, rs, "image", 1) + "/stream.hevc.m3u8/video/init.mp4", "media/" + shareTestKey(t, rs, "image", 1) + "/stream.hevc.m3u8/video/0.m4s",
 	} {
 		for _, method := range []string{http.MethodGet, http.MethodHead} {
 			request := httptest.NewRequest(method, base+endpoint+"?apikey=owner-key&token="+secret, nil)
@@ -166,13 +187,13 @@ func TestShareHTTPScopesEveryMediaRoute(t *testing.T) {
 	var content publicShareContent
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &content))
 	require.Len(t, content.Media, 1)
-	require.Equal(t, base+"media/image-1/image", content.Media[0].Image)
-	for _, endpoint := range []string{"media/image-2/", "media/image-2/image", "media/image-1/download", "graphql", "scene/1/stream", "../graphql", "media/image-1/%2e%2e/download", "media//image-1/", "media/image-1/../../graphql"} {
+	require.Equal(t, base+"media/"+shareTestKey(t, rs, "image", 1)+"/image", content.Media[0].Image)
+	for _, endpoint := range []string{"media/image-2/", "media/image-2/image", "media/" + shareTestKey(t, rs, "image", 1) + "/download", "graphql", "scene/1/stream", "../graphql", "media/" + shareTestKey(t, rs, "image", 1) + "/%2e%2e/download", "media//" + shareTestKey(t, rs, "image", 1) + "/", "media/" + shareTestKey(t, rs, "image", 1) + "/../../graphql"} {
 		require.Equal(t, http.StatusNotFound, get(endpoint).Code, endpoint)
 	}
 	_, err := rs.service.Update(context.Background(), row.ID, sharing.Options{Label: row.Label, ExpiresAt: time.Unix(row.ExpiresAt, 0), AllowDownload: true})
 	require.NoError(t, err)
-	request := httptest.NewRequest(http.MethodGet, base+"media/image-1/download", nil)
+	request := httptest.NewRequest(http.MethodGet, base+"media/"+shareTestKey(t, rs, "image", 1)+"/download", nil)
 	request.AddCookie(cookie)
 	request.Header.Set("Range", "bytes=0-7")
 	response = httptest.NewRecorder()
@@ -181,7 +202,7 @@ func TestShareHTTPScopesEveryMediaRoute(t *testing.T) {
 	require.Equal(t, "original", response.Body.String())
 	require.NotContains(t, response.Header().Get("Content-Disposition"), "secret-image-name")
 	require.NoError(t, rs.service.Revoke(context.Background(), row.ID))
-	for _, endpoint := range []string{"content", "status", "media/image-1/", "media/image-1/download"} {
+	for _, endpoint := range []string{"content", "status", "media/" + shareTestKey(t, rs, "image", 1) + "/", "media/" + shareTestKey(t, rs, "image", 1) + "/download"} {
 		require.Equal(t, http.StatusNotFound, get(endpoint).Code)
 	}
 }
@@ -275,4 +296,55 @@ func TestShareEncoderBudgetAndExpiry(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("expired encoder was not stopped")
 	}
+}
+
+func shareTestSnapshot(t *testing.T, rs *shareRoutes, row *models.ShareRecord) (models.ShareSnapshot, error) {
+	t.Helper()
+	ret, _, err := rs.service.Content(t.Context(), row, "")
+	return ret, err
+}
+func shareTestKey(t *testing.T, rs *shareRoutes, kind string, id int) string {
+	t.Helper()
+	var entity *models.ArchiveEntity
+	require.NoError(t, rs.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		entity, err = rs.service.Repo.ArchiveEntity.FindByLocalID(ctx, models.ArchiveEntityKind(kind), id)
+		return err
+	}))
+	require.NotNil(t, entity)
+	return kind + "-" + entity.UUID
+}
+
+// Mirror the catalog's rescan after a test replaces physical bytes. New
+// snapshots must pin the updated catalog generation; old grants remain stale.
+func refreshShareTestFile(t *testing.T, rs *shareRoutes, db *sqlite.Database, f models.File) {
+	t.Helper()
+	base := f.Base()
+	source := base
+	if base.ZipFile != nil {
+		source = base.ZipFile.Base()
+	}
+	stat, err := os.Stat(source.Path)
+	require.NoError(t, err)
+	require.NoError(t, rs.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		if base.ZipFile != nil {
+			_, _, err := db.ExecSQL(ctx, `INSERT INTO folders(id,path,basename,mod_time,created_at,updated_at) VALUES(2,?,'archive',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO files(id,parent_folder_id,basename,size,mod_time,created_at,updated_at) VALUES(7,2,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);`, []any{filepath.Dir(source.Path), filepath.Base(source.Path), stat.Size(), stat.ModTime().UTC().Format(time.RFC3339)})
+			if err != nil {
+				return err
+			}
+		} else {
+			base.Size = stat.Size()
+		}
+		_, _, err := db.ExecSQL(ctx, `UPDATE files SET size=?,mod_time=?,zip_file_id=? WHERE id=?`, []any{base.Size, stat.ModTime().UTC().Format(time.RFC3339), base.ZipFileID, base.ID})
+		if err != nil {
+			return err
+		}
+		files, err := db.Repository().File.Find(ctx, base.ID)
+		if err != nil {
+			return err
+		}
+		base.Generation = files[0].Base().Generation
+		return nil
+	}))
 }

@@ -63,7 +63,12 @@ func TestProducerFileHTTPRetryRecoveryAndBoundaries(t *testing.T) {
 		parent, err = repo.ArchiveJob.Find(ctx, accepted.JobUUID)
 		return err
 	}))
-	parent, err = job.NewDurable(repo).Cancel(t.Context(), parent.UUID, parent.Revision)
+	durable := job.NewDurable(repo)
+	claimed, err := durable.Claim(t.Context(), models.ArchiveJobVerifyMedia, uuid.NewString(), time.Minute)
+	require.NoError(t, err)
+	parent, err = durable.Publish(t.Context(), claimed.Lease(), func(context.Context, *models.ArchiveJob) (models.ArchiveJobOutcome, error) {
+		return models.ArchiveJobOutcome{State: "failed", ErrorCode: "file_changed", Result: json.RawMessage(`{"registration_committed":false,"media_ingested":false,"failure":{"stage":"registration","reason":"path_removed_or_moved"}}`)}, nil
+	})
 	require.NoError(t, err)
 	routes := &nativeArchiveRoutes{repo: repo, fileIngestion: true}
 	handler := routes.router()
@@ -88,6 +93,20 @@ func TestProducerFileHTTPRetryRecoveryAndBoundaries(t *testing.T) {
 	require.Equal(t, parent.UUID, first.FromJobUUID)
 	require.NotEqual(t, parent.UUID, first.JobUUID)
 	require.NotContains(t, w.Body.String(), dir)
+	for _, id := range []string{parent.UUID, first.JobUUID} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/activity/jobs/"+id, nil))
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		var detail activityJobDetail
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &detail))
+		if id == parent.UUID {
+			require.Equal(t, &ingest.FileFailure{Stage: "registration", Reason: "path_removed_or_moved"}, detail.FileFailure)
+		} else {
+			require.Equal(t, parent.UUID, detail.RetryOfJobUUID)
+		}
+		require.NotContains(t, response.Body.String(), dir)
+		require.NotContains(t, response.Body.String(), "arguments")
+	}
 	routes.fileIngestion = false
 	require.NoError(t, os.Remove(filepath.Join(dir, "sample.mp4")))
 	w = call(id, parent.Revision, "")

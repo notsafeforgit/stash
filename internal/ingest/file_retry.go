@@ -3,6 +3,7 @@ package ingest
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"time"
 
 	"github.com/stashapp/stash/pkg/models"
@@ -32,8 +33,9 @@ func fileRetryStatus(current *models.ArchiveJob, request string) (*FileRetryStat
 	}
 	ret := &FileRetryStatus{RequestUUID: request, JobUUID: current.UUID, FromJobUUID: work.Resume.FromJobUUID, FromRevision: work.Resume.FromRevision,
 		Revision: current.Revision, State: current.State, ErrorCode: current.ErrorCode}
-	if err := StrictJSON(current.Result, 16384, &ret.fileCompletion); err != nil {
-		return nil, err
+	if err := StrictJSON(current.Result, 16384, &ret.fileCompletion); err != nil || ret.MediaIngested != (current.State == "succeeded") ||
+		(ret.MediaIngested && (!ret.RegistrationCommitted || progress.Publication == nil || !reflect.DeepEqual(ret.Publication, progress.Publication))) {
+		return nil, ErrInvalid
 	}
 	ret.RegistrationCommitted, ret.Publication = progress.Publication != nil, progress.Publication
 	return ret, nil

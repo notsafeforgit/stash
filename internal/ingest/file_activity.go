@@ -10,6 +10,8 @@ type FileJobDescription struct {
 	RelativePath       string
 	MediaUUID          string
 	ManualRequestUUID  string
+	RetryOfJobUUID     string
+	Failure            *FileFailure
 }
 
 func DescribeFileJob(current *models.ArchiveJob) (*FileJobDescription, error) {
@@ -25,6 +27,14 @@ func DescribeFileJob(current *models.ArchiveJob) (*FileJobDescription, error) {
 		return nil, err
 	}
 	ret := &FileJobDescription{CollectionUUID: work.Publication.CollectionUUID, CollectionRevision: work.Publication.CollectionRevision, RelativePath: work.Publication.Target.RelativePath}
+	var completion fileCompletion
+	if err := StrictJSON(current.Result, 16384, &completion); err != nil {
+		return nil, err
+	}
+	ret.Failure = completion.Failure
+	if resume := fileResume(work); resume != nil {
+		ret.RetryOfJobUUID = resume.FromJobUUID
+	}
 	if progress.Publication != nil {
 		ret.MediaUUID = progress.Publication.MediaUUID
 	}

@@ -28,6 +28,8 @@ type activityJobDetail struct {
 	RelativePath      string                     `json:"relative_path"`
 	ManualRequestUUID string                     `json:"manual_request_uuid"`
 	MergeRequestUUID  string                     `json:"merge_request_uuid"`
+	RetryOfJobUUID    string                     `json:"retry_of_job_uuid,omitempty"`
+	FileFailure       *ingest.FileFailure        `json:"file_failure,omitempty"`
 }
 
 func (rs *nativeArchiveRoutes) describeActivityJob(ctx context.Context, summary *models.ArchiveJobActivity) (*activityJobDetail, error) {
@@ -53,6 +55,7 @@ func (rs *nativeArchiveRoutes) describeActivityJob(ctx context.Context, summary 
 				return nil, err
 			}
 			ret.RelativePath, ret.ManualRequestUUID = value.RelativePath, value.ManualRequestUUID
+			ret.RetryOfJobUUID, ret.FileFailure = value.RetryOfJobUUID, value.Failure
 			refs = append(refs, models.ArchiveActivityReference{Kind: "collection", UUID: value.CollectionUUID, Revision: value.CollectionRevision})
 			if value.MediaUUID != "" {
 				refs = append(refs, models.ArchiveActivityReference{Kind: "media", UUID: value.MediaUUID})

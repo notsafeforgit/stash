@@ -220,6 +220,9 @@ threads. Genuine gallery conflicts remain atomic failures and report
 verification results also include a bounded `failure.stage` and `failure.reason`
 to distinguish inspection, registration, effects and completion failures without
 exposing paths, captured payloads or worker output.
+The existing activity job detail exposes these categories as `file_failure`
+and identifies retry parents with `retry_of_job_uuid`; it still excludes raw
+worker arguments and output.
 
 Re-downloaded bytes at a previously deduplicated path may establish a new file
 lifetime on the deduplication's surviving media. Every recorded removal at that

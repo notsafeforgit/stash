@@ -118,6 +118,9 @@ jobs:
       - name: Install media test runtime
         timeout-minutes: 15
         run: |
+          # The Azure mirror repeatedly exhausted this step's download budget.
+          # Use the runner's existing Ubuntu archive/security fallback mirrors.
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y ffmpeg libavif-bin
       - name: Go unit and integration tests
@@ -162,6 +165,8 @@ jobs:
           cache-dependency-glob: integration-clients.json
       - name: Install media fixture tools
         run: |
+          # Match the backend job's Ubuntu mirror selection.
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y ffmpeg libavif-bin
       - run: make pre-clients test-clients

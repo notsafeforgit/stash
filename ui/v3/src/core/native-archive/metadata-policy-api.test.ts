@@ -78,10 +78,19 @@ it("paginates direct post captures and pins their reviewed association in previe
       source,
     },
     state: "ready",
-    changes: [],
+    changes: [
+      {
+        field: "title",
+        status: "retained",
+        current: "First caption",
+        message: "Keeps metadata already selected by the first source post",
+      },
+    ],
   };
   transport.mockResolvedValueOnce(Response.json(preview));
-  expect((await api.draft(draft)).context.source).toEqual(source);
+  const result = await api.draft(draft);
+  expect(result.context.source).toEqual(source);
+  expect(result.changes).toEqual(preview.changes);
   transport.mockResolvedValueOnce(
     Response.json({
       ...preview,

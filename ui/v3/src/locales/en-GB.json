@@ -3291,6 +3291,7 @@
     "needs_review": "Needs review",
     "omitted": "Expression returned no value",
     "older_capture": "Keeps newer source metadata",
+    "retained": "Keeps first metadata",
     "preview_only": "Preview only — nothing was changed",
     "current_value": "Current value",
     "proposed_value": "Proposed value",

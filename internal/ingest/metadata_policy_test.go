@@ -102,9 +102,12 @@ func intakeField(t *testing.T, repo models.Repository, entity, field string) *mo
 func TestIntakeMetadataPolicyUsesCaptureAndPreservesSourceAlternatives(t *testing.T) {
 	f := newIntakePublicationFixture(t, true)
 	repo := f.service.Repo
-	policy := f.policy(t, 0, map[string]models.MetadataMapping{"title": {JQ: `.source.metadata.title // empty`}})
+	policy := f.policy(t, 0, map[string]models.MetadataMapping{
+		"title": {JQ: `.source.metadata.title // empty`}, "urls": {JQ: `.source.urls`},
+	})
 	f.input.PolicyRevision = policy.Revision
 	first := f.publishIntake(t, f.prepared, f.input)
+	firstPost := f.receipt.PostUUID
 	state := intakeField(t, repo, first.Result.MediaUUID, "title")
 	require.JSONEq(t, `"Source album"`, string(state.Value))
 	require.Equal(t, "source", state.Origin)
@@ -143,8 +146,26 @@ func TestIntakeMetadataPolicyUsesCaptureAndPreservesSourceAlternatives(t *testin
 	input.UUID = uuid.NewString()
 	input.Source = &ingest.IntakeSource{CaptureUUID: f.receipt.CaptureUUID, AttachmentUUID: f.attachment(t, 0).UUID}
 	competing := f.publishIntake(t, f.prepared, input)
-	require.Contains(t, competing.Result.Review, "metadata:title")
+	require.NotContains(t, competing.Result.Review, "metadata:title", "a repost keeps the first caption without requiring review")
+	require.Equal(t, []string{"urls"}, competing.Result.MetadataFields)
 	require.Equal(t, `"Source album"`, string(intakeField(t, repo, first.Result.MediaUUID, "title").Value))
+	var urls []string
+	require.NoError(t, json.Unmarshal(intakeField(t, repo, first.Result.MediaUUID, "urls").Value, &urls))
+	require.Len(t, urls, 2)
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		posts, err := repo.SourcePostMedia.PostsForMedia(ctx, first.Result.MediaUUID, "", 100)
+		require.NoError(t, err)
+		ids, titles := []string{}, []string{}
+		for _, post := range posts {
+			require.False(t, post.Association.Suppressed())
+			require.Equal(t, 1, post.LinkedAttachments)
+			ids = append(ids, post.Association.PostUUID)
+			titles = append(titles, *post.LatestCapture.Title)
+		}
+		require.ElementsMatch(t, []string{firstPost, f.receipt.PostUUID}, ids)
+		require.ElementsMatch(t, []string{"Source album", "Another post"}, titles)
+		return nil
+	}))
 	// Removing the source association prevents using that capture in a preview.
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		attachment, err := repo.SourceAttachment.Find(ctx, input.Source.AttachmentUUID)

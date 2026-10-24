@@ -156,6 +156,7 @@ const previewSchema = z
             "protected",
             "omitted",
             "older_capture",
+            "retained",
           ]),
           current: z.unknown(),
           value: z.unknown().optional(),

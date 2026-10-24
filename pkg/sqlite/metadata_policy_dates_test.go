@@ -20,6 +20,7 @@ func TestMetadataPolicyConvertsSourceDatesWithoutChangingEvidence(t *testing.T) 
 		"date": {JQ: `.source.metadata.published_at | utc_date | select(. != null)`},
 	}})
 	input := f.input(policy)
+	var firstInput metadata.Input
 	manual := policyPreview(t, f.repo, input)
 	require.Equal(t, "omitted", policyChange(t, manual, "date").Status)
 	assertOriginal := func(id, original string) {
@@ -50,6 +51,9 @@ func TestMetadataPolicyConvertsSourceDatesWithoutChangingEvidence(t *testing.T) 
 			return f.repo.SourceCollection.RecordCapture(ctx, models.CollectionCapture{CollectionUUID: f.collection.UUID, CollectionRevision: f.collection.Revision, CaptureUUID: selected.UUID})
 		}))
 		input.Source = &metadata.Source{CaptureUUID: selected.UUID, AttachmentUUID: attachment.UUID}
+		if index == 0 {
+			firstInput = input
+		}
 		preview := policyPreview(t, f.repo, input)
 		change := policyChange(t, preview, "date")
 		if tc.want == "" {
@@ -72,7 +76,12 @@ func TestMetadataPolicyConvertsSourceDatesWithoutChangingEvidence(t *testing.T) 
 		}
 		assertOriginal(selected.UUID, tc.original)
 	}
-	_, err := applyMetadata(f.repo, metadataInput(metadataState(t, f.repo, f.entity.UUID, "date"), "clear", "review", ""), false)
+	older, err := applyPolicy(f.repo, firstInput, "")
+	require.NoError(t, err)
+	require.Equal(t, "older_capture", policyChange(t, older, "date").Status)
+	require.Empty(t, older.AppliedFields())
+	require.JSONEq(t, `"2026-07-05"`, string(metadataState(t, f.repo, f.entity.UUID, "date").Value))
+	_, err = applyMetadata(f.repo, metadataInput(metadataState(t, f.repo, f.entity.UUID, "date"), "clear", "review", ""), false)
 	require.NoError(t, err)
 	preview := policyPreview(t, f.repo, input)
 	require.Equal(t, "protected", policyChange(t, preview, "date").Status)

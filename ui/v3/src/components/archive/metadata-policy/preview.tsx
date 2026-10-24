@@ -69,6 +69,7 @@ function PreviewResult({ value }: { value: PolicyPreview }) {
   const statuses = {
     ready: msg("metadata_policy.would_update", "Would update"),
     unchanged: msg("metadata_policy.unchanged", "Already matches"),
+    retained: msg("metadata_policy.retained", "Keeps first metadata"),
     protected: msg("metadata_policy.protected", "Preserves an explicit choice"),
     review: msg("metadata_policy.needs_review", "Needs review"),
     omitted: msg("metadata_policy.omitted", "Expression returned no value"),

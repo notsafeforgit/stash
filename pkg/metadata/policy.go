@@ -189,10 +189,19 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 		"context": map[string]interface{}{"created": input.Created, "filename": path.Base(input.RelativePath), "relative_path": input.RelativePath},
 	}
 	expressions := make(map[string]interface{})
+	selections := make(map[string]Change, len(rule.Mappings))
 	keys := make([]string, 0, len(rule.Mappings))
 	for field, mapping := range rule.Mappings {
 		keys = append(keys, field)
-		if mapping.JQ != "" {
+		state := states[field]
+		status, message, err := s.precedence(ctx, input, field, state, capture)
+		if err != nil {
+			return nil, err
+		}
+		selections[field] = Change{Field: field, Current: state.Value, Status: status, Message: message}
+		// A later post is retained as source evidence, not a competing field
+		// choice. Do not evaluate or resolve names in an unused alternative.
+		if mapping.JQ != "" && status != "retained" {
 			expressions[field] = mapping.JQ
 		}
 	}
@@ -200,7 +209,11 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 	mapped, mappingErr := jq.EvaluateMappingsWithInputLimit(ctx, expressions, ret.Data, 12<<20)
 	for _, field := range keys {
 		mapping, state := rule.Mappings[field], states[field]
-		change := Change{Field: field, Current: state.Value, Status: "protected"}
+		change := selections[field]
+		if change.Status == "retained" {
+			ret.Changes = append(ret.Changes, change)
+			continue
+		}
 		value, origin := mapping.Value, "policy"
 		names := mapping.UsesNames()
 		if mapping.JQ != "" {
@@ -254,6 +267,14 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 		}
 		change.Origin = origin
 		change.Value, change.ReferenceRevisions, change.Names, err = s.normalize(ctx, entity.Kind, field, value, names)
+		if err == nil && capture != nil && field == "urls" {
+			// Source appearances add URLs; replaying one post must not remove
+			// links learned from another. Validate the complete union as well.
+			change.Value, err = mergeSourceURLs(state.Value, change.Value)
+			if err == nil {
+				change.Value, err = s.Repo.MetadataField.Normalize(ctx, entity.Kind, field, change.Value, nil)
+			}
+		}
 		if err == nil && names {
 			unresolved := false
 			for _, name := range change.Names {
@@ -269,11 +290,8 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 		}
 		if err != nil {
 			change.Status, change.Message = "review", err.Error()
-		} else {
-			change.Status, change.Message, err = s.precedence(ctx, input, state, change, capture)
-			if err != nil {
-				return nil, err
-			}
+		} else if bytes.Equal(state.Value, change.Value) {
+			change.Status, change.Message = "unchanged", ""
 		}
 		if state.Protected {
 			change.Status = "protected"
@@ -412,13 +430,21 @@ func (s Service) capture(ctx context.Context, input Input, entity *models.Archiv
 	return capture, nil
 }
 
-func (s Service) precedence(ctx context.Context, input Input, current *models.MetadataFieldState, change Change, capture *models.SourceCapture) (string, string, error) {
-	if bytes.Equal(current.Value, change.Value) {
-		return "unchanged", "", nil
+func (s Service) precedence(ctx context.Context, input Input, field string, current *models.MetadataFieldState, capture *models.SourceCapture) (string, string, error) {
+	if current.Protected {
+		return "protected", "", nil
+	}
+	if field == "urls" && capture != nil {
+		return "ready", "", nil // Source URL mappings are additive, after normalization.
 	}
 	if current.Decision != nil {
-		if policy := current.Decision.Policy; policy != nil && policy.CollectionUUID != input.CollectionUUID && current.Origin != "filename" {
-			return "review", "A different collection selected this field", nil
+		if policy := current.Decision.Policy; policy != nil && current.Origin != "filename" {
+			if capture != nil && (current.Decision.CaptureUUID == nil || policy.CollectionUUID != input.CollectionUUID) {
+				return "retained", "Keeps metadata already selected by a collection policy", nil
+			}
+			if policy.CollectionUUID != input.CollectionUUID {
+				return "review", "A different collection selected this field", nil
+			}
 		}
 		if old := current.Decision.CaptureUUID; old != nil {
 			if capture == nil {
@@ -428,8 +454,11 @@ func (s Service) precedence(ctx context.Context, input Input, current *models.Me
 			if err != nil {
 				return "", "", err
 			}
-			if previous == nil || previous.PostUUID != capture.PostUUID {
-				return "review", "Another source post already selected this field", nil
+			if previous == nil {
+				return "review", "The selected source capture is unavailable", nil
+			}
+			if previous.PostUUID != capture.PostUUID {
+				return "retained", "Keeps metadata already selected by the first source post", nil
 			}
 			if previous.UUID != capture.UUID && !capture.CapturedAt.After(previous.CapturedAt) {
 				return "older_capture", "An equal or newer capture already selected this field", nil

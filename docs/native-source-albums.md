@@ -30,6 +30,9 @@ activation remains governed by the
 Reddit links to Imgur albums retain the album API's original ordered media list
 in `album.imgur_media` (version 1) before gallery-dl expands it into files. Each
 member uses its own `native:imgur` media ID; the album ID is not a file identity.
+The original album list and metadata live in the shared capture body rather
+than being repeated in every member's stored patch. Historical captures without
+this evidence marker retain their existing partition and replay signatures.
 The server binds that list to the enclosing Reddit post's album link, including
 crossposts and Imgur gallery redirects. Captured API rendition URLs identify the
 download; `num`, output filenames and download order do not establish membership.

@@ -47,6 +47,7 @@ func SplitCapturePayload(origin string, payload sourceObject) (sourceObject, sou
 		}
 		if parent, ok := payload["_reddit"].(sourceObject); ok && sourceTruthy(parent["id"]) {
 			shared, parentPatch := splitSourceFields(parent, keys)
+			body := sourceObject{"_reddit": shared}
 			patch := make(sourceObject)
 			for key, child := range payload {
 				if key != "_reddit" {
@@ -56,10 +57,25 @@ func SplitCapturePayload(origin string, payload sourceObject) (sourceObject, sou
 			if len(parentPatch) > 0 {
 				patch["_reddit"] = parentPatch
 			}
-			return sourceObject{"_reddit": shared}, patch
+			if hasCapturedImgurAlbum(payload) {
+				body["album"] = payload["album"]
+				delete(patch, "album")
+			}
+			return body, patch
 		}
 		category, _ := payload["category"].(string)
 		switch category {
+		case "imgur":
+			if !hasCapturedImgurAlbum(payload) {
+				return payload, sourceObject{}
+			}
+			// Gallery redirects carry Reddit ancestry through _parent. The
+			// album list is shared; per-member API fields stay in the patch.
+			for key := range payload {
+				if key != "album" && key != "_parent" {
+					keys[key] = true
+				}
+			}
 		case "twitter":
 			for key := range captureTwitterFields {
 				keys[key] = true

@@ -14,6 +14,15 @@ import (
 var capturedImgurAlbumLink = regexp.MustCompile(`^/(?:a|gallery)/(?:[^/?#]+-)?([A-Za-z0-9]{5,12})/?$`)
 var capturedImgurMediaID = regexp.MustCompile(`^[A-Za-z0-9]{5,12}$`)
 
+// Only this new evidence format opts into shared album storage. Historical
+// captures without it retain their original partition and replay signatures.
+func hasCapturedImgurAlbum(source sourceObject) bool {
+	album, _ := source["album"].(sourceObject)
+	marker, _ := album["imgur_media"].(sourceObject)
+	version, ok := marker["version"].(json.Number)
+	return source["category"] == "imgur" && ok && version.String() == "1"
+}
+
 func redditImgurAlbumID(raw interface{}) string {
 	value, ok := raw.(string)
 	if !ok {

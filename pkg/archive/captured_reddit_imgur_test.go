@@ -55,3 +55,34 @@ func TestCapturedRedditImgurAlbums(t *testing.T) {
 		})
 	}
 }
+
+func TestImgurAlbumCapturesShareMembershipWithoutRepeatingItInFilePatches(t *testing.T) {
+	raw, err := os.ReadFile("testdata/reddit-imgur-albums-v1.json")
+	require.NoError(t, err)
+	var fixture struct {
+		Cases []struct{ Source json.RawMessage }
+	}
+	require.NoError(t, json.Unmarshal(raw, &fixture))
+	for _, index := range []int{0, len(fixture.Cases) - 1} {
+		first, err := DecodeJSONObject(fixture.Cases[index].Source, MaxSourcePayloadBytes)
+		require.NoError(t, err)
+		var shared json.RawMessage
+		for _, id := range []string{"First12", "Next123"} {
+			first["id"], first["url"], first["_url"] = id, "https://i.imgur.com/"+id+".jpg", "https://i.imgur.com/"+id+".jpg"
+			encoded, err := EncodeSourceJSON(first)
+			require.NoError(t, err)
+			payload, err := PrepareRetainedCapture("gallery-dl", "imgur", encoded)
+			require.NoError(t, err)
+			if shared == nil {
+				shared = payload.Shared
+			} else {
+				require.Equal(t, shared, payload.Shared)
+			}
+			require.Contains(t, string(payload.Shared), `"imgur_media"`)
+			require.NotContains(t, string(payload.Patch), `"imgur_media"`)
+			restored, err := RestoreCapture(payload)
+			require.NoError(t, err)
+			require.Equal(t, []byte(encoded), []byte(restored))
+		}
+	}
+}

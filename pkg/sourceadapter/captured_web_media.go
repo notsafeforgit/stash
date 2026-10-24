@@ -23,7 +23,7 @@ func capturedWebPost(data sourceObject, path, category string) (*models.SourcePo
 	case "erome":
 		id, err := capturedPostReference(namespace, capturedFieldAt(data, path, "album_id"))
 		if err == nil && id != nil && !capturedEromeAlbumID.MatchString(id.Value) {
-			return nil, errors.New("Erome post requires its source album ID")
+			return nil, errors.New("erome post requires its source album ID")
 		}
 		return id, err
 	case "tumblr":

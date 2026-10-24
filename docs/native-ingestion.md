@@ -2007,9 +2007,23 @@ mapping and unresolved-name checks.
 Preserved legacy values and explicit set/clear decisions always win. Filename
 fallback initializes an empty inherited title; another file attached to the same
 item cannot oscillate it between filenames. A permitted source mapping can later
-replace that fallback. Newer captures of the same post can update inherited
-source fields. Older captures cannot roll them back; another post or collection
-with a different selection requires review instead of winning by arrival order.
+replace that fallback. When the same media appears under another source post,
+keep the metadata first selected for each field, including title, date,
+description, relationships and explicit policy defaults. This is the first
+encountered selection, not the post with the earliest publication date. A later
+post or source collection does not overwrite it or require metadata-conflict
+review. Preview reports `retained`
+(“Keeps first metadata”) and does not evaluate unused alternative mappings or
+resolve their names. A field never selected can still be filled later;
+explicit clears remain protected. Source associations remain independently
+validated, and every linked post retains its own caption and evidence.
+
+Source-backed URL mappings add to the current media URLs, deduplicating the
+complete union and enforcing the ordinary field limits. Replaying an older post
+cannot remove URLs learned from another. Explicit URL edits/clears are protected
+like other fields. Newer captures of the same post can still update inherited
+source fields; older captures cannot roll them back. Ordinary directory policies
+without a source retain their existing cross-collection review behavior.
 
 For ordinary scans, `apply_to_scans` opts a collection into directory matching.
 Lookups use bound root paths and the file's ancestor prefixes, with dedicated

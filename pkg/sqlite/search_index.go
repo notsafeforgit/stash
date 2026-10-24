@@ -17,13 +17,13 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-// The cache has its own format version and process owner. Never trust an index
-// left by a previous process: upstream may have edited the library meanwhile.
+// The disposable cache has its own format version. Persistent source revisions
+// validate reuse across processes; owner/revision fence in-process snapshots.
 const searchIndexSchema = `
-CREATE TABLE IF NOT EXISTS snapshot (id INTEGER PRIMARY KEY CHECK(id = 1), owner TEXT, revision INTEGER);
+CREATE TABLE IF NOT EXISTS snapshot (id INTEGER PRIMARY KEY CHECK(id = 1), owner TEXT, revision INTEGER, source_token TEXT, source_schema INTEGER);
 CREATE VIRTUAL TABLE IF NOT EXISTS scenes USING fts5(text, tokenize='trigram', detail='none');
 CREATE VIRTUAL TABLE IF NOT EXISTS images USING fts5(text, tokenize='trigram', detail='none');
-PRAGMA user_version = 1;`
+PRAGMA user_version = 2;`
 
 func openSearchIndex(path string) (*sqlx.DB, error) {
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
@@ -41,17 +41,73 @@ func openSearchIndex(path string) (*sqlx.DB, error) {
 	index.SetMaxOpenConns(4)
 	var version int
 	err = index.Get(&version, "PRAGMA user_version")
-	if err == nil && version != 0 && version != 1 {
+	var objects int
+	if err == nil {
+		err = index.Get(&objects, "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('snapshot','scenes','images')")
+	}
+	if err == nil && version != 0 && version != 1 && version != 2 {
 		err = fmt.Errorf("unsupported search cache version %d", version)
+	}
+	if err == nil && version == 1 {
+		_, err = index.Exec(`BEGIN; ALTER TABLE snapshot ADD COLUMN source_token TEXT;
+ALTER TABLE snapshot ADD COLUMN source_schema INTEGER; PRAGMA user_version=2; COMMIT;`)
 	}
 	if err == nil {
 		_, err = index.Exec(searchIndexSchema)
+	}
+	if err == nil && objects != 3 {
+		// IF NOT EXISTS can repair missing virtual tables; their old stamp
+		// must not authorize the newly empty tables as a complete index.
+		_, err = index.Exec("DELETE FROM snapshot")
 	}
 	if err != nil {
 		index.Close()
 		return nil, err
 	}
 	return index, nil
+}
+
+type searchSourceRevision struct {
+	Token  string
+	Schema int
+}
+
+func searchRevisionIn(ctx context.Context, tx *sqlx.Tx) (searchSourceRevision, error) {
+	var source searchSourceRevision
+	if err := tx.GetContext(ctx, &source.Token, "SELECT token FROM library_search_state WHERE id=1"); err != nil {
+		return source, err
+	}
+	err := tx.GetContext(ctx, &source.Schema, "PRAGMA main.schema_version")
+	return source, err
+}
+
+func (a *readAcceleration) reuseSearchIndex(ctx context.Context) error {
+	tx, err := a.main.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	snapshot := a.pin(ctx, tx)
+	if snapshot == nil {
+		return fmt.Errorf("library changed while validating search index")
+	}
+	source, err := searchRevisionIn(ctx, tx)
+	if err != nil {
+		return err
+	}
+	result, err := a.index.ExecContext(ctx, `UPDATE snapshot SET owner=?, revision=?
+WHERE id=1 AND source_token=? AND source_schema=?`, a.owner, snapshot.searchRevision, source.Token, source.Schema)
+	if err != nil {
+		return err
+	}
+	n, err := result.RowsAffected()
+	if err == nil && n == 1 {
+		a.fullRebuild = false
+		logger.Info("Search index reused at its validated library revision")
+	}
+	return err
 }
 
 func (a *readAcceleration) refreshSearchIndex(ctx context.Context) error {
@@ -72,8 +128,9 @@ func (a *readAcceleration) refreshSearchIndex(ctx context.Context) error {
 	if snapshot == nil {
 		return fmt.Errorf("library changed while pinning search snapshot")
 	}
-	if !full && len(changes) == 0 {
-		return nil
+	source, err := searchRevisionIn(ctx, tx)
+	if err != nil {
+		return err
 	}
 	indexTx, err := a.index.BeginTxx(ctx, nil)
 	if err != nil {
@@ -115,7 +172,7 @@ func (a *readAcceleration) refreshSearchIndex(ctx context.Context) error {
 			}
 		}
 	}
-	if _, err := indexTx.ExecContext(ctx, "INSERT OR REPLACE INTO snapshot (id, owner, revision) VALUES (1, ?, ?)", a.owner, snapshot.searchRevision); err != nil {
+	if _, err := indexTx.ExecContext(ctx, "INSERT OR REPLACE INTO snapshot (id, owner, revision, source_token, source_schema) VALUES (1, ?, ?, ?, ?)", a.owner, snapshot.searchRevision, source.Token, source.Schema); err != nil {
 		return err
 	}
 	if err := indexTx.Commit(); err != nil {

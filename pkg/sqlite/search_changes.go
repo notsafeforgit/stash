@@ -8,9 +8,9 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// TEMP triggers belong only to the fork's writer connection. They never enter
-// sqlite_schema, database backups, or an upstream connection's write path. The
-// journal is transactional, so rolled-back edits do not invalidate the index.
+// TEMP triggers collect incremental document changes on the application writer.
+// Native triggers persist a source revision for restart validation. Both are
+// transactional, so rolled-back edits do not invalidate the index.
 func prepareSearchChanges(ctx context.Context, tx *sqlx.Tx) error {
 	var schemaVersion int
 	if err := tx.GetContext(ctx, &schemaVersion, "PRAGMA main.schema_version"); err != nil {
@@ -35,8 +35,8 @@ func prepareSearchChanges(ctx context.Context, tx *sqlx.Tx) error {
 }
 
 func installSearchChanges(ctx context.Context, tx *sqlx.Tx, schemaVersion int) error {
-	// An upstream table rebuild may have removed or retargeted TEMP triggers
-	// on a still-open fork connection. Reinstall after main.schema_version moves.
+	// Schema maintenance can remove or retarget TEMP triggers on an open
+	// connection. Reinstall after main.schema_version moves.
 	var triggers []string
 	if err := tx.SelectContext(ctx, &triggers, "SELECT name FROM sqlite_temp_schema WHERE type = 'trigger' AND name GLOB 'stash_search_*'"); err != nil {
 		return err
@@ -82,7 +82,7 @@ func searchChangeTriggers() string {
 		fmt.Fprintf(&sql, "CREATE TEMP TRIGGER stash_search_%s %s ON main.%s BEGIN %s END;\n", name, event, table, body)
 	}
 	mark := func(table, id string) string {
-		return "INSERT OR IGNORE INTO stash_search_changes VALUES ('" + table + "', " + id + ");"
+		return "INSERT INTO stash_search_changes VALUES ('" + table + "', " + id + ") ON CONFLICT(kind, id) DO NOTHING;"
 	}
 	for _, table := range []string{sceneTable, imageTable} {
 		id := strings.TrimSuffix(table, "s") + "_id"
@@ -95,8 +95,8 @@ func searchChangeTriggers() string {
 		trigger(links+"_update", "AFTER UPDATE OF "+id+", file_id", links, mark(table, "OLD."+id)+mark(table, "NEW."+id))
 	}
 	fileOwners := func(fileID string) string {
-		return "INSERT OR IGNORE INTO stash_search_changes SELECT 'scenes', scene_id FROM scenes_files WHERE file_id = " + fileID + ";" +
-			"INSERT OR IGNORE INTO stash_search_changes SELECT 'images', image_id FROM images_files WHERE file_id = " + fileID + ";"
+		return "INSERT INTO stash_search_changes SELECT 'scenes', scene_id FROM scenes_files WHERE file_id = " + fileID + " ON CONFLICT(kind, id) DO NOTHING;" +
+			"INSERT INTO stash_search_changes SELECT 'images', image_id FROM images_files WHERE file_id = " + fileID + " ON CONFLICT(kind, id) DO NOTHING;"
 	}
 	trigger("files_update", "AFTER UPDATE OF id, basename, parent_folder_id", "files", fileOwners("OLD.id")+fileOwners("NEW.id"))
 	trigger("files_delete", "BEFORE DELETE", "files", fileOwners("OLD.id"))
@@ -110,7 +110,7 @@ func searchChangeTriggers() string {
 	folderOwners := ""
 	for _, table := range []string{sceneTable, imageTable} {
 		id := strings.TrimSuffix(table, "s") + "_id"
-		folderOwners += "INSERT OR IGNORE INTO stash_search_changes SELECT '" + table + "', " + id + " FROM " + table + "_files JOIN files ON files.id = file_id WHERE files.parent_folder_id IN (OLD.id, NEW.id);"
+		folderOwners += "INSERT INTO stash_search_changes SELECT '" + table + "', " + id + " FROM " + table + "_files JOIN files ON files.id = file_id WHERE files.parent_folder_id IN (OLD.id, NEW.id) ON CONFLICT(kind, id) DO NOTHING;"
 	}
 	trigger("folders_update", "AFTER UPDATE OF id, path", "folders", folderOwners)
 	trigger("markers_insert", "AFTER INSERT", "scene_markers", mark(sceneTable, "NEW.scene_id"))

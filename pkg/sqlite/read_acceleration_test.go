@@ -43,6 +43,12 @@ func acceleratedTestDatabase(t *testing.T) *Database {
 	require.NoError(t, db.openWriteDB())
 	_, err := db.writeDB.Exec(searchTestSchema)
 	require.NoError(t, err)
+	_, err = db.writeDB.Exec("CREATE TABLE native_migration_history(version INTEGER, name TEXT, details TEXT)")
+	require.NoError(t, err)
+	script, err := migrationsBox.ReadFile("migrations/1000131_search_revision.up.sql")
+	require.NoError(t, err)
+	_, err = db.writeDB.Exec(string(script))
+	require.NoError(t, err)
 	require.NoError(t, db.openReadDB())
 	db.reads, err = newReadAcceleration(db.readDB, db.dbPath)
 	require.NoError(t, err)
@@ -274,10 +280,74 @@ func TestSearchIndexMissingDamagedOrFromPreviousProcessFallsBack(t *testing.T) {
 	_, err = db.reads.index.Exec("DROP TABLE snapshot")
 	require.NoError(t, err)
 	assertSearchMatchesScan(t, db, sceneTable, "alpha", false)
-	// Cache files never carry triggers into the upstream library.
+	// Search documents stay in the disposable cache, not the library schema.
 	var schema []string
 	require.NoError(t, db.readDB.Select(&schema, "SELECT sql FROM sqlite_schema WHERE sql IS NOT NULL"))
 	require.NotContains(t, strings.ToLower(strings.Join(schema, "\n")), "fts5")
+}
+
+func TestSearchIndexReuseRequiresMatchingPersistentRevision(t *testing.T) {
+	db := acceleratedTestDatabase(t)
+	reopen := func() {
+		db.reads.close()
+		var err error
+		db.reads, err = newReadAcceleration(db.readDB, db.dbPath)
+		require.NoError(t, err)
+		db.reads.cancel()
+		<-db.reads.done
+	}
+	owner := db.reads.owner
+	reopen()
+	require.NotEqual(t, owner, db.reads.owner)
+	require.False(t, db.reads.fullRebuild)
+	assertSearchMatchesScan(t, db, sceneTable, "alpha", true)
+	acceleratedWrite(t, db, "UPDATE scenes SET title='rolled-back' WHERE id=1", false)
+	reopen()
+	require.False(t, db.reads.fullRebuild)
+	acceleratedWrite(t, db, "INSERT INTO scenes(id,title) VALUES(1,'upsert alpha') ON CONFLICT(id) DO UPDATE SET title=excluded.title", true)
+	require.NoError(t, db.reads.refreshSearchIndex(context.Background()))
+	assertSearchMatchesScan(t, db, sceneTable, "upsert", true)
+	// A commit whose index update was interrupted must rebuild, not relabel
+	// the previous index. The original search remains correct via SQL meanwhile.
+	acceleratedWrite(t, db, "UPDATE scenes SET title='interrupted alpha' WHERE id=1", true)
+	reopen()
+	require.True(t, db.reads.fullRebuild)
+	assertSearchMatchesScan(t, db, sceneTable, "interrupted", false)
+	require.NoError(t, db.reads.refreshSearchIndex(context.Background()))
+	reopen()
+	require.False(t, db.reads.fullRebuild)
+	assertSearchMatchesScan(t, db, sceneTable, "interrupted", true)
+	// Missing FTS tables cannot inherit the still-matching snapshot marker.
+	_, err := db.reads.index.Exec("DROP TABLE scenes")
+	require.NoError(t, err)
+	reopen()
+	require.True(t, db.reads.fullRebuild)
+	assertSearchMatchesScan(t, db, sceneTable, "interrupted", false)
+	require.NoError(t, db.reads.refreshSearchIndex(context.Background()))
+	// An external connection is tracked by permanent native triggers, even
+	// while the application's connection-local journal is absent.
+	external, err := sqlx.Open("sqlite3", "file:"+db.dbPath+"?_journal=WAL&_fk=true")
+	require.NoError(t, err)
+	db.reads.close()
+	_, err = external.Exec("UPDATE scenes SET title='external restart' WHERE id=1")
+	require.NoError(t, err)
+	require.NoError(t, external.Close())
+	db.reads, err = newReadAcceleration(db.readDB, db.dbPath)
+	require.NoError(t, err)
+	db.reads.cancel()
+	<-db.reads.done
+	require.True(t, db.reads.fullRebuild)
+	assertSearchMatchesScan(t, db, sceneTable, "external", false)
+}
+
+func TestSearchRevisionCoversIncrementalTriggerDependencies(t *testing.T) {
+	db := acceleratedTestDatabase(t)
+	acceleratedWrite(t, db, "UPDATE scenes SET rating=5", true)
+	var permanent, temporary []string
+	require.NoError(t, db.writeDB.Select(&permanent, "SELECT tbl_name || substr(sql, instr(sql, 'AFTER'), instr(sql, ' ON ') - instr(sql, 'AFTER')) FROM sqlite_schema WHERE name GLOB 'library_search_*' AND name != 'library_search_state_retained' AND type='trigger' ORDER BY 1"))
+	// Normalize BEFORE DELETE to AFTER DELETE: both mark the same dependency.
+	require.NoError(t, db.writeDB.Select(&temporary, "SELECT tbl_name || replace(substr(sql, CASE WHEN instr(sql, 'BEFORE')>0 THEN instr(sql, 'BEFORE') ELSE instr(sql, 'AFTER') END, instr(sql, ' ON ') - CASE WHEN instr(sql, 'BEFORE')>0 THEN instr(sql, 'BEFORE') ELSE instr(sql, 'AFTER') END), 'BEFORE', 'AFTER') FROM sqlite_temp_schema WHERE name GLOB 'stash_search_*' AND type='trigger' ORDER BY 1"))
+	require.Equal(t, temporary, permanent, "new search dependencies must update both journals")
 }
 
 func TestReadCachesConcurrentCommits(t *testing.T) {
@@ -366,7 +436,7 @@ func TestReadCachesConcurrentCommits(t *testing.T) {
 	assertSearchMatchesScan(t, db, sceneTable, "alpha", true)
 }
 
-func TestSearchTrackingSurvivesUpstreamTableRebuild(t *testing.T) {
+func TestSearchTrackingSurvivesTableRebuild(t *testing.T) {
 	db := acceleratedTestDatabase(t)
 	acceleratedWrite(t, db, "UPDATE scenes SET rating = 10 WHERE id = 1", true)
 	external, err := sqlx.Open("sqlite3", "file:"+db.dbPath+"?_journal=WAL&_fk=false")

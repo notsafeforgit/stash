@@ -1,6 +1,6 @@
 package sqlite
 
-// Read acceleration is deliberately outside the library schema. The observer
+// Read caches are disposable; only the search source revision is durable. The observer
 // stays on one connection (SQLite data_version values cannot be compared across
 // connections), and read snapshots are pinned between two observations. Neither
 // a cached count nor a search index from a different snapshot may narrow a read.
@@ -84,6 +84,8 @@ func newReadAcceleration(main *sqlx.DB, path string) (*readAcceleration, error) 
 		// Builds without FTS5, read-only directories, or damaged caches must not
 		// prevent opening a library. Count caching still works.
 		logger.Warnf("Search index unavailable; using database search: %v", err)
+	} else if err := a.reuseSearchIndex(ctx); err != nil {
+		logger.Debugf("Search index needs rebuilding: %v", err)
 	}
 	go a.run(ctx)
 	a.signal()
@@ -105,7 +107,7 @@ func (a *readAcceleration) version(ctx context.Context) (int64, error) {
 	return version, err
 }
 
-// Called with mu held. Unknown writers (including an upstream process) cannot
+// Called with mu held. External writers cannot
 // use our connection-local change journal, so their commits require a rebuild.
 func (a *readAcceleration) observe(ctx context.Context) bool {
 	v, err := a.version(ctx)
@@ -213,6 +215,15 @@ func (a *readAcceleration) commit(ctx context.Context, tx *sqlx.Tx, snapshot *re
 		// A rebuild already in flight must not be published as this revision.
 		a.searchRevision++
 		a.signal()
+	}
+	for _, table := range tables {
+		if table == "library_search_state" {
+			// A tracked write can change the persistent token without changing
+			// documents (for example renaming an unowned file). Stamp the same
+			// validated documents at the new source revision after coalescing.
+			a.signal()
+			break
+		}
 	}
 	// data_version does not count commits, and our writer's own commit does
 	// not change its value. Observe both connections, in this order, to detect

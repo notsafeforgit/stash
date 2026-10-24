@@ -113,6 +113,11 @@ AND NOT (type='index' AND tbl_name='schema_migrations'))`); err != nil {
 		if version > GetRequiredSchemaVersion() {
 			return &MismatchedSchemaVersionError{CurrentSchemaVersion: version, RequiredSchemaVersion: GetRequiredSchemaVersion()}
 		}
+		if version >= NativeSchemaBaseline+131 {
+			if err := validateSearchRevisionSchema(conn); err != nil {
+				return err
+			}
+		}
 		for _, name := range []string{"video_file_metadata", "image_file_metadata", "scene_cover_sources", "shares", "share_sessions", "file_deletions", "legacy_schema_history"} {
 			if !present[name] {
 				return fmt.Errorf("native database schema is incomplete: missing %s", name)

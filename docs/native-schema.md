@@ -3085,3 +3085,21 @@ Recipient previews use the ordinary link. The migration removes unused
 `preview`; existing open sessions keep their original expiry and version.
 Revocation removes the stored key and all guest sessions. Backups retain active
 link secrets as well as their protected media/library data.
+
+## Search and count read caches
+
+Schema 1000131 adds a single transactional `library_search_state` token and
+triggers covering every indexed text dependency. The disposable search database
+records that token and the SQLite schema version with each completed index
+transaction. Restart reuses a matching index; interrupted updates, external edits,
+schema changes and missing cache tables require rebuilding. Reads use ordinary
+SQL until an index matches their pinned snapshot. Divergent writes after a restore
+produce different random tokens even when their write counts match. Search rows
+remain outside the library; this migration does not rebuild library data.
+
+Count cache entries record the tables SQLite reports while compiling the query.
+Transactional temporary triggers collect changed tables; only dependent entries
+expire. Rollbacks retain cached counts. Schema changes, untracked external writes
+and tracking failures conservatively invalidate the cache. Relative-time and
+nondeterministic queries remain uncached. Worker bookkeeping does not invalidate
+unrelated library totals.

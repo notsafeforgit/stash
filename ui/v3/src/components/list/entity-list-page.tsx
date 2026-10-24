@@ -39,7 +39,14 @@ import { VirtualizedItemList } from "./virtualized-item-list";
 import { useListPageFilter } from "./use-list-page-filter";
 import { useListData } from "./use-list-data";
 import { useListPageRefill } from "./use-list-page-refill";
-import { ShareSelectionButton } from "@/components/sharing/share-action";
+import {
+  ShareSelectionButton,
+  useShareAction,
+} from "@/components/sharing/share-action";
+import {
+  EntityActionsMenu,
+  type EntityActionItem,
+} from "@/components/detail/entity-actions-menu";
 
 export type {
   EntityListPageConfig,
@@ -224,18 +231,22 @@ export function EntityListPage<
         }))}
       />
     ) : undefined;
-  const listPageActions = (
-    <>
-      {source.kind === "graphql" && sharing && (
-        <ShareSelectionButton
-          compact={isMobileSidebar}
-          matching={{ kind: sharing.kind, filter }}
-          targets={[]}
-        />
-      )}
-      {pageActions}
-    </>
+  const shareList = useShareAction(
+    [],
+    source.kind === "graphql" && sharing
+      ? { kind: sharing.kind, filter }
+      : undefined,
   );
+  const listPageActions: EntityActionItem[] = [...(pageActions ?? [])];
+  if (source.kind === "graphql" && sharing) {
+    listPageActions.push({
+      ...shareList.action,
+      label: intl.formatMessage({
+        id: "sharing.share_list",
+        defaultMessage: "Share this list…",
+      }),
+    });
+  }
 
   const preserveScrollDuringRefill = useListPageRefill({
     remote: source.kind === "graphql",
@@ -448,10 +459,15 @@ export function EntityListPage<
       cardAspect={supportsCardAspect ? cardAspect : undefined}
       setCardAspect={supportsCardAspect ? setCardAspect : undefined}
       sortOptions={sortOptionsOverride}
-      pageActions={listPageActions}
+      pageActions={
+        listPageActions.length ? (
+          <EntityActionsMenu items={listPageActions} />
+        ) : undefined
+      }
       operationComponent={selectionActions}
       mobileGridCols={mobileGridCols}
     >
+      {shareList.dialog}
       {error && (
         <QueryError
           error={error}

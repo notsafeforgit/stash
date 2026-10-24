@@ -8,6 +8,7 @@ import type { ListFilterModel } from "@/models/list-filter/filter";
 import type { ISortByOption } from "@/models/list-filter/filter-options";
 import type { View } from "./views";
 import type { BulkApplyTarget } from "./list-provider";
+import type { EntityActionItem } from "@/components/detail/entity-actions-menu";
 
 /** Snapshot of the selection and filter when a delete action is opened. */
 export interface ListDeleteSelection {
@@ -163,7 +164,7 @@ export interface EntityListPageConfig<
    */
   supportsCardAspect?: boolean;
   /**
-   * When provided, a tagger mode button appears in the mobile bar and tagger
+   * When provided, a tagger action appears in the mobile overflow and tagger
    * panel is shown when active. Receives the current page's items.
    */
   renderTagger?: (items: TItem[]) => React.ReactNode;
@@ -185,11 +186,11 @@ export interface EntityListPageConfig<
    */
   getWallDimensions?: (item: TItem) => { width: number; height: number };
   /**
-   * Page-level actions in the desktop toolbar and mobile browse footer.
-   * Use compact, touch-sized controls on mobile (e.g. ListCreateButton).
+   * Page-level actions in the desktop menu and mobile overflow drawer.
+   * Keep dialogs and other action state in the page, outside the menu.
    * Hidden in selection mode and while mobile search is open.
    */
-  pageActions?: React.ReactNode;
+  pageActions?: readonly EntityActionItem[];
   /** Delete action shared by the selection toolbar and card/row menus. */
   onDeleteSelection?: (selection: ListDeleteSelection) => void;
 }

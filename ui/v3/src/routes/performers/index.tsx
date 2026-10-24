@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { useDocumentTitle } from "src/hooks/title";
-import { ListCreateButton } from "@/components/list/list-create-button";
+import { listCreateAction } from "@/components/list/list-create-action";
 import { EntityListPage } from "src/components/list";
 import { usePerformerListConfig } from "src/components/list/entity-list-configs";
 import { View } from "src/components/list/views";
@@ -29,12 +29,11 @@ function PerformersPage() {
       view: View.Performers,
       tableColumns,
       tableVisibilityKey: "performers",
-      pageActions: (
-        <ListCreateButton
-          entityType={intl.formatMessage({ id: "performer" })}
-          onClick={() => setCreating(true)}
-        />
-      ),
+      pageActions: [
+        listCreateAction(intl, intl.formatMessage({ id: "performer" }), () =>
+          setCreating(true),
+        ),
+      ],
     }),
     [performerBase, tableColumns, intl],
   );

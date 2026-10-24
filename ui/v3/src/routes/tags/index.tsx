@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { useDocumentTitle } from "src/hooks/title";
-import { ListCreateButton } from "@/components/list/list-create-button";
+import { listCreateAction } from "@/components/list/list-create-action";
 import { EntityListPage } from "src/components/list";
 import { useTagListConfig } from "src/components/list/entity-list-configs";
 import { View } from "src/components/list/views";
@@ -37,12 +37,11 @@ function TagsPage() {
       tableColumns,
       tableVisibilityKey: "tags",
       renderTagger,
-      pageActions: (
-        <ListCreateButton
-          entityType={intl.formatMessage({ id: "tag" })}
-          onClick={() => setCreating(true)}
-        />
-      ),
+      pageActions: [
+        listCreateAction(intl, intl.formatMessage({ id: "tag" }), () =>
+          setCreating(true),
+        ),
+      ],
     }),
     [tagBase, tableColumns, renderTagger, intl],
   );

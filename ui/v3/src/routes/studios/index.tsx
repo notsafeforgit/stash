@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { useDocumentTitle } from "src/hooks/title";
-import { ListCreateButton } from "@/components/list/list-create-button";
+import { listCreateAction } from "@/components/list/list-create-action";
 import * as GQL from "src/core/generated-graphql";
 import { EntityListPage, type EntityListPageConfig } from "src/components/list";
 import { StudioCard } from "src/components/cards";
@@ -73,12 +73,11 @@ function StudiosPage() {
       zoomable: true,
       tableColumns,
       tableVisibilityKey: "studios",
-      pageActions: (
-        <ListCreateButton
-          entityType={intl.formatMessage({ id: "studio" })}
-          onClick={() => setCreating(true)}
-        />
-      ),
+      pageActions: [
+        listCreateAction(intl, intl.formatMessage({ id: "studio" }), () =>
+          setCreating(true),
+        ),
+      ],
     }),
     [tableColumns, intl],
   );

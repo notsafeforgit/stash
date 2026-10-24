@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { useDocumentTitle } from "src/hooks/title";
-import { ListCreateButton } from "@/components/list/list-create-button";
+import { listCreateAction } from "@/components/list/list-create-action";
 import { EntityListPage } from "src/components/list";
 import { useGroupListConfig } from "src/components/list/entity-list-configs";
 import { View } from "src/components/list/views";
@@ -26,12 +26,11 @@ function GroupsPage() {
       ...groupBase,
       view: View.Groups,
       tableVisibilityKey: "groups",
-      pageActions: (
-        <ListCreateButton
-          entityType={intl.formatMessage({ id: "group" })}
-          onClick={() => setCreating(true)}
-        />
-      ),
+      pageActions: [
+        listCreateAction(intl, intl.formatMessage({ id: "group" }), () =>
+          setCreating(true),
+        ),
+      ],
     }),
     [groupBase, intl],
   );

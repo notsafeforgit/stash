@@ -82,8 +82,8 @@ export interface EntityListProps {
   children: React.ReactNode;
   /** Operations component passed through to ListToolbar */
   operationComponent?: React.ReactNode;
-  /** Page-level action(s) rendered at the right end of the desktop chrome bar
-   *  (e.g. a "+ New" button). Hidden in selection mode. */
+  /** Page-level action menu at the right end of the desktop toolbar.
+   *  Hidden in selection mode. */
   pageActions?: React.ReactNode;
   /** Mobile chrome component rendered below the content area */
   mobileChrome?: React.ReactNode;

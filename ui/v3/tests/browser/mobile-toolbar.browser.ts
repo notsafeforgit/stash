@@ -15,7 +15,6 @@ test("mobile drawers open directly and dismiss by tapping outside", async ({
   await page.goto("/");
   const footer = detailFooter(page);
   for (const [control, title] of [
-    ["Navigation", "Navigation"],
     ["Filters", "Filters"],
     ["View options", "View options"],
     ["Entity actions", "Entity actions"],
@@ -31,6 +30,23 @@ test("mobile drawers open directly and dismiss by tapping outside", async ({
     await expectCompactRow(footer);
     await expectTouchTargets(footer);
   }
+  await footer
+    .getByRole("button", { name: "Entity actions", exact: true })
+    .tap();
+  const actions = page.getByRole("dialog", {
+    name: "Entity actions",
+    exact: true,
+  });
+  await actions.getByRole("button", { name: "Navigation", exact: true }).tap();
+  await expect(actions).toBeHidden();
+  const navigation = page.getByRole("dialog", {
+    name: "Navigation",
+    exact: true,
+  });
+  await expect(navigation).toBeVisible();
+  await page.touchscreen.tap(8, 8);
+  await expect(navigation).toBeHidden();
+  await expectCompactRow(footer);
 });
 
 test("mobile action groups are flat and their forms outlive drawer dismissal", async ({
@@ -505,13 +521,46 @@ test("standalone lists provide page jumping, view options, and navigation", asyn
     page.getByRole("dialog", { name: "View options", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  await row.getByRole("button", { name: "Navigation", exact: true }).tap();
+  await expect(row.getByRole("button")).toHaveCount(5);
+  await row.getByRole("button", { name: "List actions", exact: true }).tap();
+  const actions = page.getByRole("dialog", {
+    name: "List actions",
+    exact: true,
+  });
+  await actions.getByRole("button", { name: "Navigation", exact: true }).tap();
+  await expect(actions).toBeHidden();
   await expect(
     page.getByRole("dialog", { name: "Navigation", exact: true }),
   ).toBeVisible();
   await page.touchscreen.tap(8, 8);
   await expectCompactRow(row);
 });
+
+for (const standalone of [false, true]) {
+  test(`tagger opens from ${standalone ? "standalone" : "embedded"} list overflow`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto(standalone ? "/?standalone" : "/");
+    const row = standalone
+      ? page.locator("[data-mobile-list-mode]")
+      : detailFooter(page);
+    await expectCompactRow(row);
+    await expectTouchTargets(row);
+    await expect(row.getByRole("button")).toHaveCount(standalone ? 5 : 6);
+    await expect(
+      row.getByRole("button", { name: "Tagger", exact: true }),
+    ).toHaveCount(0);
+    const label = standalone ? "List actions" : "Entity actions";
+    await row.getByRole("button", { name: label, exact: true }).tap();
+    const actions = page.getByRole("dialog", { name: label, exact: true });
+    await actions.getByRole("button", { name: "Tagger", exact: true }).tap();
+    await expect(actions).toBeHidden();
+    await expect(
+      page.getByText("Tagger active", { exact: true }),
+    ).toBeVisible();
+  });
+}
 
 test("single-page lists omit page navigation", async ({ page }) => {
   await page.goto("/?single");

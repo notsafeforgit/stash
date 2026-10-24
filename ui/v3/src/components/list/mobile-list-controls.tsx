@@ -2,6 +2,7 @@ import { useState, type Dispatch, type SetStateAction } from "react";
 import { useIntl } from "react-intl";
 import {
   ChevronUp,
+  Ellipsis,
   Funnel,
   ListChecks,
   Menu,
@@ -13,6 +14,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import {
+  EntityActionsList,
+  type EntityActionItem,
+} from "@/components/detail/entity-actions-menu";
 import {
   Popover,
   PopoverContent,
@@ -55,7 +67,7 @@ export interface MobileListControlsProps {
   onSearch: (value: string) => void;
   onViewOptions: () => void;
   selectionActions?: React.ReactNode;
-  pageActions?: React.ReactNode;
+  pageActions?: readonly EntityActionItem[];
 }
 
 /** One row, with explicit replacement modes instead of stacked toolbars. */
@@ -75,7 +87,7 @@ export function MobileListControls({
   onSearch,
   onViewOptions,
   selectionActions,
-  pageActions,
+  pageActions = [],
 }: MobileListControlsProps) {
   const intl = useIntl();
   const chrome = useMobileDetailChrome();
@@ -83,6 +95,7 @@ export function MobileListControls({
   const search = useMobileSearch();
   const openNavigation = useMobileNavigation();
   const [pagesOpen, setPagesOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const { triggerRef, popupRef } = usePopoverOutsideTap(pagesOpen, () =>
     setPagesOpen(false),
   );
@@ -93,9 +106,14 @@ export function MobileListControls({
   const pageCount =
     totalCount === undefined ? 0 : Math.ceil(totalCount / filter.itemsPerPage);
 
-  function runAction(action: () => void) {
+  function closeActions() {
     setPagesOpen(false);
+    setActionsOpen(false);
     chrome?.setPanel(null);
+  }
+
+  function runAction(action: () => void) {
+    closeActions();
     action();
   }
 
@@ -156,10 +174,35 @@ export function MobileListControls({
       </PopoverContent>
     </Popover>
   );
-  const taggerLabel = intl.formatMessage({
-    id: "actions.tagger",
-    defaultMessage: "Tagger",
+  const actionsLabel = intl.formatMessage({
+    id: "actions.list_actions",
+    defaultMessage: "List actions",
   });
+  const actions: EntityActionItem[] = [...pageActions];
+  if (onTaggerMode) {
+    actions.push({
+      key: "tagger",
+      icon: Tags,
+      label: intl.formatMessage({
+        id: "actions.tagger",
+        defaultMessage: "Tagger",
+      }),
+      onSelect: onTaggerMode,
+    });
+  }
+  if (!hosted) {
+    if (actions.length)
+      actions.push({ key: "navigation-separator", separator: true });
+    actions.push({
+      key: "navigation",
+      icon: Menu,
+      label: intl.formatMessage({
+        id: "navigation",
+        defaultMessage: "Navigation",
+      }),
+      onSelect: openNavigation,
+    });
+  }
   const Row = hosted ? "div" : MobileToolbarRow;
 
   return (
@@ -169,17 +212,10 @@ export function MobileListControls({
           <MobileDetailChromePortal slot="pagination">
             {pagePicker}
           </MobileDetailChromePortal>
-          {onTaggerMode && (
+          {actions.length > 0 && (
             <MobileDetailChromePortal slot="list-actions">
               <Separator className="my-1" />
-              <Button
-                variant="ghost"
-                className="h-11 w-full justify-start"
-                onClick={() => runAction(onTaggerMode)}
-              >
-                <Tags />
-                {taggerLabel}
-              </Button>
+              <EntityActionsList items={actions} onAction={closeActions} />
             </MobileDetailChromePortal>
           )}
         </>
@@ -246,40 +282,26 @@ export function MobileListControls({
           ) : (
             <>
               {!hosted && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon-lg"
-                    className="size-11 shrink-0"
-                    onClick={openNavigation}
-                    aria-label={intl.formatMessage({
-                      id: "navigation",
-                      defaultMessage: "Navigation",
-                    })}
-                  >
-                    <Menu />
-                  </Button>
-                  <div className="min-w-0 flex-1">
-                    {pageCount > 1 ? (
-                      paginationControl
-                    ) : (
-                      <span className="text-sm text-muted-foreground tabular-nums">
-                        {countError ? (
-                          <CountUnavailable />
-                        ) : totalCount === undefined ? (
-                          <Skeleton
-                            className="h-4 w-10"
-                            aria-label={intl.formatMessage({
-                              id: "loading.generic",
-                            })}
-                          />
-                        ) : (
-                          intl.formatNumber(totalCount)
-                        )}
-                      </span>
-                    )}
-                  </div>
-                </>
+                <div className="min-w-0 flex-1">
+                  {pageCount > 1 ? (
+                    paginationControl
+                  ) : (
+                    <span className="text-sm text-muted-foreground tabular-nums">
+                      {countError ? (
+                        <CountUnavailable />
+                      ) : totalCount === undefined ? (
+                        <Skeleton
+                          className="h-4 w-10"
+                          aria-label={intl.formatMessage({
+                            id: "loading.generic",
+                          })}
+                        />
+                      ) : (
+                        intl.formatNumber(totalCount)
+                      )}
+                    </span>
+                  )}
+                </div>
               )}
               <MobileSearchButton
                 buttonRef={search.buttonRef}
@@ -317,18 +339,39 @@ export function MobileListControls({
               >
                 <Settings2 />
               </Button>
-              {!hosted && onTaggerMode && (
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  className="size-11 shrink-0"
-                  onClick={() => runAction(onTaggerMode)}
-                  aria-label={taggerLabel}
+              {!hosted && (
+                <Drawer
+                  open={actionsOpen}
+                  onOpenChange={(open) => {
+                    setPagesOpen(false);
+                    setActionsOpen(open);
+                  }}
                 >
-                  <Tags />
-                </Button>
+                  <DrawerTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon-lg"
+                        className="size-11 shrink-0"
+                        aria-label={actionsLabel}
+                      />
+                    }
+                  >
+                    <Ellipsis />
+                  </DrawerTrigger>
+                  <DrawerContent>
+                    <DrawerHeader className="shrink-0 py-2">
+                      <DrawerTitle>{actionsLabel}</DrawerTitle>
+                    </DrawerHeader>
+                    <div className="min-h-0 overflow-y-auto overscroll-contain px-3 pb-2">
+                      <EntityActionsList
+                        items={actions}
+                        onAction={closeActions}
+                      />
+                    </div>
+                  </DrawerContent>
+                </Drawer>
               )}
-              {pageActions}
             </>
           )}
         </Row>

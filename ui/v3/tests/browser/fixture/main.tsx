@@ -112,6 +112,7 @@ function FixtureList({ name }: { name: string }) {
     () => new ListFilterModel(FilterMode.Performers),
   );
   const [filterOpen, setFilterOpen] = useState(false);
+  const [taggerOpen, setTaggerOpen] = useState(false);
   const [cols, setCols] = useState<1 | 2>(2);
   const selection = useListSelect(items);
   const smallScreen = useMediaQuery("(max-width: 767px)");
@@ -147,6 +148,7 @@ function FixtureList({ name }: { name: string }) {
           selectedCount={selection.selectedItems.length}
           onSelectAll={selection.onSelectAll}
           onSelectNone={selection.onSelectNone}
+          onTaggerMode={() => setTaggerOpen((open) => !open)}
           openFilterSidebar={() => setFilterOpen(true)}
           mobileGridCols={cols}
           setMobileGridCols={setCols}
@@ -154,6 +156,7 @@ function FixtureList({ name }: { name: string }) {
       }
     >
       <div data-testid={`${name}-list`} className="p-3">
+        {taggerOpen && <p>Tagger active</p>}
         <p
           data-testid="list-state"
           data-term={filter.searchTerm ?? ""}

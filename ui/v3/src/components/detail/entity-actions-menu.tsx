@@ -41,23 +41,15 @@ export type EntityActionItem =
   | EntityActionGroup
   | { key: string; separator: true };
 
-/** Desktop submenus become labelled groups of direct actions in the mobile drawer. */
-export function EntityActionsMenu({
+function EntityActionsContent({
   items,
-  busy = false,
+  mobile,
+  onAction,
 }: {
   items: readonly EntityActionItem[];
-  busy?: boolean;
+  mobile: boolean;
+  onAction?: () => void;
 }) {
-  const intl = useIntl();
-  const chrome = useMobileDetailChrome();
-  const mobile = chrome?.mobile ?? false;
-  const [open, setOpen] = useState(false);
-  const label = intl.formatMessage({
-    id: "operations",
-    defaultMessage: "Operations",
-  });
-
   function renderAction(action: EntityAction, groupDisabled = false) {
     const Icon = action.icon;
     const disabled =
@@ -66,7 +58,7 @@ export function EntityActionsMenu({
         ? action.disabled()
         : action.disabled);
     const onClick = () => {
-      if (mobile) chrome?.setPanel(null);
+      onAction?.();
       return action.onSelect();
     };
     return mobile ? (
@@ -93,7 +85,7 @@ export function EntityActionsMenu({
     );
   }
 
-  const content = items.map((item) => {
+  return items.map((item) => {
     if ("separator" in item)
       return mobile ? (
         <Separator key={item.key} className="my-1" />
@@ -123,9 +115,43 @@ export function EntityActionsMenu({
       </DropdownMenuSub>
     );
   });
+}
 
-  if (mobile)
-    return <div className="flex w-full min-w-0 flex-col gap-1">{content}</div>;
+/** Flat actions for an existing drawer, with state owned outside that drawer. */
+export function EntityActionsList({
+  items,
+  onAction,
+}: {
+  items: readonly EntityActionItem[];
+  onAction: () => void;
+}) {
+  return (
+    <div className="flex w-full min-w-0 flex-col gap-1">
+      <EntityActionsContent items={items} mobile onAction={onAction} />
+    </div>
+  );
+}
+
+/** Desktop submenus become labelled groups of direct actions in the mobile drawer. */
+export function EntityActionsMenu({
+  items,
+  busy = false,
+}: {
+  items: readonly EntityActionItem[];
+  busy?: boolean;
+}) {
+  const intl = useIntl();
+  const chrome = useMobileDetailChrome();
+  const [open, setOpen] = useState(false);
+  const label = intl.formatMessage({
+    id: "operations",
+    defaultMessage: "Operations",
+  });
+
+  if (chrome?.mobile)
+    return (
+      <EntityActionsList items={items} onAction={() => chrome.setPanel(null)} />
+    );
   return (
     <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
@@ -136,7 +162,9 @@ export function EntityActionsMenu({
         {busy ? <Spinner /> : <EllipsisVertical />}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuGroup>{content}</DropdownMenuGroup>
+        <DropdownMenuGroup>
+          <EntityActionsContent items={items} mobile={false} />
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

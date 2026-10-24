@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { useIntl } from "react-intl";
 import { ChevronLeft, Ellipsis, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import {
   Drawer,
   DrawerContent,
@@ -150,22 +151,6 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
       className="mobile-safe-footer mobile-keyboard-layout @container relative shrink-0 border-t border-border bg-background"
     >
       <MobileToolbarRow>
-        <Button
-          hidden={chrome.interaction !== null}
-          variant="ghost"
-          size="icon-lg"
-          className="size-11 shrink-0"
-          onClick={() => {
-            chrome.setPanel(null);
-            openNavigation();
-          }}
-          aria-label={intl.formatMessage({
-            id: "navigation",
-            defaultMessage: "Navigation",
-          })}
-        >
-          <Menu />
-        </Button>
         <div
           hidden={chrome.interaction !== null}
           className="min-w-11 flex-1 overflow-hidden"
@@ -219,6 +204,21 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
                 slot="list-actions"
                 className="empty:hidden"
               />
+              <Separator className="my-1" />
+              <Button
+                variant="ghost"
+                className="h-11 w-full justify-start"
+                onClick={() => {
+                  chrome.setPanel(null);
+                  openNavigation();
+                }}
+              >
+                <Menu data-icon="inline-start" />
+                {intl.formatMessage({
+                  id: "navigation",
+                  defaultMessage: "Navigation",
+                })}
+              </Button>
             </div>
           </DrawerContent>
         </Drawer>

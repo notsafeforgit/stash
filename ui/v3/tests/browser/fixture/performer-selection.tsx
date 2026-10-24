@@ -175,27 +175,29 @@ const config: EntityListPageConfig<
 };
 
 export function PerformerSelectionFixture() {
+  const list = (
+    <EntityListPage config={config} defaultFilter={filter} mobileChromeFixed />
+  );
+  const standalone = new URLSearchParams(location.search).has("standalone");
   return (
     <ApolloProvider client={client}>
-      <CollectionDetailLayout title="Example performer" onBack={() => {}}>
-        <DetailTabs
-          activeTab="scenes"
-          onTabChange={() => {}}
-          tabs={[
-            {
-              id: "scenes",
-              label: "Videos",
-              content: (
-                <EntityListPage
-                  config={config}
-                  defaultFilter={filter}
-                  mobileChromeFixed
-                />
-              ),
-            },
-          ]}
-        />
-      </CollectionDetailLayout>
+      {standalone ? (
+        <div className="flex h-dvh flex-col overflow-hidden">{list}</div>
+      ) : (
+        <CollectionDetailLayout title="Example performer" onBack={() => {}}>
+          <DetailTabs
+            activeTab="scenes"
+            onTabChange={() => {}}
+            tabs={[
+              {
+                id: "scenes",
+                label: "Videos",
+                content: list,
+              },
+            ]}
+          />
+        </CollectionDetailLayout>
+      )}
       <Toaster />
     </ApolloProvider>
   );

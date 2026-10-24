@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useIntl } from "react-intl";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Check, ChevronUp, Menu, Search } from "lucide-react";
+import { Check, ChevronUp, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,7 +10,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useMobileNavigation } from "@/components/layout/mobile-navigation";
 import { MobileToolbarRow } from "@/components/layout/mobile-toolbar";
 import { MobileSearchRow } from "@/components/layout/mobile-search-row";
 import { useMobileKeyboardLayout } from "@/hooks/use-mobile-keyboard-layout";
@@ -83,7 +82,6 @@ function MobileSettingsNav({
 }) {
   const intl = useIntl();
   const [panel, setPanel] = useState<"sections" | null>(null);
-  const openNavigation = useMobileNavigation();
   const { isOpen, inputRef, buttonRef, rowRef, openSearch, closeSearch } =
     useMobileSearch();
   const keyboardRef = useMobileKeyboardLayout<HTMLDivElement>();
@@ -97,7 +95,7 @@ function MobileSettingsNav({
       data-mobile-settings-footer
       className="mobile-safe-footer mobile-keyboard-layout @container flex shrink-0 flex-col border-t bg-background"
     >
-      <MobileToolbarRow>
+      <MobileToolbarRow onNavigate={() => setPanel(null)}>
         {isOpen ? (
           <MobileSearchRow rowRef={rowRef} onClose={closeSearch}>
             <SettingsSearchInput
@@ -109,18 +107,6 @@ function MobileSettingsNav({
           </MobileSearchRow>
         ) : (
           <>
-            <Button
-              variant="ghost"
-              size="icon-lg"
-              className="size-11 shrink-0"
-              onClick={() => {
-                setPanel(null);
-                openNavigation();
-              }}
-              aria-label={intl.formatMessage({ id: "navigation" })}
-            >
-              <Menu />
-            </Button>
             <DropdownMenu
               open={panel === "sections"}
               onOpenChange={(open) => setPanel(open ? "sections" : null)}

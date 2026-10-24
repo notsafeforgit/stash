@@ -5,7 +5,6 @@ import {
   Ellipsis,
   Funnel,
   ListChecks,
-  Menu,
   Settings2,
   Tags,
   X,
@@ -31,7 +30,6 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useMobileNavigation } from "@/components/layout/mobile-navigation";
 import { MobileToolbarRow } from "@/components/layout/mobile-toolbar";
 import { MobileSearchRow } from "@/components/layout/mobile-search-row";
 import {
@@ -93,7 +91,6 @@ export function MobileListControls({
   const chrome = useMobileDetailChrome();
   const hosted = chrome?.mobile ?? false;
   const search = useMobileSearch();
-  const openNavigation = useMobileNavigation();
   const [pagesOpen, setPagesOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const { triggerRef, popupRef } = usePopoverOutsideTap(pagesOpen, () =>
@@ -190,19 +187,6 @@ export function MobileListControls({
       onSelect: onTaggerMode,
     });
   }
-  if (!hosted) {
-    if (actions.length)
-      actions.push({ key: "navigation-separator", separator: true });
-    actions.push({
-      key: "navigation",
-      icon: Menu,
-      label: intl.formatMessage({
-        id: "navigation",
-        defaultMessage: "Navigation",
-      }),
-      onSelect: openNavigation,
-    });
-  }
   const Row = hosted ? "div" : MobileToolbarRow;
 
   return (
@@ -229,6 +213,7 @@ export function MobileListControls({
         )}
       >
         <Row
+          {...(hosted ? {} : { onNavigate: closeActions })}
           className={
             hosted
               ? "flex h-11 items-center gap-[var(--mobile-toolbar-gap)]"
@@ -339,7 +324,7 @@ export function MobileListControls({
               >
                 <Settings2 />
               </Button>
-              {!hosted && (
+              {!hosted && actions.length > 0 && (
                 <Drawer
                   open={actionsOpen}
                   onOpenChange={(open) => {

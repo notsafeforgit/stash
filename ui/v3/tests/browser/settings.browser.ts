@@ -77,7 +77,10 @@ for (const width of [320, 390]) {
     await page.goBack();
     await expect(sections).toHaveText("Interface");
 
-    await footer.getByRole("button", { name: "Navigation", exact: true }).tap();
+    await expect(footer.getByRole("button").first()).toHaveAccessibleName(
+      "Open navigation menu",
+    );
+    await footer.getByRole("button", { name: "Open navigation menu" }).tap();
     const navigation = page.getByRole("dialog", {
       name: "Navigation",
       exact: true,
@@ -126,6 +129,20 @@ test("mobile settings search opens above the row and navigates to the highlighte
   await expect(
     page.getByText("No results found.", { exact: true }),
   ).toBeVisible();
+  await expect(footer.getByRole("button").first()).toHaveAccessibleName(
+    "Open navigation menu",
+  );
+  const navigation = footer.getByRole("button", {
+    name: "Open navigation menu",
+  });
+  await navigation.tap();
+  await expect(input).not.toBeFocused();
+  await navigation.tap();
+  const drawer = page.getByRole("dialog", { name: "Navigation", exact: true });
+  await expect(drawer).toBeVisible();
+  await page.touchscreen.tap(8, 8);
+  await expect(drawer).toBeHidden();
+  await expect(input).toHaveValue("no-matching-setting");
   await footer.getByRole("button", { name: "Close search" }).tap();
   await expectCompactRow(footer);
 });

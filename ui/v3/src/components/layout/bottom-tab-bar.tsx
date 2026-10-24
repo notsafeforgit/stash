@@ -1,7 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { Menu } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useMobileNavigation } from "./mobile-navigation";
 import { useNavItems } from "./nav-items";
 import { MobileToolbarRow } from "./mobile-toolbar";
 
@@ -17,21 +14,10 @@ export function BottomTabBar() {
   // First 3 stay as primary inline tabs; everything else is reachable via
   // the drawer behind the hamburger.
   const primary = allTabs.slice(0, 3);
-  const openNavigation = useMobileNavigation();
 
   return (
     <nav className="bottom-tab-bar mobile-safe-footer @container shrink-0 border-t bg-background md:hidden">
       <MobileToolbarRow>
-        <Button
-          variant="ghost"
-          size="icon-lg"
-          className="size-11 shrink-0"
-          onClick={openNavigation}
-          aria-label="Open navigation menu"
-        >
-          <Menu />
-        </Button>
-
         {primary.map((item) => (
           <Link
             key={item.to}

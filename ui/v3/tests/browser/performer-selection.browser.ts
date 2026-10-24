@@ -8,14 +8,18 @@ import {
 } from "./test";
 
 for (const width of [320, 390]) {
-  test(`performer browse bar has only six controls at ${width}px`, async ({
+  test(`performer browse bar keeps navigation first among seven controls at ${width}px`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/performer-selection");
     const footer = detailFooter(page);
-    await expect(footer.getByRole("button")).toHaveCount(6);
+    await expect(footer.getByRole("button")).toHaveCount(7);
+    await expect(footer.getByRole("button").first()).toHaveAccessibleName(
+      "Open navigation menu",
+    );
     for (const name of [
+      "Open navigation menu",
       "Detail sections",
       "Search…",
       "Filters",
@@ -39,7 +43,7 @@ for (const width of [320, 390]) {
     });
     await expect(
       actions.getByRole("button", { name: "Navigation", exact: true }),
-    ).toBeVisible();
+    ).toHaveCount(0);
     await actions
       .getByRole("button", { name: "Share this list…", exact: true })
       .tap();

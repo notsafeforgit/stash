@@ -14,7 +14,11 @@ test("mobile drawers open directly and dismiss by tapping outside", async ({
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/");
   const footer = detailFooter(page);
+  await expect(footer.getByRole("button").first()).toHaveAccessibleName(
+    "Open navigation menu",
+  );
   for (const [control, title] of [
+    ["Open navigation menu", "Navigation"],
     ["Filters", "Filters"],
     ["View options", "View options"],
     ["Entity actions", "Entity actions"],
@@ -30,23 +34,6 @@ test("mobile drawers open directly and dismiss by tapping outside", async ({
     await expectCompactRow(footer);
     await expectTouchTargets(footer);
   }
-  await footer
-    .getByRole("button", { name: "Entity actions", exact: true })
-    .tap();
-  const actions = page.getByRole("dialog", {
-    name: "Entity actions",
-    exact: true,
-  });
-  await actions.getByRole("button", { name: "Navigation", exact: true }).tap();
-  await expect(actions).toBeHidden();
-  const navigation = page.getByRole("dialog", {
-    name: "Navigation",
-    exact: true,
-  });
-  await expect(navigation).toBeVisible();
-  await page.touchscreen.tap(8, 8);
-  await expect(navigation).toBeHidden();
-  await expectCompactRow(footer);
 });
 
 test("mobile action groups are flat and their forms outlive drawer dismissal", async ({
@@ -521,14 +508,11 @@ test("standalone lists provide page jumping, view options, and navigation", asyn
     page.getByRole("dialog", { name: "View options", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(row.getByRole("button")).toHaveCount(5);
-  await row.getByRole("button", { name: "List actions", exact: true }).tap();
-  const actions = page.getByRole("dialog", {
-    name: "List actions",
-    exact: true,
-  });
-  await actions.getByRole("button", { name: "Navigation", exact: true }).tap();
-  await expect(actions).toBeHidden();
+  await expect(row.getByRole("button")).toHaveCount(6);
+  await expect(row.getByRole("button").first()).toHaveAccessibleName(
+    "Open navigation menu",
+  );
+  await row.getByRole("button", { name: "Open navigation menu" }).tap();
   await expect(
     page.getByRole("dialog", { name: "Navigation", exact: true }),
   ).toBeVisible();
@@ -537,6 +521,55 @@ test("standalone lists provide page jumping, view options, and navigation", asyn
 });
 
 for (const standalone of [false, true]) {
+  test(`navigation stays first during ${standalone ? "standalone" : "embedded"} search and selection`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto(standalone ? "/?standalone" : "/");
+    const row = standalone
+      ? page.locator("[data-mobile-list-mode]")
+      : detailFooter(page);
+    const navigation = row.getByRole("button", {
+      name: "Open navigation menu",
+    });
+    const drawer = page.getByRole("dialog", {
+      name: "Navigation",
+      exact: true,
+    });
+    await row.getByRole("button", { name: "Search…", exact: true }).tap();
+    const input = row.getByRole("searchbox");
+    await input.fill("keep this search");
+    await expect(row.getByRole("button").first()).toHaveAccessibleName(
+      "Open navigation menu",
+    );
+    await expectCompactRow(row);
+    await expectTouchTargets(row);
+    // As with other outside touches, the first tap dismisses the keyboard.
+    await navigation.tap();
+    await expect(input).not.toBeFocused();
+    await navigation.tap();
+    await expect(drawer).toBeVisible();
+    await page.touchscreen.tap(8, 8);
+    await expect(drawer).toBeHidden();
+    await expect(input).toHaveValue("keep this search");
+    await row.getByRole("button", { name: "Close search" }).tap();
+    await page.getByRole("button", { name: "Enter selection" }).tap();
+    await row.getByRole("button", { name: "Select all on page" }).tap();
+    await expect(row).toContainText("40 selected");
+    await expect(row.getByRole("button").first()).toHaveAccessibleName(
+      "Open navigation menu",
+    );
+    await expectCompactRow(row);
+    await expectTouchTargets(row);
+    await navigation.tap();
+    await expect(drawer).toBeVisible();
+    await page.touchscreen.tap(8, 8);
+    await expect(drawer).toBeHidden();
+    await expect(row).toContainText("40 selected");
+    await row.getByRole("button", { name: "Select None", exact: true }).tap();
+    await expectCompactRow(row);
+  });
+
   test(`tagger opens from ${standalone ? "standalone" : "embedded"} list overflow`, async ({
     page,
   }) => {
@@ -547,7 +580,7 @@ for (const standalone of [false, true]) {
       : detailFooter(page);
     await expectCompactRow(row);
     await expectTouchTargets(row);
-    await expect(row.getByRole("button")).toHaveCount(standalone ? 5 : 6);
+    await expect(row.getByRole("button")).toHaveCount(standalone ? 6 : 7);
     await expect(
       row.getByRole("button", { name: "Tagger", exact: true }),
     ).toHaveCount(0);

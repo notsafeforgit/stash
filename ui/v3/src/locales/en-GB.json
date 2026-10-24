@@ -2730,6 +2730,7 @@
     "load_failed": "Some plugins could not be loaded. Reload the page to try again."
   },
   "accessibility": {
+    "open_navigation_menu": "Open navigation menu",
     "preview_named": "Preview {name}",
     "select_named": "Select {name}",
     "detail_sections": "Detail sections",

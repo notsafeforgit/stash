@@ -9,9 +9,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useIntl } from "react-intl";
-import { ChevronLeft, Ellipsis, Menu } from "lucide-react";
+import { ChevronLeft, Ellipsis } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
   Drawer,
   DrawerContent,
@@ -19,7 +18,6 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { useMobileNavigation } from "@/components/layout/mobile-navigation";
 import { MobileToolbarRow } from "./mobile-toolbar";
 import { useMobileKeyboardLayout } from "@/hooks/use-mobile-keyboard-layout";
 import { useMediaQuery } from "@/utils/screen";
@@ -138,7 +136,6 @@ export function MobileDetailChromeSlot({
 /** Render beside the page scroller: flex layout reserves the exact height. */
 export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
   const chrome = useMobileDetailChrome();
-  const openNavigation = useMobileNavigation();
   const intl = useIntl();
   const keyboardRef = useMobileKeyboardLayout<HTMLDivElement>();
   const [actionsMounted, setActionsMounted] = useState(false);
@@ -150,7 +147,7 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
       data-mobile-detail-footer
       className="mobile-safe-footer mobile-keyboard-layout @container relative shrink-0 border-t border-border bg-background"
     >
-      <MobileToolbarRow>
+      <MobileToolbarRow onNavigate={() => chrome.setPanel(null)}>
         <div
           hidden={chrome.interaction !== null}
           className="min-w-11 flex-1 overflow-hidden"
@@ -204,21 +201,6 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
                 slot="list-actions"
                 className="empty:hidden"
               />
-              <Separator className="my-1" />
-              <Button
-                variant="ghost"
-                className="h-11 w-full justify-start"
-                onClick={() => {
-                  chrome.setPanel(null);
-                  openNavigation();
-                }}
-              >
-                <Menu data-icon="inline-start" />
-                {intl.formatMessage({
-                  id: "navigation",
-                  defaultMessage: "Navigation",
-                })}
-              </Button>
             </div>
           </DrawerContent>
         </Drawer>

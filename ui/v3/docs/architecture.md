@@ -332,12 +332,13 @@ menu and the mobile overflow drawer. Use `listCreateAction` for creation and kee
 dialogs owned by the page so dismissing the menu does not dismiss a newly opened
 form. Sharing a filtered list uses the distinct **Share this list…** action.
 
-The mobile browse bar contains only the section/page picker, Search, Filters,
-View options, overflow and Back where applicable. Navigation, creation, sharing
-and Tagger live in overflow. Embedded lists contribute to the detail page's
+The mobile browse bar contains Navigation on the left, the section/page picker,
+Search, Filters, View options, overflow and Back where applicable. Creation,
+sharing and Tagger live in overflow. Embedded lists contribute to the detail page's
 existing drawer; standalone lists have a List actions drawer. Search and
-selection replace the browse controls while active. Selection retains its share
-action and page picker for accumulating items across pages.
+selection replace the browse controls while active. The shared `MobileToolbarRow`
+keeps Navigation first in every mode, including Home and Settings. Selection
+retains its share action and page picker for accumulating items across pages.
 
 | Module | Responsibility |
 | --- | --- |

@@ -26,7 +26,6 @@ for (const profile of [
     height: 740,
     path: "/home-fixture/",
     footer: ".bottom-tab-bar",
-    navigationTrigger: "Open navigation menu",
     insets: { top: 0, left: 0, right: 0, bottom: 0 },
   },
   {
@@ -35,7 +34,6 @@ for (const profile of [
     height: 844,
     path: "/home-fixture/",
     footer: ".bottom-tab-bar",
-    navigationTrigger: "Open navigation menu",
     insets: { top: 59, left: 0, right: 0, bottom: 34 },
   },
   {
@@ -44,7 +42,6 @@ for (const profile of [
     height: 390,
     path: "/?media",
     footer: "[data-mobile-detail-footer]",
-    navigationTrigger: "Entity actions",
     insets: { top: 0, left: 47, right: 47, bottom: 21 },
   },
 ]) {
@@ -97,18 +94,8 @@ for (const profile of [
       path: test.info().outputPath("safe-area-navigation.png"),
     });
     await row
-      .getByRole("button", { name: profile.navigationTrigger, exact: true })
+      .getByRole("button", { name: "Open navigation menu", exact: true })
       .click();
-    if (profile.navigationTrigger === "Entity actions") {
-      const actions = page.getByRole("dialog", {
-        name: "Entity actions",
-        exact: true,
-      });
-      await actions
-        .getByRole("button", { name: "Navigation", exact: true })
-        .click();
-      await expect(actions).toBeHidden();
-    }
     const drawer = page.getByRole("dialog", {
       name: "Navigation",
       exact: true,
@@ -136,7 +123,7 @@ test("dense toolbars retain every 44px target as phone margins grow", async ({
     await expectCompactRow(footer);
     await expectTouchTargets(footer);
     const buttons = footer.getByRole("button");
-    await expect(buttons).toHaveCount(6);
+    await expect(buttons).toHaveCount(7);
     expect((await buttons.first().boundingBox())?.x).toBeGreaterThanOrEqual(
       width >= 340 ? 16 : 6,
     );

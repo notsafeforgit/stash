@@ -139,7 +139,8 @@ Section links open in an upward menu with 44px targets and bounded scrolling.
 They remain TanStack Router links, so deep links and browser Back select the
 correct section.
 
-Search replaces the mobile row and focuses inside the opening touch handler.
+Search replaces the section controls and focuses inside the opening touch handler;
+Navigation remains on the left.
 It reuses the generated, locale-resolved settings index and navigates with the
 existing `hl` parameter to reveal the chosen setting. Both layouts render results
 as ordinary route links with native touch and keyboard activation. Mobile results
@@ -155,7 +156,8 @@ and navigation below it on mobile. `mobile-detail-chrome.tsx` provides a shared
 56px toolbar with direct Navigation, section picker, Search, Filters, View options,
 Entity actions, and Back controls. All targets stay at least 44px at 320px width;
 the section label truncates and becomes an icon on the narrowest screens. Search
-and selection replace that row, with their dismissal control at its right edge. Navigation,
+and selection replace the browse controls, keeping Navigation on the left and
+their dismissal control at the right edge. Navigation,
 Filters, View options, and Entity actions open bottom drawers with scrollable
 content and dismiss through swipe-down, outside taps, or Escape. They omit Close
 rows; the shared drawer primitive supplies bottom safe-area padding. The section

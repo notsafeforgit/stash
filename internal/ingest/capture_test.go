@@ -216,6 +216,37 @@ func TestCaptureIntakeRejectsInvalidAndUnsupportedEvidenceWithoutWrites(t *testi
 	}))
 }
 
+func TestCaptureEromeAlbumOrderAndReceiptSurviveRestart(t *testing.T) {
+	f := newCaptureFixtureForNamespace(t, "native:erome")
+	event := f.event(t)
+	event.Post = ingest.PostReference{Namespace: "native:erome", Value: "Example1"}
+	event.Source = []byte(`{"category":"erome","album_id":"Example1","title":"Source album","user":"example","date":"2026-10-01T00:00:00Z","web_media_url":"https://cdn.example/erome/photo.jpeg","web_media":{"version":1,"post_id":"Example1","complete":false,"album":true,"items":[{"url":"https://cdn.example/erome/photo.jpeg","kind":"image"},{"url":"https://cdn.example/erome/movie.mp4","kind":"video"}]}}`)
+	event.Metadata = models.SourcePostMetadata{}
+	first, err := f.submit(t, event)
+	require.NoError(t, err)
+	var result ingest.CaptureResult
+	require.NoError(t, json.Unmarshal(first.Result, &result))
+	require.Equal(t, "selected", result.Album)
+	require.NotEqual(t, "linked", result.Publisher, "an uploader handle alone does not establish an account or owner")
+	require.NoError(t, f.db.Close())
+	require.NoError(t, f.db.Open(f.db.DatabasePath()))
+	replay, err := f.submit(t, event)
+	require.NoError(t, err)
+	require.Equal(t, first, replay)
+	require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		selection, err := f.service.Repo.SourceAttachment.Selection(ctx, first.PostUUID)
+		require.NoError(t, err)
+		require.False(t, selection.Complete)
+		require.Len(t, selection.Entries, 2)
+		require.Equal(t, "url:57edcb6171276fabf40de54ec1cf4b73fb3952bb0e7193091f2ee088bac21f53", selection.Entries[0].Attachment.Reference.Value)
+		require.Equal(t, "url:9967c3d4f4ca89387e6f3751a4fb4e2c849c66a255ce6c3575f9700f67b6314a", selection.Entries[1].Attachment.Reference.Value)
+		association, err := f.service.Repo.SourceGallery.Association(ctx, first.PostUUID)
+		require.NoError(t, err)
+		require.Nil(t, association, "metadata alone never claims downloaded library files")
+		return nil
+	}))
+}
+
 type failingReceiptStore struct{ models.IngestReaderWriter }
 
 func (f failingReceiptStore) RecordReceipt(context.Context, models.IngestReceipt) (*models.IngestReceipt, error) {

@@ -89,8 +89,11 @@ func SplitCapturePayload(origin string, payload sourceObject) (sourceObject, sou
 					keys[key] = true
 				}
 			}
-		case "tumblr", "jpgfish", "imglike", "putmega", "leakgallery":
+		case "tumblr", "jpgfish", "imglike", "putmega", "leakgallery", "erome":
 			if evidence, err := capturedWebAlbum(payload, "", category); err == nil && evidence != nil {
+				if category == "erome" {
+					keys["web_media_id"] = true
+				}
 				for key := range sourceKeys("web_media_url photo source url width height native_file_exclusion") {
 					keys[key] = true
 				}

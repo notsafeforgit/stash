@@ -22,6 +22,7 @@ func TestCapturedPostURLUsesPostIdentityAndNotMediaOrDiscoveryURLs(t *testing.T)
 		{"external parent", `{"category":"imgur","id":"hostedclip","_parent":{"category":"reddit","id":"abc123","permalink":"/comments/abc123/title/"}}`, "https://www.reddit.com/comments/abc123/title/"},
 		{"twitter ID", `{"category":"twitter","tweet_id":1234567890123456789,"url":"https://video.twimg.com/media.mp4","quoted_tweet":{"tweet_id":"99"}}`, "https://x.com/i/web/status/1234567890123456789"},
 		{"twitter GraphQL", `{"category":"twitter","rest_id":"123456789","legacy":{"id_str":"123456789"}}`, "https://x.com/i/web/status/123456789"},
+		{"erome album", `{"category":"erome","album_id":"Example1","user":"uploader","num":2,"url":"https://cdn.example/file.mp4"}`, "https://www.erome.com/a/Example1"},
 		{"invalid reddit ID", `{"category":"reddit","id":"abc/other"}`, ""},
 		{"invalid twitter ID", `{"category":"twitter","tweet_id":"not-a-post"}`, ""},
 		{"unsupported source", `{"category":"unknown","id":"abc123","url":"https://example.test/post"}`, ""},

@@ -132,7 +132,7 @@ func ExtractCapturedPost(raw []byte) (*models.SourcePostIdentifier, error) {
 		return nil, err
 	}
 	switch category {
-	case "tumblr", "jpgfish", "imglike", "putmega", "leakgallery":
+	case "tumblr", "jpgfish", "imglike", "putmega", "leakgallery", "erome":
 		return capturedWebPost(data, path, category)
 	case "ytdl", "ytdl-generic":
 		return capturedYTDLPost(data, path)

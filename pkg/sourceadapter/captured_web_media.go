@@ -15,10 +15,17 @@ import (
 var capturedWebCreator = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,256}$`)
 var capturedWebFileID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,256}$`)
 var capturedWebHost = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]*$`)
+var capturedEromeAlbumID = regexp.MustCompile(`^[A-Za-z0-9_]{1,256}$`)
 
 func capturedWebPost(data sourceObject, path, category string) (*models.SourcePostIdentifier, error) {
 	namespace := "native:" + category
 	switch category {
+	case "erome":
+		id, err := capturedPostReference(namespace, capturedFieldAt(data, path, "album_id"))
+		if err == nil && id != nil && !capturedEromeAlbumID.MatchString(id.Value) {
+			return nil, errors.New("Erome post requires its source album ID")
+		}
+		return id, err
 	case "tumblr":
 		return capturedNumericPostReference(namespace, capturedFieldAt(data, path, "id"), capturedFieldAt(data, path, "id_string"))
 	case "leakgallery":
@@ -85,7 +92,8 @@ func capturedWebAlbum(data sourceObject, path, category string) (*CapturedAlbum,
 	album, albumOK := marker["album"].(bool)
 	items, itemsOK := marker["items"].([]interface{})
 	if !completeOK || !albumOK || !itemsOK || len(items) < 1 || len(items) > MaxManifestEntries ||
-		(album && (category != "tumblr" || len(items) < 2)) || (category == "leakgallery" && complete) ||
+		(album && ((category != "tumblr" && category != "erome") || len(items) < 2)) ||
+		((category == "leakgallery" || category == "erome") && complete) ||
 		((category == "jpgfish" || category == "imglike" || category == "putmega") && (!complete || len(items) != 1)) {
 		return nil, errors.New("source file/page evidence cannot establish this membership")
 	}

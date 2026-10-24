@@ -22,6 +22,10 @@ func CapturedMetadata(raw []byte) (models.SourcePostMetadata, error) {
 	}
 	textKeys, dateKeys := []string{"content", "selftext", "title"}, []string{"date"}
 	switch category {
+	case "erome":
+		// gallery-dl derives date from a media URL's cache/version parameter,
+		// which does not establish the album's publication time.
+		dateKeys = nil
 	case "bluesky":
 		textKeys, dateKeys = []string{"text"}, []string{"createdAt", "date"}
 	case "tiktok":

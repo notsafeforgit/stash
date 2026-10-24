@@ -53,7 +53,7 @@ func PreservePostText(incoming, saved []byte) (json.RawMessage, bool, error) {
 		fields = []string{"description"}
 	case "tumblr":
 		fields = []string{"title", "caption", "body", "description", "summary"}
-	case "jpgfish", "imglike", "putmega", "leakgallery":
+	case "jpgfish", "imglike", "putmega", "leakgallery", "erome":
 		fields = []string{"title", "description", "caption"}
 	case "patreon", "fansly", "kemono", "coomer":
 		fields = []string{"title", "content"}

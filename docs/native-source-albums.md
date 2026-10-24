@@ -333,6 +333,29 @@ captured CDN URLs/attachment IDs, including output numbers that differ from the
 source position. Single-media file ingestion links its source without creating
 a gallery. Other extractor and external-host associations remain unfinished.
 
+## Erome albums
+
+Native gallery-dl intake identifies an Erome post by its source `album_id`,
+retains the album title and canonical `/a/<id>` URL, and records photos and videos
+in their observed page order. It uses the existing version-1 `web_media`
+manifest and URL-qualified attachment references. Local filenames and output
+positions are not identities. Captures share the album body while retaining
+per-file details separately.
+
+HTML traversal cannot prove that inaccessible items are absent, so membership
+remains partial. Two or more observed attachments declare an album; verified
+library files join its gallery through ordinary source-gallery synchronization.
+Single-file albums retain source links without creating an empty gallery.
+The extractor's timestamp comes from a media URL version parameter and is not
+treated as a publication date. An uploader name does not assign a performer.
+
+Use a traversal profile with `stash-gallery download <album-url>`. Native Erome
+archive keys include the source URL identity, so reordered positions cannot skip
+different files. Older position-based gallery-dl entries remain intact and are
+not accepted as proof that a native attachment completed. Interrupted downloads
+use the existing durable requests, outbox, completion receipts and archive retry
+path; this support requires no database migration.
+
 ## Download reports in the application
 
 Each evidenced attachment offers Download history. Its card shows the latest

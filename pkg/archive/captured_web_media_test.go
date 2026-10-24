@@ -94,3 +94,43 @@ func TestWebMediaSharesPostBodyAndKeepsOriginalCapturePartition(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, metadata.PublishedAt)
 }
+
+func TestEromeFilesShareAlbumBodyWithoutInventingPublicationTime(t *testing.T) {
+	raw, err := os.ReadFile("testdata/captured-web-media-v1.json")
+	require.NoError(t, err)
+	var document struct {
+		Cases []struct {
+			Name   string
+			Source json.RawMessage
+		}
+	}
+	require.NoError(t, json.Unmarshal(raw, &document))
+	var source json.RawMessage
+	for _, fixture := range document.Cases {
+		if fixture.Name == "erome-mixed-album" {
+			source = fixture.Source
+		}
+	}
+	require.NotEmpty(t, source)
+	metadata, err := CapturedMetadata(source)
+	require.NoError(t, err)
+	require.Equal(t, "Example album", *metadata.Title)
+	require.Nil(t, metadata.PublishedAt, "media URL version timestamps are not publication evidence")
+	first, err := PrepareRetainedCapture("gallery-dl", "erome", source)
+	require.NoError(t, err)
+	value, err := DecodeJSONObject(source, MaxSourcePayloadBytes)
+	require.NoError(t, err)
+	value["num"] = 1
+	value["filename"] = "photo"
+	value["web_media_url"] = "https://cdn.example/erome/photo.jpeg"
+	value["web_media_id"] = "57edcb6171276fabf40de54ec1cf4b73fb3952bb0e7193091f2ee088bac21f53"
+	secondRaw, err := EncodeSourceJSON(value)
+	require.NoError(t, err)
+	second, err := PrepareRetainedCapture("gallery-dl", "erome", secondRaw)
+	require.NoError(t, err)
+	require.Equal(t, first.Shared, second.Shared)
+	require.NotEqual(t, first.Patch, second.Patch)
+	restored, err := RestoreCapture(second)
+	require.NoError(t, err)
+	require.JSONEq(t, string(secondRaw), string(restored))
+}

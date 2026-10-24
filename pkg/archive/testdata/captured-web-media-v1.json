@@ -574,6 +574,334 @@
         "id_string": "124"
       },
       "error": true
+    },
+    {
+      "name": "erome-mixed-album",
+      "source": {
+        "category": "erome",
+        "subcategory": "album",
+        "album_id": "Example1",
+        "title": "Example album",
+        "user": "example",
+        "num": 3,
+        "filename": "last",
+        "date": "2026-10-01T00:00:00Z",
+        "web_media_url": "https://cdn.example/erome/last.jpeg",
+        "web_media_id": "ee3f31296be1a9caed568b1d70a2fe6eed49a55b46bd9318efcadf902fa9db59",
+        "web_media": {
+          "version": 1,
+          "post_id": "Example1",
+          "complete": false,
+          "album": true,
+          "items": [
+            {
+              "url": "https://cdn.example/erome/photo.jpeg",
+              "kind": "image"
+            },
+            {
+              "url": "https://cdn.example/erome/movie.mp4",
+              "kind": "video"
+            },
+            {
+              "url": "https://cdn.example/erome/last.jpeg",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "error": false,
+      "post": {
+        "namespace": "native:erome",
+        "value": "Example1"
+      },
+      "items": [
+        {
+          "namespace": "native:erome",
+          "value": "url:57edcb6171276fabf40de54ec1cf4b73fb3952bb0e7193091f2ee088bac21f53"
+        },
+        {
+          "namespace": "native:erome",
+          "value": "url:9967c3d4f4ca89387e6f3751a4fb4e2c849c66a255ce6c3575f9700f67b6314a"
+        },
+        {
+          "namespace": "native:erome",
+          "value": "url:ee3f31296be1a9caed568b1d70a2fe6eed49a55b46bd9318efcadf902fa9db59"
+        }
+      ],
+      "complete": false,
+      "album": true
+    },
+    {
+      "name": "erome-single-file",
+      "source": {
+        "category": "erome",
+        "subcategory": "album",
+        "album_id": "Example1",
+        "title": "Example album",
+        "user": "example",
+        "num": 3,
+        "filename": "last",
+        "date": "2026-10-01T00:00:00Z",
+        "web_media_url": "https://cdn.example/erome/last.jpeg",
+        "web_media_id": "ee3f31296be1a9caed568b1d70a2fe6eed49a55b46bd9318efcadf902fa9db59",
+        "web_media": {
+          "version": 1,
+          "post_id": "Example1",
+          "complete": false,
+          "album": false,
+          "items": [
+            {
+              "url": "https://cdn.example/erome/last.jpeg",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "error": false,
+      "post": {
+        "namespace": "native:erome",
+        "value": "Example1"
+      },
+      "items": [
+        {
+          "namespace": "native:erome",
+          "value": "url:ee3f31296be1a9caed568b1d70a2fe6eed49a55b46bd9318efcadf902fa9db59"
+        }
+      ],
+      "complete": false,
+      "album": false
+    },
+    {
+      "name": "erome-identity-independent-of-filename-position-and-publisher",
+      "source": {
+        "category": "erome",
+        "subcategory": "album",
+        "album_id": "Example1",
+        "title": "Example album",
+        "user": "changed-label",
+        "num": 999,
+        "filename": "changed-local-name",
+        "date": "2026-10-01T00:00:00Z",
+        "web_media_url": "https://cdn.example/erome/last.jpeg",
+        "web_media_id": "ee3f31296be1a9caed568b1d70a2fe6eed49a55b46bd9318efcadf902fa9db59",
+        "web_media": {
+          "version": 1,
+          "post_id": "Example1",
+          "complete": false,
+          "album": true,
+          "items": [
+            {
+              "url": "https://cdn.example/erome/photo.jpeg",
+              "kind": "image"
+            },
+            {
+              "url": "https://cdn.example/erome/movie.mp4",
+              "kind": "video"
+            },
+            {
+              "url": "https://cdn.example/erome/last.jpeg",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "error": false,
+      "post": {
+        "namespace": "native:erome",
+        "value": "Example1"
+      },
+      "items": [
+        {
+          "namespace": "native:erome",
+          "value": "url:57edcb6171276fabf40de54ec1cf4b73fb3952bb0e7193091f2ee088bac21f53"
+        },
+        {
+          "namespace": "native:erome",
+          "value": "url:9967c3d4f4ca89387e6f3751a4fb4e2c849c66a255ce6c3575f9700f67b6314a"
+        },
+        {
+          "namespace": "native:erome",
+          "value": "url:ee3f31296be1a9caed568b1d70a2fe6eed49a55b46bd9318efcadf902fa9db59"
+        }
+      ],
+      "complete": false,
+      "album": true
+    },
+    {
+      "name": "erome-not-complete",
+      "source": {
+        "category": "erome",
+        "subcategory": "album",
+        "album_id": "Example1",
+        "title": "Example album",
+        "user": "example",
+        "num": 3,
+        "filename": "last",
+        "date": "2026-10-01T00:00:00Z",
+        "web_media_url": "https://cdn.example/erome/last.jpeg",
+        "web_media_id": "ee3f31296be1a9caed568b1d70a2fe6eed49a55b46bd9318efcadf902fa9db59",
+        "web_media": {
+          "version": 1,
+          "post_id": "Example1",
+          "complete": true,
+          "album": true,
+          "items": [
+            {
+              "url": "https://cdn.example/erome/photo.jpeg",
+              "kind": "image"
+            },
+            {
+              "url": "https://cdn.example/erome/movie.mp4",
+              "kind": "video"
+            },
+            {
+              "url": "https://cdn.example/erome/last.jpeg",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "error": true
+    },
+    {
+      "name": "erome-wrong-album",
+      "source": {
+        "category": "erome",
+        "subcategory": "album",
+        "album_id": "Example1",
+        "title": "Example album",
+        "user": "example",
+        "num": 3,
+        "filename": "last",
+        "date": "2026-10-01T00:00:00Z",
+        "web_media_url": "https://cdn.example/erome/last.jpeg",
+        "web_media_id": "ee3f31296be1a9caed568b1d70a2fe6eed49a55b46bd9318efcadf902fa9db59",
+        "web_media": {
+          "version": 1,
+          "post_id": "Elsewhere",
+          "complete": false,
+          "album": true,
+          "items": [
+            {
+              "url": "https://cdn.example/erome/photo.jpeg",
+              "kind": "image"
+            },
+            {
+              "url": "https://cdn.example/erome/movie.mp4",
+              "kind": "video"
+            },
+            {
+              "url": "https://cdn.example/erome/last.jpeg",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "error": true
+    },
+    {
+      "name": "erome-duplicate-media",
+      "source": {
+        "category": "erome",
+        "subcategory": "album",
+        "album_id": "Example1",
+        "title": "Example album",
+        "user": "example",
+        "num": 3,
+        "filename": "last",
+        "date": "2026-10-01T00:00:00Z",
+        "web_media_url": "https://cdn.example/erome/last.jpeg",
+        "web_media_id": "ee3f31296be1a9caed568b1d70a2fe6eed49a55b46bd9318efcadf902fa9db59",
+        "web_media": {
+          "version": 1,
+          "post_id": "Example1",
+          "complete": false,
+          "album": true,
+          "items": [
+            {
+              "url": "https://cdn.example/erome/photo.jpeg",
+              "kind": "image"
+            },
+            {
+              "url": "https://cdn.example/erome/photo.jpeg",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "error": true
+    },
+    {
+      "name": "erome-invalid-album-id",
+      "source": {
+        "category": "erome",
+        "subcategory": "album",
+        "album_id": "../elsewhere",
+        "title": "Example album",
+        "user": "example",
+        "num": 3,
+        "filename": "last",
+        "date": "2026-10-01T00:00:00Z",
+        "web_media_url": "https://cdn.example/erome/last.jpeg",
+        "web_media_id": "ee3f31296be1a9caed568b1d70a2fe6eed49a55b46bd9318efcadf902fa9db59",
+        "web_media": {
+          "version": 1,
+          "post_id": "Example1",
+          "complete": false,
+          "album": true,
+          "items": [
+            {
+              "url": "https://cdn.example/erome/photo.jpeg",
+              "kind": "image"
+            },
+            {
+              "url": "https://cdn.example/erome/movie.mp4",
+              "kind": "video"
+            },
+            {
+              "url": "https://cdn.example/erome/last.jpeg",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "error": true
+    },
+    {
+      "name": "erome-no-filename-identity-fallback",
+      "source": {
+        "category": "erome",
+        "subcategory": "album",
+        "title": "Example album",
+        "user": "example",
+        "num": 3,
+        "filename": "last",
+        "date": "2026-10-01T00:00:00Z",
+        "web_media_url": "https://cdn.example/erome/last.jpeg",
+        "web_media_id": "ee3f31296be1a9caed568b1d70a2fe6eed49a55b46bd9318efcadf902fa9db59",
+        "web_media": {
+          "version": 1,
+          "post_id": "Example1",
+          "complete": false,
+          "album": true,
+          "items": [
+            {
+              "url": "https://cdn.example/erome/photo.jpeg",
+              "kind": "image"
+            },
+            {
+              "url": "https://cdn.example/erome/movie.mp4",
+              "kind": "video"
+            },
+            {
+              "url": "https://cdn.example/erome/last.jpeg",
+              "kind": "image"
+            }
+          ]
+        },
+        "id": "Example1"
+      },
+      "error": true
     }
   ]
 }

@@ -27,6 +27,8 @@ func ExtractCapturedPostURL(raw []byte) (*CapturedPostURL, error) {
 		return nil, err
 	}
 	switch post.Namespace {
+	case "native:erome":
+		return &CapturedPostURL{Post: *post, URL: "https://www.erome.com/a/" + post.Value}, nil
 	case "native:reddit":
 		if !redditPostID.MatchString(post.Value) {
 			return nil, nil

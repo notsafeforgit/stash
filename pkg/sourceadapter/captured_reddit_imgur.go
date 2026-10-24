@@ -53,7 +53,7 @@ func capturedRedditImgur(result *CapturedAlbum, post, source sourceObject) (bool
 	if raw == nil {
 		return false, nil
 	}
-	invalid := errors.New("Imgur album membership does not match the linked Reddit album")
+	invalid := errors.New("captured Imgur album membership does not match the linked Reddit album")
 	var identity string
 	for _, key := range []string{"url", "url_overridden_by_dest"} {
 		if id := redditImgurAlbumID(post[key]); id != "" {

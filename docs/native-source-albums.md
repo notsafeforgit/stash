@@ -351,7 +351,10 @@ treated as a publication date. An uploader name does not assign a performer.
 
 Use a traversal profile with `stash-gallery download <album-url>`. Native Erome
 archive keys include the source URL identity, so reordered positions cannot skip
-different files. Older position-based gallery-dl entries remain intact and are
+different files. Native filenames also contain that identity, preventing an
+existing file at an old position from being linked to a different attachment.
+Custom filename and archive formats must retain `{web_media_id}`.
+Older position-based gallery-dl entries remain intact and are
 not accepted as proof that a native attachment completed. Interrupted downloads
 use the existing durable requests, outbox, completion receipts and archive retry
 path; this support requires no database migration.

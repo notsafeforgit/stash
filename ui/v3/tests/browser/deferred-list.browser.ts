@@ -52,7 +52,8 @@ for (const width of [430, 1280]) {
       .click();
     await expect(page.locator('article[data-id="41"]')).toBeVisible();
     await expect(page).toHaveURL(/[?&]p=2/);
-    // A pending total must not clamp page 2 back to page 1 or trigger refills.
+    // Paging reuses the resolved total without another count query, clamping
+    // the page back to 1, or refilling the cards.
     await page.waitForTimeout(300);
     await expect(page.locator('article[data-id="41"]')).toBeVisible();
     expect(
@@ -61,9 +62,9 @@ for (const width of [430, 1280]) {
       { operation: "FindSceneList", page: 1 },
       { operation: "FindSceneListCount", page: 1 },
       { operation: "FindSceneList", page: 2 },
-      { operation: "FindSceneListCount", page: 2 },
     ]);
-    await page.evaluate(() => window.deferredListFixture.releaseCounts());
-    await expect(page.locator('article[data-id="41"]')).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Next", exact: true }).last(),
+    ).toBeDisabled();
   });
 }

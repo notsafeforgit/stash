@@ -73,10 +73,11 @@ for (const failure of [false, true]) {
       expect(
         await page.evaluate(() =>
           window.performerListRequests.filter(
-            (name) => name === "FindPerformers",
+            (name) =>
+              name === "FindPerformerList" || name === "FindPerformerListCount",
           ),
         ),
-      ).toHaveLength(1);
+      ).toEqual(["FindPerformerList", "FindPerformerListCount"]);
     } finally {
       release();
     }

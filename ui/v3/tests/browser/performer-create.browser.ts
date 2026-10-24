@@ -19,7 +19,10 @@ for (const width of [320, 1280]) {
       if (width === 320) {
         const toolbar = page.locator("[data-mobile-toolbar-row]");
         await expectTouchTargets(toolbar);
-        await expect(toolbar.getByRole("button")).toHaveCount(4);
+        await expect(toolbar.getByRole("button")).toHaveCount(5);
+        await expect(toolbar.getByRole("button").first()).toHaveAccessibleName(
+          "Open navigation menu",
+        );
         expect(
           await toolbar.evaluate(
             (element) => element.scrollWidth <= element.clientWidth,

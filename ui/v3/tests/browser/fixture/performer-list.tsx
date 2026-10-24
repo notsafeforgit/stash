@@ -40,6 +40,22 @@ export function PerformerListFixture() {
             window.performerListRequests.push(name ?? "");
             let data: object;
             switch (name) {
+              case "FindPerformerList":
+                data = {
+                  findPerformers: {
+                    __typename: "FindPerformersResultType",
+                    performers: listItems,
+                  },
+                };
+                break;
+              case "FindPerformerListCount":
+                data = {
+                  result: {
+                    __typename: "FindPerformersResultType",
+                    count: listItems.length,
+                  },
+                };
+                break;
               case "FindPerformers":
                 data = {
                   findPerformers: {

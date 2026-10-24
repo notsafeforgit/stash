@@ -106,6 +106,47 @@ func TestShareCapabilitiesAndRevocation(t *testing.T) {
 	require.NotZero(t, saved.LastAccessedAt)
 }
 
+func TestShareSecretLookupPreservesIdentityAndLifecycle(t *testing.T) {
+	s, mocks, _, _ := testService(t)
+	defer mocks.AssertExpectations(t)
+	row, secret := createTestShare(t, s)
+	other, otherSecret := createTestShare(t, s)
+	session, _, err := s.Exchange(t.Context(), row.ID, secret)
+	require.NoError(t, err)
+	for _, invalid := range []string{"", row.ID, secret + "=", secret + "\n", session} {
+		_, err := s.ResolveLink(t.Context(), invalid)
+		require.ErrorIs(t, err, ErrUnavailable)
+	}
+	resolved, err := s.ResolveLink(t.Context(), secret)
+	require.NoError(t, err)
+	require.Equal(t, row.ID, resolved.ID)
+	require.Equal(t, 1, resolved.AccessCount, "lookup must not count a visit or issue a session")
+	resolved.Token = ""
+	require.NoError(t, s.Repo.WithTxn(t.Context(), func(ctx context.Context) error { return s.Repo.Share.Update(ctx, resolved) }))
+	resolved, err = s.ResolveLink(t.Context(), secret)
+	require.NoError(t, err, "historical hash-only links remain usable")
+	require.Empty(t, resolved.Token)
+	rotated, err := s.Rotate(t.Context(), row.ID)
+	require.NoError(t, err)
+	_, err = s.ResolveLink(t.Context(), secret)
+	require.ErrorIs(t, err, ErrUnavailable)
+	_, err = s.Authenticate(t.Context(), row.ID, session)
+	require.ErrorIs(t, err, ErrUnavailable)
+	resolved, err = s.ResolveLink(t.Context(), rotated)
+	require.NoError(t, err)
+	require.Equal(t, row.ID, resolved.ID)
+	resolvedOther, err := s.ResolveLink(t.Context(), otherSecret)
+	require.NoError(t, err)
+	require.Equal(t, other.ID, resolvedOther.ID)
+	resolved.ExpiresAt = time.Now().Unix() - 1
+	require.NoError(t, s.Repo.WithTxn(t.Context(), func(ctx context.Context) error { return s.Repo.Share.Update(ctx, resolved) }))
+	_, err = s.ResolveLink(t.Context(), rotated)
+	require.ErrorIs(t, err, ErrUnavailable)
+	require.NoError(t, s.Revoke(t.Context(), other.ID))
+	_, err = s.ResolveLink(t.Context(), otherSecret)
+	require.ErrorIs(t, err, ErrUnavailable)
+}
+
 func TestShareRotationPreviewAndExpiry(t *testing.T) {
 	s, m, _, _ := testService(t)
 	defer m.AssertExpectations(t)

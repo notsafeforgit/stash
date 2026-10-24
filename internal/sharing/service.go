@@ -51,6 +51,9 @@ func token(size int) (string, error) {
 func Hash(secret string) []byte { h := sha256.Sum256([]byte(secret)); return h[:] }
 
 func validSecret(secret string) bool {
+	if len(secret) != 43 {
+		return false
+	}
 	b, err := base64.RawURLEncoding.Strict().DecodeString(secret)
 	return err == nil && len(b) == 32
 }
@@ -340,6 +343,28 @@ func (s *Service) AuthenticateLink(ctx context.Context, id, secret string) (*mod
 		return nil, err
 	}
 	if !Ready(row, time.Now()) || subtle.ConstantTimeCompare(row.TokenHash, Hash(secret)) != 1 {
+		return nil, ErrUnavailable
+	}
+	return row, nil
+}
+
+// ResolveLink authenticates a recipient URL by its secret alone. Internal IDs
+// remain stable across rotation and still scope browser sessions and delivery.
+// Hash-only historical links work without restoring or replacing their secret.
+func (s *Service) ResolveLink(ctx context.Context, secret string) (*models.ShareRecord, error) {
+	if !validSecret(secret) {
+		return nil, ErrUnavailable
+	}
+	var row *models.ShareRecord
+	err := s.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
+		var err error
+		row, err = s.Repo.Share.FindByTokenHash(ctx, Hash(secret))
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !Ready(row, time.Now()) {
 		return nil, ErrUnavailable
 	}
 	return row, nil

@@ -64,6 +64,15 @@ func (*ShareStore) Find(ctx context.Context, id string) (*models.ShareRecord, er
 	return &row, err
 }
 
+func (*ShareStore) FindByTokenHash(ctx context.Context, hash []byte) (*models.ShareRecord, error) {
+	var row models.ShareRecord
+	err := dbWrapper.Get(ctx, &row, `SELECT * FROM shares WHERE token_hash = ?`, hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return &row, err
+}
+
 func (*ShareStore) List(ctx context.Context, options models.ShareListOptions) ([]*models.ShareRecord, error) {
 	ret := []*models.ShareRecord{}
 	query, args := shareListPredicate(options)

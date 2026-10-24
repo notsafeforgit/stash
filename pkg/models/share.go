@@ -130,6 +130,7 @@ type ShareReaderWriter interface {
 	// optional exact membership check. IDs remain repository-local.
 	QueryTargets(context.Context, ShareFilter, int, int, *int) ([]int, error)
 	Find(context.Context, string) (*ShareRecord, error)
+	FindByTokenHash(context.Context, []byte) (*ShareRecord, error)
 	List(context.Context, ShareListOptions) ([]*ShareRecord, error)
 	Create(context.Context, *ShareRecord) error
 	Update(context.Context, *ShareRecord) error

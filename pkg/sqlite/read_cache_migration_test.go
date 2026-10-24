@@ -11,6 +11,7 @@ import (
 // its dependencies. Never make production migrations tolerate object collisions.
 func removeReadCacheAndPayloadRetentionSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeShareTokenLookupSchema(t, raw)
 	if queryUint(t, raw, "SELECT count(*) FROM sqlite_schema WHERE name='catalog_payload_retirements'") > 0 {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM catalog_payload_retirements"), "historical fixture construction requires unretired inputs")
 		_, err := raw.Exec(`DROP TRIGGER catalog_payload_retirement_count;

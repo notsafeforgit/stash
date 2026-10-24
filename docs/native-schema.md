@@ -3086,6 +3086,14 @@ Recipient previews use the ordinary link. The migration removes unused
 Revocation removes the stored key and all guest sessions. Backups retain active
 link secrets as well as their protected media/library data.
 
+## Recipient share lookup (1000133)
+
+`shares_token_hash` uniquely indexes the existing `shares.token_hash` column so
+recipient URLs can identify a grant by its secret alone. The migration changes
+no keys, internal IDs, membership, versions, visit history or guest sessions.
+Old query/fragment links and hash-only grants remain valid; new management links
+use `/share/<secret>/`. Browser media delivery retains ID-scoped guest cookies.
+
 ## Search and count read caches
 
 Schema 1000131 adds a single transactional `library_search_state` token and

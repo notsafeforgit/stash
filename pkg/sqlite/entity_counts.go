@@ -57,17 +57,17 @@ hierarchy(root, id, depth, path) AS (
 		if err != nil {
 			return nil, err
 		}
-		for rows.Next() {
-			var id, count int
-			if err = rows.Scan(&id, &count); err != nil {
-				break
+		err = func() error {
+			defer rows.Close()
+			for rows.Next() {
+				var id, count int
+				if err := rows.Scan(&id, &count); err != nil {
+					return err
+				}
+				values[models.EntityCountKey{ID: id, Depth: s.depth, Field: s.field}] = count
 			}
-			values[models.EntityCountKey{ID: id, Depth: s.depth, Field: s.field}] = count
-		}
-		if err == nil {
-			err = rows.Err()
-		}
-		rows.Close()
+			return rows.Err()
+		}()
 		if err != nil {
 			return nil, err
 		}

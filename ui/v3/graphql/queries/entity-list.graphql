@@ -11,7 +11,10 @@ fragment PerformerListData on Performer {
   favorite
   scene_count
   o_counter
-  tags { id name }
+  tags {
+    id
+    name
+  }
 }
 
 fragment StudioListData on Studio {
@@ -27,26 +30,54 @@ fragment StudioListData on Studio {
   scene_marker_count
   o_counter
   o_counter_all: o_counter(depth: -1)
-  child_studios { id }
-  tags { id name }
+  child_studios {
+    id
+  }
+  tags {
+    id
+    name
+  }
 }
 
-query FindPerformerList($filter: FindFilterType, $performer_filter_ast: FilterASTInput) {
+query FindPerformerList(
+  $filter: FindFilterType
+  $performer_filter_ast: FilterASTInput
+) {
   findPerformers(filter: $filter, performer_filter_ast: $performer_filter_ast) {
-    performers { ...PerformerListData }
+    performers {
+      ...PerformerListData
+    }
   }
 }
 
-query FindPerformerListCount($filter: FindFilterType, $performer_filter_ast: FilterASTInput) {
-  result: findPerformers(filter: $filter, performer_filter_ast: $performer_filter_ast) { count }
+query FindPerformerListCount(
+  $filter: FindFilterType
+  $performer_filter_ast: FilterASTInput
+) {
+  result: findPerformers(
+    filter: $filter
+    performer_filter_ast: $performer_filter_ast
+  ) {
+    count
+  }
 }
 
-query FindStudioList($filter: FindFilterType, $studio_filter_ast: FilterASTInput) {
+query FindStudioList(
+  $filter: FindFilterType
+  $studio_filter_ast: FilterASTInput
+) {
   findStudios(filter: $filter, studio_filter_ast: $studio_filter_ast) {
-    studios { ...StudioListData }
+    studios {
+      ...StudioListData
+    }
   }
 }
 
-query FindStudioListCount($filter: FindFilterType, $studio_filter_ast: FilterASTInput) {
-  result: findStudios(filter: $filter, studio_filter_ast: $studio_filter_ast) { count }
+query FindStudioListCount(
+  $filter: FindFilterType
+  $studio_filter_ast: FilterASTInput
+) {
+  result: findStudios(filter: $filter, studio_filter_ast: $studio_filter_ast) {
+    count
+  }
 }

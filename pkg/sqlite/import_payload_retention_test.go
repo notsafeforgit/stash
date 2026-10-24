@@ -121,6 +121,8 @@ func TestImportPayloadRetirementResumesPreservesReceiptsAndNativeData(t *testing
 	require.ErrorContains(t, err, "immutable")
 	_, err = raw.Exec("UPDATE catalog_snapshot_records SET data_sha256=printf('%064d',0) WHERE original_byte_count IS NOT NULL")
 	require.ErrorContains(t, err, "immutable")
+	_, err = raw.Exec("UPDATE catalog_snapshot_records SET retained_asset_id='different' WHERE original_byte_count IS NOT NULL")
+	require.ErrorContains(t, err, "immutable")
 	for i := range f.chunks {
 		require.Equal(t, "received", f.receive(t, i).State)
 	}

@@ -7,7 +7,7 @@ import (
 )
 
 func validateImportPayloadRetentionSchema(conn *sqlx.DB, auditData bool) error {
-	for _, name := range []string{"catalog_payload_retirements", "catalog_retirable_snapshots", "catalog_retirable_payloads", "catalog_payload_retirement_begin", "catalog_payload_retirement_progress", "catalog_payload_retirement_retained", "catalog_payload_retirement_count"} {
+	for _, name := range []string{"catalog_payload_retirements", "catalog_retired_payloads", "catalog_retirable_snapshots", "catalog_retirable_payloads", "catalog_payload_retirement_begin", "catalog_payload_retirement_progress", "catalog_payload_retirement_retained", "catalog_payload_retirement_count"} {
 		var found bool
 		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
 			return err

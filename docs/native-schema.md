@@ -3127,6 +3127,7 @@ retries still verify against their immutable receipt hashes.
 
 `catalog_payload_retirements` records the policy, manifest hash, ordinal checkpoint
 and released payload bytes. Database guards allow only the defined transition;
-native backup validation checks the resulting receipts. Released bytes describe
+native backup validation checks the resulting receipts. A partial index covers
+retired rows so validation need not scan all retained source JSON. Released bytes describe
 removed JSON, not a reduction in the SQLite file's length: freed space is reused
 by later writes. Maintenance does not run `VACUUM` or rebuild the library.

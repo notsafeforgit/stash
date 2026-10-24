@@ -5,6 +5,8 @@ ALTER TABLE catalog_snapshot_records ADD COLUMN original_byte_count INTEGER;
 -- Preserve the asset reference used by receipt validation after its surrounding
 -- source JSON is retired. This value is copied exactly during the transition.
 ALTER TABLE catalog_snapshot_records ADD COLUMN retained_asset_id TEXT;
+CREATE INDEX catalog_retired_payloads ON catalog_snapshot_records(snapshot_uuid,ordinal)
+ WHERE original_byte_count IS NOT NULL;
 CREATE VIEW catalog_retirable_snapshots AS
 SELECT s.uuid FROM catalog_snapshots s
 JOIN catalog_evidence_imports evidence ON evidence.snapshot_uuid=s.uuid

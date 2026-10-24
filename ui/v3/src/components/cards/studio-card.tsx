@@ -8,9 +8,9 @@ import { useCardAspect } from "src/components/list/card-aspect-context";
 import { useStudioContextMenu } from "./use-studio-context-menu";
 import { useConfigurationContextOptional } from "src/hooks/config";
 
-// StudioDataFragment has scene_count and child_studios; use that for list cards.
+// List cards only require the summary fields, including child identities.
 type StudioCardStudio = Pick<
-  GQL.StudioDataFragment,
+  GQL.StudioListDataFragment,
   | "id"
   | "name"
   | "image_path"

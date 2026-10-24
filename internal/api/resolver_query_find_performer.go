@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"github.com/99designs/gqlgen/graphql"
+	"slices"
 	"strconv"
 
 	"github.com/stashapp/stash/pkg/models"
@@ -39,7 +41,7 @@ func (r *queryResolver) FindPerformers(ctx context.Context, performerFilterAST *
 			performers, err = r.repository.Performer.FindMany(ctx, availableLibraryKeys(performerIDs))
 			total = len(performers)
 		default:
-			performers, total, err = r.repository.Performer.QueryAST(ctx, performerFilterAST, filter)
+			performers, total, err = r.repository.Performer.QueryList(ctx, performerFilterAST, models.ListQueryOptions{QueryOptions: models.QueryOptions{FindFilter: filter, Count: slices.Contains(graphql.CollectAllFields(ctx), "count")}, SkipItems: !slices.Contains(graphql.CollectAllFields(ctx), "performers")})
 		}
 
 		if err != nil {

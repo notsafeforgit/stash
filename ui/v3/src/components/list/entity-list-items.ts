@@ -11,13 +11,13 @@ export const GalleryListItems =
   >();
 export const PerformerListItems =
   createListItemsContext<
-    GQL.FindPerformersQuery["findPerformers"]["performers"][number]
+    GQL.FindPerformerListQuery["findPerformers"]["performers"][number]
   >();
 export const GroupListItems =
   createListItemsContext<GQL.FindGroupsQuery["findGroups"]["groups"][number]>();
 export const StudioListItems =
   createListItemsContext<
-    GQL.FindStudiosQuery["findStudios"]["studios"][number]
+    GQL.FindStudioListQuery["findStudios"]["studios"][number]
   >();
 export const TagListItems =
   createListItemsContext<GQL.FindTagsQuery["findTags"]["tags"][number]>();

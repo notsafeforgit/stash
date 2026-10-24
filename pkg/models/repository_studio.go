@@ -21,6 +21,7 @@ type StudioFinder interface {
 
 // StudioQueryer provides methods to query studios.
 type StudioQueryer interface {
+	QueryList(ctx context.Context, filterAST *FilterAST, opts ListQueryOptions) ([]*Studio, int, error)
 	Query(ctx context.Context, studioFilter *StudioFilterType, findFilter *FindFilterType) ([]*Studio, int, error)
 	QueryAST(ctx context.Context, filterAST *FilterAST, findFilter *FindFilterType) ([]*Studio, int, error)
 	QueryCount(ctx context.Context, studioFilter *StudioFilterType, findFilter *FindFilterType) (int, error)
@@ -37,6 +38,8 @@ type StudioAutoTagQueryer interface {
 
 // StudioCounter provides methods to count studios.
 type StudioCounter interface {
+	// CountMany returns aggregates in key order, including zero for empty entities.
+	CountMany(ctx context.Context, keys []EntityCountKey) ([]int, error)
 	Count(ctx context.Context) (int, error)
 	CountByTagID(ctx context.Context, tagID int) (int, error)
 }

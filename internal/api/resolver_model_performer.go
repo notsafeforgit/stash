@@ -6,8 +6,6 @@ import (
 
 	"github.com/stashapp/stash/internal/api/loaders"
 	"github.com/stashapp/stash/internal/api/urlbuilders"
-	"github.com/stashapp/stash/pkg/gallery"
-	"github.com/stashapp/stash/pkg/image"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/performer"
 )
@@ -143,12 +141,8 @@ func (r *performerResolver) Birthdate(ctx context.Context, obj *models.Performer
 }
 
 func (r *performerResolver) ImagePath(ctx context.Context, obj *models.Performer) (*string, error) {
-	var hasImage bool
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		var err error
-		hasImage, err = r.repository.Performer.HasImage(ctx, obj.ID)
-		return err
-	}); err != nil {
+	hasImage, err := loaders.From(ctx).PerformerCounts.Load(models.EntityCountKey{ID: obj.ID, Field: models.EntityHasImage})
+	if err != nil {
 		return nil, err
 	}
 
@@ -157,7 +151,7 @@ func (r *performerResolver) ImagePath(ctx context.Context, obj *models.Performer
 	if identityErr != nil {
 		return nil, identityErr
 	}
-	imagePath := urlbuilders.NewPerformerURLBuilder(baseURL, obj, publicID).GetPerformerImageURL(hasImage)
+	imagePath := urlbuilders.NewPerformerURLBuilder(baseURL, obj, publicID).GetPerformerImageURL(hasImage != 0)
 	return &imagePath, nil
 }
 
@@ -175,77 +169,29 @@ func (r *performerResolver) Tags(ctx context.Context, obj *models.Performer) (re
 	return ret, firstError(errs)
 }
 
-func (r *performerResolver) SceneCount(ctx context.Context, obj *models.Performer) (ret int, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = r.repository.Scene.CountByPerformerID(ctx, obj.ID)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	return ret, nil
+func (r *performerResolver) SceneCount(ctx context.Context, obj *models.Performer) (int, error) {
+	return loaders.From(ctx).PerformerCounts.Load(models.EntityCountKey{ID: obj.ID, Field: models.EntityCountScenes})
 }
 
-func (r *performerResolver) ImageCount(ctx context.Context, obj *models.Performer) (ret int, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = image.CountByPerformerID(ctx, r.repository.Image, obj.ID)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	return ret, nil
+func (r *performerResolver) ImageCount(ctx context.Context, obj *models.Performer) (int, error) {
+	return loaders.From(ctx).PerformerCounts.Load(models.EntityCountKey{ID: obj.ID, Field: models.EntityCountImages})
 }
 
-func (r *performerResolver) GalleryCount(ctx context.Context, obj *models.Performer) (ret int, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = gallery.CountByPerformerID(ctx, r.repository.Gallery, obj.ID)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	return ret, nil
+func (r *performerResolver) GalleryCount(ctx context.Context, obj *models.Performer) (int, error) {
+	return loaders.From(ctx).PerformerCounts.Load(models.EntityCountKey{ID: obj.ID, Field: models.EntityCountGalleries})
 }
 
-func (r *performerResolver) GroupCount(ctx context.Context, obj *models.Performer) (ret int, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = r.repository.Group.CountByPerformerID(ctx, obj.ID)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	return ret, nil
+func (r *performerResolver) GroupCount(ctx context.Context, obj *models.Performer) (int, error) {
+	return loaders.From(ctx).PerformerCounts.Load(models.EntityCountKey{ID: obj.ID, Field: models.EntityCountGroups})
 }
 
-func (r *performerResolver) PerformerCount(ctx context.Context, obj *models.Performer) (ret int, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = performer.CountByAppearsWith(ctx, r.repository.Performer, obj.ID)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	return ret, nil
+func (r *performerResolver) PerformerCount(ctx context.Context, obj *models.Performer) (int, error) {
+	return loaders.From(ctx).PerformerCounts.Load(models.EntityCountKey{ID: obj.ID, Field: models.EntityCountPerformers})
 }
 
-func (r *performerResolver) OCounter(ctx context.Context, obj *models.Performer) (ret *int, err error) {
-	var res_scene int
-	var res_image int
-	var res int
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		res_scene, err = r.repository.Scene.OCountByPerformerID(ctx, obj.ID)
-		if err != nil {
-			return err
-		}
-		res_image, err = r.repository.Image.OCountByPerformerID(ctx, obj.ID)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-	res = res_scene + res_image
-	return &res, nil
+func (r *performerResolver) OCounter(ctx context.Context, obj *models.Performer) (*int, error) {
+	value, err := loaders.From(ctx).PerformerCounts.Load(models.EntityCountKey{ID: obj.ID, Field: models.EntityCountO})
+	return &value, err
 }
 
 func (r *performerResolver) Scenes(ctx context.Context, obj *models.Performer) (ret []*models.Scene, err error) {

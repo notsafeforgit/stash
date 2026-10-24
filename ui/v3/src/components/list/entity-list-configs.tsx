@@ -70,7 +70,7 @@ type SceneItem = GQL.SlimSceneDataFragment;
 type ImageItem = GQL.FindImageListQuery["findImages"]["images"][number];
 type GalleryItem = GQL.FindGalleriesQuery["findGalleries"]["galleries"][number];
 type PerformerItem =
-  GQL.FindPerformersQuery["findPerformers"]["performers"][number];
+  GQL.FindPerformerListQuery["findPerformers"]["performers"][number];
 type GroupItem = GQL.FindGroupsQuery["findGroups"]["groups"][number];
 type TagItem = GQL.FindTagsQuery["findTags"]["tags"][number];
 
@@ -935,9 +935,9 @@ export function useGalleryListConfig(onEdit: (id: string) => void): {
 export function usePerformerListConfig(
   onEdit: (id: string) => void,
 ): EntityListPageConfig<
-  GQL.FindPerformersQuery,
+  GQL.FindPerformerListQuery,
   PerformerItem,
-  GQL.FindPerformersQueryVariables
+  GQL.FindPerformerListQueryVariables
 > {
   const renderCard = useCallback(
     (
@@ -981,13 +981,13 @@ export function usePerformerListConfig(
       ItemsProvider: PerformerListItems.Provider,
       source: {
         kind: "graphql",
-        query: GQL.FindPerformersDocument,
+        query: GQL.FindPerformerListDocument,
+        countQuery: GQL.FindPerformerListCountDocument,
         makeVariables: (filter) => ({
           filter: filter.makeFindFilter(),
           performer_filter_ast: filter.makeFilterAST(),
         }),
         extractResult: (data) => ({
-          count: data?.findPerformers.count ?? 0,
           items: data?.findPerformers.performers ?? [],
         }),
       },

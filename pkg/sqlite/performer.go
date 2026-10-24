@@ -720,22 +720,30 @@ func (qb *PerformerStore) makeASTQuery(ctx context.Context, filterAST *models.Fi
 }
 
 func (qb *PerformerStore) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.Performer, int, error) {
-	query, err := qb.makeASTQuery(ctx, filterAST, findFilter)
+	return qb.QueryList(ctx, filterAST, models.ListQueryOptions{QueryOptions: models.QueryOptions{FindFilter: findFilter, Count: true}})
+}
+
+func (qb *PerformerStore) QueryList(ctx context.Context, filterAST *models.FilterAST, opts models.ListQueryOptions) ([]*models.Performer, int, error) {
+	query, err := qb.makeASTQuery(ctx, filterAST, opts.FindFilter)
 	if err != nil {
 		return nil, 0, err
 	}
-
-	ids, total, err := query.executeFind(ctx)
+	var total int
+	if opts.Count {
+		total, err = query.executeCount(ctx)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+	if opts.SkipItems {
+		return nil, total, nil
+	}
+	ids, err := query.findIDs(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
-
-	performers, err := qb.FindMany(ctx, ids)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return performers, total, nil
+	items, err := qb.FindMany(ctx, ids)
+	return items, total, err
 }
 
 func (qb *PerformerStore) sortByOCounter(direction string) string {

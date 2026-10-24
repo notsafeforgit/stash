@@ -13,7 +13,7 @@ import {
 } from "src/components/list/table-columns";
 import { useConfigurationContextOptional } from "src/hooks/config";
 
-type StudioItem = GQL.FindStudiosQuery["findStudios"]["studios"][number];
+type StudioItem = GQL.FindStudioListQuery["findStudios"]["studios"][number];
 
 export function useStudioTableColumns(): ColumnDef<StudioItem>[] {
   const intl = useIntl();

@@ -47,7 +47,7 @@ import { StudioEditSheet } from "./studio-edit-sheet";
 
 type TagData = NonNullable<GQL.FindTagQuery["findTag"]>;
 type ImageItem = GQL.FindImagesQuery["findImages"]["images"][number];
-type StudioItem = GQL.FindStudiosQuery["findStudios"]["studios"][number];
+type StudioItem = GQL.FindStudioListQuery["findStudios"]["studios"][number];
 type MarkerItem =
   GQL.FindSceneMarkersQuery["findSceneMarkers"]["scene_markers"][number];
 
@@ -258,22 +258,22 @@ export function TagStudiosTab({ tag }: { tag: TagData }) {
 
   const config = useMemo<
     EntityListPageConfig<
-      GQL.FindStudiosQuery,
+      GQL.FindStudioListQuery,
       StudioItem,
-      GQL.FindStudiosQueryVariables
+      GQL.FindStudioListQueryVariables
     >
   >(
     () => ({
       filterMode: GQL.FilterMode.Studios,
       source: {
         kind: "graphql",
-        query: GQL.FindStudiosDocument,
+        query: GQL.FindStudioListDocument,
+        countQuery: GQL.FindStudioListCountDocument,
         makeVariables: (filter) => ({
           filter: filter.makeFindFilter(),
           studio_filter_ast: filter.makeFilterAST(),
         }),
         extractResult: (data) => ({
-          count: data?.findStudios.count ?? 0,
           items: data?.findStudios.studios ?? [],
         }),
       },

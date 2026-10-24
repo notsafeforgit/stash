@@ -100,6 +100,36 @@ func (_m *PerformerReaderWriter) CountByTagID(ctx context.Context, tagID int) (i
 	return r0, r1
 }
 
+// CountMany provides a mock function with given fields: ctx, keys
+func (_m *PerformerReaderWriter) CountMany(ctx context.Context, keys []models.EntityCountKey) ([]int, error) {
+	ret := _m.Called(ctx, keys)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountMany")
+	}
+
+	var r0 []int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []models.EntityCountKey) ([]int, error)); ok {
+		return rf(ctx, keys)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []models.EntityCountKey) []int); ok {
+		r0 = rf(ctx, keys)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]int)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []models.EntityCountKey) error); ok {
+		r1 = rf(ctx, keys)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Create provides a mock function with given fields: ctx, newPerformer
 func (_m *PerformerReaderWriter) Create(ctx context.Context, newPerformer *models.CreatePerformerInput) error {
 	ret := _m.Called(ctx, newPerformer)
@@ -822,6 +852,43 @@ func (_m *PerformerReaderWriter) QueryForAutoTag(ctx context.Context, words []st
 	}
 
 	return r0, r1
+}
+
+// QueryList provides a mock function with given fields: ctx, filterAST, opts
+func (_m *PerformerReaderWriter) QueryList(ctx context.Context, filterAST *models.FilterAST, opts models.ListQueryOptions) ([]*models.Performer, int, error) {
+	ret := _m.Called(ctx, filterAST, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryList")
+	}
+
+	var r0 []*models.Performer
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.FilterAST, models.ListQueryOptions) ([]*models.Performer, int, error)); ok {
+		return rf(ctx, filterAST, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *models.FilterAST, models.ListQueryOptions) []*models.Performer); ok {
+		r0 = rf(ctx, filterAST, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.Performer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *models.FilterAST, models.ListQueryOptions) int); ok {
+		r1 = rf(ctx, filterAST, opts)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *models.FilterAST, models.ListQueryOptions) error); ok {
+		r2 = rf(ctx, filterAST, opts)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // Update provides a mock function with given fields: ctx, updatedPerformer

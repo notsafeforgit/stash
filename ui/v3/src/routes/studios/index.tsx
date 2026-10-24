@@ -15,8 +15,8 @@ import {
   StudioCreateSheet,
 } from "@/components/detail/deferred-overlays";
 
-type StudiosQuery = GQL.FindStudiosQuery;
-type StudioItem = GQL.FindStudiosQuery["findStudios"]["studios"][number];
+type StudiosQuery = GQL.FindStudioListQuery;
+type StudioItem = GQL.FindStudioListQuery["findStudios"]["studios"][number];
 
 function StudiosPage() {
   const intl = useIntl();
@@ -32,7 +32,7 @@ function StudiosPage() {
     EntityListPageConfig<
       StudiosQuery,
       StudioItem,
-      GQL.FindStudiosQueryVariables
+      GQL.FindStudioListQueryVariables
     >
   >(
     () => ({
@@ -41,13 +41,13 @@ function StudiosPage() {
       view: View.Studios,
       source: {
         kind: "graphql",
-        query: GQL.FindStudiosDocument,
+        query: GQL.FindStudioListDocument,
+        countQuery: GQL.FindStudioListCountDocument,
         makeVariables: (filter) => ({
           filter: filter.makeFindFilter(),
           studio_filter_ast: filter.makeFilterAST(),
         }),
         extractResult: (data) => ({
-          count: data?.findStudios.count ?? 0,
           items: data?.findStudios.studios ?? [],
         }),
       },

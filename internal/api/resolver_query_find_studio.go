@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"github.com/99designs/gqlgen/graphql"
+	"slices"
 	"strconv"
 
 	"github.com/stashapp/stash/pkg/models"
@@ -40,7 +42,7 @@ func (r *queryResolver) FindStudios(ctx context.Context, studioFilterAST *models
 			studios, err = r.repository.Studio.FindMany(ctx, availableLibraryKeys(idInts))
 			total = len(studios)
 		default:
-			studios, total, err = r.repository.Studio.QueryAST(ctx, studioFilterAST, filter)
+			studios, total, err = r.repository.Studio.QueryList(ctx, studioFilterAST, models.ListQueryOptions{QueryOptions: models.QueryOptions{FindFilter: filter, Count: slices.Contains(graphql.CollectAllFields(ctx), "count")}, SkipItems: !slices.Contains(graphql.CollectAllFields(ctx), "studios")})
 		}
 		if err != nil {
 			return err

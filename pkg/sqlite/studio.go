@@ -653,22 +653,30 @@ func (qb *StudioStore) makeASTQuery(ctx context.Context, filterAST *models.Filte
 }
 
 func (qb *StudioStore) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.Studio, int, error) {
-	query, err := qb.makeASTQuery(ctx, filterAST, findFilter)
+	return qb.QueryList(ctx, filterAST, models.ListQueryOptions{QueryOptions: models.QueryOptions{FindFilter: findFilter, Count: true}})
+}
+
+func (qb *StudioStore) QueryList(ctx context.Context, filterAST *models.FilterAST, opts models.ListQueryOptions) ([]*models.Studio, int, error) {
+	query, err := qb.makeASTQuery(ctx, filterAST, opts.FindFilter)
 	if err != nil {
 		return nil, 0, err
 	}
-
-	ids, total, err := query.executeFind(ctx)
+	var total int
+	if opts.Count {
+		total, err = query.executeCount(ctx)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+	if opts.SkipItems {
+		return nil, total, nil
+	}
+	ids, err := query.findIDs(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
-
-	studios, err := qb.FindMany(ctx, ids)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return studios, total, nil
+	items, err := qb.FindMany(ctx, ids)
+	return items, total, err
 }
 
 func (qb *StudioStore) sortByScenesDuration(direction string) string {

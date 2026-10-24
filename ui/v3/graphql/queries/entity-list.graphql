@@ -1,0 +1,52 @@
+fragment PerformerListData on Performer {
+  id
+  name
+  disambiguation
+  gender
+  image_path
+  birthdate
+  death_date
+  country
+  rating100
+  favorite
+  scene_count
+  o_counter
+  tags { id name }
+}
+
+fragment StudioListData on Studio {
+  id
+  name
+  image_path
+  rating100
+  favorite
+  scene_count
+  scene_count_all: scene_count(depth: -1)
+  performer_count
+  performer_count_all: performer_count(depth: -1)
+  scene_marker_count
+  o_counter
+  o_counter_all: o_counter(depth: -1)
+  child_studios { id }
+  tags { id name }
+}
+
+query FindPerformerList($filter: FindFilterType, $performer_filter_ast: FilterASTInput) {
+  findPerformers(filter: $filter, performer_filter_ast: $performer_filter_ast) {
+    performers { ...PerformerListData }
+  }
+}
+
+query FindPerformerListCount($filter: FindFilterType, $performer_filter_ast: FilterASTInput) {
+  result: findPerformers(filter: $filter, performer_filter_ast: $performer_filter_ast) { count }
+}
+
+query FindStudioList($filter: FindFilterType, $studio_filter_ast: FilterASTInput) {
+  findStudios(filter: $filter, studio_filter_ast: $studio_filter_ast) {
+    studios { ...StudioListData }
+  }
+}
+
+query FindStudioListCount($filter: FindFilterType, $studio_filter_ast: FilterASTInput) {
+  result: findStudios(filter: $filter, studio_filter_ast: $studio_filter_ast) { count }
+}

@@ -21,6 +21,7 @@
 //go:generate go run github.com/vektah/dataloaden ScenePlayHistoryLoader int []time.Time
 //go:generate go run github.com/vektah/dataloaden SceneLastPlayedLoader int *time.Time
 //go:generate go run github.com/vektah/dataloaden SceneHasCoverLoader int bool
+//go:generate go run github.com/vektah/dataloaden EntityCountLoader github.com/stashapp/stash/pkg/models.EntityCountKey int
 package loaders
 
 import (
@@ -43,6 +44,8 @@ const (
 )
 
 type Loaders struct {
+	PerformerCounts   *EntityCountLoader
+	StudioCounts      *EntityCountLoader
 	SceneByID         *SceneLoader
 	SceneIDsByFileID  *FileIDsRelatedIDsLoader
 	SceneFiles        *RelatedFileIDsLoader
@@ -91,6 +94,8 @@ func (m Middleware) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		ldrs := Loaders{
+			PerformerCounts: &EntityCountLoader{wait: wait, maxBatch: 8 * maxBatch, fetch: m.fetchEntityCounts(ctx, m.Repository.Performer.CountMany)},
+			StudioCounts:    &EntityCountLoader{wait: wait, maxBatch: 8 * maxBatch, fetch: m.fetchEntityCounts(ctx, m.Repository.Studio.CountMany)},
 			SceneByID: &SceneLoader{
 				wait:     wait,
 				maxBatch: maxBatch,
@@ -594,6 +599,17 @@ func (m Middleware) fetchScenesHasCover(ctx context.Context) func(keys []int) ([
 		err := m.Repository.WithDB(ctx, func(ctx context.Context) error {
 			var err error
 			ret, err = m.Repository.Scene.GetManyHasCover(ctx, keys)
+			return err
+		})
+		return ret, toErrorSlice(err)
+	}
+}
+
+func (m Middleware) fetchEntityCounts(ctx context.Context, fetch func(context.Context, []models.EntityCountKey) ([]int, error)) func([]models.EntityCountKey) ([]int, []error) {
+	return func(keys []models.EntityCountKey) (ret []int, errs []error) {
+		err := m.Repository.WithReadTxn(ctx, func(ctx context.Context) error {
+			var err error
+			ret, err = fetch(ctx, keys)
 			return err
 		})
 		return ret, toErrorSlice(err)

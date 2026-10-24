@@ -20,7 +20,7 @@ import { DataTableColumnHeader } from "src/components/list/data-table-column-hea
 import { CountryDisplay } from "src/components/forms/country-select";
 
 type PerformerItem =
-  GQL.FindPerformersQuery["findPerformers"]["performers"][number];
+  GQL.FindPerformerListQuery["findPerformers"]["performers"][number];
 
 function FavoriteCell({ performer }: { performer: PerformerItem }) {
   const intl = useIntl();

@@ -5,21 +5,12 @@ import (
 
 	"github.com/stashapp/stash/internal/api/loaders"
 	"github.com/stashapp/stash/internal/api/urlbuilders"
-	"github.com/stashapp/stash/pkg/gallery"
-	"github.com/stashapp/stash/pkg/group"
-	"github.com/stashapp/stash/pkg/image"
 	"github.com/stashapp/stash/pkg/models"
-	"github.com/stashapp/stash/pkg/performer"
-	"github.com/stashapp/stash/pkg/scene"
 )
 
 func (r *studioResolver) ImagePath(ctx context.Context, obj *models.Studio) (*string, error) {
-	var hasImage bool
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		var err error
-		hasImage, err = r.repository.Studio.HasImage(ctx, obj.ID)
-		return err
-	}); err != nil {
+	hasImage, err := loaders.From(ctx).StudioCounts.Load(models.EntityCountKey{ID: obj.ID, Field: models.EntityHasImage})
+	if err != nil {
 		return nil, err
 	}
 
@@ -28,7 +19,7 @@ func (r *studioResolver) ImagePath(ctx context.Context, obj *models.Studio) (*st
 	if identityErr != nil {
 		return nil, identityErr
 	}
-	imagePath := urlbuilders.NewStudioURLBuilder(baseURL, obj, publicID).GetStudioImageURL(hasImage)
+	imagePath := urlbuilders.NewStudioURLBuilder(baseURL, obj, publicID).GetStudioImageURL(hasImage != 0)
 	return &imagePath, nil
 }
 
@@ -87,90 +78,60 @@ func (r *studioResolver) Tags(ctx context.Context, obj *models.Studio) (ret []*m
 	return ret, firstError(errs)
 }
 
-func (r *studioResolver) SceneCount(ctx context.Context, obj *models.Studio, depth *int) (ret int, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = scene.CountByStudioID(ctx, r.repository.Scene, obj.ID, depth)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	return ret, nil
-}
-
-func (r *studioResolver) ImageCount(ctx context.Context, obj *models.Studio, depth *int) (ret int, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = image.CountByStudioID(ctx, r.repository.Image, obj.ID, depth)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	return ret, nil
-}
-
-func (r *studioResolver) GalleryCount(ctx context.Context, obj *models.Studio, depth *int) (ret int, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = gallery.CountByStudioID(ctx, r.repository.Gallery, obj.ID, depth)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	return ret, nil
-}
-
-func (r *studioResolver) PerformerCount(ctx context.Context, obj *models.Studio, depth *int) (ret int, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = performer.CountByStudioID(ctx, r.repository.Performer, obj.ID, depth)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	return ret, nil
-}
-
-func (r *studioResolver) GroupCount(ctx context.Context, obj *models.Studio, depth *int) (ret int, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = group.CountByStudioID(ctx, r.repository.Group, obj.ID, depth)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	return ret, nil
-}
-
-func (r *studioResolver) SceneMarkerCount(ctx context.Context, obj *models.Studio, depth *int) (ret int, err error) {
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = scene.MarkerCountByStudioID(ctx, r.repository.SceneMarker, obj.ID, depth)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	return ret, nil
-}
-
-func (r *studioResolver) OCounter(ctx context.Context, obj *models.Studio, depth *int) (ret int, err error) {
-	var res_scene int
-	var res_image int
-	depthVal := 0
+func (r *studioResolver) SceneCount(ctx context.Context, obj *models.Studio, depth *int) (int, error) {
+	d := 0
 	if depth != nil {
-		depthVal = *depth
+		d = *depth
 	}
-	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		res_scene, err = r.repository.Scene.OCountByStudioID(ctx, obj.ID, depthVal)
-		if err != nil {
-			return err
-		}
-		res_image, err = r.repository.Image.OCountByStudioID(ctx, obj.ID, depthVal)
-		return err
-	}); err != nil {
-		return 0, err
+	return loaders.From(ctx).StudioCounts.Load(models.EntityCountKey{ID: obj.ID, Depth: d, Field: models.EntityCountScenes})
+}
+
+func (r *studioResolver) ImageCount(ctx context.Context, obj *models.Studio, depth *int) (int, error) {
+	d := 0
+	if depth != nil {
+		d = *depth
 	}
-	return res_scene + res_image, nil
+	return loaders.From(ctx).StudioCounts.Load(models.EntityCountKey{ID: obj.ID, Depth: d, Field: models.EntityCountImages})
+}
+
+func (r *studioResolver) GalleryCount(ctx context.Context, obj *models.Studio, depth *int) (int, error) {
+	d := 0
+	if depth != nil {
+		d = *depth
+	}
+	return loaders.From(ctx).StudioCounts.Load(models.EntityCountKey{ID: obj.ID, Depth: d, Field: models.EntityCountGalleries})
+}
+
+func (r *studioResolver) PerformerCount(ctx context.Context, obj *models.Studio, depth *int) (int, error) {
+	d := 0
+	if depth != nil {
+		d = *depth
+	}
+	return loaders.From(ctx).StudioCounts.Load(models.EntityCountKey{ID: obj.ID, Depth: d, Field: models.EntityCountPerformers})
+}
+
+func (r *studioResolver) GroupCount(ctx context.Context, obj *models.Studio, depth *int) (int, error) {
+	d := 0
+	if depth != nil {
+		d = *depth
+	}
+	return loaders.From(ctx).StudioCounts.Load(models.EntityCountKey{ID: obj.ID, Depth: d, Field: models.EntityCountGroups})
+}
+
+func (r *studioResolver) SceneMarkerCount(ctx context.Context, obj *models.Studio, depth *int) (int, error) {
+	d := 0
+	if depth != nil {
+		d = *depth
+	}
+	return loaders.From(ctx).StudioCounts.Load(models.EntityCountKey{ID: obj.ID, Depth: d, Field: models.EntityCountMarkers})
+}
+
+func (r *studioResolver) OCounter(ctx context.Context, obj *models.Studio, depth *int) (int, error) {
+	d := 0
+	if depth != nil {
+		d = *depth
+	}
+	return loaders.From(ctx).StudioCounts.Load(models.EntityCountKey{ID: obj.ID, Depth: d, Field: models.EntityCountO})
 }
 
 func (r *studioResolver) ParentStudio(ctx context.Context, obj *models.Studio) (ret *models.Studio, err error) {

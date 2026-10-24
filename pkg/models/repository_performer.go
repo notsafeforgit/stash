@@ -23,6 +23,7 @@ type PerformerFinder interface {
 
 // PerformerQueryer provides methods to query performers.
 type PerformerQueryer interface {
+	QueryList(ctx context.Context, filterAST *FilterAST, opts ListQueryOptions) ([]*Performer, int, error)
 	Query(ctx context.Context, performerFilter *PerformerFilterType, findFilter *FindFilterType) ([]*Performer, int, error)
 	QueryAST(ctx context.Context, filterAST *FilterAST, findFilter *FindFilterType) ([]*Performer, int, error)
 	QueryCount(ctx context.Context, performerFilter *PerformerFilterType, findFilter *FindFilterType) (int, error)
@@ -39,6 +40,8 @@ type PerformerAutoTagQueryer interface {
 
 // PerformerCounter provides methods to count performers.
 type PerformerCounter interface {
+	// CountMany returns aggregates in key order, including zero for empty entities.
+	CountMany(ctx context.Context, keys []EntityCountKey) ([]int, error)
 	Count(ctx context.Context) (int, error)
 	CountByTagID(ctx context.Context, tagID int) (int, error)
 }

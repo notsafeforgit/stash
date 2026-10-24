@@ -239,7 +239,7 @@ it("renders cards before the exact total and merges either response order withou
   expect(container.querySelector("output")?.dataset.count).toBe("80");
   await act(async () => container.querySelector("button")?.click());
   expect(request("ListRows", "", 2)).toBeDefined();
-  await act(async () => request("ListCount", "", 2).count(80));
+  expect(requests.filter((r) => r.name === "ListCount")).toHaveLength(1);
   await act(async () => request("ListRows", "", 2).rows(["3", "4"]));
   expect(container.querySelector("output")?.dataset).toMatchObject({
     loading: "false",
@@ -361,7 +361,6 @@ it("refreshes a cached previous page's total after bulk deletion removes the las
   await act(async () => container.querySelector("button")?.click());
   await act(async () => {
     request("ListRows", "", 2).rows(["last-1", "last-2"]);
-    request("ListCount", "", 2).count(pageSize + 2);
   });
   expect(container.querySelector("nav")?.textContent).toContain("2 / 2");
 
@@ -381,7 +380,7 @@ it("refreshes a cached previous page's total after bulk deletion removes the las
   });
   await act(async () => {
     request("ListRows", "", 2).rows([]);
-    request("ListCount", "", 2).count(pageSize);
+    request("ListCount").count(pageSize);
   });
 
   expect(container.querySelector("output")?.dataset.page).toBe("1");

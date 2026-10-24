@@ -355,6 +355,17 @@ action and page picker for accumulating items across pages.
 | [entity-data-table.tsx](../src/components/list/entity-data-table.tsx) | Table layout and column preferences |
 | [entity-list-configs.tsx](../src/components/list/entity-list-configs.tsx) | Reusable per-entity configurations |
 
+Performer and studio lists use dedicated summary fragments, with page rows and
+counts requested separately. Counter resolvers batch selected aggregates across
+entities and studio depths. Detail queries still load their full metadata.
+
+Independent totals omit page, size and sort variables, so page navigation reuses
+the same filtered total. The client retains active list queries plus the twelve
+most recently used inactive query results across routes and filters. Eviction
+removes root query references before Apollo garbage collection; selection owns
+its selected item snapshots separately. Recent Back navigation stays cached;
+older pages reload normally. The former unused prefetch hook has been removed.
+
 Choose exactly one source, defined in
 [entity-list-types.ts](../src/components/list/entity-list-types.ts):
 

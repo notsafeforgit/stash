@@ -31,31 +31,35 @@ type readSnapshot struct {
 	searchRevision uint64
 	writable       bool
 	tracked        bool
+	countsTracked  bool
 }
 
 type countCacheEntry struct {
-	key   [32]byte
-	count int
+	key    [32]byte
+	count  int
+	tables []string
 }
 
 type searchChanges map[string]map[int]struct{}
 
 type readAcceleration struct {
-	mu             sync.Mutex
-	observer       *sql.Conn
-	main           *sqlx.DB
-	index          *sqlx.DB
-	owner          string
-	dataVersion    int64
-	revision       uint64
-	searchRevision uint64
-	counts         map[[32]byte]*list.Element
-	countOrder     list.List
-	fullRebuild    bool
-	changes        searchChanges
-	wake           chan struct{}
-	cancel         context.CancelFunc
-	done           chan struct{}
+	countAuthorizerInstalled bool
+	compilingDependencies    map[string]bool
+	mu                       sync.Mutex
+	observer                 *sql.Conn
+	main                     *sqlx.DB
+	index                    *sqlx.DB
+	owner                    string
+	dataVersion              int64
+	revision                 uint64
+	searchRevision           uint64
+	counts                   map[[32]byte]*list.Element
+	countOrder               list.List
+	fullRebuild              bool
+	changes                  searchChanges
+	wake                     chan struct{}
+	cancel                   context.CancelFunc
+	done                     chan struct{}
 }
 
 func newReadAcceleration(main *sqlx.DB, path string) (*readAcceleration, error) {
@@ -154,7 +158,7 @@ func (a *readAcceleration) begin(ctx context.Context, tx *sqlx.Tx, writable bool
 		if a.index != nil {
 			tracked = prepareSearchChanges(ctx, tx) == nil
 		}
-		return context.WithValue(ctx, readAccelerationKey, &readSnapshot{cache: a, writable: true, tracked: tracked})
+		return context.WithValue(ctx, readAccelerationKey, &readSnapshot{cache: a, writable: true, tracked: tracked, countsTracked: prepareCountChanges(ctx, tx) == nil})
 	}
 	a.mu.Lock()
 	snapshot := a.pin(ctx, tx)
@@ -174,12 +178,21 @@ func (a *readAcceleration) commit(ctx context.Context, tx *sqlx.Tx, snapshot *re
 	if snapshot.tracked {
 		changes, err = collectSearchChanges(ctx, tx)
 	}
+	var tables []string
+	var countErr error
+	if snapshot.countsTracked {
+		tables, countErr = collectCountChanges(ctx, tx)
+	}
 	var writerVersion int64
 	writerVersionErr := tx.GetContext(ctx, &writerVersion, "PRAGMA main.data_version")
 	if commitErr := tx.Commit(); commitErr != nil {
 		return commitErr
 	}
-	a.invalidate(a.index != nil && (!snapshot.tracked || err != nil))
+	if !snapshot.countsTracked || countErr != nil || (a.index != nil && (!snapshot.tracked || err != nil)) {
+		a.invalidate(a.index != nil && (!snapshot.tracked || err != nil))
+	} else {
+		a.invalidateCounts(tables)
+	}
 	if len(changes) > 0 && !a.fullRebuild {
 		a.searchRevision++
 		for table, ids := range changes {
@@ -264,17 +277,21 @@ func (s *readSnapshot) count(key [32]byte) (int, bool) {
 	return 0, false
 }
 
-func (s *readSnapshot) rememberCount(key [32]byte, count int) {
+func (s *readSnapshot) rememberCount(key [32]byte, count int, query string) {
 	a := s.cache
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if s.revision != a.revision {
 		return
 	}
+	tables, err := a.countDependencies(query)
+	if err != nil {
+		return
+	}
 	if entry := a.counts[key]; entry != nil {
 		a.countOrder.Remove(entry)
 	}
-	a.counts[key] = a.countOrder.PushFront(countCacheEntry{key, count})
+	a.counts[key] = a.countOrder.PushFront(countCacheEntry{key: key, count: count, tables: tables})
 	if a.countOrder.Len() > maxCachedCounts {
 		oldest := a.countOrder.Back()
 		delete(a.counts, oldest.Value.(countCacheEntry).key)

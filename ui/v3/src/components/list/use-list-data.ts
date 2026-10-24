@@ -1,14 +1,31 @@
-import { useCallback, useMemo } from "react";
-import { skipToken, useQuery } from "@apollo/client/react";
+import { useCallback, useEffect, useMemo } from "react";
+import { skipToken, useApolloClient, useQuery } from "@apollo/client/react";
 import type { OperationVariables } from "@apollo/client";
 import { gql } from "graphql-tag";
 import type { ListFilterModel } from "@/models/list-filter/filter";
 import type { IHasID } from "@/utils/data";
 import type { ListCountData, ListDataSource } from "./entity-list-types";
 import { useCachedQueryResult } from "./use-cached-query-result";
+import { retainListQuery } from "@/core/list-query-cache";
 
 // Hook order stays stable for local lists, which never issue this query.
 const NOOP_QUERY = gql`query EntityListNoop { __typename }`;
+
+function useRetainedListQuery(
+  query: typeof NOOP_QUERY,
+  variables: OperationVariables | undefined,
+) {
+  const client = useApolloClient();
+  const key = JSON.stringify(variables);
+  useEffect(() => {
+    if (!key) return;
+    return retainListQuery(
+      client.cache,
+      query,
+      JSON.parse(key) as OperationVariables,
+    );
+  }, [client, query, key]);
+}
 
 export function useListData<
   TData,
@@ -22,14 +39,20 @@ export function useListData<
       ? { variables: source.makeVariables(filter) }
       : skipToken;
   const variables = options === skipToken ? undefined : options.variables;
-  const raw = useQuery<TData, TVariables>(
-    source.kind === "graphql" ? source.query : NOOP_QUERY,
-    options,
-  );
+  const query = source.kind === "graphql" ? source.query : NOOP_QUERY;
+  useRetainedListQuery(query, variables);
+  const raw = useQuery<TData, TVariables>(query, options);
   const countQuery = source.kind === "graphql" ? source.countQuery : undefined;
+  // Totals depend on membership, not ordering, page number or page size.
+  const countVariables = useMemo(() => {
+    if (!countQuery || source.kind !== "graphql") return undefined;
+    const scope = source.makeVariables(filter);
+    return { ...scope, filter: { q: filter.searchTerm } } as TVariables;
+  }, [source, filter, countQuery]);
+  useRetainedListQuery(countQuery ?? NOOP_QUERY, countVariables);
   const total = useQuery<ListCountData, TVariables>(
     countQuery ?? NOOP_QUERY,
-    countQuery ? options : skipToken,
+    countVariables ? { variables: countVariables } : skipToken,
   );
   const refetchPage = raw.refetch;
   const refetchCount = total.refetch;

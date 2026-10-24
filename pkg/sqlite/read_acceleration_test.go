@@ -25,6 +25,7 @@ CREATE TABLE scenes_files (scene_id INTEGER REFERENCES scenes(id) ON DELETE CASC
 CREATE TABLE images_files (image_id INTEGER REFERENCES images(id) ON DELETE CASCADE, file_id INTEGER REFERENCES files(id) ON DELETE CASCADE);
 CREATE TABLE files_fingerprints (file_id INTEGER REFERENCES files(id) ON DELETE CASCADE, fingerprint TEXT);
 CREATE TABLE scene_markers (scene_id INTEGER REFERENCES scenes(id) ON DELETE CASCADE, title TEXT);
+CREATE TABLE worker_bookkeeping (id INTEGER PRIMARY KEY, state TEXT);
 INSERT INTO scenes VALUES (1, 'alpha beta', NULL, 0), (2, '', 'detail', 0), (3, NULL, NULL, 0), (4, '中文 café ABC', NULL, 0), (5, 'alpha', NULL, 0);
 INSERT INTO images SELECT * FROM scenes;
 INSERT INTO folders VALUES (1, '/archive/2024'), (2, '/other');
@@ -225,9 +226,43 @@ func TestReadCachesRespectSnapshotsAndExternalWriters(t *testing.T) {
 		for i := 0; i < maxCachedCounts*2; i++ {
 			key, ok := countCacheKey(query, []interface{}{i})
 			require.True(t, ok)
-			snapshot.rememberCount(key, i)
+			snapshot.rememberCount(key, i, query)
 		}
 		require.Len(t, db.reads.counts, maxCachedCounts)
+	})
+}
+
+func TestCountCacheInvalidatesOnlyReadDependencies(t *testing.T) {
+	db := acceleratedTestDatabase(t)
+	query := "SELECT count(*) AS count FROM scenes WHERE EXISTS (SELECT 1 FROM scenes_files WHERE scene_id = scenes.id)"
+	key, _ := countCacheKey(query, nil)
+	deps, dependencyErr := db.reads.countDependencies(query)
+	require.NoError(t, dependencyErr)
+	require.ElementsMatch(t, []string{"scenes", "scenes_files"}, deps)
+	acceleratedRead(t, db, func(ctx context.Context) {
+		_, err := sceneRepository.runCountQuery(ctx, query, nil)
+		require.NoError(t, err)
+		_, ok := snapshotFromContext(ctx).count(key)
+		require.True(t, ok)
+	})
+	check := func(cached bool) {
+		acceleratedRead(t, db, func(ctx context.Context) {
+			_, ok := snapshotFromContext(ctx).count(key)
+			require.Equal(t, cached, ok)
+		})
+	}
+	acceleratedWrite(t, db, "INSERT INTO worker_bookkeeping VALUES (1, 'running')", true)
+	check(true)
+	acceleratedWrite(t, db, "UPDATE images SET rating = 4", true)
+	check(true)
+	acceleratedWrite(t, db, "DELETE FROM scenes_files", false)
+	check(true)
+	acceleratedWrite(t, db, "DELETE FROM scenes_files", true)
+	check(false)
+	acceleratedRead(t, db, func(ctx context.Context) {
+		got, err := sceneRepository.runCountQuery(ctx, query, nil)
+		require.NoError(t, err)
+		require.Zero(t, got)
 	})
 }
 

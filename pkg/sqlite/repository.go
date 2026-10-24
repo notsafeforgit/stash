@@ -87,7 +87,7 @@ func (r *repository) runCountQuery(ctx context.Context, query string, args []int
 	}
 
 	if cacheable && snapshot != nil {
-		snapshot.rememberCount(cacheKey, result.Int)
+		snapshot.rememberCount(cacheKey, result.Int, query)
 	}
 	return result.Int, nil
 }

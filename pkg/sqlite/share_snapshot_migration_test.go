@@ -16,6 +16,7 @@ import (
 // normalized schema with its version marker merely changed.
 func removeSnapshotMembershipSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeReadCacheAndPayloadRetentionSchema(t, raw)
 	if queryUint(t, raw, `SELECT count(*) FROM pragma_table_info('shares') WHERE name='snapshot'`) > 0 {
 		return
 	}

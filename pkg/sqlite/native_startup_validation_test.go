@@ -46,6 +46,7 @@ func TestNativeStartupValidationDoesNotReadArchiveHistory(t *testing.T) {
 		"source_gallery_merge_context": true,
 		"metadata_field_write_context": true, "metadata_field_pending": true,
 		"metadata_field_decisions": true, // sealed=0 uses its required partial index
+		"library_search_state":     true, // PRIMARY KEY + CHECK(id=1) bounds this revision metadata to one row
 	}
 	var denied []string
 	setAuthorizer := func(callback func(int, string, string, string) int) {

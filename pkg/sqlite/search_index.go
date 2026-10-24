@@ -72,6 +72,26 @@ type searchSourceRevision struct {
 	Schema int
 }
 
+// Keep transaction cleanup synchronous with the search worker. database/sql's
+// automatic rollback on context cancellation can otherwise still be running
+// after the worker exits, leaving a reader alive while the library closes.
+// Pool acquisition and every query retain the caller's cancellation context.
+func beginSearchTransaction(ctx context.Context, db *sqlx.DB) (*sqlx.Tx, func(), error) {
+	conn, err := db.Connx(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	tx, err := conn.BeginTxx(context.WithoutCancel(ctx), nil)
+	if err != nil {
+		conn.Close()
+		return nil, nil, err
+	}
+	return tx, func() {
+		_ = tx.Rollback()
+		_ = conn.Close()
+	}, nil
+}
+
 func searchRevisionIn(ctx context.Context, tx *sqlx.Tx) (searchSourceRevision, error) {
 	var source searchSourceRevision
 	if err := tx.GetContext(ctx, &source.Token, "SELECT token FROM library_search_state WHERE id=1"); err != nil {
@@ -82,11 +102,11 @@ func searchRevisionIn(ctx context.Context, tx *sqlx.Tx) (searchSourceRevision, e
 }
 
 func (a *readAcceleration) reuseSearchIndex(ctx context.Context) error {
-	tx, err := a.main.BeginTxx(ctx, nil)
+	tx, finish, err := beginSearchTransaction(ctx, a.main)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer finish()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	snapshot := a.pin(ctx, tx)
@@ -112,11 +132,11 @@ WHERE id=1 AND source_token=? AND source_schema=?`, a.owner, snapshot.searchRevi
 
 func (a *readAcceleration) refreshSearchIndex(ctx context.Context) error {
 	started := time.Now()
-	tx, err := a.main.BeginTxx(ctx, nil)
+	tx, finish, err := beginSearchTransaction(ctx, a.main)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer finish()
 	a.mu.Lock()
 	snapshot := a.pin(ctx, tx)
 	full, changes := a.fullRebuild, a.changes
@@ -132,11 +152,11 @@ func (a *readAcceleration) refreshSearchIndex(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	indexTx, err := a.index.BeginTxx(ctx, nil)
+	indexTx, finishIndex, err := beginSearchTransaction(ctx, a.index)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = indexTx.Rollback() }()
+	defer finishIndex()
 	for _, table := range []string{sceneTable, imageTable} {
 		if full {
 			// Recreating the virtual table avoids deleting old postings one by one.
@@ -287,11 +307,11 @@ func indexedMediaCandidates(ctx context.Context, table, search string) ([]int, b
 		return nil, false
 	}
 	a := snapshot.cache
-	tx, err := a.index.BeginTxx(ctx, nil)
+	tx, finish, err := beginSearchTransaction(ctx, a.index)
 	if err != nil {
 		return nil, false
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer finish()
 	var version struct {
 		Owner    string
 		Revision uint64

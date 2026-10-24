@@ -69,6 +69,26 @@ func acceleratedRead(t *testing.T, db *Database, fn func(context.Context)) {
 	fn(ctx)
 }
 
+func TestSearchCancellationKeepsCleanupSynchronous(t *testing.T) {
+	db := acceleratedTestDatabase(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	tx, finish, err := beginSearchTransaction(ctx, db.readDB)
+	require.NoError(t, err)
+	t.Cleanup(finish)
+	var before, pinned int
+	require.NoError(t, tx.GetContext(ctx, &before, "SELECT count(*) FROM scenes"))
+	cancel()
+	require.ErrorIs(t, tx.GetContext(ctx, &pinned, "SELECT count(*) FROM scenes"), context.Canceled)
+	acceleratedWrite(t, db, "INSERT INTO scenes VALUES (99, 'later', NULL, 0)", true)
+	// Cancellation interrupts work but does not race explicit cleanup. The
+	// pinned snapshot remains owned by this scope until finish releases it.
+	require.NoError(t, tx.GetContext(t.Context(), &pinned, "SELECT count(*) FROM scenes"))
+	require.Equal(t, before, pinned)
+	finish()
+	require.Equal(t, 1, db.readDB.Stats().InUse, "only the data-version observer remains checked out")
+}
+
 func acceleratedWrite(t *testing.T, db *Database, sql string, commit bool) {
 	t.Helper()
 	ctx, err := db.Begin(context.Background(), true)

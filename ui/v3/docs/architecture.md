@@ -327,10 +327,17 @@ stale-review recovery disables inputs before refreshing/remounting the form.
 error state, and the selected layout. Add a configuration for a new entity rather
 than copying a page implementation.
 
-`pageActions` appear in both the desktop toolbar and the mobile browse footer.
-Use `ListCreateButton` for creation: it keeps a named 44px touch target on mobile
-and a visible New label on desktop. Mobile search and selection replace these
-actions while active.
+`pageActions` are typed action descriptors, rendered in the desktop Operations
+menu and the mobile overflow drawer. Use `listCreateAction` for creation and keep
+dialogs owned by the page so dismissing the menu does not dismiss a newly opened
+form. Sharing a filtered list uses the distinct **Share this list…** action.
+
+The mobile browse bar contains only the section/page picker, Search, Filters,
+View options, overflow and Back where applicable. Navigation, creation, sharing
+and Tagger live in overflow. Embedded lists contribute to the detail page's
+existing drawer; standalone lists have a List actions drawer. Search and
+selection replace the browse controls while active. Selection retains its share
+action and page picker for accumulating items across pages.
 
 | Module | Responsibility |
 | --- | --- |
@@ -398,13 +405,13 @@ selection getter separately from current-page data, so bulk card menus can
 snapshot all selected entities without subscribing every card to selection.
 The mobile selection count opens the existing page picker.
 
-Share creation can explicitly replace its draft targets with all matching
-scenes, images or galleries. The bounded query retains the current search and
-locked filter AST, starts at page one, and verifies both the complete result
-count and the server's share limit before changing the draft. Failure preserves
-the previous targets; closing the dialog cancels the request. Creation remains
-an explicit confirmation and is disabled until resolution finishes. The server
-still validates deduplicated media membership, including gallery expansion.
+Share creation submits either selected UUIDs or a filtered source retaining the
+current search and locked filter AST. Filtered shares can be snapshots or ongoing
+matches; opening their dialog does not fetch every matching item. The server
+prepares snapshot membership durably and exposes the recipient link when ready.
+Creation remains an explicit confirmation, and failed requests preserve the
+draft. The server validates deduplicated media membership, including gallery
+expansion.
 
 `onDeleteSelection` supplies the same action to the desktop/mobile selection
 toolbar and card/row menus. It snapshots selected UUIDs, the current search and

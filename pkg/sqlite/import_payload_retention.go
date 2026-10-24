@@ -136,6 +136,13 @@ WHERE p.snapshot_uuid=? AND p.ordinal>? ORDER BY p.ordinal LIMIT ?`, id, after, 
 	if err != nil {
 		return nil, err
 	}
+	update, err := dbWrapper.Prepare(ctx, `UPDATE catalog_snapshot_records SET original_byte_count=byte_count,
+retained_asset_id=json_extract(data,'$.values.asset_id'),data='{}',byte_count=2
+WHERE snapshot_uuid=? AND ordinal=?`)
+	if err != nil {
+		return nil, err
+	}
+	defer update.Close()
 	last := after
 	for _, row := range page {
 		body := []byte(row.Data)
@@ -146,9 +153,7 @@ WHERE p.snapshot_uuid=? AND p.ordinal>? ORDER BY p.ordinal LIMIT ?`, id, after, 
 		if err != nil || record.Table != row.Table || record.KeyJSON != row.Key {
 			return nil, models.ErrCatalogSnapshotInvalid
 		}
-		_, err = dbWrapper.Exec(ctx, `UPDATE catalog_snapshot_records SET original_byte_count=byte_count,
-retained_asset_id=json_extract(data,'$.values.asset_id'),data='{}',byte_count=2
-WHERE snapshot_uuid=? AND ordinal=?`, id, row.Ordinal)
+		_, err = dbWrapper.ExecStmt(ctx, update, id, row.Ordinal)
 		if err != nil {
 			return nil, err
 		}

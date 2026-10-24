@@ -1,0 +1,820 @@
+{
+  "schema": "reddit-imgur-albums-v1",
+  "cases": [
+    {
+      "name": "API membership supplies original order independently of output num and count",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12"
+        }
+      },
+      "attachment": {
+        "namespace": "native:imgur",
+        "value": "First12"
+      },
+      "manifest_error": false,
+      "entries": [
+        {
+          "position": 0,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "First12"
+          },
+          "media_kind": "image"
+        },
+        {
+          "position": 1,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "Next123"
+          },
+          "media_kind": "unknown"
+        }
+      ]
+    },
+    {
+      "name": "gallery permalink expands to the same album",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/gallery/title-Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12"
+        }
+      },
+      "attachment": {
+        "namespace": "native:imgur",
+        "value": "First12"
+      },
+      "manifest_error": false,
+      "entries": [
+        {
+          "position": 0,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "First12"
+          },
+          "media_kind": "image"
+        },
+        {
+          "position": 1,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "Next123"
+          },
+          "media_kind": "unknown"
+        }
+      ]
+    },
+    {
+      "name": "second member keeps its own identity",
+      "source": {
+        "category": "imgur",
+        "id": "Next123",
+        "url": "https://i.imgur.com/Next123.mp4",
+        "_url": "https://i.imgur.com/Next123.mp4",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12"
+        }
+      },
+      "attachment": {
+        "namespace": "native:imgur",
+        "value": "Next123"
+      },
+      "manifest_error": false,
+      "entries": [
+        {
+          "position": 0,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "First12"
+          },
+          "media_kind": "image"
+        },
+        {
+          "position": 1,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "Next123"
+          },
+          "media_kind": "unknown"
+        }
+      ]
+    },
+    {
+      "name": "unrelated selection cannot become an album member",
+      "source": {
+        "category": "imgur",
+        "id": "Other12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12"
+        }
+      },
+      "attachment": null,
+      "manifest_error": false,
+      "entries": [
+        {
+          "position": 0,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "First12"
+          },
+          "media_kind": "image"
+        },
+        {
+          "position": 1,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "Next123"
+          },
+          "media_kind": "unknown"
+        }
+      ]
+    },
+    {
+      "name": "unobserved rendition is not accepted",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/Other12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12"
+        }
+      },
+      "attachment": null,
+      "manifest_error": false,
+      "entries": [
+        {
+          "position": 0,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "First12"
+          },
+          "media_kind": "image"
+        },
+        {
+          "position": 1,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "Next123"
+          },
+          "media_kind": "unknown"
+        }
+      ]
+    },
+    {
+      "name": "album list absent remains unsupported",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12"
+        }
+      },
+      "attachment": null,
+      "manifest_error": false,
+      "entries": null
+    },
+    {
+      "name": "album belongs to another link",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Other12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12"
+        }
+      },
+      "attachment": null,
+      "manifest_error": true,
+      "entries": null
+    },
+    {
+      "name": "different Reddit destination",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Other12"
+        }
+      },
+      "attachment": null,
+      "manifest_error": true,
+      "entries": null
+    },
+    {
+      "name": "single Imgur media cannot claim an album",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/Album12",
+          "url_overridden_by_dest": "https://imgur.com/Album12"
+        }
+      },
+      "attachment": null,
+      "manifest_error": true,
+      "entries": null
+    },
+    {
+      "name": "count differs from the original API list",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 3,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12"
+        }
+      },
+      "attachment": null,
+      "manifest_error": true,
+      "entries": null
+    },
+    {
+      "name": "boolean is not a count",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": true,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12"
+        }
+      },
+      "attachment": null,
+      "manifest_error": true,
+      "entries": null
+    },
+    {
+      "name": "duplicate membership is contradictory",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "First12",
+                "kind": "image"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12"
+        }
+      },
+      "attachment": null,
+      "manifest_error": true,
+      "entries": null
+    },
+    {
+      "name": "unknown marker version",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 2,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12"
+        }
+      },
+      "attachment": null,
+      "manifest_error": true,
+      "entries": null
+    },
+    {
+      "name": "boolean is not a version",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": true,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12"
+        }
+      },
+      "attachment": null,
+      "manifest_error": true,
+      "entries": null
+    },
+    {
+      "name": "missing slot is not a complete original list",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              null
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12"
+        }
+      },
+      "attachment": null,
+      "manifest_error": true,
+      "entries": null
+    },
+    {
+      "name": "comment links do not declare the post album",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://imgur.com/a/Album12",
+          "url_overridden_by_dest": "https://imgur.com/a/Album12",
+          "comment": {
+            "id": "comment"
+          }
+        }
+      },
+      "attachment": null,
+      "manifest_error": true,
+      "entries": null
+    },
+    {
+      "name": "crosspost retains its own post and original album",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "crosspost_parent": "t3_original",
+          "crosspost_parent_list": [
+            {
+              "category": "reddit",
+              "id": "original",
+              "url": "https://imgur.com/a/Album12",
+              "url_overridden_by_dest": "https://imgur.com/a/Album12"
+            }
+          ]
+        }
+      },
+      "attachment": {
+        "namespace": "native:imgur",
+        "value": "First12"
+      },
+      "manifest_error": false,
+      "entries": [
+        {
+          "position": 0,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "First12"
+          },
+          "media_kind": "image"
+        },
+        {
+          "position": 1,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "Next123"
+          },
+          "media_kind": "unknown"
+        }
+      ]
+    },
+    {
+      "name": "nested gallery dispatch keeps Reddit ancestry",
+      "source": {
+        "category": "imgur",
+        "id": "First12",
+        "url": "https://i.imgur.com/First12.jpg",
+        "_url": "https://i.imgur.com/First12.jpg",
+        "num": 99,
+        "count": 99,
+        "album": {
+          "id": "Album12",
+          "is_album": true,
+          "image_count": 2,
+          "imgur_media": {
+            "version": 1,
+            "items": [
+              {
+                "id": "First12",
+                "kind": "image"
+              },
+              {
+                "id": "Next123",
+                "kind": "unknown"
+              }
+            ]
+          }
+        },
+        "_parent": {
+          "category": "imgur",
+          "_reddit": {
+            "category": "reddit",
+            "id": "post",
+            "url": "https://imgur.com/a/Album12",
+            "url_overridden_by_dest": "https://imgur.com/a/Album12"
+          }
+        }
+      },
+      "attachment": {
+        "namespace": "native:imgur",
+        "value": "First12"
+      },
+      "manifest_error": false,
+      "entries": [
+        {
+          "position": 0,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "First12"
+          },
+          "media_kind": "image"
+        },
+        {
+          "position": 1,
+          "reference": {
+            "namespace": "native:imgur",
+            "value": "Next123"
+          },
+          "media_kind": "unknown"
+        }
+      ]
+    }
+  ]
+}

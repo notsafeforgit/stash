@@ -54,7 +54,7 @@ func redditExternalReference(raw interface{}) (*models.SourcePostIdentifier, str
 		kind = "image"
 	case ".mp4", ".webm", ".mov", ".m4v", ".mkv":
 		kind = "video"
-	case ".gif":
+	case ".gif", ".gifv":
 	default:
 		return nil, "", false
 	}

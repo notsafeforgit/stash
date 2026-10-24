@@ -113,6 +113,7 @@ func ExtractCapturedAlbum(raw []byte) (*CapturedAlbum, error) {
 	if err != nil {
 		return nil, err
 	}
+	root := data
 	data, path, category, err := capturedSourceContext(data)
 	if err != nil {
 		return nil, err
@@ -152,6 +153,11 @@ func ExtractCapturedAlbum(raw []byte) (*CapturedAlbum, error) {
 		if gallery == nil {
 			declared, _ := data["is_gallery"].(bool)
 			if !declared {
+				if found, err := capturedRedditImgur(result, data, root); err != nil {
+					return nil, err
+				} else if found {
+					break
+				}
 				if direct, _ := redditMediaReference(data["url"]); direct == nil && data["media_metadata"] != nil {
 					found, err := capturedRedditEmbeds(result, data, path)
 					if err != nil {

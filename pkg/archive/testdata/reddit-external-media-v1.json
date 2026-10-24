@@ -1360,6 +1360,159 @@
       "complete": true,
       "kind": "video",
       "manifest_error": false
+    },
+    {
+      "name": "Imgur gifv URL resolves its API rendition",
+      "source": {
+        "category": "imgur",
+        "id": "AbcD123",
+        "is_album": false,
+        "image_count": 1,
+        "url": "https://i.imgur.com/AbcD123.mp4",
+        "_url": "https://i.imgur.com/AbcD123.mp4",
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://i.imgur.com/AbcD123.gifv",
+          "url_overridden_by_dest": "https://i.imgur.com/AbcD123.gifv"
+        }
+      },
+      "attachment": {
+        "namespace": "native:reddit",
+        "value": "url:ff8ffb7f43520c177eea3f9a1a2d54af576d07ed36a3e945f7f2c13b7fa93a37"
+      },
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "url:ff8ffb7f43520c177eea3f9a1a2d54af576d07ed36a3e945f7f2c13b7fa93a37"
+      },
+      "complete": true,
+      "kind": "unknown"
+    },
+    {
+      "name": "Imgur gifv does not match another API item",
+      "source": {
+        "category": "imgur",
+        "id": "Other12",
+        "is_album": false,
+        "image_count": 1,
+        "url": "https://i.imgur.com/AbcD123.mp4",
+        "_url": "https://i.imgur.com/AbcD123.mp4",
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://i.imgur.com/AbcD123.gifv",
+          "url_overridden_by_dest": "https://i.imgur.com/AbcD123.gifv"
+        }
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "url:ff8ffb7f43520c177eea3f9a1a2d54af576d07ed36a3e945f7f2c13b7fa93a37"
+      },
+      "complete": true,
+      "kind": "unknown"
+    },
+    {
+      "name": "Imgur gif URL resolves its API rendition",
+      "source": {
+        "category": "imgur",
+        "id": "AbcD123",
+        "is_album": false,
+        "image_count": 1,
+        "url": "https://i.imgur.com/AbcD123.mp4",
+        "_url": "https://i.imgur.com/AbcD123.mp4",
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://i.imgur.com/AbcD123.gif",
+          "url_overridden_by_dest": "https://i.imgur.com/AbcD123.gif"
+        }
+      },
+      "attachment": {
+        "namespace": "native:reddit",
+        "value": "url:ac6506daa58d4b536783e4a35e6f5bb90dd7d21b7456c70a04140924ac78d75f"
+      },
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "url:ac6506daa58d4b536783e4a35e6f5bb90dd7d21b7456c70a04140924ac78d75f"
+      },
+      "complete": true,
+      "kind": "unknown"
+    },
+    {
+      "name": "Imgur gif does not match another API item",
+      "source": {
+        "category": "imgur",
+        "id": "Other12",
+        "is_album": false,
+        "image_count": 1,
+        "url": "https://i.imgur.com/AbcD123.mp4",
+        "_url": "https://i.imgur.com/AbcD123.mp4",
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://i.imgur.com/AbcD123.gif",
+          "url_overridden_by_dest": "https://i.imgur.com/AbcD123.gif"
+        }
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "url:ac6506daa58d4b536783e4a35e6f5bb90dd7d21b7456c70a04140924ac78d75f"
+      },
+      "complete": true,
+      "kind": "unknown"
+    },
+    {
+      "name": "Imgur jpg URL resolves its API rendition",
+      "source": {
+        "category": "imgur",
+        "id": "AbcD123",
+        "is_album": false,
+        "image_count": 1,
+        "url": "https://i.imgur.com/AbcD123.mp4",
+        "_url": "https://i.imgur.com/AbcD123.mp4",
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://i.imgur.com/AbcD123.jpg",
+          "url_overridden_by_dest": "https://i.imgur.com/AbcD123.jpg"
+        }
+      },
+      "attachment": {
+        "namespace": "native:reddit",
+        "value": "url:290e78fc6e50794f67f052f96df3c21b53712d33313f8ad0a3413c5b645cd72a"
+      },
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "url:290e78fc6e50794f67f052f96df3c21b53712d33313f8ad0a3413c5b645cd72a"
+      },
+      "complete": true,
+      "kind": "image"
+    },
+    {
+      "name": "Imgur jpg does not match another API item",
+      "source": {
+        "category": "imgur",
+        "id": "Other12",
+        "is_album": false,
+        "image_count": 1,
+        "url": "https://i.imgur.com/AbcD123.mp4",
+        "_url": "https://i.imgur.com/AbcD123.mp4",
+        "_reddit": {
+          "category": "reddit",
+          "id": "post",
+          "url": "https://i.imgur.com/AbcD123.jpg",
+          "url_overridden_by_dest": "https://i.imgur.com/AbcD123.jpg"
+        }
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "url:290e78fc6e50794f67f052f96df3c21b53712d33313f8ad0a3413c5b645cd72a"
+      },
+      "complete": true,
+      "kind": "image"
     }
   ]
 }

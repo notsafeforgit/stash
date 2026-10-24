@@ -2,15 +2,17 @@ package sqlite_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/scrape"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
 
-func completedPayloadFixture(t *testing.T, review bool) *catalogSnapshotFixture {
+func completedPayloadFixture(t *testing.T, review bool, alter func([]map[string]any)) *catalogSnapshotFixture {
 	t.Helper()
 	f, binding := mediaImportFixture(t, 2, func(rows []map[string]any) {
 		if review {
@@ -26,6 +28,9 @@ func completedPayloadFixture(t *testing.T, review bool) *catalogSnapshotFixture 
 					row["key"] = []any{"reddit:handle:deliberately-unlinked"}
 				}
 			}
+		}
+		if alter != nil {
+			alter(rows)
 		}
 	})
 	relations := advanceRelations(t, f, 0)
@@ -89,7 +94,7 @@ func retirePayloadBatch(t *testing.T, f *catalogSnapshotFixture, after int64, li
 }
 
 func TestImportPayloadRetirementResumesPreservesReceiptsAndNativeData(t *testing.T) {
-	f := completedPayloadFixture(t, false)
+	f := completedPayloadFixture(t, false, nil)
 	plan := payloadPlan(t, f)
 	require.True(t, plan.Eligible, "%+v", plan)
 	require.Positive(t, plan.CandidateRecords)
@@ -153,8 +158,62 @@ func TestImportPayloadRetirementRetainsIncompleteInputs(t *testing.T) {
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM catalog_payload_retirements"))
 }
 
+func TestImportPayloadRetirementAcceptsCompactedNFOStaging(t *testing.T) {
+	f := completedPayloadFixture(t, false, func(rows []map[string]any) {
+		for _, row := range rows {
+			table := row["table"].(string)
+			values := row["values"].(map[string]any)
+			if table == "observations" && values["origin"] == "legacy-nfo" {
+				values["title"] = "Original title"
+				values["published_at"] = nil
+				values["date_basis"] = nil
+			}
+			if strings.HasPrefix(table, "sidecar") {
+				values["content_sha256"] = scrape.CatalogSnapshotSHA(nil)
+				switch table {
+				case "sidecar_documents":
+					values["raw_content"] = map[string]any{"sqlite_blob_base64": ""}
+					values["parse_status"] = "empty"
+					values["warnings_json"] = "[]"
+				case "sidecar_sources":
+					row["key"] = []any{values["relpath"], values["content_sha256"]}
+				}
+			}
+		}
+	})
+	result, err := f.db.CompactImportedNFO(t.Context(), nil)
+	require.NoError(t, err)
+	require.Positive(t, result.StagingRows)
+	plan := payloadPlan(t, f)
+	require.True(t, plan.Eligible)
+	raw := openRawDB(t, f.db.DatabasePath())
+	require.Positive(t, queryUint(t, raw, `SELECT count(*) FROM catalog_retirable_payloads p
+JOIN catalog_snapshot_records r USING(snapshot_uuid,ordinal) WHERE substr(r.data,-1)<>char(10)`),
+		"exercise JSON objects rewritten by historical NFO compaction")
+	before := map[string][][]any{}
+	for _, table := range []string{"source_captures", "source_post_revisions", "catalog_snapshot_chunks", "catalog_evidence_records", "scenes", "images", "galleries"} {
+		before[table] = albumJobRows(t, raw, table)
+	}
+	progress := retirePayloadBatch(t, f, 0, 2)
+	for progress.State != "complete" {
+		progress = retirePayloadBatch(t, f, progress.LastOrdinal, 2)
+	}
+	require.Equal(t, plan.CandidateRecords, progress.RetiredRecords)
+	require.Equal(t, plan.CandidateBytes, progress.ReleasedBytes)
+	for table, rows := range before {
+		require.Equal(t, rows, albumJobRows(t, raw, table), table)
+	}
+	for i := range f.chunks {
+		require.Equal(t, "received", f.receive(t, i).State)
+	}
+	require.NoError(t, raw.Close())
+	require.NoError(t, f.db.Close())
+	_, err = sqlite.VerifyNativeSnapshot(t.Context(), f.db.DatabasePath())
+	require.NoError(t, err)
+}
+
 func TestImportPayloadRetirementRetainsHistoricalReviews(t *testing.T) {
-	f := completedPayloadFixture(t, true)
+	f := completedPayloadFixture(t, true, nil)
 	plan := payloadPlan(t, f)
 	require.False(t, plan.Eligible)
 	require.Equal(t, "incomplete_imports_or_historical_reviews", plan.Reason)
@@ -166,7 +225,7 @@ func TestImportPayloadRetirementRetainsHistoricalReviews(t *testing.T) {
 }
 
 func TestImportPayloadRetirementFailureCannotCommitPartialBatch(t *testing.T) {
-	f := completedPayloadFixture(t, false)
+	f := completedPayloadFixture(t, false, nil)
 	raw := openRawDB(t, f.db.DatabasePath())
 	defer raw.Close()
 	_, err := raw.Exec(`CREATE TRIGGER reject_retirement BEFORE UPDATE OF original_byte_count ON catalog_snapshot_records

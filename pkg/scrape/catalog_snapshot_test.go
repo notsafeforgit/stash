@@ -90,6 +90,32 @@ func TestCatalogSnapshotRejectsUnrecognizedManifest(t *testing.T) {
 	require.ErrorIs(t, err, models.ErrCatalogSnapshotInvalid)
 }
 
+func TestCatalogSnapshotStoredRecordsPreserveValidationWithoutWireFraming(t *testing.T) {
+	_, m := snapshotManifest(t)
+	for _, chunk := range m.Chunks {
+		body, err := os.ReadFile(filepath.Join("testdata/catalog_snapshot", chunk.File))
+		require.NoError(t, err)
+		for _, line := range bytes.SplitAfter(body, []byte{'\n'}) {
+			if len(line) == 0 {
+				continue
+			}
+			original, err := m.Record(line)
+			require.NoError(t, err)
+			stored := bytes.TrimSuffix(line, []byte{'\n'})
+			_, err = m.Record(stored)
+			require.ErrorIs(t, err, models.ErrCatalogSnapshotInvalid, "wire framing remains required")
+			record, err := m.StoredRecord(stored)
+			require.NoError(t, err)
+			require.Equal(t, original.Table, record.Table)
+			require.Equal(t, original.KeyJSON, record.KeyJSON)
+			require.Equal(t, original.Values, record.Values)
+			require.Equal(t, stored, record.Line, "the reader must not re-encode retained bytes")
+			_, err = m.StoredRecord(append(append([]byte(nil), stored...), stored...))
+			require.ErrorIs(t, err, models.ErrCatalogSnapshotInvalid, "only one JSON object is allowed")
+		}
+	}
+}
+
 func TestCatalogSnapshotRejectsChangedKeysBinaryAndJSON(t *testing.T) {
 	_, m := snapshotManifest(t)
 	for _, chunk := range m.Chunks {
@@ -113,6 +139,8 @@ func TestCatalogSnapshotRejectsChangedKeysBinaryAndJSON(t *testing.T) {
 			changed, err := archive.EncodeSourceJSON(original)
 			require.NoError(t, err)
 			_, err = m.Record(append(changed, '\n'))
+			require.ErrorIs(t, err, models.ErrCatalogSnapshotInvalid)
+			_, err = m.StoredRecord(changed)
 			require.ErrorIs(t, err, models.ErrCatalogSnapshotInvalid)
 		}
 	}

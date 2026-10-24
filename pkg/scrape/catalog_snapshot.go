@@ -277,7 +277,18 @@ type CatalogSnapshotRecord struct {
 // Each original line survives staging verbatim. Native source payload encoding
 // is a separate operation; re-encoding here would lose original digest evidence.
 func (m *CatalogSnapshotManifest) Record(line []byte) (*CatalogSnapshotRecord, error) {
-	r, err := prepareSQLiteSnapshotRecord(line, m.Tables, validCatalogValue)
+	if !validSnapshotRecordLine(line) {
+		return nil, models.ErrCatalogSnapshotInvalid
+	}
+	return m.StoredRecord(line)
+}
+
+// StoredRecord validates a retained JSON record against its manifest. Offline
+// NFO compaction re-encodes these objects without JSONL framing. Callers must
+// verify the stored bytes and digest before using this reader; incoming chunks
+// still use Record, which also requires the original wire framing.
+func (m *CatalogSnapshotManifest) StoredRecord(body []byte) (*CatalogSnapshotRecord, error) {
+	r, err := prepareSQLiteSnapshotRecordJSON(body, m.Tables, validCatalogValue)
 	if err != nil {
 		return nil, err
 	}
@@ -291,11 +302,19 @@ func (m *CatalogSnapshotManifest) Record(line []byte) (*CatalogSnapshotRecord, e
 	return r, nil
 }
 
+func validSnapshotRecordLine(line []byte) bool {
+	return len(line) > 0 && line[len(line)-1] == '\n' && bytes.Count(line, []byte{'\n'}) == 1
+}
+
 func prepareSQLiteSnapshotRecord(line []byte, tables map[string]CatalogSnapshotTable, validValue func(string, string, any, map[string]any) bool) (*CatalogSnapshotRecord, error) {
-	bad := models.ErrCatalogSnapshotInvalid
-	if len(line) == 0 || line[len(line)-1] != '\n' || bytes.Count(line, []byte{'\n'}) != 1 {
-		return nil, bad
+	if !validSnapshotRecordLine(line) {
+		return nil, models.ErrCatalogSnapshotInvalid
 	}
+	return prepareSQLiteSnapshotRecordJSON(line, tables, validValue)
+}
+
+func prepareSQLiteSnapshotRecordJSON(line []byte, tables map[string]CatalogSnapshotTable, validValue func(string, string, any, map[string]any) bool) (*CatalogSnapshotRecord, error) {
+	bad := models.ErrCatalogSnapshotInvalid
 	object, err := archive.DecodeJSONObject(line, CatalogChunkLimit)
 	if err != nil || len(object) != 3 {
 		return nil, bad

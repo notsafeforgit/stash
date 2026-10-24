@@ -3125,6 +3125,11 @@ The asset reference needed by media receipt validation is copied exactly into
 media, galleries and domain receipts are not rewritten. Original snapshot chunk
 retries still verify against their immutable receipt hashes.
 
+Stored record validation accepts the JSON objects produced by historical NFO
+compaction as well as the original JSONL rows. It checks their exact retained
+bytes and digest before validating keys and values against the manifest. Incoming
+snapshot chunks continue to require JSONL framing.
+
 `catalog_payload_retirements` records the policy, manifest hash, ordinal checkpoint
 and released payload bytes. Database guards allow only the defined transition;
 native backup validation checks the resulting receipts. A partial index covers

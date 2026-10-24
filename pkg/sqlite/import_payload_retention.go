@@ -142,7 +142,7 @@ WHERE p.snapshot_uuid=? AND p.ordinal>? ORDER BY p.ordinal LIMIT ?`, id, after, 
 		if len(body) != row.Bytes || scrape.CatalogSnapshotSHA(body) != row.SHA256 {
 			return nil, models.ErrCatalogSnapshotInvalid
 		}
-		record, err := manifest.Record(body)
+		record, err := manifest.StoredRecord(body)
 		if err != nil || record.Table != row.Table || record.KeyJSON != row.Key {
 			return nil, models.ErrCatalogSnapshotInvalid
 		}

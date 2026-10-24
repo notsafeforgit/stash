@@ -29,6 +29,8 @@ DELETE FROM scenes_galleries;`)
 	require.ErrorIs(t, err, ErrUnavailable)
 	_, err = f.service.AuthenticateLink(t.Context(), row.ID, row.Token)
 	require.ErrorIs(t, err, ErrUnavailable)
+	_, err = f.service.ResolveLink(t.Context(), row.Token)
+	require.ErrorIs(t, err, ErrUnavailable)
 	_, err = f.service.Rotate(t.Context(), row.ID)
 	require.ErrorIs(t, err, ErrUnavailable)
 	require.NoError(t, f.service.PrepareBatch(t.Context(), row))
@@ -56,6 +58,8 @@ DELETE FROM scenes_galleries;`)
 	require.Equal(t, PreparationBatchSize, row.PreparedCount)
 	require.NotEmpty(t, row.PreparationError)
 	require.Empty(t, SavedLinkSecret(row))
+	_, err = f.service.ResolveLink(t.Context(), row.Token)
+	require.ErrorIs(t, err, ErrUnavailable)
 	f.exec(`DELETE FROM galleries_images WHERE image_id>100;
 UPDATE images SET title='Changed later' WHERE id>1;
 INSERT INTO images(id,title,created_at,updated_at) VALUES(2056,'Added later',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
@@ -83,6 +87,9 @@ INSERT INTO galleries_images(gallery_id,image_id) VALUES(1,2056);`)
 	require.Equal(t, "READY", row.PreparationState, row.PreparationError)
 	require.Equal(t, 2055, row.PreparedCount)
 	require.NotEmpty(t, SavedLinkSecret(row))
+	resolved, err := f.service.ResolveLink(t.Context(), row.Token)
+	require.NoError(t, err)
+	require.Equal(t, row.ID, resolved.ID)
 	gallery := "gallery-" + f.identity("GALLERY", 1)
 	for _, scope := range []string{"", gallery} {
 		keys := map[string]bool{}

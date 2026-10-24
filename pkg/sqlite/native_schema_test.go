@@ -79,6 +79,10 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		name, change, message string
 	}{
 		{"missing lineage", "DROP TABLE native_schema", "no native lineage marker"},
+		{"missing share token lookup", "DROP INDEX shares_token_hash", "unique share token lookup"},
+		{"nonunique share token lookup", "DROP INDEX shares_token_hash; CREATE INDEX shares_token_hash ON shares(token_hash)", "unique share token lookup"},
+		{"wrong share token lookup", "DROP INDEX shares_token_hash; CREATE UNIQUE INDEX shares_token_hash ON shares(id)", "unique share token lookup"},
+		{"partial share token lookup", "DROP INDEX shares_token_hash; CREATE UNIQUE INDEX shares_token_hash ON shares(token_hash) WHERE revoked_at=0", "unique share token lookup"},
 		{"foreign lineage", "UPDATE native_schema SET lineage = 'another-application'", "unsupported database lineage"},
 		{"newer version", fmt.Sprintf("UPDATE schema_migrations SET version = %d", sqlite.GetRequiredSchemaVersion()+1), "incompatible with required"},
 		{"dirty migration", "UPDATE schema_migrations SET dirty = 1", "is incomplete"},

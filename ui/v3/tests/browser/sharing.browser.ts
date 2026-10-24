@@ -16,6 +16,8 @@ test.use({
 
 const id = "abcdefghijklmnopqrstuv";
 const base = `/share/${id}/`;
+const secret = "A".repeat(43);
+const recipientBase = `/share/${secret}/`;
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==",
   "base64",
@@ -67,11 +69,11 @@ async function serveShare(
     const headers = await request.allHeaders();
     expect(headers.apikey).toBeUndefined();
     expect(url.searchParams.has("key")).toBe(false);
-    expect(headers.referer ?? "").not.toContain("test-capability");
+    expect(headers.referer ?? "").not.toContain(secret);
     if (endpoint === "exchange") {
       exchanges++;
       expect(request.method()).toBe("POST");
-      expect(request.postDataJSON()).toEqual({ secret: "test-capability" });
+      expect(request.postDataJSON()).toEqual({ secret: secret });
       expiry = new Date(Date.now() + expiresIn * 1000).toISOString();
       await route.fulfill({
         status: 204,
@@ -201,10 +203,11 @@ test("older fragment links become forwardable URLs without owner providers", asy
   page,
 }) => {
   const fixture = await serveShare(page, false);
-  await page.goto(`${base}#test-capability`);
+  await page.goto(`${base}#${secret}`);
   await expect(page.locator(".yarl__portal")).toBeVisible();
   expect(new URL(page.url()).hash).toBe("");
-  expect(new URL(page.url()).searchParams.get("key")).toBe("test-capability");
+  expect(new URL(page.url()).pathname).toBe(recipientBase);
+  expect(new URL(page.url()).searchParams.has("key")).toBe(false);
   expect(fixture.exchanges()).toBe(1);
   await expect(
     page.getByRole("link", { name: "Download original" }),
@@ -235,9 +238,10 @@ test.describe("forwardable recipient links", () => {
     context,
   }) => {
     const fixture = await serveShare(page, false);
-    await page.goto(`${base}?key=test-capability`);
+    await page.goto(`${base}?key=${secret}`);
     await expect(page.locator(".yarl__portal")).toBeVisible();
-    expect(new URL(page.url()).searchParams.get("key")).toBe("test-capability");
+    expect(new URL(page.url()).pathname).toBe(recipientBase);
+    expect(new URL(page.url()).searchParams.has("key")).toBe(false);
     expect(fixture.exchanges()).toBe(1);
     expect(fixture.sessionMisses()).toBe(1);
     const copiedURL = page.url();
@@ -259,15 +263,17 @@ test.describe("forwardable recipient links", () => {
     context,
   }) => {
     const fixture = await serveShare(page, true, 3600, { media: mixed });
-    await page.goto(`${base}?key=test-capability`);
+    await page.goto(`${base}?key=${secret}`);
     await page.getByRole("tab", { name: "Images (2)" }).click();
-    expect(new URL(page.url()).searchParams.get("key")).toBe("test-capability");
+    expect(new URL(page.url()).pathname).toBe(recipientBase);
+    expect(new URL(page.url()).searchParams.has("key")).toBe(false);
     const link = page.getByRole("link", { name: "First image", exact: true });
     const copiedLink = new URL(
       (await link.getAttribute("href")) ?? "",
       page.url(),
     );
-    expect(copiedLink.searchParams.get("key")).toBe("test-capability");
+    expect(copiedLink.pathname).toBe(recipientBase);
+    expect(copiedLink.searchParams.has("key")).toBe(false);
     expect(copiedLink.searchParams.get("media")).toBe("image-1");
     await link.press("Enter");
     await expect(
@@ -279,7 +285,8 @@ test.describe("forwardable recipient links", () => {
       "aria-selected",
       "true",
     );
-    expect(new URL(page.url()).searchParams.get("key")).toBe("test-capability");
+    expect(new URL(page.url()).pathname).toBe(recipientBase);
+    expect(new URL(page.url()).searchParams.has("key")).toBe(false);
     expect(fixture.exchanges()).toBe(1);
 
     await context.clearCookies();
@@ -295,7 +302,7 @@ test("guest HLS playback reuses the player and stops at expiry", async ({
   page,
 }) => {
   const fixture = await serveShare(page, true, 12);
-  await page.goto(`${base}#test-capability`);
+  await page.goto(`${base}#${secret}`);
   await playSharedVideo(page);
   await expect
     .poll(() =>
@@ -349,7 +356,7 @@ test("one distinct item opens directly even when shared through overlapping gall
       { kind: "GALLERY", title: "Album", media_keys: ["image-1"] },
     ],
   });
-  await page.goto(`${base}#test-capability`);
+  await page.goto(`${base}#${secret}`);
   await expect(page.locator(".yarl__portal")).toBeVisible();
   await expect(
     page.locator(".yarl__slide_current img.yarl__slide_image"),
@@ -360,7 +367,7 @@ test("single-item shares preserve an explicit overview link", async ({
   page,
 }) => {
   await serveShare(page, false);
-  await page.goto(`${base}?tab=images#test-capability`);
+  await page.goto(`${base}?tab=images#${secret}`);
   await expect(
     page.getByRole("button", { name: "Preview Image" }),
   ).toBeVisible();
@@ -388,7 +395,7 @@ for (const savedTheme of ["system", "dark", "light"] as const) {
       await appReady;
       await route.continue();
     });
-    await page.goto(`${base}#test-capability`, { waitUntil: "commit" });
+    await page.goto(`${base}#${secret}`, { waitUntil: "commit" });
     const checkTheme = async (dark: boolean) => {
       const scheme = dark ? "dark" : "light";
       await expect(page.locator("html")).toHaveCSS("color-scheme", scheme);
@@ -465,7 +472,7 @@ test("mixed shares browse tabs, minimal details and gallery lightboxes with Back
       },
     ],
   });
-  await page.goto(`${base}#test-capability`);
+  await page.goto(`${base}#${secret}`);
   await expect(page.getByRole("tab", { name: "Scenes (2)" })).toHaveAttribute(
     "aria-selected",
     "true",
@@ -534,7 +541,7 @@ test("video previews use the scene lightbox and retain its video element when na
   page,
 }) => {
   await serveShare(page, true, 3600, { media: mixed.slice(0, 2) });
-  await page.goto(`${base}#test-capability`);
+  await page.goto(`${base}#${secret}`);
   await page
     .locator('.entity-card[data-id="scene-1"] [data-entity-card-preview]')
     .click();
@@ -588,7 +595,7 @@ for (const width of [390, 1280]) {
       sharedMedia(`image-${index + 1}`, `Shared image ${index + 1}`),
     );
     await serveShare(page, false, 3600, { media });
-    await page.goto(`${base}#test-capability`);
+    await page.goto(`${base}#${secret}`);
     const scroll = page.locator("[data-share-scroll]");
     await expect(page.locator(".entity-card").first()).toBeVisible();
     await scroll.evaluate((element) => {
@@ -631,7 +638,7 @@ test("only granted items and download actions are exposed through public details
   const media = sharedMedia("image-1", "Allowed image");
   media.download = `${base}media/image-1/download`;
   const fixture = await serveShare(page, false, 3600, { media: [media] });
-  await page.goto(`${base}?media=scene-999#test-capability`);
+  await page.goto(`${base}?media=scene-999#${secret}`);
   await expect(
     page.getByText("This item is no longer available."),
   ).toBeVisible();
@@ -674,7 +681,7 @@ test("shared cards and lightbox reuse scoped HDR preview catalogs", async ({
     };
   });
   const fixture = await serveShare(page, true, 3600, { media });
-  await page.goto(`${base}#test-capability`);
+  await page.goto(`${base}#${secret}`);
   const card = page.locator('.entity-card[data-id="scene-1"]');
   await expect(
     card.locator('source[type="image/avif"]').first(),
@@ -701,7 +708,7 @@ test("shares prefer playable original video without starting an encoder", async 
   const fixture = await serveShare(page, true, 3600, {
     originalVideo: "playable",
   });
-  await page.goto(`${base}#test-capability`);
+  await page.goto(`${base}#${secret}`);
   await playSharedVideo(page);
   const video = page.locator("video");
   await expect(video).toBeVisible();
@@ -742,7 +749,7 @@ for (const originalVideo of ["unsupported", "decode-error"] as const) {
       originalVideo,
       media: [media],
     });
-    await page.goto(`${base}#test-capability`);
+    await page.goto(`${base}#${secret}`);
     await playSharedVideo(page);
     const video = page.locator("video");
     await expect(video).toBeVisible();

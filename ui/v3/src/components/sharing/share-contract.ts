@@ -109,6 +109,7 @@ export async function shareRequest<T>(
 export function shareTarget(
   href: string,
   baseHref: string,
+  resolvedID: string | null = null,
 ): { base: URL; navigationBase: URL; secret: string } | null {
   const location = new URL(href);
   const root = new URL(baseHref);
@@ -117,15 +118,21 @@ export function shareTarget(
     !location.pathname.startsWith(root.pathname)
   )
     return null;
-  const id = location.pathname.slice(root.pathname.length).replace(/\/$/, "");
-  if (!/^[A-Za-z0-9_-]{22}$/.test(id)) return null;
+  const address = location.pathname
+    .slice(root.pathname.length)
+    .replace(/\/$/, "");
+  const shortLink = /^[A-Za-z0-9_-]{43}$/.test(address);
+  const id = shortLink ? resolvedID : address;
+  if (!id || !/^[A-Za-z0-9_-]{22}$/.test(id)) return null;
+  const secret = shortLink
+    ? address
+    : (location.searchParams.get("key") ?? location.hash.slice(1));
+  if (secret && !/^[A-Za-z0-9_-]{43}$/.test(secret)) return null;
   const base = new URL(`${id}/`, root);
-  const navigationBase = new URL(base);
-  const key = location.searchParams.get("key") ?? location.hash.slice(1);
   // All recipient links stay forwardable, including older fragment URLs.
   // Media/API requests still use the clean base and a scoped guest cookie.
-  if (key) navigationBase.searchParams.set("key", key);
-  return { base, navigationBase, secret: key };
+  const navigationBase = secret ? new URL(`${secret}/`, root) : new URL(base);
+  return { base, navigationBase, secret };
 }
 
 export function shareDeadline(

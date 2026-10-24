@@ -151,17 +151,26 @@ covers, thumbnails and the normal temporary video-stream cache.
 
 ## Credentials and enforcement
 
-New recipient links are `/share/<random-id>/?key=<256-bit-secret>`. The server
-can authenticate this URL to render link previews without JavaScript or cookies.
-Older `/#<secret>` recipient links still open in the browser and become the
-same `?key=` URL for copying and navigation. Crawlers need that query URL because
-they never receive fragments.
-Recipient links keep their `key` in the address bar, including when navigating
-between tabs and item details, so browser Copy/Share and copied item links remain
-usable by another recipient and by link-preview crawlers. The viewer exchanges
-the key via same-origin JSON POST and uses a Secure, HttpOnly, SameSite=Strict,
-host-only cookie scoped to that share's path for content and playback requests.
-Reloading reuses a valid cookie without creating another guest session.
+Recipient links are `/share/<256-bit-secret>/`. The server resolves the secret
+through a unique index on its hash and renders link previews without JavaScript
+or cookies. The internal share ID stays stable for management, membership,
+history and sessions; it is no longer a second component of the recipient URL.
+Regenerating a link replaces the secret and invalidates old links and sessions
+without recreating the share.
+
+Existing `/share/<id>/?key=<secret>` and `/share/<id>/#<secret>` links still work.
+The viewer replaces them with the short URL while retaining the selected tab or
+item. Query links still render crawler previews; fragment links need a browser
+because crawlers never receive fragments. Hash-only historical shares also
+resolve by their existing secret without rotation or reconstructing a stored key.
+
+The secret stays in the address-bar path during navigation, so browser Copy/Share
+and copied item links remain forwardable. The authenticated document supplies
+the internal ID in an inert meta tag. The viewer exchanges the secret via
+same-origin JSON POST at `/share/<id>/exchange` and uses a Secure, HttpOnly,
+SameSite=Strict, host-only cookie scoped to `/share/<id>/` for content and playback.
+Those API/media URLs contain no link secret and never accept the secret instead
+of a guest cookie. Reloading reuses a valid cookie without creating another session.
 
 Share link keys are stored directly in `shares.token`, without application-level
 encryption, so authenticated management can return the same URL later. Validation
@@ -196,13 +205,13 @@ concurrent preview encodes, no persistent video copy and no byte-range support
 for the generated stream. Images use compatible originals or a JPEG still.
 The share viewer still offers the ordinary original/remux/HLS playback choices.
 
-Use a newly created or rotated link for preview support. Existing fragment links
-can also be converted by replacing `#` with `?key=` without rotating the secret.
+Existing fragment links can be opened in a browser and copied in the short form
+for preview support, without rotating the secret.
 External preview services may keep a downloaded copy after a link is revoked;
 Stash can prevent future fetches, but cannot remove a copy held by Telegram.
-Treat complete URLs as credentials: omit or redact the `key` query parameter in
-proxy/access logs. The app sends no referrer and uses cookie-authenticated URLs
-without the key when fetching normal share content. Preview media explicitly
+Treat complete URLs as credentials: omit or redact the secret path segment and
+legacy `key` query parameter in proxy/access logs. The app sends no referrer and
+uses cookie-authenticated URLs without the secret when fetching normal share content. Preview media explicitly
 permits cross-origin display; ordinary share/API endpoints retain their existing
 cookie and origin checks.
 

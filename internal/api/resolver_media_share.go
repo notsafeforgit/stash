@@ -55,7 +55,7 @@ func shareResultInTxn(ctx context.Context, repo models.Repository, row *models.S
 		}
 	}
 	if secret := sharing.SavedLinkSecret(row); secret != "" {
-		link := shareLink(ctx, row.ID, secret)
+		link := shareLink(ctx, secret)
 		ret.URL = &link
 	}
 	if row.RevokedAt != 0 {
@@ -76,13 +76,13 @@ func shareResultInTxn(ctx context.Context, repo models.Repository, row *models.S
 	return ret, nil
 }
 
-func shareLink(ctx context.Context, id, secret string) string {
+func shareLink(ctx context.Context, secret string) string {
 	base := config.GetInstance().GetSharingPublicURL()
 	if base == "" {
 		base, _ = ctx.Value(BaseURLCtxKey).(string)
 		base = strings.TrimRight(base, "/") + "/share"
 	}
-	return base + "/" + url.PathEscape(id) + "/?" + url.Values{"key": {secret}}.Encode()
+	return base + "/" + url.PathEscape(secret) + "/"
 }
 
 func (r *queryResolver) MediaShares(ctx context.Context, limit int, offset int, status *MediaShareStatus) ([]*MediaShare, error) {
@@ -214,7 +214,7 @@ func (r *mutationResolver) MediaShareRotate(ctx context.Context, id string) (str
 	if err != nil {
 		return "", err
 	}
-	return shareLink(ctx, id, secret), nil
+	return shareLink(ctx, secret), nil
 }
 
 func (r *mutationResolver) MediaShareRetry(ctx context.Context, id string) (*MediaShare, error) {

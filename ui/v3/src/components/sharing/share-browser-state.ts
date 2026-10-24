@@ -66,7 +66,7 @@ const historySchema = z.object({
   stashShareDepth: z.number().int().nonnegative(),
 });
 
-/** Public navigation stays under the share URL; the fragment is only a grant. */
+/** Public navigation retains the forwardable recipient URL. */
 export function useShareNavigation(base: URL) {
   const [location, setLocation] = useState(() =>
     readShareLocation(window.location.search),

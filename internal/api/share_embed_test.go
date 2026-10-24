@@ -35,13 +35,14 @@ func linkCard(t *testing.T, handler http.Handler, target string) map[string]stri
 func TestShareLinkImageCardWithoutCookies(t *testing.T) {
 	rs, handler, row, secret := shareHTTPFixture(t)
 	base := "https://shares.test/share/" + row.ID + "/"
-	link := base + "?key=" + secret
+	link := "https://shares.test/share/" + secret + "/"
 	card := linkCard(t, handler, link)
+	require.Equal(t, card, linkCard(t, handler, base+"?key="+secret), "existing links advertise the canonical URL without rotating")
 	require.Equal(t, row.Label, card["og:title"])
 	require.Equal(t, "summary_large_image", card["twitter:card"])
 	require.Equal(t, link, card["og:url"])
 	require.Empty(t, card["og:video"])
-	require.Equal(t, base+"preview/image?key="+secret, card["og:image"])
+	require.Equal(t, link+"preview/image", card["og:image"])
 	for _, method := range []string{http.MethodGet, http.MethodHead} {
 		r := httptest.NewRequest(method, card["og:image"], nil)
 		r.Header.Set("Origin", "https://web.telegram.org")
@@ -81,7 +82,8 @@ func TestShareLinkImageCardWithoutCookies(t *testing.T) {
 	// Management Preview and Copy link receive the same public, crawler-capable URL.
 	parsed, err := url.Parse(*managed.URL)
 	require.NoError(t, err)
-	require.Equal(t, secret, parsed.Query().Get("key"))
+	require.Equal(t, "/share/"+secret+"/", parsed.Path)
+	require.Empty(t, parsed.RawQuery)
 	require.Empty(t, parsed.Fragment)
 	require.NoError(t, rs.service.Revoke(t.Context(), row.ID))
 	for _, target := range []string{link, card["og:image"]} {
@@ -168,10 +170,49 @@ func TestShareLinkPublicOriginAndMount(t *testing.T) {
 		require.True(t, strings.HasPrefix(card[key], "https://public.test/mounted/share/"), card[key])
 	}
 	ctx := context.WithValue(t.Context(), BaseURLCtxKey, "http://internal.test")
-	link, err := url.Parse(shareLink(ctx, row.ID, secret))
+	link, err := url.Parse(shareLink(ctx, secret))
 	require.NoError(t, err)
 	require.Empty(t, link.Fragment)
-	require.Equal(t, secret, link.Query().Get("key"))
+	require.Equal(t, "/mounted/share/"+secret+"/", link.Path)
+	require.Empty(t, link.RawQuery)
+}
+
+func TestShareShortLinkBootstrapAndCookieScope(t *testing.T) {
+	rs, handler, row, secret := shareHTTPFixture(t)
+	base := "https://shares.test/share/" + secret + "/"
+	cookie := exchangeShareHTTP(t, handler, row, secret)
+	for _, suffix := range []string{"", "?tab=images&media=" + shareTestKey(t, rs, "image", 1)} {
+		w := sharedPreviewRequest(handler, http.MethodGet, base+suffix, nil)
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Contains(t, w.Body.String(), `<meta name="stash-share-id" content="`+row.ID+`"/>`)
+		require.NotContains(t, w.Body.String(), cookie.Value)
+		require.Empty(t, w.Header().Get("Set-Cookie"))
+		head := sharedPreviewRequest(handler, http.MethodHead, base+suffix, nil)
+		require.Equal(t, http.StatusOK, head.Code)
+		require.Empty(t, head.Body.String())
+		require.Equal(t, w.Header().Get("Content-Length"), head.Header().Get("Content-Length"))
+	}
+	for _, endpoint := range []string{"content", "status", "media/" + shareTestKey(t, rs, "image", 1) + "/image"} {
+		r := httptest.NewRequest(http.MethodGet, base+endpoint, nil)
+		r.AddCookie(cookie)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		require.Equal(t, http.StatusNotFound, w.Code, "capability paths are not browser API paths")
+	}
+	for _, invalid := range []string{strings.Repeat("A", 43), secret + "=", secret + "%0A", secret[:42]} {
+		w := sharedPreviewRequest(handler, http.MethodGet, "/share/"+invalid+"/", nil)
+		require.Equal(t, http.StatusNotFound, w.Code)
+		require.NotContains(t, w.Body.String(), row.ID)
+	}
+	rotated, err := rs.service.Rotate(t.Context(), row.ID)
+	require.NoError(t, err)
+	for _, endpoint := range []string{"", "preview/image"} {
+		require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, base+endpoint, nil).Code)
+	}
+	card := linkCard(t, handler, "/share/"+rotated+"/")
+	require.Equal(t, row.Label, card["og:title"])
+	require.NoError(t, rs.service.Revoke(t.Context(), row.ID))
+	require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, "/share/"+rotated+"/", nil).Code)
 }
 
 func TestShareLinkVideoCompatibility(t *testing.T) {

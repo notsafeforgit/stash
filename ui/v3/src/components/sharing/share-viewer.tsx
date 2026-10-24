@@ -29,12 +29,13 @@ async function openShare(
   if (!target) throw new ShareUnavailableError();
   const secret = target.secret;
   const cleanURL = new URL(location.href);
+  cleanURL.pathname = target.navigationBase.pathname;
   cleanURL.hash = "";
-  if (secret) cleanURL.searchParams.set("key", secret);
+  cleanURL.searchParams.delete("key");
   history.replaceState(history.state, "", cleanURL.pathname + cleanURL.search);
   const contentURL = shareContentURL(target.base);
   if (secret) {
-    // The address-bar key survives reloads. Reuse a valid guest cookie instead
+    // The address-bar secret survives reloads. Reuse a valid guest cookie instead
     // of creating another session and counting another recipient exchange.
     try {
       return await shareRequest(contentURL, shareContentSchema);
@@ -62,7 +63,14 @@ export function ShareViewer() {
   const [loadingMore, setLoadingMore] = useState(false);
   const contentRequest = useRef<AbortController | null>(null);
   useEffect(() => () => contentRequest.current?.abort(), []);
-  const [target] = useState(() => shareTarget(location.href, document.baseURI));
+  const [target] = useState(() =>
+    shareTarget(
+      location.href,
+      document.baseURI,
+      document.querySelector<HTMLMetaElement>('meta[name="stash-share-id"]')
+        ?.content ?? null,
+    ),
+  );
   const [navigationBase] = useState(
     () => target?.navigationBase ?? new URL(document.baseURI),
   );

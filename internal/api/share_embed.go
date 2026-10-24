@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -34,7 +33,7 @@ func (rs *shareRoutes) linkItem(r *http.Request) (*models.ShareMedia, models.Fil
 	return rs.service.Item(r.Context(), shareGrant(r), snapshot.Media[0].Key)
 }
 
-func shareLinkBase(r *http.Request, id string) string {
+func shareLinkBase(r *http.Request, secret string) string {
 	base := config.GetInstance().GetSharingPublicURL()
 	if base == "" {
 		scheme := "http"
@@ -43,16 +42,18 @@ func shareLinkBase(r *http.Request, id string) string {
 		}
 		base = scheme + "://" + r.Host + strings.TrimSuffix(sharePrefix(r), "/")
 	}
-	return strings.TrimRight(base, "/") + "/" + id + "/"
+	return strings.TrimRight(base, "/") + "/" + secret + "/"
 }
 
 func (rs *shareRoutes) linkPage(w http.ResponseWriter, r *http.Request) {
 	row := shareGrant(r)
-	base := shareLinkBase(r, row.ID)
-	query := "?" + url.Values{"key": {r.URL.Query().Get("key")}}.Encode()
+	base := shareLinkBase(r, shareLinkSecret(r))
 	title := row.Label
 	card, kind := "summary", "website"
 	var tags strings.Builder
+	// The viewer exchanges the link at the stable, cookie-scoped API path.
+	// This inert bootstrap contains an ID, never a session or owner credential.
+	fmt.Fprintf(&tags, `<meta name="stash-share-id" content="%s"/>`+"\n", html.EscapeString(row.ID))
 	meta := func(property, value string) {
 		fmt.Fprintf(&tags, `<meta property="%s" content="%s"/>`+"\n", property, html.EscapeString(value))
 	}
@@ -66,10 +67,10 @@ func (rs *shareRoutes) linkPage(w http.ResponseWriter, r *http.Request) {
 			title = item.Title
 		}
 		card = "summary_large_image"
-		meta("og:image", base+"preview/image"+query)
+		meta("og:image", base+"preview/image")
 		if vf, ok := f.(*models.VideoFile); ok {
 			card, kind = "player", "video.other"
-			video := base + "preview/video.mp4" + query
+			video := base + "preview/video.mp4"
 			width, height := item.Width, item.Height
 			if !directLinkVideo(vf) && min(width, height) > 720 {
 				scale := 720.0 / float64(min(width, height))
@@ -90,12 +91,12 @@ func (rs *shareRoutes) linkPage(w http.ResponseWriter, r *http.Request) {
 			// fallback, so preview consumers select the video stream card.
 			meta("twitter:image", "0")
 		} else {
-			meta("twitter:image", base+"preview/image"+query)
+			meta("twitter:image", base+"preview/image")
 		}
 	}
 	meta("og:type", kind)
 	meta("og:site_name", "Stash")
-	meta("og:url", base+query)
+	meta("og:url", base)
 	meta("og:title", title)
 	meta("twitter:title", title)
 	meta("twitter:card", card)

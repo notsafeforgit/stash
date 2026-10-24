@@ -44,7 +44,7 @@ export default defineConfig({
             return;
           }
           if (
-            /^\/share\/[A-Za-z0-9_-]{22}\/?$/.test(
+            /^\/share\/(?:[A-Za-z0-9_-]{22}|[A-Za-z0-9_-]{43})\/?$/.test(
               new URL(request.url ?? "/", "http://localhost").pathname,
             )
           ) {
@@ -63,7 +63,7 @@ export default defineConfig({
                   // before the React module loads. Reproduce that ordering.
                   .replace(
                     "</head>",
-                    `<link rel="stylesheet" href="/@fs${source}/styles/globals.css"></head>`,
+                    `<meta name="stash-share-id" content="abcdefghijklmnopqrstuv"><link rel="stylesheet" href="/@fs${source}/styles/globals.css"></head>`,
                   ),
               );
               response.setHeader("Content-Type", "text/html");

@@ -26,6 +26,7 @@ import (
 )
 
 var shareIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{22}$`)
+var shareSecretPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
 var shareAssetPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+\.(js|css|woff2|png|svg)$`)
 
 type shareContextKey int
@@ -176,11 +177,12 @@ func sameShareOrigin(r *http.Request, require bool) bool {
 }
 
 func (rs *shareRoutes) page(w http.ResponseWriter, r *http.Request) {
-	if id := chi.URLParam(r, "shareID"); id != "" && !shareIDPattern.MatchString(id) {
+	id := chi.URLParam(r, "shareID")
+	if id != "" && !shareIDPattern.MatchString(id) && !shareSecretPattern.MatchString(id) {
 		http.NotFound(w, r)
 		return
 	}
-	if r.URL.Query().Has("key") {
+	if shareSecretPattern.MatchString(id) || r.URL.Query().Has("key") {
 		rs.authorizeLink(http.HandlerFunc(rs.linkPage)).ServeHTTP(w, r)
 		return
 	}
@@ -258,26 +260,46 @@ func (rs *shareRoutes) authorizeLink(next http.Handler) http.Handler {
 	return rs.withGrant(next, true)
 }
 
+func shareLinkSecret(r *http.Request) string {
+	if value := chi.URLParam(r, "shareID"); shareSecretPattern.MatchString(value) {
+		return value
+	}
+	return r.URL.Query().Get("key")
+}
+
 func (rs *shareRoutes) withGrant(next http.Handler, link bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "shareID")
-		if !shareIDPattern.MatchString(id) || (!link && !sameShareOrigin(r, false)) {
+		validAddress := shareIDPattern.MatchString(id) || (link && shareSecretPattern.MatchString(id))
+		if !validAddress || (!link && !sameShareOrigin(r, false)) {
 			http.NotFound(w, r)
 			return
 		}
 		authenticate := rs.service.Authenticate
 		secret := ""
+		var row *models.ShareRecord
+		var err error
 		if link {
 			authenticate = rs.service.AuthenticateLink
-			secret = r.URL.Query().Get("key")
+			secret = shareLinkSecret(r)
+			if shareSecretPattern.MatchString(id) {
+				row, err = rs.service.ResolveLink(r.Context(), secret)
+			} else {
+				row, err = authenticate(r.Context(), id, secret)
+			}
 		} else if cookie, err := r.Cookie(shareCookieName(id)); err == nil {
 			secret = cookie.Value
 		}
-		row, err := authenticate(r.Context(), id, secret)
+		if !link {
+			row, err = authenticate(r.Context(), id, secret)
+		}
 		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
+		// Delivery budgets and revalidation always use the immutable internal ID,
+		// including when the document/preview was addressed by its capability.
+		id = row.ID
 		ctx, done, err := rs.service.BeginDelivery(r.Context(), row)
 		if err != nil {
 			w.Header().Set("Retry-After", "2")

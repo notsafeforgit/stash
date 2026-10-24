@@ -760,6 +760,18 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				}
 			}
 		}
+		if version >= NativeSchemaBaseline+133 {
+			var complete bool
+			if err := conn.Get(&complete, `SELECT
+EXISTS(SELECT 1 FROM pragma_index_list('shares') WHERE name='shares_token_hash' AND "unique"=1 AND partial=0)
+AND (SELECT count(*) FROM pragma_index_info('shares_token_hash'))=1
+AND EXISTS(SELECT 1 FROM pragma_index_info('shares_token_hash') WHERE name='token_hash')`); err != nil {
+				return err
+			}
+			if !complete {
+				return errors.New("native database schema is incomplete: unique share token lookup")
+			}
+		}
 		if version >= NativeSchemaBaseline+130 {
 			for _, name := range []string{"share_snapshot_entries", "share_snapshot_media", "share_snapshot_members", "shares_preparing", "share_snapshot_entries_kind", "share_snapshot_members_media", "share_snapshot_entry_immutable", "share_snapshot_member_immutable", "share_snapshot_media_immutable", "share_snapshot_ready", "share_snapshot_sealed", "share_snapshot_entry_insert", "share_snapshot_member_insert", "share_snapshot_media_insert", "share_snapshot_entry_delete", "share_snapshot_member_delete", "share_snapshot_media_delete", "share_snapshot_admission_closed", "share_snapshot_counts_immutable", "share_snapshot_checkpoint", "share_snapshot_media_preparation", "share_snapshot_media_kind"} {
 				var found bool

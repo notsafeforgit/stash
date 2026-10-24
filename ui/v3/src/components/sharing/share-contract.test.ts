@@ -12,16 +12,17 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("share capabilities in the browser", () => {
   const id = "abcdefghijklmnopqrstuv";
+  const secret = "A".repeat(43);
   it("accepts older fragment links and resolves mounted share paths", () => {
     const target = shareTarget(
-      `https://share.test/mounted/share/${id}/#secret`,
+      `https://share.test/mounted/share/${id}/#${secret}`,
       "https://share.test/mounted/share/",
     );
     expect(target?.base.href).toBe(`https://share.test/mounted/share/${id}/`);
     expect(target?.navigationBase.href).toBe(
-      `https://share.test/mounted/share/${id}/?key=secret`,
+      `https://share.test/mounted/share/${secret}/`,
     );
-    expect(target?.secret).toBe("secret");
+    expect(target?.secret).toBe(secret);
     expect(
       shareTarget(
         `https://other.test/share/${id}/`,
@@ -43,14 +44,27 @@ describe("share capabilities in the browser", () => {
   });
   it("reads crawler-compatible links without putting credentials in media base URLs", () => {
     const target = shareTarget(
-      `https://share.test/mounted/share/${id}/?key=crawler-capability`,
+      `https://share.test/mounted/share/${id}/?key=${secret}`,
       "https://share.test/mounted/share/",
     );
-    expect(target?.secret).toBe("crawler-capability");
+    expect(target?.secret).toBe(secret);
     expect(target?.base.href).toBe(`https://share.test/mounted/share/${id}/`);
     expect(target?.navigationBase.href).toBe(
-      `https://share.test/mounted/share/${id}/?key=crawler-capability`,
+      `https://share.test/mounted/share/${secret}/`,
     );
+  });
+  it("uses the server-resolved ID for short links and keeps secrets out of API paths", () => {
+    const root = "https://share.test/mounted/share/";
+    const href = `${root}${secret}/?tab=images`;
+    const target = shareTarget(href, root, id);
+    expect(target?.base.href).toBe(`${root}${id}/`);
+    expect(target?.navigationBase.href).toBe(`${root}${secret}/`);
+    expect(target?.secret).toBe(secret);
+    expect(shareTarget(href, root)).toBeNull();
+    expect(shareTarget(href, root, "../graphql")).toBeNull();
+    expect(shareTarget(`${root}${id}/?key=invalid`, root)).toBeNull();
+    expect(shareTarget(`${root}${secret}/content`, root, id)).toBeNull();
+    expect(shareTarget(`${root}${id}/`, root)?.secret).toBe("");
   });
   it("uses server time to expire when the recipient clock is wrong", () => {
     expect(

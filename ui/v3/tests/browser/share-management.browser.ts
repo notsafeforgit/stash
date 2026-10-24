@@ -139,10 +139,8 @@ for (const older of [false, true]) {
     context,
   }, testInfo) => {
     await page.setViewportSize({ width: 320, height: 720 });
-    const original =
-      "https://shares.test/share/abcdefghijklmnopqrstuv/?key=original";
-    const replacement =
-      "https://shares.test/share/abcdefghijklmnopqrstuv/?key=replacement";
+    const original = `https://shares.test/share/${"A".repeat(43)}/`;
+    const replacement = `https://shares.test/share/${"B".repeat(42)}A/`;
     let share: GQL.MediaShareFieldsFragment = {
       __typename: "MediaShare",
       preparation_state: GQL.SharePreparationState.Ready,
@@ -629,7 +627,7 @@ for (const width of [320, 1280]) {
       preparation_error: "",
       prepared_count: 0,
       id: "active-share",
-      url: "https://shares.test/share/active-share/?key=example",
+      url: `https://shares.test/share/${"A".repeat(43)}/`,
       label: "Keep this active share",
       created_at: now.toISOString(),
       expires_at: "2026-10-19T12:00:00Z",
@@ -895,7 +893,7 @@ test("large snapshots survive closing the dialog and expose a link only after re
   );
   share.preparation_state = GQL.SharePreparationState.Ready;
   share.prepared_count = 4000;
-  share.url = "https://shares.test/share/abcdefghijklmnopqrstuv/?key=completed";
+  share.url = `https://shares.test/share/${"A".repeat(43)}/`;
   const ready = page.getByRole("dialog", {
     name: "Your share link is ready",
     exact: true,

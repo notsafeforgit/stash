@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -68,7 +69,18 @@ func validateCatalogMediaSchema(conn *sqlx.DB, auditData bool) error {
 	if !auditData {
 		return nil
 	}
-	err := conn.Get(&invalid, catalogMediaValidationQuery)
+	query := catalogMediaValidationQuery
+	var retained bool
+	if err := conn.Get(&retained, "SELECT EXISTS(SELECT 1 FROM pragma_table_info('catalog_snapshot_records') WHERE name='original_byte_count')"); err != nil {
+		return err
+	}
+	if retained {
+		// Retired payloads retain the asset reference checked here. The database
+		// transition guard requires it to equal the original JSON value.
+		// Inputs not retired keep their original validation semantics.
+		query = strings.ReplaceAll(query, "json_extract(e.data,'$.values.asset_id')", "CASE WHEN e.original_byte_count IS NULL THEN json_extract(e.data,'$.values.asset_id') ELSE e.retained_asset_id END")
+	}
+	err := conn.Get(&invalid, query)
 	if err != nil {
 		return err
 	}

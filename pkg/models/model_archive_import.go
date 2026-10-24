@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 // ArchiveImportSnapshot separates receipt of migration input from the outcomes
@@ -59,4 +60,34 @@ var ErrArchiveImportInvalid = errors.New("invalid archive import history request
 type ArchiveImportReader interface {
 	Snapshots(context.Context, ArchiveImportFilter) ([]ArchiveImportSnapshot, error)
 	Snapshot(context.Context, string, string) (*ArchiveImportDetails, error)
+}
+
+type ImportPayloadRetirement struct {
+	SnapshotUUID   string `json:"snapshot_uuid" db:"snapshot_uuid"`
+	Policy         string `json:"policy" db:"policy"`
+	ManifestSHA256 string `json:"manifest_sha256" db:"manifest_sha256"`
+	State          string `json:"state" db:"state"`
+	LastOrdinal    int64  `json:"last_ordinal" db:"last_ordinal"`
+	RetiredRecords int64  `json:"retired_records" db:"retired_records"`
+	ReleasedBytes  int64  `json:"released_bytes" db:"released_bytes"`
+	CreatedAt      string `json:"created_at" db:"created_at"`
+	UpdatedAt      string `json:"updated_at" db:"updated_at"`
+}
+
+type ImportPayloadRetention struct {
+	Kind             string                   `json:"kind"`
+	SnapshotUUID     string                   `json:"snapshot_uuid"`
+	Eligible         bool                     `json:"eligible"`
+	Reason           string                   `json:"reason"`
+	CandidateRecords int64                    `json:"candidate_records"`
+	CandidateBytes   int64                    `json:"candidate_bytes"`
+	Progress         *ImportPayloadRetirement `json:"progress"`
+}
+
+var ErrImportPayloadRetentionConflict = errors.New("import payloads are retained or checkpoint changed")
+
+type ArchiveImportReaderWriter interface {
+	ArchiveImportReader
+	PayloadRetention(context.Context, string, string) (*ImportPayloadRetention, error)
+	RetirePayloads(context.Context, string, int64, int, time.Time) (*ImportPayloadRetirement, error)
 }

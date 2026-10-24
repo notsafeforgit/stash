@@ -47,7 +47,7 @@ type Repository struct {
 	ArchiveActivity             ArchiveActivityReader
 	ArchiveReview               ArchiveReviewReader
 	ArchivePagination           ArchivePaginationReader
-	ArchiveImport               ArchiveImportReader
+	ArchiveImport               ArchiveImportReaderWriter
 	SourceRun                   SourceRunReaderWriter
 	WorkerPolicy                WorkerPolicyReaderWriter
 	SourceBackfill              SourceBackfillReaderWriter

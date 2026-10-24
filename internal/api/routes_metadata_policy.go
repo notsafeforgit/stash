@@ -239,6 +239,8 @@ func (rs *nativeArchiveRoutes) routerWithSourceTracking(enabled bool) http.Handl
 	r.Get("/review-queue/{kind}", rs.archiveReviewQueue)
 	r.Get("/import-history/{kind}", rs.importSnapshots)
 	r.Get("/import-history/{kind}/{snapshot}", rs.importSnapshot)
+	r.Get("/import-history/{kind}/{snapshot}/payload-retention", rs.importPayloadRetention)
+	r.Post("/import-history/{kind}/{snapshot}/payload-retention", rs.retireImportPayloads)
 	r.Post("/catalog-snapshots", rs.beginCatalogSnapshot)
 	r.Get("/catalog-snapshots/{snapshot}", rs.catalogSnapshot)
 	r.Put("/catalog-snapshots/{snapshot}/chunks/{chunk}", rs.receiveCatalogSnapshotChunk)

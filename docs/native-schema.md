@@ -3103,3 +3103,30 @@ expire. Rollbacks retain cached counts. Schema changes, untracked external write
 and tracking failures conservatively invalidate the cache. Relative-time and
 nondeterministic queries remain uncached. Worker bookkeeping does not invalidate
 unrelated library totals.
+
+## Consumed catalog payload retention (1000132)
+
+Catalog staging now separates the lifetime of source JSON from durable import
+receipts. An explicit, resumable maintenance operation can retire payloads for
+`account_snapshots`, `observations`, `observation_details`, `assets`, `files` and
+`appearances` after all eleven catalog consumers have finished without historical
+reviews. Individual media rows must have mapped successfully; unavailable inputs
+remain intact. Automation inputs and other catalog families remain retained
+because activation, provenance validation or detail readers still consume them.
+
+The migration adds the lifecycle but does not retire any data. Each transaction
+handles at most 512 records and 16 MiB of source payloads. It verifies original
+hashes and manifest keys, replaces eligible JSON with `{}`, and commits its
+checkpoint atomically. Retries return the committed checkpoint; interruption
+leaves a valid native database that can resume. Snapshot, chunk and row identities,
+original hashes, original byte counts and import outcomes remain unchanged.
+The asset reference needed by media receipt validation is copied exactly into
+`retained_asset_id` under a database transition guard. Canonical source evidence,
+media, galleries and domain receipts are not rewritten. Original snapshot chunk
+retries still verify against their immutable receipt hashes.
+
+`catalog_payload_retirements` records the policy, manifest hash, ordinal checkpoint
+and released payload bytes. Database guards allow only the defined transition;
+native backup validation checks the resulting receipts. Released bytes describe
+removed JSON, not a reduction in the SQLite file's length: freed space is reused
+by later writes. Maintenance does not run `VACUUM` or rebuild the library.

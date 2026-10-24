@@ -3170,6 +3170,23 @@ keeps successful same-scope results after a failed refresh and preserves list
 position when returning from a selected snapshot. Current associations are
 reviewed through their domain screens rather than by editing historical receipts.
 
+Consumed catalog JSON can be retired through the authenticated maintenance route
+`/api/v3/archive/import-history/{kind}/{snapshot}/payload-retention`. `GET` returns
+eligibility, retained-input reasons, candidate record/byte totals and any existing
+checkpoint. It accepts no query parameters. Automation inputs remain ineligible;
+catalog snapshots require all eleven consumers to finish without historical
+reviews. Unavailable media inputs and families still needed by validators are
+retained. See [the retention contract](native-schema.md#consumed-catalog-payload-retention-1000132).
+
+For an eligible catalog snapshot, `POST` requires `{"after":0,"limit":512}` for
+the initial batch. Continue with the returned `last_ordinal` until `state` is
+`complete`. Limits are 1–512 records and each batch also has a 16 MiB payload
+budget. Repeating an older checkpoint returns committed progress; a checkpoint
+ahead of the server or ineligible input returns 409. Each batch is atomic and
+safe to resume after a lost response or process interruption. The operation
+removes only redundant staged JSON and records released payload bytes; it does
+not rerun imports, change media metadata or shrink the database file.
+
 ## Saved application actions
 
 `/saved-actions` in the desktop utility menu and mobile drawer discovers actions

@@ -224,6 +224,10 @@ func TestCatalogEnrichmentMigrationPreservesExistingState(t *testing.T) {
 	for i := range before["catalog_snapshots"] {
 		before["catalog_snapshots"][i] = append(before["catalog_snapshots"][i], int64(0), int64(0))
 	}
+	// Adding the retention lifecycle must leave every payload unretired.
+	for i := range before["catalog_snapshot_records"] {
+		before["catalog_snapshot_records"][i] = append(before["catalog_snapshot_records"][i], nil, nil)
+	}
 	var needed *sqlite.MigrationNeededError
 	require.True(t, errors.As(f.db.Open(path), &needed))
 	require.NoError(t, f.db.RunAllMigrations())

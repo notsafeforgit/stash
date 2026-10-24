@@ -263,6 +263,11 @@ func TestCatalogCleanupMigrationPreservesExistingState(t *testing.T) {
 				require.NoError(t, f.db.RunAllMigrations())
 				require.NoError(t, f.db.ReInitialise())
 				require.EqualValues(t, 1, advanceCatalogCleanup(t, f, 0).HeldRecords)
+				// Successful upgrade adds unset retention fields; it must not
+				// retire any payload or alter any original receipt value.
+				for i := range before["catalog_snapshot_records"] {
+					before["catalog_snapshot_records"][i] = append(before["catalog_snapshot_records"][i], nil, nil)
+				}
 			}
 			for table, rows := range before {
 				require.Equal(t, rows, albumJobRows(t, raw, table), table)

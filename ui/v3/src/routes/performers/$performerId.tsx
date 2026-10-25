@@ -324,7 +324,19 @@ function PerformerDetailPage() {
 
   return (
     <>
-      <CollectionDetailLayout title={title} onBack={goBack}>
+      <CollectionDetailLayout
+        title={title}
+        onBack={goBack}
+        shareEntity={
+          performer
+            ? {
+                kind: GQL.ShareLibraryKind.Performer,
+                id: performer.id,
+                name: performer.name,
+              }
+            : undefined
+        }
+      >
         {/* Mobile: single vertical scroll. Desktop (md+): split into a left
           sidebar holding the entity details (portrait + toolbar + details
           tab) and a right column holding the embedded list tabs — each

@@ -284,7 +284,19 @@ function TagDetailPage() {
   }
 
   return (
-    <CollectionDetailLayout title={tag?.name ?? ""} onBack={goBack}>
+    <CollectionDetailLayout
+      title={tag?.name ?? ""}
+      onBack={goBack}
+      shareEntity={
+        tag
+          ? {
+              kind: GQL.ShareLibraryKind.Tag,
+              id: tag.id,
+              name: tag.name,
+            }
+          : undefined
+      }
+    >
       <DetailPageState
         loading={loading}
         error={error}

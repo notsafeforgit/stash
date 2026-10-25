@@ -43,6 +43,7 @@ import {
   ShareSelectionButton,
   useShareAction,
 } from "@/components/sharing/share-action";
+import { useActiveCollectionShareList } from "@/components/sharing/collection-share-context";
 import {
   EntityActionsMenu,
   type EntityActionItem,
@@ -219,24 +220,29 @@ export function EntityListPage<
     pageKey: JSON.stringify(filter.makeFindFilter()),
     loading: isLoading,
   });
+  const shareSource =
+    source.kind === "graphql" && sharing
+      ? {
+          matching: { kind: sharing.kind, filter },
+          targets: listSelect.selectedItems.map((item) => ({
+            kind: sharing.kind,
+            id: item.id,
+            name: sharing.getTitle(item) || item.id,
+          })),
+        }
+      : undefined;
+  useActiveCollectionShareList(shareSource);
+  const shareList = useShareAction(
+    shareSource?.targets ?? [],
+    shareSource?.matching,
+  );
   const shareSelection =
-    source.kind === "graphql" && sharing && listSelect.hasSelection ? (
+    shareSource && listSelect.hasSelection ? (
       <ShareSelectionButton
         compact={isMobileSidebar}
-        matching={{ kind: sharing.kind, filter }}
-        targets={listSelect.selectedItems.map((item) => ({
-          kind: sharing.kind,
-          id: item.id,
-          name: sharing.getTitle(item) || item.id,
-        }))}
+        onShare={shareList.open}
       />
     ) : undefined;
-  const shareList = useShareAction(
-    [],
-    source.kind === "graphql" && sharing
-      ? { kind: sharing.kind, filter }
-      : undefined,
-  );
   const listPageActions: EntityActionItem[] = [...(pageActions ?? [])];
   if (source.kind === "graphql" && sharing) {
     listPageActions.push({

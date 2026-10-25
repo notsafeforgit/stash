@@ -18,6 +18,13 @@ export interface ShareEntitySource {
   name: string;
 }
 
+export type ShareScope = "selection" | "filter" | "entity";
+
+export interface ShareListSource {
+  targets: ShareSelection[];
+  matching: MatchingShareSelection;
+}
+
 export const allShareMediaTypes = [
   GQL.ShareEntityKind.Scene,
   GQL.ShareEntityKind.Image,

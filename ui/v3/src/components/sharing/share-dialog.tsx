@@ -37,6 +37,7 @@ import {
   type ShareSelection,
   type MatchingShareSelection,
   type ShareEntitySource,
+  type ShareScope,
 } from "./share-source";
 import {
   ShareResultDialog,
@@ -54,6 +55,7 @@ type ShareDialogProps = {
   targets?: ShareSelection[];
   matching?: MatchingShareSelection;
   entity?: ShareEntitySource;
+  initialScope?: ShareScope;
   share?: GQL.MediaShareFieldsFragment;
 };
 
@@ -83,6 +85,7 @@ function ShareForm({
   targets = [],
   matching,
   entity,
+  initialScope,
   share,
   onCreated,
 }: ShareDialogProps & {
@@ -100,6 +103,18 @@ function ShareForm({
   const [update] = useMutation(GQL.MediaShareUpdateDocument, {
     refetchQueries: [GQL.MediaSharesDocument],
   });
+  const scopes: ShareScope[] = [
+    ...(targets.length ? ["selection" as const] : []),
+    ...(matching ? ["filter" as const] : []),
+    ...(entity ? ["entity" as const] : []),
+  ];
+  const entityLabel = entity
+    ? {
+        [GQL.ShareLibraryKind.Performer]: msg("performer", "Performer"),
+        [GQL.ShareLibraryKind.Studio]: msg("studio", "Studio"),
+        [GQL.ShareLibraryKind.Tag]: msg("tag", "Tag"),
+      }[entity.kind]
+    : "";
   const form = useForm({
     defaultValues: {
       label:
@@ -112,47 +127,52 @@ function ShareForm({
       ),
       allowDownload: share?.allow_download ?? false,
       showMetadata: share?.show_metadata ?? false,
-      scope: targets.length ? "selection" : entity ? "entity" : "filter",
+      scope:
+        initialScope ??
+        (targets.length ? "selection" : entity ? "entity" : "filter"),
       mode: GQL.ShareMembership.Snapshot,
       mediaTypes: allShareMediaTypes,
     },
     validators: {
-      onChange: z.object({
-        label: z
-          .string()
-          .trim()
-          .min(1, msg("sharing.label_required", "Enter a label."))
-          .max(200, msg("sharing.label_long", "Use at most 200 characters.")),
-        expiry: z.string().refine(
-          (value) => {
-            if (!z.iso.datetime({ local: true }).safeParse(value).success)
-              return false;
-            const time = new Date(value).getTime();
-            return (
-              Number.isFinite(time) &&
-              time > now &&
-              time <= now + 30 * 86_400_000
-            );
-          },
-          msg(
-            "sharing.expiry_invalid",
-            "Choose a future expiry within 30 days.",
-          ),
-        ),
-        allowDownload: z.boolean(),
-        showMetadata: z.boolean(),
-        scope: z.string(),
-        mode: z.enum(GQL.ShareMembership),
-        mediaTypes: z
-          .array(z.enum(GQL.ShareEntityKind))
-          .min(
-            1,
+      onChange: z
+        .object({
+          label: z
+            .string()
+            .trim()
+            .min(1, msg("sharing.label_required", "Enter a label."))
+            .max(200, msg("sharing.label_long", "Use at most 200 characters.")),
+          expiry: z.string().refine(
+            (value) => {
+              if (!z.iso.datetime({ local: true }).safeParse(value).success)
+                return false;
+              const time = new Date(value).getTime();
+              return (
+                Number.isFinite(time) &&
+                time > now &&
+                time <= now + 30 * 86_400_000
+              );
+            },
             msg(
+              "sharing.expiry_invalid",
+              "Choose a future expiry within 30 days.",
+            ),
+          ),
+          allowDownload: z.boolean(),
+          showMetadata: z.boolean(),
+          scope: z.enum(["selection", "filter", "entity"]),
+          mode: z.enum(GQL.ShareMembership),
+          mediaTypes: z.array(z.enum(GQL.ShareEntityKind)),
+        })
+        .refine(
+          (value) => value.scope !== "entity" || value.mediaTypes.length > 0,
+          {
+            path: ["mediaTypes"],
+            message: msg(
               "sharing.media_types_required",
               "Choose at least one media type.",
             ),
-          ),
-      }),
+          },
+        ),
     },
     onSubmit: async ({ value }) => {
       try {
@@ -285,23 +305,52 @@ function ShareForm({
                 <form.Field name="scope">
                   {(field) => (
                     <FieldSet>
-                      <FieldLegend variant="label">
+                      <FieldLegend id={`${id}-scope`} variant="label">
                         {msg("sharing.selection", "Included items")}
                       </FieldLegend>
-                      {matching && targets.length > 0 && (
+                      {scopes.length > 1 && (
                         <ToggleGroup
                           variant="outline"
+                          aria-labelledby={`${id}-scope`}
                           value={[field.state.value]}
                           onValueChange={([value]) => {
                             if (value) field.handleChange(value);
                           }}
                         >
-                          <ToggleGroupItem value="selection">
-                            {msg("sharing.selected_items", "Selected items")}
-                          </ToggleGroupItem>
-                          <ToggleGroupItem value="filter">
-                            {msg("sharing.filtered_list", "Filtered list")}
-                          </ToggleGroupItem>
+                          {targets.length > 0 && (
+                            <ToggleGroupItem
+                              value="selection"
+                              aria-label={msg(
+                                "sharing.selected_items",
+                                "Selected items",
+                              )}
+                            >
+                              {scopes.length > 2
+                                ? msg("sharing.scope_selected", "Selected")
+                                : msg(
+                                    "sharing.selected_items",
+                                    "Selected items",
+                                  )}
+                            </ToggleGroupItem>
+                          )}
+                          {matching && (
+                            <ToggleGroupItem
+                              value="filter"
+                              aria-label={msg(
+                                "sharing.filtered_list",
+                                "Filtered list",
+                              )}
+                            >
+                              {scopes.length > 2
+                                ? msg("sharing.scope_filtered", "Filtered")
+                                : msg("sharing.filtered_list", "Filtered list")}
+                            </ToggleGroupItem>
+                          )}
+                          {entity && (
+                            <ToggleGroupItem value="entity">
+                              {entityLabel}
+                            </ToggleGroupItem>
+                          )}
                         </ToggleGroup>
                       )}
                       <FieldDescription>
@@ -314,11 +363,19 @@ function ShareForm({
                               },
                               { count: targets.length },
                             )
-                          : (entity?.name ??
-                            msg(
-                              "sharing.filtered_description",
-                              "All items matching this list’s current search and filters, across every page.",
-                            ))}
+                          : field.state.value === "entity" && entity
+                            ? intl.formatMessage(
+                                {
+                                  id: "sharing.entity_description",
+                                  defaultMessage:
+                                    "All media linked to {name}, regardless of this list’s search and filters.",
+                                },
+                                { name: entity.name },
+                              )
+                            : msg(
+                                "sharing.filtered_description",
+                                "All items matching this list’s current search and filters, across every page.",
+                              )}
                       </FieldDescription>
                       {field.state.value === "selection" && (
                         <FieldDescription className="line-clamp-2 [overflow-wrap:anywhere]">
@@ -331,37 +388,47 @@ function ShareForm({
                     </FieldSet>
                   )}
                 </form.Field>
-                {entity && (
-                  <form.Field name="mediaTypes">
-                    {(field) => (
-                      <FieldSet
-                        data-invalid={field.state.meta.errors.length > 0}
-                      >
-                        <FieldLegend variant="label">
-                          {msg("sharing.media_types", "Media types")}
-                        </FieldLegend>
-                        <ToggleGroup
-                          multiple
-                          variant="outline"
-                          value={field.state.value}
-                          onValueChange={field.handleChange}
-                          aria-invalid={field.state.meta.errors.length > 0}
-                        >
-                          <ToggleGroupItem value={GQL.ShareEntityKind.Scene}>
-                            {msg("scenes", "Scenes")}
-                          </ToggleGroupItem>
-                          <ToggleGroupItem value={GQL.ShareEntityKind.Image}>
-                            {msg("images", "Images")}
-                          </ToggleGroupItem>
-                          <ToggleGroupItem value={GQL.ShareEntityKind.Gallery}>
-                            {msg("galleries", "Galleries")}
-                          </ToggleGroupItem>
-                        </ToggleGroup>
-                        <FieldError errors={field.state.meta.errors} />
-                      </FieldSet>
-                    )}
-                  </form.Field>
-                )}
+                <form.Subscribe selector={(state) => state.values.scope}>
+                  {(scope) =>
+                    scope === "entity" && entity ? (
+                      <form.Field name="mediaTypes">
+                        {(field) => (
+                          <FieldSet
+                            data-invalid={field.state.meta.errors.length > 0}
+                          >
+                            <FieldLegend variant="label">
+                              {msg("sharing.media_types", "Media types")}
+                            </FieldLegend>
+                            <ToggleGroup
+                              multiple
+                              variant="outline"
+                              value={field.state.value}
+                              onValueChange={field.handleChange}
+                              aria-invalid={field.state.meta.errors.length > 0}
+                            >
+                              <ToggleGroupItem
+                                value={GQL.ShareEntityKind.Scene}
+                              >
+                                {msg("scenes", "Scenes")}
+                              </ToggleGroupItem>
+                              <ToggleGroupItem
+                                value={GQL.ShareEntityKind.Image}
+                              >
+                                {msg("images", "Images")}
+                              </ToggleGroupItem>
+                              <ToggleGroupItem
+                                value={GQL.ShareEntityKind.Gallery}
+                              >
+                                {msg("galleries", "Galleries")}
+                              </ToggleGroupItem>
+                            </ToggleGroup>
+                            <FieldError errors={field.state.meta.errors} />
+                          </FieldSet>
+                        )}
+                      </form.Field>
+                    ) : null
+                  }
+                </form.Subscribe>
                 <form.Subscribe selector={(state) => state.values.scope}>
                   {(scope) =>
                     scope !== "selection" ? (

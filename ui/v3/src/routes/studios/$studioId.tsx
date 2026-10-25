@@ -294,7 +294,19 @@ function StudioDetailPage() {
   }
 
   return (
-    <CollectionDetailLayout title={studio?.name ?? ""} onBack={goBack}>
+    <CollectionDetailLayout
+      title={studio?.name ?? ""}
+      onBack={goBack}
+      shareEntity={
+        studio
+          ? {
+              kind: GQL.ShareLibraryKind.Studio,
+              id: studio.id,
+              name: studio.name,
+            }
+          : undefined
+      }
+    >
       <DetailPageState
         loading={loading}
         error={error}

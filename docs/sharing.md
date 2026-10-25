@@ -30,11 +30,19 @@ all its guest sessions.
 
 List selections persist across pages. On mobile, tap the selected count to open
 the page picker, then select more items on another page. To share all of a
-performer's videos, open **Share…** on their video tab without selecting items.
-With a selection, the dialog also offers **Filtered list**. The list's complete
-search and filter AST are copied, including locked performer/studio/tag context;
-page number, page size and later edits to the list or saved filter do not affect
-the share. Changing the list's search or filters clears its selection.
+performer's videos, open **Share this list…** on their video tab without selecting
+items. On performer, studio and tag detail pages, both the collection action and
+the list toolbar offer distinct scopes: **Selected items**, **Filtered list**, and
+the **Performer**, **Studio**, or **Tag**. A selection is the default when items are
+selected. Only the collection scope shows media-type controls; it includes that
+entity's media regardless of the current list filters. Filtered sharing stays
+within the active tab's media type. Hidden tabs cannot contribute their retained
+selections or filters to another tab's share action.
+
+The list's complete search and filter AST are copied, including locked
+performer/studio/tag context; page number, page size and later edits to the list
+or saved filter do not affect the share. Changing the list's search or filters
+clears its selection.
 
 Explicit selections always create snapshots. Filtered lists and performer,
 studio or tag sources offer **Snapshot** (the default) and **Ongoing**:

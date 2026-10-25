@@ -5,8 +5,12 @@ import {
   type OperationVariables,
 } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
+import { useState } from "react";
 import { CollectionDetailLayout } from "@/components/detail/collection-detail-layout";
 import { DetailTabs } from "@/components/detail/detail-tabs";
+import { EntityActionsMenu } from "@/components/detail/entity-actions-menu";
+import { MobileDetailChromePortal } from "@/components/layout/mobile-detail-chrome";
+import { useShareAction } from "@/components/sharing/share-action";
 import { EntityCard } from "@/components/cards/entity-card";
 import {
   EntityListPage,
@@ -18,6 +22,8 @@ import * as GQL from "@/core/generated-graphql";
 import { objectTitle } from "@/core/files";
 import { ListFilterModel } from "@/models/list-filter/filter";
 import { PerformersCriterion } from "@/models/list-filter/criteria/performers";
+import { RatingCriterion } from "@/models/list-filter/criteria/rating";
+import { defaultRatingSystemOptions } from "@/utils/rating";
 import {
   createASTConditionFromCriterion,
   createASTGroup,
@@ -133,6 +139,17 @@ filter.lockedFilterAst = createASTGroup(
   GQL.FilterGroupOperator.And,
   [createASTConditionFromCriterion(GQL.FilterMode.Scenes, performer)],
 );
+if (new URLSearchParams(location.search).has("filtered")) {
+  filter.searchTerm = "Video";
+  const rating = new RatingCriterion(defaultRatingSystemOptions);
+  rating.modifier = GQL.CriterionModifier.GreaterThan;
+  rating.value = { value: 75, value2: undefined };
+  filter.filterAst = createASTGroup(
+    GQL.FilterMode.Scenes,
+    GQL.FilterGroupOperator.And,
+    [createASTConditionFromCriterion(GQL.FilterMode.Scenes, rating)],
+  );
+}
 const config: EntityListPageConfig<
   GQL.FindSceneListQuery,
   GQL.SlimSceneDataFragment,
@@ -174,7 +191,26 @@ const config: EntityListPageConfig<
   ),
 };
 
+const shareEntity = {
+  kind: GQL.ShareLibraryKind.Performer,
+  id: libraryID(999),
+  name: "Example performer",
+};
+
+function PerformerActions() {
+  const share = useShareAction([], undefined, shareEntity);
+  return (
+    <>
+      <MobileDetailChromePortal slot="actions">
+        <EntityActionsMenu items={[share.action]} />
+      </MobileDetailChromePortal>
+      {share.dialog}
+    </>
+  );
+}
+
 export function PerformerSelectionFixture() {
+  const [tab, setTab] = useState("scenes");
   const list = (
     <EntityListPage config={config} defaultFilter={filter} mobileChromeFixed />
   );
@@ -184,15 +220,25 @@ export function PerformerSelectionFixture() {
       {standalone ? (
         <div className="flex h-dvh flex-col overflow-hidden">{list}</div>
       ) : (
-        <CollectionDetailLayout title="Example performer" onBack={() => {}}>
+        <CollectionDetailLayout
+          title="Example performer"
+          onBack={() => {}}
+          shareEntity={shareEntity}
+        >
+          <PerformerActions />
           <DetailTabs
-            activeTab="scenes"
-            onTabChange={() => {}}
+            activeTab={tab}
+            onTabChange={setTab}
             tabs={[
               {
                 id: "scenes",
                 label: "Videos",
                 content: list,
+              },
+              {
+                id: "details",
+                label: "Details",
+                content: <div>Performer details</div>,
               },
             ]}
           />

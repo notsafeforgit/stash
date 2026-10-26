@@ -33,11 +33,15 @@ snapshot per operation through `manager.LibraryPaths`, or `ReadLibraryPaths`
 inside an existing repository transaction. See the
 [folder contract](docs/native-ingestion.md#library-folders-and-logical-roots).
 
-Some implementation notes below describe intermediate staging gates. Use the
-dated progress/cutover records for current deployment status; do not repeat a
-completed migration, reconciliation or restore because an older note calls it
-pending. These notes do not require two UIs, legacy API shims or dual migration
-tracks. Do not remove a required caller without converting and testing it.
+For an architecture review, start with the [current reading order](docs/README.md#starting-an-architecture-review)
+and [repository boundaries](docs/ARCHITECTURE.md#repository-and-review-boundaries).
+Versioned implementation notes below describe individual migration phases; later
+sections may extend them. A staging receipt's `imported:false` is a real phase
+contract, not evidence that the whole native application remains unimplemented.
+Use current code/tests for implementation and operations release selections and
+verification records for deployment. Dated cutover notes are historical evidence,
+not instructions to repeat a migration, reconciliation or restore. Do not remove
+a required caller without converting and testing it.
 
 ## Development quickstart
 
@@ -397,8 +401,9 @@ policies. Capture acceptance records the policy decision and at most two target
 references in its own transaction. Repeated captures retain existing holds,
 deadlines and outcomes; receipt replay never applies a later policy. A changed
 collection requires policy review. Provider execution remains separately enabled,
-and scheduling never selects scene/image fields. Existing policy migration and
-enrichment/discovery caller conversion remain transition work.
+and scheduling never selects scene/image fields. Policy migration and the
+enrichment/discovery clients have their own reviewed activation and receipt
+boundaries; see [policy migration](docs/native-metadata-policy-migration.md).
 
 `stash_ingest.metadata_fetch` is the isolated metadata-only extractor for native
 enrichment. It shares retained post fields in bounded resumable transcripts,
@@ -411,8 +416,8 @@ retention preserves holds, exclusions, deadlines and completion; rescheduling
 requires the current target revision. Completion requires retained gallery-dl
 captures for that same post and collection revision. It must be part of the
 calling worker's fenced publication transaction, and has no public mutation
-endpoint. Connecting extraction to execution, importing legacy enrichment state,
-and scheduled-service conversion remain pending.
+endpoint. The subsequent job/publication schemas below implement execution and
+historical enrichment import; external scheduling belongs to the operations repo.
 Schema 1000051 binds enrichment jobs to exact target/source revisions and each
 attempt to its authenticated producer. The internal coordinator checks the
 recorded logical-root scope, current eligibility and lease/credential validity
@@ -432,8 +437,8 @@ with publication, retaining native captures, original receipts/provenance,
 unresolved references and a versioned integrity proof. Older publications retain
 their bodies until verified release. Failed/cancelled evidence stays staged.
 Preserve acknowledgement replay, exact storage accounting and validation before
-opening a writer. Public worker routes, additional post adapters, shared
-cooldown/fairness and stale-job maintenance remain pending. See
+opening a writer during full upgrade/snapshot validation. Scoped producer routes,
+shared cooldown/fairness and stale-job maintenance are implemented. See
 [enrichment work](docs/native-schema.md#post-enrichment-targets-and-completion)
 and [metadata-only extraction](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
 
@@ -471,8 +476,9 @@ discovery before local profile loading. Collection lookup follows current grants
 and discovers later registrations under a root; returned containers still need
 policy/runtime readiness checks. Preserve profile/collection rotation across
 restart and both journals when upgrading an outbox. Reviewed fresh searches now
-recover missing-history searches while preserving earlier evidence. Actual
-coverage, weak-candidate details and native page release remain transition work. See
+recover missing-history searches while preserving earlier evidence. Candidate
+detail execution is described below; discovery page/detail staging remains
+retained, and successful enumeration alone does not prove historical coverage. See
 [listing storage](docs/native-schema.md#durable-account-listing-pages).
 `scrape.MatchDiscoveryListing` and `MatchDiscoveryPage` implement the pure
 `retained-discovery-listing-v1` candidate policy. Preserve unchanged original
@@ -503,8 +509,9 @@ together. Lost responses must reuse the saved operation and hash, even after
 later native edits or comparison progress. Never interpret activation as job
 admission, source coverage, accepted identity or import completion. Producer
 tokens cannot use the archive review routes. The saved operator command is
-implemented; the review UI and detail/staging-release workflow
-remain open. Target reviews derive coverage and blockers in one read transaction,
+implemented; candidate-detail execution is described below. A dedicated discovery
+activation UI and discovery staging release remain unimplemented. Target reviews
+derive coverage and blockers in one read transaction,
 without loading page bodies. Preserve missing-history, weak/competing-candidate,
 changed-source/post and existing-identifier distinctions. Empty blockers do not
 accept an identity or create a durable approval token.
@@ -551,7 +558,7 @@ authenticated checkpoint provenance, immutable comparison results and scoped
 worker HTTP. Preserve original records across failover and old acknowledgements
 after source changes. Detail work shares metadata/download pacing, including
 saved child-service cooldowns. Job success retains a comparison, including an
-uncorroborated result; it cannot accept identity. Startup must
+uncorroborated result; it cannot accept identity. Full migration/snapshot audits
 rederive its saved proof, and anonymisation must remove its private transcripts.
 Producer schema 14 adds the Python detail journal, selected execution and scoped
 collection/profile dispatch. Keep its `comparison` receipts distinct from
@@ -648,8 +655,9 @@ targets. The HTTP-owned translate-shell/Bing worker is opt-in through
 `translation_worker_enabled` and `translation_shell_path`; migration and normal
 startup leave it disabled by default. Provider calls have bounded output and
 timeouts, and cancellation terminates the Unix process group. Translation history
-import, reviewed activation and capture scheduling are implemented; remaining
-operational imports, policy migration and review UI remain transition work. See
+import, reviewed activation and capture scheduling are implemented. Collection
+policies have native controls; historical activation uses its separate application
+API and client. Installation-specific activation remains explicit. See
 [translation work](docs/native-schema.md#translation-requests-cache-and-targets).
 
 Schema 1000120 adds optional namespace translation defaults and selected post

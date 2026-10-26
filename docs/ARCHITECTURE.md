@@ -14,6 +14,35 @@ owns setup and validation commands. [PROJECT.md](../PROJECT.md) is authoritative
 selective feature imports and migration policy. See the [documentation index](README.md)
 for feature guides and explicitly labelled future plans.
 
+## Repository and review boundaries
+
+This overview was checked against `develop` on 2026-10-26, including native
+schema 1000133. Version numbers below identify when a contract was introduced;
+the [migration directory](../pkg/sqlite/migrations/) defines the current schema.
+
+| Repository | Owns | Start here |
+| --- | --- | --- |
+| `stash` (`develop`) | Go application, native SQLite schema, HTTP/GraphQL contracts, UI and domain integrity | This guide, [project policy](../PROJECT.md), and the [frontend architecture](../ui/v3/docs/architecture.md) |
+| [`stash-integrations`](https://github.com/notsafeforgit/stash-integrations) (`main`) | Reusable Python API clients, producer outboxes, downloader adapters and portable archive tooling | [Package and contract boundaries](https://github.com/notsafeforgit/stash-integrations/blob/main/README.md) |
+| `stash-ops` (`main`, private) | This installation's workers, n8n/FileFlows workflows, schedules, host backup orchestration and deployment evidence | Its `README.md`, `deployment/README.md` and dated deployment records |
+
+An architecture review should trace a proposed change through the owning service,
+repository, migration and actual callers before choosing an abstraction. The
+[identity contract](library-identities.md), [read-performance guide](read-performance.md),
+[ingestion contract](native-ingestion.md) and [archive format](native-archive-format.md)
+cover boundaries that cross those layers. Core tests pinned external clients via
+`integration-clients.json`; operations pins its own release in `dependencies.json`.
+Those pins serve different purposes and need not be identical.
+
+Current feature guides describe implemented behavior. Dated audits, measurements
+and cutover records describe their recorded revision, not an outstanding task
+list. Verify open findings against the code and tests before implementing them.
+Published artifacts and deployment are separate facts: use the operations release
+selection and verification records to establish what is installed, then live
+service state for current health. A Git commit or successful image build alone
+does not establish deployment. Routine improvements do not repeat catalog imports,
+library reconciliation or the completed native cutover.
+
 ## Runtime map
 
 ```mermaid
@@ -81,7 +110,7 @@ links, worker scopes, or media requests.
 | [pkg/sqlite](../pkg/sqlite/) and [pkg/txn](../pkg/txn/) | Repository implementation, query builders, connection pools, migrations, transaction context, and commit hooks |
 | [pkg/ffmpeg](../pkg/ffmpeg/), [pkg/file](../pkg/file/), [pkg/previewimage](../pkg/previewimage/) | Probing, transcoding/streaming, file scanning, and still-image renditions |
 | [pkg/job](../pkg/job/) | In-memory job queue, progress, cancellation, and subscriptions |
-| [internal/sharing](../internal/sharing/) | Frozen share membership, credentials, expiry, and revocation |
+| [internal/sharing](../internal/sharing/) | Indexed snapshot membership and resumable preparation, ongoing filter grants, credentials, expiry and revocation |
 | [pkg/plugin](../pkg/plugin/), [pkg/scraper](../pkg/scraper/), [internal/identify](../internal/identify/) | Backend extensions, metadata retrieval, and identification |
 
 Resolvers receive their repository and service dependencies from
@@ -132,7 +161,7 @@ not made atomic by a SQLite transaction.
 | Server/UI configuration | YAML configuration managed by [internal/manager/config](../internal/manager/config/); includes UI defaults and plugin settings |
 | Original media | Configured library paths and archive contents; database file/folder records describe these files |
 | Verified byte identity | Shared SHA-256 content UUIDs and immutable verification history in the main database; file generations fence observed changes without merging media entities |
-| Durable archive work | Native jobs, submission acknowledgements and attempts in the library database; fenced leases and atomic domain/result publication, with file-worker and producer integration still in progress |
+| Durable archive work | Native jobs, submission acknowledgements and attempts in the library database; fenced leases, checkpointed file/metadata work and atomic domain/result publication |
 | Stored artwork blobs | [BlobStore](../pkg/sqlite/blob.go), configured for database blobs or a separate filesystem location |
 | Generated media | Configured generated paths: covers, previews, sprites, transcodes, temporary downloads; generation and cleanup belong to manager/media services |
 | Search acceleration | Separate `<database>.search.sqlite` plus an in-memory exact-count cache; derived and rebuildable |
@@ -144,8 +173,38 @@ pins read snapshots before accepting cached counts or search candidates. The
 FTS5 trigram index narrows candidates; the original SQL predicates still check
 them. Missing, stale, unsupported, or overly broad index results fall back to
 ordinary SQL. External writes invalidate caches, and startup rebuilds the search
-index. No FTS tables or persistent search tracking triggers are added to the
-library database. See [read performance](read-performance.md) for details.
+index only when it cannot validate the saved index against the native search
+token and SQLite schema version. Native migration 1000131 adds the token and
+transactional tracking triggers; FTS rows remain in the disposable database.
+Tracked application writes invalidate only counts whose table dependencies
+changed. Untracked writes and failed tracking conservatively invalidate caches.
+See [read performance](read-performance.md) for details.
+
+### Identity, evidence and storage lifetime
+
+Public library identities are UUIDs; local integer keys remain repository join
+keys. A file location, verified content identity, scene/image entity, source post,
+and source account are distinct records. Equal bytes do not by themselves merge
+entities or establish account ownership. Depicted performers and source publishers
+are separate relationships. See [library identities](library-identities.md) and
+[file deduplication](native-file-deduplication.md).
+
+Many source posts can link to the same media. Each post keeps its evidence and
+caption. Automatic intake keeps the first selected metadata per media field when
+another post reuses that media; this means encounter order, not the earliest post
+date. Unselected fields can still be filled, source URLs accumulate, and explicit
+edits/clears remain protected. Newer observations of the same post can update
+eligible inherited fields. The [metadata policy contract](native-ingestion.md#native-metadata-policies)
+owns these decisions.
+
+Receipts and source evidence have different lifetimes from temporary staging.
+Completed enrichment releases verified staging while retaining publication proof.
+Consumed historical catalog payloads have a separate explicit, checkpointed
+[retirement operation](native-schema.md#consumed-catalog-payload-retention-1000132).
+It retains receipts and hashes and frees reusable SQLite pages; it does not
+shrink the database file or run on ordinary startup. Discovery listing/detail
+staging still has separate retention limits; do not generalize catalog or
+enrichment cleanup to every job payload.
 
 ### Historical bridge and native migration
 
@@ -173,10 +232,10 @@ release's documented boundary. Native databases are incompatible with old
 binaries. [PROJECT.md](../PROJECT.md) and the
 [native archive plan](native-archive-transition-plan.md) define the current policy.
 
-### Native state and remaining API conversion
+### Native application contracts
 
 The [native schema](native-schema.md) now owns saved/default filters and performer
-names. Other API bridges remain until their callers are converted:
+names. Current contracts include:
 
 - Saved filters persist their canonical AST on `saved_filters`; the old sidecar
   and projection column are removed. Their API and exports use `filter_ast`
@@ -216,9 +275,27 @@ Current `source.capture` intake verifies the post identity, retained source
 policy, collection definition, and root grant, then commits capture evidence,
 publisher resolution, album manifest/selection, and receipt together. Each batch
 item has an independent transaction. Retries return the original receipt and
-conflicting event bytes are rejected. This implemented endpoint covers metadata
-capture; final-file intake, durable producer delivery, native review UI, catalog
-migration, and actual host/n8n conversion remain required before cutover.
+conflicting event bytes are rejected. Completed-file events add verified file
+preparation and durable publication; the admission receipt is not proof that
+all processing or notifications finished. Native review pages inspect and resolve
+ownership, metadata and attachment choices through application-authorized APIs.
+
+Source runs own traversal windows, progress, retry deadlines and fenced leases
+in Stash. The external producer owns its local durable outbox, exact event bytes,
+caller tickets and undelivered acknowledgements. Both are needed: a remote job
+status cannot discard unacknowledged local delivery. Saved delivery precedes new
+website work. Website throttling uses server-coordinated budgets; local SQLite
+contention uses the producer's bounded retry path and storage diagnostics.
+See [source runs](native-source-runs.md) and the
+[producer queue](native-ingestion.md#producer-delivery-queue).
+
+These clients are implemented and used by the separate host/n8n deployment;
+installing or activating them is optional, not an unfinished core cutover.
+Shared-outbox clients and archive readers must support a producer schema before
+its writer is activated. Preserve outboxes, producer identities, policies,
+windows and receipts when updating them. Execution/capture contracts describe
+compatibility; exact implementation revisions remain provenance. The integrations
+repository owns that review, while operations owns coordinated runtime selection.
 
 ## Request and work flows
 
@@ -231,10 +308,14 @@ run inside read transactions, and model field resolvers/loaders hydrate requeste
 relationships. The selected GraphQL fields determine which count, page, or
 aggregate work is needed.
 
-v3 scene/image lists request cards and exact counts separately. Cards can render
-while the total is unknown; count-dependent pagination and bulk actions wait
+v3 scene, image, performer and studio lists request rows and exact counts
+separately. Cards can render while the total is unknown; count-dependent pagination and bulk actions wait
 for the total. Apollo merges the selections, and mutation invalidation refreshes
-the affected queries. Other entities can use combined item/count queries.
+the affected queries. Performer/studio summaries avoid full detail projections,
+and selected relationship counters are batched across entities and studio depths.
+Other lists can use combined item/count queries. Count requests omit page/sort
+variables; the client retains active list results and twelve inactive results,
+then removes unused query roots before Apollo garbage collection.
 [The list contract](../ui/v3/docs/architecture.md#lists) owns this distinction.
 
 ### Editing and background jobs
@@ -381,9 +462,19 @@ custom JavaScript run as trusted application code, not in a security sandbox;
 runtime CSS/JavaScript customization is covered by [theming](../ui/v3/docs/theming.md).
 
 Shares use [routes_share.go](../internal/api/routes_share.go), an isolated
-`/share` router selected before owner authentication. A link secret is exchanged
-for a path-scoped guest session. Each request is checked against the current
-grant and frozen media membership. Guest credentials do not authorize GraphQL
+`/share` router selected before owner authentication. Recipient URLs contain one
+256-bit secret, resolved through its indexed hash; the management UUID remains
+separate. Older ID-plus-key links still work. The viewer exchanges the secret
+for an ID-path-scoped guest session; API/media URLs use that cookie without
+carrying the link secret.
+
+Explicit selections are snapshots; filtered lists and performer/studio/tag
+sources offer snapshots or ongoing matches. Snapshot membership is captured
+transactionally in indexed tables, with file preparation outside the write lock
+and resumable checkpoints. The link is available only after preparation finishes.
+Ongoing grants retain fixed rules and evaluate current matches. Both paginate
+and recheck access on media requests, so deleted media loses access in either
+mode. Guest credentials do not authorize GraphQL
 or the ordinary library routes, and the guest entry point does not boot the
 owner app. [Sharing](sharing.md) owns the public-host proxy configuration,
 credential lifecycle, rendition policy, and limits.

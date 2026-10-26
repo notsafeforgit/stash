@@ -1,26 +1,44 @@
 # v3 read performance
 
-The September 2026 improvements address list aggregates, startup dependencies,
-and SQLite browsing/search. They retain the v2.5 API and upstream database format.
-See [preview images](preview-images.md) for the separate card-thumbnail work.
+This guide describes the native read path, checked against `develop` on
+2026-10-26. Library data uses the native schema and API; upstream formats are
+supported historical upgrade inputs, not runtime compatibility requirements.
+See [preview images](preview-images.md) for card thumbnails and viewing renditions.
+The measurement sections below retain September 2026 results from the earlier
+implementation; they are not fresh benchmarks of the current release.
 
 ## Query and loading boundaries
 
-v3 scene/image list operations fetch card data and exact counts independently,
+v3 scene, image, performer and studio lists fetch rows and exact counts independently,
 without requesting unused duration/filesize totals. Cards render as soon as the
 page arrives; a loading placeholder represents an unknown total. Page clamping,
 deletion refills and bulk actions that require a total wait for that total.
 Apollo merges the two selections into the same result object and refreshes both
 after mutations or an explicit refresh. The backend skips count work for card
 requests and skips page selection/hydration for count requests, including AST
-filters. Existing v2.5 operations and aggregate selections remain supported.
+filters. Performer and studio lists use summary fragments rather than full detail
+projections. Requested relationship counters use the request-scoped entity-count
+loader and [batched repository queries](../pkg/sqlite/entity_counts.go), grouped
+by aggregate and studio depth, instead of a query per entity. Other list sources
+can still combine page and count selections; aggregate fields remain available
+to native callers that request them.
+
+Independent count queries omit page, page size and sort, allowing pagination to
+reuse a filtered total. The [client cache policy](../ui/v3/src/core/list-query-cache.ts)
+retains active list queries and twelve most recently used inactive results.
+It evicts root references before Apollo garbage collection; selected item
+snapshots have their own lifetime. Recent Back navigation remains cached and
+older results reload. This bounds list-result retention, not every object in
+Apollo's normalized cache.
 
 SearchInput retains its 300 ms typing debounce. List fetching adds no second
 delay, so Enter, clearing search, and page navigation start immediately.
 
 Home retains visited carousel components, cached results, random seeds and
-scroll positions. Vertical row visibility and horizontal card visibility gate
-only card images, preview videos and sprite media. Leaving the nearby area
+scroll positions. Rows and cards mount near the viewport, preserving native
+snap targets and strip geometry for cards not yet mounted. Once mounted, vertical
+row visibility and horizontal card visibility gate card images, preview videos
+and sprite media. Leaving the nearby area
 releases those media elements while keeping card geometry, controls and open
 overlay state. Returning restores media without another list request.
 
@@ -34,9 +52,9 @@ retain their original lifetime after first use; they do not replace the player
 during scene navigation. Offline precaching
 includes dynamic dependencies so opening a saved scene remains possible offline.
 
-## SQLite compatibility and search semantics
+## Native SQLite browsing and search
 
-Fork migration 6 adds two ordinary covering indexes:
+The native schema retains these ordinary covering indexes:
 
 ```sql
 CREATE INDEX fork_scenes_created_at ON scenes (created_at, title);
@@ -57,12 +75,11 @@ The check happens when rendering SQL, after aggregate fields can add joins.
 Regression checks run after `ANALYZE` with the production SQLite build tags and
 compare both sort directions, timestamp/title ties, counts, and page boundaries.
 
-These indexes require no custom collations, columns, triggers, or virtual tables.
-Upstream writes maintain them normally; an idempotent fork reconciler recreates
-them if an upstream table migration drops them. Upstream's `schema_migrations`
-version and table definitions remain unchanged. The rollback/roll-forward tests
-exercise plain SQLite writes and reopening in the fork. The indexes occupied
-49 MiB on the measured 915 MiB library snapshot.
+Their `fork_` names reflect their historical introduction, not a live fork
+reconciler. They are native schema objects maintained by normal SQLite writes;
+historical reconciliation runs only while upgrading supported old databases.
+Native migrations and fresh-baseline equivalence checks preserve the current
+schema. The indexes occupied 49 MiB on the historical 915 MiB measurement snapshot.
 
 For scene/image searches, `pkg/sqlite/search_index.go` stores searchable text in
 `<library database>.search.sqlite`, a separate disposable database. FTS5's
@@ -81,28 +98,45 @@ find a candidate superset; it never substitutes for the original predicates.
 The SQL fallback probe remains limited to global lists so it does not add a
 library-wide scan to an already selective entity filter.
 
-No FTS tables or persistent search-maintenance triggers enter the main database.
-The fork writer installs connection-local TEMP triggers to collect text and
-relationship changes transactionally, including deletions and replacements.
-It reinstalls them after a main-schema change. A background worker batches
-incremental updates; startup and commits from other connections require full
-rebuilds. Non-text edits retain the search index. A pinned observer connection
-uses [data_version](https://sqlite.org/pragma.html#pragma_data_version) to detect
-external commits. Readers pin their main snapshot between version observations;
-only a matching index snapshot can narrow the query. Counts use a bounded
-256-entry in-memory cache keyed by SQL and typed bindings within that revision,
-so pagination can reuse a total. Every commit invalidates counts; time-dependent
-predicates bypass the cache.
+FTS rows stay outside the main database. Native migration 1000131 adds a durable
+`library_search_state` token and ordinary triggers for indexed text dependencies.
+Each completed index transaction records that token and the SQLite schema version.
+Startup reuses an index only when both match the library snapshot. Interrupted
+updates, offline text edits, schema changes or invalid cache contents require a
+rebuild. Random tokens distinguish divergent writes after a restore even when
+the number of writes is equal. The search revision is authoritative native state;
+the derived documents remain disposable.
+
+The application writer also installs connection-local TEMP triggers to collect
+changed document IDs transactionally, including deletions and replacements.
+A background worker batches incremental updates; non-text edits can retain the
+index. A pinned observer connection uses SQLite `data_version` to detect commits
+outside that tracked writer, conservatively invalidating caches and requesting
+a rebuild. Readers pin their main snapshot between observations; only a matching
+index snapshot can narrow a query. Ordinary SQL remains available while the index
+is unavailable or catching up. See [read_acceleration.go](../pkg/sqlite/read_acceleration.go),
+[search_index.go](../pkg/sqlite/search_index.go) and
+[search_changes.go](../pkg/sqlite/search_changes.go).
+
+Exact counts use a bounded 256-entry in-memory cache keyed by SQL and typed
+bindings. SQLite's compiler supplies the query's actual table dependencies,
+including subqueries; [count_changes.go](../pkg/sqlite/count_changes.go) does not
+parse SQL or maintain a filter allowlist. Transactional TEMP triggers collect
+changed tables, and a tracked commit expires dependent counts only. Rollbacks
+retain them; unrelated worker bookkeeping need not invalidate library totals.
+Schema changes, external writes and failed tracking invalidate conservatively.
+Relative-time and nondeterministic queries bypass the cache.
 
 The search cache is created with mode 0600 and contains library text. Exclude it
 from backups if desired. To force a clean rebuild, stop Stash and delete only
 `<library database>.search.sqlite` and its `-wal`/`-shm` companions. The next start
 rebuilds automatically; no backfill command is needed. Builds without
 `sqlite_fts5`, unavailable cache directories and failed index builds retain
-ordinary SQL search. Returning from upstream also rebuilds at startup. Neither
-the upstream schema version nor fork schema version changes for this feature.
+ordinary SQL search. Never delete `library_search_state` or its native triggers
+to reset a cache; startup validates those required schema objects. Native
+libraries cannot be opened with an old upstream/frozen binary.
 
-## Indexed-search follow-up measurements
+## Historical indexed-search measurements (September 2026)
 
 A second isolated snapshot contained 267,302 scenes and 492,854 images. With
 production tags `sqlite_stat4 sqlite_math_functions sqlite_fts5`, the initial
@@ -131,7 +165,7 @@ rows before counts, pagination while a total is pending, and Home media release
 and restoration in Chromium and WebKit. These checks do not measure physical
 iPhone memory behavior.
 
-## Earlier browsing and loading measurements
+## Historical browsing and loading measurements (September 2026)
 
 The library contained 266,950 scenes and 492,381 images. SQLite measurements used
 a consistent backup obtained through a read-only connection. Only that temporary

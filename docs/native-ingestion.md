@@ -2,12 +2,15 @@
 
 When [source tracking](optional-integrations.md#source-tracking) is enabled,
 the server exposes a separate, versioned producer interface at
-`/api/v3/ingest`. Protocol 1 currently accepts `source.capture` events for
-Reddit, Twitter, Bluesky, TikTok, Instagram posts/reels and individual stories, Patreon, Fansly and
-Kemono/Coomer post identities. It records sanitized source evidence,
+`/api/v3/ingest`. Protocol 1 accepts `source.capture` events for supported
+source identities, including Reddit, Twitter, Bluesky, TikTok, Instagram,
+Patreon, Fansly, Kemono/Coomer and Erome. The offline
+[source adapters](../pkg/sourceadapter/) define the supported interpretations;
+see [source albums](native-source-albums.md) for attachment mappings.
+Intake records sanitized source evidence,
 publisher choices, collection provenance, and supported album manifests with a
-durable receipt. This interface is not deployed to the compatible production
-server.
+durable receipt. This is a native application interface; the frozen compatible
+release is an upgrade input, not the current production architecture.
 
 The v3 server also accepts `file.completed` when its scanner and preview tools
 are configured. Admission commits a receipt and durable verification job;
@@ -30,10 +33,10 @@ eligible work after restart with persistent producer pagination/backoff. Caller
 snapshots now preserve URL lists and time windows before lookup; resolution
 commits each selected collection/revision and source ticket atomically in the
 producer outbox. Whole-call inspection requires source coverage for every
-original ticket. Launcher integration, additional
-post adapters, host/n8n activation, catalog import, and native administration/review
-UI remain required.
-Installation-specific deployment status is maintained with each deployment's operations records.
+original ticket. Host/n8n clients, reviewed historical imports and native
+administration/review interfaces are implemented. Installation-specific activation,
+schedules and deployment status belong to each deployment's operations records,
+not an application-wide pending cutover.
 Root, collection and policy administration endpoints are described below.
 
 ## Performer links from captured profiles
@@ -324,8 +327,8 @@ File jobs renew their lease while hashing, probing and running effects. Producer
 claims never count as verification. A changed digest, generation, path removal,
 inactive collection or lost ownership prevents completion. A later failure does
 not undo an earlier committed registration: status reports that distinction.
-Source-worker conversion and host/n8n outboxes remain required before switching
-the current scheduled scrapes to this interface.
+Source workers retain their own outboxes and inspect these receipts separately
+from source traversal completion.
 
 ### Historical source album backfill
 
@@ -407,8 +410,8 @@ Job status separates committed changes from notification delivery. Retry after
 publication retains its original event and never reapplies gallery edits.
 History and worker attempts load independently in bounded pages; visible active
 jobs are polled read-only. Publication refreshes the affected album order and
-gallery association without browsing the library again. These development
-controls do not activate production workers; production cutover remains pending.
+gallery association without browsing the library again. These controls do not
+activate external scraper deployments; opening a review page is read-only.
 
 Discovery uses indexed UUID pagination over selected attachment lists. It includes
 disabled and forgotten posts for exclusion accounting, and returns no materialized
@@ -668,8 +671,8 @@ publications keep their bodies through migration until the scoped internal
 `ReleaseCheckpoint` operation verifies them. A null `CheckpointHead` with a
 publication/release receipt means completed staging was released, not that the
 observations disappeared. Exact acknowledgement and completion replays still work.
-Worker dispatch, source scheduling and the remaining download
-adapters remain transition work. See [staging release](native-schema.md#completed-enrichment-staging-release),
+Producer execution and dispatch use the scoped API below and the shared
+[source-run budget](native-source-runs.md). See [staging release](native-schema.md#completed-enrichment-staging-release),
 [publication](native-schema.md#verified-enrichment-publication),
 [checkpoint storage and lifecycle](native-schema.md#enrichment-jobs-and-checkpoint-ownership)
 and the [producer contract](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
@@ -798,7 +801,7 @@ media and translation workers. It cancels stale source/target work, recovers
 expired attempts without consuming failures and preserves checkpoint/receipt evidence. Claims
 and source reservations also recover conflicting expired work; discovery remains
 read-only. Stash never contacts websites for these operations. Legacy queue import
-and host/n8n activation remain required before switching production schedules.
+is a separate, explicit upgrade path; native dispatch does not replay it.
 
 The Python selected-job executor now journals stable claim requests, returned
 checkpoint bytes and pending publication/failure operations in producer outbox
@@ -1153,7 +1156,7 @@ uncompared batch count and earlier candidate counts. The original target review
 exposes `replacement_listing_uuid`. Retained earlier batches must finish
 comparison, and differing candidates require review even if the fresh search
 finds only one match. The same checks protect automatic/manual publication and
-startup verification. A recovery with no earlier conflict can publish only after
+full snapshot/upgrade verification. A recovery with no earlier conflict can publish only after
 the fresh search itself finishes and all its batches have been compared.
 
 This obtains new complete search evidence without inventing lost historical
@@ -1624,11 +1627,11 @@ The producer SDK implements durable local request coalescing during outages,
 outbox delivery, shared filesystem locking, lease renewal and pausing before the
 next source request after expiry. It applies the claimed Reddit/Twitter post
 window before file processing. Reviewed worker profiles, one-attempt execution
-and finish-response recovery are implemented. Conversion of the actual
-host/n8n/recovery configuration and launch paths remains required.
+and finish-response recovery are implemented. Host/n8n profiles and launch paths
+are deployed by operations; their schedules are not defined by core migrations.
 No legacy PID, lease or journal is promoted automatically by this migration.
-The separate importer must preserve permanent completions, checkpoints,
-deferrals and intentionally ignored unavailable originals before cutover.
+Historical importers preserve permanent completions, checkpoints, deferrals and
+intentionally ignored unavailable originals when upgrading a legacy installation.
 
 ## Byte identity and receipts
 
@@ -2032,9 +2035,11 @@ a disabled child policy can mask an enabled parent. The scanner records manual
 intake provenance without a fictional account/post and re-evaluates eligible
 unchanged files on rescan. ZIP members do not yet support folder policies.
 
-Remaining work includes the native forms/review queue, migration and comparison
-of installed plugin mappings, per-name reviewed resolution, and catalog import.
-Scan conflicts currently appear in scan logs and repeatable previews; file jobs
+The [collection editor](native-source-collections.md#metadata-rules-and-direct-file-imports)
+and [review queue](#shared-review-queue) expose native policies and unresolved
+choices. Historical plugin mappings use an explicit
+[policy migration](native-metadata-policy-migration.md); their retained settings
+are not live policy writers. Scan conflicts appear in scan logs and repeatable previews; file jobs
 also retain their review summary in durable status. General API/scan edit hooks
 still use the existing after-commit delivery path; the ingestion worker retains
 its retryable notification checkpoint.
@@ -2206,8 +2211,8 @@ through their desktop tab and mobile section selector. Each slot links to the
 current image/video and its source review, with unavailable positions retained.
 Match existing media exposes the guarded historical matching controls described
 above. Choose source list exposes the guarded source-list editor described below.
-Explicit gallery-association editing and live download-state inspection remain
-transition work.
+Gallery/attachment association review is described below; attachment reports
+retain download-state evidence separately from verified file registration.
 
 ### Reviewing source attachment lists
 
@@ -2737,8 +2742,10 @@ remain in the gallery-dl environment and are not managed by this client.
 The adapter queues retained captures before download, checks source leases and
 the pinned destination, holds shared filesystem locks, and queues flushed final
 files before archive acknowledgement. It preserves original Twitter attachment
-membership through gallery-dl's transformation and supports single-media Reddit
-evidence without inventing albums. The claimed date window is enforced with
+membership through gallery-dl's transformation and maps evidenced Reddit
+attachments, including native galleries and linked Imgur albums. Missing album
+positions remain explicit; filenames and download counters cannot invent order.
+The claimed date window is enforced with
 source timestamp precision, including out-of-order posts and parent dates for
 linked child work. Reddit inline images use their captured `media_metadata`
 identities; multiple embedded items use their first references in the post body
@@ -2766,26 +2773,25 @@ access references while removing recognized catalog writers. Optional source
 categories retain relevant child settings and reject a different root extractor.
 See the package guide for conversion and publication semantics.
 
-Staged Twitter/Reddit host launchers now expand the existing account/list, mode
+Twitter/Reddit host clients expand the existing account/list, mode
 and date options into durable caller snapshots. Full-history and Reddit top mode
 select separately reviewed global `skip=true` profiles. Local recording returns
 the execution UUID; strict inspection cannot report success until every original
-source ticket completes. The staged n8n adapter now gates source admission on
+source ticket completes. The n8n adapter gates source admission on
 native permanent history, freezes completion proof and exposes pending results
 for a durable workflow wait. An explicit maintenance importer now retains old
 n8n result tokens in the producer outbox for local inspection, preserving exact
-bytes and import manifests without creating source-completion proof. The other
-operational journal families and saved executions still require migration before
-activation.
+bytes and import manifests without creating source-completion proof. Historical
+importers are one-time upgrade tools, not prerequisites for routine native work.
 
-This package is not yet installed into the host/n8n launch paths. Runtime alignment,
-activation of converted profiles, additional source adapters and conversion of
-recovery and scheduled callers remain required before cutover.
-
-The producer's n8n Containerfile now builds an isolated pinned worker runtime
-on an explicitly selected existing custom n8n image. A separate rehearsal image
-has passed the producer suite and actual host/n8n profile comparison; selecting
-that image and updating the live workflow commands still belong to cutover.
+The reusable packages are installed separately from Stash. Operations owns the
+host launcher, worker containers and n8n command bridge; updating a scraper image
+does not update commands mounted into the n8n controller. A producer-schema
+upgrade requires compatible archive readers and every shared-outbox client before
+activating the new writer. Compatible repairs keep the execution/capture contract
+and queued policies; a changed command meaning or reviewed configuration needs
+an explicit policy transition. See the
+[integration compatibility policy](https://github.com/notsafeforgit/stash-integrations/blob/main/README.md#worker-compatibility-review).
 
 ## Permanent account backfill decisions
 
@@ -2837,8 +2843,8 @@ for read-only preflight and resumable batches. The [native n8n adapter](https://
 uses this status/proof API with durable caller snapshots. Its producer schema 7
 commits the first history decision and local source snapshot together, then retains
 the original ticket bindings and submitted proof across retries. Converted graphs
-wait on pending results and inspect the same token. Installed n8n workflows still
-use the old runner until the remaining operational-history and deployment gates pass.
+wait on pending results and inspect the same token. Current workflow installation
+and recovery are owned by the operations repository.
 The [receipt importer](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#retaining-old-n8n-result-tokens)
 preserves historical inspection results separately from this proof API. Importing
 one never assigns an account, launches work or marks native source windows complete.
@@ -3016,8 +3022,8 @@ first; an uncertain admission is recovered through the ready-job pass. Complete
 container traversals pause before polling again.
 
 Authenticated results feed the guarded native publication service above.
-Verified staging release remains transition work. Production scrapers have not
-switched to these routes.
+Candidate-detail staging remains retained; verified release of that staging is
+still unimplemented. This is separate from implemented enrichment checkpoint release.
 
 ## Reviewed post merges
 

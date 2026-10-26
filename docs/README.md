@@ -5,6 +5,23 @@ is in `ui/v3/`. The [architecture and upgrade boundaries](native-archive-transit
 describe the native application and its supported historical inputs.
 Personal automation and production records are maintained separately.
 
+## Starting an architecture review
+
+Read [PROJECT.md](../PROJECT.md), the [system architecture](ARCHITECTURE.md), and
+the [frontend architecture](../ui/v3/docs/architecture.md) first. For data and
+performance changes, follow with [library identities](library-identities.md),
+[read performance](read-performance.md) and the relevant domain guide below.
+The overview maps ownership across Stash, `stash-integrations` and `stash-ops`;
+read the latter repositories' guidance before changing their clients or deployment.
+
+The overview and performance guide were reconciled with the code on 2026-10-26.
+Treat versioned migration sections as the contract introduced at that version,
+and dated audits or rollout records as historical evidence. Confirm any proposed
+unfinished work against the current implementation and tests. Implementation,
+publication, deployment and present service health are separate facts; operations
+owns the last two. Do not repeat an installation's completed cutover to improve
+the current architecture.
+
 ## Current development guides
 
 | Guide | Use it for |
@@ -45,7 +62,7 @@ Personal automation and production records are maintained separately.
 | [Expiring shares](sharing.md) | Anonymous scoped media links, management, security boundaries and Caddy setup |
 | [TV mode](../ui/v3/docs/tv-mode.md) | Scene and marker feeds, quality settings, controls, shared activity, and implementation boundaries |
 | [Preview images](preview-images.md) | HDR AVIF, SDR fallbacks, generation requirements, and the v2.5 compatibility boundary |
-| [Read performance](read-performance.md) | Lazy browsing dependencies, compatible SQLite indexes/search, and library-scale measurements |
+| [Read performance](read-performance.md) | Split list reads, batched counters, bounded caches, native search revision tracking, and dated measurements |
 | [Locales](../ui/v3/src/locales/README.md) | Translation files and message conventions |
 
 ## Operations

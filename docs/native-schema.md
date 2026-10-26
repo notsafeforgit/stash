@@ -1,5 +1,13 @@
 # Native schema promotion
 
+This is a versioned schema reference, not a deployment checklist. Sections
+describe individual migration phases; staging, activation and domain publication
+have separate receipts even when all three are implemented. Start with the
+[system overview](ARCHITECTURE.md) for current ownership and execution paths.
+The startup-versus-full-audit boundary below applies to the historical proof
+validation described throughout this guide. Deployment and one-time import
+completion belong to the installation's operations records.
+
 Schema 1000126 adds bounded durable commands and per-item checkpoints for ordinary
 [bulk edits](native-bulk-updates.md), including fenced recovery and notification
 attempts. Existing ordinary job history is preserved; pending old executors
@@ -177,7 +185,8 @@ matches must therefore return candidates rather than establish identity. Exact
 duplicate canonical/alias entries are represented once; migration history keeps
 their original evidence and any unmatched old policy. Case variants are retained
 as distinct spellings. The old name column, alias table, and policy table are
-removed. Startup refuses a native database with a missing canonical name.
+removed. Full native audits reject a missing canonical name; ordinary writes
+enforce the native name constraints.
 
 Migration 1000003 adds `default_filters`, one native record per view with a
 revision that survives clearing the default. Default filters no longer live in
@@ -271,7 +280,7 @@ depicted performers, alter source payloads, or consolidate service accounts.
 Discovery pages canonical accounts and bounded identifier summaries. Account
 details, identifier evidence and ownership history use selected-record lookups
 with independent pagination. Ambiguous identifiers remain multiple candidates.
-Startup validates receipt integrity before writes, and anonymisation removes
+Full native audits validate receipt integrity before writes, and anonymisation removes
 receipts before the private account evidence they reference. The native
 [Account review screen](native-ingestion.md#account-ownership-review-api) uses
 these selected-record endpoints, with explicit performer choices, ownership
@@ -421,7 +430,7 @@ The migration preserves existing evidence UUIDs, details, timestamps and capture
 membership. Nullable scope fields remain immutable; newly established provenance
 requires new evidence. Insertion advances the post and, when present, attachment
 revision in the same SQL statement. Retirement prevents new evidence while
-historical replay and archive UUID adoption remain supported. Startup validates
+historical replay and archive UUID adoption remain supported. Full native audits validate
 the new scope, target kinds and required guards. Catalog path/asset matching and
 appearance import remain subsequent work.
 
@@ -495,7 +504,7 @@ a caller catches a late error. The shared read-only selection builder also serve
 ordinary ingestion; its compatible-list merge and protected/no-op behavior stay
 unchanged.
 
-Receipts preserve original input across subsequent choices. Startup verifies
+Receipts preserve original input across subsequent choices. Full native audits verify
 canonical request bytes, request/decision signatures, the original preceding
 decision, and capture-to-manifest scope. Anonymisation removes receipts before
 source evidence. The migration adds no choices and rewrites no existing media,
@@ -525,7 +534,7 @@ Migration 1000086 adds `gallery_association_reviews` and
 its original decision through scoped foreign keys and insertion guards. Preview
 and Apply share the ordinary association validators. Revisions, preview digests
 and managed-transaction completion guards prevent stale or partly committed
-choices. Startup validates original request bytes, signatures, previous decisions
+choices. Full native audits validate original request bytes, signatures, previous decisions
 and their scopes. Existing successful requests survive later choices, deletion
 and identity adoption without rewriting their original input. Anonymisation
 removes receipts before source evidence; native backup/export retains them.
@@ -599,7 +608,7 @@ Changes to a tag, studio, or group definition, including its own URLs, aliases,
 remote IDs, custom fields, tags, and hierarchy as applicable, advance its
 revision. Moving a relationship advances both affected definitions. Unrelated
 media usage is not part of that revision: services reviewing usage transfers
-must also validate the relevant associations. Startup verifies the new lifecycle
+must also validate the relevant associations. Full native audits verify the new lifecycle
 and relationship guards. Anonymisation rekeys these identities and preserves
 their redirect graphs. These identities supply stable relationship targets for
 the later relationship-field decisions.
@@ -714,7 +723,8 @@ to media. A performer merge or new identity evidence invalidates a stale preview
 An optional consolidation UUID supplies replay identity: exact repeated input
 returns the existing event, and changed input is rejected. Failed writes leave
 transaction context that prevents an accidental partial commit. Startup checks
-the context and agreement between canonical indexes and consolidation history.
+for unfinished contexts; full audits also verify agreement between canonical
+indexes and consolidation history.
 Identifiers and evidence claims cannot be rewritten; repeated observations may
 extend their time intervals. Anonymised exports remove the new history and
 context with the other account evidence. Migration begins with every existing
@@ -744,7 +754,7 @@ unchanged definition at its current revision is a no-op. Disabled definitions
 can be reactivated; retirement is permanent. The root and collection creation
 transactions must publish revision one before commit: deferred foreign keys
 prevent an ignored late error from committing an incomplete identity. SQL guards
-require consecutive immutable revisions and startup rejects missing definitions.
+require consecutive immutable revisions; full audits reject missing definitions.
 A collection account foreign key includes its service namespace. Consolidated
 account references retain their original identity and resolve through the
 account service when current ownership is needed.
@@ -809,7 +819,7 @@ relevant identity changes, current selections, and candidate ambiguity.
 SQL guards publish consecutive immutable decisions and checked heads atomically.
 Deferred foreign keys require a head for every decision. A durable write context
 blocks partial commits after account allocation or evidence recording fails;
-startup rejects unfinished writes and inconsistent publication. Request digests
+startup rejects unfinished writes, and full audits check publication consistency. Request digests
 make exact replay return the original result, without restoring an old choice
 over a newer one. Anonymised exports remove these private histories before
 removing captures and accounts. Migration creates no publisher choices for
@@ -910,7 +920,7 @@ Migration 1000040 extends the job kind constraint with `album.backfill` and adds
 history. The jobs table is rebuilt under its original name, retaining every job,
 submission, attempt, receipt reference and progress/result checkpoint. Existing
 receipt guards still require `media.verify`; producers cannot submit album work.
-Startup checks the new index and supported kinds before writes. Historical album
+Startup checks the required index and schema objects. Historical album
 publication commits its gallery/media decisions and compact checkpoint together;
 hooks then use the original publication UUID across automatic recovery or a new
 explicit retry. Terminal history is retained. See the [album Apply API](native-ingestion.md#historical-source-album-backfill).
@@ -980,8 +990,8 @@ ranges; failed attempts restore their range without bypassing backoff or permane
 deferral. Foreign keys retain producer, collection and root revision provenance.
 Unique active-work, collection, target and destination indexes serialize ownership;
 claim additionally excludes overlapping directory scopes. Scoped pagination and
-expiry indexes bound operational lookups independently of library size. Startup
-validates the schema and current attempt/lease agreement. Anonymisation removes
+expiry indexes bound operational lookups independently of library size. Full native audits
+validate the schema and current attempt/lease agreement. Anonymisation removes
 run state before its producer and source definitions. Migration invents no runs
 or legacy journal completion. See the [run protocol](native-ingestion.md#source-run-coordination).
 
@@ -1018,8 +1028,8 @@ Native decisions reference the authenticated producer's immutable request rows
 with foreign keys. The request digest, root, exact target URL, policy and actual
 completed ranges must cover every URL and the whole requested window. Proof
 links and decisions commit together, and replay preserves the original receipt.
-Startup requires the tables/indexes/guards and rejects missing or inconsistent
-proof links. Anonymised exports remove these private decisions before their
+Startup requires the tables/indexes/guards; full audits also reject missing or
+inconsistent proof links. Anonymised exports remove these private decisions before their
 source-run and producer references. Ordinary database backups include them.
 
 ## Retained scan journal snapshots
@@ -1049,15 +1059,16 @@ from account backfill decisions. Retention alone creates no source runs or
 completion proof; the separate schema-27 activation receipt records a reviewed
 operational binding.
 
-Table/index/guard checks and record-count reconciliation run at startup.
+Startup checks the tables/indexes/guards. Record-count reconciliation runs during
+explicit full audits.
 Snapshots and rows are immutable; anonymised exports remove this private history
 before deleting source roots. Normal database backups include it.
 
 Migrations run against copies during development. SQL failure leaves a dirty
 migration state that startup refuses; restore the migration backup or use a
 validated recovery procedure. Do not force a schema version to hide a failure.
-The compatible database and deployment stay pinned until the production cutover
-and restore gates pass.
+For a historical promotion, retain the original compatible database until the
+reviewed upgrade completes. Routine native updates do not repeat that cutover.
 
 ## Reviewed scan activation
 
@@ -1067,7 +1078,7 @@ to a native collection/root revision, worker policy, cutoff, consolidated window
 retry state and optional legacy checkpoint. Its receipt references the created
 source run. Each original scan key is unique within its original database UUID,
 so later snapshots cannot activate the same pending job again. SQL guards and
-startup reconciliation protect the record-to-plan bindings; anonymised exports
+full-audit reconciliation protect the record-to-plan bindings; anonymised exports
 remove them before deleting the retained journal and source runs.
 
 Activation creates a queued or deferred source run without producer requests,
@@ -1127,7 +1138,7 @@ changes, UUID adoption or deletion. Post-file evidence advances the post's
 review revision once and does not select attachments or assign performers.
 
 Historical collection/root definitions scope every observation, so offline or
-disabled roots can retain evidence without activating workers. Startup checks
+disabled roots can retain evidence without activating workers. Full native audits check
 scope, target kinds and canonical relative paths before writes. Normal database
 backups include these tables; anonymised exports remove their private evidence.
 
@@ -1139,7 +1150,7 @@ for locations, edits, states and deduplication. An event pins the original
 collection/root revisions. Its source timestamp may be unknown; `observed_at`
 records receipt of the assertion, and `created_at` records native insertion.
 Signatures cover its provenance and complete child values. Partial event writes
-cannot commit, even when a caller discards a late error. Startup validates the
+cannot commit, even when a caller discards a late error. Full native audits validate the
 graph, signatures and import receipts during migration and full snapshot verification.
 
 Locations refer to source file observations, including unavailable files and
@@ -1236,7 +1247,7 @@ Clients save a request UUID and exact apply body before sending it. A retry
 recovers the original receipt even after later edits, UUID adoption or deletion
 of the matched file; it does not rerun the old change. Reusing a request UUID
 with a different body fails. Receipt signatures bind the request and decision;
-startup also checks source scope, normalized scalar choices and preserved UUID
+full native audits also check source scope, normalized scalar choices and preserved UUID
 redirects. A late failure cannot commit a field without its receipt, even when
 the caller discards the error. Application notifications use the existing
 after-commit contract and are not registered again for a committed retry.
@@ -1260,8 +1271,8 @@ Keep repeats the same preview digest, current ownership and file-generation
 checks before commit. Its signed receipt remains replayable after later edits,
 UUID adoption, merges and file deletion. Apply and Keep cannot share a request
 UUID; triggers enforce that distinction across both receipt tables. A late
-receipt failure prevents the surrounding transaction from committing. Startup
-validates scope, signatures, redirects and cross-table request uniqueness.
+receipt failure prevents the surrounding transaction from committing. Full native audits
+validate scope, signatures, redirects and cross-table request uniqueness.
 Anonymisation removes Keep receipts before their private source history.
 
 The shared review queue considers each retained source field separately. An
@@ -1288,7 +1299,7 @@ Content is bounded to 16 MiB; parser warnings and results are each bounded to
 4 MiB. JSON must be unambiguous, with valid Unicode and no duplicate object keys.
 The document identity includes exact parser JSON text so an import does not
 silently reserialize, reinterpret, or drop unknown legacy fields. Byte digests
-and interpretation identities are checked when read and during startup.
+and interpretation identities are checked when read and during full native audits.
 Source timestamp spelling and precision are retained; an empty timestamp means
 unknown. Recorded-at timestamps separately identify native receipt time.
 
@@ -1346,7 +1357,7 @@ and a 1–100 `limit`; `GET /records/{ordinal}` includes one original source row
 Exit 0 means mapped, exit 2 means completed with review outcomes, and exit 1
 means failure or an unavailable response. Completed passes still report
 `imported:false`; other catalog families and final reconciliation remain required.
-Startup verifies phase coverage, counts and native reference scope. Normal
+Full native audits verify phase coverage, counts and native reference scope. Normal
 SQLite backups retain these records; anonymised exports clear them.
 
 ### Document application API
@@ -1438,8 +1449,8 @@ Under `/api/v3/archive/catalog-snapshots/{snapshot_uuid}/translation-import`,
 `after`. `GET /records` returns bounded summaries with source-ordinal `after`
 and a 1–100 `limit`; `GET /records/{ordinal}` includes one original row.
 Completed passes remain `imported:false` until the entire migration is reconciled.
-Startup validates receipts against their staged source, result, post and
-collection references and recomputes historical input-hash classifications.
+Full native audits validate receipts against their staged source, result, post and
+collection references and recompute historical input-hash classifications.
 
 ## Translation requests, cache and targets
 
@@ -1592,7 +1603,7 @@ families. `automation_snapshot_chunks` stores immutable chunk receipts, and
 `automation_snapshot_records` retains each original line, source key and ordinal.
 Chunk records, table hashes and the receiving checkpoint commit atomically.
 Indexed chunk/table ranges support bounded verification and later domain mapping.
-Startup verifies manifest identity, registry references, original bytes, ordering,
+Full native audits verify manifest identity, registry references, original bytes, ordering,
 chunk receipts and table digests before accepting writes. Source schema SQL is
 retained as evidence and never executed. Anonymisation removes these records.
 
@@ -1641,7 +1652,7 @@ imports must finish before resolving their post references; unresolved or
 forgotten posts retain review receipts.
 
 All domain writes and their receipts commit atomically in batches of at most
-200 source rows or 16 MiB. Startup checks source scope, checkpoint counts,
+200 source rows or 16 MiB. Full native audits check source scope, checkpoint counts,
 deterministic request/cache identities, original schedules, historical revisions
 and migration completion provenance. Ordinary backup/restore includes the source
 and its mappings; anonymisation removes both before dependent native work.
@@ -1698,7 +1709,7 @@ uses an index over original held receipts; it neither scans other operational
 families nor guarantees that candidates remain unchanged until Apply.
 
 Requests are bounded to 128 KiB and duplicate target UUIDs are rejected. Producer
-tokens cannot administer these routes. Startup verifies plan/input hashes,
+tokens cannot administer these routes. Full native audits verify plan/input hashes,
 source bindings and the historical held-to-pending transitions, independently
 of current target states. Backup/restore retains activation receipts;
 anonymisation removes them before their referenced source/target histories.
@@ -1739,7 +1750,7 @@ Application routes under `/api/v3/archive`:
 | `GET /captures/{capture_uuid}/translation-decision` | Requires `collection_uuid` and `collection_revision`; returns the saved decision or 404. |
 
 Producer tokens cannot configure these policies or inspect unscoped decisions.
-The producer receives its decision in the capture receipt. Startup validates
+The producer receives its decision in the capture receipt. Full native audits validate
 policy definitions, capture/collection membership, exact source text and saved
 target history independently of current policy and target states. Backup/restore
 preserves these records; anonymisation removes them with the source evidence.
@@ -1792,7 +1803,7 @@ completed target; a failed late write also aborts a caller that swallows the
 error. The invoking worker must fence that same transaction with its execution
 lease and perform source identity validation. These records alone do not assert
 that a worker ran, authorize downloads, change selected scene/image fields, or
-certify that all linked media are locally available. Startup validation checks
+certify that all linked media are locally available. Full native audits check
 identities, scopes, histories, counts and receipt digests. Ordinary database
 backup retains the records; anonymised copies remove them with source evidence.
 
@@ -1853,7 +1864,7 @@ records. `enrichment_checkpoint_usage` enforces a 2 GiB total staging budget,
 including bodies retained by failed, cancelled or older published jobs. Exhaustion
 refuses new storage rather than discarding evidence. Verified publication now
 releases completed staging as described below. Ordinary database backups retain these records;
-anonymisation removes them. Startup validates bindings, provenance, record hashes,
+anonymisation removes them. Full native audits validate bindings, provenance, record hashes,
 checkpoint histories and exact storage accounting.
 
 A real target schedule change cancels its active job in the same transaction.
@@ -1914,7 +1925,7 @@ checked through commit; expiry or a source edit rolls back all effects.
 An ordinary job success assertion cannot bypass publication. Lost completion
 responses replay the original receipt for the publishing producer/attempt, even
 after later source edits or lease expiry. They do not rerun normalization or
-metadata scheduling. Startup checks the job result, all associations and every
+metadata scheduling. Full native audits check the job result, all associations and every
 capture against the saved source evidence, including shared-body/profile hashes.
 Migration preserves queued, running, failed and cancelled schema-51 work; a
 schema-51 success assertion is refused because that schema had no verified
@@ -1949,10 +1960,10 @@ and checkpoint acknowledgement replays continue returning their original receipt
 `CheckpointHead` returns null after release; `CheckpointRelease`, publication
 status and published records describe the retained result and unresolved links.
 
-Startup requires either the original staging body or a valid release for every
-publication. It rechecks the proof, bounded native payloads/profile references,
-post identifiers, collection provenance, receipt histories and storage accounting
-before opening a writable connection. A missing or altered release, reference,
+Full native audits require either the original staging body or a valid release
+for every publication. They recheck the proof, bounded native payloads/profile
+references, post identifiers, collection provenance, receipt histories and storage
+accounting during migration or explicit snapshot verification. A missing or altered release, reference,
 capture association or payload is rejected. Ordinary database backups retain
 releases and their native evidence; anonymisation removes both. Releasing staging
 makes SQLite pages reusable; it does not vacuum the database or delete media.
@@ -1987,7 +1998,7 @@ cannot extend the deadline when replayed.
 Migration derives bindings from existing immutable source definitions and post
 URLs while preserving jobs, attempts, checkpoint bytes and prior cooldowns.
 Existing running checkpoints gain child reservations; original root reservations
-are reconstructed for historical attempts. Startup checks bindings and required
+are reconstructed for historical attempts. Full native audits check bindings and required
 objects. Ordinary backups retain scheduling state; anonymisation removes it with
 work history. This does not import legacy catalog cooldowns or scheduling history.
 
@@ -2010,7 +2021,7 @@ receives any applicable cooldown. Local storage/configuration failures and
 individual media download failures retain their existing generic attempt errors.
 No source URL, website response or access value enters these tables. The additive
 migration binds historical attempts to their existing root scope and preserves
-all previous rows and schema objects. Startup validates dependencies and failure
+all previous rows and schema objects. Full native audits validate dependencies and failure
 receipts; ordinary backups retain them and anonymisation removes them.
 
 ## Bounded source preference
@@ -2044,7 +2055,7 @@ budget, not a hard execution timeout. Yield uses `retry` with the controlled
 cooldown, and does not consume the failure/backoff budget.
 
 Migration starts a new fairness epoch with zero counters; it does not invent
-historical scheduling interest or rewrite existing work. Startup validates
+historical scheduling interest or rewrite existing work. Full native audits validate
 service coverage, current queued-job bindings and the complete required-service
 set. Ordinary backups retain this state; anonymisation removes it. Producer
 outbox schema 10 adds rotation across local download/metadata profiles and
@@ -2076,7 +2087,7 @@ Receipt identity includes its source/catalog, native scope and assertion; equal
 values in different catalogs do not silently acquire shared provenance. The
 snapshot importer currently accepts one frozen snapshot per source/catalog.
 Ordinary backups include the receipts and original source ledger; anonymisation
-removes both. Startup checks progress, source scope, receipt identity, counts and
+removes both. Full native audits check progress, source scope, receipt identity, counts and
 original timestamps. Catalog-wide completion remains `imported:false`.
 
 Application APIs expose resumable progress and source records at
@@ -2121,7 +2132,7 @@ post-file evidence and file-match records through foreign keys. No source payloa
 or post body is copied into these records.
 
 Receipts and proof references are immutable. SQL guards enforce post/decision
-scope and the original appearance/file chain; startup also verifies decision
+scope and the original appearance/file chain; full native audits also verify decision
 counts, required proofs and all cross-record references. The shared service
 checks current file/archive generations and ownership before selection and again
 before commit, preserving explicit choices and merge conflicts. Exact request
@@ -2136,7 +2147,7 @@ the application API and saved-plan client.
 Schema 1000091 updates only the file-proof scope trigger. A new post/media
 matching decision can use an original member's evidence when both posts resolve
 to the same current post identity. The evidence, appearance and file match must
-still form their original chain. Startup validates that distinction, including
+still form their original chain. Full native audits validate that distinction, including
 after another merge or portable restore. Historical schema versions retain
 their original same-post validation before migration.
 
@@ -2173,7 +2184,7 @@ or execute an intent.
 Progress ends as `retained` when every entry was held, including an absent or
 empty queue, or `review` when some rows need review. Both retain
 `imported:false`: this pass does not certify the whole catalog migration.
-Startup reconciles each intent with its immutable source record, original scope,
+Full native audits reconcile each intent with its immutable source record, original scope,
 timestamp and import counters. Ordinary archive backups include these tables;
 anonymisation removes their private values and migration receipts.
 
@@ -2231,8 +2242,8 @@ their priority/deadline or finish using historical proof.
 Application APIs expose GET/POST
 `/api/v3/archive/automation-snapshots/{snapshot}/enrichment-import`, a `/records`
 list (ordinal cursor, limit 1–100), and `/records/{ordinal}` with original source
-values. Backups include these records; anonymisation removes them. Startup
-checks progress, typed projections, source bindings, scoped proofs and native
+values. Backups include these records; anonymisation removes them. Full native
+audits check progress, typed projections, source bindings, scoped proofs and native
 history. Overall migration remains `imported:false`; review resolution and
 reviewed activation are separate release requirements.
 
@@ -2276,7 +2287,7 @@ collections and occupied replacement targets. A later native hold cannot be
 selected merely by substituting its new revision in a snapshot-bound request.
 
 Plans and responses allow 8 MiB so a complete page of retained URLs, including
-JSON escaping, fits. Startup validates receipt hashes, original import ownership,
+JSON escaping, fits. Full native audits validate receipt hashes, original import ownership,
 source/destination identity, active historical collection definitions and exact
 held-to-pending or held-to-excluded/replacement histories. Backup retains the
 receipts and anonymisation removes them with source evidence. The bulk application
@@ -2320,7 +2331,7 @@ rewrite original provenance. Requests are bounded to 64 KiB and plans to 8 MiB.
 `GET /api/v3/archive/enrichment-rebindings/{uuid}` recovers the immutable receipt.
 Apply checks that receipt before current eligibility, so a lost response can be
 recovered after later holds, collection edits or source forgetting. A reused UUID
-with different input/digest conflicts. Startup validates the full original and
+with different input/digest conflicts. Full native audits validate the full original and
 intermediate target histories, nested activation, historical destination
 definition and absence of earlier worker bindings before writing. Backup/export
 includes both new tables; anonymisation removes them before activation history.
@@ -2359,7 +2370,7 @@ not activate a root or admit a job. Worker authorization, readiness, fetching,
 detail verification and capture publication use the reviewed definition. A grant
 limited to the previous root cannot authorize a new root, and admission requires
 the reviewed definition digest. Read-only review retains
-its separate timing rules. Startup validates the review chain, historical
+its separate timing rules. Full native audits validate the review chain, historical
 collection definitions, plan/input/definition digests, effective projection and
 worker history. Anonymisation clears reviews with the discovery graph.
 
@@ -2405,7 +2416,7 @@ Conversion leaves posts, media, target choices, deadlines, captures and worker
 state unchanged. It does not resolve the original review hold or mark the full
 archive migration imported. Reviewed handoff of this retained evidence to native
 execution remains a separate operation. Backup includes the converted evidence;
-anonymisation removes it. Startup checks complete source bindings, progress,
+anonymisation removes it. Full native audits check complete source bindings, progress,
 hashes and deterministic conversion semantics, including review outcomes.
 
 ### Accepting retained checkpoint evidence
@@ -2452,11 +2463,11 @@ caller catches a late write error.
 
 Acceptance leaves the target's review state, schedule and history unchanged. It
 does not create a worker job, complete enrichment, select publisher accounts or
-apply Stash metadata. Reviewed child execution remains a separate handoff to
-implement. Backup preserves acceptance and source evidence; anonymisation removes
-both. Startup recomputes the original conversion and reconstructed capture hashes,
-checks the original review history and collection associations, and rejects altered
-evidence before opening a writable database.
+apply Stash metadata. Reviewed child execution uses the separate handoff below.
+Backup preserves acceptance and source evidence; anonymisation removes
+both. Full native audits recompute the original conversion and reconstructed capture hashes,
+check the original review history and collection associations, and reject altered
+evidence.
 
 ### Original observation context and reviewed retry format
 
@@ -2549,9 +2560,8 @@ Accepting this review does **not** release the original target, create a job,
 write a worker checkpoint/lease/receipt, or complete enrichment. The separate
 admission operation below consumes the review and binds its exact seed.
 Backup retains the review and its source evidence; anonymisation removes the
-execution bindings before the review. Startup
-reconstructs the seed and verifies historical collection and evidence bindings
-before opening for writes.
+execution bindings before the review. Full native audits reconstruct the seed
+and verify historical collection and evidence bindings.
 
 ### Executing a reviewed checkpoint handoff
 
@@ -2602,10 +2612,11 @@ new observations and unresolved references. Unscoped legacy references remain
 in the original acceptance linked by the review; no parent or new failure is
 invented for them. Completed staging is released only after this proof verifies.
 
-Startup checks both the retained seed projections and current checkpoint or
+Full native audits check both the retained seed projections and current checkpoint or
 released publication. Backups preserve these records and anonymisation removes
-them in dependency order. Review UI and coordinated production activation remain
-transition work.
+them in dependency order. Dedicated checkpoint-handoff review UI remains separate
+from the implemented application API and client; deployment activation is an
+installation responsibility.
 
 ## Frozen discovery and maintenance history
 
@@ -2651,14 +2662,14 @@ an ordinal cursor and limit 1–100. `/records/{ordinal}` returns original value
 on demand. Paged results contain compact projections and native associations;
 payloads are not copied from the snapshot into another document store.
 
-Foreign keys and immutable records retain source-family scope. Startup validates
-progress, recomputes typed projections and digests, and checks native account,
+Foreign keys and immutable records retain source-family scope. Full native audits validate
+progress, recompute typed projections and digests, and check native account,
 post, collection and enrichment-proof bindings before writes. Normal database
 backups include the original snapshot and these associations; anonymisation
 removes the import before its dependencies. No jobs, captures, performer links,
 post identifiers or selected metadata are changed by this pass. The client is
-`stash-import-automation-discovery`; migration remains `imported:false` and
-reviewed discovery activation/execution remain separate transition work.
+`stash-import-automation-discovery`; this staging phase reports `imported:false`.
+Reviewed discovery activation and execution use the separate services below.
 
 ## Verified legacy discovery identities
 
@@ -2688,15 +2699,15 @@ from committing the identity mutation without the complete publication.
 Unknown or multiply mapped inputs and IDs already belonging to another post
 require review. Publication rolls back and the controlled failure retains its
 checkpoint for later inspection. No post consolidation or performer assignment
-is inferred. Reopening verifies the original snapshot bytes, reconstructed
+is inferred. Full native audits verify the original snapshot bytes, reconstructed
 native capture, matching basis, identifier receipt and publication binding even
 after compact staging has been released. Anonymisation removes resolutions
 before their dependencies; ordinary database backups retain them.
 
 The migration itself leaves existing jobs, identifiers and selected metadata
-unchanged. It does not activate workers. Account-listing historical coverage,
-detail execution, reviewed post consolidation and production caller conversion
-remain transition work.
+unchanged. It does not activate workers or prove historical listing coverage.
+Candidate-detail execution and reviewed post consolidation are described below;
+external caller activation belongs to deployment.
 
 ### Account-listing candidate evidence
 
@@ -2761,7 +2772,7 @@ listing's final cursor. It does not certify coverage of earlier historical
 pages, choose a unique identity, complete an import, or authorize release of
 source evidence. Historical-coverage reconciliation and weak-candidate detail
 execution remain necessary before those candidates can publish.
-Startup verifies original target bindings, page/result digests, record
+Full native audits verify original target bindings, page/result digests, record
 references and candidate aggregates. Normal backups retain the entire graph;
 anonymised exports remove it before removing its source evidence.
 
@@ -2790,7 +2801,7 @@ receipt atomically. A late failure rolls back the whole batch; a changed native
 post or collection requires another preview. The same operation UUID and request
 return their original receipt after a lost response, later comparison progress,
 post forgetting or collection retirement. Different inputs cannot reuse that
-operation UUID. Backup/reopen validation checks the original receipt graph and
+operation UUID. Full native snapshot/upgrade audits check the original receipt graph and
 anonymised exports remove it before removing comparison bindings.
 
 Activation creates no page jobs, fetches no source data and chooses no post
@@ -2799,8 +2810,9 @@ routes expose preview/apply/replay, retained listing summaries and the compariso
 targets, candidates and original record references. Producer tokens cannot use
 these review routes. See [activation API](native-ingestion.md#reviewed-discovery-activation).
 The operator command saves reviewed activations and recovers their original
-receipts. Missing-history searches can use reviewed recovery below; the review
-UI, detail execution and staging-release workflow remain open.
+receipts. Missing-history searches can use reviewed recovery below. Detail
+execution is implemented below; dedicated discovery activation UI and verified
+discovery staging release remain open.
 
 ### Verified discovery publication
 
@@ -2823,7 +2835,7 @@ and patches. Original imported post UUIDs and legacy keys remain valid, and a
 source ID already owned by another post requires explicit consolidation.
 
 Replay returns the same receipt after lost responses, restarts and later native
-edits. Startup reconstructs the original proof and verifies every capture,
+edits. Full native audits reconstruct the original proof and verify every capture,
 collection association, identity/URL evidence row and record mapping. Ordinary
 backups retain the graph; anonymisation deletes publication children before their
 dependencies. Publication does not release page bodies, finish catalog import or
@@ -2850,9 +2862,9 @@ original source ordinal, hash and post UUID; it cannot invent a new association.
 
 Read-only reviews expose both search references. A new complete strong match
 cannot publish while the predecessor has uncompared retained pages or a differing
-candidate. Publication reconstruction checks those same facts on reopen, after
+candidate. Publication reconstruction checks those same facts during full audits, after
 which later native edits can still replay the original receipt. Foreign keys,
-unique predecessor constraints, mutation guards and startup graph checks preserve
+unique predecessor constraints, mutation guards and full graph audits preserve
 these relationships. Backups include both searches; anonymisation removes recovery
 links before their dependencies. New fetching supplies current evidence, not a
 claim that missing historical bodies were recovered or all past posts still exist.
@@ -2898,7 +2910,7 @@ The internal coordinator authenticates collection/root grants and rechecks the
 original lease deadline, credential and source definition through commit.
 Descriptions return the requested job's original input cursor even after later
 pages advance the listing. Controlled failure receipts preserve the original
-attempt and cannot prolong cooldowns on replay. Startup validates definitions,
+attempt and cannot prolong cooldowns on replay. Full native audits validate definitions,
 import provenance, generations, cursor chains, page bodies and completion proofs.
 Anonymisation removes these records before their dependencies; ordinary database
 backups include them.
@@ -2912,9 +2924,10 @@ producer delivery, selected-job execution and shared profile/collection dispatch
 are implemented, along with the native candidate comparison worker described
 above. Reviewed activation and publication of complete, unique strong matches
 are implemented, through both the application endpoint and a bounded server
-worker. Both use the same atomic publication checks and receipts. Historical
-coverage, weak-candidate detail execution, verified staging release and reviewed
-post consolidation remain required.
+worker. Both use the same atomic publication checks and receipts. Candidate-detail
+execution and reviewed post consolidation have their own services below.
+Historical coverage is evidence-dependent; verified discovery staging release
+remains unimplemented.
 
 ### Durable candidate detail comparisons
 
@@ -2954,8 +2967,8 @@ cannot acknowledge the predecessor's checkpoint. The scoped worker coordinator
 rechecks credentials, source choices and the original lease deadline at commit.
 
 The migration preserves all prior jobs, attempts, receipts and pacing rows.
-Startup checks job bindings, generation continuity, checkpoint accounting,
-record hashes/times and rederives completed comparisons before opening a writer.
+Full native audits check job bindings, generation continuity, checkpoint accounting,
+record hashes/times and rederive completed comparisons.
 Normal database backups contain these records; anonymisation removes their
 private source bodies and associations. The Python producer executes and recovers
 these jobs. Verified staging release remains open.
@@ -2996,7 +3009,7 @@ publication receipt and identity evidence reference that proof. The server
 rechecks current eligibility inside the transaction and verifies every native
 capture and association before commit. Response replay retains the selected
 proof even after later edits; it never reruns a fetch or repeats capture effects.
-Startup reconstructs both kinds of publication. Anonymisation deletes publication
+Full native audits reconstruct both kinds of publication. Anonymisation deletes publication
 children before detail results. This migration does not release staged evidence,
 enable live scrapers or complete the broader catalog import.
 
@@ -3012,8 +3025,8 @@ collection revision and root; it retains its separate verification job.
 Unique indexes bound a transfer to one start and one terminal report. A durable
 producer sequence orders transfers within the original attempt independently of
 clock differences or delayed delivery. Foreign keys, insertion guards and a
-managed-transaction check prevent a report or receipt committing alone. Startup
-checks retained scope and transfer consistency. Anonymisation removes reports
+managed-transaction check prevent a report or receipt committing alone. Full native audits
+check retained scope and transfer consistency. Anonymisation removes reports
 before receipts and source evidence; native backups and portable exports retain
 them. Original report and receipt contents survive restart and relocated restore.
 
@@ -3040,7 +3053,7 @@ and immutable work key. Four authoritative tables retain each completed review:
 | `post_consolidation_review_attachments` | Ordered attachment decisions created by this review |
 
 Foreign keys and immutable/scope triggers bind these records to the original
-identity event and reviewed decisions. Startup checks canonical request/result
+identity event and reviewed decisions. Full native audits check canonical request/result
 bytes, signatures, original members, decision ownership and original job scope;
 corrupt receipts or missing authoritative tables are rejected. Anonymization
 removes dependent receipt rows in dependency order. Portable exports and restored

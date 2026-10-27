@@ -58,6 +58,8 @@ const generateMetadataInputSchema = z.looseObject({
   previews: z.boolean().nullish().catch(undefined),
   // Replacing authored frame selections must always be an explicit action.
   resetCoversToDefault: z.preprocess(() => undefined, z.boolean().nullish()),
+  // Restore mode belongs only to an explicitly submitted recovery operation.
+  coversMissingOnly: z.preprocess(() => undefined, z.boolean().nullish()),
   sceneIDs: z.array(z.string()).nullish().catch(undefined),
   // A list scope belongs only to the action that explicitly selected it.
   sceneSelection: z.preprocess(() => undefined, z.undefined()),

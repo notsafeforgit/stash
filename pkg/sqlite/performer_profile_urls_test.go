@@ -12,6 +12,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin"
 	"github.com/stashapp/stash/pkg/plugin/hook"
+	"github.com/stashapp/stash/pkg/sourceadapter"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
@@ -141,6 +142,72 @@ func TestPerformerProfileURLsAddAfterOwnershipAndRespectPruning(t *testing.T) {
 	defer raw.Close()
 	require.EqualValues(t, 3, queryUint(t, raw, "SELECT count(*) FROM account_profile_urls"), "account links are shared across captures")
 	require.EqualValues(t, 2, queryUint(t, raw, "SELECT count(*) FROM performer_profile_url_suppressions"))
+}
+
+func TestOnlyFansPerformerURLWritesAndSuppression(t *testing.T) {
+	db, repo := archiveTestDatabase(t)
+	urls := []string{"https://manual.invalid/Case?x=1", "https://onlyfans.com/LucyMochi/c76", "https://onlyfans.com/lucymochi/c30", "https://onlyfans.com/lucymochi_vip/trial/token"}
+	want := []string{"https://manual.invalid/Case?x=1", "https://onlyfans.com/lucymochi", "https://onlyfans.com/lucymochi_vip"}
+	created := &models.Performer{Name: "OnlyFans URL fixture", URLs: models.NewRelatedStrings(urls)}
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		return repo.Performer.Create(ctx, &models.CreatePerformerInput{Performer: created})
+	}))
+	require.Equal(t, want, performerProfileURLs(t, repo, created.ID))
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		p, err := repo.Performer.Find(ctx, 71)
+		require.NoError(t, err)
+		p.URLs = models.NewRelatedStrings(urls)
+		return repo.Performer.Update(ctx, &models.UpdatePerformerInput{Performer: p})
+	}))
+	require.Equal(t, want, performerProfileURLs(t, repo, 71))
+	editProfileURLs(t, repo, 71, models.RelationshipUpdateModeAdd, "http://www.onlyfans.com/lucymochi?ref=bio")
+	require.Equal(t, want, performerProfileURLs(t, repo, 71))
+	first := profileCapture(t, repo, "https://onlyfans.com/lucymochi/c99")
+	profileOwner(t, repo, *first.AccountUUID, 71)
+	require.Equal(t, want, performerProfileURLs(t, repo, 71))
+	editProfileURLs(t, repo, 71, models.RelationshipUpdateModeRemove, "onlyfans.com/LucyMochi/c1")
+	require.Equal(t, []string{want[0], want[2]}, performerProfileURLs(t, repo, 71))
+	require.NoError(t, db.Close())
+	require.NoError(t, db.Open(db.DatabasePath()))
+	profileCapture(t, repo, "https://onlyfans.com/lucymochi/c100 https://onlyfans.com/lucymochi_vip/c2")
+	require.Equal(t, []string{want[0], want[2]}, performerProfileURLs(t, repo, 71), "removal suppresses the profile across suffixes and restarts")
+	editProfileURLs(t, repo, 71, models.RelationshipUpdateModeAdd, "https://onlyfans.com/lucymochi/trial/new")
+	require.Equal(t, []string{want[0], want[2], want[1]}, performerProfileURLs(t, repo, 71), "explicit restoration is allowed")
+}
+
+func TestOnlyFansHistoricalEvidenceAndEmptyAddNormalizeWithoutMigration(t *testing.T) {
+	db, repo := archiveTestDatabase(t)
+	first := profileCapture(t, repo, "https://onlyfans.com/lucymochi")
+	raw := openRawDB(t, db.DatabasePath())
+	defer raw.Close()
+	old := "https://onlyfans.com/LucyMochi/c76"
+	// Reconstruct the stored metadata/evidence spelling from before the fix.
+	_, err := raw.Exec("UPDATE account_profile_urls SET url=?,url_key=? WHERE account_uuid=?", old, sourceadapter.ProfileURLKey(old), *first.AccountUUID)
+	require.NoError(t, err)
+	_, err = raw.Exec("INSERT INTO performer_urls(performer_id,position,url) VALUES(71,0,?),(71,1,?),(71,2,?)", old, "https://onlyfans.com/lucymochi/c30", "https://unrelated.invalid/keep")
+	require.NoError(t, err)
+	editProfileURLs(t, repo, 71, models.RelationshipUpdateModeAdd)
+	want := []string{"https://onlyfans.com/lucymochi", "https://unrelated.invalid/keep"}
+	require.Equal(t, want, performerProfileURLs(t, repo, 71), "empty ADD audits current URLs inside the transaction")
+	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM performer_profile_url_suppressions"), "canonical replacement is not a removal")
+	profileOwner(t, repo, *first.AccountUUID, 71)
+	require.Equal(t, want, performerProfileURLs(t, repo, 71), "historical evidence cannot re-add a suffix")
+	// A removal recorded by the previous runtime has its original URL/key.
+	_, err = raw.Exec("DELETE FROM performer_urls WHERE performer_id=71 AND url=?", want[0])
+	require.NoError(t, err)
+	_, err = raw.Exec("INSERT INTO performer_profile_url_suppressions(performer_uuid,url_key,url) SELECT uuid,?,? FROM archive_entities WHERE performer_id=71", sourceadapter.ProfileURLKey(old), old)
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+	require.NoError(t, db.Open(db.DatabasePath()))
+	profileCapture(t, repo, "https://onlyfans.com/lucymochi/c100")
+	require.Equal(t, []string{want[1]}, performerProfileURLs(t, repo, 71), "historical removals suppress newly normalized observations")
+	var stored string
+	require.NoError(t, raw.QueryRow("SELECT url FROM performer_profile_url_suppressions").Scan(&stored))
+	require.Equal(t, old, stored, "historical suppression evidence is retained")
+	require.NoError(t, raw.Close())
+	require.NoError(t, db.Close())
+	_, err = sqlite.VerifyNativeSnapshot(t.Context(), db.DatabasePath())
+	require.NoError(t, err, "historical evidence still validates without a schema migration")
 }
 
 func TestPerformerProfileURLFullUpdatesRollbackAndMerge(t *testing.T) {

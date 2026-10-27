@@ -2,9 +2,11 @@ package sqlite
 
 import (
 	"context"
+	"slices"
 
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/sourceadapter"
 )
 
 // Called only after a capture has an established publisher. Profile links are
@@ -83,11 +85,11 @@ func syncAccountProfileURLs(ctx context.Context, accountID string) error {
 	}
 	seen := profileURLKeys(existing)
 	var suppressed []string
-	if err := dbWrapper.Select(ctx, &suppressed, "SELECT url_key FROM performer_profile_url_suppressions WHERE performer_uuid=?", performer.UUID); err != nil {
+	if err := dbWrapper.Select(ctx, &suppressed, "SELECT url FROM performer_profile_url_suppressions WHERE performer_uuid=?", performer.UUID); err != nil {
 		return err
 	}
-	for _, key := range suppressed {
-		seen[key] = true
+	for _, value := range suppressed {
+		seen[performerProfileURLKey(value)] = true
 	}
 	var added []string
 	afterAccount, afterKey := "", ""
@@ -106,9 +108,10 @@ ORDER BY u.account_uuid,u.url_key LIMIT 128`, account.UUID, afterAccount, afterK
 			return err
 		}
 		for _, row := range rows {
-			if !seen[row.Key] {
-				added = append(added, row.URL)
-				seen[row.Key] = true
+			key := performerProfileURLKey(row.URL)
+			if !seen[key] {
+				added = append(added, sourceadapter.PerformerProfileURL(row.URL))
+				seen[key] = true
 			}
 			afterAccount, afterKey = row.AccountUUID, row.Key
 		}
@@ -127,9 +130,10 @@ ORDER BY u.account_uuid,u.url_key LIMIT 128`, account.UUID, afterAccount, afterK
 			return err
 		}
 		for _, row := range rows {
-			if !seen[row.Key] {
-				added = append(added, row.URL)
-				seen[row.Key] = true
+			key := performerProfileURLKey(row.URL)
+			if !seen[key] {
+				added = append(added, sourceadapter.PerformerProfileURL(row.URL))
+				seen[key] = true
 			}
 			afterAccount, afterKey = row.AccountUUID, row.Key
 		}
@@ -137,7 +141,7 @@ ORDER BY u.account_uuid,u.url_key LIMIT 128`, account.UUID, afterAccount, afterK
 			break
 		}
 	}
-	if len(added) == 0 {
+	if len(added) == 0 && slices.Equal(existing, normalizePerformerURLs(existing)) {
 		return nil
 	}
 	update := models.NewPerformerPartial()
@@ -152,11 +156,28 @@ ORDER BY u.account_uuid,u.url_key LIMIT 128`, account.UUID, afterAccount, afterK
 func profileURLKeys(urls []string) map[string]bool {
 	keys := make(map[string]bool, len(urls))
 	for _, value := range urls {
-		if key := archive.ProfileURLKey(value); key != "" {
+		if key := performerProfileURLKey(value); key != "" {
 			keys[key] = true
 		}
 	}
 	return keys
+}
+
+func performerProfileURLKey(value string) string {
+	return archive.ProfileURLKey(sourceadapter.PerformerProfileURL(value))
+}
+
+func normalizePerformerURLs(values []string) []string {
+	ret := make([]string, 0, len(values))
+	seen := make(map[string]bool, len(values))
+	for _, value := range values {
+		value = sourceadapter.PerformerProfileURL(value)
+		if !seen[value] {
+			ret = append(ret, value)
+			seen[value] = true
+		}
+	}
+	return ret
 }
 
 func updatePerformerURLs(ctx context.Context, id int, update models.UpdateStrings) error {
@@ -164,7 +185,12 @@ func updatePerformerURLs(ctx context.Context, id int, update models.UpdateString
 	if err != nil {
 		return err
 	}
-	if err := performersURLsTableMgr.modifyJoins(ctx, id, update.Values, update.Mode); err != nil {
+	update.Values = normalizePerformerURLs(update.Values)
+	after := update.Apply(normalizePerformerURLs(before))
+	if slices.Equal(before, after) {
+		return nil
+	}
+	if err := performersURLsTableMgr.replaceJoins(ctx, id, after); err != nil {
 		return err
 	}
 	return rememberRemovedPerformerURLs(ctx, id, before)
@@ -179,6 +205,7 @@ func rememberRemovedPerformerURLs(ctx context.Context, performerID int, before [
 	}
 	remaining := profileURLKeys(after)
 	for _, value := range before {
+		value = sourceadapter.PerformerProfileURL(value)
 		key := archive.ProfileURLKey(value)
 		if key == "" || remaining[key] {
 			continue

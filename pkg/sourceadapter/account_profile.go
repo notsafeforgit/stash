@@ -74,7 +74,8 @@ func applyProfileResolutions(profile sourceObject, links map[string]string) {
 		entry, _ := item.(sourceObject)
 		from, _ := entry["url"].(string)
 		to, _ := entry["resolved_url"].(string)
-		fromKey, toKey := ProfileURLKey(from), ProfileURLKey(to)
+		to = PerformerProfileURL(to)
+		fromKey, toKey := ProfileURLKey(PerformerProfileURL(from)), ProfileURLKey(to)
 		if _, ok := links[fromKey]; ok && toKey != "" && fromKey != toKey {
 			delete(links, fromKey)
 			links[toKey] = to

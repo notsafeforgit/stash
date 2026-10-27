@@ -287,7 +287,7 @@ func (qb *PerformerStore) Create(ctx context.Context, newObject *models.CreatePe
 
 	if newObject.URLs.Loaded() {
 		const startPos = 0
-		if err := performersURLsTableMgr.insertJoins(ctx, id, startPos, newObject.URLs.List()); err != nil {
+		if err := performersURLsTableMgr.insertJoins(ctx, id, startPos, normalizePerformerURLs(newObject.URLs.List())); err != nil {
 			return err
 		}
 	}

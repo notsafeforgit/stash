@@ -39,7 +39,7 @@ func profileObservationFixture(t *testing.T) (captureFixture, ingest.AccountProf
 	run, err = coordinator.Claim(t.Context(), f.token, run.UUID, uuid.NewString(), policy, time.Minute)
 	require.NoError(t, err)
 	event := ingest.AccountProfileEvent{Protocol: 1, ProducerUUID: f.producer.UUID, EventUUID: uuid.NewString(), RunUUID: run.UUID, CollectionUUID: f.collection.UUID, CollectionRevision: f.collection.Revision, RootUUID: &f.root.UUID, OwnerUUID: run.OwnerUUID, Fence: run.Fence, Kind: "account.profile", ObservedAt: time.Now().UTC(), ExtractorVersion: "fixture", RetentionPolicy: archive.SourceRetentionVersion,
-		Source: json.RawMessage(`{"category":"reddit","user":{"id":"123","name":"Example","subreddit":{"public_description":"https://bio.invalid"},"social_links":[{"url":"https://myredlink.com/example"}],"resolved_links":[{"url":"https://myredlink.com/example","resolved_url":"https://onlyfans.com/example"}]}}`)}
+		Source: json.RawMessage(`{"category":"reddit","user":{"id":"123","name":"Example","subreddit":{"public_description":"https://bio.invalid https://onlyfans.com/Example/trial/token"},"social_links":[{"url":"https://myredlink.com/example"},{"url":"https://www.onlyfans.com/example?ref=bio"}],"resolved_links":[{"url":"https://myredlink.com/example","resolved_url":"https://onlyfans.com/example/c76"}]}}`)}
 	return f.captureFixture, event
 }
 
@@ -104,6 +104,7 @@ func TestAccountProfileWithoutPostsReplayLateOwnerAndRemoval(t *testing.T) {
 	require.Equal(t, first, replay)
 	event.EventUUID = uuid.NewString()
 	event.Source = json.RawMessage(strings.Replace(string(event.Source), "https://bio.invalid", "https://bio.invalid https://new.invalid", 1))
+	event.Source = json.RawMessage(strings.Replace(string(event.Source), "/example/c76", "/example/c99", 1))
 	_, err = submitProfile(t, f, event)
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{"https://bio.invalid", "https://new.invalid"}, urls())

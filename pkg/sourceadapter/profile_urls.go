@@ -141,6 +141,7 @@ func collectProfileURLs(profile sourceObject, links map[string]string) {
 		if expanded := expansions[value]; expanded != "" {
 			value = expanded
 		}
+		value = PerformerProfileURL(value)
 		key := ProfileURLKey(value)
 		if key != "" && len(links) < 128 {
 			if _, exists := links[key]; !exists {

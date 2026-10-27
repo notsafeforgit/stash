@@ -49,6 +49,15 @@ performer URLs stay in their original order, and equivalent URLs are not added
 twice. Known account locators such as `x.com/name` and `twitter.com/name` compare
 as the same link; other websites retain meaningful path/query differences.
 
+OnlyFans performer links use `https://onlyfans.com/<username>`: campaign and
+trial suffixes, query parameters, fragments, host aliases and username case do
+not create separate profiles. All performer URL saves use this rule, including
+manual edits, imports, bulk edits and discovered bios/social-link redirects.
+Distinct usernames remain separate. Removing any spelling suppresses future
+automatic additions of the same profile; replacing a campaign link with its
+profile URL does not count as a removal. Historical captures and stored evidence
+keys remain unchanged, so this normalization needs no schema migration.
+
 Post captures recognize bio/website/link-list fields on Reddit, Twitter,
 Instagram, Bluesky, TikTok, Fansly, mirror profiles and generic publisher objects
 that contain a matching stable ID. Captured expanded links take precedence over

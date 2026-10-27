@@ -35,6 +35,13 @@ func recordAccountProfileURLs(ctx context.Context, account, captureID string) er
 		// explicit link must not turn malformed profile fields into metadata.
 		return nil
 	}
+	linked, err := recordLinkedRedgifsProfile(ctx, captureID, raw)
+	if err != nil {
+		return err
+	}
+	if linked != "" {
+		urls = append(urls, linked)
+	}
 	for _, value := range urls {
 		if _, err := dbWrapper.Exec(ctx, `INSERT INTO account_profile_urls(account_uuid,url_key,url,capture_uuid) VALUES(?,?,?,?)
 ON CONFLICT(account_uuid,url_key) DO UPDATE SET url=excluded.url,capture_uuid=excluded.capture_uuid`,
@@ -95,6 +102,27 @@ CROSS JOIN source_captures c ON c.uuid=u.capture_uuid
 CROSS JOIN source_post_identities i ON i.post_uuid=c.post_uuid
 CROSS JOIN source_posts post ON post.uuid=i.canonical_uuid AND post.state='active'
 WHERE a.canonical_uuid=? AND p.canonical_uuid=a.canonical_uuid AND (u.account_uuid,u.url_key)>(?,?)
+ORDER BY u.account_uuid,u.url_key LIMIT 128`, account.UUID, afterAccount, afterKey); err != nil {
+			return err
+		}
+		for _, row := range rows {
+			if !seen[row.Key] {
+				added = append(added, row.URL)
+				seen[row.Key] = true
+			}
+			afterAccount, afterKey = row.AccountUUID, row.Key
+		}
+		if len(rows) < 128 {
+			break
+		}
+	}
+	afterAccount, afterKey = "", ""
+	for {
+		var rows []accountProfileURLRow
+		if err := dbWrapper.Select(ctx, &rows, `SELECT u.account_uuid,u.url_key,u.url FROM source_accounts a
+CROSS JOIN account_observed_profile_urls u ON u.account_uuid=a.uuid
+CROSS JOIN source_account_profiles p ON p.uuid=u.profile_uuid AND p.account_uuid=u.account_uuid
+WHERE a.canonical_uuid=? AND (u.account_uuid,u.url_key)>(?,?)
 ORDER BY u.account_uuid,u.url_key LIMIT 128`, account.UUID, afterAccount, afterKey); err != nil {
 			return err
 		}

@@ -57,6 +57,10 @@ func ExtractCapturedProfileURLs(raw []byte) ([]string, error) {
 	return sourceadapter.ExtractCapturedProfileURLs(raw)
 }
 
+func ExtractCapturedRedditRedgifsProfile(raw []byte) (*sourceadapter.CapturedLinkedProfile, error) {
+	return sourceadapter.ExtractCapturedRedditRedgifsProfile(raw)
+}
+
 func ExtractCapturedPost(raw []byte) (*models.SourcePostIdentifier, error) {
 	return sourceadapter.ExtractCapturedPost(raw)
 }

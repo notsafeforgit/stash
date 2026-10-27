@@ -924,6 +924,11 @@ AND EXISTS(SELECT 1 FROM pragma_index_info('shares_token_hash') WHERE name='toke
 				return err
 			}
 		}
+		if version >= NativeSchemaBaseline+134 {
+			if err := validateAccountProfileSchema(conn, auditData); err != nil {
+				return err
+			}
+		}
 		if version >= NativeSchemaBaseline+93 {
 			if err := validateArchiveActivitySchema(conn); err != nil {
 				return err

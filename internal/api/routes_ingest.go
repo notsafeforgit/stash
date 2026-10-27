@@ -169,17 +169,18 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		ingestError(w, err)
 		return
 	}
-	kinds := []string{"source.capture", "attachment.download"}
+	kinds := []string{"source.capture", "attachment.download", "account.profile"}
 	if rs.fileIngestion {
 		kinds = append(kinds, "file.completed")
 	}
 	ingestJSON(w, http.StatusOK, map[string]interface{}{
 		"protocol": ingest.ProtocolVersion, "producer_uuid": credential.ProducerUUID, "scopes": credential.Scopes,
 		"root_uuids": credential.RootUUIDs,
-		"kinds":      kinds, "post_namespaces": []string{"native:reddit", "native:twitter", "native:bluesky", "native:tiktok", "native:instagram", "native:patreon", "native:fansly", "native:tumblr", "native:jpgfish", "native:imglike", "native:putmega", "native:leakgallery", "native:erome"},
+		"kinds":      kinds, "post_namespaces": []string{"native:reddit", "native:redgifs", "native:twitter", "native:bluesky", "native:tiktok", "native:instagram", "native:patreon", "native:fansly", "native:tumblr", "native:jpgfish", "native:imglike", "native:putmega", "native:leakgallery", "native:erome"},
 		"post_namespace_prefixes": []string{"mirror:coomer:", "mirror:kemono:", "ytdl:"},
 		"retention_policy":        archive.SourceRetentionVersion, "max_event_bytes": ingest.MaxEventBytes, "max_batch_bytes": ingest.MaxBatchBytes, "max_batch_events": ingest.MaxBatchEvents,
 		"attachment_download_protocol": 1, "max_attachment_download_bytes": ingest.MaxAttachmentDownloadBytes,
+		"account_profile_protocol": 1, "max_account_profile_bytes": ingest.MaxAccountProfileBytes,
 		"file_transformation_protocol": 1,
 		"max_file_event_bytes":         ingest.MaxFileEventBytes, "file_ingestion": rs.fileIngestion,
 		"source_runs": true, "source_run_protocol": 1, "source_run_submission_receipts": true, "source_run_dispatch": true,
@@ -323,6 +324,8 @@ func (rs *ingestRoutes) accept(r *http.Request, token string, item ingestBatchEv
 		return nil, ingest.ErrInvalid
 	}
 	switch kind {
+	case "account.profile":
+		return rs.service.AccountProfile(r.Context(), token, item.Event, item.Digest)
 	case "source.capture":
 		return rs.service.Capture(r.Context(), token, item.Event, item.Digest)
 	case "attachment.download":

@@ -36,7 +36,7 @@ func NormalizeAccountReference(ref models.AccountReference) (models.AccountRefer
 		ref.Value = value
 	} else if ref.Kind == "handle" {
 		switch ref.Namespace {
-		case "native:reddit", "native:twitter", "native:instagram", "native:bluesky", "native:tiktok", "native:onlyfans", "native:fansly", "native:patreon", "native:tumblr":
+		case "native:reddit", "native:redgifs", "native:twitter", "native:instagram", "native:bluesky", "native:tiktok", "native:onlyfans", "native:fansly", "native:patreon", "native:tumblr":
 			ref.Value = cases.Fold().String(norm.NFC.String(ref.Value))
 		}
 	}

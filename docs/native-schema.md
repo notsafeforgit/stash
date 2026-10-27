@@ -8,6 +8,14 @@ The startup-versus-full-audit boundary below applies to the historical proof
 validation described throughout this guide. Deployment and one-time import
 completion belong to the installation's operations records.
 
+Schema 1000134 adds independent account profile observations and normalized
+profile links, with `account.profile` ingestion receipts. The receipt migration
+preserves existing capture, file and attachment receipts and their references.
+Profile observations do not create source posts or claim media coverage; see
+[performer profile links](native-ingestion.md#performer-links-from-captured-profiles).
+The direct initialization baseline remains pinned. Backups include this evidence;
+anonymized exports remove it.
+
 Schema 1000126 adds bounded durable commands and per-item checkpoints for ordinary
 [bulk edits](native-bulk-updates.md), including fenced recovery and notification
 attempts. Existing ordinary job history is preserved; pending old executors

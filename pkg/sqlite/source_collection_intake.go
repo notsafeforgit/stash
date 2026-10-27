@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
 )
 
@@ -36,6 +37,33 @@ func (s *SourceCollectionStore) RecordCapture(ctx context.Context, input models.
 	}
 	_, err = dbWrapper.Exec(ctx, `INSERT INTO source_collection_captures(collection_uuid,collection_revision,capture_uuid)
 VALUES(?,?,?) ON CONFLICT(collection_uuid,capture_uuid,collection_revision) DO NOTHING`, collection, input.CollectionRevision, capture)
+	if err != nil {
+		return err
+	}
+	// The same observation can first arrive through a feed and later through
+	// its author's profile. Re-evaluate newly recorded scope for an already
+	// established publisher; a fresh publisher is handled by Apply below.
+	publisher, err := (&CapturePublisherStore{}).Current(ctx, capture)
+	if err != nil {
+		return err
+	}
+	if publisher != nil && publisher.State == "linked" && publisher.AccountUUID != nil {
+		return recordAccountProfileURLs(ctx, *publisher.AccountUUID, capture)
+	}
+	if publisher != nil && publisher.State == "unlinked" {
+		return nil
+	}
+	// A locator-only publisher may require review. That must not prevent a
+	// verified related profile from being collected in its own source scope.
+	observation, err := (&SourceEvidenceStore{}).FindCapture(ctx, capture)
+	if err != nil || observation == nil || observation.Origin != "gallery-dl" && observation.Origin != "gallery-dl-enrichment" {
+		return err
+	}
+	raw, err := archive.RestoreCapture(observation.Payload)
+	if err != nil {
+		return err
+	}
+	_, err = recordLinkedRedgifsProfile(ctx, capture, raw)
 	return err
 }
 

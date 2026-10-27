@@ -12,6 +12,7 @@ import (
 
 func removeShareTokenLookupSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeAccountProfileSchema(t, raw)
 	_, err := raw.Exec(`DROP INDEX IF EXISTS shares_token_hash;
 DELETE FROM native_migration_history WHERE version=1000133`)
 	require.NoError(t, err)

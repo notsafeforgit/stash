@@ -120,6 +120,8 @@ func ExtractCapturedAlbum(raw []byte) (*CapturedAlbum, error) {
 	}
 	result := &CapturedAlbum{Policy: CapturedAlbumPolicy}
 	switch category {
+	case "redgifs":
+		return capturedRedgifsAlbum(data, path)
 	case "tumblr", "jpgfish", "imglike", "putmega", "leakgallery", "erome":
 		result, err = capturedWebAlbum(data, path, category)
 		if err != nil || result == nil {

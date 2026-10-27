@@ -21,6 +21,7 @@ a nil parser result does not authorize discarding them.
 | Extractor | Account ID evidence | Additional captured identity |
 | --- | --- | --- |
 | Reddit | `author_fullname` | `author`, or the author object's `name`; never a feed owner's `user` object |
+| Redgifs | No immutable ID in the item API response; automatic publisher selection remains unavailable | `userName` is retained as a handle for explicit review; `/users/<handle>` URLs identify the Redgifs profile |
 | Twitter | `author.id` | `author.name` |
 | Instagram | `owner_id` | `username` |
 | Bluesky | `author.did` | `author.handle` |
@@ -35,6 +36,14 @@ its pointers retain the `/_reddit/` prefix. For unfamiliar extractors, a separat
 named author cannot borrow the ID of another `user` object. Directory names,
 filenames, post IDs, captions, and scraper target URLs do not identify the author.
 Generic yt-dlp URLs establish only a site namespace, never an account ID.
+
+An API-resolved Redgifs item linked from the author's Reddit profile can supply
+a related `/users/<userName>` URL. It is retained on the Reddit publisher's
+performer and can become a monitored source with the observed Reddit download
+directory. This is a discovery association, not an immutable account ID, account
+merge, Redgifs ownership decision or depicted-performer assignment. The two
+services' handles may differ. Existing URL removals and subscription decisions
+remain authoritative.
 
 Opaque IDs retain spelling and case. JSON integer IDs remain exact even above
 JavaScript's safe integer range. Fractional/exponent numeric IDs, nested objects,

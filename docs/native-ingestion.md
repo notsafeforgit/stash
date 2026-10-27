@@ -49,13 +49,36 @@ performer URLs stay in their original order, and equivalent URLs are not added
 twice. Known account locators such as `x.com/name` and `twitter.com/name` compare
 as the same link; other websites retain meaningful path/query differences.
 
-This uses metadata already supplied by the configured extractor. Neither Stash
-nor the adapter enables additional profile requests, follows links, or changes
-gallery-dl's user/bio settings. It recognizes captured bio/website/link-list
-fields on Reddit, Twitter, Instagram, Bluesky, TikTok, Fansly, mirror profiles
-and generic publisher objects that contain a matching stable ID. Twitter's
-captured expanded links take precedence over their short-link spelling. Each
-capture supplies at most 128 distinct valid profile links.
+Post captures recognize bio/website/link-list fields on Reddit, Twitter,
+Instagram, Bluesky, TikTok, Fansly, mirror profiles and generic publisher objects
+that contain a matching stable ID. Captured expanded links take precedence over
+their short-link spelling. Each observation supplies at most 128 valid links.
+
+Reddit user-profile downloads additionally refresh the profile independently of
+post selection. The producer retains the API bio and reads Social Links from
+the current Reddit profile page, requiring that page's account ID and handle to
+match the API. It resolves known redirectors (`myredlink.com`, `t.co`, `bit.ly`,
+`tinyurl.com`) with at most five hops, including the myredlink Continue/JavaScript
+landing page. Destination profiles are not requested, and Reddit credentials
+are not sent to redirectors. Unrecognized link hubs keep their original URL.
+Unavailable social pages or resolutions warn and retain the available bio/link;
+the next profile run retries. Shared request budgets and cooldowns still apply.
+
+The producer durably queues `account.profile` before iterating the submissions,
+including empty, date-filtered and archive-only runs. It does not advance media
+cursors, publication coverage, or counters and creates no source post. Retained
+profile evidence, URL changes and the ordinary ingestion receipt commit together.
+The server validates the historical run attempt, collection profile, stable ID,
+and ownership; ambiguous or handle-only account matches retain evidence for
+review without assigning a performer. Existing post captures still carry the
+same enriched profile for their own verified author.
+
+This requires schema 1000134 and `account_profile_protocol: 1` in ingestion
+capabilities. Events use the common scope/time envelope plus `owner_uuid`,
+`fence`, `extractor_version`, `retention_policy` and `source` (only `category`
+and `user`). They are limited to 128 KiB with a 64 KiB retained profile. Receipts
+return `result.profile_uuid` and an optional resolved `result.account_uuid` or
+review reason; they have no post, capture, media or job UUID.
 
 When importing profile links changes a performer, Stash sends the normal
 `Performer.Update.Post` plugin notification with `urls` in `inputFields` after
@@ -77,8 +100,11 @@ deleted owners are skipped. These links do not establish other account ownership
 or assign people depicted in the post. The normalized per-account link evidence
 and per-performer removals live in `account_profile_urls` and
 `performer_profile_url_suppressions` in the native SQLite database, alongside
-their referenced source captures and UUIDs. Normal database backups include both;
-anonymized exports remove their private data. Schema 1000097 is required.
+their referenced source captures and UUIDs. Standalone observations live in
+`source_account_profiles`, with their normalized links in
+`account_observed_profile_urls`. Normal database backups include these records;
+anonymized exports remove their private data. Post-based URL import requires
+schema 1000097; standalone profile observations require schema 1000134.
 
 ## Authentication and scope
 
@@ -525,7 +551,42 @@ must still satisfy the qualified-namespace rules.
 
 Reddit crossposts and independent social posts keep their own identity. Supported
 Imgur/Redgifs child hosts retain their enclosing post scope, caption and publisher.
+Standalone Redgifs captures use `native:redgifs` and the API item ID for their
+post and attachment. A Reddit embed and a standalone item retain separate posts
+while sharing the same attachment identity. Only API media renditions establish
+attachments; posters are excluded. `createDate` supplies the publication time.
+Gallery labels and output counts do not prove ordered album membership. Redgifs
+profile URLs are recognized as account locators; the item API supplies a handle
+only, so publisher and performer ownership still require explicit review.
 A social extractor's parent feed/profile does not replace its actual post.
+
+For a Reddit user-profile collection, a resolved Redgifs clip can also discover
+its uploader profile. The offline adapter requires the captured Reddit author,
+an exact linked item (or captured numeric-alias resolution), and the API's
+`userName`. Comments, crossposts and unrelated child items are excluded. Core
+matches the author to the current collection's profile, records the related URL
+against the established Reddit publisher, and adds it to that account owner's
+performer URLs. Linking an owner later also synchronizes the URL; explicit URL
+removals remain suppressed. This discovery does not assert Redgifs account
+ownership or assign depicted performers.
+
+The producer includes `native_redgifs_directory`, the root-relative directory
+actually chosen by the Reddit download job, even on archive skips. Core validates
+it within the original collection scope before creating one enabled Redgifs
+subscription per profile/root, with that directory as its path prefix. Capture,
+URL evidence and initial subscription commit atomically. Missing or invalid
+directory hints cannot create download work. Existing sources, destinations,
+paused subscriptions and retired definitions are preserved on fresh captures
+and retries. Stale collection revisions cannot create new subscriptions.
+
+The external Redgifs worker uses the claimed destination when configured with
+`extractor.redgifs.user.native-profile-directory: true`; this keeps direct
+profile downloads beside the Reddit user's files without fabricating Reddit
+metadata. A separately configured subscription scheduler chooses the cadence
+and queues full-history passes using the same Redgifs download archive. New
+profiles enter that next pass; existing archived clips are skipped. This also
+allows missing older uploads to be collected without relying on Reddit's
+listing limit or source-post date window.
 
 Reddit and Twitter captures also fill a missing source-post URL in the same
 transaction as the receipt. Reddit uses its captured permalink when it matches

@@ -113,6 +113,10 @@ func extractCapturedAccount(raw []byte, requireID bool) (*CapturedAccount, error
 	field := func(key string) capturedField { return capturedFieldAt(data, path, key) }
 	first := func(keys ...string) capturedField { return firstCapturedField(data, path, keys...) }
 	switch category {
+	case "redgifs":
+		// The API exposes a handle, not an immutable account ID. Retain it
+		// for explicit review without borrowing a feed owner or inventing an ID.
+		handle = field("userName")
 	case "reddit":
 		id, handle = field("author_fullname"), field("author")
 		if author != nil {

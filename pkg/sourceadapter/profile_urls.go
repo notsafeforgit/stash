@@ -57,6 +57,7 @@ func ExtractCapturedProfileURLs(raw []byte) ([]string, error) {
 			if page, ok := profile["subreddit"].(sourceObject); ok {
 				collectProfileURLs(page, links)
 			}
+			applyProfileResolutions(profile, links)
 		}
 		if category == "twitter" {
 			if legacy, ok := profile["legacy"].(sourceObject); ok {

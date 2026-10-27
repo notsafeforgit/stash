@@ -1107,6 +1107,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 		for _, table := range []string{
 			"source_post_import_labels", "source_post_studios",
 			"account_profile_urls", "performer_profile_url_suppressions",
+			"account_observed_profile_urls", "source_account_profiles",
 			"provider_metadata_imports",
 			"file_deduplications",
 			"discovery_published_records", "discovery_match_publications",

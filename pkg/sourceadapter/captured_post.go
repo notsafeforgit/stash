@@ -132,6 +132,8 @@ func ExtractCapturedPost(raw []byte) (*models.SourcePostIdentifier, error) {
 		return nil, err
 	}
 	switch category {
+	case "redgifs":
+		return capturedRedgifsPost(data, path)
 	case "tumblr", "jpgfish", "imglike", "putmega", "leakgallery", "erome":
 		return capturedWebPost(data, path, category)
 	case "ytdl", "ytdl-generic":

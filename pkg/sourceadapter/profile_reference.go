@@ -13,6 +13,7 @@ var profilePatterns = map[string]*regexp.Regexp{
 	"twitter_id":     regexp.MustCompile(`^/i/user/([0-9]+)$`),
 	"twitter":        regexp.MustCompile(`^/([A-Za-z0-9_]{1,15})(?:/(?:media|with_replies))?$`),
 	"reddit":         regexp.MustCompile(`^/(?:user|u)/([A-Za-z0-9_-]{1,32})$`),
+	"redgifs":        regexp.MustCompile(`^/users/([A-Za-z0-9_-]{1,256})$`),
 	"instagram":      regexp.MustCompile(`^/([A-Za-z0-9_.]{1,30})$`),
 	"bluesky":        regexp.MustCompile(`^/profile/([^/?#%]+)(?:/(?:posts|media|replies|video))?$`),
 	"bluesky_id":     regexp.MustCompile(`^did:(?:plc:[a-zA-Z0-9]+|web:[A-Za-z0-9.:-]+)$`),
@@ -85,6 +86,10 @@ func ProfileReference(value string) *models.AccountReference {
 	case "instagram.com":
 		if m := match("instagram"); m != nil {
 			return nativeProfileHandle("instagram", m[1], "p reel reels stories explore accounts direct about developer legal web")
+		}
+	case "redgifs.com":
+		if m := match("redgifs"); m != nil {
+			return nativeProfileHandle("redgifs", m[1], "")
 		}
 	case "bsky.app", "main.bsky.dev":
 		if m := match("bluesky"); m != nil {

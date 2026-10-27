@@ -13,7 +13,7 @@ var captureInstagramFields = sourceKeys("date shortcode display_url video_url wi
 var captureMirrorFields = sourceKeys("path name url hash type native_file_exclusion")
 var captureBlueskyFields = sourceKeys("description width height count")
 var captureTiktokFields = sourceKeys("image type title duration width height")
-var captureProvenanceFields = sourceKeys("source_extractor_url subcategory nfo_path")
+var captureProvenanceFields = sourceKeys("source_extractor_url subcategory nfo_path native_redgifs_directory")
 
 // RetainSourcePayload applies the versioned gallery-dl policy to a decoded
 // copy. It never modifies an extractor's working metadata or fetches URLs.

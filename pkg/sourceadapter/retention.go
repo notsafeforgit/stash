@@ -23,7 +23,7 @@ var sourceSecretKeys = sourceKeys("password passwd cookie cookies authorization 
 var retainedPrivateKeys = sourceKeys("_reddit _parent _url")
 var profileRoles = sourceKeys("user author source_user retweeted_by quoted_by quote_by")
 var twitterProfileFields = sourceKeys("id id_str rest_id name screen_name nick description location based_in url date created_at profile_image profile_banner profile_image_url profile_image_url_https profile_banner_url")
-var redditProfileFields = sourceKeys("id name created created_utc icon_img snoovatar_img")
+var redditProfileFields = sourceKeys("id name created created_utc icon_img snoovatar_img social_links resolved_links")
 var redditPageFields = sourceKeys("id name display_name display_name_prefixed title url description public_description icon_img banner_img header_img community_icon")
 
 func sanitizeSource(value interface{}) interface{} {

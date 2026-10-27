@@ -27,6 +27,8 @@ func ExtractCapturedPostURL(raw []byte) (*CapturedPostURL, error) {
 		return nil, err
 	}
 	switch post.Namespace {
+	case "native:redgifs":
+		return &CapturedPostURL{Post: *post, URL: "https://www.redgifs.com/watch/" + post.Value}, nil
 	case "native:erome":
 		return &CapturedPostURL{Post: *post, URL: "https://www.erome.com/a/" + post.Value}, nil
 	case "native:reddit":

@@ -82,6 +82,7 @@ var (
 )
 
 type SourceAccountReaderWriter interface {
+	RecordProfile(context.Context, AccountProfileInput) (*AccountProfileResult, error)
 	Create(context.Context, string, string) (*SourceAccount, error)
 	Find(context.Context, string) (*SourceAccount, error)
 	Resolve(context.Context, string) (*SourceAccount, error)

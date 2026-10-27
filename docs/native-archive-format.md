@@ -9,6 +9,37 @@ are preserved exactly. The package uses Python 3.11 or newer and its standard
 library; inspecting a restored archive requires neither Stash nor a catalog
 plugin.
 
+Archive version 2 supports `originals-and-untracked-v1` artwork retention.
+It preserves the native SQLite bytes, performer photos, studio logos, tag images,
+group covers and uploaded/scraped or otherwise untracked scene covers. An
+external scene image is omitted only when every owner is a scene with a matching
+saved frame selection, attached source UUID, valid timestamp and matching file
+fingerprint metadata. Shared original images and uncertain sources remain required.
+Embedded image bytes remain inside the unchanged SQLite snapshot. The manifest
+records the policy and omitted image/scene counts; verification recomputes the
+omissions from that snapshot. Arbitrarily missing originals still fail verification.
+Version 1 archives remain supported; older readers reject version 2.
+
+Use `stash-archive export --artwork-policy originals-and-untracked-v1 ...` to
+select this policy. The host publisher selects it automatically. Offline import
+also writes `generated-covers.jsonl`, `regenerate-covers.graphql`, and a pending
+regeneration count in `restore.json`. After restoring the media (including its
+saved modification times) and starting Stash, submit the supplied mutation:
+
+```graphql
+mutation RestoreGeneratedCovers {
+  metadataGenerate(input: {covers: true, coversMissingOnly: true})
+}
+```
+
+This operation preserves existing images and untracked artwork, uses each saved
+source/timestamp, and refuses changed or unavailable source videos. It can be
+repeated after restoring more media. A concurrent cover or frame edit prevents
+publication over the newer selection. Regenerated image bytes may differ between
+encoder versions, so Stash updates their checksums through its normal API.
+Offline archive verification does not claim that media has been restored or
+that omitted renditions have already been regenerated.
+
 The current coverage is **declared components**. Each database has a consistent
 SQLite snapshot, and each restored component is verified. Production backup
 still needs a coordinated producer receipt boundary, configuration/filesystem

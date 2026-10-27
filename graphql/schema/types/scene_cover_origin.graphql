@@ -26,6 +26,8 @@ extend type Mutation {
 }
 
 extend input GenerateMetadataInput {
+  "Restore missing generated covers from their saved source and timestamp. Keeps present and untracked artwork. Requires covers, and excludes overwrite/resetCoversToDefault."
+  coversMissingOnly: Boolean
   "With covers selected, replace their frame selections with the default at 20% of the primary video. Regenerates covers regardless of overwrite. Requires v3."
   resetCoversToDefault: Boolean
 }

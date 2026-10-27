@@ -231,6 +231,9 @@ func (s *Manager) RunSingleTask(ctx context.Context, t interface {
 }
 
 func (s *Manager) Generate(ctx context.Context, input GenerateMetadataInput) (string, error) {
+	if input.CoversMissingOnly && (!input.Covers || input.Overwrite || input.ResetCoversToDefault) {
+		return "", fmt.Errorf("coversMissingOnly requires covers and excludes overwrite/resetCoversToDefault")
+	}
 	input, err := s.resolveGenerateSceneSelection(ctx, input)
 	if err != nil {
 		return "", err

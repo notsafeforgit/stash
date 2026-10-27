@@ -14,6 +14,7 @@ type GenerateCoverTask struct {
 	ScreenshotAt     *float64
 	Overwrite        bool
 	ResetToDefault   bool
+	MissingOnly      bool
 	onError          func(error)
 	publicationGuard func(context.Context) error
 }
@@ -40,6 +41,10 @@ func (t *GenerateCoverTask) generate(ctx context.Context) error {
 // required returns true if the cover needs to be generated
 // assumes in a transaction
 func (t *GenerateCoverTask) required(ctx context.Context) bool {
+	if t.MissingOnly {
+		// Check the current selection and actual artwork at execution time.
+		return true
+	}
 	if t.Overwrite {
 		return true
 	}

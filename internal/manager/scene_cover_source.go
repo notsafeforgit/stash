@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -168,6 +169,12 @@ func (t *GenerateCoverTask) generateWithCoverSource(ctx context.Context) error {
 		}
 		scene = *current
 		required = t.Overwrite || scene.CoverChecksum == ""
+		if t.MissingOnly {
+			required, err = missingGeneratedCover(ctx, r, &scene)
+			if err != nil {
+				return err
+			}
+		}
 		if !required {
 			return nil
 		}
@@ -281,6 +288,24 @@ func (t *GenerateCoverTask) generateWithCoverSource(ctx context.Context) error {
 		}
 		return err
 	})
+}
+
+// A restore must never replace uploaded/scraped artwork or invent a frame for
+// an untracked cover. The normal generation path rechecks the source and cover
+// selection in the publication transaction, including concurrent user edits.
+func missingGeneratedCover(ctx context.Context, r models.Repository, scene *models.Scene) (bool, error) {
+	if scene.CoverChecksum == "" {
+		return false, nil
+	}
+	source, err := r.Scene.GetCoverSource(ctx, scene.ID)
+	if err != nil || source == nil {
+		return false, err
+	}
+	cover, err := r.Scene.GetCover(ctx, scene.ID)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return false, err
+	}
+	return len(cover) == 0, nil
 }
 
 func sameCoverSource(a, b *models.SceneCoverSource) bool {

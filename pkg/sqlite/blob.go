@@ -168,6 +168,10 @@ func (e *ChecksumBlobNotExistError) Error() string {
 	return fmt.Sprintf("blob for checksum %s does not exist", e.Checksum)
 }
 
+func (e *ChecksumBlobNotExistError) Unwrap() error {
+	return fs.ErrNotExist
+}
+
 func (qb *BlobStore) readSQL(ctx context.Context, querySQL string, args ...interface{}) ([]byte, string, error) {
 	if !qb.options.UseDatabase && !qb.options.UseFilesystem {
 		panic("no blob store configured")

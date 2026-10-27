@@ -19,6 +19,7 @@ import (
 
 type GenerateMetadataInput struct {
 	Covers               bool                         `json:"covers"`
+	CoversMissingOnly    bool                         `json:"coversMissingOnly"`
 	ResetCoversToDefault bool                         `json:"resetCoversToDefault"`
 	Sprites              bool                         `json:"sprites"`
 	Previews             bool                         `json:"previews"`
@@ -431,6 +432,7 @@ func (j *GenerateJob) queueSceneJobs(ctx context.Context, g *generate.Generator,
 			Scene:          *scene,
 			Overwrite:      j.overwrite || j.input.ResetCoversToDefault,
 			ResetToDefault: j.input.ResetCoversToDefault,
+			MissingOnly:    j.input.CoversMissingOnly,
 			onError:        j.coverFailures.Add,
 		}
 

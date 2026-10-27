@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -218,12 +219,15 @@ func TestBulkCoverDefaultSelection(t *testing.T) {
 		at        float64
 		reset     bool
 		overwrite bool
+		missing   bool
 		detached  bool
 		want      float64
 	}{
 		{name: "unknown falls back to default", overwrite: true, want: 0.6},
 		{name: "recorded frame is preserved", recorded: true, at: 1.125, overwrite: true, want: 1.125},
 		{name: "recorded zero is preserved", recorded: true, at: 0, overwrite: true, want: 0},
+		{name: "restore missing saved frame", recorded: true, at: 1.125, missing: true, want: 1.125},
+		{name: "restore missing zero frame", recorded: true, at: 0, missing: true, want: 0},
 		{name: "reset overrides recorded frame without global overwrite", recorded: true, at: 1.125, reset: true, want: 0.6},
 		{name: "reset uses primary instead of detached source", recorded: true, at: 1.125, reset: true, detached: true, want: 0.6},
 	} {
@@ -248,7 +252,12 @@ func TestBulkCoverDefaultSelection(t *testing.T) {
 			db.Scene.On("Find", mock.Anything, scene.ID).Return(scene, nil)
 			db.Scene.On("GetFiles", mock.Anything, scene.ID).Return(scene.Files.List(), nil)
 			db.Scene.On("GetCoverSource", mock.Anything, scene.ID).Return(func(context.Context, int) *models.SceneCoverSource { return saved }, nil)
+			var restored []byte
+			if tc.missing {
+				db.Scene.On("GetCover", mock.Anything, scene.ID).Return(func(context.Context, int) []byte { return restored }, nil)
+			}
 			db.Scene.On("UpdateCover", mock.Anything, scene.ID, mock.Anything).Run(func(args mock.Arguments) {
+				restored = args.Get(2).([]byte)
 				scene.CoverChecksum = md5.FromBytes(args.Get(2).([]byte))
 			}).Return(nil).Once()
 			db.Scene.On("SetCoverSource", mock.Anything, scene.ID, mock.Anything).Run(func(args mock.Arguments) {
@@ -256,7 +265,7 @@ func TestBulkCoverDefaultSelection(t *testing.T) {
 				saved = &selection
 			}).Return(nil).Once()
 			db.Scene.On("UpdatePartial", mock.Anything, scene.ID, mock.Anything).Return(scene, nil).Once()
-			j := &GenerateJob{repository: db.Repository(), input: GenerateMetadataInput{SceneIDs: []string{"1"}, Covers: true, Overwrite: tc.overwrite, ResetCoversToDefault: tc.reset}}
+			j := &GenerateJob{repository: db.Repository(), input: GenerateMetadataInput{SceneIDs: []string{"1"}, Covers: true, Overwrite: tc.overwrite, ResetCoversToDefault: tc.reset, CoversMissingOnly: tc.missing}}
 			id, admissionErr := mgr.JobManager.Add(context.Background(), "Generate covers", j)
 			if admissionErr != nil {
 				t.Fatal(admissionErr)
@@ -272,8 +281,65 @@ func TestBulkCoverDefaultSelection(t *testing.T) {
 			require.NotNil(t, manifest)
 			require.InDelta(t, tc.want, manifest.At, 0.000001)
 			require.NotEmpty(t, manifest.Thumbnail)
+			if tc.missing {
+				task := GenerateCoverTask{repository: db.Repository(), Scene: *scene, MissingOnly: true}
+				require.NoError(t, task.generate(context.Background()), "repeating a restore must keep the now-present cover")
+			}
 			db.AssertExpectations(t)
 		})
+	}
+}
+
+func TestMissingCoverRestoreKeepsOriginalsAndReportsIOErrors(t *testing.T) {
+	for _, mode := range []string{"present", "external", "empty", "io-error", "changed-source"} {
+		t.Run(mode, func(t *testing.T) {
+			mgr, db := coverTestManager(t)
+			previous := instance
+			instance = mgr
+			t.Cleanup(func() { instance = previous })
+			scene, file, source := coverSourceFixture(t)
+			if mode == "empty" {
+				scene.CoverChecksum = ""
+			}
+			db.Scene.On("Find", mock.Anything, scene.ID).Return(scene, nil)
+			if mode != "empty" {
+				if mode == "external" {
+					source = nil
+				}
+				db.Scene.On("GetCoverSource", mock.Anything, scene.ID).Return(source, nil)
+			}
+			switch mode {
+			case "present":
+				db.Scene.On("GetCover", mock.Anything, scene.ID).Return([]byte("present artwork"), nil)
+			case "io-error":
+				db.Scene.On("GetCover", mock.Anything, scene.ID).Return(nil, errors.New("disk read failure"))
+			case "changed-source":
+				require.NoError(t, os.WriteFile(file.Path, []byte("replacement video"), 0600))
+				db.Scene.On("GetCover", mock.Anything, scene.ID).Return(nil, os.ErrNotExist)
+				db.Scene.On("GetFiles", mock.Anything, scene.ID).Return(scene.Files.List(), nil)
+			}
+			task := GenerateCoverTask{repository: db.Repository(), Scene: *scene, MissingOnly: true}
+			err := task.generate(context.Background())
+			if mode == "io-error" || mode == "changed-source" {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			db.Scene.AssertNotCalled(t, "UpdateCover", mock.Anything, mock.Anything, mock.Anything)
+			db.AssertExpectations(t)
+		})
+	}
+}
+
+func TestMissingCoverRestoreRejectsConflictingOptions(t *testing.T) {
+	mgr, _ := coverTestManager(t)
+	for _, input := range []GenerateMetadataInput{
+		{CoversMissingOnly: true},
+		{Covers: true, CoversMissingOnly: true, Overwrite: true},
+		{Covers: true, CoversMissingOnly: true, ResetCoversToDefault: true},
+	} {
+		_, err := mgr.Generate(context.Background(), input)
+		require.ErrorContains(t, err, "coversMissingOnly")
 	}
 }
 

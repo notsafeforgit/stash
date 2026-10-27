@@ -43,30 +43,6 @@ export const StudioCard: React.FC<StudioCardProps> = ({
 }) => {
   const cardAspect = useCardAspect();
   const isPortrait = cardAspect === "portrait";
-  const showChildStudioContent =
-    useConfigurationContextOptional()?.configuration.ui
-      .showChildStudioContent ?? false;
-  const sceneCount = showChildStudioContent
-    ? studio.scene_count_all
-    : studio.scene_count;
-  const performerCount = showChildStudioContent
-    ? studio.performer_count_all
-    : studio.performer_count;
-  const oCounter = showChildStudioContent
-    ? studio.o_counter_all
-    : studio.o_counter;
-
-  const counts = [
-    sceneCount > 0 ? `${sceneCount} scenes` : null,
-    performerCount > 0 ? `${performerCount} performers` : null,
-    oCounter != null && oCounter > 0 ? `${oCounter} O` : null,
-    studio.child_studios.length > 0
-      ? `${studio.child_studios.length} sub-studios`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
   const { menuContent, dialogs, onContextMenuOpen } = useStudioContextMenu({
     studio,
     onSelectedChanged,
@@ -103,14 +79,56 @@ export const StudioCard: React.FC<StudioCardProps> = ({
           isPortrait={isPortrait}
           fit="contain"
         />
-        <EntityCard.Body>
-          <EntityCard.Title>{studio.name}</EntityCard.Title>
-          {counts && <EntityCard.Subtitle>{counts}</EntityCard.Subtitle>}
-          <EntityCard.Tags tags={studio.tags} />
-          <EntityCard.Rating rating100={studio.rating100} />
-        </EntityCard.Body>
+        <StudioCardBody studio={studio} isMobile={isMobile} />
       </EntityCard>
       {dialogs}
     </>
   );
 };
+
+function StudioCardBody({
+  studio,
+}: Pick<StudioCardProps, "studio" | "isMobile">) {
+  const showChildStudioContent =
+    useConfigurationContextOptional()?.configuration.ui
+      .showChildStudioContent ?? false;
+  const sceneCount = showChildStudioContent
+    ? studio.scene_count_all
+    : studio.scene_count;
+  const performerCount = showChildStudioContent
+    ? studio.performer_count_all
+    : studio.performer_count;
+  const oCounter = showChildStudioContent
+    ? studio.o_counter_all
+    : studio.o_counter;
+
+  const counts = [
+    sceneCount > 0 ? `${sceneCount} scenes` : null,
+    performerCount > 0 ? `${performerCount} performers` : null,
+    oCounter != null && oCounter > 0 ? `${oCounter} O` : null,
+    studio.child_studios.length > 0
+      ? `${studio.child_studios.length} sub-studios`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <EntityCard.Body>
+      <EntityCard.Title>{studio.name}</EntityCard.Title>
+      {counts && <EntityCard.Subtitle>{counts}</EntityCard.Subtitle>}
+      <EntityCard.Tags tags={studio.tags} />
+      <EntityCard.Rating rating100={studio.rating100} />
+    </EntityCard.Body>
+  );
+}
+
+export function StudioCardLayout(
+  props: Pick<StudioCardProps, "studio" | "isMobile">,
+) {
+  return (
+    <EntityCard.Layout isMobile={props.isMobile ?? false}>
+      <StudioCardBody {...props} />
+    </EntityCard.Layout>
+  );
+}

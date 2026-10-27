@@ -289,18 +289,36 @@ export const GalleryCard: React.FC<GalleryCardProps> = ({
         ) : (
           preview
         )}
-        <EntityCard.Body>
-          <EntityCard.Title>{galleryLabel(gallery)}</EntityCard.Title>
-          {(gallery.date || gallery.studio) && (
-            <EntityCard.Subtitle noTooltip>
-              {[gallery.date, gallery.studio?.name].filter(Boolean).join(" · ")}
-            </EntityCard.Subtitle>
-          )}
-          <EntityCard.Tags tags={gallery.tags} />
-          <EntityCard.Rating rating100={gallery.rating100} />
-        </EntityCard.Body>
+        <GalleryCardBody gallery={gallery} isMobile={isMobile} />
       </EntityCard>
       {dialogs}
     </>
   );
 };
+
+function GalleryCardBody({
+  gallery,
+}: Pick<GalleryCardProps, "gallery" | "isMobile">) {
+  return (
+    <EntityCard.Body>
+      <EntityCard.Title>{galleryLabel(gallery)}</EntityCard.Title>
+      {(gallery.date || gallery.studio) && (
+        <EntityCard.Subtitle noTooltip>
+          {[gallery.date, gallery.studio?.name].filter(Boolean).join(" · ")}
+        </EntityCard.Subtitle>
+      )}
+      <EntityCard.Tags tags={gallery.tags} />
+      <EntityCard.Rating rating100={gallery.rating100} />
+    </EntityCard.Body>
+  );
+}
+
+export function GalleryCardLayout(
+  props: Pick<GalleryCardProps, "gallery" | "isMobile">,
+) {
+  return (
+    <EntityCard.Layout isMobile={props.isMobile ?? false}>
+      <GalleryCardBody {...props} />
+    </EntityCard.Layout>
+  );
+}

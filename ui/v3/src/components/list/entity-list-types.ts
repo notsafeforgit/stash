@@ -135,11 +135,14 @@ export interface EntityListPageConfig<
     onSelectedChanged: (selected: boolean, shiftKey: boolean) => void,
     onPreviewClick?: () => void,
   ) => React.ReactNode;
+  /** Media-free card layout, measured once per page/layout before virtualization.
+   * Share its metadata with renderCard so wrapped text reserves the same space. */
+  renderCardLayout?: (item: TItem, isMobile: boolean) => React.ReactNode;
   /** Called when the preview area of a card is clicked/tapped. Receives the
    *  clicked item, all currently-displayed items, and the item's index. */
   onCardPreviewClick?: (item: TItem, allItems: TItem[], index: number) => void;
   zoomable?: boolean;
-  /** When true, skeleton cards use portrait (2:3) aspect ratio instead of landscape (16:9). */
+  /** Default orientation for loading/custom-card estimates in auto aspect mode. */
   cardIsPortrait?: boolean;
   /** Column definitions for the Table display mode. When provided, Table mode is available. */
   tableColumns?: ColumnDef<TItem>[];

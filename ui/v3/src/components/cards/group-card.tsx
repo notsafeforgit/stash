@@ -38,13 +38,6 @@ export const GroupCard: React.FC<GroupCardProps> = ({
   const cardAspect = useCardAspect();
   const isPortrait = cardAspect === "portrait";
 
-  const counts = [
-    group.scene_count > 0 ? `${group.scene_count} scenes` : null,
-    group.sub_group_count > 0 ? `${group.sub_group_count} sub-groups` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
   const { menuContent, dialogs, onContextMenuOpen } = useGroupContextMenu({
     group,
     onSelectedChanged,
@@ -80,20 +73,41 @@ export const GroupCard: React.FC<GroupCardProps> = ({
           image={group.front_image_path}
           isPortrait={isPortrait}
         />
-        <EntityCard.Body>
-          <EntityCard.Title>{group.name}</EntityCard.Title>
-          {(group.date || group.studio || counts) && (
-            <EntityCard.Subtitle>
-              {[group.date, group.studio?.name, counts]
-                .filter(Boolean)
-                .join(" · ")}
-            </EntityCard.Subtitle>
-          )}
-          <EntityCard.Tags tags={group.tags} />
-          <EntityCard.Rating rating100={group.rating100} />
-        </EntityCard.Body>
+        <GroupCardBody group={group} isMobile={isMobile} />
       </EntityCard>
       {dialogs}
     </>
   );
 };
+
+function GroupCardBody({ group }: Pick<GroupCardProps, "group" | "isMobile">) {
+  const counts = [
+    group.scene_count > 0 ? `${group.scene_count} scenes` : null,
+    group.sub_group_count > 0 ? `${group.sub_group_count} sub-groups` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <EntityCard.Body>
+      <EntityCard.Title>{group.name}</EntityCard.Title>
+      {(group.date || group.studio || counts) && (
+        <EntityCard.Subtitle>
+          {[group.date, group.studio?.name, counts].filter(Boolean).join(" · ")}
+        </EntityCard.Subtitle>
+      )}
+      <EntityCard.Tags tags={group.tags} />
+      <EntityCard.Rating rating100={group.rating100} />
+    </EntityCard.Body>
+  );
+}
+
+export function GroupCardLayout(
+  props: Pick<GroupCardProps, "group" | "isMobile">,
+) {
+  return (
+    <EntityCard.Layout isMobile={props.isMobile ?? false}>
+      <GroupCardBody {...props} />
+    </EntityCard.Layout>
+  );
+}

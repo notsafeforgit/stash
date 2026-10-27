@@ -68,14 +68,6 @@ export const ImageCard: React.FC<ImageCardProps> = ({
       : cardAspect === "landscape"
         ? false
         : fileIsPortrait;
-  const mobileGridCols = useMobileGridCols();
-  const cardLayout = useCardLayout();
-  const zoomIndex = useZoomIndex();
-  const showDetails =
-    cardLayout === "details" ||
-    (isMobile && mobileGridCols === 1) ||
-    (!isMobile && cardLayout === "grid" && zoomIndex <= 1);
-  const showExtras = showDetails || !isMobile;
 
   const lightboxSrc =
     image.paths.image ?? image.paths.preview ?? image.paths.thumbnail ?? "";
@@ -131,22 +123,11 @@ export const ImageCard: React.FC<ImageCardProps> = ({
           organized={image.organized}
           oCounter={image.o_counter}
         />
-        <EntityCard.Body>
-          <EntityCard.Title>{imageTitle(image)}</EntityCard.Title>
-          {showDetails && image.details && (
-            <EntityCard.Subtitle>{image.details}</EntityCard.Subtitle>
-          )}
-          {(image.date || image.studio) && (
-            <EntityCard.Subtitle noTooltip>
-              {[image.date, image.studio?.name].filter(Boolean).join(" · ")}
-            </EntityCard.Subtitle>
-          )}
-          {showExtras && !hidePerformers && (
-            <EntityCard.Performers performers={image.performers} />
-          )}
-          {showExtras && <EntityCard.Tags tags={image.tags} />}
-          <EntityCard.Rating rating100={image.rating100} />
-        </EntityCard.Body>
+        <ImageCardBody
+          image={image}
+          isMobile={isMobile}
+          hidePerformers={hidePerformers}
+        />
       </EntityCard>
 
       {!externalPreviewClick && lightboxSrc && (
@@ -168,3 +149,50 @@ export const ImageCard: React.FC<ImageCardProps> = ({
     </>
   );
 };
+
+function ImageCardBody({
+  image,
+  isMobile = false,
+  hidePerformers = false,
+}: Pick<ImageCardProps, "image" | "isMobile" | "hidePerformers">) {
+  const mobileGridCols = useMobileGridCols();
+  const cardLayout = useCardLayout();
+  const zoomIndex = useZoomIndex();
+  const showDetails =
+    cardLayout === "details" ||
+    (isMobile && mobileGridCols === 1) ||
+    (!isMobile && cardLayout === "grid" && zoomIndex <= 1);
+  const showExtras = showDetails || !isMobile;
+  return (
+    <EntityCard.Body>
+      <EntityCard.Title>{imageTitle(image)}</EntityCard.Title>
+      {showDetails && image.details && (
+        <EntityCard.Subtitle>{image.details}</EntityCard.Subtitle>
+      )}
+      {(image.date || image.studio) && (
+        <EntityCard.Subtitle noTooltip>
+          {[image.date, image.studio?.name].filter(Boolean).join(" · ")}
+        </EntityCard.Subtitle>
+      )}
+      {showExtras && !hidePerformers && (
+        <EntityCard.Performers performers={image.performers} />
+      )}
+      {showExtras && <EntityCard.Tags tags={image.tags} />}
+      <EntityCard.Rating rating100={image.rating100} />
+    </EntityCard.Body>
+  );
+}
+
+export function ImageCardLayout(
+  props: Pick<ImageCardProps, "image" | "isMobile" | "hidePerformers">,
+) {
+  const file = props.image.visual_files[0];
+  return (
+    <EntityCard.Layout
+      isMobile={props.isMobile ?? false}
+      naturalIsPortrait={!!file && (file.height ?? 0) > (file.width ?? 0)}
+    >
+      <ImageCardBody {...props} />
+    </EntityCard.Layout>
+  );
+}

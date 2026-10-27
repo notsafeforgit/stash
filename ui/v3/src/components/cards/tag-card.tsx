@@ -41,18 +41,6 @@ export const TagCard: React.FC<TagCardProps> = ({
   const cardAspect = useCardAspect();
   const isPortrait = cardAspect === "portrait";
 
-  const counts = [
-    tag.scene_count > 0 ? `${tag.scene_count} scenes` : null,
-    tag.scene_marker_count > 0 ? `${tag.scene_marker_count} markers` : null,
-    tag.image_count > 0 ? `${tag.image_count} images` : null,
-    tag.gallery_count > 0 ? `${tag.gallery_count} galleries` : null,
-    tag.performer_count > 0 ? `${tag.performer_count} performers` : null,
-    tag.studio_count > 0 ? `${tag.studio_count} studios` : null,
-    tag.group_count > 0 ? `${tag.group_count} groups` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
   const { menuContent, dialogs, onContextMenuOpen } = useTagContextMenu({
     tag,
     onSelectedChanged,
@@ -85,12 +73,38 @@ export const TagCard: React.FC<TagCardProps> = ({
       >
         <EntityCard.SelectCheckbox />
         <EntityCard.Preview image={tag.image_path} isPortrait={isPortrait} />
-        <EntityCard.Body>
-          <EntityCard.Title>{tag.name}</EntityCard.Title>
-          {counts && <EntityCard.Subtitle>{counts}</EntityCard.Subtitle>}
-        </EntityCard.Body>
+        <TagCardBody tag={tag} isMobile={isMobile} />
       </EntityCard>
       {dialogs}
     </>
   );
 };
+
+function TagCardBody({ tag }: Pick<TagCardProps, "tag" | "isMobile">) {
+  const counts = [
+    tag.scene_count > 0 ? `${tag.scene_count} scenes` : null,
+    tag.scene_marker_count > 0 ? `${tag.scene_marker_count} markers` : null,
+    tag.image_count > 0 ? `${tag.image_count} images` : null,
+    tag.gallery_count > 0 ? `${tag.gallery_count} galleries` : null,
+    tag.performer_count > 0 ? `${tag.performer_count} performers` : null,
+    tag.studio_count > 0 ? `${tag.studio_count} studios` : null,
+    tag.group_count > 0 ? `${tag.group_count} groups` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <EntityCard.Body>
+      <EntityCard.Title>{tag.name}</EntityCard.Title>
+      {counts && <EntityCard.Subtitle>{counts}</EntityCard.Subtitle>}
+    </EntityCard.Body>
+  );
+}
+
+export function TagCardLayout(props: Pick<TagCardProps, "tag" | "isMobile">) {
+  return (
+    <EntityCard.Layout isMobile={props.isMobile ?? false}>
+      <TagCardBody {...props} />
+    </EntityCard.Layout>
+  );
+}

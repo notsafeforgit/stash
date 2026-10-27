@@ -52,12 +52,7 @@ export const MarkerCard: React.FC<MarkerCardProps> = ({
   onSelectedChanged,
   onPreviewClick,
 }) => {
-  const sceneTitle = objectTitle(marker.scene);
-  const title =
-    marker.title ||
-    (sceneTitle
-      ? `${sceneTitle} — ${marker.primary_tag.name}`
-      : marker.primary_tag.name);
+  const title = markerCardTitle(marker);
   const timestamp = formatTimestamp(marker.seconds);
   const { menuContent, dialogs, onContextMenuOpen } = useMarkerContextMenu({
     marker,
@@ -136,13 +131,44 @@ export const MarkerCard: React.FC<MarkerCardProps> = ({
             </span>
           )}
         </EntityCard.Preview>
-        <EntityCard.Body>
-          <EntityCard.Title>{title}</EntityCard.Title>
-          <EntityCard.Subtitle>{marker.primary_tag.name}</EntityCard.Subtitle>
-          <EntityCard.Tags tags={marker.tags} />
-        </EntityCard.Body>
+        <MarkerCardBody marker={marker} />
       </EntityCard>
       {dialogs}
     </>
   );
 };
+
+function markerCardTitle(marker: MarkerCardMarker) {
+  const sceneTitle = objectTitle(marker.scene);
+  return (
+    marker.title ||
+    (sceneTitle
+      ? `${sceneTitle} — ${marker.primary_tag.name}`
+      : marker.primary_tag.name)
+  );
+}
+
+function MarkerCardBody({ marker }: Pick<MarkerCardProps, "marker">) {
+  const title = markerCardTitle(marker);
+  return (
+    <EntityCard.Body>
+      <EntityCard.Title>{title}</EntityCard.Title>
+      <EntityCard.Subtitle>{marker.primary_tag.name}</EntityCard.Subtitle>
+      <EntityCard.Tags tags={marker.tags} />
+    </EntityCard.Body>
+  );
+}
+
+export function MarkerCardLayout(
+  props: Pick<MarkerCardProps, "marker" | "isMobile">,
+) {
+  const file = props.marker.scene.files[0];
+  return (
+    <EntityCard.Layout
+      isMobile={props.isMobile ?? false}
+      naturalIsPortrait={!!file && (file.height ?? 0) > (file.width ?? 0)}
+    >
+      <MarkerCardBody marker={props.marker} />
+    </EntityCard.Layout>
+  );
+}

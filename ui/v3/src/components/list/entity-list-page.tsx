@@ -142,6 +142,7 @@ export function EntityListPage<
     sortOptions: sortOptionsOverride,
     emptyState: emptyStateOverride,
     renderCard,
+    renderCardLayout,
     onCardPreviewClick,
     zoomable,
     cardIsPortrait,
@@ -557,6 +558,7 @@ export function EntityListPage<
                         zoomIndex={filter.zoomIndex}
                         isMobile={isMobileSidebar}
                         cardIsPortrait={cardIsPortrait}
+                        renderCardLayout={renderCardLayout}
                         isLoading={isLoading}
                         itemsPerPage={filter.itemsPerPage}
                         preserveScrollDuringRefill={preserveScrollDuringRefill}

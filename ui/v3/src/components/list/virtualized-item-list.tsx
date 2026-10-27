@@ -5,7 +5,9 @@ import React, {
   useLayoutEffect,
   useMemo,
   useCallback,
+  useEffect,
 } from "react";
+import { useIntl } from "react-intl";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { IHasID } from "@/utils/data";
 import { cn } from "@/lib/utils";
@@ -125,6 +127,7 @@ interface VirtualizedItemListProps<TItem extends IHasID> {
   zoomIndex: number;
   isMobile: boolean;
   cardIsPortrait?: boolean;
+  renderCardLayout?: (item: TItem, isMobile: boolean) => React.ReactNode;
   isLoading: boolean;
   itemsPerPage: number;
   preserveScrollDuringRefill: boolean;
@@ -147,6 +150,7 @@ export function VirtualizedItemList<TItem extends IHasID>({
   zoomIndex,
   isMobile,
   cardIsPortrait,
+  renderCardLayout,
   isLoading,
   itemsPerPage,
   preserveScrollDuringRefill,
@@ -165,6 +169,13 @@ export function VirtualizedItemList<TItem extends IHasID>({
   const pad = isMobile ? 8 : 16;
   const [scrollMargin, setScrollMargin] = useState(0);
   const cardAspect = useCardAspect();
+  const { locale } = useIntl();
+  const [fontRevision, setFontRevision] = useState(0);
+  useEffect(() => {
+    const loaded = () => setFontRevision((revision) => revision + 1);
+    document.fonts?.addEventListener("loadingdone", loaded);
+    return () => document.fonts?.removeEventListener("loadingdone", loaded);
+  }, []);
   const measurementKey = JSON.stringify([
     scrollContext?.restorationKey,
     displayMode,
@@ -249,10 +260,58 @@ export function VirtualizedItemList<TItem extends IHasID>({
     : items.length;
   const rowCount = lanes > 0 ? Math.ceil(total / lanes) : 0;
 
-  // Row-height estimate: card image aspect × column width + ~80px body.
-  // Details cards are a fixed-height flex-row layout.
+  // Text wrapping and natural preview orientation are known before any media
+  // loads. Measure their lightweight layouts in one pre-paint pass, then remove
+  // them. This also gives restoration the full page height on its first commit.
+  const layoutIdentity = useMemo(
+    () => ({
+      items,
+      renderCardLayout,
+      measurementKey,
+      containerWidth,
+      locale,
+      fontRevision,
+    }),
+    [
+      items,
+      renderCardLayout,
+      measurementKey,
+      containerWidth,
+      locale,
+      fontRevision,
+    ],
+  );
+  const [measuredLayout, setMeasuredLayout] = useState<{
+    identity: typeof layoutIdentity;
+    rows: number[];
+  }>();
+  // Keep interactive cards mounted while metadata, fonts or a renderer change
+  // on the same page. Remeasuring must not cancel an in-progress long press.
+  const previousLayout = measuredLayout?.identity;
+  const samePage =
+    previousLayout &&
+    previousLayout.measurementKey === measurementKey &&
+    previousLayout.containerWidth === containerWidth &&
+    previousLayout.items.length === items.length &&
+    previousLayout.items.every((item, index) => item.id === items[index]?.id);
+  const rowSizes = samePage ? measuredLayout?.rows : undefined;
+  const measuring =
+    !isLoading && !!renderCardLayout && previousLayout !== layoutIdentity;
+  useLayoutEffect(() => {
+    if (!measuring || !containerWidth) return;
+    const rows = Array.from(
+      containerRef.current?.querySelectorAll<HTMLElement>(
+        "[data-measure-row]",
+      ) ?? [],
+      (row) => row.getBoundingClientRect().height,
+    );
+    setMeasuredLayout({ identity: layoutIdentity, rows });
+  }, [measuring, containerWidth, layoutIdentity]);
+
+  // Custom cards without a lightweight layout retain an aspect-aware estimate.
   const estimateSize = useCallback(
     (index: number) => {
+      if (rowSizes?.[index] !== undefined) return rowSizes[index];
       // Reuse measured rows above the viewport as well as the scroll offset;
       // estimates alone would put the returning cards at different positions.
       const savedSize = measurements?.rows[index]?.size;
@@ -261,14 +320,43 @@ export function VirtualizedItemList<TItem extends IHasID>({
       if (containerWidth === 0 || lanes === 0) return 280;
       const inner = Math.max(0, containerWidth - pad * 2);
       const colWidth = (inner - gap * (lanes - 1)) / lanes;
-      const aspectH = cardIsPortrait ? colWidth * 1.5 : colWidth * 0.5625;
+      const portrait =
+        cardAspect === "auto" ? cardIsPortrait : cardAspect === "portrait";
+      const aspectH = portrait ? colWidth * 1.5 : colWidth * 0.5625;
       return Math.round(aspectH + 80) + gap;
     },
-    [measurements, isDetails, containerWidth, lanes, gap, pad, cardIsPortrait],
+    [
+      rowSizes,
+      measurements,
+      isDetails,
+      containerWidth,
+      lanes,
+      gap,
+      pad,
+      cardIsPortrait,
+      cardAspect,
+    ],
+  );
+
+  // An indexed row from another page or width is not a measurement of this
+  // row. Height changes on the same page keep the card's React identity.
+  const getRowKey = useCallback(
+    (index: number) =>
+      isLoading && measurements?.rows[index]
+        ? measurements.rows[index].key
+        : JSON.stringify([
+            index,
+            measurementKey,
+            containerWidth,
+            lanes,
+            itemIds.slice(index * lanes, (index + 1) * lanes),
+          ]),
+    [isLoading, measurements, measurementKey, containerWidth, lanes, itemIds],
   );
 
   const virtualizer = useVirtualizer<HTMLElement, HTMLDivElement>({
     count: rowCount,
+    getItemKey: getRowKey,
     getScrollElement: () => scrollEl,
     scrollMargin,
     initialOffset: scrollContext?.initialOffset,
@@ -304,6 +392,7 @@ export function VirtualizedItemList<TItem extends IHasID>({
     measurementKey,
     containerWidth,
     !!measurements,
+    rowSizes,
   ]);
   const previousLayoutKey = useRef(layoutKey);
   useLayoutEffect(() => {
@@ -321,6 +410,7 @@ export function VirtualizedItemList<TItem extends IHasID>({
     if (
       !scrollContext ||
       isLoading ||
+      measuring ||
       preserveScrollDuringRefill ||
       !containerWidth
     )
@@ -332,8 +422,20 @@ export function VirtualizedItemList<TItem extends IHasID>({
     });
   });
 
-  const totalSize = virtualizer.getTotalSize();
-  const virtualRows = virtualizer.getVirtualItems();
+  const totalSize = rowSizes
+    ? rowSizes.reduce((height, row) => height + row, 0)
+    : virtualizer.getTotalSize();
+  const virtualRows =
+    measuring && !rowSizes ? [] : virtualizer.getVirtualItems();
+  const rowStyle: React.CSSProperties = {
+    paddingBottom: gap,
+    display: isDetails ? "flex" : "grid",
+    flexDirection: isDetails ? "column" : undefined,
+    gridTemplateColumns: !isDetails
+      ? `repeat(${lanes}, minmax(0, 1fr))`
+      : undefined,
+    columnGap: !isDetails ? gap : undefined,
+  };
 
   return (
     <div
@@ -344,10 +446,24 @@ export function VirtualizedItemList<TItem extends IHasID>({
       <div
         style={{
           position: "relative",
-          height: totalSize + pad,
+          height: measuring ? undefined : totalSize + pad,
+          paddingBottom: measuring ? pad : undefined,
           width: "100%",
         }}
       >
+        {measuring && (
+          <div aria-hidden="true" inert className="invisible">
+            {Array.from({ length: rowCount }, (_, row) => (
+              <div key={row} data-measure-row style={rowStyle}>
+                {items.slice(row * lanes, (row + 1) * lanes).map((item) => (
+                  <React.Fragment key={item.id}>
+                    {renderCardLayout?.(item, isMobile)}
+                  </React.Fragment>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
         {virtualRows.map((vRow) => {
           const rowStart = vRow.index * lanes;
           const rowEnd = Math.min(rowStart + lanes, total);
@@ -357,18 +473,12 @@ export function VirtualizedItemList<TItem extends IHasID>({
               data-index={vRow.index}
               ref={virtualizer.measureElement}
               style={{
+                ...rowStyle,
                 position: "absolute",
                 top: 0,
                 left: 0,
                 right: 0,
                 transform: `translateY(${vRow.start - scrollMargin}px)`,
-                paddingBottom: gap,
-                display: isDetails ? "flex" : "grid",
-                flexDirection: isDetails ? "column" : undefined,
-                gridTemplateColumns: !isDetails
-                  ? `repeat(${lanes}, minmax(0, 1fr))`
-                  : undefined,
-                columnGap: !isDetails ? gap : undefined,
               }}
             >
               {Array.from({ length: rowEnd - rowStart }).map((_, i) => {
@@ -377,7 +487,11 @@ export function VirtualizedItemList<TItem extends IHasID>({
                   return (
                     <SkeletonCard
                       key={idx}
-                      isPortrait={cardIsPortrait}
+                      isPortrait={
+                        cardAspect === "auto"
+                          ? cardIsPortrait
+                          : cardAspect === "portrait"
+                      }
                       isDetails={isDetails}
                     />
                   );

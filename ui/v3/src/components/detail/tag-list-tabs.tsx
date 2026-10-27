@@ -22,7 +22,12 @@ import {
   usePerformerListConfig,
   useGroupListConfig,
 } from "src/components/list/entity-list-configs";
-import { StudioCard, MarkerCard } from "src/components/cards";
+import {
+  StudioCard,
+  StudioCardLayout,
+  MarkerCard,
+  MarkerCardLayout,
+} from "src/components/cards";
 import { useMarkerLightbox } from "src/components/lightbox";
 import { useMutation } from "@apollo/client/react";
 import { ListFilterModel } from "src/models/list-filter/filter";
@@ -277,6 +282,9 @@ export function TagStudiosTab({ tag }: { tag: TagData }) {
           items: data?.findStudios.studios ?? [],
         }),
       },
+      renderCardLayout: (studio, isMobile) => (
+        <StudioCardLayout studio={studio} isMobile={isMobile} />
+      ),
       renderCard: (studio, isMobile, selected, onSelectedChanged) => (
         <StudioCard
           key={studio.id}
@@ -346,6 +354,9 @@ export function TagMarkersTab({ tag }: { tag: TagData }) {
           items: data?.findSceneMarkers.scene_markers ?? [],
         }),
       },
+      renderCardLayout: (marker, isMobile) => (
+        <MarkerCardLayout marker={marker} isMobile={isMobile} />
+      ),
       renderCard: (
         marker,
         isMobile,

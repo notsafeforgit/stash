@@ -49,23 +49,9 @@ export const PerformerCard: React.FC<PerformerCardProps> = ({
   onSelectedChanged,
   onEdit,
 }) => {
-  const intl = useIntl();
   const cardAspect = useCardAspect();
   // Performers default to portrait in auto mode; respect forced landscape.
   const isPortrait = cardAspect !== "landscape";
-
-  const age = getAge(performer.birthdate, performer.death_date);
-  const genderSymbol = performer.gender
-    ? GENDER_LABEL[performer.gender]
-    : undefined;
-
-  const subtitle = [
-    genderSymbol,
-    age != null ? String(age) : undefined,
-    formatCountry(performer.country, intl.locale),
-  ]
-    .filter(Boolean)
-    .join(" · ");
 
   const displayName = performer.disambiguation
     ? `${performer.name} (${performer.disambiguation})`
@@ -106,14 +92,50 @@ export const PerformerCard: React.FC<PerformerCardProps> = ({
           image={performer.image_path}
           isPortrait={isPortrait}
         />
-        <EntityCard.Body>
-          <EntityCard.Title>{displayName}</EntityCard.Title>
-          {subtitle && <EntityCard.Subtitle>{subtitle}</EntityCard.Subtitle>}
-          <EntityCard.Tags tags={performer.tags} />
-          <EntityCard.Rating rating100={performer.rating100} />
-        </EntityCard.Body>
+        <PerformerCardBody performer={performer} isMobile={isMobile} />
       </EntityCard>
       {dialogs}
     </>
   );
 };
+
+function PerformerCardBody({
+  performer,
+}: Pick<PerformerCardProps, "performer" | "isMobile">) {
+  const intl = useIntl();
+  const age = getAge(performer.birthdate, performer.death_date);
+  const genderSymbol = performer.gender
+    ? GENDER_LABEL[performer.gender]
+    : undefined;
+
+  const subtitle = [
+    genderSymbol,
+    age != null ? String(age) : undefined,
+    formatCountry(performer.country, intl.locale),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const displayName = performer.disambiguation
+    ? `${performer.name} (${performer.disambiguation})`
+    : performer.name;
+
+  return (
+    <EntityCard.Body>
+      <EntityCard.Title>{displayName}</EntityCard.Title>
+      {subtitle && <EntityCard.Subtitle>{subtitle}</EntityCard.Subtitle>}
+      <EntityCard.Tags tags={performer.tags} />
+      <EntityCard.Rating rating100={performer.rating100} />
+    </EntityCard.Body>
+  );
+}
+
+export function PerformerCardLayout(
+  props: Pick<PerformerCardProps, "performer" | "isMobile">,
+) {
+  return (
+    <EntityCard.Layout isMobile={props.isMobile ?? false} naturalIsPortrait>
+      <PerformerCardBody {...props} />
+    </EntityCard.Layout>
+  );
+}

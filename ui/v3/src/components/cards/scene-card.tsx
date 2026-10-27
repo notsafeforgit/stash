@@ -157,14 +157,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
       : cardAspect === "landscape"
         ? false
         : fileIsPortrait;
-  const mobileGridCols = useMobileGridCols();
   const cardLayout = useCardLayout();
-  const zoomIndex = useZoomIndex();
-  const showDetails =
-    cardLayout === "details" ||
-    (isMobile && mobileGridCols === 1) ||
-    (!isMobile && cardLayout === "grid" && zoomIndex <= 1);
-  const showExtras = showDetails || !isMobile;
 
   const { menuContent, dialogs, onContextMenuOpen } = useSceneContextMenu({
     scene,
@@ -233,24 +226,60 @@ export const SceneCard: React.FC<SceneCardProps> = ({
             />
           )}
         </EntityCard.Preview>
-        <EntityCard.Body>
-          <EntityCard.Title>{objectTitle(scene)}</EntityCard.Title>
-          {showDetails && scene.details && (
-            <EntityCard.Subtitle>{scene.details}</EntityCard.Subtitle>
-          )}
-          {(scene.date || scene.studio) && (
-            <EntityCard.Subtitle noTooltip>
-              {[scene.date, scene.studio?.name].filter(Boolean).join(" · ")}
-            </EntityCard.Subtitle>
-          )}
-          {showExtras && !hidePerformers && (
-            <EntityCard.Performers performers={scene.performers} />
-          )}
-          {showExtras && <EntityCard.Tags tags={scene.tags} />}
-          <EntityCard.Rating rating100={scene.rating100} />
-        </EntityCard.Body>
+        <SceneCardBody
+          scene={scene}
+          isMobile={isMobile}
+          hidePerformers={hidePerformers}
+        />
       </EntityCard>
       {dialogs}
     </>
   );
 };
+
+function SceneCardBody({
+  scene,
+  isMobile = false,
+  hidePerformers = false,
+}: Pick<SceneCardProps, "scene" | "isMobile" | "hidePerformers">) {
+  const mobileGridCols = useMobileGridCols();
+  const cardLayout = useCardLayout();
+  const zoomIndex = useZoomIndex();
+  const showDetails =
+    cardLayout === "details" ||
+    (isMobile && mobileGridCols === 1) ||
+    (!isMobile && cardLayout === "grid" && zoomIndex <= 1);
+  const showExtras = showDetails || !isMobile;
+  return (
+    <EntityCard.Body>
+      <EntityCard.Title>{objectTitle(scene)}</EntityCard.Title>
+      {showDetails && scene.details && (
+        <EntityCard.Subtitle>{scene.details}</EntityCard.Subtitle>
+      )}
+      {(scene.date || scene.studio) && (
+        <EntityCard.Subtitle noTooltip>
+          {[scene.date, scene.studio?.name].filter(Boolean).join(" · ")}
+        </EntityCard.Subtitle>
+      )}
+      {showExtras && !hidePerformers && (
+        <EntityCard.Performers performers={scene.performers} />
+      )}
+      {showExtras && <EntityCard.Tags tags={scene.tags} />}
+      <EntityCard.Rating rating100={scene.rating100} />
+    </EntityCard.Body>
+  );
+}
+
+export function SceneCardLayout(
+  props: Pick<SceneCardProps, "scene" | "isMobile" | "hidePerformers">,
+) {
+  const file = props.scene.files[0];
+  return (
+    <EntityCard.Layout
+      isMobile={props.isMobile ?? false}
+      naturalIsPortrait={!!file && (file.height ?? 0) > (file.width ?? 0)}
+    >
+      <SceneCardBody {...props} />
+    </EntityCard.Layout>
+  );
+}

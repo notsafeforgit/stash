@@ -6,7 +6,7 @@ import { useDocumentTitle } from "src/hooks/title";
 import { listCreateAction } from "@/components/list/list-create-action";
 import * as GQL from "src/core/generated-graphql";
 import { EntityListPage, type EntityListPageConfig } from "src/components/list";
-import { StudioCard } from "src/components/cards";
+import { StudioCard, StudioCardLayout } from "src/components/cards";
 import { StudioRowContextMenu } from "src/components/cards/use-studio-context-menu";
 import { View } from "src/components/list/views";
 import { useStudioTableColumns } from "./-table-columns";
@@ -51,6 +51,9 @@ function StudiosPage() {
           items: data?.findStudios.studios ?? [],
         }),
       },
+      renderCardLayout: (studio, isMobile) => (
+        <StudioCardLayout studio={studio} isMobile={isMobile} />
+      ),
       renderCard: (studio, isMobile, selected, onSelectedChanged) => (
         <StudioCard
           key={studio.id}

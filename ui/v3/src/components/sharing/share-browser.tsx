@@ -83,25 +83,22 @@ function SharedGrid({
             isPortrait={item.kind === "IMAGE" && item.height > item.width}
             naturalIsPortrait={preview ? preview.height > preview.width : false}
           />
-          <EntityCard.Body>
-            <EntityCard.Title>{title}</EntityCard.Title>
-            {gallery && (
-              <EntityCard.Subtitle noTooltip>
-                {intl.formatMessage(
-                  {
-                    id: "sharing.item_count",
-                    defaultMessage:
-                      "{count, plural, one {# item} other {# items}}",
-                  },
-                  { count: item.mediaCount },
-                )}
-              </EntityCard.Subtitle>
-            )}
-          </EntityCard.Body>
+          <SharedCardBody item={item} />
         </EntityCard>
       );
     },
     [intl, base, location, navigate, onPreview],
+  );
+  const renderCardLayout = useCallback(
+    (item: SharedItem, mobile: boolean) => (
+      <EntityCard.Layout
+        isMobile={mobile}
+        isPortrait={item.kind === "IMAGE" && item.height > item.width}
+      >
+        <SharedCardBody item={item} />
+      </EntityCard.Layout>
+    ),
+    [],
   );
   if (!items.length)
     return (
@@ -129,9 +126,32 @@ function SharedGrid({
           preserveScrollDuringRefill={false}
           items={items}
           renderCard={renderCard}
+          renderCardLayout={renderCardLayout}
         />
       </MobileGridColsContext>
     </CardAspectContext>
+  );
+}
+
+function SharedCardBody({ item }: { item: SharedItem }) {
+  const intl = useIntl();
+  const title = item.title || intl.formatMessage(kindLabels[item.kind]);
+  const gallery = item.kind === "GALLERY";
+  return (
+    <EntityCard.Body>
+      <EntityCard.Title>{title}</EntityCard.Title>
+      {gallery && (
+        <EntityCard.Subtitle noTooltip>
+          {intl.formatMessage(
+            {
+              id: "sharing.item_count",
+              defaultMessage: "{count, plural, one {# item} other {# items}}",
+            },
+            { count: item.mediaCount },
+          )}
+        </EntityCard.Subtitle>
+      )}
+    </EntityCard.Body>
   );
 }
 

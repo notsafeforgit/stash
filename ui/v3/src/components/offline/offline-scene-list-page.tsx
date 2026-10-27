@@ -31,7 +31,7 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "src/components/ui/empty";
-import { SceneCard } from "src/components/cards/scene-card";
+import { SceneCard, SceneCardLayout } from "src/components/cards/scene-card";
 import { EntityContextMenuContent } from "@/components/cards/entity-context-menu-content";
 import { objectTitle } from "@/core/files";
 import { useBulkCardActions } from "src/components/cards/use-bulk-card-actions";
@@ -174,6 +174,12 @@ export function OfflineSceneListPage() {
           </EmptyHeader>
         </Empty>
       ) : undefined,
+      renderCardLayout: (item: OfflineCardItem, isMobile: boolean) => (
+        <SceneCardLayout
+          scene={offlineEntryToSceneCardScene(item.entry)}
+          isMobile={isMobile}
+        />
+      ),
       renderCard,
       zoomable: true,
       onCardPreviewClick: (

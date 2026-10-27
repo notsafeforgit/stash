@@ -867,6 +867,51 @@ function EntityCardPreview({
   return previewContent;
 }
 
+/** Geometry-only version of a card. Lists measure this before mounting media
+ * or interactive cards, including wrapped metadata in single-column mode. */
+function EntityCardLayout({
+  children,
+  isMobile,
+  naturalIsPortrait = false,
+  isPortrait: portraitOverride,
+}: {
+  children: React.ReactNode;
+  isMobile: boolean;
+  naturalIsPortrait?: boolean;
+  isPortrait?: boolean;
+}) {
+  const isDetails = useCardLayout() === "details";
+  const aspect = useCardAspect();
+  const isPortrait =
+    portraitOverride ??
+    (aspect === "auto" ? naturalIsPortrait : aspect === "portrait");
+  return (
+    <EntityCardCtx
+      value={{
+        id: "",
+        label: "",
+        isHovered: false,
+        isMobile,
+        isTouch: true,
+        isDetails,
+        isWall: false,
+      }}
+    >
+      <div className={cn("flex text-sm", isDetails ? "flex-row" : "flex-col")}>
+        <div
+          className={cn(
+            "shrink-0",
+            isDetails
+              ? "aspect-video w-32 self-stretch"
+              : cn("w-full", isPortrait ? "aspect-[2/3]" : "aspect-video"),
+          )}
+        />
+        {children}
+      </div>
+    </EntityCardCtx>
+  );
+}
+
 // ── Body ─────────────────────────────────────────────────────────────────────
 
 function EntityCardBody({ children }: { children: React.ReactNode }) {
@@ -1155,6 +1200,7 @@ function EntityCardSelectCheckbox() {
 // ── Compound export ───────────────────────────────────────────────────────────
 
 export const EntityCard = Object.assign(EntityCardRoot, {
+  Layout: EntityCardLayout,
   Preview: EntityCardPreview,
   Body: EntityCardBody,
   Title: EntityCardTitle,

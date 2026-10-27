@@ -29,11 +29,17 @@ import { galleryLabel } from "@/lib/gallery-utils";
 import type { EntityListPageConfig, PageNavHandle } from "src/components/list";
 import {
   SceneCard,
+  SceneCardLayout,
   ImageCard,
+  ImageCardLayout,
   GalleryCard,
+  GalleryCardLayout,
   PerformerCard,
+  PerformerCardLayout,
   GroupCard,
+  GroupCardLayout,
   TagCard,
+  TagCardLayout,
 } from "src/components/cards";
 import { SceneRowContextMenu } from "src/components/cards/use-scene-context-menu";
 import { ImageRowContextMenu } from "src/components/cards/use-image-context-menu";
@@ -383,6 +389,13 @@ export function useSceneListConfig(
           items: data?.findScenes.scenes ?? [],
         }),
       },
+      renderCardLayout: (scene, isMobile) => (
+        <SceneCardLayout
+          scene={scene}
+          isMobile={isMobile}
+          hidePerformers={hidePerformers}
+        />
+      ),
       renderCard,
       renderTableRow,
       tableColumns,
@@ -398,6 +411,7 @@ export function useSceneListConfig(
       },
     }),
     [
+      hidePerformers,
       renderCard,
       renderTableRow,
       tableColumns,
@@ -555,6 +569,13 @@ export function useImageListConfig(
           items: data?.findImages.images ?? [],
         }),
       },
+      renderCardLayout: (image, isMobile) => (
+        <ImageCardLayout
+          image={image}
+          isMobile={isMobile}
+          hidePerformers={hidePerformers}
+        />
+      ),
       renderCard,
       renderTableRow,
       zoomable: true,
@@ -570,6 +591,7 @@ export function useImageListConfig(
       },
     }),
     [
+      hidePerformers,
       renderCard,
       renderTableRow,
       onCardPreviewClick,
@@ -919,6 +941,9 @@ export function useGalleryListConfig(onEdit: (id: string) => void): {
           items: data?.findGalleries.galleries ?? [],
         }),
       },
+      renderCardLayout: (gallery, isMobile) => (
+        <GalleryCardLayout gallery={gallery} isMobile={isMobile} />
+      ),
       renderCard,
       renderTableRow,
       zoomable: true,
@@ -991,6 +1016,9 @@ export function usePerformerListConfig(
           items: data?.findPerformers.performers ?? [],
         }),
       },
+      renderCardLayout: (performer, isMobile) => (
+        <PerformerCardLayout performer={performer} isMobile={isMobile} />
+      ),
       renderCard,
       renderTableRow,
       zoomable: true,
@@ -1109,6 +1137,9 @@ export function useGroupListConfig(
           items: data?.findGroups.groups ?? [],
         }),
       },
+      renderCardLayout: (group, isMobile) => (
+        <GroupCardLayout group={group} isMobile={isMobile} />
+      ),
       renderCard,
       renderTableRow,
       zoomable: true,
@@ -1179,6 +1210,9 @@ export function useTagListConfig(
           items: data?.findTags.tags ?? [],
         }),
       },
+      renderCardLayout: (tag, isMobile) => (
+        <TagCardLayout tag={tag} isMobile={isMobile} />
+      ),
       renderCard,
       renderTableRow,
       zoomable: true,

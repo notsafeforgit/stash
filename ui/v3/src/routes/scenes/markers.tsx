@@ -4,7 +4,7 @@ import { useIntl } from "react-intl";
 import { useDocumentTitle } from "src/hooks/title";
 import * as GQL from "src/core/generated-graphql";
 import { EntityListPage, type EntityListPageConfig } from "src/components/list";
-import { MarkerCard } from "src/components/cards";
+import { MarkerCard, MarkerCardLayout } from "src/components/cards";
 import { useMarkerLightbox } from "src/components/lightbox";
 import { View } from "src/components/list/views";
 import { markerTableColumns, markerTitle } from "./-markers-table-columns";
@@ -53,6 +53,9 @@ function MarkersPage() {
           items: data?.findSceneMarkers.scene_markers ?? [],
         }),
       },
+      renderCardLayout: (marker, isMobile) => (
+        <MarkerCardLayout marker={marker} isMobile={isMobile} />
+      ),
       renderCard: (
         marker,
         isMobile,

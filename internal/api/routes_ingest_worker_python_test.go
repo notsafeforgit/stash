@@ -250,9 +250,26 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 		} else {
 			require.Len(t, history, 2)
 		}
+		startedCaptures := map[string]bool{}
 		for _, report := range history {
-			require.Equal(t, "downloaded", report.TransferState)
+			if report.State == "started" {
+				startedCaptures[report.CaptureEventUUID] = true
+			}
+		}
+		localCompletions := 0
+		for _, report := range history {
+			expected := "downloaded"
+			if !startedCaptures[report.CaptureEventUUID] {
+				expected = "available"
+				localCompletions++
+			}
+			require.Equal(t, expected, report.TransferState)
 			require.Equal(t, "queued", report.VerificationState)
+		}
+		if adapter == "restart" {
+			require.Equal(t, 1, localCompletions, "restart reuses the completed local file without another transfer")
+		} else {
+			require.Zero(t, localCompletions)
 		}
 		for event, state := range map[string]string{result.Started: "started", result.Downloaded: "downloaded"} {
 			receipt, err := service.Repo.Ingest.FindReceipt(ctx, producer.UUID, event)

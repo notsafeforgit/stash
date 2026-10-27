@@ -5,6 +5,9 @@ import "time"
 // AttachmentDownloadTransfer combines one transfer's original start and terminal
 // reports. Sequence is the first server receipt ID, not a source clock or a claim
 // about which run began most recently. Library availability remains independent.
+// A completed local file without a recorded transfer start has state "available".
+// It may have been reused; a delayed start report changes that state to "downloaded"
+// without moving its pagination anchor or rewriting the original reports.
 type AttachmentDownloadTransfer struct {
 	Sequence           int64      `json:"sequence"`
 	AttachmentUUID     string     `json:"attachment_uuid"`

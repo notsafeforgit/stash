@@ -14,6 +14,7 @@
     "capture": "Source capture",
     "checked": "Download reports checked {time}",
     "downloaded": "Download reported complete",
+    "available": "Local file available",
     "downloading": "Download started",
     "excluded": "Excluded from download",
     "failed": "Download failed",

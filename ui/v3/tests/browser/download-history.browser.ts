@@ -81,6 +81,11 @@ async function archive(page: Page) {
         transfer.reported_state = "skipped";
         transfer.reason_code = "archive_entry_without_file";
       }
+      if (transfers[1]) {
+        transfers[1].state = "available";
+        transfers[1].started_at = null;
+        delete transfers[1].start_event_uuid;
+      }
       return route.fulfill({
         json: {
           attachment_uuid: attachment,
@@ -155,6 +160,9 @@ for (const desktop of [false, true]) {
     await expect(dialog.locator("[data-download-transfer]")).toHaveCount(25);
     await expect(
       dialog.getByText("Skipped without a file", { exact: true }),
+    ).toHaveCount(1);
+    await expect(
+      dialog.getByText("Local file available", { exact: true }),
     ).toHaveCount(1);
     await expect(
       dialog.getByText(

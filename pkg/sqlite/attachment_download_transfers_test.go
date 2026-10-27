@@ -3,6 +3,9 @@ package sqlite_test
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +15,61 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAttachmentDownloadLocalCompletionDoesNotClaimANewTransfer(t *testing.T) {
+	f, start, input := downloadSQLFixture(t)
+	require.NoError(t, os.MkdirAll(filepath.Join(f.root.Binding.Path, "Example"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(f.root.Binding.Path, "Example", "existing.jpg"), []byte(strings.Repeat("x", 123)), 0o600))
+	file := ingest.FileEvent{Protocol: 1, ProducerUUID: start.ProducerUUID, EventUUID: uuid.NewString(), RunUUID: start.RunUUID,
+		CollectionUUID: start.CollectionUUID, CollectionRevision: start.CollectionRevision, RootUUID: start.RootUUID,
+		Kind: "file.completed", ObservedAt: f.now, RelativePath: "Example/existing.jpg", Size: 123,
+		SHA256: strings.Repeat("a", 64), MediaKind: models.ArchiveImage,
+		Source: &ingest.FileEventSource{CaptureEventUUID: start.CaptureEventUUID, Attachment: start.Attachment}}
+	body, err := json.Marshal(file)
+	require.NoError(t, err)
+	fileReceipt, err := f.service.FileCompleted(t.Context(), f.token, body, ingest.Digest(body))
+	require.NoError(t, err)
+	end := start
+	end.EventUUID, end.State, end.FileEventUUID = uuid.NewString(), "downloaded", file.EventUUID
+	body, err = json.Marshal(end)
+	require.NoError(t, err)
+	original, err := f.service.AttachmentDownload(t.Context(), f.token, body, ingest.Digest(body))
+	require.NoError(t, err)
+	read := func(state string) models.AttachmentDownloadTransfer {
+		t.Helper()
+		var row models.AttachmentDownloadTransfer
+		require.NoError(t, f.repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+			page, err := f.repo.SourceAttachment.DownloadTransfers(ctx, input.AttachmentUUID, 0, 25, f.now)
+			require.NoError(t, err)
+			require.Len(t, page.Transfers, 1)
+			row = page.Transfers[0]
+			require.Equal(t, state, row.State)
+			require.Equal(t, "downloaded", row.ReportedState)
+			require.Equal(t, fileReceipt.JobUUID, row.VerificationJob)
+			require.Equal(t, "queued", row.VerificationState)
+			history, err := f.repo.SourceAttachment.DownloadHistory(ctx, input.AttachmentUUID, 0, 100, f.now)
+			require.NoError(t, err)
+			for _, report := range history {
+				require.Equal(t, state, report.TransferState)
+			}
+			return nil
+		}))
+		return row
+	}
+	available := read("available")
+	require.Nil(t, available.StartedAt)
+	// A delayed start establishes a transfer; absence alone never proves reuse.
+	body, err = json.Marshal(start)
+	require.NoError(t, err)
+	_, err = f.service.AttachmentDownload(t.Context(), f.token, body, ingest.Digest(body))
+	require.NoError(t, err)
+	downloaded := read("downloaded")
+	require.Equal(t, available.Sequence, downloaded.Sequence)
+	require.NotNil(t, downloaded.StartedAt)
+	receipt, err := f.service.Receipt(t.Context(), f.token, end.EventUUID)
+	require.NoError(t, err)
+	require.Equal(t, original, receipt, "reading transfer evidence must not rewrite completion receipts")
+}
 
 func TestAttachmentDownloadTransfersKeepOneStableEntryAcrossReversedReports(t *testing.T) {
 	f, event, input := downloadSQLFixture(t)

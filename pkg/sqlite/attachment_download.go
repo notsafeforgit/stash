@@ -119,10 +119,13 @@ func (s *SourceAttachmentStore) DownloadHistory(ctx context.Context, id string, 
 	}
 	err := dbWrapper.Select(ctx, &rows, `SELECT d.id,d.producer_uuid,d.event_uuid,d.run_uuid,d.fence,d.owner_uuid,d.transfer_sequence,
  d.capture_event_uuid,d.attachment_uuid,d.state,d.file_event_uuid,d.reason_code,d.observed_at,d.recorded_at,r.collection_uuid,r.root_uuid,
- CASE WHEN t.id IS NOT NULL THEN t.state WHEN r.state='running' AND r.fence=d.fence AND r.producer_uuid=d.producer_uuid
+ CASE WHEN t.state='downloaded' AND s.id IS NULL THEN 'available'
+ WHEN t.id IS NOT NULL THEN t.state WHEN r.state='running' AND r.fence=d.fence AND r.producer_uuid=d.producer_uuid
  AND r.owner_uuid=d.owner_uuid AND r.lease_until_ms>? THEN 'downloading' ELSE 'interrupted' END AS current_state,
  coalesce(j.state,'') AS job_state,coalesce(j.uuid,'') AS job_uuid
  FROM source_attachment_downloads d JOIN source_runs r ON r.uuid=d.run_uuid
+ LEFT JOIN source_attachment_downloads s ON s.producer_uuid=d.producer_uuid AND s.capture_event_uuid=d.capture_event_uuid
+ AND s.attachment_uuid=d.attachment_uuid AND s.phase=0
  LEFT JOIN source_attachment_downloads t ON t.producer_uuid=d.producer_uuid AND t.capture_event_uuid=d.capture_event_uuid
  AND t.attachment_uuid=d.attachment_uuid AND t.phase=1
  LEFT JOIN ingest_receipts f ON f.producer_uuid=t.producer_uuid AND f.event_uuid=t.file_event_uuid

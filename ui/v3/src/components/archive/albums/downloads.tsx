@@ -35,6 +35,7 @@ function useDownloadLabels() {
       downloading: msg("downloads.downloading", "Download started"),
       interrupted: msg("downloads.interrupted", "No completion report"),
       downloaded: msg("downloads.downloaded", "Download reported complete"),
+      available: msg("downloads.available", "Local file available"),
       failed: msg("downloads.failed", "Download failed"),
       excluded: msg("downloads.excluded", "Excluded from download"),
       skipped: msg("downloads.skipped", "Skipped without a file"),

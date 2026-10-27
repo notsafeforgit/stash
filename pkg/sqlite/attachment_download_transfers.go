@@ -22,7 +22,8 @@ const attachmentDownloadTransfersSQL = `WITH recent AS MATERIALIZED (
 SELECT d.id,d.attachment_uuid,d.producer_uuid,d.run_uuid,d.fence,d.transfer_sequence,d.capture_event_uuid,
  r.collection_uuid,r.collection_revision,c.label AS collection_label,r.root_uuid,m.label AS root_label,
  coalesce(t.state,'started') AS reported_state,coalesce(t.reason_code,'') AS reason_code,
- CASE WHEN t.id IS NOT NULL THEN t.state WHEN r.state='running' AND r.fence=d.fence AND r.producer_uuid=d.producer_uuid
+ CASE WHEN t.state='downloaded' AND s.id IS NULL THEN 'available'
+ WHEN t.id IS NOT NULL THEN t.state WHEN r.state='running' AND r.fence=d.fence AND r.producer_uuid=d.producer_uuid
  AND r.owner_uuid=d.owner_uuid AND r.lease_until_ms>? THEN 'downloading' ELSE 'interrupted' END AS current_state,
  coalesce(s.event_uuid,'') AS start_event_uuid,coalesce(t.event_uuid,'') AS terminal_event_uuid,
  s.observed_at AS started_at,t.observed_at AS finished_at,d.recorded_at AS first_recorded_at,

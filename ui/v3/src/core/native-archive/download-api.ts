@@ -26,6 +26,7 @@ export const downloadTransferSchema = z
       "downloading",
       "interrupted",
       "downloaded",
+      "available",
       "failed",
       "excluded",
       "skipped",
@@ -76,16 +77,18 @@ export const downloadTransferSchema = z
         !row.verification_state &&
         !row.reason_code
       );
-    if (!row.terminal_event_uuid || row.state !== row.reported_state)
-      return false;
+    if (!row.terminal_event_uuid) return false;
     if (row.reported_state === "downloaded")
       return (
+        row.state === (row.start_event_uuid ? "downloaded" : "available") &&
         Boolean(
           row.file_event_uuid &&
             row.verification_job_uuid &&
             row.verification_state,
-        ) && !row.reason_code
+        ) &&
+        !row.reason_code
       );
+    if (row.state !== row.reported_state) return false;
     if (
       row.file_event_uuid ||
       row.verification_job_uuid ||

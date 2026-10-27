@@ -386,6 +386,13 @@ times are visible; report identifiers expand on request. Missing local files,
 excluded media, failures and attempts without a completion report have distinct
 labels. Older transfers load 25 at a time; refresh starts a new current read.
 
+A completed file without a transfer-start report is shown as **Local file
+available** (`state: "available"`). This includes archive skips that reuse
+existing bytes. It does not claim a new download or that the file remains online.
+A start report establishes **Download reported complete**; a delayed start updates
+the label without changing the history position. Original `reported_state`
+receipts remain unchanged, so this distinction also applies to historical jobs.
+
 Cards share batches of at most 25 distinct attachments. Visible groups refresh
 every 15 seconds without overlapping requests; hidden pages and offscreen groups
 suspend polling. A failed refresh keeps the last successful check with an error

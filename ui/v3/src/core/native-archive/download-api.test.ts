@@ -45,18 +45,26 @@ it("reads grouped transfers with application authentication and a bounded receip
 
 it("retains late reports and terminal-only transfers without inventing start times", async () => {
   const transfer = downloadTransfer();
+  transfer.state = "available";
   transfer.started_at = null;
   delete transfer.start_event_uuid;
   const response = page([transfer]);
+  expect(
+    (await client(response).api.history(attachment)).transfers[0]?.state,
+  ).toBe("available");
   expect(
     (await client(response).api.history(attachment)).transfers[0]?.started_at,
   ).toBeNull();
   transfer.started_at = "2026-10-06T11:06:00Z";
   transfer.start_event_uuid = albumUUID(6100);
+  transfer.state = "downloaded";
   // Worker clock order is not pagination order, even when start arrives last.
   expect((await client(response).api.history(attachment)).transfers).toEqual([
     transfer,
   ]);
+  await expect(
+    client(page([{ ...transfer, state: "available" }])).api.history(attachment),
+  ).rejects.toThrow();
 });
 
 it("rejects cross-attachment data, duplicated transfer phases and non-descending anchors", async () => {

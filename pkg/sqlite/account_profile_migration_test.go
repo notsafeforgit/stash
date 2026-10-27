@@ -34,7 +34,7 @@ func removeAccountProfileSchema(t *testing.T, raw *sql.DB) {
 	attachment := s[strings.Index(s, "CREATE TRIGGER attachment_download_receipt"):strings.Index(s, "INSERT INTO native_migration_history")]
 	tx, err := raw.Begin()
 	require.NoError(t, err)
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	_, err = tx.Exec(`PRAGMA defer_foreign_keys=ON;
 DROP TABLE account_observed_profile_urls;
 DROP TABLE source_account_profiles;

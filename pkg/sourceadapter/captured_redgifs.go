@@ -15,7 +15,7 @@ var redgifsItemID = regexp.MustCompile(`^[A-Za-z0-9]{1,256}$`)
 func capturedRedgifsPost(data sourceObject, path string) (*models.SourcePostIdentifier, error) {
 	id, ok := data["id"].(string)
 	if !ok || !redgifsItemID.MatchString(id) {
-		return nil, errors.New("Redgifs item requires its API ID")
+		return nil, errors.New("redgifs item requires its API ID")
 	}
 	return capturedPostReference("native:redgifs", capturedField{value: strings.ToLower(id), path: pointerMember(path, "id")})
 }

@@ -51,7 +51,10 @@ func (s *SourceAccountStore) RecordProfile(ctx context.Context, input models.Acc
 	if account != nil {
 		accountID = &account.UUID
 		result.AccountUUID = account.UUID
-		details, _ := json.Marshal(map[string]string{"profile_uuid": input.UUID})
+		details, err := json.Marshal(map[string]string{"profile_uuid": input.UUID})
+		if err != nil {
+			return nil, err
+		}
 		for _, ref := range []models.AccountReference{profile.ID, profile.Handle} {
 			_, err = s.ObserveIdentifier(ctx, account.UUID, ref, models.AccountIdentifierEvidence{
 				Key: "profile:" + input.UUID, Basis: "captured-profile", Origin: "gallery-dl", Details: details,

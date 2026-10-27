@@ -52,27 +52,10 @@ OR EXISTS(SELECT 1 FROM ingest_receipts r WHERE r.kind='account.profile' AND NOT
 	if invalid {
 		return models.ErrSourcePayloadCorrupt
 	}
-	rows, err := conn.Queryx("SELECT source FROM source_account_profiles")
-	if err != nil {
+	if err := validateAccountProfilePayloads(conn); err != nil {
 		return err
 	}
-	for rows.Next() {
-		var raw []byte
-		if err = rows.Scan(&raw); err != nil {
-			rows.Close()
-			return err
-		}
-		if _, err = sourceadapter.ExtractAccountProfile(raw); err != nil {
-			rows.Close()
-			return models.ErrSourcePayloadCorrupt
-		}
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return err
-	}
-	rows, err = conn.Queryx("SELECT url_key,url FROM account_observed_profile_urls")
+	rows, err := conn.Queryx("SELECT url_key,url FROM account_observed_profile_urls")
 	if err != nil {
 		return err
 	}
@@ -83,6 +66,24 @@ OR EXISTS(SELECT 1 FROM ingest_receipts r WHERE r.kind='account.profile' AND NOT
 			return err
 		}
 		if key == "" || sourceadapter.ProfileURLKey(value) != key {
+			return models.ErrSourcePayloadCorrupt
+		}
+	}
+	return rows.Err()
+}
+
+func validateAccountProfilePayloads(conn *sqlx.DB) error {
+	rows, err := conn.Queryx("SELECT source FROM source_account_profiles")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var raw []byte
+		if err = rows.Scan(&raw); err != nil {
+			return err
+		}
+		if _, err = sourceadapter.ExtractAccountProfile(raw); err != nil {
 			return models.ErrSourcePayloadCorrupt
 		}
 	}

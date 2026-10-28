@@ -399,14 +399,24 @@ func (db *Database) Backup(backupPath string) (err error) {
 	}
 	defer thisDB.Close()
 
-	// if backup path is not in the same directory as the database,
-	// then backup to the same directory first, then move to the final location.
-	// This is to prevent errors if the backup directory is over a network share.
-	dbDir := filepath.Dir(db.dbPath)
-	moveAfter := filepath.Dir(backupPath) != dbDir
-	vacuumOut := backupPath
-	if moveAfter {
-		vacuumOut = filepath.Join(dbDir, filepath.Base(backupPath))
+	// Build on the destination filesystem: staging beside the live database
+	// consumes another database's worth of system-disk space and requires a
+	// second full copy when the backup directory is on a different disk.
+	if _, err := os.Lstat(backupPath); !errors.Is(err, os.ErrNotExist) {
+		if err == nil {
+			err = os.ErrExist
+		}
+		return fmt.Errorf("backup destination unavailable: %w", err)
+	}
+	backupDir := filepath.Dir(backupPath)
+	staged, err := os.CreateTemp(backupDir, ".stash-backup-*.sqlite")
+	if err != nil {
+		return fmt.Errorf("create backup staging file: %w", err)
+	}
+	vacuumOut := staged.Name()
+	defer os.Remove(vacuumOut)
+	if err := staged.Close(); err != nil {
+		return fmt.Errorf("close backup staging file: %w", err)
 	}
 
 	logger.Infof("Backing up database into: %s", vacuumOut)
@@ -415,12 +425,21 @@ func (db *Database) Backup(backupPath string) (err error) {
 		return fmt.Errorf("vacuum failed: %w", err)
 	}
 
-	if moveAfter {
-		logger.Infof("Moving database backup to: %s", backupPath)
-		err = fsutil.SafeMove(vacuumOut, backupPath)
-		if err != nil {
-			return fmt.Errorf("moving database backup failed: %w", err)
-		}
+	// Only expose a complete, flushed snapshot under its final name. A failed
+	// or interrupted copy must not look like a completed backup to consumers.
+	staged, err = os.OpenFile(vacuumOut, os.O_RDWR, 0)
+	if err != nil {
+		return fmt.Errorf("open completed backup: %w", err)
+	}
+	syncErr := staged.Sync()
+	if err := errors.Join(syncErr, staged.Close()); err != nil {
+		return fmt.Errorf("flush completed backup: %w", err)
+	}
+	if err := fsutil.RenameNoReplace(vacuumOut, backupPath); err != nil {
+		return fmt.Errorf("publish completed backup: %w", err)
+	}
+	if err := fsutil.SyncDir(backupDir); err != nil {
+		return fmt.Errorf("flush backup directory: %w", err)
 	}
 
 	return nil

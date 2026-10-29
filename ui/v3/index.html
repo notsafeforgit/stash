@@ -9,32 +9,38 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
     />
+    <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="%COLOR%" />
     <link rel="manifest" crossorigin="use-credentials" href="manifest.json" />
     <title>Stash</title>
-    <link rel="stylesheet" href="css" />
     <script>
       (() => {
+        let theme = "system";
         try {
-          const t = localStorage.getItem("theme") || "system";
-          if (t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
-            document.documentElement.classList.add("dark");
-          }
+          theme = localStorage.getItem("theme") || "system";
         } catch (_e) {}
+        const dark = theme === "dark" || (theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        const root = document.documentElement;
+        const resolved = dark ? "dark" : "light";
+        root.classList.toggle("dark", dark);
+        root.dataset.theme = resolved;
+        root.style.colorScheme = resolved;
+        document.querySelector('meta[name="color-scheme"]').content = resolved;
       })();
     </script>
     <style>
-      /* Paint the page background in the head so a hard refresh doesn't
-         flash white before the Vite/Tailwind-bundled stylesheet loads.
-         The inline script above adds `.dark` to <html> synchronously
-         from localStorage / prefers-color-scheme, so this rule is in
-         effect before <body> first renders. The colour mirrors
-         `--color-background` in src/styles/globals.css. Light mode
-         keeps the browser default (white) and so needs no rule here.
-         `color-scheme: dark` also flips UA-styled scrollbars and form
-         controls to their dark variant on the same frame. */
-      html.dark { color-scheme: dark; background-color: oklch(0.145 0 0); }
+      /* Safari can retain the first color sampled from our fixed body.
+         Resolve both surfaces before the app or custom styles load, as in
+         the share, login and offline documents. */
+      html { color-scheme: light dark; background-color: var(--color-background, #ffffff); }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-theme]) { background-color: #0a0a0a; }
+      }
+      html[data-theme="light"] { background-color: var(--color-background, #ffffff); }
+      html[data-theme="dark"] { background-color: var(--color-background, #0a0a0a); }
+      body { background-color: inherit; }
     </style>
+    <link rel="stylesheet" href="css" />
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

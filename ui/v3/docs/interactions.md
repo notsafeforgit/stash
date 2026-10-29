@@ -203,6 +203,14 @@ combine it with the separate CSS `translate` property on the popup: Base UI
 supplies an inline transform while dragging, and the two translations add
 together instead of tracking the pointer one-to-one.
 
+The app, login and offline document heads resolve the saved/system appearance
+before React starts. Keep the document canvas and fixed body the same opaque
+background from their first paint, including while scripts are still loading:
+Safari can retain the initial color it samples for the status-bar area. The
+bootstrap colors fall back to the standard palette and follow the shared
+`--color-background` token once styles load. Public shares retain their external
+bootstrap script so their stricter CSP can prohibit inline JavaScript.
+
 The footer participates in flex layout, reserving its actual height without
 fixed offsets or content overlays, including Home's bottom navigation. The shell
 owns top/side safe-area insets; footers own the bottom inset. Shared CSS tokens

@@ -27,6 +27,50 @@ export default defineConfig({
       name: "sharing-fixture",
       configureServer(server) {
         server.middlewares.use(async (request, response, next) => {
+          const themeShell = /^\/theme-shell\/(app|login|offline)$/.exec(
+            request.url ?? "",
+          );
+          if (themeShell) {
+            try {
+              const entry = themeShell[1] === "app" ? "index" : themeShell[1];
+              const html = await readFile(
+                new URL(`../../${entry}.html`, import.meta.url),
+                "utf8",
+              );
+              const transformed = await server.transformIndexHtml(
+                `/${entry}.html`,
+                html
+                  .replace(/<base href="[^"]*"/, '<base href="/"')
+                  .replace("%COLOR%", "#202b33")
+                  .replace(
+                    /\/src\/(?:pwa\/offline-main|login-main|main)\.tsx/,
+                    "/document-theme.tsx",
+                  )
+                  .replace('<link rel="stylesheet" href="css" />', "")
+                  .replace('<script defer src="javascript"></script>', "")
+                  .replace(
+                    "</head>",
+                    `<link rel="stylesheet" href="/@fs${source}/styles/globals.css"></head>`,
+                  ),
+              );
+              response.setHeader("Content-Type", "text/html");
+              response.end(transformed);
+            } catch (error) {
+              next(error);
+            }
+            return;
+          }
+          if (
+            [
+              "/manifest.json",
+              "/favicon.ico",
+              "/apple-touch-icon.png",
+            ].includes(request.url ?? "")
+          ) {
+            response.statusCode = 204;
+            response.end();
+            return;
+          }
           if (request.url === "/share/assets/share-theme.js") {
             try {
               response.setHeader("Content-Type", "text/javascript");

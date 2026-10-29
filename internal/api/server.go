@@ -640,7 +640,9 @@ func setPageSecurityHeaders(c *config.Config, w http.ResponseWriter, r *http.Req
 		"data:",
 		"'self'",
 	}
-	imageSrc := "data: *"
+	// Clipboard PNG conversion and local image previews decode object URLs.
+	// The wildcard permits network images, but does not include blob URLs.
+	imageSrc := "data: blob: *"
 	scriptSrcSlice := []string{
 		"'self'",
 		"http://www.gstatic.com",

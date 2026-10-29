@@ -31,17 +31,18 @@ test("image lightbox copies image pixels through the native clipboard API", asyn
   browserName,
 }) => {
   // Chromium's headless permission prompt cannot be answered by a person.
-  // WebKit uses its normal click-gesture path with no permission override.
+  // WebKit uses its normal touch-gesture path with no permission override.
   if (browserName === "chromium")
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.goto("/image-lightbox");
-  await page.getByRole("button", { name: "Open images", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Image actions", exact: true })
-    .click();
+  const response = await page.goto("/image-lightbox");
+  expect(response?.headers()["content-security-policy"]).toBe(
+    "img-src data: blob: *",
+  );
+  await page.getByRole("button", { name: "Open images", exact: true }).tap();
+  await page.getByRole("button", { name: "Image actions", exact: true }).tap();
   await fileMenu(page)
     .getByRole("menuitem", { name: "Copy image", exact: true })
-    .click();
+    .tap();
   await expect(page.getByText("Image copied", { exact: true })).toBeVisible();
   if (browserName === "chromium") {
     const copied = await page.evaluate(async () => {

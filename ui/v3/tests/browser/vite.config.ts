@@ -27,6 +27,14 @@ export default defineConfig({
       name: "sharing-fixture",
       configureServer(server) {
         server.middlewares.use(async (request, response, next) => {
+          if (/^\/image-(?:lightbox|files)(?:\?|$)/.test(request.url ?? "")) {
+            // Match production's image policy, covered by the Go header test.
+            // Copy image must decode its temporary blob URL with CSP enabled.
+            response.setHeader(
+              "Content-Security-Policy",
+              "img-src data: blob: *",
+            );
+          }
           const themeShell = /^\/theme-shell\/(app|login|offline)$/.exec(
             request.url ?? "",
           );

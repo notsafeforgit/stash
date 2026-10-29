@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useRouter, useSearch } from "@tanstack/react-router";
 import { ApolloClient, ApolloLink, Observable } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
 import { EntityListPage } from "@/components/list/entity-list-page";
@@ -16,6 +17,8 @@ import { ConfigurationProvider } from "@/hooks/config";
 import { images } from "./image-lightbox";
 import { scenes } from "./scene-lightbox";
 import { playerConfiguration } from "./player-configuration";
+import { CollectionDetailLayout } from "@/components/detail/collection-detail-layout";
+import { DetailTabs } from "@/components/detail/detail-tabs";
 
 declare global {
   interface Window {
@@ -181,13 +184,43 @@ function Scenes() {
   );
 }
 
+function MediaTabs() {
+  const { tab = "scenes" } = useSearch({ strict: false });
+  const router = useRouter();
+  return (
+    <CollectionDetailLayout title="Example performer" onBack={() => {}}>
+      <div className="md:flex md:h-full">
+        <aside className="h-96 md:w-72 md:shrink-0">Performer details</aside>
+        <DetailTabs
+          activeTab={tab}
+          onTabChange={(tab) =>
+            router.navigate({
+              href: `/lightbox-list?tab=${tab}`,
+              replace: true,
+            })
+          }
+          tabs={[
+            { id: "scenes", label: "Scenes", content: <Scenes /> },
+            { id: "images", label: "Images", content: <Images /> },
+          ]}
+        />
+      </div>
+    </CollectionDetailLayout>
+  );
+}
+
 export function LightboxListFixture() {
   const client = useMemo(makeClient, []);
+  const [tabbed] = useState(() =>
+    new URLSearchParams(location.search).has("tabs"),
+  );
   return (
     <ApolloProvider client={client}>
       <ConfigurationProvider configuration={playerConfiguration}>
         <div data-app-viewport className="flex h-dvh flex-col overflow-hidden">
-          {new URLSearchParams(location.search).get("kind") === "scene" ? (
+          {tabbed ? (
+            <MediaTabs />
+          ) : new URLSearchParams(location.search).get("kind") === "scene" ? (
             <Scenes />
           ) : (
             <Images />

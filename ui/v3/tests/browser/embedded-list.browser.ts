@@ -132,3 +132,45 @@ test("header resizing, tab changes and desktop resizing keep the correct scroll 
     .poll(() => page.locator("[data-card-id]").count())
     .toBeLessThan(40);
 });
+
+for (const desktop of [false, true]) {
+  test(`scene cards recover from layout updates in a hidden tab on ${desktop ? "desktop" : "mobile"}`, async ({
+    page,
+  }) => {
+    if (desktop) await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/embedded-list?mixed");
+    await expect(page.locator('[data-card-id="1"]')).toBeAttached();
+    await page.evaluate(() => document.fonts.ready);
+    if (!desktop)
+      await page
+        .locator('[data-scroll-restoration-id="collection-detail"]')
+        .evaluate((el) => {
+          el.scrollTop = 900;
+        });
+    await expect(page.locator('[data-card-id="1"]')).toBeInViewport();
+    const selectTab = async (name: string) => {
+      if (desktop) await page.getByRole("tab", { name, exact: true }).click();
+      else await chooseSection(page, name);
+    };
+    await selectTab("Other");
+    await expect(page.getByText("Other content")).toBeVisible();
+    // Fonts can finish loading while a previously visited list is hidden.
+    await page.evaluate(() => {
+      document.fonts.dispatchEvent(new Event("loadingdone"));
+    });
+    await selectTab("Scenes");
+    await expect(page.locator('[data-card-id="1"]')).toBeInViewport();
+    const scroller = page.locator(
+      desktop
+        ? '[data-scroll-restoration-id^="entity-list-"]'
+        : '[data-scroll-restoration-id="collection-detail"]',
+    );
+    await scroller.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await expect(page.locator('[data-card-id="40"]')).toBeInViewport();
+    await expect
+      .poll(() => page.locator("[data-card-id]").count())
+      .toBeLessThan(40);
+  });
+}

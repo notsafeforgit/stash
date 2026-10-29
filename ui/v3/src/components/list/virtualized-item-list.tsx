@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { DisplayMode } from "@/models/list-filter/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ListScrollContext } from "./list-scroll-context";
+import { useListActivity } from "./list-activity-context";
 import { shouldAdjustVirtualizedListScrollPosition } from "./list-scroll-state";
 import { useCardAspect } from "./card-aspect-context";
 import {
@@ -160,6 +161,7 @@ export function VirtualizedItemList<TItem extends IHasID>({
   onCardPreviewClick,
   renderCard,
 }: VirtualizedItemListProps<TItem>) {
+  const isActive = useListActivity();
   // EntityList provides the scroll element and cached offset through context.
   // Null on the first commit, populated on the second; the virtualizer
   // computes 0 rows on the first commit and the actual rows on the second.
@@ -206,7 +208,7 @@ export function VirtualizedItemList<TItem extends IHasID>({
 
   useLayoutEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!isActive || !el) return;
     const sync = () => {
       const w = el.getBoundingClientRect().width;
       if (w > 0) setContainerWidth(w);
@@ -231,7 +233,7 @@ export function VirtualizedItemList<TItem extends IHasID>({
       ancestor = ancestor.parentElement;
     }
     return () => ro.disconnect();
-  }, [scrollEl, pad]);
+  }, [isActive, scrollEl, pad]);
 
   const isDetails = displayMode === DisplayMode.Details;
   const lanes = useMemo(() => {
@@ -296,17 +298,31 @@ export function VirtualizedItemList<TItem extends IHasID>({
     previousLayout.items.every((item, index) => item.id === items[index]?.id);
   const rowSizes = samePage ? measuredLayout?.rows : undefined;
   const measuring =
-    !isLoading && !!renderCardLayout && previousLayout !== layoutIdentity;
+    isActive &&
+    !isLoading &&
+    !!renderCardLayout &&
+    previousLayout !== layoutIdentity;
   useLayoutEffect(() => {
     if (!measuring || !containerWidth) return;
-    const rows = Array.from(
-      containerRef.current?.querySelectorAll<HTMLElement>(
-        "[data-measure-row]",
-      ) ?? [],
-      (row) => row.getBoundingClientRect().height,
-    );
-    setMeasuredLayout({ identity: layoutIdentity, rows });
-  }, [measuring, containerWidth, layoutIdentity]);
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      // Kept-mounted tabs can receive data/font/URL updates while hidden.
+      // Wait for actual layout instead of retaining zero-height rows.
+      if (!el.getClientRects().length) return;
+      const rows = Array.from(
+        el.querySelectorAll<HTMLElement>("[data-measure-row]"),
+        (row) => row.getBoundingClientRect().height,
+      );
+      if (rows.length !== rowCount || rows.some((height) => height <= 0))
+        return;
+      setMeasuredLayout({ identity: layoutIdentity, rows });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measuring, containerWidth, layoutIdentity, rowCount]);
 
   // Custom cards without a lightweight layout retain an aspect-aware estimate.
   const estimateSize = useCallback(
@@ -365,12 +381,17 @@ export function VirtualizedItemList<TItem extends IHasID>({
     overscan: 2,
     measureElement:
       typeof ResizeObserver !== "undefined"
-        ? (el, _entry, instance) =>
-            // Skeleton geometry must not overwrite real row measurements.
-            isLoading
-              ? (instance.measurementsCache[Number(el.dataset.index)]?.size ??
-                estimateSize(Number(el.dataset.index)))
-              : el.getBoundingClientRect().height
+        ? (el, _entry, instance) => {
+            // Skeletons and hidden panels must not overwrite real geometry.
+            if (isActive && !isLoading) {
+              const height = el.getBoundingClientRect().height;
+              if (height > 0) return height;
+            }
+            return (
+              instance.measurementsCache[Number(el.dataset.index)]?.size ??
+              estimateSize(Number(el.dataset.index))
+            );
+          }
         : undefined,
   });
   virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (
@@ -396,7 +417,7 @@ export function VirtualizedItemList<TItem extends IHasID>({
   ]);
   const previousLayoutKey = useRef(layoutKey);
   useLayoutEffect(() => {
-    if (previousLayoutKey.current === layoutKey) return;
+    if (!isActive || previousLayoutKey.current === layoutKey) return;
     previousLayoutKey.current = layoutKey;
     virtualizer.measure();
     containerRef.current
@@ -404,10 +425,11 @@ export function VirtualizedItemList<TItem extends IHasID>({
       .forEach((row) => {
         virtualizer.measureElement(row);
       });
-  }, [layoutKey, virtualizer]);
+  }, [isActive, layoutKey, virtualizer]);
 
   useLayoutEffect(() => {
     if (
+      !isActive ||
       !scrollContext ||
       isLoading ||
       measuring ||

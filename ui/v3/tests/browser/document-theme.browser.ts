@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { test, expect } from "./test";
+import { test, expect, fixtureModule } from "./test";
 
 test.use({
   // The real app/offline viewport also opts into Chromium's keyboard sizing.
@@ -74,7 +74,7 @@ for (const entry of ["app", "login", "offline"]) {
       const ready = new Promise<void>((resolve) => {
         startApp = resolve;
       });
-      await page.route(/\/document-theme\.(?:tsx|js)$/, async (route) => {
+      await page.route(fixtureModule("document-theme"), async (route) => {
         await ready;
         await route.continue();
       });

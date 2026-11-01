@@ -233,7 +233,9 @@ with source maps and failure traces. Fresh browser contexts and request guards
 remain enabled: prebundling avoids serving hundreds of individual development
 modules again for each test. The theme and sharing fixtures retain the actual
 application HTML heads and load CSS before React, and synthetic media retains
-byte-range support. For interactive fixture development with hot reload, run
+byte-range support. Each entry is built independently to preserve lazy-loading
+boundaries and its stylesheet order. For interactive fixture development with
+hot reload, run
 `STASH_BROWSER_DEV=1 pnpm --dir ui/v3 test:browser`.
 
 The suite renders the real collection/media and settings layouts,

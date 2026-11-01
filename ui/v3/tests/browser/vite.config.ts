@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
-import { cp, readFile } from "node:fs/promises";
+import { readdirSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { defineConfig, type Connect, type Manifest } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -31,12 +32,24 @@ export default defineConfig({
     cssCodeSplit: false,
     rolldownOptions: {
       input: {
-        index: `${fixture}/index.html`,
-        "share-recipient": `${fixture}/share-recipient.html`,
+        // Include every isolated entry as well as the main SPA fixture.
+        ...Object.fromEntries(
+          readdirSync(fixture)
+            .filter((name) => name.endsWith(".html"))
+            .map((name) => [name.slice(0, -5), `${fixture}/${name}`]),
+        ),
         "document-theme": `${fixture}/document-theme.tsx`,
         sharing: `${fixture}/sharing.tsx`,
       },
-      output: { entryFileNames: "[name].js" },
+      output: {
+        entryFileNames: "[name].js",
+        // Distinguish a lazy component from shared fixture chunks with the
+        // same basename, so delayed/failed-module tests intercept it exactly.
+        chunkFileNames: (chunk) =>
+          chunk.isDynamicEntry
+            ? "assets/lazy-[name]-[hash].js"
+            : "assets/[name]-[hash].js",
+      },
     },
   },
   plugins: [
@@ -44,26 +57,33 @@ export default defineConfig({
     tailwindcss(),
     {
       name: "sharing-fixture",
-      async writeBundle() {
-        // Synthetic media needs byte-range support from Vite's static server.
-        await cp(`${fixture}/media`, `${output}/media`, { recursive: true });
-      },
       async configurePreviewServer(server) {
-        const manifest: Manifest = JSON.parse(
-          await readFile(`${output}/.vite/manifest.json`, "utf8"),
+        const manifests: Record<string, Manifest> = Object.fromEntries(
+          await Promise.all(
+            ["document-theme", "sharing"].map(async (name) => [
+              name,
+              JSON.parse(
+                await readFile(`${output}/.vite/${name}.json`, "utf8"),
+              ),
+            ]),
+          ),
         );
-        const asset = (name: string) => {
+        const asset = (manifest: Manifest, name: string) => {
           const entry = manifest[name];
           if (!entry) throw new Error(`Missing browser fixture asset: ${name}`);
           return `/${entry.file}`;
         };
         server.middlewares.use(
-          fixturePages(async (_url, html) =>
-            html
-              .replace("/document-theme.tsx", asset("document-theme.tsx"))
-              .replace("/sharing.tsx", asset("sharing.tsx"))
-              .replace(`/@fs${source}/styles/globals.css`, asset("style.css")),
-          ),
+          fixturePages(async (url, html) => {
+            const name = url === "/share.html" ? "sharing" : "document-theme";
+            const manifest = manifests[name]!;
+            return html
+              .replace(`/${name}.tsx`, asset(manifest, `${name}.tsx`))
+              .replace(
+                `/@fs${source}/styles/globals.css`,
+                asset(manifest, "style.css"),
+              );
+          }),
         );
       },
       configureServer(server) {

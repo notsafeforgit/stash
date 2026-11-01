@@ -1,6 +1,6 @@
 import { libraryID } from "../fixtures/library";
 import type { Page } from "@playwright/test";
-import { test, expect } from "./test";
+import { test, expect, fixtureModule } from "./test";
 import { serveSceneMedia } from "./scene-media";
 
 test.beforeEach(async ({ page }) => {
@@ -321,7 +321,7 @@ for (const viewport of [
     }, testInfo) => {
       const editorRequests: string[] = [];
       page.on("request", (request) => {
-        if (new URL(request.url()).pathname.endsWith("/tv-rail-editor.tsx"))
+        if (fixtureModule("tv-rail-editor").test(request.url()))
           editorRequests.push(request.url());
       });
       await open(page, "?paused&legacy-gear");
@@ -1163,7 +1163,7 @@ test("TV settings show the rail editor directly and save reordered actions witho
 }) => {
   const editorRequests: string[] = [];
   page.on("request", (request) => {
-    if (new URL(request.url()).pathname.endsWith("/tv-rail-editor.tsx")) {
+    if (fixtureModule("tv-rail-editor").test(request.url())) {
       editorRequests.push(request.url());
     }
   });

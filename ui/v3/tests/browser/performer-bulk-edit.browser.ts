@@ -1,4 +1,4 @@
-import { test, expect, holdForContextMenu } from "./test";
+import { test, expect, fixtureModule, holdForContextMenu } from "./test";
 
 for (const failure of [false, true]) {
   test(`bulk performer editing preserves the list while its module ${failure ? "fails" : "loads slowly"}`, async ({
@@ -20,23 +20,26 @@ for (const failure of [false, true]) {
     page.on("request", (request) => {
       if (request.isNavigationRequest()) documents.push(request.url());
     });
-    await page.route("**/performer-bulk-edit-sheet.tsx*", async (route) => {
-      requested = true;
-      await pending;
-      if (!failure) return route.continue();
-      // Vite's production import helper emits this event before rejecting.
-      await page.evaluate(() => {
-        const event = Object.assign(
-          new Event("vite:preloadError", { cancelable: true }),
-          { payload: new Error("Importing a module script failed") },
-        );
-        window.dispatchEvent(event);
-      });
-      await route.fulfill({
-        status: 503,
-        body: "Bulk editor unavailable",
-      });
-    });
+    await page.route(
+      fixtureModule("performer-bulk-edit-sheet"),
+      async (route) => {
+        requested = true;
+        await pending;
+        if (!failure) return route.continue();
+        // Vite's production import helper emits this event before rejecting.
+        await page.evaluate(() => {
+          const event = Object.assign(
+            new Event("vite:preloadError", { cancelable: true }),
+            { payload: new Error("Importing a module script failed") },
+          );
+          window.dispatchEvent(event);
+        });
+        await route.fulfill({
+          status: 503,
+          body: "Bulk editor unavailable",
+        });
+      },
+    );
     try {
       await page.goto("/performer-list");
       const card = page.locator("article[data-id]").first();

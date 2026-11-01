@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { PreviewImageDynamicRange } from "../../src/core/generated-graphql";
 import { errors, type Page } from "@playwright/test";
-import { test, expect } from "./test";
+import { test, expect, fixtureModule } from "./test";
 import type {
   SharedContent,
   SharedMedia,
@@ -391,7 +391,7 @@ for (const savedTheme of ["system", "dark", "light"] as const) {
     const appReady = new Promise<void>((resolve) => {
       startApp = resolve;
     });
-    await page.route(/\/sharing\.(?:tsx|js)$/, async (route) => {
+    await page.route(fixtureModule("sharing"), async (route) => {
       await appReady;
       await route.continue();
     });

@@ -1,5 +1,5 @@
 import { libraryID } from "../fixtures/library";
-import { test, expect } from "./test";
+import { test, expect, fixtureModule } from "./test";
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/home-covers/*.svg", (route) =>
@@ -183,7 +183,7 @@ test("Home loads its customisation code and saved filters only when opened", asy
 }) => {
   const configRequests: string[] = [];
   page.on("request", (request) => {
-    if (new URL(request.url()).pathname.endsWith("/front-page-config.tsx"))
+    if (fixtureModule("front-page-config").test(request.url()))
       configRequests.push(request.url());
   });
   await page.goto("/home-fixture/");

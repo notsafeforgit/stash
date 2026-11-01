@@ -1,7 +1,7 @@
-import { test, expect } from "./test";
+import { test, expect, fixtureModule } from "./test";
 import { serveSceneMedia } from "./scene-media";
 
-const lightboxChunk = /\/components\/lightbox\/scene-lightbox\.tsx(?:\?.*)?$/;
+const lightboxChunk = fixtureModule("components/lightbox/scene-lightbox");
 
 test("startup preloads the player before selection and opens without a loading overlay", async ({
   page,

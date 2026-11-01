@@ -7,6 +7,17 @@ import {
 
 export { expect };
 
+// Match the same module in the unbundled dev server and the prebuilt fixture.
+// A source path disambiguates components from fixtures with the same basename.
+export function fixtureModule(source: string) {
+  const escapePattern = (value: string) =>
+    value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const name = escapePattern(source.split("/").at(-1)!);
+  return new RegExp(
+    `/(?:${escapePattern(source)}\\.tsx|${name}\\.js|assets/lazy-${name}-[\\w-]+\\.js)(?:\\?.*)?$`,
+  );
+}
+
 export const test = base.extend<{ expectedConsoleErrors: string[] }>({
   expectedConsoleErrors: [[], { option: true }],
   page: async ({ page, baseURL, expectedConsoleErrors }, use) => {

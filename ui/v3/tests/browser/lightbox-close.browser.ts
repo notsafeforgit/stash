@@ -2,6 +2,77 @@ import { test, expect } from "./test";
 import { serveSceneMedia } from "./scene-media";
 
 for (const kind of ["image", "scene"] as const) {
+  for (const interaction of kind === "scene"
+    ? ["rotation", "playback"]
+    : ["rotation"]) {
+    test(`${kind} dismissal preserves the embedded list after ${interaction}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await serveSceneMedia(page);
+      await page.goto(
+        `/lightbox-list?kind=${kind}&tabs&tab=${kind === "image" ? "images" : "scenes"}${interaction === "playback" ? "&activity" : ""}`,
+      );
+      await expect(page.locator("article[data-id]").first()).toBeVisible();
+      await expect(
+        page.locator("[data-entity-card-preview]").first(),
+      ).toHaveCSS("aspect-ratio", kind === "image" ? "2 / 3" : "16 / 9");
+      await page.evaluate(() => document.fonts.ready);
+      const scroller = page.locator(
+        '[data-scroll-restoration-id="collection-detail"]',
+      );
+      await scroller.evaluate((el) => {
+        el.scrollTop = 2000;
+      });
+      await expect
+        .poll(() => scroller.evaluate((el) => el.scrollTop))
+        .toBe(2000);
+      const visiblePoint = () =>
+        page.locator("[data-entity-card-preview]").evaluateAll((elements) => {
+          for (const el of elements) {
+            const rect = el.getBoundingClientRect();
+            const top = Math.max(160, rect.top);
+            const bottom = Math.min(innerHeight - 160, rect.bottom);
+            if (bottom > top && rect.width > 0)
+              return { x: rect.left + rect.width / 2, y: (top + bottom) / 2 };
+          }
+        });
+      await expect.poll(visiblePoint).toBeTruthy();
+      const point = await visiblePoint();
+      await page.touchscreen.tap(point!.x, point!.y);
+      const portal = page.locator(".yarl__portal");
+      await expect(portal).toBeVisible();
+      if (interaction === "playback") {
+        await expect
+          .poll(() =>
+            portal
+              .locator("video")
+              .evaluate((video: HTMLVideoElement) => video.currentTime),
+          )
+          .toBeGreaterThan(1);
+      } else {
+        await page.setViewportSize({ width: 844, height: 390 });
+        await expect(
+          page.locator('[data-scroll-restoration-id^="entity-list-"]'),
+        ).toHaveCount(1);
+        await page.setViewportSize({ width: 390, height: 844 });
+        await expect(
+          page.locator('[data-scroll-restoration-id^="entity-list-"]'),
+        ).toHaveCount(0);
+      }
+      await portal.getByRole("button", { name: "Close", exact: true }).tap();
+      await expect(portal).toHaveCount(0);
+      if (interaction === "playback") {
+        expect(
+          await page.evaluate(() => window.lightboxListRequests),
+        ).toContain("SceneSaveActivity");
+      }
+      await expect
+        .poll(() => scroller.evaluate((el) => el.scrollTop))
+        .toBe(2000);
+    });
+  }
+
   for (const width of [390, 1280]) {
     test(`${kind} dismissal returns to the retained list at ${width}px without refetching`, async ({
       page,

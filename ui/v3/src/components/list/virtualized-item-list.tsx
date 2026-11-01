@@ -468,7 +468,10 @@ export function VirtualizedItemList<TItem extends IHasID>({
       <div
         style={{
           position: "relative",
-          height: measuring ? undefined : totalSize + pad,
+          // Keep the spacer during measurement too. Removing the temporary
+          // rows from an auto-height spacer can briefly collapse the list and
+          // clamp WebKit's scroll position before the measured height commits.
+          height: totalSize + pad,
           paddingBottom: measuring ? pad : undefined,
           width: "100%",
         }}

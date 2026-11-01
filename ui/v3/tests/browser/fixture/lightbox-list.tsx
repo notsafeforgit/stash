@@ -211,12 +211,20 @@ function MediaTabs() {
 
 export function LightboxListFixture() {
   const client = useMemo(makeClient, []);
+  const [configuration] = useState(() => ({
+    ...playerConfiguration,
+    ui: {
+      ...playerConfiguration.ui,
+      trackActivity: new URLSearchParams(location.search).has("activity"),
+      minimumPlayPercent: 0,
+    },
+  }));
   const [tabbed] = useState(() =>
     new URLSearchParams(location.search).has("tabs"),
   );
   return (
     <ApolloProvider client={client}>
-      <ConfigurationProvider configuration={playerConfiguration}>
+      <ConfigurationProvider configuration={configuration}>
         <div data-app-viewport className="flex h-dvh flex-col overflow-hidden">
           {tabbed ? (
             <MediaTabs />

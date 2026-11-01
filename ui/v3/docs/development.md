@@ -206,7 +206,7 @@ make test-ui-browser
 ```
 
 The [browser workflow](../../../.github/workflows/v3-browser-tests.yml) runs
-Chromium with two shards and WebKit with four in a digest-pinned Playwright
+Chromium and WebKit with four shards each in a digest-pinned Playwright
 Ubuntu 26.04 container. The image holds both browsers and their system media
 libraries; CI does not reinstall packages from changing Ubuntu repositories.
 WebKit needs the newer GStreamer media runtime: the 1.24 backend on Ubuntu 24.04
@@ -226,8 +226,17 @@ Linux WebKit coverage does not verify Apple's media stack or physical iPhone
 behavior. Playwright [recommends macOS for Safari video testing](https://playwright.dev/docs/browsers#webkit);
 use a supported Mac environment and physical iOS checks for those differences.
 
-[tests/browser](../tests/browser) starts and stops its own Vite server on
-`127.0.0.1:3025`. It renders the real collection/media and settings layouts,
+[tests/browser](../tests/browser) bundles its fixtures once per run and serves
+them through Vite preview on `127.0.0.1:3025`. The bundle uses
+`NODE_ENV=development` to retain React diagnostics and StrictMode behavior,
+with source maps and failure traces. Fresh browser contexts and request guards
+remain enabled: prebundling avoids serving hundreds of individual development
+modules again for each test. The theme and sharing fixtures retain the actual
+application HTML heads and load CSS before React, and synthetic media retains
+byte-range support. For interactive fixture development with hot reload, run
+`STASH_BROWSER_DEV=1 pnpm --dir ui/v3 test:browser`.
+
+The suite renders the real collection/media and settings layouts,
 tabs, lists, toolbar, popovers, drawers, and forms with synthetic data; backend-dependent
 navigation and default-filter integrations are substituted. No backend, credentials, or
 existing library is required. Unexpected requests and browser errors fail the

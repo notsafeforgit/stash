@@ -391,7 +391,7 @@ for (const savedTheme of ["system", "dark", "light"] as const) {
     const appReady = new Promise<void>((resolve) => {
       startApp = resolve;
     });
-    await page.route("**/sharing.tsx", async (route) => {
+    await page.route(/\/sharing\.(?:tsx|js)$/, async (route) => {
       await appReady;
       await route.continue();
     });

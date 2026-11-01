@@ -72,4 +72,5 @@ jobs:
           path: |
             ui/v3/playwright-report/
             ui/v3/test-results/
+            ui/v3/dist/browser/
           retention-days: 7

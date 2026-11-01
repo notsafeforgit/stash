@@ -74,7 +74,7 @@ for (const entry of ["app", "login", "offline"]) {
       const ready = new Promise<void>((resolve) => {
         startApp = resolve;
       });
-      await page.route("**/document-theme.tsx", async (route) => {
+      await page.route(/\/document-theme\.(?:tsx|js)$/, async (route) => {
         await ready;
         await route.continue();
       });

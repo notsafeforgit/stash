@@ -444,8 +444,12 @@ export function VirtualizedItemList<TItem extends IHasID>({
     });
   });
 
-  const totalSize = rowSizes
-    ? rowSizes.reduce((height, row) => height + row, 0)
+  // A width change invalidates row estimates before the new layout is
+  // measured. Retain the last full height until then so shorter estimates
+  // cannot clamp a scroll position near the bottom of the page.
+  const spacerRows = rowSizes ?? (measuring ? measuredLayout?.rows : undefined);
+  const totalSize = spacerRows
+    ? spacerRows.reduce((height, row) => height + row, 0)
     : virtualizer.getTotalSize();
   const virtualRows =
     measuring && !rowSizes ? [] : virtualizer.getVirtualItems();

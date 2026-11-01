@@ -128,9 +128,11 @@ test("bottom pagination and Back restore complete geometry, including after a re
     .toBe(before.height);
 
   await page.setViewportSize({ width: 320, height: 739 });
-  await scroller.evaluate((el) => {
-    el.scrollTop = el.scrollHeight;
-  });
+  // Resizing a shorter page must keep the bottom visible without a second
+  // scroll that could hide a temporary clamp to estimated row heights.
+  await expect
+    .poll(() => scroller.evaluate((el) => el.scrollHeight))
+    .not.toBe(before.height);
   await expect(lastCard).toBeInViewport();
   const resizedHeight = await scroller.evaluate((el) => el.scrollHeight);
   await scroller.evaluate((el) => {

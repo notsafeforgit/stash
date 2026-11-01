@@ -213,6 +213,11 @@ WebKit needs the newer GStreamer media runtime: the 1.24 backend on Ubuntu 24.04
 can deadlock or crash during HLS EOF seeks even with a bare video element.
 Chromium uses two workers per shard. WebKit uses one to avoid competing media
 pipelines during playback and frame-timing checks on small CI runners.
+The shard runner distributes adjacent independent tests across the four jobs,
+so slow player cases do not accumulate on one runner. It discovers the complete
+suite each time, including new tests, and assigns every case to exactly one job.
+To reproduce a CI shard from `ui/v3`, run
+`pnpm test:browser:shard webkit 2/4`; append `--list` to inspect its cases.
 For matching local Linux coverage, use the exact image pinned in the workflow.
 Update its version and digest alongside `@playwright/test` in `package.json` and
 the lockfile; mismatched browser and package versions are unsupported. See

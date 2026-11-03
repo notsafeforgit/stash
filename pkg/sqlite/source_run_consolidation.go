@@ -96,6 +96,7 @@ func (s *SourceRunStore) Consolidate(ctx context.Context, input models.SourceRun
 		return nil, err
 	}
 	if from == nil || to == nil || from.Revision != input.SourceRevision || to.Revision != input.TargetRevision ||
+		from.AttachmentRetry || to.AttachmentRetry ||
 		from.ConsolidatedInto != "" || to.ConsolidatedInto != "" || from.State != to.State ||
 		(from.State != "queued" && from.State != "deferred") || now.Before(from.UpdatedAt) || now.Before(to.UpdatedAt) ||
 		from.CollectionUUID != to.CollectionUUID || from.CollectionRevision != to.CollectionRevision ||

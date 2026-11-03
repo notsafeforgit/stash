@@ -188,7 +188,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"source_runs": true, "source_run_protocol": 1, "source_run_submission_receipts": true, "source_run_dispatch": true,
 		"source_run_consolidation_protocol":        1,
 		"source_run_compatible_admission_protocol": 1,
-		"source_run_attachment_retry_protocol":     1,
+		"source_run_attachment_retry_protocol":     2,
 		"source_run_redgifs_pagination_protocol":   1,
 		"source_run_recovery_protocol":             1,
 		"source_run_pacing_protocol":               1,

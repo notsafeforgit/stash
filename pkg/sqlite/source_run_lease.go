@@ -46,6 +46,9 @@ func (s *SourceRunStore) Claim(ctx context.Context, id, producer, owner, policy 
 		if _, _, err := sourceRunDefinition(ctx, r); err != nil {
 			return nil, err
 		}
+		if err := attachmentRetryFinalizationSource(ctx, r); err != nil {
+			return nil, err
+		}
 		return r, nil // a lost claim response does not create a second attempt
 	}
 	if row.State != "queued" || row.Available > now.UnixMilli() {
@@ -61,7 +64,7 @@ func (s *SourceRunStore) Claim(ctx context.Context, id, producer, owner, policy 
 	if err != nil {
 		return nil, err
 	}
-	if retired, err := s.retireExpiredAttachmentRetry(ctx, r, now); err != nil || retired {
+	if err := s.prepareAttachmentRetryFinalization(ctx, r, now); err != nil {
 		return nil, err
 	}
 	collection, root, err := sourceRunDefinition(ctx, r)
@@ -126,7 +129,7 @@ OR EXISTS(SELECT 1 FROM source_run_cooldowns WHERE target_key=? AND available_at
 		}
 	}
 	ready, err := sourcePacingReady(ctx, scope, collection.UUID, r.Operation == "enrich", now)
-	if err != nil || !ready {
+	if err != nil || (!ready && !r.AttachmentRetryFinalize) {
 		return nil, err
 	}
 	// Keep linked-service dependencies across retries of this exact traversal.
@@ -209,6 +212,9 @@ SELECT uuid,fence,producer_uuid,owner_uuid,window,progress,? FROM source_runs WH
 		return nil, err
 	}
 	result, err := s.Find(ctx, id)
+	if err == nil {
+		err = attachmentRetryFinalizationSource(ctx, result)
+	}
 	*complete = err == nil && result != nil
 	return result, err
 }
@@ -359,7 +365,10 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 			r.Failures++
 			deadline := r.CreatedAt.Add(attachmentRetryLifetime)
 			if !now.Before(deadline) {
-				state, runError, delay = "cancelled", "attachment_retry_exhausted", 0
+				if _, err := dbWrapper.Exec(ctx, "UPDATE source_run_attachment_retries SET finalize=1 WHERE run_uuid=?", r.UUID); err != nil {
+					return nil, err
+				}
+				runError, delay = "attachment_retry_archive", 0
 			} else {
 				// The parent already tried this file. Allow a recovery check the
 				// next day, then close the retained gap at the two-day boundary.

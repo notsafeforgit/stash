@@ -10,6 +10,7 @@ import (
 	"github.com/stashapp/stash/internal/ingest"
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
 
@@ -107,7 +108,7 @@ func newFocusedAttachmentRetry(t *testing.T) (*sourceRunFixture, *models.SourceR
 	return f, parent, child, request
 }
 
-func TestFocusedAttachmentRetryExpiresWithoutCompletingMissingCoverageOrBlockingOtherPasses(t *testing.T) {
+func TestFocusedAttachmentRetryFinalizesArchiveWithoutInventingDownloadsOrBlockingOtherPasses(t *testing.T) {
 	for _, code := range []string{"source_download_failed", "not_found"} {
 		t.Run(code, func(t *testing.T) {
 			f, parent, child, original := newFocusedAttachmentRetry(t)
@@ -133,22 +134,27 @@ func TestFocusedAttachmentRetryExpiresWithoutCompletingMissingCoverageOrBlocking
 				}
 				f.now = child.AvailableAt
 			}
-			require.Nil(t, f.claim(t, child), "do not repeat a known missing transfer after its recovery window")
-			closed := f.find(t, child.UUID)
-			require.Equal(t, "cancelled", closed.State)
-			require.Equal(t, "attachment_retry_exhausted", closed.ErrorCode)
-			require.Equal(t, child.Fence, closed.Fence, "retirement does not invent another download attempt")
-			require.Equal(t, child.Pending, closed.Pending)
-			require.Empty(t, closed.Completed)
+			finalizing := f.claim(t, child)
+			require.NotNil(t, finalizing)
+			require.True(t, finalizing.AttachmentRetryFinalize, "expiry permits only the local archive write")
+			require.JSONEq(t, `{"category":"reddit","id":"retry123","url":"https://i.redd.it/missing.jpg","user":null}`, string(finalizing.AttachmentRetrySource))
+			require.Empty(t, f.find(t, child.UUID).AttachmentRetrySource, "listing jobs does not copy source payloads")
+			closed := f.finish(t, finalizing, "succeeded")
+			require.Equal(t, "succeeded", closed.State)
+			require.False(t, closed.AttachmentRetry, "the archive owns the final decision; retire the retry-only record")
+			require.False(t, closed.AttachmentRetryFinalize)
+			require.Zero(t, closed.Progress.FilesCompleted, "archive completion is not a successful download")
+			require.NotEmpty(t, closed.Completed)
 			require.Equal(t, closed, f.submit(t, original), "original callers retain their exact terminal receipt")
 			require.Equal(t, "succeeded", f.find(t, parent.UUID).State)
 			attempts, err := f.coordinator.Attempts(t.Context(), f.token, child.UUID, 0)
 			require.NoError(t, err)
-			require.Len(t, attempts, 2)
-			for _, attempt := range attempts {
+			require.Len(t, attempts, 3)
+			for _, attempt := range attempts[:2] {
 				require.Equal(t, "retry", attempt.Outcome)
 				require.Equal(t, code, attempt.ErrorCode, "actual failure history is retained")
 			}
+			require.Equal(t, "succeeded", attempts[2].Outcome)
 		})
 	}
 }
@@ -174,8 +180,9 @@ func TestFocusedAttachmentRetryPreservesRecoveryAndInfrastructureFailures(t *tes
 				require.Equal(t, "succeeded", result.State)
 				require.NotEmpty(t, result.Completed)
 			case "source_download_failed":
-				require.Equal(t, "cancelled", result.State)
-				require.Equal(t, "attachment_retry_exhausted", result.ErrorCode)
+				require.Equal(t, "queued", result.State)
+				require.Equal(t, "attachment_retry_archive", result.ErrorCode)
+				require.True(t, result.AttachmentRetryFinalize)
 				require.Empty(t, result.Completed)
 			default:
 				require.Equal(t, "queued", result.State, "local infrastructure failure says nothing about remote media")
@@ -184,4 +191,61 @@ func TestFocusedAttachmentRetryPreservesRecoveryAndInfrastructureFailures(t *tes
 			}
 		})
 	}
+}
+
+func TestFocusedAttachmentRetryArchiveFinalizationSurvivesStorageFailureAndRestart(t *testing.T) {
+	f, _, child, _ := newFocusedAttachmentRetry(t)
+	child = f.claim(t, child)
+	child, err := f.coordinator.Finish(t.Context(), f.token, child.Lease(), models.SourceRunOutcome{State: "retry", ErrorCode: "source_download_failed"})
+	require.NoError(t, err)
+	f.now = child.CreatedAt.Add(48 * time.Hour)
+	child = f.claim(t, child)
+	require.True(t, child.AttachmentRetryFinalize)
+	source := child.AttachmentRetrySource
+	child, err = f.coordinator.Finish(t.Context(), f.token, child.Lease(), models.SourceRunOutcome{State: "retry", ErrorCode: "worker_storage_unavailable"})
+	require.NoError(t, err)
+	require.Equal(t, "queued", child.State)
+	require.True(t, child.AttachmentRetryFinalize)
+	require.Empty(t, child.Completed)
+	require.NoError(t, f.db.Close())
+	require.NoError(t, f.db.Open(f.db.DatabasePath()))
+	f.now = child.AvailableAt
+	child = f.claim(t, child)
+	require.True(t, child.AttachmentRetryFinalize, "storage recovery cannot authorize another website fetch")
+	require.Equal(t, source, child.AttachmentRetrySource)
+	child = f.finish(t, child, "succeeded")
+	require.False(t, child.AttachmentRetry)
+	require.Zero(t, child.Progress.FilesCompleted)
+}
+
+func TestAttachmentRetryArchiveMigrationReopensOnlyExpiredLocalFinalization(t *testing.T) {
+	f, _, child, _ := newFocusedAttachmentRetry(t)
+	path := f.db.DatabasePath()
+	require.NoError(t, f.db.Close())
+	raw := openRawDB(t, path)
+	defer raw.Close()
+	_, err := raw.Exec(`DROP TRIGGER source_run_attachment_retry_completed;
+ DROP TRIGGER source_run_attachment_retry_immutable;
+ ALTER TABLE source_run_attachment_retries DROP COLUMN finalize;
+ CREATE TRIGGER source_run_attachment_retry_immutable BEFORE UPDATE ON source_run_attachment_retries
+ BEGIN SELECT RAISE(ABORT,'attachment retry source is immutable'); END;
+ UPDATE source_runs SET state='cancelled',error_code='attachment_retry_exhausted',revision=revision+1 WHERE uuid=?;
+ DELETE FROM native_migration_history WHERE version=1000137;
+ UPDATE schema_migrations SET version=1000136,dirty=0`, child.UUID)
+	require.NoError(t, err)
+	requests := albumJobRows(t, raw, "source_run_requests")
+	attempts := albumJobRows(t, raw, "source_run_attempts")
+	var needed *sqlite.MigrationNeededError
+	require.ErrorAs(t, f.db.Open(path), &needed)
+	require.NoError(t, f.db.RunAllMigrations())
+	require.NoError(t, f.db.Open(path))
+	after := f.find(t, child.UUID)
+	require.Equal(t, "queued", after.State)
+	require.Equal(t, "attachment_retry_archive", after.ErrorCode)
+	require.True(t, after.AttachmentRetryFinalize)
+	require.Equal(t, child.Pending, after.Pending)
+	require.Empty(t, after.Completed)
+	require.Equal(t, requests, albumJobRows(t, raw, "source_run_requests"))
+	require.Equal(t, attempts, albumJobRows(t, raw, "source_run_attempts"))
+	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
 }

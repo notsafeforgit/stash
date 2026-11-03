@@ -114,6 +114,11 @@ FROM source_collection_revisions WHERE collection_uuid=? AND revision=?`, row.UU
 	if err := dbWrapper.Get(ctx, &r.AttachmentRetry, "SELECT EXISTS(SELECT 1 FROM source_run_attachment_retries WHERE run_uuid=?)", r.UUID); err != nil {
 		return nil, err
 	}
+	if r.AttachmentRetry {
+		if err := dbWrapper.Get(ctx, &r.AttachmentRetryFinalize, "SELECT finalize FROM source_run_attachment_retries WHERE run_uuid=?", r.UUID); err != nil {
+			return nil, err
+		}
+	}
 	if err := resolveSourceRunConsolidation(ctx, r); err != nil {
 		return nil, err
 	}

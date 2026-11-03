@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/scrape"
 )
@@ -20,15 +21,41 @@ func attachmentRetryFailure(code string) bool {
 	return code == "source_download_failed" || code == "not_found"
 }
 
-// This limit belongs to a focused missing-file recovery, never a profile or a
-// failed local worker. Keep its failed receipts and unfinished coverage intact.
-func (s *SourceRunStore) retireExpiredAttachmentRetry(ctx context.Context, run *models.SourceRun, now time.Time) (bool, error) {
-	if !run.AttachmentRetry || !attachmentRetryFailure(run.ErrorCode) || now.Before(run.CreatedAt.Add(attachmentRetryLifetime)) {
-		return false, nil
+// At expiry, the remaining work is a durable local archive write. Its lease
+// survives crashes, but cannot authorize another attempt to fetch the post.
+func (s *SourceRunStore) prepareAttachmentRetryFinalization(ctx context.Context, run *models.SourceRun, now time.Time) error {
+	if !run.AttachmentRetry || run.AttachmentRetryFinalize || !attachmentRetryFailure(run.ErrorCode) || now.Before(run.CreatedAt.Add(attachmentRetryLifetime)) {
+		return nil
 	}
-	_, err := dbWrapper.Exec(ctx, `UPDATE source_runs SET state='cancelled',error_code='attachment_retry_exhausted',
- revision=revision+1,updated_at_ms=? WHERE uuid=? AND state='queued' AND revision=?`, now.UnixMilli(), run.UUID, run.Revision)
-	return err == nil, err
+	_, err := dbWrapper.Exec(ctx, "UPDATE source_run_attachment_retries SET finalize=1 WHERE run_uuid=?", run.UUID)
+	run.AttachmentRetryFinalize = err == nil
+	return err
+}
+
+// Only an owned retry claim receives the original retained source, so its
+// archive path can be resolved without fetching the post again. List responses
+// and subsequent renewals do not duplicate that payload.
+func attachmentRetryFinalizationSource(ctx context.Context, run *models.SourceRun) error {
+	if run == nil || !run.AttachmentRetry {
+		return nil
+	}
+	var captureID string
+	err := dbWrapper.Get(ctx, &captureID, `SELECT receipt.capture_uuid FROM source_run_attachment_retries retry
+ JOIN source_attachment_downloads d ON d.producer_uuid=retry.producer_uuid AND d.event_uuid=retry.event_uuid
+ JOIN ingest_receipts receipt ON receipt.producer_uuid=d.producer_uuid AND receipt.event_uuid=d.capture_event_uuid
+ WHERE retry.run_uuid=?`, run.UUID)
+	if err != nil {
+		return err
+	}
+	capture, err := (&SourceEvidenceStore{}).FindCapture(ctx, captureID)
+	if err != nil {
+		return err
+	}
+	if capture == nil {
+		return models.ErrSourcePayloadCorrupt
+	}
+	run.AttachmentRetrySource, err = archive.RestoreCapture(capture.Payload)
+	return err
 }
 
 // An ordinary listing must not be held open by a missing file. Its failed

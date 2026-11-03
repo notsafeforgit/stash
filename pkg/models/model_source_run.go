@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -33,39 +34,41 @@ type SourceRunRequest struct {
 }
 
 type SourceRun struct {
-	SubscriptionRevision  int                `json:"subscription_revision,omitempty"`
-	AttachmentRetry       bool               `json:"attachment_retry,omitempty"`
-	ConsolidatedInto      string             `json:"consolidated_into,omitempty"`
-	RetrievalURL          string             `json:"retrieval_url,omitempty"`
-	Sequence              int64              `json:"sequence"`
-	UUID                  string             `json:"uuid"`
-	CollectionUUID        string             `json:"collection_uuid"`
-	CollectionRevision    int                `json:"collection_revision"`
-	TargetURL             string             `json:"target_url"`
-	PathPrefix            string             `json:"path_prefix"`
-	RootUUID              *string            `json:"root_uuid"`
-	RootRevision          int                `json:"root_revision"`
-	Operation             string             `json:"operation"`
-	PolicySHA256          string             `json:"policy_sha256"`
-	ExecutionPolicySHA256 string             `json:"execution_policy_sha256"`
-	CooldownSeconds       int                `json:"cooldown_seconds"`
-	State                 string             `json:"state"`
-	Revision              int64              `json:"revision"`
-	Fence                 int64              `json:"fence"`
-	Failures              int                `json:"failures"`
-	Pending               []SourceWindow     `json:"pending"`
-	Completed             []SourceWindow     `json:"completed"`
-	Window                *SourceWindow      `json:"window"`
-	ProducerUUID          string             `json:"producer_uuid,omitempty"`
-	OwnerUUID             string             `json:"owner_uuid,omitempty"`
-	LeaseUntil            *time.Time         `json:"lease_until,omitempty"`
-	TurnUntil             *time.Time         `json:"turn_until,omitempty"`
-	AvailableAt           time.Time          `json:"available_at"`
-	Progress              SourceRunProgress  `json:"progress"`
-	Recovery              *SourceRunRecovery `json:"recovery,omitempty"`
-	ErrorCode             string             `json:"error_code"`
-	CreatedAt             time.Time          `json:"created_at"`
-	UpdatedAt             time.Time          `json:"updated_at"`
+	SubscriptionRevision    int                `json:"subscription_revision,omitempty"`
+	AttachmentRetry         bool               `json:"attachment_retry,omitempty"`
+	AttachmentRetryFinalize bool               `json:"attachment_retry_finalize,omitempty"`
+	AttachmentRetrySource   json.RawMessage    `json:"attachment_retry_source,omitempty"`
+	ConsolidatedInto        string             `json:"consolidated_into,omitempty"`
+	RetrievalURL            string             `json:"retrieval_url,omitempty"`
+	Sequence                int64              `json:"sequence"`
+	UUID                    string             `json:"uuid"`
+	CollectionUUID          string             `json:"collection_uuid"`
+	CollectionRevision      int                `json:"collection_revision"`
+	TargetURL               string             `json:"target_url"`
+	PathPrefix              string             `json:"path_prefix"`
+	RootUUID                *string            `json:"root_uuid"`
+	RootRevision            int                `json:"root_revision"`
+	Operation               string             `json:"operation"`
+	PolicySHA256            string             `json:"policy_sha256"`
+	ExecutionPolicySHA256   string             `json:"execution_policy_sha256"`
+	CooldownSeconds         int                `json:"cooldown_seconds"`
+	State                   string             `json:"state"`
+	Revision                int64              `json:"revision"`
+	Fence                   int64              `json:"fence"`
+	Failures                int                `json:"failures"`
+	Pending                 []SourceWindow     `json:"pending"`
+	Completed               []SourceWindow     `json:"completed"`
+	Window                  *SourceWindow      `json:"window"`
+	ProducerUUID            string             `json:"producer_uuid,omitempty"`
+	OwnerUUID               string             `json:"owner_uuid,omitempty"`
+	LeaseUntil              *time.Time         `json:"lease_until,omitempty"`
+	TurnUntil               *time.Time         `json:"turn_until,omitempty"`
+	AvailableAt             time.Time          `json:"available_at"`
+	Progress                SourceRunProgress  `json:"progress"`
+	Recovery                *SourceRunRecovery `json:"recovery,omitempty"`
+	ErrorCode               string             `json:"error_code"`
+	CreatedAt               time.Time          `json:"created_at"`
+	UpdatedAt               time.Time          `json:"updated_at"`
 }
 
 // Recovery comes from a reviewed journal activation, never from a worker's

@@ -14,9 +14,10 @@ import (
 
 func removeSourceRunConsolidationSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
-	_, err := raw.Exec(`DROP TABLE IF EXISTS source_run_attachment_retries;
+	_, err := raw.Exec(`DROP TRIGGER IF EXISTS source_run_attachment_retry_completed;
+ DROP TABLE IF EXISTS source_run_attachment_retries;
  DROP TABLE IF EXISTS source_run_consolidations;
- DELETE FROM native_migration_history WHERE version IN (1000135,1000136);`)
+ DELETE FROM native_migration_history WHERE version IN (1000135,1000136,1000137);`)
 	require.NoError(t, err)
 }
 

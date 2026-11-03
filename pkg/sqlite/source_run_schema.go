@@ -9,6 +9,16 @@ import (
 )
 
 func validateSourceRunSchema(conn *sqlx.DB, version uint, auditData bool) error {
+	if version >= NativeSchemaBaseline+137 {
+		var ready bool
+		if err := conn.Get(&ready, `SELECT EXISTS(SELECT 1 FROM pragma_table_info('source_run_attachment_retries') WHERE name='finalize')
+ AND EXISTS(SELECT 1 FROM sqlite_schema WHERE name='source_run_attachment_retry_completed')`); err != nil {
+			return err
+		}
+		if !ready {
+			return errors.New("native database is missing attachment retry archive completion")
+		}
+	}
 	if version >= NativeSchemaBaseline+136 {
 		for _, name := range []string{"source_run_attachment_retries", "source_run_attachment_retry_valid", "source_run_attachment_retry_immutable", "source_run_attachment_retry_retained"} {
 			var exists bool

@@ -32,8 +32,9 @@ Reviewed `stash-gallery-worker-v1` profiles have a `scan_mode`:
   under one profile subscription. Search is queued independently even when the
   profile listing is hidden or unavailable. Ordered
   listings stop after the first wholly archived, unpinned post. Every attachment
-  and external child of that post is processed before deciding; the successful
-  download archive must already contain every item. Dates alone, deleted items,
+  and external child of that post is processed before deciding. Existing file
+  archive entries or a committed execution-v3 Reddit post-completion entry establish
+  completion. Dates alone, unfinalized missing items,
   empty/unsupported children and partial albums do not establish that boundary.
   Replayed checkpoint posts cannot end the run before unfinished work resumes.
   Instagram's posts/photos feed uses the same complete-post boundary, including
@@ -99,18 +100,24 @@ run with a reviewed execution-policy upgrade can then absorb the request without
 changing its original policy identity. Admission receipts and backup verification
 retain the original request digest and the policy upgrade that justified reuse.
 
-With `source_run_attachment_retry_protocol: 1`, a failed individual Reddit file
+With `source_run_attachment_retry_protocol: 2`, a failed individual Reddit file
 can create a separate focused post retry. Admission requires that producer's exact
 failed `attachment.download` receipt, matching collection revision, subscription,
 and original window; it returns HTTP 425 while the receipt is still in delivery.
-The parent advances only after the focused request is durably queued. The failure
-and missing file remain visible, and no successful download-archive entry is made.
+The parent advances only after the focused request is durably queued. Actual
+failure history remains truthful; no absent file gets a successful file receipt.
 A focused retry cannot recursively delegate its own failure.
 Focused retries have a 48-hour recovery window from admission. A failed transfer
 or missing post is checked again the next day; after that window, automatic
-recovery closes as `cancelled` with `attachment_retry_exhausted`. Original failure
-reports and unfinished coverage remain retained; the missing file is never
-reported as downloaded. Authentication, rate limits and local worker failures do
+recovery becomes a local archive-finalization claim (`attachment_retry_finalize`).
+The owned claim includes `attachment_retry_source` from the original capture, so
+the worker can resolve the configured archive without another website request.
+It commits `stash:completed:reddit:<id>` to that archive before finishing the run
+as processed. The native adapter honors this post marker on subsequent crawls.
+Individual file archive keys and completed-file counters still represent actual
+downloads. Schema 1000137 retires the retry-only link when its run is terminal;
+it preserves normal request/attempt history. A failed local archive write remains
+retryable and cannot re-enable website fetching. Authentication, rate limits and local worker failures do
 not establish that a file is permanently unavailable. The focused job's retry
 delay does not hold up other passes for the same account.
 
@@ -130,11 +137,12 @@ history, checkpoints and existing explicit holds. Routine request priority and
 shared service budgets continue to apply during retries.
 
 An explicit Redgifs item deletion (HTTP 404/410 with the provider's deletion
-message) is handled individually. Its parent post and a failed source-transfer
-report remain recorded; it is never entered into the successful download archive.
+message) is handled individually. Execution v3 records whole-post completion in
+the downloader archive only after all members finish processing. It creates no
+new permanent missing-file ledger or fictitious completed-file receipt.
 Reddit's available fallback can still download, and the remaining posts continue.
-Outbox schema 18 caches that specific deleted item for 30 days, across restarts,
-without extending the expiry on cache hits. Generic 404s, authentication errors,
+Temporary observations are removed after the post marker commits and caches older
+than 48 hours are pruned when a Reddit worker starts. Generic 404s, authentication errors,
 rate limits, server failures and timeouts are not treated as confirmed deletions.
 
 ## Remote pagination

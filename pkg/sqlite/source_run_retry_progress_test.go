@@ -1,6 +1,7 @@
 package sqlite_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -8,6 +9,72 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSourceRunReviewDrainedOutboxPreservesCrawlAndSharedPacing(t *testing.T) {
+	f := newSourceRunFixture(t)
+	run := f.claim(t, f.submit(t, f.request()))
+	progress := models.SourceRunProgress{ItemsSeen: 9000, FilesCompleted: 18, Cursor: "page-93"}
+	_, err := f.coordinator.Progress(t.Context(), f.token, run.Lease(), progress)
+	require.NoError(t, err)
+	run, err = f.coordinator.Finish(t.Context(), f.token, run.Lease(), models.SourceRunOutcome{State: "retry", ErrorCode: "outbox_capacity"})
+	require.NoError(t, err)
+	require.True(t, run.AvailableAt.After(f.now))
+	require.Zero(t, run.Failures, "local queue capacity must not consume website retries")
+	require.Equal(t, 30*time.Second, run.AvailableAt.Sub(f.now))
+	attempts, err := f.coordinator.Attempts(t.Context(), f.token, run.UUID, 0)
+	require.NoError(t, err)
+	raw := openRawDB(t, f.db.DatabasePath())
+	defer raw.Close()
+	blockedUntil := f.now.Add(time.Minute)
+	_, err = raw.Exec("UPDATE source_pacing SET available_at_ms=? WHERE scope='service:reddit'", blockedUntil.UnixMilli())
+	require.NoError(t, err)
+	review := func(revision int64) (*models.SourceRun, error) {
+		var result *models.SourceRun
+		err := f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+			var err error
+			result, err = f.repo.SourceRun.Review(ctx, run.UUID, revision, "retry", f.now)
+			return err
+		})
+		return result, err
+	}
+	_, err = review(run.Revision - 1)
+	require.ErrorIs(t, err, models.ErrSourceRunConflict)
+	ready, err := review(run.Revision)
+	require.NoError(t, err)
+	require.Equal(t, f.now, ready.AvailableAt)
+	require.Equal(t, run.Pending, ready.Pending)
+	require.Equal(t, run.Completed, ready.Completed)
+	require.Equal(t, progress, ready.Progress)
+	require.Equal(t, run.Fence, ready.Fence)
+	require.Zero(t, ready.Failures)
+	require.Empty(t, ready.ErrorCode)
+	remaining, err := f.coordinator.Attempts(t.Context(), f.token, run.UUID, 0)
+	require.NoError(t, err)
+	require.Equal(t, attempts, remaining)
+	require.EqualValues(t, 1, queryUint(t, raw, "SELECT count(*) FROM source_run_reviews WHERE action='retry'"))
+	require.Nil(t, f.claim(t, ready), "clearing a local capacity delay must not bypass shared site pacing")
+	f.now = blockedUntil
+	active := f.claim(t, ready)
+	require.NotNil(t, active)
+	require.Equal(t, progress, active.Progress)
+}
+
+func TestSourceRunReviewCannotBypassWebsiteRetryDelays(t *testing.T) {
+	for _, code := range []string{"rate_limited", "not_found", "access_denied", "network_unreachable"} {
+		t.Run(code, func(t *testing.T) {
+			f := newSourceRunFixture(t)
+			run := f.claim(t, f.submit(t, f.request()))
+			run, err := f.coordinator.Finish(t.Context(), f.token, run.Lease(), models.SourceRunOutcome{State: "retry", ErrorCode: code})
+			require.NoError(t, err)
+			err = f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+				_, err := f.repo.SourceRun.Review(ctx, run.UUID, run.Revision, "retry", f.now)
+				return err
+			})
+			require.ErrorIs(t, err, models.ErrSourceRunConflict)
+			require.Equal(t, run, f.find(t, run.UUID))
+		})
+	}
+}
 
 func TestSourceRunNewScheduledWindowFinishesInterruptedCrawlFirst(t *testing.T) {
 	f := newSourceRunFixture(t)

@@ -391,9 +391,10 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 			// The shared HTTP budget owns retry timing; retain progress without
 			// adding a second account delay or consuming a failure allowance.
 			delay = 0
-		case outcome.State == "expired" || outcome.ErrorCode == "worker_interrupted" || outcome.ErrorCode == "worker_publication_busy":
+		case outcome.State == "expired" || outcome.ErrorCode == "worker_interrupted" || outcome.ErrorCode == "worker_publication_busy" || outcome.ErrorCode == "outbox_capacity":
 			// Restarts and local backup/dedupe contention preserve progress and
-			// do not exhaust the source's retry budget.
+			// do not exhaust the source's retry budget. A full delivery queue
+			// likewise needs time to drain, not an escalating website delay.
 			delay = max(delay, 30*time.Second)
 		case accessRecheck:
 			delay = max(delay, 24*time.Hour, time.Duration(outcome.RetryAfterSeconds)*time.Second)
@@ -498,13 +499,28 @@ func (s *SourceRunStore) Review(ctx context.Context, id string, revision int64, 
 		return nil, models.ErrSourceRunConflict
 	}
 	if action == "retry" {
-		if r.State != "deferred" {
+		// A drained local outbox can be retried without waiting out yesterday's
+		// capacity failure. Website retry delays still require their normal wait.
+		capacityRetry := r.State == "queued" && r.ErrorCode == "outbox_capacity"
+		if r.State != "deferred" && !capacityRetry {
 			return nil, models.ErrSourceRunConflict
 		}
 		if _, _, err := sourceRunDefinition(ctx, r); err != nil {
 			return nil, err
 		}
-		_, err = dbWrapper.Exec(ctx, "UPDATE source_runs SET state='queued',failures=0,error_code='',revision=revision+1,updated_at_ms=? WHERE uuid=?", now.UnixMilli(), id)
+		available := r.AvailableAt
+		if capacityRetry {
+			available = now
+		}
+		_, err = dbWrapper.Exec(ctx, "UPDATE source_runs SET state='queued',failures=0,error_code='',available_at_ms=?,revision=revision+1,updated_at_ms=? WHERE uuid=?", available.UnixMilli(), now.UnixMilli(), id)
+		if err == nil && capacityRetry {
+			// Finish also held this target until the capacity retry. Release only
+			// that exact delay, retaining any other run's later target restriction.
+			_, err = dbWrapper.Exec(ctx, `UPDATE source_run_cooldowns SET available_at_ms=?
+ WHERE target_key=(SELECT target_key FROM source_runs WHERE uuid=?) AND available_at_ms=?
+ AND NOT EXISTS(SELECT 1 FROM source_runs r WHERE r.target_key=source_run_cooldowns.target_key
+ AND r.uuid!=? AND r.state IN ('queued','deferred','running') AND r.available_at_ms>?)`, now.UnixMilli(), id, r.AvailableAt.UnixMilli(), id, now.UnixMilli())
+		}
 	} else {
 		if r.Window != nil {
 			r.Pending = scrape.Union(r.Pending, []models.SourceWindow{*r.Window})

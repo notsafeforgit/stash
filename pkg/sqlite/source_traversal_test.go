@@ -2,6 +2,7 @@ package sqlite_test
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -100,6 +101,10 @@ func TestSourceTraversalCannotSupplyPublishedBackfillCoverage(t *testing.T) {
 func TestSourceTraversalMigrationPreservesExistingPublishedRuns(t *testing.T) {
 	f := newSourceRunFixture(t)
 	old := f.finish(t, f.claim(t, f.submit(t, f.request())), "succeeded")
+	request := f.request()
+	request.PolicySHA256 = strings.Repeat("b", 64)
+	queued := f.submit(t, request)
+	require.NotEqual(t, old.UUID, queued.UUID)
 	path := f.db.DatabasePath()
 	require.NoError(t, f.db.Close())
 	raw := openRawDB(t, path)
@@ -122,7 +127,10 @@ func TestSourceTraversalMigrationPreservesExistingPublishedRuns(t *testing.T) {
 		`[{"since":"2026-09-01T00:00:00Z","until":"2026-10-01T00:00:00Z","basis":"traversal"}]`,
 		`[{"since":null,"until":"2026-10-01T00:00:00Z"},{"since":null,"until":"2026-10-01T00:00:00Z","basis":"traversal"}]`,
 	} {
-		_, err := raw.Exec("UPDATE source_runs SET completed=? WHERE uuid=?", completed, old.UUID)
+		// Test the coverage guard with an otherwise valid transition. A
+		// terminal row or unchanged revision independently rejects this write;
+		// SQLite does not promise which BEFORE trigger runs first.
+		_, err := raw.Exec("UPDATE source_runs SET completed=?,revision=revision+1 WHERE uuid=?", completed, queued.UUID)
 		require.ErrorContains(t, err, "coverage bas")
 	}
 	require.Equal(t, beforeRuns, albumJobRows(t, raw, "source_runs"))

@@ -245,11 +245,7 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 		attachmentID = attachment.UUID
 		history, err := service.Repo.SourceAttachment.DownloadHistory(ctx, attachment.UUID, 0, 10, time.Now())
 		require.NoError(t, err)
-		if adapter == "restart" {
-			require.GreaterOrEqual(t, len(history), 2)
-		} else {
-			require.Len(t, history, 2)
-		}
+		require.Len(t, history, 2, "restarting an archived post preserves the original transfer without another report")
 		startedCaptures := map[string]bool{}
 		for _, report := range history {
 			if report.State == "started" {
@@ -266,11 +262,7 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 			require.Equal(t, expected, report.TransferState)
 			require.Equal(t, "queued", report.VerificationState)
 		}
-		if adapter == "restart" {
-			require.Equal(t, 1, localCompletions, "restart reuses the completed local file without another transfer")
-		} else {
-			require.Zero(t, localCompletions)
-		}
+		require.Zero(t, localCompletions, "the post archive avoids redundant local-file completion reports on restart")
 		for event, state := range map[string]string{result.Started: "started", result.Downloaded: "downloaded"} {
 			receipt, err := service.Repo.Ingest.FindReceipt(ctx, producer.UUID, event)
 			require.NoError(t, err)

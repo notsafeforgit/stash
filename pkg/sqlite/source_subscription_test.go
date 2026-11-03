@@ -146,6 +146,7 @@ func TestSourceSubscriptionAdoptsExistingSchedulerRunWithoutChangingProgress(t *
 	}
 	require.ErrorIs(t, bind(run.Revision+1), models.ErrSourceDefinitionConflict)
 	require.NoError(t, bind(run.Revision))
+	run.SubscriptionRevision = 1
 	require.Equal(t, run, f.find(t, run.UUID), "adopting a queued run preserves its original admission and progress")
 	setSubscription(t, f.repo, f.collection.UUID, 1, false)
 	require.Equal(t, "cancelled", f.find(t, run.UUID).State)

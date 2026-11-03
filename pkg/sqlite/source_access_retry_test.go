@@ -14,6 +14,10 @@ func TestSourceAccessRechecksKeepProgressBeyondRetryLimit(t *testing.T) {
 	for _, code := range []string{"not_found", "access_denied"} {
 		t.Run(code, func(t *testing.T) {
 			f := newSourceRunFixture(t)
+			delay := 24 * time.Hour
+			if code == "not_found" {
+				delay *= 30
+			}
 			input := f.request()
 			run := f.submit(t, input)
 			progress := models.SourceRunProgress{ItemsSeen: 12, FilesCompleted: 3, Cursor: "retained-item"}
@@ -34,15 +38,15 @@ func TestSourceAccessRechecksKeepProgressBeyondRetryLimit(t *testing.T) {
 				require.Equal(t, []models.SourceWindow{input.Window}, run.Pending)
 				require.Empty(t, run.Completed)
 				require.Equal(t, progress, run.Progress)
-				require.Equal(t, f.now.Add(24*time.Hour), run.AvailableAt)
+				require.Equal(t, f.now.Add(delay), run.AvailableAt)
 				input.RequestUUID = uuid.NewString()
-				require.Equal(t, run.AvailableAt, f.submit(t, input).AvailableAt, "scheduled submissions cannot reset the daily wait")
+				require.Equal(t, run.AvailableAt, f.submit(t, input).AvailableAt, "scheduled submissions cannot reset the recheck wait")
 				f.now = run.AvailableAt.Add(-time.Millisecond)
 				require.Nil(t, f.claim(t, run))
 				f.now = run.AvailableAt
 			}
 			active := f.claim(t, run)
-			require.NotNil(t, active, "a returning account remains eligible after ten days")
+			require.NotNil(t, active, "a returning account remains eligible after ten rechecks")
 			run = f.finish(t, active, "succeeded")
 			require.Equal(t, "succeeded", run.State)
 			require.Equal(t, []models.SourceWindow{input.Window}, run.Completed)
@@ -62,7 +66,7 @@ func TestSourceAccessRecheckDoesNotBlockRedditSearch(t *testing.T) {
 	require.NotNil(t, profile)
 	profile, err := f.coordinator.Finish(t.Context(), f.token, profile.Lease(), models.SourceRunOutcome{State: "retry", ErrorCode: "not_found", RetryAfterSeconds: 2 * 86400})
 	require.NoError(t, err)
-	require.Equal(t, f.now.Add(48*time.Hour), profile.AvailableAt, "longer source retry delays are retained")
+	require.Equal(t, f.now.Add(30*24*time.Hour), profile.AvailableAt, "a shorter source delay cannot override the monthly recheck")
 	input.RequestUUID = uuid.NewString()
 	input.RetrievalURL = "https://www.reddit.com/search?q=author%3Aexample+nsfw%3Ayes&include_over_18=on&sort=new&t=all"
 	search := f.submit(t, input)

@@ -149,6 +149,27 @@ func TestSourceRunHTTPScopedOwnershipAndLateEvidence(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &run))
 	require.Equal(t, upgrade.PolicySHA256, run.ExecutionPolicySHA256)
 	require.Equal(t, input.PolicySHA256, run.PolicySHA256)
+	compatible := input
+	compatible.RequestUUID, compatible.PolicySHA256 = uuid.NewString(), upgrade.PolicySHA256
+	w = request(handler, http.MethodPost, ingestPath+"/runs", token, compatible)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var duplicate models.SourceRun
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &duplicate))
+	require.NotEqual(t, run.UUID, duplicate.UUID)
+	consolidation := models.SourceRunConsolidationInput{RequestUUID: uuid.NewString(), SourceUUID: duplicate.UUID, TargetUUID: run.UUID,
+		SourceRevision: duplicate.Revision, TargetRevision: run.Revision, Reason: "Combine reviewed compatible attempts"}
+	require.Equal(t, http.StatusNotFound, request(handler, http.MethodPost, ingestPath+"/run-consolidations", token, consolidation).Code)
+	w = request(admin, http.MethodPost, "/api/v3/ingest-admin/run-consolidations", "", consolidation)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	consolidationReceipt := w.Body.String()
+	w = request(admin, http.MethodPost, "/api/v3/ingest-admin/run-consolidations", "", consolidation)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.JSONEq(t, consolidationReceipt, w.Body.String())
+	w = request(handler, http.MethodGet, ingestPath+"/runs/"+duplicate.UUID, token, nil)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), `"consolidated_into":"`+run.UUID+`"`)
+	w = request(handler, http.MethodGet, ingestPath+"/runs/"+run.UUID, token, nil)
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &run))
 	metadataUpgrade := models.WorkerPolicyUpgradeInput{RequestUUID: uuid.NewString(), Kind: models.ArchiveJobEnrichPost,
 		OriginalPolicySHA256: strings.Repeat("a", 64), ExpectedPolicySHA256: strings.Repeat("a", 64),
 		PolicySHA256: strings.Repeat("b", 64), Reason: "Compatible metadata adapter repair"}

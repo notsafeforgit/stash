@@ -71,7 +71,7 @@ func (s *SourceRunStore) UpgradePolicy(ctx context.Context, input models.SourceR
 	if err != nil {
 		return nil, err
 	}
-	if run == nil || run.Revision != input.ExpectedRevision || run.ExecutionPolicySHA256 != input.ExpectedPolicySHA256 ||
+	if run == nil || run.ConsolidatedInto != "" || run.Revision != input.ExpectedRevision || run.ExecutionPolicySHA256 != input.ExpectedPolicySHA256 ||
 		(run.State != "queued" && run.State != "deferred") || now.Before(run.UpdatedAt) {
 		return nil, models.ErrSourceRunConflict
 	}

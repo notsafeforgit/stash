@@ -19,18 +19,23 @@ type SourceWindow struct {
 // PolicySHA256 identifies the effective, secret-free worker configuration and
 // adapter version. It never contains executable commands or website logins.
 type SourceRunRequest struct {
-	SubscriptionRevision int          `json:"subscription_revision,omitempty"`
-	RetrievalURL         string       `json:"retrieval_url,omitempty"`
-	RequestUUID          string       `json:"request_uuid"`
-	CollectionUUID       string       `json:"collection_uuid"`
-	CollectionRevision   int          `json:"collection_revision"`
-	Operation            string       `json:"operation"` // download or enrich
-	PolicySHA256         string       `json:"policy_sha256"`
-	Window               SourceWindow `json:"window"`
-	CooldownSeconds      int          `json:"cooldown_seconds"`
+	AttachmentRetryEventUUID string       `json:"attachment_retry_event_uuid,omitempty"`
+	ReuseCompatiblePolicy    bool         `json:"reuse_compatible_policy,omitempty"`
+	SubscriptionRevision     int          `json:"subscription_revision,omitempty"`
+	RetrievalURL             string       `json:"retrieval_url,omitempty"`
+	RequestUUID              string       `json:"request_uuid"`
+	CollectionUUID           string       `json:"collection_uuid"`
+	CollectionRevision       int          `json:"collection_revision"`
+	Operation                string       `json:"operation"` // download or enrich
+	PolicySHA256             string       `json:"policy_sha256"`
+	Window                   SourceWindow `json:"window"`
+	CooldownSeconds          int          `json:"cooldown_seconds"`
 }
 
 type SourceRun struct {
+	SubscriptionRevision  int                `json:"subscription_revision,omitempty"`
+	AttachmentRetry       bool               `json:"attachment_retry,omitempty"`
+	ConsolidatedInto      string             `json:"consolidated_into,omitempty"`
 	RetrievalURL          string             `json:"retrieval_url,omitempty"`
 	Sequence              int64              `json:"sequence"`
 	UUID                  string             `json:"uuid"`
@@ -142,11 +147,29 @@ type SourceRunOutcome struct {
 	ErrorScope        string `json:"error_scope,omitempty"`
 }
 
+// Consolidation preserves both original runs and request receipts. Only their
+// remaining execution is combined, after an application-authenticated review.
+type SourceRunConsolidationInput struct {
+	RequestUUID    string `json:"request_uuid"`
+	SourceUUID     string `json:"source_uuid"`
+	TargetUUID     string `json:"target_uuid"`
+	SourceRevision int64  `json:"source_revision"`
+	TargetRevision int64  `json:"target_revision"`
+	Reason         string `json:"reason"`
+}
+
+type SourceRunConsolidation struct {
+	SourceRunConsolidationInput
+	PolicySHA256 string    `json:"policy_sha256"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
 var (
-	ErrSourceRunInvalid  = errors.New("invalid source run request")
-	ErrSourceRunConflict = errors.New("source run or request changed")
-	ErrSourceRunLease    = errors.New("source run lease expired or is no longer owned")
-	ErrSourceRunCapacity = errors.New("source run queue or window capacity reached")
+	ErrSourceRunDependency = errors.New("source run is awaiting its attachment failure receipt")
+	ErrSourceRunInvalid    = errors.New("invalid source run request")
+	ErrSourceRunConflict   = errors.New("source run or request changed")
+	ErrSourceRunLease      = errors.New("source run lease expired or is no longer owned")
+	ErrSourceRunCapacity   = errors.New("source run queue or window capacity reached")
 )
 
 // The caller owns a managed transaction and the server clock. Claim validates
@@ -171,5 +194,6 @@ type SourceRunReaderWriter interface {
 	Review(context.Context, string, int64, string, time.Time) (*SourceRun, error) // retry or cancel
 	UpgradePolicy(context.Context, SourceRunPolicyUpgradeInput, time.Time) (*SourceRunPolicyUpgrade, error)
 	PolicyUpgrade(context.Context, string) (*SourceRunPolicyUpgrade, error)
+	Consolidate(context.Context, SourceRunConsolidationInput, time.Time) (*SourceRunConsolidation, error)
 	Recover(context.Context, time.Time, int) (int, error)
 }

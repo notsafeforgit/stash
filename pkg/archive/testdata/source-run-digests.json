@@ -180,5 +180,41 @@
       "retrieval_url": "https://www.reddit.com/user/example/submitted/?sort=top&t=year"
     },
     "native_sha256": "71a47595822d2cae5307f2fd29eb458a33f2edc538c268d3578ef64f8602bbb3"
+  },
+  {
+    "name": "compatible_policy_admission",
+    "input": {
+      "request_uuid": "33333333-3333-4333-8333-333333333333",
+      "collection_uuid": "22222222-2222-4222-8222-222222222222",
+      "collection_revision": 7,
+      "operation": "download",
+      "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "window": {
+        "since": null,
+        "until": "2026-10-01T00:00:00Z"
+      },
+      "cooldown_seconds": 30,
+      "reuse_compatible_policy": true
+    },
+    "native_sha256": "7b6ca31fcde25fa1a115df2d3ce21562135dc15f392eb74bb08580a623dc7337"
+  },
+  {
+    "name": "focused_attachment_retry",
+    "input": {
+      "request_uuid": "33333333-3333-4333-8333-333333333333",
+      "collection_uuid": "22222222-2222-4222-8222-222222222222",
+      "collection_revision": 7,
+      "operation": "download",
+      "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "window": {
+        "since": null,
+        "until": "2026-10-01T00:00:00Z"
+      },
+      "cooldown_seconds": 30,
+      "reuse_compatible_policy": true,
+      "attachment_retry_event_uuid": "44444444-4444-4444-8444-444444444444",
+      "retrieval_url": "https://www.reddit.com/comments/abc123/"
+    },
+    "native_sha256": "44ccd506b077fb203a1a2482f4e943d164b90fa9fbee87a5a445d51a8c577d0d"
   }
 ]

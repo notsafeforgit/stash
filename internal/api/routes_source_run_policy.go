@@ -46,3 +46,22 @@ func (rs *ingestRoutes) sourceRunPolicyUpgrade(w http.ResponseWriter, r *http.Re
 	}
 	ingestJSON(w, http.StatusOK, result)
 }
+
+func (rs *ingestRoutes) consolidateSourceRuns(w http.ResponseWriter, r *http.Request) {
+	var input models.SourceRunConsolidationInput
+	if err := readIngestJSON(w, r, 4096, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	var result *models.SourceRunConsolidation
+	err := rs.service.Repo.WithTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		result, err = rs.service.Repo.SourceRun.Consolidate(ctx, input, time.Now())
+		return err
+	})
+	if err != nil {
+		ingestError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, result)
+}

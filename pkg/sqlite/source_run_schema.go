@@ -9,6 +9,41 @@ import (
 )
 
 func validateSourceRunSchema(conn *sqlx.DB, version uint, auditData bool) error {
+	if version >= NativeSchemaBaseline+136 {
+		for _, name := range []string{"source_run_attachment_retries", "source_run_attachment_retry_valid", "source_run_attachment_retry_immutable", "source_run_attachment_retry_retained"} {
+			var exists bool
+			if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+				return err
+			}
+			if !exists {
+				return fmt.Errorf("native database schema is incomplete: missing %s", name)
+			}
+		}
+	}
+	if version >= NativeSchemaBaseline+135 {
+		for _, name := range []string{"source_run_consolidations", "source_run_consolidation_target", "source_run_consolidation_valid", "source_run_consolidation_immutable", "source_run_consolidation_retained"} {
+			var exists bool
+			if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+				return err
+			}
+			if !exists {
+				return fmt.Errorf("native database schema is incomplete: missing %s", name)
+			}
+		}
+		if auditData {
+			var invalid bool
+			if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_run_consolidations c
+ LEFT JOIN source_runs s ON s.uuid=c.source_uuid LEFT JOIN source_runs t ON t.uuid=c.target_uuid
+ WHERE s.uuid IS NULL OR t.uuid IS NULL OR s.state!='cancelled' OR s.revision<=c.source_revision
+ OR t.revision<=c.target_revision OR s.collection_uuid!=t.collection_uuid OR s.collection_revision!=t.collection_revision
+ OR s.operation!=t.operation OR s.root_uuid IS NOT t.root_uuid OR s.root_revision IS NOT t.root_revision)`); err != nil {
+				return err
+			}
+			if invalid {
+				return errors.New("native database has inconsistent source run consolidations")
+			}
+		}
+	}
 	if version >= NativeSchemaBaseline+116 {
 		var definition string
 		if err := conn.Get(&definition, "SELECT sql FROM sqlite_schema WHERE type='table' AND name='source_runs'"); err != nil {

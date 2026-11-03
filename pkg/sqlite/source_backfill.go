@@ -321,7 +321,8 @@ func proveBackfillCoverage(ctx context.Context, producer string, input models.Ba
 		if err != nil {
 			return err
 		}
-		if run == nil || run.RootUUID == nil || *run.RootUUID != input.RootUUID || run.Operation != "download" || run.PolicySHA256 != input.PolicySHA256 {
+		if run == nil || run.RootUUID == nil || *run.RootUUID != input.RootUUID || run.Operation != "download" ||
+			(run.PolicySHA256 != input.PolicySHA256 && (!request.ReuseCompatiblePolicy || request.PolicySHA256 != input.PolicySHA256)) {
 			return models.ErrBackfillConflict
 		}
 		if _, found := covered[run.TargetURL]; !found {

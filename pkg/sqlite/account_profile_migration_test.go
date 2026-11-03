@@ -20,6 +20,7 @@ import (
 // Reconstruct the actual prior receipt schema, not a relabelled current schema.
 func removeAccountProfileSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSourceRunConsolidationSchema(t, raw)
 	var exists bool
 	require.NoError(t, raw.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='source_account_profiles')").Scan(&exists))
 	if !exists {

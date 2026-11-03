@@ -53,22 +53,25 @@ type sourceRunRow struct {
 
 func (row sourceRunRow) resolve(ctx context.Context) (*models.SourceRun, error) {
 	var definition struct {
-		TargetURL       string `db:"target_url"`
-		RetrievalURL    string `db:"retrieval_url"`
-		PathPrefix      string `db:"path_prefix"`
-		ExecutionPolicy string `db:"execution_policy"`
+		SubscriptionRevision int    `db:"subscription_revision"`
+		TargetURL            string `db:"target_url"`
+		RetrievalURL         string `db:"retrieval_url"`
+		PathPrefix           string `db:"path_prefix"`
+		ExecutionPolicy      string `db:"execution_policy"`
 	}
 	if err := dbWrapper.Get(ctx, &definition, `SELECT target_url,path_prefix,
+coalesce((SELECT revision FROM source_run_subscriptions WHERE run_uuid=?),0) AS subscription_revision,
 coalesce((SELECT url FROM source_run_retrievals WHERE run_uuid=?),'') AS retrieval_url,
 coalesce((SELECT policy_sha256 FROM source_run_policy_upgrades WHERE run_uuid=? ORDER BY expected_revision DESC LIMIT 1),?) AS execution_policy
-FROM source_collection_revisions WHERE collection_uuid=? AND revision=?`, row.UUID, row.UUID, row.Policy, row.Collection, row.CollectionRevision); err != nil {
+FROM source_collection_revisions WHERE collection_uuid=? AND revision=?`, row.UUID, row.UUID, row.UUID, row.Policy, row.Collection, row.CollectionRevision); err != nil {
 		return nil, err
 	}
 	if definition.RetrievalURL != "" {
 		definition.TargetURL = definition.RetrievalURL
 	}
 	r := &models.SourceRun{RetrievalURL: definition.RetrievalURL, Sequence: row.Sequence, UUID: row.UUID, CollectionUUID: row.Collection, CollectionRevision: row.CollectionRevision,
-		TargetURL: definition.TargetURL, PathPrefix: definition.PathPrefix,
+		SubscriptionRevision: definition.SubscriptionRevision,
+		TargetURL:            definition.TargetURL, PathPrefix: definition.PathPrefix,
 		RootUUID: row.Root, RootRevision: int(row.RootRevision.Int64), Operation: row.Operation, PolicySHA256: row.Policy, CooldownSeconds: row.Cooldown,
 		ExecutionPolicySHA256: definition.ExecutionPolicy,
 		State:                 row.State, Revision: row.Revision, Fence: row.Fence, Failures: row.Failures, ProducerUUID: row.Producer.String, OwnerUUID: row.Owner.String,
@@ -107,6 +110,12 @@ FROM source_collection_revisions WHERE collection_uuid=? AND revision=?`, row.UU
 		if r.Window != nil && !scrape.SameWindow(*r.Window, activation.Window) {
 			r.Recovery.ReplayArchive = true
 		}
+	}
+	if err := dbWrapper.Get(ctx, &r.AttachmentRetry, "SELECT EXISTS(SELECT 1 FROM source_run_attachment_retries WHERE run_uuid=?)", r.UUID); err != nil {
+		return nil, err
+	}
+	if err := resolveSourceRunConsolidation(ctx, r); err != nil {
+		return nil, err
 	}
 	return r, nil
 }
@@ -207,11 +216,21 @@ func (s *SourceRunStore) Submit(ctx context.Context, producer string, input mode
 	if window.Until.After(now.Add(time.Minute)) {
 		return nil, models.ErrSourceRunInvalid
 	}
-	run, _, err := s.enqueue(ctx, input, now, maxActive)
+	if input.AttachmentRetryEventUUID != "" {
+		if err := validateSourceAttachmentRetry(ctx, producer, input); err != nil {
+			return nil, err
+		}
+	}
+	run, created, err := s.enqueue(ctx, input, now, maxActive)
 	if err != nil {
 		return nil, err
 	}
 	id := run.UUID
+	if input.AttachmentRetryEventUUID != "" && created {
+		if _, err := dbWrapper.Exec(ctx, "INSERT INTO source_run_attachment_retries(run_uuid,producer_uuid,event_uuid) VALUES(?,?,?)", id, producer, input.AttachmentRetryEventUUID); err != nil {
+			return nil, err
+		}
+	}
 	if _, err = dbWrapper.Exec(ctx, "INSERT INTO source_run_requests(producer_uuid,request_uuid,digest,run_uuid,created_at_ms) VALUES(?,?,?,?,?)", producer, input.RequestUUID, digest, id, now.UnixMilli()); err != nil {
 		return nil, err
 	}
@@ -233,7 +252,7 @@ func (s *SourceRunStore) enqueue(ctx context.Context, input models.SourceRunRequ
 	if err := profileAliasActive(ctx, c); err != nil {
 		return nil, false, err
 	}
-	if (input.RetrievalURL != "" && c.Namespace != "native:reddit") || !scrape.RetrievalURL(c.TargetURL, input.RetrievalURL) {
+	if (input.RetrievalURL != "" && c.Namespace != "native:reddit") || (input.AttachmentRetryEventUUID == "" && !scrape.RetrievalURL(c.TargetURL, input.RetrievalURL)) {
 		return nil, false, models.ErrSourceRunInvalid
 	}
 	var rootRevision any
@@ -273,6 +292,24 @@ func (s *SourceRunStore) enqueue(ctx context.Context, input models.SourceRunRequ
 	row, err := findSourceRun(ctx, "SELECT * FROM source_runs WHERE work_key=? AND state IN ('queued','running','deferred')", work)
 	if err != nil {
 		return nil, false, err
+	}
+	if row == nil && input.ReuseCompatiblePolicy {
+		// A reviewed compatible upgrade changes execution policy while retaining
+		// the original admission identity. New callers may opt into that work
+		// explicitly, instead of creating another job for every release.
+		row, err = findSourceRun(ctx, `SELECT r.* FROM source_runs r
+ WHERE r.collection_uuid=? AND r.collection_revision=? AND r.root_revision IS ? AND r.operation=?
+ AND r.cooldown_seconds=? AND r.state IN ('queued','running','deferred')
+ AND coalesce((SELECT policy_sha256 FROM source_run_policy_upgrades WHERE run_uuid=r.uuid ORDER BY expected_revision DESC LIMIT 1),r.policy_sha256)=?
+ AND coalesce((SELECT url FROM source_run_retrievals WHERE run_uuid=r.uuid),'')=?
+ AND coalesce((SELECT revision FROM source_run_subscriptions WHERE run_uuid=r.uuid),0)=?
+ AND coalesce(json_extract(coalesce(r.window,json_extract(r.pending,'$[0]')),'$.basis'),'')=?
+ ORDER BY CASE r.state WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END,r.id LIMIT 1`,
+			c.UUID, c.Revision, rootRevision, input.Operation, input.CooldownSeconds, input.PolicySHA256,
+			input.RetrievalURL, input.SubscriptionRevision, input.Window.Basis)
+		if err != nil {
+			return nil, false, err
+		}
 	}
 	created := row == nil
 	id := uuid.NewString()

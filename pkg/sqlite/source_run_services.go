@@ -98,7 +98,7 @@ func sourceRunPendingPacingReady(ctx context.Context, r *models.SourceRun, windo
 
 func validSourceServiceFailure(code string) bool {
 	switch code {
-	case "source_busy", "rate_limited", "timeout", "extraction_failed", "authentication", "access_denied", "challenge", "not_found":
+	case "source_busy", "rate_limited", "timeout", "extraction_failed", "authentication", "access_denied", "challenge", "not_found", "source_history_limit":
 		return true
 	}
 	return false

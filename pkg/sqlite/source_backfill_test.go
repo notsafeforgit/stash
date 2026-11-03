@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,6 +46,38 @@ func backfillStatus(t *testing.T, f *sourceRunFixture, account, component string
 		return err
 	}))
 	return state
+}
+
+func TestSourceBackfillCompatibleAdmissionUsesOriginalRequestProof(t *testing.T) {
+	f := newSourceRunFixture(t)
+	_, token, err := f.service.IssueCredential(t.Context(), f.producer.UUID, nil, nil, f.root.UUID)
+	require.NoError(t, err)
+	f.token = token
+	input := models.BackfillCompletion{UUID: uuid.NewString(), BackfillSubject: models.BackfillSubject{RootUUID: f.root.UUID, Platform: "reddit", Account: "retry_example"},
+		Component: "reddit-profile-new", Window: models.SourceWindow{Until: f.now}, PolicySHA256: strings.Repeat("b", 64)}
+	targets, err := scrape.BackfillTargets(input.BackfillSubject, input.Component)
+	require.NoError(t, err)
+	collection := putSourceCollection(t, f.repo, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
+		Label: "Backfill profile", Kind: "account", Namespace: "native:reddit", State: "active", TargetURL: scrape.RedditProfileURL(targets[0]), RootUUID: &f.root.UUID, PathPrefix: "Example"}})
+	request := f.request()
+	request.CollectionUUID, request.CollectionRevision = collection.UUID, collection.Revision
+	request.RetrievalURL, request.Window, request.CooldownSeconds = targets[0], input.Window, 0
+	run := f.submit(t, request)
+	_, err = f.upgrade(t, models.SourceRunPolicyUpgradeInput{RequestUUID: uuid.NewString(), RunUUID: run.UUID,
+		ExpectedRevision: run.Revision, ExpectedPolicySHA256: request.PolicySHA256, PolicySHA256: input.PolicySHA256, Reason: "Compatible repair"})
+	require.NoError(t, err)
+	request.RequestUUID, request.PolicySHA256, request.ReuseCompatiblePolicy = uuid.NewString(), input.PolicySHA256, true
+	require.Equal(t, run.UUID, f.submit(t, request).UUID)
+	input.Requests = []models.SourceRunRequest{request}
+	run, err = f.coordinator.Claim(t.Context(), f.token, run.UUID, uuid.NewString(), input.PolicySHA256, time.Minute)
+	require.NoError(t, err)
+	require.NotNil(t, run)
+	f.finish(t, run, "succeeded")
+	result, err := f.service.CompleteBackfill(t.Context(), f.token, input)
+	require.NoError(t, err)
+	require.Equal(t, "source_runs", result.Basis)
+	_, err = f.service.CompleteBackfill(t.Context(), f.token, input)
+	require.NoError(t, err)
 }
 
 func TestSourceBackfillLegacyEvidenceIsLosslessAndNeverCreatesCoverage(t *testing.T) {

@@ -128,6 +128,27 @@ OR EXISTS(SELECT 1 FROM source_run_cooldowns WHERE target_key=? AND available_at
 	}
 	// Keep linked-service dependencies across retries of this exact traversal.
 	window := r.Pending[len(r.Pending)-1]
+	// New scheduled requests may widen Pending while a crawl is between turns.
+	// Finish its frozen traversal first: changing its end date would invalidate
+	// the checkpoint and repeatedly restart large initial crawls from page one.
+	if r.Fence > 0 && (r.Progress.ItemsSeen > 0 || r.Progress.Cursor != "" || r.Progress.Pagination != nil) {
+		var previous struct {
+			Window  string `db:"window"`
+			Outcome string `db:"outcome"`
+		}
+		if err := dbWrapper.Get(ctx, &previous, "SELECT window,outcome FROM source_run_attempts WHERE run_uuid=? AND fence=?", id, r.Fence); err != nil {
+			return nil, err
+		}
+		if previous.Outcome == "retry" || previous.Outcome == "expired" || previous.Outcome == "deferred" {
+			var interrupted models.SourceWindow
+			if err := json.Unmarshal([]byte(previous.Window), &interrupted); err != nil {
+				return nil, err
+			}
+			if len(scrape.Subtract([]models.SourceWindow{interrupted}, r.Pending)) == 0 {
+				window = interrupted
+			}
+		}
+	}
 	windowJSON, err := json.Marshal(window)
 	if err != nil {
 		return nil, err
@@ -137,8 +158,8 @@ OR EXISTS(SELECT 1 FROM source_run_cooldowns WHERE target_key=? AND available_at
 		return nil, err
 	}
 	complete := sourcePacingAtomic(ctx)
-	// Latest uncovered range first; old history remains durable pending work.
-	r.Pending = r.Pending[:len(r.Pending)-1]
+	// Preserve every newer/older uncovered range around the frozen traversal.
+	r.Pending = scrape.Subtract(r.Pending, []models.SourceWindow{window})
 	pendingJSON, err := json.Marshal(r.Pending)
 	if err != nil {
 		return nil, err
@@ -161,7 +182,7 @@ OR EXISTS(SELECT 1 FROM source_run_cooldowns WHERE target_key=? AND available_at
 	}
 	if r.Fence > 0 {
 		// A checkpoint is meaningful only for the same exact traversal window.
-		// Widening an interrupted window restarts that traversal deliberately.
+		// Requests added between turns must not change that traversal's window.
 		var resumable bool
 		if err := dbWrapper.Get(ctx, &resumable, "SELECT EXISTS(SELECT 1 FROM source_run_attempts WHERE run_uuid=? AND fence=? AND window=? AND outcome IN ('retry','expired','deferred'))", id, r.Fence, string(windowJSON)); err != nil {
 			return nil, err
@@ -239,7 +260,7 @@ func (s *SourceRunStore) Progress(ctx context.Context, lease models.SourceRunLea
 		u, err := url.Parse(page.URL)
 		if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Fragment != "" ||
 			len(page.URL) > 4096 || len(page.Cursor) > 8192 || len(page.Item) > 1024 || len(page.Extractor) > 80 ||
-			(!strings.HasPrefix(page.Extractor, "twitter:") && !strings.HasPrefix(page.Extractor, "reddit:") && !strings.HasPrefix(page.Extractor, "instagram:")) ||
+			(!strings.HasPrefix(page.Extractor, "twitter:") && !strings.HasPrefix(page.Extractor, "reddit:") && !strings.HasPrefix(page.Extractor, "instagram:") && page.Extractor != "redgifs:user") ||
 			strings.ContainsFunc(page.URL+page.Cursor+page.Item+page.Extractor, unicode.IsControl) ||
 			(page.Item != "" && page.Item != p.Cursor) {
 			return nil, models.ErrSourceRunInvalid
@@ -339,6 +360,9 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 			delay = max(delay, 30*time.Second)
 		case accessRecheck:
 			delay = max(delay, 24*time.Hour, time.Duration(outcome.RetryAfterSeconds)*time.Second)
+			if outcome.ErrorCode == "not_found" {
+				delay = max(delay, 30*24*time.Hour)
+			}
 		case outcome.ErrorCode != "source_turn_complete":
 			r.Failures++
 			// Continuous subscriptions must not silently stop after a fixed
@@ -433,7 +457,7 @@ func (s *SourceRunStore) Review(ctx context.Context, id string, revision int64, 
 	if err != nil {
 		return nil, err
 	}
-	if r == nil || r.Revision != revision || r.State == "succeeded" || r.State == "cancelled" {
+	if r == nil || r.Revision != revision || r.ConsolidatedInto != "" || r.State == "succeeded" || r.State == "cancelled" {
 		return nil, models.ErrSourceRunConflict
 	}
 	if action == "retry" {

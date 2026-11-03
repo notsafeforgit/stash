@@ -71,12 +71,41 @@ not an account count. A completed search updates the same source's last successf
 check even if a profile listing is unavailable. It does not claim that another
 pass's unfinished window was downloaded.
 
-`not_found` and `access_denied` attempts stay queued for an automatic recheck
-after 24 hours (or a longer requested retry delay). Each failed pass keeps its pending
-windows and progress. Its daily delay applies to that run, so other passes for
+`not_found` attempts stay queued for an automatic recheck after 30 days;
+`access_denied` attempts recheck after 24 hours (or a longer requested retry delay).
+Each failed pass keeps its pending windows and progress. The delay applies to that run, so other passes for
 the same account can continue after the normal short target cooldown. Shared
 service budgets and routine-check priority still apply. Stopping a subscription
 still stops its work.
+
+An interrupted crawl with progress keeps its original traversal window when a
+later scheduled request extends the pending coverage. It finishes that frozen
+window before starting the additional ranges, so daily admission cannot restart
+a large initial crawl from its beginning.
+
+Application-authenticated `POST /api/v3/ingest-admin/run-consolidations` combines
+compatible queued runs, or compatible deferred runs, using both expected revisions
+and an idempotent request UUID. Collection/root revisions, retrieval pass, window
+basis, execution policy, subscription revision and cooldown must agree. The target
+retains the union of unfinished ranges and the later retry deadline. The original
+run and its request/attempt history remain retained, with an immutable successor
+record. Reading an original run preserves its admission identity and reports only
+coverage established by its successor, including later completion. Consolidation
+does not release a deferred run or transfer a live lease.
+
+New clients may set `reuse_compatible_policy: true` when admitting a request.
+The `source_run_compatible_admission_protocol: 1` capability is required. A matching
+run with a reviewed execution-policy upgrade can then absorb the request without
+changing its original policy identity. Admission receipts and backup verification
+retain the original request digest and the policy upgrade that justified reuse.
+
+With `source_run_attachment_retry_protocol: 1`, a failed individual Reddit file
+can create a separate focused post retry. Admission requires that producer's exact
+failed `attachment.download` receipt, matching collection revision, subscription,
+and original window; it returns HTTP 425 while the receipt is still in delivery.
+The parent advances only after the focused request is durably queued. The failure
+and missing file remain visible, and no successful download-archive entry is made.
+A focused retry cannot recursively delegate its own failure.
 
 Authentication/challenge, invalid configuration and rejected source metadata
 remain explicit attention states. They are not treated as inaccessible accounts.
@@ -98,7 +127,7 @@ rate limits, server failures and timeouts are not treated as confirmed deletions
 
 ## Remote pagination
 
-Reddit, Twitter and Instagram posts/photos checkpoints include the extractor,
+Reddit, Twitter, Instagram posts/photos and Redgifs user checkpoints include the extractor,
 public retrieval URL,
 opaque cursor for the current remote page, and last completed attachment within
 that page. The page start is committed before requesting it. A restart fetches
@@ -117,6 +146,14 @@ Instagram feed checkpoints require `source_run_instagram_pagination_protocol: 1`
 Only the post-feed GraphQL connection updates them; profile lookups, story
 containers and media detail requests cannot replace a saved feed page. Stories
 and highlights retain item replay and never inherit the feed's pagination cursor.
+
+Redgifs user listings require `source_run_redgifs_pagination_protocol: 1` and resume
+the saved numbered page. Authentication and media-detail requests cannot replace
+that checkpoint. An explicit provider history-page limit defers the crawl with
+`source_history_limit`, preserving unfinished coverage for review. It never proves
+the inaccessible history complete. Execution contract v2 introduces these cursor
+and independent-file-retry semantics; deployments explicitly upgrade compatible
+queued policies after upgrading the native server and all backup receipt readers.
 
 ## Shared source budget
 

@@ -49,6 +49,15 @@ ORDER BY r.collection_uuid,r.revision LIMIT 128`, capture, after, revision); err
 			if scrape.RedditProfileURL(scope.Target) != link.SourceProfileURL {
 				continue
 			}
+			if scope.Root != nil {
+				retired, err := linkedRedgifsProfileRetired(ctx, link.URL, *scope.Root)
+				if err != nil {
+					return "", err
+				}
+				if retired {
+					continue // Old captures cannot relink a retired account.
+				}
+			}
 			url = link.URL
 			// Keep the directory actually chosen by the Reddit job, including
 			// custom names. Missing/unsafe hints may add a URL but cannot widen
@@ -65,6 +74,17 @@ ORDER BY r.collection_uuid,r.revision LIMIT 128`, capture, after, revision); err
 			return url, nil
 		}
 	}
+}
+
+func linkedRedgifsProfileRetired(ctx context.Context, target, root string) (bool, error) {
+	bare := strings.Replace(target, "https://www.", "https://", 1)
+	var retired bool
+	err := dbWrapper.Get(ctx, &retired, `SELECT EXISTS(SELECT 1 FROM source_collections b
+ JOIN source_collection_revisions r ON r.collection_uuid=b.uuid AND r.revision=b.revision
+ WHERE r.root_uuid=? AND r.namespace='native:redgifs' AND r.kind='account' AND r.state='retired'
+ AND lower(rtrim(r.target_url,'/')) IN (?,?,?,?))`, root, target, bare,
+		strings.Replace(target, "https://", "http://", 1), strings.Replace(bare, "https://", "http://", 1))
+	return retired, err
 }
 
 func subscribeLinkedRedgifsProfile(ctx context.Context, target, root, prefix, capture string) error {

@@ -73,11 +73,28 @@ check even if a profile listing is unavailable. It does not claim that another
 pass's unfinished window was downloaded.
 
 `not_found` attempts stay queued for an automatic recheck after 30 days;
+with `source_run_account_status_protocol: 1`, explicit `account_suspended`,
+`account_deactivated`, `account_unavailable` and `account_not_found` results
+retain their distinction and use that same monthly check. None establishes
+permanent deletion, and a generic 404 is not classified as a suspension.
 `access_denied` attempts recheck after 24 hours (or a longer requested retry delay).
 Each failed pass keeps its pending windows and progress. The delay applies to that run, so other passes for
 the same account can continue after the normal short target cooldown. Shared
 service budgets and routine-check priority still apply. Stopping a subscription
 still stops its work.
+
+With `source_run_redgifs_deletion_protocol: 1`, an explicit Redgifs
+`User account deleted.` response from the claimed account's listing permanently
+retires that source. The worker finishes with `state: "deferred"`,
+`error_code: "account_deleted"`, and `error_scope: "service:redgifs"`. The server
+requires a current account definition and a reported listing request under the
+same live lease, retires the collection, disables its subscription, and cancels
+its queued/deferred work, including initial and manual runs. The returned run is
+`cancelled`; its attempt retains the deletion outcome. Pending ranges, previous
+captures and media remain preserved, without a claim of successful coverage.
+Generic missing, restricted, rate-limited or embedded-account responses cannot
+retire the parent source. Rediscovering the retired Redgifs profile cannot relink
+or subscribe it; a different Redgifs profile can still be discovered and fetched.
 
 An interrupted crawl with progress keeps its original traversal window when a
 later scheduled request extends the pending coverage. It finishes that frozen

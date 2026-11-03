@@ -98,7 +98,16 @@ func sourceRunPendingPacingReady(ctx context.Context, r *models.SourceRun, windo
 
 func validSourceServiceFailure(code string) bool {
 	switch code {
-	case "source_busy", "rate_limited", "timeout", "extraction_failed", "authentication", "access_denied", "challenge", "not_found", "source_history_limit":
+	case "source_busy", "rate_limited", "timeout", "extraction_failed", "authentication", "access_denied", "challenge", "not_found", "source_history_limit", "account_deleted",
+		"account_suspended", "account_deactivated", "account_unavailable", "account_not_found":
+		return true
+	}
+	return false
+}
+
+func missingSourceAccount(code string) bool {
+	switch code {
+	case "not_found", "account_suspended", "account_deactivated", "account_unavailable", "account_not_found":
 		return true
 	}
 	return false

@@ -1453,7 +1453,11 @@ still apply.
 
 An unsuccessful `outcome` may include `error_scope` with a controlled source code:
 `source_busy`, `rate_limited`, `timeout`, `extraction_failed`, `authentication`,
-`access_denied`, `challenge` or `not_found`. Except for `source_busy`, the attempt
+`access_denied`, `challenge`, `not_found`, `source_history_limit` or
+`account_deleted`, `account_suspended`, `account_deactivated`,
+`account_unavailable` or `account_not_found`. `account_deleted` requires an explicit Redgifs account deletion
+and retires that profile under the [account-access contract](native-source-runs.md#account-access-and-retrieval-passes).
+Except for `source_busy`, the attempt
 must have held that service. Attempts expose the retained `error_scope`; lost
 completion responses must match outcome, code and scope as well as producer,
 owner and fence. Error scopes contain service identities, never source URLs.

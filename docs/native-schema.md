@@ -8,6 +8,13 @@ The startup-versus-full-audit boundary below applies to the historical proof
 validation described throughout this guide. Deployment and one-time import
 completion belong to the installation's operations records.
 
+Schema 1000138 expands the existing attempt-failure constraint to retain explicit
+account availability and Redgifs deletion codes, including provider history-limit
+failures. It preserves every existing failure and request. Fenced confirmed
+Redgifs deletion retires its source through the existing collection/subscription
+model; other account states keep recovery checks. The migration itself retires
+no accounts and changes no downloaded media.
+
 Schema 1000134 adds independent account profile observations and normalized
 profile links, with `account.profile` ingestion receipts. The receipt migration
 preserves existing capture, file and attachment receipts and their references.

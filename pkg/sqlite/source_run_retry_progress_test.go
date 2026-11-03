@@ -49,16 +49,22 @@ func TestSourceRunMissingProfileRechecksMonthlyAndPrivateProfileDaily(t *testing
 	for _, test := range []struct {
 		code  string
 		delay time.Duration
-	}{{"not_found", 30 * 24 * time.Hour}, {"access_denied", 24 * time.Hour}} {
+	}{{"not_found", 30 * 24 * time.Hour}, {"access_denied", 24 * time.Hour},
+		{"account_not_found", 30 * 24 * time.Hour}, {"account_suspended", 30 * 24 * time.Hour},
+		{"account_deactivated", 30 * 24 * time.Hour}, {"account_unavailable", 30 * 24 * time.Hour}} {
 		t.Run(test.code, func(t *testing.T) {
 			f := newSourceRunFixture(t)
 			request := f.request()
 			run := f.claim(t, f.submit(t, request))
-			run, err := f.coordinator.Finish(t.Context(), f.token, run.Lease(), models.SourceRunOutcome{State: "retry", ErrorCode: test.code})
+			run, err := f.coordinator.Finish(t.Context(), f.token, run.Lease(), models.SourceRunOutcome{State: "retry", ErrorCode: test.code, ErrorScope: "service:reddit"})
 			require.NoError(t, err)
 			require.Equal(t, test.delay, run.AvailableAt.Sub(f.now))
 			require.Zero(t, run.Failures)
 			require.Empty(t, run.Completed)
+			attempts, err := f.coordinator.Attempts(t.Context(), f.token, run.UUID, 0)
+			require.NoError(t, err)
+			require.Equal(t, test.code, attempts[0].ErrorCode)
+			require.Equal(t, "service:reddit", attempts[0].ErrorScope)
 			request.RequestUUID = uuid.NewString()
 			request.Window.Since = nil
 			repeated := f.submit(t, request)

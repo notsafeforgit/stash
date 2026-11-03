@@ -9,6 +9,15 @@ import (
 )
 
 func validateSourceRunSchema(conn *sqlx.DB, version uint, auditData bool) error {
+	if version >= NativeSchemaBaseline+138 {
+		var found bool
+		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='source_run_attempt_account_failure')"); err != nil {
+			return err
+		}
+		if !found {
+			return errors.New("native database is missing distinct account failure attribution")
+		}
+	}
 	if version >= NativeSchemaBaseline+137 {
 		var ready bool
 		if err := conn.Get(&ready, `SELECT EXISTS(SELECT 1 FROM pragma_table_info('source_run_attachment_retries') WHERE name='finalize')

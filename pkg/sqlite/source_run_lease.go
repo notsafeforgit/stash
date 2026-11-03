@@ -320,6 +320,19 @@ func (s *SourceRunStore) Finish(ctx context.Context, lease models.SourceRunLease
 	if err != nil {
 		return nil, err
 	}
+	if outcome.ErrorCode == "account_deleted" {
+		collection, err := deletedRedgifsCollection(ctx, r, outcome)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := s.finish(ctx, r, outcome, now); err != nil {
+			return nil, err
+		}
+		if err := retireDeletedRedgifsCollection(ctx, r, collection, now); err != nil {
+			return nil, err
+		}
+		return s.Find(ctx, r.UUID)
+	}
 	if outcome.State == "succeeded" {
 		if _, _, err := sourceRunDefinition(ctx, r); err != nil {
 			return nil, err
@@ -344,7 +357,7 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 	}
 	requestBackoff = requestBackoff && outcome.State == "retry"
 	attachmentRecheck := r.AttachmentRetry && outcome.State == "retry" && attachmentRetryFailure(outcome.ErrorCode)
-	accessRecheck := !r.AttachmentRetry && outcome.State == "retry" && (outcome.ErrorCode == "not_found" || outcome.ErrorCode == "access_denied")
+	accessRecheck := !r.AttachmentRetry && outcome.State == "retry" && (missingSourceAccount(outcome.ErrorCode) || outcome.ErrorCode == "access_denied")
 	runError := outcome.ErrorCode
 	if outcome.State == "succeeded" {
 		r.Completed = scrape.Union(r.Completed, []models.SourceWindow{*r.Window})
@@ -384,7 +397,7 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 			delay = max(delay, 30*time.Second)
 		case accessRecheck:
 			delay = max(delay, 24*time.Hour, time.Duration(outcome.RetryAfterSeconds)*time.Second)
-			if outcome.ErrorCode == "not_found" {
+			if missingSourceAccount(outcome.ErrorCode) {
 				delay = max(delay, 30*24*time.Hour)
 			}
 		case outcome.ErrorCode != "source_turn_complete":

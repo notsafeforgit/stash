@@ -3,6 +3,7 @@ package ingest_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +13,46 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/require"
 )
+
+func TestRetiredRedgifsProfileStaysRetiredWhileNewUploaderIsDiscovered(t *testing.T) {
+	f, root := linkedProfileFixture(t, "https://www.reddit.com/user/example/", ".")
+	_, err := f.submit(t, linkedProfileEvent(t, f, root, "Example, reddit", "post1"))
+	require.NoError(t, err)
+	old := linkedProfileSubscriptions(t, f, root)[0]
+	require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		definition := old.Collection.SourceCollectionDefinition
+		definition.State = "retired"
+		_, err := f.service.Repo.SourceCollection.Put(ctx, models.SourceCollectionInput{UUID: old.Collection.UUID,
+			ExpectedRevision: old.Collection.Revision, SourceCollectionDefinition: definition, Origin: "review", Reason: "Confirmed deleted account"})
+		require.NoError(t, err)
+		_, err = f.service.Repo.SourceSubscription.Put(ctx, old.Collection.UUID, models.SourceSubscriptionInput{ExpectedRevision: old.Revision, Enabled: false})
+		return err
+	}))
+	_, err = f.submit(t, linkedProfileEvent(t, f, root, "Example, reddit", "post2"))
+	require.NoError(t, err)
+	items := linkedProfileSubscriptions(t, f, root)
+	require.Len(t, items, 1)
+	require.False(t, items[0].Enabled)
+	require.Equal(t, "retired", items[0].Collection.State)
+	event := linkedProfileEvent(t, f, root, "Example, reddit", "post3")
+	event.Source, err = archive.RetainSourcePayload([]byte(strings.ReplaceAll(string(event.Source), "DifferentUploader", "NewUploader")))
+	require.NoError(t, err)
+	event.Metadata, err = archive.CapturedMetadata(event.Source)
+	require.NoError(t, err)
+	_, err = f.submit(t, event)
+	require.NoError(t, err)
+	items = linkedProfileSubscriptions(t, f, root)
+	require.Len(t, items, 2)
+	for _, item := range items {
+		if item.Collection.UUID == old.Collection.UUID {
+			require.False(t, item.Enabled)
+		} else {
+			require.True(t, item.Enabled)
+			require.Equal(t, "https://www.redgifs.com/users/newuploader", item.Collection.TargetURL)
+			require.Equal(t, "Example, reddit", item.Collection.PathPrefix)
+		}
+	}
+}
 
 func linkedProfileFixture(t *testing.T, target, prefix string) (captureFixture, *models.MediaRoot) {
 	f := newCaptureFixture(t)

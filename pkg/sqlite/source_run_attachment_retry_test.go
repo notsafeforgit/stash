@@ -224,6 +224,7 @@ func TestAttachmentRetryArchiveMigrationReopensOnlyExpiredLocalFinalization(t *t
 	require.NoError(t, f.db.Close())
 	raw := openRawDB(t, path)
 	defer raw.Close()
+	removeSourceAccountStatusSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER source_run_attachment_retry_completed;
  DROP TRIGGER source_run_attachment_retry_immutable;
  ALTER TABLE source_run_attachment_retries DROP COLUMN finalize;

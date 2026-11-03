@@ -14,6 +14,7 @@ import (
 
 func removeSourceRunConsolidationSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSourceAccountStatusSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER IF EXISTS source_run_attachment_retry_completed;
  DROP TABLE IF EXISTS source_run_attachment_retries;
  DROP TABLE IF EXISTS source_run_consolidations;

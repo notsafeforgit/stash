@@ -52,6 +52,13 @@ INSERT INTO images_tags(image_id,tag_id) VALUES(1,1);
 INSERT INTO galleries_tags(gallery_id,tag_id) VALUES(1,1);
 INSERT INTO galleries_images(gallery_id,image_id) VALUES(1,1);
 INSERT INTO scenes_galleries(scene_id,gallery_id) VALUES(1,1);`)
+	// A fixture may cross a second between writing the file and inserting its
+	// row. Snapshot verification requires the observed file time in both places.
+	for _, name := range []string{"clip.mp4", "photo.jpg"} {
+		info, err := os.Stat(filepath.Join(dir, name))
+		require.NoError(t, err)
+		f.exec(`UPDATE files SET mod_time=? WHERE basename=?`, info.ModTime(), name)
+	}
 	return f
 }
 

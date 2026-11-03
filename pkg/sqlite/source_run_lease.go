@@ -499,9 +499,10 @@ func (s *SourceRunStore) Review(ctx context.Context, id string, revision int64, 
 		return nil, models.ErrSourceRunConflict
 	}
 	if action == "retry" {
-		// A drained local outbox can be retried without waiting out yesterday's
-		// capacity failure. Website retry delays still require their normal wait.
+		// A drained outbox or explicitly reviewed history ceiling has no
+		// recovery deadline. Website failures retain their normal retry wait.
 		capacityRetry := r.State == "queued" && r.ErrorCode == "outbox_capacity"
+		historyRetry := r.State == "deferred" && r.ErrorCode == "source_history_limit"
 		if r.State != "deferred" && !capacityRetry {
 			return nil, models.ErrSourceRunConflict
 		}
@@ -509,13 +510,13 @@ func (s *SourceRunStore) Review(ctx context.Context, id string, revision int64, 
 			return nil, err
 		}
 		available := r.AvailableAt
-		if capacityRetry {
+		if capacityRetry || historyRetry {
 			available = now
 		}
 		_, err = dbWrapper.Exec(ctx, "UPDATE source_runs SET state='queued',failures=0,error_code='',available_at_ms=?,revision=revision+1,updated_at_ms=? WHERE uuid=?", available.UnixMilli(), now.UnixMilli(), id)
-		if err == nil && capacityRetry {
-			// Finish also held this target until the capacity retry. Release only
-			// that exact delay, retaining any other run's later target restriction.
+		if err == nil && (capacityRetry || historyRetry) {
+			// Release only this exact target delay, retaining any other run's
+			// later restriction and every shared website request budget.
 			_, err = dbWrapper.Exec(ctx, `UPDATE source_run_cooldowns SET available_at_ms=?
  WHERE target_key=(SELECT target_key FROM source_runs WHERE uuid=?) AND available_at_ms=?
  AND NOT EXISTS(SELECT 1 FROM source_runs r WHERE r.target_key=source_run_cooldowns.target_key

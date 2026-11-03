@@ -76,6 +76,38 @@ func TestSourceRunReviewCannotBypassWebsiteRetryDelays(t *testing.T) {
 	}
 }
 
+func TestSourceRunReviewHistoryLimitPreservesProgressAndWebsitePacing(t *testing.T) {
+	f := newSourceRunFixture(t)
+	run := f.claim(t, f.submit(t, f.request()))
+	progress := models.SourceRunProgress{ItemsSeen: 10000, FilesCompleted: 25, Cursor: "last-item"}
+	_, err := f.coordinator.Progress(t.Context(), f.token, run.Lease(), progress)
+	require.NoError(t, err)
+	run, err = f.coordinator.Finish(t.Context(), f.token, run.Lease(), models.SourceRunOutcome{State: "deferred", ErrorCode: "source_history_limit"})
+	require.NoError(t, err)
+	require.True(t, run.AvailableAt.After(f.now))
+	raw := openRawDB(t, f.db.DatabasePath())
+	defer raw.Close()
+	blockedUntil := f.now.Add(time.Minute)
+	_, err = raw.Exec("UPDATE source_pacing SET available_at_ms=? WHERE scope='service:reddit'", blockedUntil.UnixMilli())
+	require.NoError(t, err)
+	var reviewed *models.SourceRun
+	err = f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		reviewed, err = f.repo.SourceRun.Review(ctx, run.UUID, run.Revision, "retry", f.now)
+		return err
+	})
+	require.NoError(t, err)
+	require.Equal(t, "queued", reviewed.State)
+	require.Equal(t, f.now, reviewed.AvailableAt)
+	require.Equal(t, progress, reviewed.Progress)
+	require.Equal(t, run.Pending, reviewed.Pending)
+	require.Equal(t, run.Completed, reviewed.Completed)
+	require.Equal(t, run.Fence, reviewed.Fence)
+	require.Nil(t, f.claim(t, reviewed), "review must not clear shared website pacing")
+	f.now = blockedUntil
+	require.NotNil(t, f.claim(t, reviewed))
+}
+
 func TestSourceRunNewScheduledWindowFinishesInterruptedCrawlFirst(t *testing.T) {
 	f := newSourceRunFixture(t)
 	request := f.request()

@@ -61,6 +61,9 @@ func (s *SourceRunStore) Claim(ctx context.Context, id, producer, owner, policy 
 	if err != nil {
 		return nil, err
 	}
+	if retired, err := s.retireExpiredAttachmentRetry(ctx, r, now); err != nil || retired {
+		return nil, err
+	}
 	collection, root, err := sourceRunDefinition(ctx, r)
 	if errors.Is(err, models.ErrSourceDefinitionConflict) {
 		_, err = dbWrapper.Exec(ctx, "UPDATE source_runs SET state='deferred',error_code='definition_changed',revision=revision+1,updated_at_ms=? WHERE uuid=?", now.UnixMilli(), id)
@@ -334,7 +337,9 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 		return nil, err
 	}
 	requestBackoff = requestBackoff && outcome.State == "retry"
-	accessRecheck := outcome.State == "retry" && (outcome.ErrorCode == "not_found" || outcome.ErrorCode == "access_denied")
+	attachmentRecheck := r.AttachmentRetry && outcome.State == "retry" && attachmentRetryFailure(outcome.ErrorCode)
+	accessRecheck := !r.AttachmentRetry && outcome.State == "retry" && (outcome.ErrorCode == "not_found" || outcome.ErrorCode == "access_denied")
+	runError := outcome.ErrorCode
 	if outcome.State == "succeeded" {
 		r.Completed = scrape.Union(r.Completed, []models.SourceWindow{*r.Window})
 		if r.Operation == "download" {
@@ -350,6 +355,16 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 	} else {
 		r.Pending = scrape.Union(r.Pending, []models.SourceWindow{*r.Window})
 		switch {
+		case attachmentRecheck:
+			r.Failures++
+			deadline := r.CreatedAt.Add(attachmentRetryLifetime)
+			if !now.Before(deadline) {
+				state, runError, delay = "cancelled", "attachment_retry_exhausted", 0
+			} else {
+				// The parent already tried this file. Allow a recovery check the
+				// next day, then close the retained gap at the two-day boundary.
+				delay = max(delay, min(24*time.Hour, deadline.Sub(now)), time.Duration(outcome.RetryAfterSeconds)*time.Second)
+			}
 		case requestBackoff:
 			// The shared HTTP budget owns retry timing; retain progress without
 			// adding a second account delay or consuming a failure allowance.
@@ -404,14 +419,14 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 		}
 	}
 	_, err = dbWrapper.Exec(ctx, `UPDATE source_runs SET state=?,pending=?,completed=?,failures=?,available_at_ms=?,error_code=?,window=NULL,producer_uuid=NULL,owner_uuid=NULL,lease_until_ms=NULL,revision=revision+1,updated_at_ms=? WHERE uuid=?`,
-		state, string(pending), string(completed), r.Failures, now.Add(delay).UnixMilli(), outcome.ErrorCode, now.UnixMilli(), r.UUID)
+		state, string(pending), string(completed), r.Failures, now.Add(delay).UnixMilli(), runError, now.UnixMilli(), r.UUID)
 	if err != nil {
 		return nil, err
 	}
 	targetDelay := delay
-	if accessRecheck {
-		// The failed pass waits a day, but another retrieval for this source
-		// (for example Reddit author search) can still find public posts.
+	if accessRecheck || r.AttachmentRetry {
+		// A missing profile or file must not impose its retry delay on another
+		// retrieval for this source, such as an initial Reddit author search.
 		targetDelay = time.Duration(r.CooldownSeconds) * time.Second
 	}
 	if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_run_cooldowns(target_key,available_at_ms) SELECT target_key,? FROM source_runs WHERE uuid=?

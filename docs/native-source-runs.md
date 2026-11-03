@@ -106,11 +106,23 @@ and original window; it returns HTTP 425 while the receipt is still in delivery.
 The parent advances only after the focused request is durably queued. The failure
 and missing file remain visible, and no successful download-archive entry is made.
 A focused retry cannot recursively delegate its own failure.
+Focused retries have a 48-hour recovery window from admission. A failed transfer
+or missing post is checked again the next day; after that window, automatic
+recovery closes as `cancelled` with `attachment_retry_exhausted`. Original failure
+reports and unfinished coverage remain retained; the missing file is never
+reported as downloaded. Authentication, rate limits and local worker failures do
+not establish that a file is permanently unavailable. The focused job's retry
+delay does not hold up other passes for the same account.
+
+An inaccessible Reddit profile alone is not proof of permanent account deletion.
+Missing-profile rechecks preserve independent initial/search passes, which can
+still discover public posts. Confirmed deletion and reversible suspension must
+not be inferred from the same generic `not_found` response.
 
 Authentication/challenge, invalid configuration and rejected source metadata
 remain explicit attention states. They are not treated as inaccessible accounts.
 
-Recoverable download-run failures retry continuously, with exponential backoff
+Other recoverable download-run failures retry continuously, with exponential backoff
 starting at five minutes and capped at 24 hours (a longer provider-requested
 delay wins). Eight failures no longer create an automatic review hold. Schema
 1000116 removes the database counter ceiling while preserving run and attempt

@@ -57,7 +57,7 @@ func validSourceRequestResult(input models.SourceRequestResult) bool {
 		(input.BlockReason == "" || (input.BlockReason == "network_security" && (input.Status == 200 || input.Status == 403)))
 }
 
-func sourceRequestFeedback(ctx context.Context, scope, owner string, granted int64, probe bool, input models.SourceRequestResult, now time.Time) (bool, error) {
+func sourceRequestFeedback(ctx context.Context, scope, operation, owner string, granted int64, probe bool, input models.SourceRequestResult, now time.Time) (bool, error) {
 	var b sourceBackoff
 	if err := dbWrapper.Get(ctx, &b, `SELECT backoff_step,backoff_at_ms,blocked_until_ms,probe_uuid,probe_until_ms,probe_owner
  FROM source_request_budgets WHERE scope=?`, scope); err != nil {
@@ -88,8 +88,17 @@ func sourceRequestFeedback(ctx context.Context, scope, owner string, granted int
 		return true, sourcePacingPause(ctx, scope, "rate_limited", time.UnixMilli(until))
 	}
 	if probe {
+		if scope == "service:redgifs" && (operation != "listing" || input.Status < 200 || input.Status >= 300) {
+			// Redgifs can serve authentication and individual media while its
+			// listing quota is still exhausted. Release this request's slot so
+			// a listing can probe next, but retain the backoff until a listing
+			// succeeds. An account-specific error is not listing recovery either.
+			_, err := dbWrapper.Exec(ctx, `UPDATE source_request_budgets SET
+ probe_uuid='',probe_owner='',probe_until_ms=0 WHERE scope=?`, scope)
+			return false, err
+		}
 		// A normal response, including an account-specific 404/403, proves the
-		// service is reachable. Its ordinary account error still applies.
+		// other services are reachable. Their ordinary account errors still apply.
 		_, err := dbWrapper.Exec(ctx, `UPDATE source_request_budgets SET backoff_step=0,backoff_at_ms=?,
  blocked_until_ms=0,probe_uuid='',probe_owner='',probe_until_ms=0 WHERE scope=?`, now.UnixMilli(), scope)
 		return false, err

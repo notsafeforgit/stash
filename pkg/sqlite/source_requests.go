@@ -176,7 +176,7 @@ func (s *SourceRunStore) ReportSourceRequest(ctx context.Context, lease models.S
   WHERE hour=? AND scope=? AND class=? AND operation=?`, input.Status == 429 || input.BlockReason != "", input.Status == 0 || input.Status >= 400 || input.BlockReason != "", row.GrantedAt.Int64/3600000, row.Scope, row.Class, row.Operation); err != nil {
 		return err
 	}
-	backoff, err := sourceRequestFeedback(ctx, row.Scope, sourceRequestOwner("run", lease.RunUUID, lease.Fence), row.GrantedAt.Int64, row.Backoff, input, now)
+	backoff, err := sourceRequestFeedback(ctx, row.Scope, row.Operation, sourceRequestOwner("run", lease.RunUUID, lease.Fence), row.GrantedAt.Int64, row.Backoff, input, now)
 	if err != nil {
 		return err
 	}

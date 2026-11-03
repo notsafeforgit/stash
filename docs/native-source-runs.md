@@ -129,6 +129,15 @@ not be inferred from the same generic `not_found` response.
 Authentication/challenge, invalid configuration and rejected source metadata
 remain explicit attention states. They are not treated as inaccessible accounts.
 
+Redgifs listing throttles retain the shared HTTP backoff across successful
+authentication and individual-media requests. After the cooldown, those requests
+release their probe slot without clearing the backoff history; only a successful
+listing response resets it. Redirects and account-specific errors do not establish
+listing recovery. Both download and metadata workers use this rule. Repeated
+throttles back off for 1, 2, 4, 8, then 15 minutes, unless the provider supplies
+`Retry-After`; existing request spacing, probe leases and stale-response guards
+still apply.
+
 Other recoverable download-run failures retry continuously, with exponential backoff
 starting at five minutes and capped at 24 hours (a longer provider-requested
 delay wins). Eight failures no longer create an automatic review hold. Schema

@@ -141,7 +141,7 @@ func (s *EnrichmentJobStore) ReportSourceRequest(ctx context.Context, lease mode
  WHERE hour=? AND scope=? AND class='recovery' AND operation=?`, input.Status == 429 || input.BlockReason != "", input.Status == 0 || input.Status >= 400 || input.BlockReason != "", row.GrantedAt/3600000, row.Scope, row.Operation); err != nil {
 		return err
 	}
-	backoff, err := sourceRequestFeedback(ctx, row.Scope, sourceRequestOwner("metadata", lease.JobUUID, lease.Fence), row.GrantedAt, row.Backoff, input, now)
+	backoff, err := sourceRequestFeedback(ctx, row.Scope, row.Operation, sourceRequestOwner("metadata", lease.JobUUID, lease.Fence), row.GrantedAt, row.Backoff, input, now)
 	if err != nil {
 		return err
 	}

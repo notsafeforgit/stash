@@ -306,7 +306,9 @@ Redgifs sources already have an account binding. Repairing an older unbound
 source increments its collection revision and atomically rebinds the identical
 metadata policy; unfinished crawls or metadata jobs return `waiting`. External
 schedulers must pause and drain local pending requests before invoking this
-repair. Completed run coverage, disabled subscriptions, explicit ownership
+repair. Older collections with a saved translation policy return `review`;
+their translation targets need a separate scope migration. Completed run
+coverage, disabled subscriptions, explicit ownership
 choices and destinations remain unchanged. Retrying the original revision after
 a committed binding returns the current link without another revision.
 

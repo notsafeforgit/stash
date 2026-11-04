@@ -175,6 +175,16 @@ func (s *SourceCollectionStore) LinkProfileAccount(ctx context.Context, id strin
 			result.Reason = "metadata_policy_scope_changed"
 			return result, nil
 		}
+		// Translation targets may still carry the old collection revision even
+		// without a running job. This narrow repair does not migrate those scopes.
+		translation, err := (&TranslationPolicyStore{}).Find(ctx, collection.UUID)
+		if err != nil {
+			return nil, err
+		}
+		if translation != nil {
+			result.Reason = "translation_policy_scope"
+			return result, nil
+		}
 	}
 	var account *models.SourceAccount
 	if collection.AccountUUID == nil {

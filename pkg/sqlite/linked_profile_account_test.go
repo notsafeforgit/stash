@@ -81,7 +81,7 @@ func TestLinkProfileAccountPreservesWorkPolicyMonitoringAndReplay(t *testing.T) 
 }
 
 func TestLinkProfileAccountPreservesConflictingChoices(t *testing.T) {
-	for _, scenario := range []string{"ambiguous-url", "missing-url", "unlinked", "different-owner", "ambiguous-account"} {
+	for _, scenario := range []string{"ambiguous-url", "missing-url", "unlinked", "different-owner", "ambiguous-account", "translation-policy"} {
 		t.Run(scenario, func(t *testing.T) {
 			f, owner := profileBindingFixture(t)
 			switch scenario {
@@ -89,6 +89,8 @@ func TestLinkProfileAccountPreservesConflictingChoices(t *testing.T) {
 				editProfileURLs(t, f.repo, 72, models.RelationshipUpdateModeAdd, f.collection.TargetURL)
 			case "missing-url":
 				editProfileURLs(t, f.repo, 71, models.RelationshipUpdateModeSet)
+			case "translation-policy":
+				putTranslationPolicy(t, f.repo, f.collection, 0, translationPolicyDefinition())
 			default:
 				first := linkProfile(t, f, owner)
 				f.collection = first.Collection

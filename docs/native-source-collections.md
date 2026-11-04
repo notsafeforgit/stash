@@ -304,7 +304,8 @@ administration. Responses use `Cache-Control: no-store`.
 Profile-account linking returns `linked`, `waiting`, or `review`. New discovered
 Redgifs sources already have an account binding. Repairing an older unbound
 source increments its collection revision and atomically rebinds the identical
-metadata policy; unfinished crawls or metadata jobs return `waiting`. External
+metadata policy; unfinished crawls, accepted file imports, or metadata jobs
+return `waiting`. External
 schedulers must pause and drain local pending requests before invoking this
 repair. Older collections with a saved translation policy return `review`;
 their translation targets need a separate scope migration. Completed run

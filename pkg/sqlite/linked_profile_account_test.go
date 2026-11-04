@@ -2,11 +2,33 @@ package sqlite_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/require"
 )
+
+func TestLinkProfileAccountWaitsForAcceptedFileImport(t *testing.T) {
+	f, owner := profileBindingFixture(t)
+	input := jobSubmission("pending", "profile")
+	var err error
+	input.Arguments, err = json.Marshal(map[string]any{"publication": map[string]any{"collection_uuid": f.collection.UUID}})
+	require.NoError(t, err)
+	var pending *models.ArchiveJob
+	require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		pending, err = f.repo.ArchiveJob.Submit(ctx, input, f.now, 100)
+		return err
+	}))
+	result := linkProfile(t, f, owner)
+	require.Equal(t, "waiting", result.State)
+	require.Equal(t, f.collection, result.Collection)
+	require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, err := f.repo.ArchiveJob.Cancel(ctx, pending.UUID, pending.Revision, f.now)
+		return err
+	}))
+	require.Equal(t, "linked", linkProfile(t, f, owner).State)
+}
 
 func profileBindingFixture(t *testing.T) (*sourceRunFixture, *models.ArchiveEntity) {
 	t.Helper()

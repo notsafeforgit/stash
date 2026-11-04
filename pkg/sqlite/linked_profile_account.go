@@ -159,8 +159,10 @@ func (s *SourceCollectionStore) LinkProfileAccount(ctx context.Context, id strin
 		var busy bool
 		if err := dbWrapper.Get(ctx, &busy, `SELECT
  EXISTS(SELECT 1 FROM source_runs WHERE collection_uuid=? AND state IN ('queued','running','deferred'))
- OR EXISTS(SELECT 1 FROM archive_jobs WHERE kind='post.enrich' AND state IN ('queued','running')
- AND json_extract(arguments,'$.collection_uuid')=?)`, collection.UUID, collection.UUID); err != nil {
+ OR EXISTS(SELECT 1 FROM archive_jobs WHERE state IN ('queued','running')
+ AND (json_extract(arguments,'$.collection_uuid')=?
+ OR (kind='media.verify' AND json_extract(arguments,'$.publication.collection_uuid')=?)))`,
+			collection.UUID, collection.UUID, collection.UUID); err != nil {
 			return nil, err
 		}
 		if busy {

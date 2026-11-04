@@ -351,6 +351,8 @@ type Mutation {
   sceneAssignFile(input: AssignSceneFileInput!): Boolean! @libraryScope(kind: "file")
 
   imageUpdate(input: ImageUpdateInput!): Image @libraryScope(kind: "image")
+  "Merge reviewed image records; physical duplicate removal remains separate."
+  imageMerge(input: ImageMergeInput!): Image! @libraryScope(kind: "image")
   "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
   bulkImageUpdate(input: BulkImageUpdateInput!): BulkUpdateResult! @libraryScope(kind: "image")
   """

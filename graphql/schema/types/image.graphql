@@ -106,6 +106,14 @@ input ImageDestroyInput {
   destroy_file_entry: Boolean
 }
 
+"Explicitly combine two image records, keeping destination metadata and all files and galleries."
+input ImageMergeInput {
+  source: ID! @libraryID(kind: "image")
+  destination: ID! @libraryID(kind: "image")
+  source_revision: Int!
+  destination_revision: Int!
+}
+
 input ImagesDestroyInput {
   ids: [ID!]! @libraryID(kind: "image")
   delete_file: Boolean

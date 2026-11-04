@@ -19,6 +19,20 @@ review or intake first. The service does not infer a media merge, discard
 captions, or treat a filename/fclones hash as proof of identical bytes. Unrelated
 media entries remain available for a separate explicit merge decision.
 
+For reviewed duplicate image records, GraphQL `imageMerge` accepts `source`,
+`destination` (public image UUIDs), `source_revision` and
+`destination_revision`. Both must still be active at those exact archive
+revisions. This explicit operation keeps the destination's metadata, field
+decisions and primary file, unions file and gallery memberships, retains gallery
+covers, and redirects the source UUID before removing its library row. Existing
+source evidence and attachment decisions remain intact and resolve to the
+survivor. A fileless destination takes the source primary. No physical media or
+shared generated images are deleted by the merge. Use the file-deduplication
+preview/apply operation afterward to verify and remove redundant locations.
+Byte equality alone never invokes an image merge automatically. Following an
+uncertain merge response, inspect the original source identity's redirect and
+the survivor before attempting another operation.
+
 ## Application API
 
 These routes are under `/api/v3/archive`, behind application authentication and

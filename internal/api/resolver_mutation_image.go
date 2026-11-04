@@ -50,6 +50,35 @@ func (r *mutationResolver) ImageUpdate(ctx context.Context, input models.ImageUp
 	return r.getImage(ctx, ret.ID)
 }
 
+func (r *mutationResolver) ImageMerge(ctx context.Context, input ImageMergeInput) (ret *models.Image, err error) {
+	sourceID, err := strconv.Atoi(input.Source)
+	if err != nil {
+		return nil, fmt.Errorf("converting source image: %w", err)
+	}
+	destinationID, err := strconv.Atoi(input.Destination)
+	if err != nil {
+		return nil, fmt.Errorf("converting destination image: %w", err)
+	}
+	var source *models.Image
+	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		var err error
+		source, err = r.repository.Image.Find(ctx, sourceID)
+		if err != nil {
+			return err
+		}
+		ret, err = image.Merge(ctx, r.repository, sourceID, destinationID, input.SourceRevision, input.DestinationRevision)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	r.hookExecutor.ExecutePostHooks(ctx, sourceID, hook.ImageDestroyPost, plugin.ImageDestroyInput{
+		ImageDestroyInput: models.ImageDestroyInput{ID: input.Source},
+		Checksum:          source.Checksum, Path: source.Path,
+	}, nil)
+	r.hookExecutor.ExecutePostHooks(ctx, destinationID, hook.ImageUpdatePost, input, []string{"files", "gallery_ids"})
+	return ret, nil
+}
+
 func (r *mutationResolver) ImagesUpdate(ctx context.Context, input []*models.ImageUpdateInput) (ret []*models.Image, err error) {
 	inputMaps := getUpdateInputMaps(ctx)
 

@@ -576,8 +576,10 @@ an exact linked item (or captured numeric-alias resolution), and the API's
 matches the author to the current collection's profile, records the related URL
 against the established Reddit publisher, and adds it to that account owner's
 performer URLs. Linking an owner later also synchronizes the URL; explicit URL
-removals remain suppressed. This discovery does not assert Redgifs account
-ownership or assign depicted performers.
+removals remain suppressed. The discovered Redgifs collection binds an observed
+handle account in its first revision. Its unique performer profile URL can link
+that account to the same performer, preserving explicit unlinks or another
+selected owner. This does not invent a service ID or assign depicted performers.
 
 The producer includes `native_redgifs_directory`, the root-relative directory
 actually chosen by the Reddit download job, even on archive skips. Core validates
@@ -2097,6 +2099,17 @@ review. Preview reports `retained`
 resolve their names. A field never selected can still be filled later;
 explicit clears remain protected. Source associations remain independently
 validated, and every linked post retains its own caption and evidence.
+
+One specific precedence rule applies to hosted content: a Reddit capture that
+actually references the previously selected Redgifs item supplies its title,
+details and date ahead of that item's standalone Redgifs metadata. This works
+across collections and in either arrival order. Protected edits and unrelated
+reposts retain the ordinary first-selection rule. A Reddit capture can reuse an
+already linked Redgifs file by the exact captured item ID and current verified
+file generation, even when gallery-dl skips the file at a different download
+path. Core checks both source decisions, file ownership and collection scope,
+then applies the Reddit policy and synchronizes eligible galleries in the
+capture transaction. No new media file or successful-download report is created.
 
 Source-backed URL mappings add to the current media URLs, deduplicating the
 complete union and enforcing the ordinary field limits. Replaying an older post

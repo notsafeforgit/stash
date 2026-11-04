@@ -142,12 +142,19 @@ ORDER BY u.account_uuid,u.url_key LIMIT 128`, account.UUID, afterAccount, afterK
 		}
 	}
 	if len(added) == 0 && slices.Equal(existing, normalizePerformerURLs(existing)) {
-		return nil
+		return syncRedgifsProfileOwners(ctx, performer, existing)
 	}
 	update := models.NewPerformerPartial()
 	update.URLs = &models.UpdateStrings{Mode: models.RelationshipUpdateModeAdd, Values: added}
 	_, err = NewPerformerStore(nil).UpdatePartial(ctx, *performer.LocalID, update)
 	if err != nil {
+		return err
+	}
+	performer, err = (&ArchiveEntityStore{}).Find(ctx, performer.UUID)
+	if err != nil {
+		return err
+	}
+	if err := syncRedgifsProfileOwners(ctx, performer, append(existing, added...)); err != nil {
 		return err
 	}
 	return models.NotifyEntityUpdate(ctx, models.ArchivePerformer, *performer.LocalID, []string{"urls"})

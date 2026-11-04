@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/pkg/archive"
@@ -102,10 +103,18 @@ func subscribeLinkedRedgifsProfile(ctx context.Context, target, root, prefix, ca
 		// Preserve existing subscriptions, including paused/retired/manual ones.
 		return err
 	}
+	account, err := redgifsProfileAccount(ctx, id, target, time.Now().UTC())
+	if err != nil {
+		return err
+	}
+	var accountID *string
+	if account != nil {
+		accountID = &account.UUID
+	}
 	_, err = collections.Put(ctx, models.SourceCollectionInput{UUID: id,
 		SourceCollectionDefinition: models.SourceCollectionDefinition{
 			Label: "Redgifs / " + strings.TrimPrefix(target, "https://www.redgifs.com/users/"),
-			Kind:  "account", Namespace: "native:redgifs", State: "active", TargetURL: target, RootUUID: &root, PathPrefix: prefix,
+			Kind:  "account", Namespace: "native:redgifs", State: "active", TargetURL: target, AccountUUID: accountID, RootUUID: &root, PathPrefix: prefix,
 		}, Origin: "ingest", Reason: "Linked Redgifs uploader observed in Reddit profile capture " + capture})
 	if err != nil {
 		return err

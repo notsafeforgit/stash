@@ -88,6 +88,7 @@ func (rs *nativeArchiveRoutes) routerWithSourceTracking(enabled bool) http.Handl
 	r.Post("/entities/{entity}/stop-monitoring", rs.stopPerformerMonitoring)
 	r.Get("/subscriptions", rs.subscriptions)
 	r.Put("/collections/{collection}/subscription", rs.putSubscription)
+	r.Post("/collections/{collection}/profile-account", rs.linkProfileAccount)
 	r.Put("/runs/{run}/subscription", rs.bindRunSubscription)
 	r.Get("/entities/{entity}/performer-identities", rs.performerSourceIdentities)
 	r.Get("/source-accounts", rs.reviewAccounts)

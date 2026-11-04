@@ -103,6 +103,19 @@ type SourceCollectionInput struct {
 	Reason string `json:"reason"`
 }
 
+// ProfileAccountLink connects a saved Redgifs profile to an existing performer
+// whose current URLs uniquely name that profile. It does not assign media.
+type ProfileAccountLink struct {
+	ExpectedRevision int    `json:"expected_revision"`
+	PerformerUUID    string `json:"performer_uuid"`
+}
+
+type ProfileAccountLinkResult struct {
+	State      string            `json:"state"`
+	Reason     string            `json:"reason,omitempty"`
+	Collection *SourceCollection `json:"collection"`
+}
+
 type CollectionCapture struct {
 	CaptureUUID        string    `json:"capture_uuid"`
 	CollectionUUID     string    `json:"collection_uuid"`
@@ -157,6 +170,7 @@ type MediaRootReaderWriter interface {
 }
 
 type SourceCollectionReaderWriter interface {
+	LinkProfileAccount(context.Context, string, ProfileAccountLink) (*ProfileAccountLinkResult, error)
 	Put(context.Context, SourceCollectionInput) (*SourceCollection, error)
 	Find(context.Context, string) (*SourceCollection, error)
 	List(context.Context, string, int) ([]*SourceCollection, error)

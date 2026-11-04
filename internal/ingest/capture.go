@@ -321,6 +321,9 @@ func (s *Service) recordCaptureEffects(ctx context.Context, capture *models.Sour
 		if err := s.captureAlbum(ctx, capture, album, result); err != nil {
 			return nil, nil, err
 		}
+		if err := s.reuseHostedRedgifs(ctx, capture, collection, result); err != nil {
+			return nil, nil, err
+		}
 	}
 	result.Translation, err = s.Repo.TranslationPolicy.ScheduleCapture(ctx, provenance, now)
 	if err != nil {

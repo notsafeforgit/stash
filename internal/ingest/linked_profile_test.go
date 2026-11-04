@@ -113,7 +113,12 @@ func TestLinkedRedgifsProfileCaptureAtomicityOwnershipAndOptOut(t *testing.T) {
 	require.True(t, subscription.Enabled)
 	require.Equal(t, "https://www.redgifs.com/users/differentuploader", subscription.Collection.TargetURL)
 	require.Equal(t, "Custom/Example, reddit", subscription.Collection.PathPrefix)
-	require.Nil(t, subscription.Collection.AccountUUID, "a related URL is not another account's ownership")
+	require.NotNil(t, subscription.Collection.AccountUUID, "the observed Redgifs profile has its own service account")
+	require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		owner, err := f.service.Repo.SourceAccount.Ownership(ctx, *subscription.Collection.AccountUUID)
+		require.Nil(t, owner, "the originating Reddit account has no selected performer yet")
+		return err
+	}))
 
 	var performerID int
 	require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
@@ -145,8 +150,22 @@ func TestLinkedRedgifsProfileCaptureAtomicityOwnershipAndOptOut(t *testing.T) {
 		return ret
 	}
 	require.Equal(t, []string{subscription.Collection.TargetURL}, urls(), "late ownership receives the discovered profile URL")
+	require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		owner, err := f.service.Repo.SourceAccount.Ownership(ctx, *subscription.Collection.AccountUUID)
+		require.NoError(t, err)
+		require.Equal(t, models.AccountOwnershipLinked, owner.State)
+		performer, err := f.service.Repo.ArchiveEntity.FindByLocalID(ctx, models.ArchivePerformer, performerID)
+		require.NoError(t, err)
+		require.Equal(t, performer.UUID, *owner.PerformerUUID)
+		return nil
+	}))
 	require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		_, err := f.service.Repo.SourceSubscription.Put(ctx, subscription.Collection.UUID, models.SourceSubscriptionInput{ExpectedRevision: subscription.Revision, Enabled: false})
+		require.NoError(t, err)
+		account, err := f.service.Repo.SourceAccount.Find(ctx, *subscription.Collection.AccountUUID)
+		require.NoError(t, err)
+		_, err = f.service.Repo.SourceAccount.DecideOwnership(ctx, models.AccountOwnershipInput{AccountUUID: account.UUID,
+			ExpectedAccountRevision: account.Revision, State: models.AccountOwnershipUnlinked, Origin: "review", Reason: "Account ownership changed"})
 		require.NoError(t, err)
 		update := models.NewPerformerPartial()
 		update.URLs = &models.UpdateStrings{Mode: models.RelationshipUpdateModeSet, Values: []string{}}
@@ -163,6 +182,12 @@ func TestLinkedRedgifsProfileCaptureAtomicityOwnershipAndOptOut(t *testing.T) {
 	items = linkedProfileSubscriptions(t, f, root)
 	require.Len(t, items, 1)
 	require.False(t, items[0].Enabled)
+	require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		owner, err := f.service.Repo.SourceAccount.Ownership(ctx, *items[0].Collection.AccountUUID)
+		require.NoError(t, err)
+		require.Equal(t, models.AccountOwnershipUnlinked, owner.State, "a fresh capture cannot undo the explicit unlink")
+		return nil
+	}))
 	require.Equal(t, subscription.Collection.PathPrefix, items[0].Collection.PathPrefix, "fresh posts must not rewrite a saved destination")
 	require.Empty(t, urls(), "removed profile URLs remain suppressed")
 }

@@ -10,6 +10,25 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
+func (rs *nativeArchiveRoutes) linkProfileAccount(w http.ResponseWriter, r *http.Request) {
+	var input models.ProfileAccountLink
+	if err := readIngestJSON(w, r, 1024, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	var result *models.ProfileAccountLinkResult
+	err := rs.repo.WithTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		result, err = rs.repo.SourceCollection.LinkProfileAccount(ctx, chi.URLParam(r, "collection"), input)
+		return err
+	})
+	if err != nil {
+		nativeArchiveError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, result)
+}
+
 func (rs *nativeArchiveRoutes) roots(w http.ResponseWriter, r *http.Request) {
 	filter, err := definitionFilter(r)
 	if err != nil || filter.Kind != "" {

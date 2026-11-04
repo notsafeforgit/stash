@@ -285,6 +285,7 @@ administration. Responses use `Cache-Control: no-store`.
 | `GET /collections` | Current definitions; optional `q`, `kind`, `state`, UUID `after`, and `limit` |
 | `GET /collections/{uuid}` | One current definition |
 | `PUT /collections/{uuid}` | Create with `expected_revision: 0`, or edit the expected current revision |
+| `POST /collections/{uuid}/profile-account` | Link an observed Redgifs profile to its unique existing performer URL using `expected_revision` and `performer_uuid`; preserve explicit ownership choices |
 | `GET /collections/{uuid}/history` | Immutable definitions including reason/origin; integer revision `after` and `limit` |
 | `GET /media-roots` | Current root bindings; optional `q`, `state`, UUID `after`, and `limit` |
 | `GET /media-roots/{uuid}` | One root, including its local binding |
@@ -299,6 +300,15 @@ administration. Responses use `Cache-Control: no-store`.
 | `GET /collections/{uuid}/metadata-policy/samples/{entity}/sources` | Current capture/attachment choices; required `collection_revision`, paired `after_capture`/`after_attachment` cursor and bounded `limit` |
 | `POST /metadata-policy/references` | Resolve at most 100 fixed-reference UUIDs to current names, following merge redirects without rewriting saved rules |
 | `POST /metadata-policy/draft-preview` | Read-only unsaved definition preview, pinned to current collection/policy revisions, selected entity/file and optional source capture/attachment |
+
+Profile-account linking returns `linked`, `waiting`, or `review`. New discovered
+Redgifs sources already have an account binding. Repairing an older unbound
+source increments its collection revision and atomically rebinds the identical
+metadata policy; unfinished crawls or metadata jobs return `waiting`. External
+schedulers must pause and drain local pending requests before invoking this
+repair. Completed run coverage, disabled subscriptions, explicit ownership
+choices and destinations remain unchanged. Retrying the original revision after
+a committed binding returns the current link without another revision.
 
 Collection/root list routes retain their existing default of 50 results, with an
 explicit limit from 1 to 100. History defaults to 25. Search treats `%`, `_` and

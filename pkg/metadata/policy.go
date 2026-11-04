@@ -437,6 +437,19 @@ func (s Service) precedence(ctx context.Context, input Input, field string, curr
 	if field == "urls" && capture != nil {
 		return "ready", "", nil // Source URL mappings are additive, after normalization.
 	}
+	// A hosted file may arrive through Redgifs before its Reddit post. The
+	// enclosing Reddit post supplies the editorial text/date for that same item;
+	// unrelated reposts, policy constants and explicit choices retain precedence.
+	if current.Decision != nil && current.Origin == "source" && current.Decision.CaptureUUID != nil &&
+		capture != nil && capture.Platform == "reddit" && (field == "title" || field == "details" || field == "date") {
+		preferred, err := s.redditHostedMetadata(ctx, capture, *current.Decision.CaptureUUID)
+		if err != nil {
+			return "", "", err
+		}
+		if preferred {
+			return "ready", "Uses the Reddit post metadata for its hosted Redgifs item", nil
+		}
+	}
 	if current.Decision != nil {
 		if policy := current.Decision.Policy; policy != nil && current.Origin != "filename" {
 			if capture != nil && (current.Decision.CaptureUUID == nil || policy.CollectionUUID != input.CollectionUUID) {

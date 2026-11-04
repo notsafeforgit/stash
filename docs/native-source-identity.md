@@ -40,10 +40,13 @@ Generic yt-dlp URLs establish only a site namespace, never an account ID.
 An API-resolved Redgifs item linked from the author's Reddit profile can supply
 a related `/users/<userName>` URL. It is retained on the Reddit publisher's
 performer and can become a monitored source with the observed Reddit download
-directory. This is a discovery association, not an immutable account ID, account
-merge, Redgifs ownership decision or depicted-performer assignment. The two
-services' handles may differ. Existing URL removals and subscription decisions
-remain authoritative.
+directory. Native discovery creates or reuses an unambiguous Redgifs handle
+account and binds it to the new collection before its first run. A unique
+existing performer profile URL links that account to the performer, including
+when the Reddit owner is chosen later. This does not invent an immutable ID,
+merge accounts, or assign depicted performers. The two services' handles may
+differ. Existing URL removals, explicit ownership decisions and subscription
+decisions remain authoritative; ambiguous handles or performer URLs need review.
 
 Opaque IDs retain spelling and case. JSON integer IDs remain exact even above
 JavaScript's safe integer range. Fractional/exponent numeric IDs, nested objects,

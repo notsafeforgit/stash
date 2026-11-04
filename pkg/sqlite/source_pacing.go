@@ -41,7 +41,7 @@ func sourcePacingScope(ctx context.Context, id string, enrichment bool) (string,
 
 // Both claim paths call this inside their managed write transaction. Existing
 // download/destination exclusions still apply; independent downloads may run
-// together, but metadata enrichment cannot compete with them on the same service.
+// together. A metadata turn starts only after existing downloads finish.
 func sourcePacingReady(ctx context.Context, scope, collection string, enrichment bool, now time.Time) (bool, error) {
 	return sourcePacingReadyFor(ctx, scope, collection, enrichment, "", "", now)
 }
@@ -52,16 +52,23 @@ func sourcePacingReadyFor(ctx context.Context, scope, collection string, enrichm
  EXISTS(SELECT 1 FROM source_pacing WHERE scope=? AND (available_at_ms>? OR last_started_at_ms>?))
  OR EXISTS(SELECT 1 FROM archive_jobs j INDEXED BY archive_jobs_active_work
   JOIN enrichment_attempt_pacing p ON p.job_uuid=j.uuid AND p.fence=j.fence
+  JOIN archive_job_attempts a ON a.job_uuid=j.uuid AND a.fence=j.fence
   WHERE j.kind IN ('post.enrich','account.list_page','post.verify_candidate') AND j.state IN ('queued','running') AND j.state='running'
-   AND j.uuid!=? AND (? OR j.kind!='post.enrich') AND (p.scope=? OR json_extract(j.arguments,'$.collection_uuid')=?))
+   AND j.uuid!=? AND (? OR j.kind!='post.enrich' OR a.started_at_ms>?) AND (p.scope=? OR json_extract(j.arguments,'$.collection_uuid')=?))
  OR EXISTS(SELECT 1 FROM source_runs r INDEXED BY source_runs_expired
   JOIN source_run_attempt_pacing p ON p.run_uuid=r.uuid AND p.fence=r.fence AND p.reserved=1
   WHERE r.state='running' AND r.uuid!=? AND (p.scope=? OR r.collection_uuid=?) AND (? OR r.operation='enrich'))`,
-		scope, now.UnixMilli(), now.UnixMilli(), ignoreJob, enrichment, scope, collection, ignoreRun, scope, collection, enrichment); err != nil {
+		scope, now.UnixMilli(), now.UnixMilli(), ignoreJob, enrichment, now.Add(-sourceMetadataTurn).UnixMilli(), scope, collection, ignoreRun, scope, collection, enrichment); err != nil {
 		return false, err
 	}
 	if busy {
 		return !busy, nil
+	}
+	if enrichment && ignoreJob != "" {
+		active, err := sourceMetadataTurnActive(ctx, ignoreJob, now)
+		if err != nil || active {
+			return active, err
+		}
 	}
 	turn, err := sourceEnrichmentTurn(ctx, scope, collection, now)
 	if err != nil {
@@ -73,7 +80,7 @@ func sourcePacingReadyFor(ctx context.Context, scope, collection string, enrichm
 	if !enrichment {
 		return true, nil
 	}
-	// Current, enabled download definitions take precedence. Stale definitions,
+	// Outside a granted metadata turn, enabled downloads take precedence. Stale definitions,
 	// deferred runs and retries still in backoff cannot indefinitely reserve it.
 	if err := dbWrapper.Get(ctx, &busy, `SELECT EXISTS(
  SELECT 1 FROM source_runs r INDEXED BY source_runs_active

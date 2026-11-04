@@ -7,7 +7,7 @@ existing capture. Dispatch and execution check for reusable captures before
 admitting or claiming a separate fetch. This preserves the original observation
 time and does not copy the payload or manufacture another observation.
 
-`post.enrich` is gap recovery only, using idle source capacity. It fills old
+`post.enrich` is gap recovery, using bounded turns and idle source capacity. It fills old
 imports that have no retained gallery-dl post capture; it does not refetch every
 downloaded post to refresh detail-only fields, later edits or profile changes.
 Running jobs and retained partial child transcripts are protected from reuse;
@@ -220,11 +220,14 @@ response bodies are retained in budget records.
 
 Schema 1000112 extends the same budget to historical metadata jobs. Every HTTP
 attempt, redirect, retry and external-media resolution requires a permit. These
-jobs cannot gain priority through age or a fairness turn: any ready same-service
-download takes precedence, even after a metadata job has claimed a lease.
-Download claims do not wait for an idle metadata lease. Metadata checks both its
-parent service and the contacted host, and yields before its next request when
-higher-priority work appears. An already in-flight HTTP request can finish.
+jobs register scheduling interest when polled. After four download starts or two
+minutes of live waiting, the oldest eligible requester gets a turn once current
+downloads drain. A claimed metadata attempt reserves its services for at most 60
+seconds before queued downloads regain priority; lease renewal cannot extend
+that turn. Metadata checks both its parent service and the contacted host, and
+yields before its next request when its turn ends and downloads are waiting.
+It may continue while the service is otherwise idle. An already in-flight HTTP
+request can finish. Provider cooldowns and request spacing still apply throughout.
 `budget_yield` retains partial records and checkpoints without consuming the
 failure/retry budget. Historical requests and rate limits appear in the existing
 recovery metrics. The capability `enrichment_gap_protocol: 1` prevents older

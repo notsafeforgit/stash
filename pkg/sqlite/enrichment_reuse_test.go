@@ -70,7 +70,7 @@ func TestEnrichmentCaptureReuseDoesNotHideWrongIdentityOrPendingChildren(t *test
 	require.Nil(t, completion, "a partial enrichment still owns its child checkpoint")
 }
 
-func TestMetadataRequestYieldsToNewDownloadsWithoutConsumingFailureBudget(t *testing.T) {
+func TestMetadataRequestYieldsAfterBoundedTurnWithoutConsumingFailureBudget(t *testing.T) {
 	f := newEnrichmentExecutionFixture(t)
 	job := f.admit(t)
 	running := f.claim(t, job.UUID, 0)
@@ -83,8 +83,18 @@ func TestMetadataRequestYieldsToNewDownloadsWithoutConsumingFailureBudget(t *tes
 	require.Equal(t, permit, again)
 	require.NoError(t, f.worker.ReportSourceRequest(t.Context(), f.tokens[0], running.Lease(), models.SourceRequestResult{RequestUUID: input.RequestUUID, Status: 200}))
 	download := newPacingDownload(t, f, "https://reddit.com/user/new-posts")
+	require.Nil(t, download.claim(t), "metadata gets time to make progress")
+	f.now = f.now.Add(30 * time.Second)
+	running, err = f.worker.Renew(t.Context(), f.tokens[0], running.Lease(), 2*time.Minute)
+	require.NoError(t, err)
+	input.RequestUUID = uuid.NewString()
+	permit, err = f.worker.RequestSource(t.Context(), f.tokens[0], running.Lease(), input)
+	require.NoError(t, err)
+	require.True(t, permit.Ready, "queued downloads do not interrupt the granted turn")
+	require.NoError(t, f.worker.ReportSourceRequest(t.Context(), f.tokens[0], running.Lease(), models.SourceRequestResult{RequestUUID: input.RequestUUID, Status: 200}))
+	f.now = f.now.Add(30 * time.Second)
 	run := download.claim(t)
-	require.NotNil(t, run, "a metadata lease cannot block newly queued downloads")
+	require.NotNil(t, run, "heartbeat renewal cannot extend the sixty-second turn")
 	input.RequestUUID = uuid.NewString()
 	permit, err = f.worker.RequestSource(t.Context(), f.tokens[0], running.Lease(), input)
 	require.NoError(t, err)
@@ -101,7 +111,12 @@ func TestMetadataRequestYieldsToNewDownloadsWithoutConsumingFailureBudget(t *tes
 	request.Class = "routine"
 	grant, err := download.coordinator.RequestSource(t.Context(), download.token, run.Lease(), request)
 	require.NoError(t, err)
-	require.False(t, grant.Ready, "both paths share the same last-request spacing")
+	require.True(t, grant.Ready, "the download can resume after the metadata turn")
+	require.NoError(t, download.coordinator.ReportSourceRequest(t.Context(), download.token, run.Lease(), models.SourceRequestResult{RequestUUID: request.RequestUUID, Status: 200}))
+	request.RequestUUID = uuid.NewString()
+	grant, err = download.coordinator.RequestSource(t.Context(), download.token, run.Lease(), request)
+	require.NoError(t, err)
+	require.False(t, grant.Ready, "ordinary request spacing still applies")
 	f.now = f.now.Add(5 * time.Second)
 	grant, err = download.coordinator.RequestSource(t.Context(), download.token, run.Lease(), request)
 	require.NoError(t, err)

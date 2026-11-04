@@ -2065,6 +2065,13 @@ budget, preserving download preference between metadata turns. All admission and
 counter updates commit with the actual attempt; replaying ownership or a held
 reservation does not count another start.
 
+Historical `post.enrich` attempts receive a fixed 60-second turn measured from
+the current attempt's start. Heartbeats do not extend it. Once it ends, ready
+downloads can claim the same service and metadata yields at its next HTTP
+boundary without consuming its failure allowance. With no queued download it
+can continue using idle capacity. Shared request pacing and provider cooldowns
+remain authoritative during the turn, including for linked services.
+
 Download attempts expose `turn_until`, five minutes after their recorded start.
 The worker checks that server-derived deadline at source boundaries; heartbeats
 cannot extend it. It finishes the current file and saves its checkpoint before

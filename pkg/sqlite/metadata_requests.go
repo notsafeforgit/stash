@@ -22,8 +22,8 @@ type metadataRequestRow struct {
 	Backoff     bool   `db:"backoff"`
 }
 
-// Metadata gets idle capacity only. Recheck downloads on every HTTP attempt,
-// including child resolution, so a previously claimed job cannot reserve a site.
+// Metadata gets a bounded turn, then idle capacity. Recheck pacing on every HTTP
+// attempt, including child resolution, so a lease cannot reserve a site forever.
 func (s *EnrichmentJobStore) RequestSource(ctx context.Context, lease models.EnrichmentJobLease, input models.SourceRequestInput, now time.Time) (*models.SourceRequestPermit, error) {
 	if _, err := archiveUUID(input.RequestUUID); err != nil || input.Class != "recovery" {
 		return nil, models.ErrEnrichmentInvalid

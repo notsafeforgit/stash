@@ -10,6 +10,18 @@ import (
 )
 
 const sourceDownloadTurn = 5 * time.Minute
+const sourceMetadataTurn = time.Minute
+
+// A claimed metadata job gets a short, fixed turn. Heartbeats cannot extend it;
+// after it ends, queued downloads regain priority at the next HTTP boundary.
+func sourceMetadataTurnActive(ctx context.Context, job string, now time.Time) (bool, error) {
+	var active bool
+	err := dbWrapper.Get(ctx, &active, `SELECT EXISTS(
+ SELECT 1 FROM archive_jobs j JOIN archive_job_attempts a ON a.job_uuid=j.uuid AND a.fence=j.fence
+ WHERE j.uuid=? AND j.kind='post.enrich' AND j.state='running'
+ AND a.started_at_ms<=? AND a.started_at_ms>?)`, job, now.UnixMilli(), now.Add(-sourceMetadataTurn).UnixMilli())
+	return active, err
+}
 
 func metadataJobCollection(ctx context.Context, job *models.ArchiveJob, now time.Time) (string, error) {
 	if job.Kind == models.ArchiveJobVerifyCandidate {
@@ -74,7 +86,7 @@ func sourceEnrichmentWaiting(ctx context.Context, job *models.ArchiveJob, now ti
 func sourceEnrichmentTurn(ctx context.Context, scope, collection string, now time.Time) (string, error) {
 	var rows []archiveJobRow
 	err := dbWrapper.Select(ctx, &rows, `SELECT j.* FROM source_enrichment_waiters w JOIN archive_jobs j ON j.uuid=w.job_uuid
- WHERE j.kind!='post.enrich' AND w.expires_at_ms>? AND w.refreshed_at_ms<=? AND j.state='queued' AND j.fence=w.fence
+ WHERE w.expires_at_ms>? AND w.refreshed_at_ms<=? AND j.state='queued' AND j.fence=w.fence
  AND j.available_at_ms<=? AND j.failures<j.max_attempts
  AND (json_extract(j.arguments,'$.collection_uuid')=? OR EXISTS(
   SELECT 1 FROM source_enrichment_waiter_scopes p WHERE p.job_uuid=w.job_uuid AND p.scope=?))

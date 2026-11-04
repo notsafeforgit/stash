@@ -61,13 +61,14 @@ func TestSourceRunServicesReserveBeforeChildAndReleaseAfterFinish(t *testing.T) 
 	require.ErrorIs(t, err, models.ErrSourceRunLease)
 }
 
-func TestSourceRunServicesDownloadsPreemptCompetingMetadataChildReservation(t *testing.T) {
+func TestSourceRunServicesCompetingReservationsRespectBoundedMetadataTurn(t *testing.T) {
 	f := newEnrichmentExecutionFixture(t)
 	job := f.admit(t)
 	enriching := f.claim(t, job.UUID, 0)
 	d := newPacingDownload(t, f, "https://x.com/different")
 	r := d.claim(t)
 	var download *models.SourceRunServiceReservation
+	var metadata bool
 	var one, two error
 	start := make(chan struct{})
 	var group sync.WaitGroup
@@ -77,13 +78,22 @@ func TestSourceRunServicesDownloadsPreemptCompetingMetadataChildReservation(t *t
 	})
 	group.Go(func() {
 		<-start
-		_, two = f.worker.ReserveSource(t.Context(), f.tokens[0], enriching.Lease(), "https://redgifs.com/watch/two")
+		metadata, two = f.worker.ReserveSource(t.Context(), f.tokens[0], enriching.Lease(), "https://redgifs.com/watch/two")
 	})
 	close(start)
 	group.Wait()
 	require.NoError(t, one)
 	require.NoError(t, two)
-	require.True(t, download.Ready, "downloads take priority regardless of which reservation arrived first")
+	require.NotEqual(t, metadata, download.Ready, "exactly one competing request reserves the child service")
+	f.now = f.now.Add(30 * time.Second)
+	enriching, one = f.worker.Renew(t.Context(), f.tokens[0], enriching.Lease(), 2*time.Minute)
+	require.NoError(t, one)
+	r, two = d.coordinator.Renew(t.Context(), d.token, r.Lease(), 2*time.Minute)
+	require.NoError(t, two)
+	f.now = f.now.Add(30 * time.Second)
+	download, one = d.coordinator.ReserveSource(t.Context(), d.token, r.Lease(), "https://redgifs.com/watch/one")
+	require.NoError(t, one)
+	require.True(t, download.Ready, "downloads regain priority after the metadata turn, even if metadata reserved first")
 	ready, err := f.worker.ReserveSource(t.Context(), f.tokens[0], enriching.Lease(), "https://redgifs.com/watch/two")
 	require.NoError(t, err)
 	require.False(t, ready, "a previously reserved metadata child must yield before its next request")

@@ -195,3 +195,79 @@ func TestThreadGalleryLaterRootFromDifferentAuthorRequiresReview(t *testing.T) {
 	require.Equal(t, "review", sourceGalleryPreview(t, repo, second).Action)
 	sourceGalleryMemberships(t, repo, *album.GalleryID, []int{41}, []int{31})
 }
+
+func TestPostConsolidationPreservesUnchangedGalleryWhenThreadNeedsReview(t *testing.T) {
+	db, repo := archiveTestDatabase(t)
+	first := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "legacy:catalog:fixture", Value: "first"}, "")
+	later := threadPost(t, repo, "102", "100", "101", "99", "99")
+	threadMedia(t, repo, later, "502", models.ArchiveImage, 41)
+	threadPost(t, repo, "100", "100", "", "88", "")
+	require.Equal(t, "review", sourceGalleryPreview(t, repo, later).Action)
+	input := models.PostConsolidationReviewInput{SourceUUID: later, DestinationUUID: first.UUID, Reason: "Keep first stored post"}
+	var preview *models.PostConsolidationReviewPreview
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		preview, err = repo.SourceEvidence.PreviewConsolidationReview(ctx, input)
+		return err
+	}))
+	require.True(t, preview.Ready)
+	require.Equal(t, "ineligible", preview.Album.Action)
+	raw := openRawDB(t, db.DatabasePath())
+	defer raw.Close()
+	tables := []string{"galleries", "galleries_images", "images", "source_post_threads"}
+	before := map[string][][]any{}
+	for _, table := range tables {
+		before[table] = albumJobRows(t, raw, table)
+	}
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		result, _, err := repo.SourceEvidence.ApplyConsolidationReview(ctx, models.PostConsolidationReviewApplyInput{
+			PostConsolidationReviewInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest}, time.Now())
+		require.NoError(t, err)
+		require.Equal(t, "ineligible", result.Result.Gallery.Action)
+		require.False(t, result.Result.Gallery.Changed())
+		return err
+	}))
+	for _, table := range tables {
+		require.Equal(t, before[table], albumJobRows(t, raw, table), table)
+	}
+	require.Equal(t, "review", sourceGalleryPreview(t, repo, first.UUID).Action, "thread evidence still requires review before gallery changes")
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		identity, err := repo.SourceEvidence.PostIdentity(ctx, later)
+		require.NoError(t, err)
+		require.Equal(t, first.UUID, identity.CanonicalUUID)
+		return nil
+	}))
+}
+
+func TestPostConsolidationStillRejectsGalleryChangesWhenThreadNeedsReview(t *testing.T) {
+	_, repo := archiveTestDatabase(t)
+	first := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "legacy:catalog:fixture", Value: "first"}, "")
+	later := threadPost(t, repo, "102", "100", "101", "99", "99")
+	selection := selectAlbum(t, repo, later, models.SourceAttachmentManifestInput{Complete: true, Entries: []models.SourceAttachmentEntry{
+		albumEntry(0, "native:twitter", "502", "image"), albumEntry(1, "native:twitter", "503", "video"),
+	}})
+	chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveImage, 41)
+	chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveScene, 31)
+	threadPost(t, repo, "100", "100", "", "88", "")
+	input := models.PostConsolidationReviewInput{SourceUUID: later, DestinationUUID: first.UUID}
+	var preview *models.PostConsolidationReviewPreview
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		preview, err = repo.SourceEvidence.PreviewConsolidationReview(ctx, input)
+		return err
+	}))
+	require.True(t, preview.Ready)
+	require.Equal(t, "create", preview.Album.Action)
+	err := repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, _, err := repo.SourceEvidence.ApplyConsolidationReview(ctx, models.PostConsolidationReviewApplyInput{
+			PostConsolidationReviewInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest}, time.Now())
+		return err
+	})
+	require.ErrorIs(t, err, models.ErrPostConsolidationReviewConflict)
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		identity, err := repo.SourceEvidence.PostIdentity(ctx, later)
+		require.NoError(t, err)
+		require.Equal(t, later, identity.CanonicalUUID, "the failed merge rolls back")
+		return nil
+	}))
+}

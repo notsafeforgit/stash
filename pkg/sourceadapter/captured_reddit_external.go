@@ -11,6 +11,7 @@ import (
 )
 
 var capturedRedgifsWatch = regexp.MustCompile(`^/(?:watch|ifr)/([A-Za-z0-9]{1,256})/?$`)
+var capturedGfycatItem = regexp.MustCompile(`^/(?:gifs/detail/|detail/|ifr/)?([A-Za-z0-9]{1,256})/?$`)
 var capturedImgurItem = regexp.MustCompile(`^/([A-Za-z0-9]{5,12})/?$`)
 
 // A linked clip has an explicit identity even when its external gallery's
@@ -42,6 +43,13 @@ func redditExternalReference(raw interface{}) (*models.SourcePostIdentifier, str
 		return &models.SourcePostIdentifier{Namespace: "native:imgur", Value: match[1]}, "unknown", false
 	case "redgifs.com", "www.redgifs.com", "m.redgifs.com", "v3.redgifs.com":
 		if match := capturedRedgifsWatch.FindStringSubmatch(u.EscapedPath()); match != nil {
+			return &models.SourcePostIdentifier{Namespace: "native:redgifs", Value: strings.ToLower(match[1])}, "unknown", false
+		}
+		return nil, "", false
+	case "gfycat.com", "www.gfycat.com", "m.gfycat.com":
+		// gallery-dl resolves these legacy item permalinks through the
+		// Redgifs item API. Keep the same attachment identity as watch/ifr.
+		if match := capturedGfycatItem.FindStringSubmatch(u.EscapedPath()); match != nil {
 			return &models.SourcePostIdentifier{Namespace: "native:redgifs", Value: strings.ToLower(match[1])}, "unknown", false
 		}
 		return nil, "", false

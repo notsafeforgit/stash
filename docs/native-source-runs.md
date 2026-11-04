@@ -221,7 +221,7 @@ response bodies are retained in budget records.
 Schema 1000112 extends the same budget to historical metadata jobs. Every HTTP
 attempt, redirect, retry and external-media resolution requires a permit. These
 jobs register scheduling interest when polled. After four download starts or two
-minutes of live waiting, the oldest eligible requester gets a turn once current
+minutes of live waiting, an eligible polling requester gets a turn once current
 downloads drain. A claimed metadata attempt reserves its services for at most 60
 seconds before queued downloads regain priority; lease renewal cannot extend
 that turn. Metadata checks both its parent service and the contacted host, and

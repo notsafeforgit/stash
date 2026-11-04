@@ -78,7 +78,8 @@ func TestSourceFairnessLiveWaitingAgesButAbandonedInterestExpires(t *testing.T) 
 	}
 }
 
-func TestSourceFairnessOldestMetadataRequesterWinsConcurrentClaims(t *testing.T) {
+func fairnessMetadataPeers(t *testing.T) (*enrichmentExecutionFixture, *models.ArchiveJob, *models.ArchiveJob, string) {
+	t.Helper()
 	f := newEnrichmentExecutionFixture(t)
 	one := f.admit(t)
 	collection := putSourceCollection(t, f.repo, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
@@ -92,6 +93,11 @@ func TestSourceFairnessOldestMetadataRequesterWinsConcurrentClaims(t *testing.T)
 	require.NoError(t, err)
 	two, err := f.worker.Admit(t.Context(), token, target.UUID, target.Revision, strings.Repeat("a", 64), "1.32.15-dev")
 	require.NoError(t, err)
+	return f, one, two, token
+}
+
+func TestSourceFairnessOneDueMetadataRequesterWinsConcurrentClaims(t *testing.T) {
+	f, one, two, token := fairnessMetadataPeers(t)
 	download := newPacingDownload(t, f, "https://reddit.com/user/download")
 	require.Nil(t, tryPacingEnrichment(t, f, one))
 	f.now = f.now.Add(time.Second)
@@ -125,9 +131,8 @@ func TestSourceFairnessOldestMetadataRequesterWinsConcurrentClaims(t *testing.T)
 	for _, err := range errs {
 		require.NoError(t, err)
 	}
-	require.NotNil(t, results[0])
-	require.Nil(t, results[1])
-	require.Nil(t, run, "the oldest waiting job gets the due turn regardless of claim order")
+	require.NotEqual(t, results[0] == nil, results[1] == nil, "exactly one eligible metadata caller receives the turn")
+	require.Nil(t, run, "a due metadata turn takes precedence regardless of claim order")
 }
 
 func TestSourceFairnessHeldTargetDoesNotReserveService(t *testing.T) {
@@ -295,4 +300,25 @@ func TestSourceFairnessMigrationPreservesExistingState(t *testing.T) {
 	require.EqualValues(t, queryUint(t, raw, "SELECT count(*) FROM source_pacing"), queryUint(t, raw, "SELECT count(*) FROM source_service_turns"))
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM source_enrichment_waiters"))
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
+}
+
+func TestSourceFairnessDueTurnDoesNotWaitForAbsentRequester(t *testing.T) {
+	f, one, two, token := fairnessMetadataPeers(t)
+	download := newPacingDownload(t, f, "https://reddit.com/user/download")
+	require.Nil(t, tryPacingEnrichment(t, f, one))
+	raw := openRawDB(t, f.db.DatabasePath())
+	defer raw.Close()
+	_, err := raw.Exec("UPDATE source_service_turns SET download_starts=4 WHERE scope='service:reddit'")
+	require.NoError(t, err)
+	// Collection rotation has moved away from the older blocked requester. A
+	// live hint must not reserve the service for a worker that is not polling it.
+	f.now = f.now.Add(30 * time.Second)
+	running, err := f.worker.Claim(t.Context(), token, two.UUID, two.Revision, uuid.NewString(), strings.Repeat("a", 64), "1.32.15-dev", time.Minute)
+	require.NoError(t, err)
+	require.NotNil(t, running, "a due metadata turn can be used by the eligible caller currently polling")
+	require.Nil(t, download.claim(t), "the successful claim still receives a bounded metadata turn")
+	require.Nil(t, tryPacingEnrichment(t, f, one), "concurrent metadata cannot steal the active turn")
+	_, err = f.worker.Fail(t.Context(), token, running.Lease(), "budget_yield")
+	require.NoError(t, err)
+	require.NotNil(t, download.claim(t), "download preference returns after that turn")
 }

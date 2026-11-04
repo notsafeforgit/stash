@@ -81,12 +81,14 @@ func sourceEnrichmentWaiting(ctx context.Context, job *models.ArchiveJob, now ti
 }
 
 // A turn becomes due after four download starts or two minutes of live waiting.
-// The last enrichment start resets the age budget for other waiting jobs. Choose
-// the oldest eligible requester; merely polling a newer job cannot steal its turn.
-func sourceEnrichmentTurn(ctx context.Context, scope, collection string, now time.Time) (string, error) {
+// The last enrichment start resets the age budget for other waiting jobs.
+// Downloads yield to any due requester. A metadata claim checks its own due turn:
+// reserving it for a different, absent caller can deadlock collection rotation.
+func sourceEnrichmentTurn(ctx context.Context, scope, collection, requester string, now time.Time) (string, error) {
 	var rows []archiveJobRow
 	err := dbWrapper.Select(ctx, &rows, `SELECT j.* FROM source_enrichment_waiters w JOIN archive_jobs j ON j.uuid=w.job_uuid
  WHERE w.expires_at_ms>? AND w.refreshed_at_ms<=? AND j.state='queued' AND j.fence=w.fence
+ AND (?='' OR j.uuid=?)
  AND j.available_at_ms<=? AND j.failures<j.max_attempts
  AND (json_extract(j.arguments,'$.collection_uuid')=? OR EXISTS(
   SELECT 1 FROM source_enrichment_waiter_scopes p WHERE p.job_uuid=w.job_uuid AND p.scope=?))
@@ -94,7 +96,7 @@ func sourceEnrichmentTurn(ctx context.Context, scope, collection string, now tim
   WHERE p.job_uuid=w.job_uuid AND (s.available_at_ms>? OR s.last_started_at_ms>?))
  AND ((SELECT max(s.download_starts) FROM source_enrichment_waiter_scopes p JOIN source_service_turns s ON s.scope=p.scope WHERE p.job_uuid=w.job_uuid)>=4
  OR max(w.first_requested_at_ms,coalesce((SELECT max(s.enrichment_started_at_ms) FROM source_enrichment_waiter_scopes p JOIN source_service_turns s ON s.scope=p.scope WHERE p.job_uuid=w.job_uuid),0))<=?)
- ORDER BY w.first_requested_at_ms,w.job_uuid LIMIT ?`, now.UnixMilli(), now.UnixMilli(), now.UnixMilli(), collection, scope,
+ ORDER BY w.first_requested_at_ms,w.job_uuid LIMIT ?`, now.UnixMilli(), now.UnixMilli(), requester, requester, now.UnixMilli(), collection, scope,
 		now.UnixMilli(), now.UnixMilli(), now.Add(-2*time.Minute).UnixMilli(), archive.MaxEnrichmentJobs+archive.MaxDiscoveryJobs+archive.MaxDiscoveryDetailJobs+1)
 	if err != nil {
 		return "", err

@@ -70,7 +70,7 @@ func sourcePacingReadyFor(ctx context.Context, scope, collection string, enrichm
 			return active, err
 		}
 	}
-	turn, err := sourceEnrichmentTurn(ctx, scope, collection, now)
+	turn, err := sourceEnrichmentTurn(ctx, scope, collection, ignoreJob, now)
 	if err != nil {
 		return false, err
 	}

@@ -2055,7 +2055,10 @@ ignored and pruned by subsequent registrations.
 
 A waiting enrichment job becomes due after four download starts on any required
 service, or two minutes of continuously live interest since the last enrichment
-start. The oldest eligible requester wins, with UUID as the tie-breaker. Required
+start. An eligible requester actively polling its own due turn can claim it;
+an older hint belonging to another caller does not reserve the turn exclusively.
+This lets persisted collection rotation make progress without waiting for an
+absent requester. Concurrent claims still grant only one metadata owner. Required
 services include checkpointed children. Current target/source definitions,
 cooldowns and existing enrichment ownership must still allow the work. Held or
 stale targets and cooling dependencies cannot reserve an unrelated parent.

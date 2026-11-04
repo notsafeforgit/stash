@@ -12,7 +12,7 @@ import (
 	"github.com/stashapp/stash/pkg/txn"
 )
 
-type EnrichmentJobStore struct{}
+type EnrichmentJobStore struct{ gallery *GalleryStore }
 
 func enrichmentRetryAt(job *models.ArchiveJob, now time.Time) time.Time {
 	shift := job.Failures

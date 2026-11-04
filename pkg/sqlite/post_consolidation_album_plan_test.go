@@ -105,7 +105,7 @@ func TestPostConsolidationPlanCreatesAlbumFromOriginalCaptureWithoutMutating(t *
 	require.Equal(t, plan.preview.Album, actual.preview.Album)
 }
 
-func TestPostConsolidationPlanProtectsOutsideGalleryClaimsAcrossRedirects(t *testing.T) {
+func TestPostConsolidationPlanRetainsSharedGalleryAcrossRedirects(t *testing.T) {
 	_, repo := postIdentityFixture(t)
 	a := identityPost(t, repo, "legacy:catalog:fixture", "first")
 	b := identityPost(t, repo, "native:reddit", "one-post")
@@ -123,10 +123,14 @@ func TestPostConsolidationPlanProtectsOutsideGalleryClaimsAcrossRedirects(t *tes
 	}))
 	input := models.PostConsolidationReviewInput{SourceUUID: a, DestinationUUID: b}
 	plan := consolidationTestPlan(t, repo, input)
-	require.False(t, plan.preview.Ready)
-	require.Equal(t, []string{"gallery_claimed"}, consolidationTestPlanBlockers(plan))
-	input.Gallery = &models.PostConsolidationGalleryChoice{State: "disabled"}
-	require.True(t, consolidationTestPlan(t, repo, input).preview.Ready)
+	require.True(t, plan.preview.Ready)
+	require.Empty(t, consolidationTestPlanBlockers(plan))
+	require.Equal(t, *gc.GalleryUUID, plan.preview.Gallery.GalleryUUID)
+	before := identityRows(t, repo, "galleries", "galleries_images", "scenes_galleries")
+	applyConsolidationReview(t, repo, consolidationReviewRequest(t, repo, input))
+	require.Equal(t, before, identityRows(t, repo, "galleries", "galleries_images", "scenes_galleries"))
+	require.Equal(t, gc, consolidationGalleryChoice(t, repo, c), "the other post retains its own association")
+	require.Equal(t, *gc.GalleryUUID, *consolidationGalleryChoice(t, repo, b).GalleryUUID)
 }
 
 func TestPostConsolidationPlanGalleryMetadataAndClaimsUseBoundedIndexes(t *testing.T) {

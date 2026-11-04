@@ -117,7 +117,21 @@ func verifyEnrichmentCapture(get enrichmentGet, selectRows enrichmentSelect, inp
 		return err
 	}
 	if !valid {
-		return models.ErrEnrichmentConflict
+		// Consolidation preserves immutable captures and job scope. Their native
+		// identifier may belong to another original member of the same post.
+		if err := get(&valid, `SELECT EXISTS(SELECT 1 FROM source_post_identifiers id
+ JOIN source_post_identities owner ON owner.post_uuid=id.post_uuid
+ JOIN source_post_identities target ON target.canonical_uuid=owner.canonical_uuid
+ WHERE id.namespace=? AND id.value=? AND target.post_uuid=?)
+ AND EXISTS(SELECT 1 FROM source_collection_captures c JOIN source_collection_revisions r
+  ON r.collection_uuid=c.collection_uuid AND r.revision=c.collection_revision
+  WHERE c.capture_uuid=? AND c.collection_uuid=? AND c.collection_revision=? AND (r.namespace='' OR r.namespace=?))`,
+			post.Namespace, post.Value, input.PostUUID, input.UUID, collection, revision, post.Namespace); err != nil {
+			return err
+		}
+		if !valid {
+			return models.ErrEnrichmentConflict
+		}
 	}
 	refs := []models.SourceProfileReference{}
 	if err := selectRows(&refs, "SELECT part,path,profile_hash AS hash FROM source_capture_profiles WHERE capture_uuid=? ORDER BY part,path LIMIT 1025", input.UUID); err != nil {

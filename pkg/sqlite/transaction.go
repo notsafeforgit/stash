@@ -235,7 +235,7 @@ func (db *Database) Repository() models.Repository {
 		SourceTranslation:           &SourceTranslationStore{},
 		TranslationWork:             &TranslationWorkStore{},
 		EnrichmentWork:              &EnrichmentWorkStore{},
-		EnrichmentJob:               &EnrichmentJobStore{},
+		EnrichmentJob:               &EnrichmentJobStore{gallery: db.Gallery},
 		DiscoveryJob:                &DiscoveryJobStore{},
 		DiscoveryDetail:             &DiscoveryDetailStore{},
 		DiscoveryMatch:              &DiscoveryMatchStore{},

@@ -35,16 +35,8 @@ func (p *postConsolidationPlan) prepareAlbum(ctx context.Context) error {
 	for _, member := range p.snapshot.Identity.Members {
 		owners[member.UUID] = true
 	}
-	if ret.Gallery != nil {
-		claimed, err := postConsolidationGalleryClaimed(ctx, ret.Gallery.UUID, sortedPostConsolidationKeys(owners))
-		if err != nil {
-			return err
-		}
-		if claimed {
-			p.block("gallery_claimed", "", "", ret.Gallery.UUID)
-			return p.setAlbumPlan(ret)
-		}
-	}
+	// The selected gallery already belongs to a member of this merge. Other
+	// posts may share it; the ordinary membership preview preserves their media.
 	if p.selection == nil {
 		return p.setAlbumPlan(ret)
 	}

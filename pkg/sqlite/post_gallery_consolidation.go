@@ -59,6 +59,32 @@ func publishConsolidatedPostGallery(ctx context.Context, input models.SourceGall
 	if !slices.Equal(current, expected) {
 		return nil, models.ErrSourceGalleryConflict
 	}
+	store := &SourceGalleryStore{}
+	retainShared := false
+	if input.State == "linked" {
+		owners := make([]string, 0, len(heads))
+		owned := false
+		for _, head := range heads {
+			owners = append(owners, head.PostUUID)
+			choice, err := store.associationForOriginal(ctx, head.PostUUID)
+			if err != nil {
+				return nil, err
+			}
+			if choice != nil && choice.GalleryUUID != nil {
+				gallery, err := (&ArchiveEntityStore{}).Resolve(ctx, *choice.GalleryUUID)
+				if err != nil {
+					return nil, err
+				}
+				owned = owned || (gallery != nil && gallery.UUID == input.GalleryUUID)
+			}
+		}
+		if owned {
+			retainShared, err = postConsolidationGalleryClaimed(ctx, input.GalleryUUID, owners)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 	finish := postConsolidationCommitGuard(ctx, models.ErrSourceGalleryConflict)
 	if len(heads) > 0 {
 		args := make([]interface{}, 0, len(heads))
@@ -69,7 +95,21 @@ func publishConsolidatedPostGallery(ctx context.Context, input models.SourceGall
 			return nil, err
 		}
 	}
-	ret, err := (&SourceGalleryStore{}).DecideAssociation(ctx, input)
+	var ret *models.SourceGalleryDecision
+	if retainShared && (input.Origin == "review" || input.Origin == "migration") {
+		// Retaining a gallery already shared by this identity group is part of
+		// the same managed post consolidation, not a new unrelated adoption.
+		if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_post_consolidation_context(request_uuid,source_uuid,destination_uuid)
+SELECT uuid,source_uuid,destination_uuid FROM source_post_consolidations WHERE uuid=?`, consolidation); err != nil {
+			return nil, err
+		}
+		ret, err = store.decideAssociationWithSharing(ctx, input, nil, true)
+		if err == nil {
+			_, err = dbWrapper.Exec(ctx, "DELETE FROM source_post_consolidation_context WHERE request_uuid=?", consolidation)
+		}
+	} else {
+		ret, err = store.DecideAssociation(ctx, input)
+	}
 	if err == nil {
 		finish()
 	}

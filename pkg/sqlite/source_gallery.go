@@ -112,6 +112,10 @@ func (s *SourceGalleryStore) DecideAssociation(ctx context.Context, input models
 }
 
 func (s *SourceGalleryStore) prepareAssociationChoice(ctx context.Context, input models.SourceGalleryChoiceInput) (*models.SourcePost, *models.ArchiveEntity, error) {
+	return s.prepareAssociationChoiceWithSharing(ctx, input, false)
+}
+
+func (s *SourceGalleryStore) prepareAssociationChoiceWithSharing(ctx context.Context, input models.SourceGalleryChoiceInput, retainShared bool) (*models.SourcePost, *models.ArchiveEntity, error) {
 	post, err := currentSourcePost(ctx, input.PostUUID)
 	if err != nil {
 		return nil, nil, err
@@ -149,7 +153,7 @@ func (s *SourceGalleryStore) prepareAssociationChoice(ctx context.Context, input
 		if err != nil {
 			return nil, nil, err
 		}
-		if claimed {
+		if claimed && !retainShared {
 			shared := false
 			if input.Origin == "source" {
 				shared, err = sourceThreadSharesGallery(ctx, identity.UUID, post.UUID)
@@ -173,7 +177,11 @@ func (s *SourceGalleryStore) prepareAssociationChoice(ctx context.Context, input
 }
 
 func (s *SourceGalleryStore) decideAssociation(ctx context.Context, input models.SourceGalleryChoiceInput, selection *string) (*models.SourceGalleryDecision, error) {
-	post, gallery, err := s.prepareAssociationChoice(ctx, input)
+	return s.decideAssociationWithSharing(ctx, input, selection, false)
+}
+
+func (s *SourceGalleryStore) decideAssociationWithSharing(ctx context.Context, input models.SourceGalleryChoiceInput, selection *string, retainShared bool) (*models.SourceGalleryDecision, error) {
+	post, gallery, err := s.prepareAssociationChoiceWithSharing(ctx, input, retainShared)
 	if err != nil {
 		return nil, err
 	}

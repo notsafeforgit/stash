@@ -93,7 +93,11 @@ func (c *EnrichmentCoordinator) Publish(ctx context.Context, token string, lease
 				if err != nil {
 					return err
 				}
-				if post == nil || post.UUID != work.PostUUID {
+				matches, err := c.enrichmentPostMatches(ctx, post, work.PostUUID)
+				if err != nil {
+					return err
+				}
+				if !matches {
 					if _, err := c.Service.Repo.EnrichmentJob.ResolveDiscoveryIdentity(ctx, owned, expected, digest, record.Ordinal, c.Now()); err != nil {
 						return err
 					}
@@ -101,8 +105,12 @@ func (c *EnrichmentCoordinator) Publish(ctx context.Context, token string, lease
 					if err != nil {
 						return err
 					}
+					matches, err = c.enrichmentPostMatches(ctx, post, work.PostUUID)
+					if err != nil {
+						return err
+					}
 				}
-				if post == nil || post.UUID != work.PostUUID || post.State != "active" ||
+				if !matches ||
 					(collection.Namespace != "" && collection.Namespace != reference.Namespace) {
 					return models.ErrEnrichmentConflict
 				}
@@ -162,6 +170,26 @@ func (c *EnrichmentCoordinator) Publish(ctx context.Context, token string, lease
 		return nil, err
 	}
 	return result, nil
+}
+
+// Jobs and captures keep their original owner after consolidation. The current
+// identity may be another member of the same post, including for staged jobs.
+func (c *EnrichmentCoordinator) enrichmentPostMatches(ctx context.Context, post *models.SourcePost, target string) (bool, error) {
+	if post == nil || post.State != "active" {
+		return false, nil
+	}
+	if post.UUID == target {
+		return true, nil
+	}
+	left, err := c.Service.Repo.SourceEvidence.PostIdentity(ctx, post.UUID)
+	if err != nil {
+		return false, err
+	}
+	right, err := c.Service.Repo.SourceEvidence.PostIdentity(ctx, target)
+	if err != nil {
+		return false, err
+	}
+	return left != nil && right != nil && right.State == "active" && left.CanonicalUUID == right.CanonicalUUID, nil
 }
 
 func (c *EnrichmentCoordinator) Publication(ctx context.Context, token, id string) (*models.EnrichmentPublication, error) {

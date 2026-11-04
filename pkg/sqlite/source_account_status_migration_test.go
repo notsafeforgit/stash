@@ -13,6 +13,7 @@ import (
 
 func removeSourceAccountStatusSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeConsolidatedSharedGallerySchema(t, raw)
 	prior, err := os.ReadFile("migrations/1000055_source_run_services.up.sql")
 	require.NoError(t, err)
 	definition := strings.Split(strings.Split(string(prior), "CREATE TABLE source_run_attempt_failures (")[1], "INSERT INTO native_migration_history")[0]

@@ -142,7 +142,17 @@ func (s *EnrichmentJobStore) ResolveDiscoveryIdentity(ctx context.Context, lease
 		return nil, err
 	}
 	if existing != nil {
-		return nil, models.ErrEnrichmentIdentityReview
+		// The saved filename/account evidence corroborates this exact source
+		// identity. Reuse the first post instead of leaving duplicate imports in
+		// review. Publication below still has to succeed in the same transaction.
+		if err := s.consolidateDiscoveryDuplicate(ctx, job.UUID, post.UUID, existing.UUID, basis, now); err != nil {
+			return nil, err
+		}
+		txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
+			_, err := enrichmentPublishedJob(ctx, job.UUID)
+			return err
+		})
+		return nil, nil
 	}
 	observed, err := time.Parse(time.RFC3339Nano, transcript.Records[ordinal].ObservedAt)
 	if err != nil {

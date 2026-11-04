@@ -8,6 +8,11 @@ The startup-versus-full-audit boundary below applies to the historical proof
 validation described throughout this guide. Deployment and one-time import
 completion belong to the installation's operations records.
 
+Schema 1000139 permits a managed post consolidation to retain a gallery already
+shared by one of its members. It changes the insertion guard only; existing
+media, galleries and their metadata remain intact. Ordinary gallery adoption
+continues to enforce source ownership.
+
 Schema 1000138 expands the existing attempt-failure constraint to retain explicit
 account availability and Redgifs deletion codes, including provider history-limit
 failures. It preserves every existing failure and request. Fenced confirmed
@@ -2711,9 +2716,17 @@ identifier, captures, resolution, job result and target completion commit
 together. A deferred foreign key and pre-commit verification prevent a caller
 from committing the identity mutation without the complete publication.
 
-Unknown or multiply mapped inputs and IDs already belonging to another post
-require review. Publication rolls back and the controlled failure retains its
-checkpoint for later inspection. No post consolidation or performer assignment
+When the corroborated ID already belongs to another post, publication consolidates
+the duplicate into the first stored identity. Compatible choices use their normal
+union; conflicting selections, gallery links and media choices retain the first
+post's choices. Existing media metadata keeps its first-seen policy. Distinct source
+posts can continue to share media and galleries. Jobs staged before consolidation
+can finish against their original owner once both posts share a canonical identity.
+Original identifiers, observations and capture owners remain unchanged.
+
+Unknown or multiply mapped inputs still require review. Publication rolls back
+and the controlled failure retains its checkpoint for later inspection. Duplicate
+consolidation and checkpoint publication commit together; no performer assignment
 is inferred. Full native audits verify the original snapshot bytes, reconstructed
 native capture, matching basis, identifier receipt and publication binding even
 after compact staging has been released. Anonymisation removes resolutions

@@ -155,14 +155,12 @@ func TestDiscoveryPublicationPreservesPostAndProvesIdentityAfterRestart(t *testi
 }
 
 func TestDiscoveryPublicationConflictsKeepEvidenceForReview(t *testing.T) {
-	for _, mode := range []string{"unverified", "owned_by_another_post"} {
+	for _, mode := range []string{"unverified", "unverified_existing_post"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newDiscoveryExecutionFixture(t, func(e map[string]any) {
-				if mode == "unverified" {
-					e["account_key"] = nil
-				}
+				e["account_key"] = nil
 			})
-			if mode == "owned_by_another_post" {
+			if mode == "unverified_existing_post" {
 				sourceTestPost(t, f.repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "abc123"}, "")
 			}
 			raw := openRawDB(t, f.db.DatabasePath())

@@ -10,6 +10,7 @@ import (
 )
 
 const sourceDownloadTurn = 5 * time.Minute
+
 // Match the metadata collector's bounded fetch budget, including paced startup
 // requests needed before the source can return its first post.
 const sourceMetadataTurn = 3 * time.Minute

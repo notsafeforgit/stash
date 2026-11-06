@@ -442,15 +442,6 @@ the post. Adding it requires the reviewed post revision and cannot move an
 identifier already owned by another post. Catalog aliases must keep their
 physical-catalog scope until stronger evidence establishes a service identity.
 
-`POST /api/v3/archive/posts/{post}/identifiers` records an application-authenticated
-identifier review through `SourcePostLinks.ObserveIdentifier`. The body supplies
-the immutable evidence `uuid`, matching `post_uuid`, `origin` of `review`,
-`basis`, `observed_at`, bounded JSON `details`, the qualified `identifier`, and
-`expected_post_revision`. It returns the retained identifier evidence. Exact
-request replay returns the original result, and stale revisions, changed review
-contents or identifiers owned by another post return a conflict. This supports
-linking a reviewed legacy album identity to its corroborated service identifier.
-
 `source_post_account_claims` retains an association with an original account
 UUID. Reads also resolve its current canonical UUID after consolidation. A
 claim does not choose a capture's publisher, change an explicit unlink, establish

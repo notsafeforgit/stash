@@ -121,7 +121,6 @@ func (rs *nativeArchiveRoutes) routerWithSourceTracking(enabled bool) http.Handl
 	r.Post("/post-merge-notifications/{job}/cancel", rs.cancelPostMergeNotification)
 	r.Post("/post-merge-notifications/{job}/retry", rs.retryPostMergeNotification)
 	r.Get("/posts/{post}/identifiers", rs.sourcePostIdentifiers)
-	r.Post("/posts/{post}/identifiers", rs.reviewPostIdentifier)
 	r.Get("/posts/{post}/publishers", rs.sourcePostPublishers)
 	r.Post("/capture-publisher/preview", rs.previewCapturePublisher)
 	r.Post("/capture-publisher/apply", rs.applyCapturePublisher)

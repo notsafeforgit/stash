@@ -444,8 +444,13 @@ validate:
 	$(MAKE) -j$(VALIDATION_JOBS) validate-backend validate-ci
 
 ACTIONLINT_VERSION ?= v1.7.12
+.PHONY: validate-action-pins
+validate-action-pins:
+	go test ./scripts/check_action_pins
+	go run ./scripts/check_action_pins
+
 .PHONY: validate-ci
-validate-ci:
+validate-ci: validate-action-pins
 	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_ci_*.py'
 	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s docker/runtime/tests
 	bash -n docker/runtime/root/usr/local/bin/stash-entrypoint docker/runtime/root/opt/python-requirements.sh

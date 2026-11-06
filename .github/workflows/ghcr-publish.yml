@@ -31,10 +31,10 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
     - name: Download validated Linux binary
-      uses: actions/download-artifact@v8
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
       with:
         name: native-linux-amd64
         path: dist
@@ -50,18 +50,18 @@ jobs:
         } >> "$GITHUB_OUTPUT"
 
     - name: Log in to the Container registry
-      uses: docker/login-action@v4
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v4
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
     - name: Build and push Docker image
       id: image
-      uses: docker/build-push-action@v7
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
       with:
         context: .
         file: docker/ghcr/Dockerfile
@@ -103,14 +103,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: native-linux-amd64
           path: dist
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: native-generated
           path: generated
@@ -122,7 +122,7 @@ jobs:
           sha1sum dist/stash-linux dist/stash-ui.zip | sed 's/dist\///g' | tee -a CHECKSUMS_SHA1
           echo "STASH_VERSION=$(git describe --tags --exclude latest_develop)" >> "$GITHUB_ENV"
       - name: Development Release
-        uses: marvinpinto/action-automatic-releases@v1.1.2
+        uses: marvinpinto/action-automatic-releases@4951e72708bd9a79dce9d5c81425b028a7ab407b # v1.1.2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           prerelease: true
@@ -145,7 +145,7 @@ jobs:
 
     steps:
     - name: Delete expired branch build tags
-      uses: actions/github-script@v8
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
       with:
         script: |
           const owner = context.repo.owner;

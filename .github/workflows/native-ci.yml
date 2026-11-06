@@ -14,14 +14,14 @@ jobs:
       backend: ${{ steps.changes.outputs.backend }}
       clients: ${{ steps.changes.outputs.clients }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
       - name: Test check selection and publication gate
         run: |
           python3 -m unittest discover -s scripts -p 'test_ci_*.py'
       - name: Find successfully published baselines
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             let runs = [];
@@ -44,16 +44,16 @@ jobs:
   assets:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-native-go
         with:
           suite: assets
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
         with:
           package_json_file: ui/v3/package.json
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24'
           cache: pnpm
@@ -65,7 +65,7 @@ jobs:
         run: make generate-backend
       - name: Validate and build UI once
         run: make ui-ci
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: native-generated
           retention-days: 1
@@ -85,7 +85,7 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: ./.github/actions/setup-native-go
         with:
           suite: tests-sqlite-${{ matrix.shard }}
@@ -96,7 +96,7 @@ jobs:
           --output "$RUNNER_TEMP/sqlite-tests"
       - name: Retain test timings and failure output
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: sqlite-tests-${{ matrix.shard }}
           path: ${{ runner.temp }}/sqlite-tests/
@@ -108,11 +108,11 @@ jobs:
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: ./.github/actions/setup-native-go
         with:
           suite: tests-other
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: native-generated
       - name: Install media test runtime
@@ -133,11 +133,11 @@ jobs:
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: ./.github/actions/setup-native-go
         with:
           suite: lint
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: native-generated
       - run: make lint
@@ -147,14 +147,14 @@ jobs:
     if: needs.changes.outputs.clients == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: ./.github/actions/setup-native-go
         with:
           suite: client-contracts
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: native-generated
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
@@ -175,13 +175,13 @@ jobs:
     needs: assets
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-native-go
         with:
           suite: binary
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: native-generated
       # Frontend-only runs still prove that all four entry points and their
@@ -193,7 +193,7 @@ jobs:
           OFFICIAL_BUILD: ${{ github.event_name != 'pull_request' && github.repository == 'notsafeforgit/stash' && github.ref == 'refs/heads/develop' }}
           UPDATE_REPO: ${{ github.repository }}
         run: make build-cc-linux
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: native-linux-amd64
           path: dist/stash-linux
@@ -208,19 +208,19 @@ jobs:
       options: --ipc=host
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: ./.github/actions/setup-native-go
         with:
           suite: browser-stack
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
         with:
           package_json_file: ui/v3/package.json
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24'
           cache: pnpm
           cache-dependency-path: ui/v3/pnpm-lock.yaml
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: native-linux-amd64
           path: dist
@@ -236,7 +236,7 @@ jobs:
       - name: Browser tests against the Go server and reverse proxy
         working-directory: ui/v3
         run: pnpm exec playwright test --config playwright.stack.config.ts
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: failure()
         with:
           name: browser-stack-failure
@@ -250,7 +250,7 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Require every selected check before publication
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}

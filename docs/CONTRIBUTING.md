@@ -58,6 +58,16 @@ browser suites and `make pre-clients test-clients` when changing external-client
 contracts. Test durable changes with real SQLite fixtures, including interruption
 and retry cases where relevant.
 
+All external GitHub Actions and reusable workflows must use a full 40-character
+commit SHA, with the upstream version in a trailing comment. This includes steps
+inside local composite actions. Local `./` references use this repository's
+revision; `docker://` actions require a `sha256` digest. `make validate-action-pins`
+checks these rules, and `make validate-ci` runs it in pull-request and publication
+validation. When updating a pin, resolve the release in the upstream repository
+and use the commit SHA, dereferencing annotated tags rather than using tag-object
+SHAs. Build-time GitHub source downloads must likewise use commit SHAs; release
+assets used by the build must verify a committed SHA-256 checksum before use.
+
 Publish incremental commits without rewriting published history. Pull requests
 use the same validation workflow as the `develop` publisher. Production uses
 GitHub Actions-built GHCR images by verified digest; follow the

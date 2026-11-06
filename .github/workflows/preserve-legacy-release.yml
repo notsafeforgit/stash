@@ -18,7 +18,7 @@ jobs:
       contents: read
       packages: write
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
     - name: Install registry copy tool
       run: sudo apt-get update && sudo apt-get install -y skopeo
     - name: Check preservation invariants
@@ -37,7 +37,7 @@ jobs:
           --manifest docs/releases/v2.5-compatible-final.json \
           --repository ghcr.io/notsafeforgit/stash \
           --receipt compatible-release-receipt.json
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
         name: compatible-stash-release-receipt
         path: compatible-release-receipt.json

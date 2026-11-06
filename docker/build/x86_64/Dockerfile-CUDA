@@ -68,8 +68,12 @@ COPY --from=backend --chmod=555 /stash/stash /usr/bin/
 
 # NVENC Patch
 RUN mkdir -p /usr/local/bin /patched-lib
-ADD --chmod=555 https://raw.githubusercontent.com/keylase/nvidia-patch/master/patch.sh /usr/local/bin/patch.sh
-ADD --chmod=555 https://raw.githubusercontent.com/keylase/nvidia-patch/master/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+# keylase/nvidia-patch master snapshot, 2026-11-06.
+ARG NVIDIA_PATCH_REVISION=809fa4add10a0ab44f872096c0d787275e210cb4
+ADD --chmod=555 --checksum=sha256:b7a3b88743dda61fc821164474f58ec7cb616cec4794c0e2a5ebda35cd3373bf \
+    https://raw.githubusercontent.com/keylase/nvidia-patch/${NVIDIA_PATCH_REVISION}/patch.sh /usr/local/bin/patch.sh
+ADD --chmod=555 --checksum=sha256:e15f1191cc67e244fd97f026ddf466c3a775377d583a19d5475ca520b7a37377 \
+    https://raw.githubusercontent.com/keylase/nvidia-patch/${NVIDIA_PATCH_REVISION}/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Replace distro libraries and modules with the matching security builds.
 RUN find /usr/lib \( -name 'libheif.so*' -o -name 'libvips.so*' -o -name 'libvips-cpp.so*' \) -delete \

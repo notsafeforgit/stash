@@ -2068,7 +2068,7 @@ budget, preserving download preference between metadata turns. All admission and
 counter updates commit with the actual attempt; replaying ownership or a held
 reservation does not count another start.
 
-Historical `post.enrich` attempts receive a fixed 60-second turn measured from
+Historical `post.enrich` attempts receive a fixed 180-second turn measured from
 the current attempt's start. Heartbeats do not extend it. Once it ends, ready
 downloads can claim the same service and metadata yields at its next HTTP
 boundary without consuming its failure allowance. With no queued download it

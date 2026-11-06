@@ -10,7 +10,9 @@ import (
 )
 
 const sourceDownloadTurn = 5 * time.Minute
-const sourceMetadataTurn = time.Minute
+// Match the metadata collector's bounded fetch budget, including paced startup
+// requests needed before the source can return its first post.
+const sourceMetadataTurn = 3 * time.Minute
 
 // A claimed metadata job gets a short, fixed turn. Heartbeats cannot extend it;
 // after it ends, queued downloads regain priority at the next HTTP boundary.

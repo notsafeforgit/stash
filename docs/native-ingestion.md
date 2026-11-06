@@ -838,7 +838,7 @@ existing destination/target exclusions. Eligible queued downloads initially take
 precedence. Actual enrichment claim requests keep a 90-second interest deadline,
 refreshed by polling. After four download starts or two minutes of live waiting,
 an eligible requester actively polling its due turn can claim it once existing downloads
-drain. A historical metadata attempt then has a fixed 60-second turn before
+drain. A historical metadata attempt then has a fixed 180-second turn before
 queued downloads regain priority at its next HTTP boundary; heartbeat renewal
 does not extend it. Provider cooldowns and request spacing remain in force.
 An enrichment start resets download preference. Stale/held work and

@@ -116,6 +116,8 @@ func ingestErrorCode(err error) (int, string) {
 		return http.StatusUnauthorized, "unauthorized"
 	case errors.Is(err, ingest.ErrForbidden):
 		return http.StatusForbidden, "outside_scope"
+	case errors.Is(err, ingest.ErrCaptureDependency):
+		return http.StatusTooEarly, "source_capture_pending"
 	case errors.Is(err, ingest.ErrNotFound):
 		return http.StatusNotFound, "not_found"
 	case errors.Is(err, ingest.ErrUnsupported):

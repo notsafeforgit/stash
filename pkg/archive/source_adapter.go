@@ -61,6 +61,14 @@ func ExtractCapturedRedditRedgifsProfile(raw []byte) (*sourceadapter.CapturedLin
 	return sourceadapter.ExtractCapturedRedditRedgifsProfile(raw)
 }
 
+func CapturedRedgifsGalleryLink(raw []byte) (*models.SourcePostIdentifier, error) {
+	return sourceadapter.CapturedRedgifsGalleryLink(raw)
+}
+
+func CapturedRedgifsGalleryMember(parent, member []byte) (bool, error) {
+	return sourceadapter.CapturedRedgifsGalleryMember(parent, member)
+}
+
 func ExtractCapturedPost(raw []byte) (*models.SourcePostIdentifier, error) {
 	return sourceadapter.ExtractCapturedPost(raw)
 }

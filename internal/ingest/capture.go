@@ -220,7 +220,9 @@ func (s *Service) Capture(ctx context.Context, token string, raw []byte, digest 
 			return ErrDefinition
 		}
 		if collection.Namespace != "" && collection.Namespace != event.Post.Namespace {
-			return ErrForbidden
+			if err := s.allowLinkedGalleryCapture(ctx, event, collection); err != nil {
+				return err
+			}
 		}
 		if event.RootUUID != nil {
 			root, err := s.Repo.MediaRoot.Find(ctx, *event.RootUUID)

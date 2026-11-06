@@ -559,7 +559,12 @@ Capabilities enumerate native services in `post_namespaces` and advertise
 must still satisfy the qualified-namespace rules.
 
 Reddit crossposts and independent social posts keep their own identity. Supported
-Imgur/Redgifs child hosts retain their enclosing post scope, caption and publisher.
+Directly linked Imgur/Redgifs items retain their enclosing post scope, caption
+and publisher. Additional Redgifs image-gallery members use their own item
+identities and metadata. Core requires an acknowledged Reddit capture in the
+same producer, collection revision, root and crawl, with matching linked-seed
+and API gallery evidence. Out-of-order delivery receives retryable HTTP 425
+until that parent capture arrives.
 Standalone Redgifs captures use `native:redgifs` and the API item ID for their
 post and attachment. A Reddit embed and a standalone item retain separate posts
 while sharing the same attachment identity. Only API media renditions establish

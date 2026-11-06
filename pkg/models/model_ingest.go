@@ -62,5 +62,6 @@ type IngestReaderWriter interface {
 	Credentials(context.Context, string, string, int) ([]IngestCredential, error)
 	RevokeCredential(context.Context, string) error
 	FindReceipt(context.Context, string, string) (*IngestReceipt, error)
+	CaptureParents(context.Context, IngestReceipt, SourcePostIdentifier, int) ([]string, error)
 	RecordReceipt(context.Context, IngestReceipt) (*IngestReceipt, error)
 }

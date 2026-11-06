@@ -300,3 +300,23 @@ VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`, input.ProducerUUID, input.EventUUID, input.D
 	}
 	return s.FindReceipt(ctx, input.ProducerUUID, input.EventUUID)
 }
+
+// CaptureParents finds acknowledged source evidence in the exact delivery
+// scope. The attachment must occur in that capture's original manifest.
+func (s *IngestStore) CaptureParents(ctx context.Context, scope models.IngestReceipt, ref models.SourcePostIdentifier, limit int) ([]string, error) {
+	if limit < 1 || limit > 100 {
+		return nil, errors.New("invalid capture parent limit")
+	}
+	var captures []string
+	err := dbWrapper.Select(ctx, &captures, `SELECT r.capture_uuid
+FROM ingest_receipts r INDEXED BY ingest_receipts_collection
+WHERE r.collection_uuid=? AND r.collection_revision=? AND r.root_uuid IS ?
+ AND r.producer_uuid=? AND r.run_uuid=? AND r.kind='source.capture'
+ AND EXISTS(SELECT 1 FROM source_attachments a
+  JOIN source_attachment_entries e ON e.attachment_uuid=a.uuid
+  JOIN source_capture_attachment_manifests m ON m.manifest_uuid=e.manifest_uuid
+  WHERE a.post_uuid=r.post_uuid AND a.namespace=? AND a.value=? AND m.capture_uuid=r.capture_uuid)
+ORDER BY r.committed_at DESC,r.event_uuid DESC LIMIT ?`, scope.CollectionUUID, scope.CollectionRevision,
+		scope.RootUUID, scope.ProducerUUID, scope.RunUUID, ref.Namespace, ref.Value, limit)
+	return captures, err
+}

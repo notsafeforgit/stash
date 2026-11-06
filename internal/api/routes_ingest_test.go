@@ -22,6 +22,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestIngestLinkedGalleryDependencyIsRetryable(t *testing.T) {
+	status, code := ingestErrorCode(ingest.ErrCaptureDependency)
+	require.Equal(t, http.StatusTooEarly, status)
+	require.Equal(t, "source_capture_pending", code)
+}
+
 func TestIngestHTTPAuthenticationPartialBatchAndReceiptIsolation(t *testing.T) {
 	config.InitializeEmpty()
 	db := sqlite.NewDatabase()

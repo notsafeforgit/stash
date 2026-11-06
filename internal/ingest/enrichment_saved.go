@@ -71,9 +71,7 @@ func (c *EnrichmentCoordinator) excludeUnavailableSavedPost(ctx context.Context,
 			if err != nil {
 				return err
 			}
-			for _, value := range values {
-				files = append(files, value)
-			}
+			files = append(files, values...)
 		default:
 			return nil
 		}

@@ -56,6 +56,19 @@ func (s *SourceEvidenceStore) PostContent(ctx context.Context, post string) (*mo
 			result.PublishedAt, result.DateBasis = metadata.PublishedAt, metadata.DateBasis
 		}
 	}
+	if result == nil || result.PublishedAt == nil {
+		date, err := twitterPostDate(ctx, post)
+		if err != nil {
+			return nil, err
+		}
+		if date != nil {
+			if result == nil {
+				result = &models.SourcePostMetadata{}
+			}
+			basis := sourceadapter.TwitterDateBasis
+			result.PublishedAt, result.DateBasis = date, &basis
+		}
+	}
 	return result, nil
 }
 

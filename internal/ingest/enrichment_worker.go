@@ -220,7 +220,7 @@ func (c *EnrichmentCoordinator) Fail(ctx context.Context, token string, lease mo
 			return models.ErrEnrichmentAtomic
 		}
 		ret = &EnrichmentFailureReceipt{ArchiveJobAttempt: attempts[0], ProducerUUID: credential.ProducerUUID}
-		if err := c.excludeUnavailableSavedPost(ctx, after, code); err != nil {
+		if _, err := c.excludeUnavailableSavedPost(ctx, after, code); err != nil {
 			return err
 		}
 		c.guard(ctx, token, after, nil)

@@ -82,6 +82,18 @@ func CapturedMetadata(raw []byte) (models.SourcePostMetadata, error) {
 	if ret.PublishedAt != nil {
 		basis := "source"
 		ret.DateBasis = &basis
+	} else if category == "twitter" {
+		post, err := ExtractCapturedPost(raw)
+		if err != nil {
+			return ret, err
+		}
+		if post != nil && post.Namespace == "native:twitter" {
+			ret.PublishedAt = TwitterPublicationDate(post.Value)
+			if ret.PublishedAt != nil {
+				basis := TwitterDateBasis
+				ret.DateBasis = &basis
+			}
+		}
 	}
 	encoded, err := json.Marshal(ret)
 	if err != nil || len(encoded) > 262144 {

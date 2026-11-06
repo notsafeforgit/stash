@@ -9,8 +9,37 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stashapp/stash/internal/ingest"
+	"github.com/stashapp/stash/pkg/metadata"
 	"github.com/stashapp/stash/pkg/models"
 )
+
+func (rs *nativeArchiveRoutes) acceptSavedEnrichment(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Revision int `json:"expected_revision"`
+	}
+	if err := readIngestJSON(w, r, 1024, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	worker := ingest.NewEnrichmentCoordinator(&ingest.Service{Repo: rs.repo})
+	var result *ingest.SavedEnrichmentResolution
+	err := rs.repo.WithTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		result, err = worker.AcceptSaved(ctx, chi.URLParam(r, "target"), input.Revision)
+		if err != nil {
+			return err
+		}
+		if rs.notifyMetadata != nil {
+			for _, id := range result.DatesFilled {
+				if err := rs.notifyMetadata(ctx, metadata.Input{EntityUUID: id}, []string{"date"}); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	writeEnrichmentWork(w, result, err)
+}
 
 func writeEnrichmentWork(w http.ResponseWriter, value any, err error) {
 	switch {

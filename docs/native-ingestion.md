@@ -831,6 +831,17 @@ file-verification, checkpoint and handoff checks apply. The target then becomes
 excluded with `reviewed_saved_metadata_accepted`. Authentication and challenge
 failures still require review.
 
+X posts with a missing publication date can derive it from an unambiguous native
+post ID or a saved X permalink backed by a Twitter capture. The projection records
+`twitter-snowflake` provenance and requires a decoded timestamp from 2011 through
+the present. Saved publication dates take precedence. Eligible unavailable-post
+resolution fills blank media dates through field decisions, respecting manual
+clears and existing values. An owner can reevaluate an already failed attempt
+using `POST /api/v3/archive/enrichment-targets/{target}/accept-saved` with
+`expected_revision`. The operation verifies local files, updates eligible dates
+and excludes the target in one transaction. Replaying the committed revision is
+idempotent.
+
 Claims coordinate with source downloads in the same write transaction. Enrichment
 excludes other claims for its services and collection. Download attempts reserve
 their root and supported linked services; independent downloads retain their

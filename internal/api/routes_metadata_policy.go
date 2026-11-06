@@ -297,6 +297,7 @@ func (rs *nativeArchiveRoutes) routerWithSourceTracking(enabled bool) http.Handl
 	r.Get("/enrichment-targets/{target}/history", rs.enrichmentTargetHistory)
 	r.Put("/enrichment-targets/{target}/schedule", rs.scheduleEnrichmentTarget)
 	r.Post("/enrichment-targets/{target}/retry", rs.retryEnrichmentTarget)
+	r.Post("/enrichment-targets/{target}/accept-saved", rs.acceptSavedEnrichment)
 	r.Get("/enrichment-completions/{completion}", rs.enrichmentCompletion)
 	r.Get("/enrichment-jobs/{job}/discovery-resolution", rs.enrichmentDiscoveryResolution)
 	r.Get("/translation-requests/{request}", rs.translationRequest)

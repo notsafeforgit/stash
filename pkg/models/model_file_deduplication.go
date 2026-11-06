@@ -7,12 +7,16 @@ import (
 	"time"
 )
 
-// Deduplication removes a redundant physical location, never a scene/image or
-// its selected metadata. Distinct media owners require a separate merge review.
+const FileDeduplicationEarliest = "earliest-fill-blanks-v1"
+
+// Without MediaPolicy, distinct media owners require a separate merge review.
+// The opt-in policy preserves the earliest entity and fills eligible blank
+// dates/details only after the service proves equal bytes for both owners.
 type FileDeduplicationInput struct {
-	RootUUID   string `json:"root_uuid"`
-	KeepPath   string `json:"keep_path"`
-	RemovePath string `json:"remove_path"`
+	RootUUID    string `json:"root_uuid"`
+	KeepPath    string `json:"keep_path"`
+	RemovePath  string `json:"remove_path"`
+	MediaPolicy string `json:"media_policy,omitempty"`
 }
 
 type FileDeduplicationFile struct {
@@ -34,6 +38,7 @@ type FileDeduplicationState struct {
 	Kept          *FileDeduplicationFile `json:"kept"`
 	Removed       *FileDeduplicationFile `json:"removed"`
 	Owner         *ArchiveEntity         `json:"owner"`
+	MergeSource   *ArchiveEntity         `json:"merge_source,omitempty"`
 	Matches       []SourceFileMatch      `json:"matches"`
 	BlockedReason string                 `json:"blocked_reason,omitempty"`
 }
@@ -52,6 +57,7 @@ type FileDeduplicationReceipt struct {
 	SHA256            string          `json:"sha256" db:"sha256"`
 	Proof             json.RawMessage `json:"proof,omitempty" db:"proof"`
 	CommittedAt       time.Time       `json:"committed_at" db:"committed_at"`
+	MediaPolicy       string          `json:"media_policy,omitempty" db:"-"`
 }
 
 var ErrFileDeduplicationInvalid = errors.New("invalid file deduplication request")

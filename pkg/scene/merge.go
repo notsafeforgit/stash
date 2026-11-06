@@ -132,7 +132,9 @@ func (s *Service) Merge(ctx context.Context, sourceIDs []int, destinationID int,
 		return fmt.Errorf("preserving merged scene identities: %w", err)
 	}
 	for _, src := range sources {
-		const deleteGenerated = true
+		// Exact duplicates share generated paths. Removing the source's artwork
+		// in that case would also remove the surviving scene's artwork.
+		deleteGenerated := src.GetHash(s.Config.GetVideoFileNamingAlgorithm()) != dest.GetHash(s.Config.GetVideoFileNamingAlgorithm())
 		const deleteFile = false
 		const destroyFileEntry = false
 		if err := s.Destroy(ctx, src, fileDeleter, deleteGenerated, deleteFile, destroyFileEntry); err != nil {

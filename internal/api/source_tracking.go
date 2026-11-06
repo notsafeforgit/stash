@@ -5,6 +5,7 @@ import (
 
 	"github.com/stashapp/stash/internal/ingest"
 	"github.com/stashapp/stash/pkg/gallery"
+	"github.com/stashapp/stash/pkg/scene"
 	"github.com/stashapp/stash/pkg/translation"
 )
 
@@ -15,6 +16,8 @@ func (s *Server) configureSourceTracking(enabled bool) (*ingest.Service, *native
 	mgr := s.manager
 	repo := mgr.Repository
 	routes := &nativeArchiveRoutes{repo: repo, notifyMetadata: mgr.RegisterMetadataPolicyHooks}
+	routes.scenes = &scene.Service{File: repo.File, Repository: repo.Scene, MarkerRepository: repo.SceneMarker,
+		Paths: mgr.Paths, Config: mgr.Config}
 	if !enabled {
 		return nil, routes
 	}

@@ -1,5 +1,5 @@
-// Package dedup removes verified redundant locations without merging logical
-// media or discarding source provenance. Candidate discovery is host-owned;
+// Package dedup removes verified redundant locations and optionally reconciles
+// their media records under a reviewed policy. Candidate discovery is host-owned;
 // only this service stages filesystem removal and commits native associations.
 package dedup
 
@@ -13,15 +13,20 @@ import (
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/file"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/scene"
 	"github.com/stashapp/stash/pkg/txn"
 )
 
 type Service struct {
-	repo  models.Repository
-	trash string
+	repo   models.Repository
+	trash  string
+	scenes *scene.Service
 }
 
 func New(repo models.Repository, trash string) *Service { return &Service{repo: repo, trash: trash} }
+
+// WithScenes supplies the existing scene merge service and its generated paths.
+func (s *Service) WithScenes(service *scene.Service) *Service { s.scenes = service; return s }
 
 type Request struct {
 	models.FileDeduplicationInput
@@ -41,6 +46,7 @@ type Preview struct {
 	Bytes          int64  `json:"bytes"`
 	SourceMatches  int    `json:"source_matches"`
 	ReplacePrimary bool   `json:"replace_primary"`
+	MergeMediaUUID string `json:"merge_media_uuid,omitempty"`
 }
 
 type plan = archive.DeduplicationProof
@@ -101,6 +107,9 @@ func (s *Service) Preview(ctx context.Context, input models.FileDeduplicationInp
 	if p.State.Owner != nil {
 		ret.MediaUUID = p.State.Owner.UUID
 	}
+	if p.State.MergeSource != nil {
+		ret.MergeMediaUUID = p.State.MergeSource.UUID
+	}
 	return ret, nil
 }
 
@@ -124,7 +133,7 @@ func (s *Service) prior(ctx context.Context, request Request) (*models.FileDedup
 	if err != nil {
 		return nil, err
 	}
-	if prior != nil && (prior.Signature != request.Signature || prior.RootUUID != request.RootUUID || prior.KeepPath != request.KeepPath || prior.RemovePath != request.RemovePath) {
+	if prior != nil && (prior.Signature != request.Signature || prior.RootUUID != request.RootUUID || prior.KeepPath != request.KeepPath || prior.RemovePath != request.RemovePath || prior.MediaPolicy != request.MediaPolicy) {
 		return nil, models.ErrFileDeduplicationReplay
 	}
 	return prior, nil
@@ -218,9 +227,16 @@ func (s *Service) Apply(ctx context.Context, request Request) (*models.FileDedup
 		result, err = s.repo.FileDeduplication.Record(ctx, p.State, models.FileDeduplicationReceipt{UUID: request.RequestUUID,
 			Signature: request.Signature, RootUUID: request.RootUUID, KeepPath: request.KeepPath, RemovePath: request.RemovePath,
 			KeptUUID: p.State.Kept.UUID, KeptGeneration: p.State.Kept.Generation, RemovedUUID: p.State.Removed.UUID,
-			RemovedGeneration: p.State.Removed.Generation, MediaUUID: p.State.Owner.UUID, SHA256: kept.SHA256, Proof: proof})
+			RemovedGeneration: p.State.Removed.Generation, MediaUUID: p.State.Owner.UUID, SHA256: kept.SHA256, Proof: proof, MediaPolicy: request.MediaPolicy})
 		if err != nil {
 			return err
+		}
+		// Metadata reconciliation and physical removal share this transaction.
+		// A stale review or failed deletion rolls back both records and the file.
+		if p.State.MergeSource != nil {
+			if err := s.mergeMedia(ctx, p.State); err != nil {
+				return err
+			}
 		}
 		if p.State.Removed.Primary {
 			if p.State.Owner.Kind == models.ArchiveScene {

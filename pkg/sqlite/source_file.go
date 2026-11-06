@@ -412,6 +412,16 @@ func (s *SourceFileStore) RecordPostEvidence(ctx context.Context, input models.S
 }
 
 func (s *SourceFileStore) PostEvidence(ctx context.Context, post, after string, limit int) ([]models.SourcePostFileEvidence, error) {
+	return sourcePostFilePage(ctx, "post_uuid", post, after, limit)
+}
+
+// ObservationPosts follows retained exact-path evidence; filenames never imply
+// a post identity. The observation index bounds this reverse lookup.
+func (s *SourceFileStore) ObservationPosts(ctx context.Context, observation, after string, limit int) ([]models.SourcePostFileEvidence, error) {
+	return sourcePostFilePage(ctx, "observation_uuid", observation, after, limit)
+}
+
+func sourcePostFilePage(ctx context.Context, column, post, after string, limit int) ([]models.SourcePostFileEvidence, error) {
 	if err := sourceFileIDs(&post); err != nil {
 		return nil, err
 	}
@@ -420,7 +430,7 @@ func (s *SourceFileStore) PostEvidence(ctx context.Context, post, after string, 
 		return nil, err
 	}
 	var rows []sourcePostFileRow
-	if err := dbWrapper.Select(ctx, &rows, "SELECT * FROM source_post_file_evidence WHERE post_uuid=? AND uuid>? ORDER BY uuid LIMIT ?", post, after, limit); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, "SELECT * FROM source_post_file_evidence WHERE "+column+"=? AND uuid>? ORDER BY uuid LIMIT ?", post, after, limit); err != nil {
 		return nil, err
 	}
 	ret := make([]models.SourcePostFileEvidence, 0, len(rows))

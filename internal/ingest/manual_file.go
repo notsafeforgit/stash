@@ -22,12 +22,13 @@ var ErrManualFileChanged = errors.New("local file import preview changed")
 // ManualFileInput refers to an existing bound collection, including a folder or
 // manual batch with a shared performer policy. It needs no producer or source.
 type ManualFileInput struct {
-	ScanCollectionUUID string                   `json:"scan_collection_uuid,omitempty"`
-	CollectionUUID     string                   `json:"collection_uuid"`
-	RelativePath       string                   `json:"relative_path"`
-	MediaKind          models.ArchiveEntityKind `json:"media_kind"`
-	OriginalGIFPath    string                   `json:"original_gif_path,omitempty"`
-	Metadata           *ManualFileMetadata      `json:"metadata,omitempty"`
+	ScanCollectionUUID  string                   `json:"scan_collection_uuid,omitempty"`
+	CollectionUUID      string                   `json:"collection_uuid"`
+	RelativePath        string                   `json:"relative_path"`
+	MediaKind           models.ArchiveEntityKind `json:"media_kind"`
+	OriginalGIFPath     string                   `json:"original_gif_path,omitempty"`
+	Metadata            *ManualFileMetadata      `json:"metadata,omitempty"`
+	DeduplicationPolicy string                   `json:"deduplication_policy,omitempty"`
 }
 
 type ManualFileRequest struct {
@@ -47,6 +48,7 @@ type ManualFilePreview struct {
 	Size                   int64     `json:"size"`
 	ModifiedAt             time.Time `json:"modified_at"`
 	ExistingFileUUID       string    `json:"existing_file_uuid,omitempty"`
+	SavedPostCount         int       `json:"saved_post_count,omitempty"`
 	OriginalImageUUID      string    `json:"original_image_uuid,omitempty"`
 	ExistingSceneUUID      string    `json:"existing_scene_uuid,omitempty"`
 	FileSignature          string    `json:"file_signature,omitempty"`
@@ -57,6 +59,7 @@ type ManualFilePreview struct {
 // arguments. The archive job submission is its durable application receipt.
 // Producer file events cannot supply this variant of work.
 type ManualFileWork struct {
+	SavedPosts             []SavedFilePost             `json:"saved_posts,omitempty"`
 	ScanCollectionRevision int                         `json:"scan_collection_revision,omitempty"`
 	Resume                 *FileResume                 `json:"resume,omitempty"`
 	Request                ManualFileRequest           `json:"request"`
@@ -85,6 +88,7 @@ type ManualFileStatus struct {
 }
 
 type manualFilePlan struct {
+	SavedPosts     []SavedFilePost `json:",omitempty"`
 	Preview        ManualFilePreview
 	Target         FileTarget
 	Inspection     archive.MediaFileInspection
@@ -93,6 +97,9 @@ type manualFilePlan struct {
 
 func validManualFileInput(input ManualFileInput) bool {
 	if !validManualFileMetadata(input.Metadata) {
+		return false
+	}
+	if input.DeduplicationPolicy != "" && input.DeduplicationPolicy != models.FileDeduplicationEarliest {
 		return false
 	}
 	if input.OriginalGIFPath != "" && (input.ScanCollectionUUID != "" || !validFileTransformation(
@@ -180,6 +187,13 @@ func (s *Service) manualFilePlan(ctx context.Context, input ManualFileInput) (*m
 		plan.Preview.OriginalImageUUID = plan.Transformation.ReviewedImageUUID
 		plan.Preview.ExistingSceneUUID = plan.Transformation.ReviewedSceneUUID
 	}
+	if input.DeduplicationPolicy != "" {
+		plan.SavedPosts, err = savedFilePosts(ctx, s.Repo, target, inspection.Snapshot.Size)
+		if err != nil {
+			return nil, err
+		}
+		plan.Preview.SavedPostCount = len(plan.SavedPosts)
+	}
 	// Folder discovery needs a filesystem version that remains stable when
 	// registration creates or updates the database's file identity. Hash the
 	// confined inspection, including ctime/inode (or full digest fallback),
@@ -226,7 +240,7 @@ func validFileWork(work FileWork) bool {
 		return false
 	}
 	if work.Version == 1 {
-		return work.Manual == nil && work.Publication.ManualMetadata == nil && (work.Publication.Transformation == nil || work.Publication.Transformation.ReviewedImageUUID == "") &&
+		return work.Manual == nil && work.Publication.ManualMetadata == nil && len(work.Publication.SavedPosts) == 0 && (work.Publication.Transformation == nil || work.Publication.Transformation.ReviewedImageUUID == "") &&
 			ValidUUID(work.ProducerUUID) && ValidUUID(work.EventUUID) && archive.ValidSHA256(work.SHA256) && validFileResume(work.Resume)
 	}
 	m := work.Manual
@@ -251,7 +265,7 @@ func validFileWork(work FileWork) bool {
 	} else if p.Transformation != nil {
 		return false
 	}
-	return p.Source == nil && reflect.DeepEqual(p.ManualMetadata, m.Request.Metadata) && p.UUID == manualIntakeUUID(m.Request.RequestUUID) && p.Kind == m.Request.MediaKind &&
+	return p.Source == nil && (len(m.SavedPosts) == 0 || m.Request.DeduplicationPolicy != "") && reflect.DeepEqual(p.SavedPosts, m.SavedPosts) && reflect.DeepEqual(p.ManualMetadata, m.Request.Metadata) && p.UUID == manualIntakeUUID(m.Request.RequestUUID) && p.Kind == m.Request.MediaKind &&
 		p.CollectionUUID == m.Request.CollectionUUID && p.Target.RelativePath == m.Request.RelativePath
 }
 
@@ -332,9 +346,9 @@ func (s *Service) SubmitManualFile(ctx context.Context, input ManualFileRequest)
 			return ErrManualFileChanged
 		}
 		work := FileWork{Version: 2, Size: plan.Inspection.Snapshot.Size, SHA256: plan.Inspection.SHA256,
-			Manual: &ManualFileWork{Request: input, RootRevision: plan.Preview.RootRevision, Inspection: plan.Inspection, ScanCollectionRevision: plan.Preview.ScanCollectionRevision},
+			Manual: &ManualFileWork{Request: input, RootRevision: plan.Preview.RootRevision, Inspection: plan.Inspection, ScanCollectionRevision: plan.Preview.ScanCollectionRevision, SavedPosts: plan.SavedPosts},
 			Publication: IntakePublication{UUID: manualIntakeUUID(input.RequestUUID), CollectionUUID: input.CollectionUUID,
-				CollectionRevision: plan.Preview.CollectionRevision, PolicyRevision: plan.Preview.PolicyRevision, Target: plan.Target, Kind: input.MediaKind, Transformation: plan.Transformation, ManualMetadata: input.Metadata}}
+				CollectionRevision: plan.Preview.CollectionRevision, PolicyRevision: plan.Preview.PolicyRevision, Target: plan.Target, Kind: input.MediaKind, Transformation: plan.Transformation, ManualMetadata: input.Metadata, SavedPosts: plan.SavedPosts}}
 		args, err := json.Marshal(work)
 		if err != nil {
 			return err
@@ -413,6 +427,15 @@ func (s *Service) CancelManualFile(ctx context.Context, request string, revision
 func (s *Service) validateManualFilePublication(ctx context.Context, work FileWork) error {
 	if work.Manual == nil {
 		return nil
+	}
+	if work.Manual.Request.DeduplicationPolicy != "" {
+		current, err := savedFilePosts(ctx, s.Repo, work.Publication.Target, work.Size)
+		if err != nil {
+			return err
+		}
+		if !reflect.DeepEqual(current, work.Manual.SavedPosts) {
+			return ErrManualFileChanged
+		}
 	}
 	scanRevision, err := s.manualFileScanRevision(ctx, work.Manual.Request.ManualFileInput)
 	if err != nil {

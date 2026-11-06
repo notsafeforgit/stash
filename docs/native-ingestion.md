@@ -810,6 +810,15 @@ the failure route or supply their own retry deadline. Failed attempts retain
 checkpoints and do not complete the target. A terminal job requires an explicit
 owner retry that creates a new target revision.
 
+An unavailable individual post has one bounded exception: `access_denied` or
+`not_found` excludes its pending target with `saved_metadata_sufficient` when
+retained metadata already contains a title, description and valid date, every
+associated media record is actively linked, and its registered files still exist
+with their recorded nonzero sizes. The failed attempt remains failed; no fresh
+capture or enrichment completion is invented. Partial checkpoints, handoffs,
+missing fields/files, ambiguous associations and authentication/challenge errors
+remain review work. This rule does not change account monitoring or downloads.
+
 Claims coordinate with source downloads in the same write transaction. Enrichment
 excludes other claims for its services and collection. Download attempts reserve
 their root and supported linked services; independent downloads retain their

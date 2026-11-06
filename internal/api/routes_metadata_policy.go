@@ -13,6 +13,7 @@ import (
 	"github.com/stashapp/stash/pkg/gallery"
 	"github.com/stashapp/stash/pkg/metadata"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/scene"
 	"github.com/stashapp/stash/pkg/translation"
 )
 
@@ -22,6 +23,7 @@ type nativeArchiveRoutes struct {
 	albums         *gallery.AlbumBackfill
 	translations   *translation.Service
 	fileIngestion  bool
+	scenes         *scene.Service
 }
 
 // This router is mounted behind application authentication. Producer bearer

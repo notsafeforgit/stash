@@ -171,6 +171,24 @@ func (w *FileWorker) process(ctx context.Context, claimed *models.ArchiveJob) er
 			if err := w.Service.validateManualFilePublication(ctx, work); err != nil {
 				return nil, err
 			}
+			if work.Manual != nil && work.Manual.Request.DeduplicationPolicy != "" {
+				// Scheduled duplicate repair may reuse a live verified owner or
+				// introduce previously unseen bytes. It cannot resurrect retired
+				// content under a different filename without an explicit review.
+				content, err := w.Service.Repo.FileContent.FindBySHA256(ctx, prepared.SHA256())
+				if err != nil {
+					return nil, err
+				}
+				if content != nil {
+					owners, err := w.Service.Repo.FileContent.MediaCandidates(ctx, content.UUID)
+					if err != nil {
+						return nil, err
+					}
+					if len(owners) == 0 {
+						return nil, models.ErrFilePathChanged
+					}
+				}
+			}
 			if work.Manual != nil {
 				txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
 					return w.Service.validateManualFilePublication(ctx, work)

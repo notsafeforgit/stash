@@ -29,6 +29,8 @@ func redditMediaReference(value interface{}) (*models.SourcePostIdentifier, stri
 		ext := strings.ToLower(path.Ext(parts[0]))
 		id = strings.TrimSuffix(parts[0], path.Ext(parts[0]))
 		switch ext {
+		case "":
+			kind = "unknown" // Bare CDN media IDs have no file-type evidence.
 		case ".jpg", ".jpeg", ".png", ".webp", ".avif", ".jxl":
 			kind = "image"
 		case ".mp4", ".webm":

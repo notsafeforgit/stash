@@ -8,6 +8,7 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/pkg/archive"
@@ -24,7 +25,8 @@ const fileDeduplicationSelect = `SELECT uuid,signature,root_uuid,keep_path,remov
 func (s *FileDeduplicationStore) Inspect(ctx context.Context, input models.FileDeduplicationInput) (*models.FileDeduplicationState, error) {
 	if id, err := archiveUUID(input.RootUUID); err != nil || id != input.RootUUID ||
 		!archive.ValidRootRelativePath(input.KeepPath, false) || !archive.ValidRootRelativePath(input.RemovePath, false) ||
-		input.KeepPath == input.RemovePath || strings.HasSuffix(strings.ToLower(input.KeepPath), ".part") || strings.HasSuffix(strings.ToLower(input.RemovePath), ".part") {
+		input.KeepPath == input.RemovePath || strings.HasSuffix(strings.ToLower(input.KeepPath), ".part") || strings.HasSuffix(strings.ToLower(input.RemovePath), ".part") ||
+		(input.MediaPolicy != "" && input.MediaPolicy != models.FileDeduplicationEarliest) {
 		return nil, models.ErrFileDeduplicationInvalid
 	}
 	root, err := (&MediaRootStore{}).Find(ctx, input.RootUUID)
@@ -56,10 +58,31 @@ func (s *FileDeduplicationStore) Inspect(ctx context.Context, input models.FileD
 		return ret, nil
 	}
 	if keptOwner.UUID != removedOwner.UUID {
-		ret.BlockedReason = "different_media_owners"
-		return ret, nil
+		if input.MediaPolicy == "" || keptOwner.Kind != removedOwner.Kind {
+			ret.BlockedReason = "different_media_owners"
+			return ret, nil
+		}
+		// A shared file does not prove that other versions attached to either
+		// record are interchangeable. Leave multi-file owners for explicit review.
+		var dates [2]time.Time
+		for i, owner := range []*models.ArchiveEntity{keptOwner, removedOwner} {
+			date, count, err := deduplicationOwner(ctx, owner)
+			if err != nil {
+				return nil, err
+			}
+			if count != 1 {
+				ret.BlockedReason = "media_variants_require_review"
+				return ret, nil
+			}
+			dates[i] = date
+		}
+		ret.Owner, ret.MergeSource = keptOwner, removedOwner
+		if dates[1].Before(dates[0]) || (dates[0].Equal(dates[1]) && *removedOwner.LocalID < *keptOwner.LocalID) {
+			ret.Owner, ret.MergeSource = removedOwner, keptOwner
+		}
+	} else {
+		ret.Owner = keptOwner
 	}
-	ret.Owner = keptOwner
 	// Caption sidecars are not interchangeable just because the video bytes are.
 	var captions bool
 	if err := dbWrapper.Get(ctx, &captions, "SELECT EXISTS(SELECT 1 FROM video_captions WHERE file_id=?)", ret.Removed.ID); err != nil {
@@ -78,6 +101,25 @@ func (s *FileDeduplicationStore) Inspect(ctx context.Context, input models.FileD
 		ret.BlockedReason = "source_history_requires_review"
 	}
 	return ret, nil
+}
+
+func deduplicationOwner(ctx context.Context, owner *models.ArchiveEntity) (time.Time, int, error) {
+	if owner == nil || owner.LocalID == nil || owner.State != models.ArchiveEntityActive {
+		return time.Time{}, 0, models.ErrFileDeduplicationConflict
+	}
+	table, relation, key := "images", "images_files", "image_id"
+	if owner.Kind == models.ArchiveScene {
+		table, relation, key = "scenes", "scenes_files", "scene_id"
+	}
+	var row struct {
+		CreatedAt time.Time `db:"created_at"`
+		Files     int       `db:"files"`
+	}
+	err := dbWrapper.Get(ctx, &row, "SELECT created_at,(SELECT count(*) FROM "+relation+" WHERE "+key+"=m.id) AS files FROM "+table+" m WHERE id=?", *owner.LocalID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return time.Time{}, 0, models.ErrFileDeduplicationConflict
+	}
+	return row.CreatedAt, row.Files, err
 }
 
 func deduplicationFile(ctx context.Context, path string) (*models.FileDeduplicationFile, *models.ArchiveEntity, string, error) {
@@ -146,6 +188,13 @@ func (s *FileDeduplicationStore) Find(ctx context.Context, id string) (*models.F
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
+	if err == nil && len(ret.Proof) != 0 {
+		var proof archive.DeduplicationProof
+		if err := json.Unmarshal(ret.Proof, &proof); err != nil {
+			return nil, err
+		}
+		ret.MediaPolicy = proof.State.Input.MediaPolicy
+	}
 	return &ret, err
 }
 
@@ -157,7 +206,7 @@ func (s *FileDeduplicationStore) Record(ctx context.Context, state models.FileDe
 		!archive.ValidSHA256(receipt.SHA256) || state.BlockedReason != "" || state.Kept == nil || state.Removed == nil || state.Owner == nil ||
 		receipt.RootUUID != state.Input.RootUUID || receipt.KeepPath != state.Input.KeepPath || receipt.RemovePath != state.Input.RemovePath ||
 		receipt.KeptUUID != state.Kept.UUID || receipt.KeptGeneration != state.Kept.Generation ||
-		receipt.RemovedUUID != state.Removed.UUID || receipt.RemovedGeneration != state.Removed.Generation || receipt.MediaUUID != state.Owner.UUID {
+		receipt.RemovedUUID != state.Removed.UUID || receipt.RemovedGeneration != state.Removed.Generation || receipt.MediaUUID != state.Owner.UUID || receipt.MediaPolicy != state.Input.MediaPolicy {
 		return nil, models.ErrFileDeduplicationInvalid
 	}
 	prior, err := s.Find(ctx, receipt.UUID)

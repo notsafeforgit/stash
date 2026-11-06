@@ -49,6 +49,14 @@ bearer tokens cannot authorize them. Responses use `Cache-Control: no-store`.
 | `POST /manual-intake/requests/{request}/cancel` | Cancel the selected `expected_revision` |
 | `POST /manual-intake/requests/{request}/retry` | Resume a terminal attempt using `expected_revision` and a new `request_uuid` |
 
+The optional `deduplication_policy: "earliest-fill-blanks-v1"` binds the reviewed
+[automatic duplicate repair](native-file-deduplication.md#reviewed-automatic-media-reconciliation)
+policy to a request. Preview reports `saved_post_count` when exact retained source
+locations provide metadata. That evidence is selected by Stash, included in the
+admission signature, and rechecked before publication; clients cannot supply a
+forged saved post. Existing manual decisions and deleted-content fences remain
+authoritative. Ordinary manual imports retain their existing behavior.
+
 Directory listing accepts `directory` (defaults to the collection prefix),
 `q` (literal filename search), `limit` (1–100; the UI uses 50), and the previous
 page's `after`/`signature`. It reads only that folder, sorts directories before

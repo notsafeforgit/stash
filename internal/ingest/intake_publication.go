@@ -26,6 +26,7 @@ type IntakePublication struct {
 	Source             *IntakeSource            `json:"source,omitempty"`
 	Transformation     *IntakeTransformation    `json:"transformation,omitempty"`
 	ManualMetadata     *ManualFileMetadata      `json:"manual_metadata,omitempty"`
+	SavedPosts         []SavedFilePost          `json:"saved_posts,omitempty"`
 }
 
 type IntakeSource struct {
@@ -165,6 +166,9 @@ func (p *PreparedMedia) PublishIntake(ctx context.Context, repo models.Repositor
 	}
 	for _, field := range policyResult.ReviewFields() {
 		ret.Result.Review = append(ret.Result.Review, "metadata:"+field)
+	}
+	if err := applySavedFilePosts(ctx, repo, input, ret); err != nil {
+		return nil, err
 	}
 	// Gallery guards include member revisions. Establish them only after this
 	// transaction's media metadata is final, so our own policy writes cannot

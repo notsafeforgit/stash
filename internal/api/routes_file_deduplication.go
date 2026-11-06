@@ -21,7 +21,7 @@ func fileDeduplicationError(w http.ResponseWriter, err error) {
 	case errors.Is(err, models.ErrFileDeduplicationReplay):
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "deduplication_request_changed"})
 	case errors.Is(err, models.ErrFileDeduplicationConflict), errors.Is(err, models.ErrFileGenerationConflict),
-		errors.Is(err, models.ErrArchiveIdentityConflict), errors.Is(err, models.ErrFileContentConflict), errors.Is(err, archive.ErrMediaFileChanged):
+		errors.Is(err, models.ErrArchiveIdentityConflict), errors.Is(err, models.ErrMetadataFieldConflict), errors.Is(err, models.ErrFileContentConflict), errors.Is(err, archive.ErrMediaFileChanged):
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "deduplication_preview_changed"})
 	case errors.Is(err, archive.ErrMediaFileDigest):
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "deduplication_bytes_differ"})
@@ -52,7 +52,7 @@ func (rs *nativeArchiveRoutes) applyFileDeduplication(w http.ResponseWriter, r *
 		fileDeduplicationError(w, err)
 		return
 	}
-	result, err := dedup.New(rs.repo, config.GetInstance().GetDeleteTrashPath()).Apply(r.Context(), input)
+	result, err := dedup.New(rs.repo, config.GetInstance().GetDeleteTrashPath()).WithScenes(rs.scenes).Apply(r.Context(), input)
 	if err != nil {
 		fileDeduplicationError(w, err)
 		return

@@ -4,7 +4,8 @@ Fclones remains the duplicate discovery engine. The native backend implements
 a preview/apply service for redundant physical media files in schema 1000095.
 The installed scheduled/pre-backup host launcher uses this native API through
 `stash-dedupe-host`, provided by the native producer package.
-This service is not a scene/image merge operation.
+By default this service removes redundant locations within one media record.
+The explicit `earliest-fill-blanks-v1` policy also reconciles separate records.
 
 An automatic candidate must contain two distinct, indexed, nonempty regular
 video or image locations under one active, reviewed media root. Both must belong
@@ -29,9 +30,42 @@ source evidence and attachment decisions remain intact and resolve to the
 survivor. A fileless destination takes the source primary. No physical media or
 shared generated images are deleted by the merge. Use the file-deduplication
 preview/apply operation afterward to verify and remove redundant locations.
-Byte equality alone never invokes an image merge automatically. Following an
+Without the explicit policy, byte equality never invokes an image merge. Following an
 uncertain merge response, inspect the original source identity's redirect and
 the survivor before attempting another operation.
+
+## Reviewed automatic media reconciliation
+
+Preview and apply may include `"media_policy":"earliest-fill-blanks-v1"`.
+For two separate single-file owners of the same kind, the earliest-created
+scene/image survives (local ID breaks ties). This is independent of which
+physical path the client keeps. Full-byte verification, unchanged revisions,
+metadata reconciliation and journaled removal remain mandatory. Blank dates
+and descriptions may be filled; existing values and explicit clears survive.
+URLs and gallery memberships are preserved. Shared generated artwork is kept.
+The receipt binds this policy, so an old request cannot acquire merge semantics
+merely because the host configuration changed.
+
+Separate owners containing additional files return
+`media_variants_require_review`: equality of this pair says nothing about those
+other renditions. Ambiguous owners, captions and archive members also remain
+review cases. Multiple redundant locations of the same owner still use the
+ordinary file-only removal path.
+
+An explicitly configured `intake_collection_uuid` lets the host register
+unindexed equal-byte candidates before dedupe. Native preview reports
+`saved_post_count`; scheduled intake requires retained source metadata matched
+through exact root/path observations and size, never a guessed filename.
+Admission binds those source records, and publication rechecks them. It fills
+eligible blank title/details/date, preserves source URLs, links each saved post,
+and synchronizes existing source galleries through the ordinary decision service.
+Manual unlinks, changed evidence and removal fences stop publication. Previously
+verified bytes without a live media owner cannot silently recreate deleted media.
+
+Registration intents are durable and limited to eight pending jobs. The host
+returns `waiting_for_intake` until they finish; it never reports admission as
+duplicate removal. `stash-dedupe-host --resume-only` resumes an existing pass
+without starting a new scan. Journal schema 2 retains schema-1 requests unchanged.
 
 ## Application API
 

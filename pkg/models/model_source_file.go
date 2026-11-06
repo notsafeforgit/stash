@@ -90,4 +90,5 @@ type SourceFileReaderWriter interface {
 	Matches(context.Context, string, string, int) ([]SourceFileMatch, error)
 	RecordPostEvidence(context.Context, SourcePostFileEvidence) (*SourcePostFileEvidence, error)
 	PostEvidence(context.Context, string, string, int) ([]SourcePostFileEvidence, error)
+	ObservationPosts(context.Context, string, string, int) ([]SourcePostFileEvidence, error)
 }

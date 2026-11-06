@@ -1513,6 +1513,63 @@
       },
       "complete": true,
       "kind": "image"
+    },
+    {
+      "name": "extensionless Reddit CDN identity",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://i.redd.it/abc123",
+        "_url": "https://i.redd.it/abc123"
+      },
+      "attachment": {
+        "namespace": "native:reddit",
+        "value": "abc123"
+      },
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "abc123"
+      },
+      "complete": true,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "extensionless Reddit CDN named rendition",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://i.redd.it/abc123",
+        "_url": "https://i.redd.it/abc123.jpg"
+      },
+      "attachment": {
+        "namespace": "native:reddit",
+        "value": "abc123"
+      },
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "abc123"
+      },
+      "complete": true,
+      "kind": "unknown",
+      "manifest_error": false
+    },
+    {
+      "name": "extensionless Reddit CDN rejects unrelated item",
+      "source": {
+        "category": "reddit",
+        "id": "post",
+        "url": "https://i.redd.it/abc123",
+        "_url": "https://i.redd.it/other123"
+      },
+      "attachment": null,
+      "manifest": {
+        "namespace": "native:reddit",
+        "value": "abc123"
+      },
+      "complete": true,
+      "kind": "unknown",
+      "manifest_error": false
     }
   ]
 }

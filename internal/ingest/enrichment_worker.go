@@ -220,6 +220,9 @@ func (c *EnrichmentCoordinator) Fail(ctx context.Context, token string, lease mo
 			return models.ErrEnrichmentAtomic
 		}
 		ret = &EnrichmentFailureReceipt{ArchiveJobAttempt: attempts[0], ProducerUUID: credential.ProducerUUID}
+		if err := c.excludeUnavailableSavedPost(ctx, after, code); err != nil {
+			return err
+		}
 		c.guard(ctx, token, after, nil)
 		txn.AddPreCommitHook(ctx, func(context.Context) error {
 			if !c.Now().Before(*before.LeaseUntil) {

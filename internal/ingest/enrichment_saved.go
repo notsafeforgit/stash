@@ -40,8 +40,12 @@ func (c *EnrichmentCoordinator) excludeUnavailableSavedPost(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	if content == nil || content.Title == nil || strings.TrimSpace(*content.Title) == "" ||
-		content.OriginalText == nil || strings.TrimSpace(*content.OriginalText) == "" || savedPostDate(content.PublishedAt) == "" {
+	reviewed := target.Reason == "reviewed_single_retry_saved_metadata"
+	if content == nil {
+		return nil
+	}
+	if !reviewed && (content.Title == nil || strings.TrimSpace(*content.Title) == "" ||
+		content.OriginalText == nil || strings.TrimSpace(*content.OriginalText) == "" || savedPostDate(content.PublishedAt) == "") {
 		return nil
 	}
 	items, err := repo.SourcePostMedia.MediaForPost(ctx, work.PostUUID, "", 100)
@@ -90,6 +94,9 @@ func (c *EnrichmentCoordinator) excludeUnavailableSavedPost(ctx context.Context,
 	}
 	schedule := target.EnrichmentSchedule
 	schedule.State, schedule.Reason = "excluded", "saved_metadata_sufficient"
+	if reviewed {
+		schedule.Reason = "reviewed_saved_metadata_accepted"
+	}
 	_, err = repo.EnrichmentWork.Schedule(ctx, target.UUID, target.Revision, schedule, c.Now())
 	return err
 }

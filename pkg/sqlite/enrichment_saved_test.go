@@ -12,14 +12,25 @@ import (
 )
 
 func TestUnavailableEnrichmentRetiresOnlyCompleteSavedPosts(t *testing.T) {
-	for _, scenario := range []string{"access_denied", "not_found", "authentication", "missing_date", "missing_file", "unlinked", "checkpoint"} {
+	for _, scenario := range []string{"access_denied", "not_found", "authentication", "missing_date", "missing_file", "unlinked", "checkpoint", "reviewed_incomplete", "reviewed_missing_file", "reviewed_authentication"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newEnrichmentExecutionFixture(t)
+			reviewed := scenario == "reviewed_incomplete" || scenario == "reviewed_missing_file" || scenario == "reviewed_authentication"
+			if reviewed {
+				schedule := f.target.EnrichmentSchedule
+				schedule.Reason = "reviewed_single_retry_saved_metadata"
+				var err error
+				f.target, err = scheduleEnrichment(f.repo, f.target, schedule, f.now)
+				require.NoError(t, err)
+			}
 			job := f.admit(t)
 			running := f.claim(t, job.UUID, 0)
 			raw := `{"category":"reddit","id":"abc123","title":"Saved title","selftext":"Saved description","date":"2026-10-01T00:00:00Z"}`
 			if scenario == "missing_date" {
 				raw = `{"category":"reddit","id":"abc123","title":"Saved title","selftext":"Saved description"}`
+			}
+			if reviewed {
+				raw = `{"category":"reddit","id":"abc123","title":"Saved title"}`
 			}
 			capturedGapFixture(t, f, []byte(raw))
 			binding, err := archive.ProbeMediaRoot(t.TempDir())
@@ -45,7 +56,7 @@ func TestUnavailableEnrichmentRetiresOnlyCompleteSavedPosts(t *testing.T) {
 					MediaUUID: media.UUID, ExpectedPostRevision: post.Revision, ExpectedMediaRevision: media.Revision, State: state, Origin: "review"})
 				return err
 			}))
-			if scenario == "missing_file" {
+			if scenario == "missing_file" || scenario == "reviewed_missing_file" {
 				require.NoError(t, os.Remove(file.Base().Path))
 			}
 			if scenario == "checkpoint" {
@@ -56,14 +67,21 @@ func TestUnavailableEnrichmentRetiresOnlyCompleteSavedPosts(t *testing.T) {
 			if scenario == "not_found" || scenario == "authentication" {
 				code = scenario
 			}
+			if scenario == "reviewed_authentication" {
+				code = "authentication"
+			}
 			receipt, err := f.worker.Fail(t.Context(), f.tokens[0], running.Lease(), code)
 			require.NoError(t, err)
 			require.Equal(t, "failed", receipt.Outcome)
 			require.Equal(t, code, receipt.ErrorCode)
 			target := readEnrichmentTarget(t, f.repo, f.target.UUID)
-			if scenario == "access_denied" || scenario == "not_found" {
+			if scenario == "access_denied" || scenario == "not_found" || scenario == "reviewed_incomplete" {
 				require.Equal(t, "excluded", target.State)
-				require.Equal(t, "saved_metadata_sufficient", target.Reason)
+				reason := "saved_metadata_sufficient"
+				if reviewed {
+					reason = "reviewed_saved_metadata_accepted"
+				}
+				require.Equal(t, reason, target.Reason)
 				require.Nil(t, target.CompletionUUID)
 			} else {
 				require.Equal(t, "pending", target.State, scenario)

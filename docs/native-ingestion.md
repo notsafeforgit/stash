@@ -819,6 +819,13 @@ capture or enrichment completion is invented. Partial checkpoints, handoffs,
 missing fields/files, ambiguous associations and authentication/challenge errors
 remain review work. This rule does not change account monitoring or downloads.
 
+An owner can schedule a fresh target revision with the reason
+`reviewed_single_retry_saved_metadata` to accept incomplete saved text or dates
+after that attempt returns `access_denied` or `not_found`. The same active-media,
+file-verification, checkpoint and handoff checks apply. The target then becomes
+excluded with `reviewed_saved_metadata_accepted`. Authentication and challenge
+failures still require review.
+
 Claims coordinate with source downloads in the same write transaction. Enrichment
 excludes other claims for its services and collection. Download attempts reserve
 their root and supported linked services; independent downloads retain their

@@ -214,31 +214,35 @@ func (p *postConsolidationPlan) publishGalleryChoice(ctx context.Context, input 
 
 func (s *SourceEvidenceStore) publishConsolidatedAlbum(ctx context.Context, input models.PostConsolidationReviewApplyInput, planned *postConsolidationPlan, result *models.PostConsolidationReviewResult) error {
 	gallery := &SourceGalleryStore{gallery: s.gallery}
-	preview, err := gallery.Preview(ctx, input.DestinationUUID)
+	selection, err := (&SourceAttachmentStore{}).Selection(ctx, input.DestinationUUID)
 	if err != nil {
 		return err
 	}
-	selection, err := (&SourceAttachmentStore{}).Selection(ctx, input.DestinationUUID)
+	// The reviewed merge concerns these duplicate posts, not their neighboring
+	// replies. A plan with no gallery effects can complete when its persisted
+	// single-post choices agree, even if ordinary thread sync has other work.
+	if planned.preview.Album.Action == "ineligible" && planned.preview.Album.GalleryUUID == "" &&
+		len(planned.preview.Album.Add) == 0 && len(planned.preview.Album.Remove) == 0 {
+		preview, err := gallery.previewSinglePost(ctx, input.DestinationUUID, nil, nil, false)
+		if err != nil {
+			return err
+		}
+		actual := &postConsolidationPlan{preview: &models.PostConsolidationReviewPreview{}, selection: selection}
+		if err := actual.setAlbumPlan(preview); err != nil {
+			return err
+		}
+		if reflect.DeepEqual(actual.preview.Album, planned.preview.Album) {
+			result.Gallery = models.PostConsolidationGalleryResult{Action: "ineligible", Added: []string{}, Removed: []string{}}
+			return nil
+		}
+	}
+	preview, err := gallery.Preview(ctx, input.DestinationUUID)
 	if err != nil {
 		return err
 	}
 	actual := &postConsolidationPlan{preview: &models.PostConsolidationReviewPreview{}, selection: selection}
 	if err := actual.setAlbumPlan(preview); err != nil {
 		return err
-	}
-	// A single-post plan can leave the gallery untouched while the wider
-	// thread needs review. That must not block consolidating a duplicate post.
-	// Accept only the action difference: no gallery, membership, metadata, or
-	// selection differences may slip past the reviewed plan. Do not sync the
-	// thread or report that its independent gallery conflict was resolved.
-	if planned.preview.Album.Action == "ineligible" && planned.preview.Album.GalleryUUID == "" &&
-		len(planned.preview.Album.Add) == 0 && len(planned.preview.Album.Remove) == 0 && actual.preview.Album.Action == "review" {
-		unchanged := *actual.preview.Album
-		unchanged.Action = "ineligible"
-		if reflect.DeepEqual(&unchanged, planned.preview.Album) {
-			result.Gallery = models.PostConsolidationGalleryResult{Action: "ineligible", Added: []string{}, Removed: []string{}}
-			return nil
-		}
 	}
 	if !reflect.DeepEqual(actual.preview.Album, planned.preview.Album) {
 		return models.ErrPostConsolidationReviewConflict

@@ -60,7 +60,10 @@ VALUES(?,?,?,?,?,?,?,?)`, capture.PostUUID, capture.UUID, facts.Namespace, facts
 	}
 	old, next := previous.SourceThreadFacts, *facts
 	old.ReplyAuthorID, next.ReplyAuthorID = "", ""
-	if previous.PostUUID != capture.PostUUID || old != next ||
+	// Lookup already resolves the reviewed canonical group. A capture on its
+	// retained first post must not conflict solely because older thread facts
+	// were observed on a later identity that has since been consolidated.
+	if old != next ||
 		(previous.ReplyAuthorID != "" && facts.ReplyAuthorID != "" && previous.ReplyAuthorID != facts.ReplyAuthorID) {
 		_, err = dbWrapper.Exec(ctx, "UPDATE source_post_threads SET conflict_capture_uuid=? WHERE post_uuid=?", capture.UUID, previous.PostUUID)
 		return "review", err
@@ -161,10 +164,11 @@ func sourceThreadMembers(ctx context.Context, post string) ([]sourceThreadRow, e
 		return nil, models.ErrSourceGalleryConflict
 	}
 	var rows []sourceThreadRow
-	err = dbWrapper.Select(ctx, &rows, `SELECT t.* FROM source_post_threads t
-JOIN source_posts p ON p.uuid=t.post_uuid JOIN source_post_identities i ON i.post_uuid=t.post_uuid
+	err = dbWrapper.Select(ctx, &rows, `SELECT i.canonical_uuid AS post_uuid,t.capture_uuid,t.namespace,t.post_id,
+t.conversation_id,t.author_id,t.reply_id,t.reply_author_id,t.conflict_capture_uuid FROM source_post_threads t
+JOIN source_post_identities i ON i.post_uuid=t.post_uuid JOIN source_posts p ON p.uuid=i.canonical_uuid
 WHERE t.namespace=? AND t.conversation_id=? AND t.author_id=? AND t.conflict_capture_uuid IS NULL
-AND (t.reply_id='' OR t.reply_author_id=t.author_id) AND p.state='active' AND i.canonical_uuid=t.post_uuid
+AND (t.reply_id='' OR t.reply_author_id=t.author_id) AND p.state='active'
 ORDER BY length(t.post_id),t.post_id LIMIT 257`, row.Namespace, row.ConversationID, row.AuthorID)
 	if len(rows) > 256 {
 		return nil, models.ErrSourceAlbumLimit
@@ -185,7 +189,8 @@ func sourceThreadSharesGallery(ctx context.Context, gallery, post string) (bool,
 		allowed[m.PostUUID] = true
 	}
 	var posts []string
-	if err := dbWrapper.Select(ctx, &posts, `SELECT post_uuid FROM post_gallery_links WHERE gallery_uuid=? LIMIT 1025`, gallery); err != nil {
+	if err := dbWrapper.Select(ctx, &posts, `SELECT DISTINCT i.canonical_uuid FROM post_gallery_links l
+JOIN source_post_identities i ON i.post_uuid=l.post_uuid WHERE l.gallery_uuid=? LIMIT 1025`, gallery); err != nil {
 		return false, err
 	}
 	if len(posts) > 1024 {

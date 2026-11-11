@@ -239,6 +239,115 @@ func TestPostConsolidationPreservesUnchangedGalleryWhenThreadNeedsReview(t *test
 	}))
 }
 
+func TestPostConsolidationDoesNotExpandSinglePostReviewToWholeThread(t *testing.T) {
+	for _, existingGallery := range []bool{false, true} {
+		t.Run(fmt.Sprintf("existing_gallery_%t", existingGallery), func(t *testing.T) {
+			db, repo := archiveTestDatabase(t)
+			first := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "legacy:catalog:fixture", Value: "first"}, "")
+			root := threadPost(t, repo, "100", "100", "", "99", "")
+			threadMedia(t, repo, root, "500", models.ArchiveScene, 31)
+			if existingGallery {
+				middle := threadPost(t, repo, "101", "100", "100", "99", "99")
+				threadMedia(t, repo, middle, "501", models.ArchiveScene, 32)
+				require.True(t, syncSourceGallery(t, repo, middle).Created)
+			}
+			later := threadPost(t, repo, "102", "100", "100", "99", "99")
+			threadMedia(t, repo, later, "502", models.ArchiveImage, 41)
+			threadPreview := sourceGalleryPreview(t, repo, later)
+			require.Contains(t, []string{"create", "sync"}, threadPreview.Action)
+			require.NotEmpty(t, threadPreview.Add)
+
+			input := models.PostConsolidationReviewInput{SourceUUID: later, DestinationUUID: first.UUID, Reason: "Keep first stored post"}
+			var preview *models.PostConsolidationReviewPreview
+			require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+				var err error
+				preview, err = repo.SourceEvidence.PreviewConsolidationReview(ctx, input)
+				return err
+			}))
+			require.True(t, preview.Ready)
+			require.Equal(t, "ineligible", preview.Album.Action)
+			require.Empty(t, preview.Album.Add)
+			raw := openRawDB(t, db.DatabasePath())
+			defer raw.Close()
+			tables := []string{"galleries", "galleries_images", "scenes_galleries", "source_post_threads"}
+			before := map[string][][]any{}
+			for _, table := range tables {
+				before[table] = albumJobRows(t, raw, table)
+			}
+			require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+				result, _, err := repo.SourceEvidence.ApplyConsolidationReview(ctx, models.PostConsolidationReviewApplyInput{
+					PostConsolidationReviewInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest}, time.Now())
+				require.NoError(t, err)
+				require.Equal(t, "ineligible", result.Result.Gallery.Action)
+				require.False(t, result.Result.Gallery.Changed())
+				require.Empty(t, result.Result.NotificationJobUUID)
+				return err
+			}))
+			for _, table := range tables {
+				require.Equal(t, before[table], albumJobRows(t, raw, table), table)
+			}
+			metadata := []byte(`{"category":"twitter","tweet_id":"102","conversation_id":"100","reply_id":"100","reply_user_id":"99","author":{"id":"99"}}`)
+			payload, err := archive.PrepareRetainedCapture("gallery-dl", "twitter", metadata)
+			require.NoError(t, err)
+			capture := recordSourceTestCapture(t, repo, models.SourceCaptureInput{UUID: uuid.NewString(), PostUUID: first.UUID,
+				Origin: "gallery-dl", Platform: "twitter", CapturedAt: time.Now(), RetentionPolicy: archive.SourceRetentionVersion, Payload: *payload})
+			require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+				status, err := repo.SourceThread.ObserveCapture(ctx, capture)
+				require.NoError(t, err)
+				require.Equal(t, "recorded", status, "a later capture on the canonical post preserves the original thread identity")
+				return err
+			}))
+			// The independent thread operation remains available after the
+			// identity repair and uses the consolidated post's saved selection.
+			album := syncSourceGallery(t, repo, first.UUID)
+			require.NotEmpty(t, album.Added)
+			scenes := []int{31}
+			if existingGallery {
+				scenes = append(scenes, 32)
+			}
+			sourceGalleryMemberships(t, repo, *album.GalleryID, []int{41}, scenes)
+		})
+	}
+}
+
+func TestThreadFirstObservationAfterPostConsolidationUsesReviewedIdentity(t *testing.T) {
+	_, repo := archiveTestDatabase(t)
+	first := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "legacy:catalog:fixture", Value: "first"}, "")
+	later := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:twitter", Value: "102"}, "")
+	input := models.PostConsolidationReviewInput{SourceUUID: later.UUID, DestinationUUID: first.UUID}
+	var preview *models.PostConsolidationReviewPreview
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		preview, err = repo.SourceEvidence.PreviewConsolidationReview(ctx, input)
+		return err
+	}))
+	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, _, err := repo.SourceEvidence.ApplyConsolidationReview(ctx, models.PostConsolidationReviewApplyInput{
+			PostConsolidationReviewInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest}, time.Now())
+		return err
+	}))
+	metadata := []byte(`{"category":"twitter","tweet_id":"102","conversation_id":"100","reply_id":"100","reply_user_id":"99","author":{"id":"99"}}`)
+	payload, err := archive.PrepareRetainedCapture("gallery-dl", "twitter", metadata)
+	require.NoError(t, err)
+	wrong := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:twitter", Value: "103"}, "")
+	for _, post := range []string{wrong.UUID, first.UUID} {
+		capture := recordSourceTestCapture(t, repo, models.SourceCaptureInput{UUID: uuid.NewString(), PostUUID: post,
+			Origin: "gallery-dl", Platform: "twitter", CapturedAt: time.Now(), RetentionPolicy: archive.SourceRetentionVersion, Payload: *payload})
+		err := repo.WithTxn(t.Context(), func(ctx context.Context) error {
+			status, err := repo.SourceThread.ObserveCapture(ctx, capture)
+			if post == first.UUID {
+				require.Equal(t, "recorded", status)
+			}
+			return err
+		})
+		if post == wrong.UUID {
+			require.Error(t, err, "unrelated captures cannot claim another post's thread identity")
+		} else {
+			require.NoError(t, err)
+		}
+	}
+}
+
 func TestPostConsolidationStillRejectsGalleryChangesWhenThreadNeedsReview(t *testing.T) {
 	_, repo := archiveTestDatabase(t)
 	first := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "legacy:catalog:fixture", Value: "first"}, "")

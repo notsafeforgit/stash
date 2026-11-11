@@ -12,6 +12,7 @@ import (
 
 func removeConsolidatedSharedGallerySchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeCanonicalThreadEvidenceSchema(t, raw)
 	prior, err := os.ReadFile("migrations/1000117_overlapping_source_galleries.up.sql")
 	require.NoError(t, err)
 	definition := strings.Split(strings.Split(string(prior), "DROP TRIGGER post_gallery_thread_share_insert;")[1], "DROP TRIGGER post_gallery_thread_share_update;")[0]

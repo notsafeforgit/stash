@@ -82,5 +82,8 @@ ON CONFLICT(account_uuid,url_key) DO UPDATE SET url=excluded.url,profile_uuid=ex
 	if err = syncAccountProfileURLs(ctx, account.UUID); err != nil {
 		return nil, err
 	}
+	if err := resumeRedditMonitoring(ctx, input.CollectionUUID, input.ObservedAt); err != nil {
+		return nil, err
+	}
 	return result, nil
 }

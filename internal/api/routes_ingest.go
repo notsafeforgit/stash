@@ -194,6 +194,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"source_run_redgifs_pagination_protocol":   1,
 		"source_run_redgifs_deletion_protocol":     1,
 		"source_run_account_status_protocol":       1,
+		"source_reddit_monitoring_protocol":        1,
 		"source_run_recovery_protocol":             1,
 		"source_run_pacing_protocol":               1,
 		"source_request_budget_protocol":           1,

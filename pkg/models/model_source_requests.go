@@ -4,16 +4,18 @@ import "time"
 
 // Request permits apply to extractor HTTP attempts, never media transfers.
 type SourceRequestInput struct {
-	RequestUUID string `json:"request_uuid"`
-	URL         string `json:"url"`
-	Class       string `json:"class"`
-	Operation   string `json:"operation"`
+	RequestUUID               string `json:"request_uuid"`
+	URL                       string `json:"url"`
+	Class                     string `json:"class"`
+	Operation                 string `json:"operation"`
+	AccountMonitoringProtocol int    `json:"account_monitoring_protocol,omitempty"`
 }
 type SourceRequestPermit struct {
 	RequestUUID string `json:"request_uuid"`
 	Scope       string `json:"source_scope"`
 	Ready       bool   `json:"ready"`
 	WaitMS      int64  `json:"wait_ms"`
+	PauseReason string `json:"pause_reason,omitempty"`
 }
 type SourceRequestResult struct {
 	RequestUUID       string `json:"request_uuid"`

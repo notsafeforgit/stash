@@ -38,6 +38,9 @@ func (s *SourceRunStore) RequestSource(ctx context.Context, lease models.SourceR
 	if _, err := archiveUUID(input.RequestUUID); err != nil {
 		return nil, models.ErrSourceRunInvalid
 	}
+	if input.AccountMonitoringProtocol < 0 || input.AccountMonitoringProtocol > 1 {
+		return nil, models.ErrSourceRunInvalid
+	}
 	switch input.Class {
 	case "routine", "initial", "recovery":
 	default:
@@ -90,6 +93,21 @@ func (s *SourceRunStore) RequestSource(ctx context.Context, lease models.SourceR
 	}
 	if _, err := dbWrapper.Exec(ctx, "UPDATE source_request_permits SET touched_at_ms=? WHERE run_uuid=?", stamp, lease.RunUUID); err != nil {
 		return nil, err
+	}
+	if input.AccountMonitoringProtocol == 1 && input.Class == "routine" && scope == "service:reddit" {
+		run, err := s.Find(ctx, lease.RunUUID)
+		if err != nil {
+			return nil, err
+		}
+		paused, err := redditMonitoringPaused(ctx, run)
+		if err != nil {
+			return nil, err
+		}
+		if paused {
+			result.PauseReason, result.WaitMS = "account_unavailable", 0
+			*complete = true
+			return result, nil
+		}
 	}
 	wait, err := sourceRequestWait(ctx, scope, input.RequestUUID, sourceRequestOwner("run", lease.RunUUID, lease.Fence), now)
 	if err != nil {

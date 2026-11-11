@@ -313,12 +313,21 @@ func (s *SourceRunStore) Finish(ctx context.Context, lease models.SourceRunLease
 	}
 	if (outcome.State != "succeeded" && outcome.State != "retry" && outcome.State != "deferred") || !jobErrorCode(outcome.ErrorCode) || outcome.RetryAfterSeconds < 0 || outcome.RetryAfterSeconds > 604800 ||
 		(outcome.State == "succeeded" && (outcome.ErrorCode != "" || outcome.ErrorScope != "" || outcome.RetryAfterSeconds != 0)) || (outcome.State != "succeeded" && outcome.ErrorCode == "") ||
-		((outcome.ErrorCode == "source_turn_complete" || outcome.ErrorCode == "worker_interrupted" || outcome.ErrorCode == "worker_publication_busy") && (outcome.State != "retry" || outcome.ErrorScope != "" || outcome.RetryAfterSeconds != 0)) {
+		((outcome.ErrorCode == "source_turn_complete" || outcome.ErrorCode == "worker_interrupted" || outcome.ErrorCode == "worker_publication_busy" || outcome.ErrorCode == "account_check_pending") && (outcome.State != "retry" || outcome.ErrorScope != "" || outcome.RetryAfterSeconds != 0)) {
 		return nil, models.ErrSourceRunInvalid
 	}
 	r, err := s.CheckLease(ctx, lease, now)
 	if err != nil {
 		return nil, err
+	}
+	if outcome.ErrorCode == "account_check_pending" {
+		var permitted bool
+		if err := dbWrapper.Get(ctx, &permitted, `SELECT EXISTS(SELECT 1 FROM source_request_permits WHERE run_uuid=? AND fence=? AND class='routine' AND scope='service:reddit' AND granted_at_ms IS NULL)`, r.UUID, r.Fence); err != nil {
+			return nil, err
+		}
+		if !permitted || redditMonitoringProfile(r) == "" {
+			return nil, models.ErrSourceRunInvalid
+		}
 	}
 	if outcome.ErrorCode == "account_deleted" {
 		collection, err := deletedRedgifsCollection(ctx, r, outcome)
@@ -374,6 +383,15 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 	} else {
 		r.Pending = scrape.Union(r.Pending, []models.SourceWindow{*r.Window})
 		switch {
+		case outcome.ErrorCode == "account_check_pending":
+			paused, err := redditMonitoringPaused(ctx, r)
+			if err != nil {
+				return nil, err
+			}
+			delay = 0
+			if paused {
+				delay = 30 * 24 * time.Hour
+			}
 		case attachmentRecheck:
 			r.Failures++
 			deadline := r.CreatedAt.Add(attachmentRetryLifetime)
@@ -447,7 +465,7 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 		return nil, err
 	}
 	targetDelay := delay
-	if accessRecheck || r.AttachmentRetry {
+	if accessRecheck || r.AttachmentRetry || outcome.ErrorCode == "account_check_pending" {
 		// A missing profile or file must not impose its retry delay on another
 		// retrieval for this source, such as an initial Reddit author search.
 		targetDelay = time.Duration(r.CooldownSeconds) * time.Second
@@ -455,6 +473,11 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 	if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_run_cooldowns(target_key,available_at_ms) SELECT target_key,? FROM source_runs WHERE uuid=?
 ON CONFLICT(target_key) DO UPDATE SET available_at_ms=max(available_at_ms,excluded.available_at_ms)`, now.Add(targetDelay).UnixMilli(), r.UUID); err != nil {
 		return nil, err
+	}
+	if outcome.State == "succeeded" {
+		if err := resumeRedditMonitoring(ctx, r.CollectionUUID, now); err != nil {
+			return nil, err
+		}
 	}
 	result, err := s.Find(ctx, r.UUID)
 	*complete = err == nil && result != nil

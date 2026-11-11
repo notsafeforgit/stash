@@ -29,8 +29,9 @@ Reviewed `stash-gallery-worker-v1` profiles have a `scan_mode`:
 
 - `routine`: recent checks. Twitter selects its direct media listing; Reddit
   checks both the submitted-post listing and newest-first author search,
-  under one profile subscription. Search is queued independently even when the
-  profile listing is hidden or unavailable. Ordered
+  under one profile subscription. Search remains independent during historical backfill. Once history is
+  complete, missing/suspended profiles pause routine author searches until a
+  profile recovery check succeeds (see below). Ordered
   listings stop after the first wholly archived, unpinned post. Every attachment
   and external child of that post is processed before deciding. Existing file
   archive entries or a committed execution-v3 Reddit post-completion entry establish
@@ -82,6 +83,27 @@ Each failed pass keeps its pending windows and progress. The delay applies to th
 the same account can continue after the normal short target cooldown. Shared
 service budgets and routine-check priority still apply. Stopping a subscription
 still stops its work.
+
+With `source_reddit_monitoring_protocol: 1`, request permits carrying
+`account_monitoring_protocol: 1` pause routine author-search runs after completed
+Reddit history (`reddit-new` and `reddit-top`) when the latest profile evidence
+is `account_not_found`, `account_suspended`, or the older `not_found`, attributed
+to Reddit. The existing profile runs continue their 30-day checks. Initial and
+explicit recovery requests, unrelated searches, attachment retries and other
+sites remain eligible. HTTP 403/429, authentication errors and linked-host
+failures do not establish account unavailability.
+
+A paused permit returns `pause_reason: "account_unavailable"`, `ready: false`
+and `wait_ms: 0`. The worker releases its lease with `account_check_pending`;
+this is a local scheduling pause, not a fresh website failure or completed
+coverage. Pending windows and checkpoints remain queued for up to 30 days,
+daily submissions coalesce, and no HTTP request or failure allowance is spent.
+A successful profile pass or newer accepted standalone profile observation
+wakes retained searches immediately, including when the subsequent listing or
+media download fails. Author-search success never counts as profile recovery.
+All detection uses already-saved observations and attempt histories, including
+consolidated runs; no additional Reddit calls or per-post status records are
+created. Generic 404 responses remain missing, not falsely labeled banned.
 
 With `source_run_redgifs_deletion_protocol: 1`, an explicit Redgifs
 `User account deleted.` response from the claimed account's listing permanently
@@ -139,7 +161,7 @@ not establish that a file is permanently unavailable. The focused job's retry
 delay does not hold up other passes for the same account.
 
 An inaccessible Reddit profile alone is not proof of permanent account deletion.
-Missing-profile rechecks preserve independent initial/search passes, which can
+Missing-profile rechecks preserve independent initial and explicit recovery passes, which can
 still discover public posts. Confirmed deletion and reversible suspension must
 not be inferred from the same generic `not_found` response.
 

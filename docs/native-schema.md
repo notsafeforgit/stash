@@ -8,6 +8,18 @@ The startup-versus-full-audit boundary below applies to the historical proof
 validation described throughout this guide. Deployment and one-time import
 completion belong to the installation's operations records.
 
+Schema 1000141 stops retaining routine field-value history. Replacing a field
+choice deletes its superseded value, relationship references and automatic
+provenance links in the same transaction. The upgrade removes existing obsolete
+choices while preserving current heads, values, protection, UUIDs and revisions.
+Only decisions explicitly referenced by historical file-review/keep receipts
+remain as that operation's replay proof; they are not returned as field history.
+Ordinary repeated saves reuse an equivalent explicit library choice, including
+empty values. Changing an inherited value to an explicit choice remains a real
+change. The UI shows the current choice; the existing history endpoint returns
+at most that current choice, using its original sequence cursor. Freed SQLite
+pages become reusable; this migration does not run a whole-library VACUUM.
+
 Schema 1000139 permits a managed post consolidation to retain a gallery already
 shared by one of its members. It changes the insertion guard only; existing
 media, galleries and their metadata remain intact. Ordinary gallery adoption
@@ -645,7 +657,8 @@ relationships as described below.
 `metadata_field_baselines` marks existing entities without copying their fields.
 Both populated and empty legacy values remain protected; migration does not
 invent user intent or allow a first scrape to fill a previously empty title.
-The first edit materializes the prior field value as preserved history. Newly
+Before schema 1000141, the first edit materialized the prior value as history.
+Current writes retain only the newly selected choice. Newly
 created empty fields can inherit; nonempty initial values of unknown origin are
 conservatively protected. New source albums record their known initial title,
 description, and date as inherited choices with capture references. An untitled
@@ -659,7 +672,7 @@ replace a nonempty selection from another origin. Normal column updates record
 library choices even when a user reaffirms the same empty value. Timestamp-only
 or playback-counter updates do not create metadata decisions.
 
-The repository updates the browsing field and its history in one transaction,
+The repository updates the browsing field and its selected choice in one transaction,
 checks the entity revision, verifies the resulting value, and detects equivalent
 replay. `metadata_field_write_context` distinguishes these writes from ordinary
 library edits. An ignored late error leaves the marker and prevents commit;

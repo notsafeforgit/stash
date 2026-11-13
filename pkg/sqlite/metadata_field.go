@@ -230,6 +230,9 @@ WHERE h.entity_uuid=? AND h.field=?`, identity.UUID, field)
 	return ret, nil
 }
 
+// History retains its cursor contract but returns only the current choice.
+// Superseded values are not an edit log; any receipt-pinned decisions are private
+// to the file-review operation that still needs them for exact replay.
 func (s *MetadataFieldStore) History(ctx context.Context, entityUUID, field string, after, limit int) ([]models.MetadataFieldDecision, error) {
 	id, err := archiveUUID(entityUUID)
 	if err != nil {
@@ -253,7 +256,8 @@ func (s *MetadataFieldStore) History(ctx context.Context, entityUUID, field stri
 		return nil, err
 	}
 	var rows []metadataFieldRow
-	if err := dbWrapper.Select(ctx, &rows, "SELECT * FROM metadata_field_decisions WHERE entity_uuid=? AND field=? AND sequence>? AND sealed=1 ORDER BY sequence LIMIT ?", id, field, after, limit); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, `SELECT d.* FROM metadata_field_heads h JOIN metadata_field_decisions d ON d.uuid=h.decision_uuid
+WHERE h.entity_uuid=? AND h.field=? AND d.sequence>? AND d.sealed=1 ORDER BY d.sequence LIMIT ?`, id, field, after, limit); err != nil {
 		return nil, err
 	}
 	ret := make([]models.MetadataFieldDecision, 0, len(rows))
@@ -447,11 +451,6 @@ WHERE c.uuid=? AND p.state='active')`, id); err != nil {
 			}
 			current, err = s.State(ctx, current.Entity.UUID, input.Field)
 			if err != nil {
-				return err
-			}
-		}
-		if current.Decision == nil && current.Protected {
-			if err := insertMetadataDecision(ctx, current.Entity.UUID, input.Field, "preserved", current.Origin, current.Value, nil, "Preserved before the first recorded choice"); err != nil {
 				return err
 			}
 		}

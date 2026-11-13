@@ -240,7 +240,7 @@ export function NativeMetadataReview({
           </AlertDescription>
         </Alert>
       )}
-      {fields && <FieldSummary fields={fields} api={api} entity={entity} />}
+      {fields && <FieldSummary fields={fields} entity={entity} />}
       {fields && edits.length === 0 && (
         <Empty>
           <EmptyHeader>

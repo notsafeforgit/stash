@@ -83,7 +83,7 @@ func TestMetadataFieldChoicesClearInheritAndReplay(t *testing.T) {
 	replayed, err := applyMetadata(repo, input, true)
 	require.NoError(t, err)
 	require.Equal(t, state, replayed)
-	require.Len(t, metadataHistory(t, repo, identity.UUID, "title"), 2)
+	require.Len(t, metadataHistory(t, repo, identity.UUID, "title"), 1)
 	_, err = applyMetadata(repo, metadataInput(state, "inherit", "filename", `"Weaker filename"`), true)
 	require.ErrorIs(t, err, models.ErrMetadataFieldProtected)
 
@@ -198,7 +198,7 @@ func TestMetadataFieldSchemasAndOrdinaryEdits(t *testing.T) {
 	require.Equal(t, "0", string(rating.Value))
 }
 
-func TestMetadataFieldPreservedValuesAndPortableHistory(t *testing.T) {
+func TestMetadataFieldCurrentChoiceSurvivesAdoptionAndDeletion(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	identity := archiveFind(t, repo, models.ArchiveImage, 41)
 	state := metadataState(t, repo, identity.UUID, "title")
@@ -209,9 +209,9 @@ func TestMetadataFieldPreservedValuesAndPortableHistory(t *testing.T) {
 	state, err = applyMetadata(repo, metadataInput(state, "set", "review", `"New title"`), false)
 	require.NoError(t, err)
 	history := metadataHistory(t, repo, identity.UUID, "title")
-	require.Len(t, history, 2)
-	require.Equal(t, "preserved", history[0].Mode)
-	require.Equal(t, `"Kept image"`, string(history[0].Value))
+	require.Len(t, history, 1)
+	require.Equal(t, "set", history[0].Mode)
+	require.Equal(t, `"New title"`, string(history[0].Value))
 	adopted := uuid.NewString()
 	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error {
 		_, err := repo.ArchiveEntity.AdoptUUID(ctx, identity.UUID, adopted, state.Entity.Revision)
@@ -277,10 +277,9 @@ UPDATE scenes SET title='', date='2024-01-01', date_precision=2 WHERE id=31;`)
 	require.ErrorIs(t, err, models.ErrMetadataFieldProtected)
 	attachmentSQL(t, db, "UPDATE scenes SET title='Reviewed new title' WHERE id=31")
 	history := metadataHistory(t, repo, identity.UUID, "title")
-	require.Len(t, history, 2)
-	require.Equal(t, "legacy", history[0].Origin)
-	require.Equal(t, `""`, string(history[0].Value))
-	require.Equal(t, "library", history[1].Origin)
+	require.Len(t, history, 1)
+	require.Equal(t, `"Reviewed new title"`, string(history[0].Value))
+	require.Equal(t, "library", history[0].Origin)
 	require.Equal(t, `"2024"`, string(metadataState(t, repo, identity.UUID, "date").Value))
 	raw = openRawDB(t, path)
 	defer raw.Close()

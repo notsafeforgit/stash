@@ -50,9 +50,9 @@ DELETE FROM performers_scenes WHERE scene_id=31 AND performer_id=71;`, nil)
 		return nil
 	}))
 	history := metadataHistory(t, repo, scene.UUID, "performers")
-	require.Len(t, history, 2)
+	require.Len(t, history, 1)
 	p := archiveFind(t, repo, models.ArchivePerformer, 72)
-	require.JSONEq(t, `["`+p.UUID+`"]`, string(history[1].Value))
+	require.JSONEq(t, `["`+p.UUID+`"]`, string(history[0].Value))
 	require.False(t, metadataState(t, repo, scene.UUID, "performers").Pending)
 	for _, mode := range []models.RelationshipUpdateMode{models.RelationshipUpdateModeSet, models.RelationshipUpdateModeAdd, models.RelationshipUpdateModeRemove} {
 		state, err := applyMetadata(repo, metadataInput(metadataState(t, repo, scene.UUID, "tags"), "inherit", "review", "[]"), false)
@@ -137,8 +137,8 @@ func TestMetadataCollectionTargetRevisionsAndIdentityHistory(t *testing.T) {
 	state = metadataState(t, repo, scene.UUID, "performers")
 	require.JSONEq(t, `["`+merged.UUID+`"]`, string(state.Value))
 	history := metadataHistory(t, repo, scene.UUID, "performers")
-	require.JSONEq(t, `["`+p.UUID+`"]`, string(history[0].Value))
-	require.Len(t, history, 3)
+	require.JSONEq(t, `["`+merged.UUID+`"]`, string(history[0].Value))
+	require.Len(t, history, 1)
 	_, err = applyMetadata(repo, metadataReferenceInput(t, state, p), false)
 	require.ErrorIs(t, err, models.ErrMetadataFieldConflict)
 	adopted := uuid.NewString()
@@ -151,7 +151,7 @@ func TestMetadataCollectionTargetRevisionsAndIdentityHistory(t *testing.T) {
 	require.JSONEq(t, `["`+adopted+`"]`, string(history[len(history)-1].Value))
 	attachmentSQL(t, db, "DELETE FROM performers WHERE id=72")
 	history = metadataHistory(t, repo, scene.UUID, "performers")
-	require.JSONEq(t, `["`+adopted+`"]`, string(history[len(history)-2].Value))
+	require.Len(t, history, 1)
 	require.Equal(t, "[]", string(history[len(history)-1].Value))
 	attachmentSQL(t, db, "INSERT INTO performers(id,created_at,updated_at) VALUES(72,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)")
 	require.NotEqual(t, adopted, archiveFind(t, repo, models.ArchivePerformer, 72).UUID)
@@ -286,7 +286,7 @@ INSERT INTO scenes_tags(scene_id,tag_id) VALUES(31,81);`)
 	require.NoError(t, err)
 	snapshot := func() string {
 		var ret string
-		require.NoError(t, raw.QueryRow(`SELECT json_group_array(json_object('uuid',uuid,'entity',entity_uuid,'field',field,'mode',mode,'origin',origin,'value',value_json,'sequence',sequence,'created',created_at)) FROM (SELECT * FROM metadata_field_decisions ORDER BY sequence)`).Scan(&ret))
+		require.NoError(t, raw.QueryRow(`SELECT json_group_array(json_object('uuid',uuid,'entity',entity_uuid,'field',field,'mode',mode,'origin',origin,'value',value_json,'sequence',sequence,'created',created_at)) FROM (SELECT d.* FROM metadata_field_heads h JOIN metadata_field_decisions d ON d.uuid=h.decision_uuid ORDER BY d.sequence)`).Scan(&ret))
 		return ret
 	}
 	before := snapshot()
@@ -311,18 +311,15 @@ INSERT INTO scenes_tags(scene_id,tag_id) VALUES(31,81);`)
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM metadata_field_pending"))
 	require.JSONEq(t, `"Already reviewed"`, string(metadataState(t, repo, sceneUUID, "title").Value))
 	require.True(t, metadataState(t, repo, sceneUUID, "performers").Protected)
-	// First deletion must retain the old UUID even though the FK is then nulled
-	// and the native integer ID may later be reused.
+	// Deletion protects the cleared relationship without retaining the old value.
 	attachmentSQL(t, db, "DELETE FROM performers WHERE id=71; DELETE FROM studios WHERE id=91; DELETE FROM groups WHERE id=101;")
-	for field, previous := range map[string]string{
+	for field := range map[string]string{
 		"performers": `["` + performerUUID + `"]`, "studio": `"` + studioUUID + `"`, "groups": `[{"uuid":"` + groupUUID + `","scene_index":4}]`,
 	} {
 		history := metadataHistory(t, repo, sceneUUID, field)
-		require.Len(t, history, 2)
+		require.Len(t, history, 1)
 		require.Greater(t, history[0].Sequence, int(lastSequence))
-		require.Equal(t, "preserved", history[0].Mode)
-		require.JSONEq(t, previous, string(history[0].Value))
-		require.Equal(t, "clear", history[1].Mode)
+		require.Equal(t, "clear", history[0].Mode)
 	}
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
 	require.NoError(t, raw.Close())

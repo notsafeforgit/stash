@@ -18,7 +18,9 @@ func TestMetadataFieldIntegrityAndIndexedHistory(t *testing.T) {
 	before := metadataState(t, repo, identity.UUID, "title")
 	current, err := applyMetadata(repo, metadataInput(before, "set", "review", `"Chosen title"`), false)
 	require.NoError(t, err)
-	history := metadataHistory(t, repo, identity.UUID, "title")
+	superseded := current.Decision.UUID
+	current, err = applyMetadata(repo, metadataInput(current, "set", "review", `"Latest title"`), false)
+	require.NoError(t, err)
 	image := archiveFind(t, repo, models.ArchiveImage, 41)
 	_, err = applyMetadata(repo, metadataInput(metadataState(t, repo, image.UUID, "title"), "set", "review", `"Other image title"`), false)
 	require.NoError(t, err)
@@ -31,7 +33,7 @@ func TestMetadataFieldIntegrityAndIndexedHistory(t *testing.T) {
 	}{
 		{"UPDATE metadata_field_decisions SET value_json='\"Rewritten evidence\"' WHERE uuid=?", []interface{}{current.Decision.UUID}},
 		{"UPDATE metadata_field_decisions SET entity_uuid=? WHERE uuid=?", []interface{}{image.UUID, current.Decision.UUID}},
-		{"UPDATE metadata_field_heads SET decision_uuid=? WHERE entity_uuid=? AND field='title'", []interface{}{history[0].UUID, identity.UUID}},
+		{"UPDATE metadata_field_heads SET decision_uuid=? WHERE entity_uuid=? AND field='title'", []interface{}{superseded, identity.UUID}},
 		{"UPDATE metadata_field_heads SET decision_uuid=? WHERE entity_uuid=? AND field='title'", []interface{}{other.Decision.UUID, identity.UUID}},
 		{"UPDATE metadata_field_heads SET field='code' WHERE entity_uuid=? AND field='title'", []interface{}{identity.UUID}},
 		{"INSERT INTO metadata_field_decisions(entity_uuid,field,mode,origin,value_json) VALUES (?,'filename','set','review','\"Bad target\"')", []interface{}{identity.UUID}},

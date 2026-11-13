@@ -12,6 +12,7 @@ import (
 
 func removeCanonicalThreadEvidenceSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeMetadataCurrentValuesSchema(t, raw)
 	for name, file := range map[string]string{
 		"source_post_thread_scope":         "migrations/1000105_source_threads.up.sql",
 		"post_gallery_thread_share_insert": "migrations/1000139_consolidated_shared_galleries.up.sql",

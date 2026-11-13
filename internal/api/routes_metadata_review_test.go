@@ -155,7 +155,7 @@ func TestNativeMetadataReviewHTTPSelectionRetryAndAfterCommit(t *testing.T) {
 	var history []models.MetadataFieldDecision
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &history))
 	require.Len(t, history, 1)
-	require.Equal(t, "preserved", history[0].Mode)
+	require.Equal(t, "set", history[0].Mode)
 	apply.SourceField = "details"
 	w = request(http.MethodPost, "/metadata-file-edits/apply", apply)
 	require.Equal(t, http.StatusConflict, w.Code, w.Body.String())

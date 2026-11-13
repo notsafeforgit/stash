@@ -111,9 +111,11 @@ func TestSourceGalleryPerformersMixedMembersAndEdits(t *testing.T) {
 		return err
 	}))
 	assertSourceGalleryPerformers(t, repo, g, 72)
-	require.Len(t, metadataHistory(t, repo, g.UUID, "performers"), len(before)+1)
+	current := metadataHistory(t, repo, g.UUID, "performers")
+	require.Len(t, current, 1)
+	require.NotEqual(t, before[0].UUID, current[0].UUID)
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error { return repo.Image.UpdatePerformers(ctx, 41, []int{72}) }))
-	require.Len(t, metadataHistory(t, repo, g.UUID, "performers"), len(before)+1, "unchanged union creates no extra decision")
+	require.Equal(t, current, metadataHistory(t, repo, g.UUID, "performers"), "unchanged union creates no extra decision")
 
 	// The same transaction rolls back both the media edit and its inheritance.
 	err := repo.WithTxn(t.Context(), func(ctx context.Context) error {

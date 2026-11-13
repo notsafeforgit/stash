@@ -78,7 +78,7 @@ type metadataFieldSummary struct {
 }
 
 // The selected value, field, mode and entity already appear in the summary.
-// Full decision values are returned only when requesting field history.
+// The current value is returned once per field; decision metadata carries its provenance.
 type metadataDecisionProvenance struct {
 	UUID        string                         `json:"uuid"`
 	Sequence    int                            `json:"sequence"`

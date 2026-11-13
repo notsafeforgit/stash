@@ -8,7 +8,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateMetadataFieldSchema(conn *sqlx.DB) error {
+func validateMetadataFieldSchema(conn *sqlx.DB, version uint) error {
 	var names []string
 	if err := conn.Select(&names, "SELECT name FROM sqlite_schema WHERE name LIKE 'metadata_%'"); err != nil {
 		return err
@@ -20,6 +20,9 @@ func validateMetadataFieldSchema(conn *sqlx.DB) error {
 	required := []string{"metadata_field_baselines", "metadata_field_decisions", "metadata_field_heads", "metadata_field_write_context",
 		"metadata_field_decisions_entity", "metadata_field_decisions_capture", "metadata_field_decision_scope", "metadata_field_decision_immutable",
 		"metadata_field_head_forward", "metadata_field_head_scope", "metadata_field_current"}
+	if version >= NativeSchemaBaseline+141 {
+		required = append(required, "metadata_field_decision_cleanup", "metadata_field_retire_superseded", "metadata_file_edit_keeps_decision")
+	}
 	for _, kind := range []models.ArchiveEntityKind{models.ArchiveScene, models.ArchiveImage, models.ArchiveGallery} {
 		for _, def := range models.MetadataFields(kind) {
 			if !metadataCollectionDefinition(def) {

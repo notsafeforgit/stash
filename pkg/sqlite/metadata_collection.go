@@ -453,8 +453,8 @@ VALUES(?,?,?,?,?,'null',?,?,0)`, id, entity, field, mode, origin, capture, reaso
 	return err
 }
 
-// The first native join change retains the previous value; the transaction's
-// final value becomes one decision regardless of how many rows were changed.
+// A transaction keeps one final choice, regardless of how many joins changed.
+// Reaffirming the same explicit library choice does not create another decision.
 func flushMetadataFieldPending(ctx context.Context, entity, field string) error {
 	previous, err := metadataPending(ctx, entity, field)
 	if err != nil || previous == nil {
@@ -476,30 +476,28 @@ func flushMetadataFieldPending(ctx context.Context, entity, field string) error 
 		if err != nil {
 			return err
 		}
-		var head, legacy bool
-		if err := dbWrapper.Get(ctx, &head, "SELECT EXISTS(SELECT 1 FROM metadata_field_heads WHERE entity_uuid=? AND field=?)", entity, field); err != nil {
-			return err
-		}
-		if !head {
-			if err := dbWrapper.Get(ctx, &legacy, "SELECT EXISTS(SELECT 1 FROM metadata_field_baselines WHERE entity_uuid=?)", entity); err != nil {
-				return err
-			}
-			if legacy || !bytes.Equal(previous, def.ClearValue) {
-				origin := "unattributed"
-				if legacy {
-					origin = "legacy"
-				}
-				if err := insertMetadataDecision(ctx, entity, field, "preserved", origin, previous, nil, "Preserved before the first recorded choice"); err != nil {
-					return err
-				}
-			}
-		}
 		mode := "set"
 		if bytes.Equal(value, def.ClearValue) {
 			mode = "clear"
 		}
-		if err := insertMetadataDecision(ctx, entity, field, mode, "library", value, nil, ""); err != nil {
+		var row metadataFieldRow
+		err = dbWrapper.Get(ctx, &row, `SELECT d.* FROM metadata_field_heads h
+JOIN metadata_field_decisions d ON d.uuid=h.decision_uuid WHERE h.entity_uuid=? AND h.field=?`, entity, field)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
+		}
+		equivalent := false
+		if err == nil && row.Mode == mode && row.Origin == "library" && row.Reason == "" && !row.CaptureUUID.Valid {
+			decision, err := row.resolve(ctx)
+			if err != nil {
+				return err
+			}
+			equivalent = bytes.Equal(decision.Value, value)
+		}
+		if !equivalent {
+			if err := insertMetadataDecision(ctx, entity, field, mode, "library", value, nil, ""); err != nil {
+				return err
+			}
 		}
 	}
 	_, err = dbWrapper.Exec(ctx, "DELETE FROM metadata_field_pending WHERE entity_uuid=? AND field=?", entity, field)

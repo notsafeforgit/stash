@@ -495,7 +495,7 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+12 {
-			if err := validateMetadataFieldSchema(conn); err != nil {
+			if err := validateMetadataFieldSchema(conn, version); err != nil {
 				return err
 			}
 		}

@@ -727,6 +727,18 @@ func getScanHandlers(options ScanMetadataInput, taskQueue *job.TaskQueue, progre
 	}
 }
 
+// runScanGenerator runs a generation step for a scanned file. With sequential
+// scanning enabled it runs inline, so the file's artifacts are finished before
+// the scan moves on; otherwise it is queued to run alongside the scan.
+func runScanGenerator(ctx context.Context, sequential bool, queue *job.TaskQueue, description string, fn func(context.Context)) {
+	if sequential {
+		fn(ctx)
+		return
+	}
+
+	queue.Add(description, fn)
+}
+
 type imageGenerators struct {
 	input     ScanMetadataInput
 	taskQueue *job.TaskQueue
@@ -772,11 +784,7 @@ func (g *imageGenerators) Generate(ctx context.Context, i *models.Image, f model
 			progress.Increment()
 		}
 
-		if g.sequentialScanning {
-			previewsFn(ctx)
-		} else {
-			g.taskQueue.Add(fmt.Sprintf("Generating preview for %s", path), previewsFn)
-		}
+		runScanGenerator(ctx, g.sequentialScanning, g.taskQueue, fmt.Sprintf("Generating preview for %s", path), previewsFn)
 	}
 
 	if t.ScanGenerateImagePhashes {
@@ -795,11 +803,7 @@ func (g *imageGenerators) Generate(ctx context.Context, i *models.Image, f model
 			progress.Increment()
 		}
 
-		if g.sequentialScanning {
-			phashFn(ctx)
-		} else {
-			g.taskQueue.Add(fmt.Sprintf("Generating phash for %s", path), phashFn)
-		}
+		runScanGenerator(ctx, g.sequentialScanning, g.taskQueue, fmt.Sprintf("Generating phash for %s", path), phashFn)
 	}
 
 	return nil
@@ -836,11 +840,7 @@ func (g *sceneGenerators) Generate(ctx context.Context, s *models.Scene, f *mode
 			progress.Increment()
 		}
 
-		if g.sequentialScanning {
-			spriteFn(ctx)
-		} else {
-			g.taskQueue.Add(fmt.Sprintf("Generating sprites for %s", path), spriteFn)
-		}
+		runScanGenerator(ctx, g.sequentialScanning, g.taskQueue, fmt.Sprintf("Generating sprites for %s", path), spriteFn)
 	}
 
 	if t.ScanGeneratePhashes {
@@ -856,11 +856,7 @@ func (g *sceneGenerators) Generate(ctx context.Context, s *models.Scene, f *mode
 			progress.Increment()
 		}
 
-		if g.sequentialScanning {
-			phashFn(ctx)
-		} else {
-			g.taskQueue.Add(fmt.Sprintf("Generating phash for %s", path), phashFn)
-		}
+		runScanGenerator(ctx, g.sequentialScanning, g.taskQueue, fmt.Sprintf("Generating phash for %s", path), phashFn)
 	}
 
 	if t.ScanGeneratePreviews {
@@ -889,16 +885,12 @@ func (g *sceneGenerators) Generate(ctx context.Context, s *models.Scene, f *mode
 			progress.Increment()
 		}
 
-		if g.sequentialScanning {
-			previewsFn(ctx)
-		} else {
-			g.taskQueue.Add(fmt.Sprintf("Generating preview for %s", path), previewsFn)
-		}
+		runScanGenerator(ctx, g.sequentialScanning, g.taskQueue, fmt.Sprintf("Generating preview for %s", path), previewsFn)
 	}
 
 	if t.ScanGenerateCovers {
 		progress.AddTotal(1)
-		g.taskQueue.Add(fmt.Sprintf("Generating cover for %s", path), func(ctx context.Context) {
+		coverFn := func(ctx context.Context) {
 			taskCover := GenerateCoverTask{
 				repository: mgr.Repository,
 				Scene:      *s,
@@ -906,7 +898,9 @@ func (g *sceneGenerators) Generate(ctx context.Context, s *models.Scene, f *mode
 			}
 			taskCover.Start(ctx)
 			progress.Increment()
-		})
+		}
+
+		runScanGenerator(ctx, g.sequentialScanning, g.taskQueue, fmt.Sprintf("Generating cover for %s", path), coverFn)
 	}
 
 	return nil

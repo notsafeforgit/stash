@@ -10,6 +10,7 @@ import { SaveFilterDialog } from "./saved-filter-list";
 import {
   useDestroySavedFilter,
   useFindSavedFilters,
+  useRenameSavedFilter,
   useSaveFilter,
 } from "src/core/saved-filters";
 import { useToast } from "src/hooks/toast";
@@ -82,6 +83,7 @@ export const SavedFilterBar: React.FC<{
   const Toast = useToast();
   const { data, previousData, refetch } = useFindSavedFilters(filter.mode);
   const saveFilter = useSaveFilter();
+  const renameSaved = useRenameSavedFilter();
   const [destroySavedFilter] = useDestroySavedFilter();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -154,6 +156,37 @@ export const SavedFilterBar: React.FC<{
       defaultMessage: "Saved filters",
     });
 
+  // Rename echoes the stored criteria; only the name changes. The selection is
+  // matched by name, so the current label follows the rename.
+  async function renameSavedFilter(
+    saved: SavedFilterDataFragment,
+    name: string,
+  ): Promise<boolean> {
+    try {
+      const result = await renameSaved(saved, name);
+      if (!result.data?.saveFilter) {
+        throw new Error(
+          intl.formatMessage({
+            id: "search_filter.rename_saved_filter_failed",
+          }),
+        );
+      }
+      if (currentSavedFilterName === saved.name) {
+        onCurrentSavedFilterChange({ id: saved.id, name });
+      }
+      Toast.success(
+        intl.formatMessage(
+          { id: "search_filter.saved_filter_renamed" },
+          { name },
+        ),
+      );
+      return true;
+    } catch (error) {
+      Toast.error(error);
+      return false;
+    }
+  }
+
   async function deleteSavedFilter(saved: SavedFilterDataFragment) {
     const result = await destroySavedFilter({
       variables: { input: { id: saved.id } },
@@ -197,6 +230,7 @@ export const SavedFilterBar: React.FC<{
             pinnedIds={pinnedIds}
             onSelect={loadSavedFilter}
             onTogglePinned={togglePinned}
+            onRename={renameSavedFilter}
             onDelete={deleteSavedFilter}
           />
           <Button variant="outline" onClick={() => setShowSaveDialog(true)}>

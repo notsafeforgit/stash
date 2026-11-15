@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/field";
 import type { FilterMode } from "@/core/generated-graphql";
 import { useFindSavedFilters } from "@/core/saved-filters";
+import { findSavedFilterByName } from "./saved-filter-name";
 
 export function SaveFilterDialog({
   mode,
@@ -70,11 +71,7 @@ export function SaveFilterDialog({
     contains(filter.name, values.name.trim()),
   );
   function namedFilter(name: string) {
-    return savedFilters.find(
-      (filter) =>
-        filter.name.toLocaleLowerCase(intl.locale) ===
-        name.trim().toLocaleLowerCase(intl.locale),
-    );
+    return findSavedFilterByName(savedFilters, name, intl.locale);
   }
   const nameTaken = !selected && !!namedFilter(values.name);
 

@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { Check, ChevronDown, Pin, PinOff, Search, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Pencil,
+  Pin,
+  PinOff,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { DeleteDialog } from "@/components/detail/delete-dialog";
 import { Button } from "@/components/ui/button";
@@ -17,6 +25,7 @@ import {
 import { Empty, EmptyHeader, EmptyDescription } from "@/components/ui/empty";
 import type { SavedFilterDataFragment } from "@/core/generated-graphql";
 import { usePopoverOutsideTap } from "@/hooks/use-outside-tap";
+import { RenameSavedFilterDialog } from "./saved-filter-rename-dialog";
 
 export function SavedFilterPicker({
   filters,
@@ -25,6 +34,7 @@ export function SavedFilterPicker({
   pinnedIds,
   onSelect,
   onTogglePinned,
+  onRename,
   onDelete,
 }: {
   filters: readonly SavedFilterDataFragment[];
@@ -33,12 +43,16 @@ export function SavedFilterPicker({
   pinnedIds: readonly string[];
   onSelect: (filter: SavedFilterDataFragment) => void;
   onTogglePinned: (id: string) => void;
+  /** Resolves true when the rename was saved; the dialog then closes. */
+  onRename: (filter: SavedFilterDataFragment, name: string) => Promise<boolean>;
   onDelete: (filter: SavedFilterDataFragment) => Promise<void>;
 }) {
   const intl = useIntl();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [pendingDelete, setPendingDelete] =
+    useState<SavedFilterDataFragment | null>(null);
+  const [pendingRename, setPendingRename] =
     useState<SavedFilterDataFragment | null>(null);
   const { triggerRef, popupRef } = usePopoverOutsideTap(open, () =>
     setOpen(false),
@@ -84,8 +98,8 @@ export function SavedFilterPicker({
         <PopoverContent
           ref={popupRef}
           align="start"
-          className="w-80 max-w-(--available-width) max-h-(--available-height)"
-          finalFocus={pendingDelete ? false : undefined}
+          className="w-96 max-w-(--available-width) max-h-(--available-height)"
+          finalFocus={pendingDelete || pendingRename ? false : undefined}
         >
           <PopoverTitle className="sr-only">
             <FormattedMessage id="search_filter.saved_filters" />
@@ -126,6 +140,10 @@ export function SavedFilterPicker({
                           },
                           { name: filter.name },
                         );
+                        const renameLabel = intl.formatMessage(
+                          { id: "search_filter.rename_saved_filter" },
+                          { name: filter.name },
+                        );
                         const deleteLabel = intl.formatMessage(
                           { id: "search_filter.delete_saved_filter" },
                           { name: filter.name },
@@ -149,6 +167,19 @@ export function SavedFilterPicker({
                                 <Check data-icon="inline-start" />
                               )}
                               <span className="truncate">{filter.name}</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-11"
+                              aria-label={renameLabel}
+                              title={renameLabel}
+                              onClick={() => {
+                                setOpen(false);
+                                setPendingRename(filter);
+                              }}
+                            >
+                              <Pencil />
                             </Button>
                             <Button
                               variant="ghost"
@@ -199,6 +230,16 @@ export function SavedFilterPicker({
           </div>
         </PopoverContent>
       </Popover>
+      {pendingRename && (
+        <RenameSavedFilterDialog
+          key={pendingRename.id}
+          filter={pendingRename}
+          filters={filters}
+          finalFocus={triggerRef}
+          onClose={() => setPendingRename(null)}
+          onRename={(name) => onRename(pendingRename, name)}
+        />
+      )}
       <DeleteDialog
         open={pendingDelete !== null}
         onOpenChange={(next) => {

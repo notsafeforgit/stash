@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import type { Reference } from "@apollo/client";
 import * as GQL from "./generated-graphql";
@@ -32,16 +33,20 @@ export const useDestroySavedFilter = () =>
     },
   });
 
-export const useSaveFilter = () => {
-  const [saveFilterMutation] = useMutation<
-    GQL.SaveFilterMutation,
-    GQL.SaveFilterMutationVariables
-  >(GQL.SaveFilterDocument, {
-    update(cache, result) {
-      if (!result.data?.saveFilter) return;
-      evictQueries(cache, [GQL.FindSavedFiltersDocument]);
+function useSaveFilterMutation() {
+  return useMutation<GQL.SaveFilterMutation, GQL.SaveFilterMutationVariables>(
+    GQL.SaveFilterDocument,
+    {
+      update(cache, result) {
+        if (!result.data?.saveFilter) return;
+        evictQueries(cache, [GQL.FindSavedFiltersDocument]);
+      },
     },
-  });
+  );
+}
+
+export const useSaveFilter = () => {
+  const [saveFilterMutation] = useSaveFilterMutation();
 
   function saveFilter(filter: ListFilterModel, name: string, id?: string) {
     const filterCopy = filter.clone();
@@ -60,4 +65,45 @@ export const useSaveFilter = () => {
   }
 
   return saveFilter;
+};
+
+// The fragment selects every find-filter field the API exposes. Dropping the
+// Apollo `__typename` is the only change, because GraphQL rejects it as input.
+function storedFindFilter(
+  find: GQL.SavedFilterDataFragment["find_filter"],
+): GQL.FindFilterType | null {
+  if (!find) return null;
+  const { q, page, per_page, sort, direction } = find;
+  return { q, page, per_page, sort, direction };
+}
+
+/**
+ * Builds the saveFilter input that renames an existing saved filter. The stored
+ * criteria are echoed exactly: re-serialising through the list model would drop
+ * criteria it does not understand, and omitted or null criteria clear the filter.
+ */
+export function buildRenameSavedFilterInput(
+  saved: GQL.SavedFilterDataFragment,
+  name: string,
+): GQL.SaveFilterInput {
+  return {
+    id: saved.id,
+    mode: saved.mode,
+    name,
+    find_filter: storedFindFilter(saved.find_filter),
+    filter_ast: saved.filter_ast,
+    ui_options: saved.ui_options,
+  };
+}
+
+export const useRenameSavedFilter = () => {
+  const [saveFilterMutation] = useSaveFilterMutation();
+
+  return useCallback(
+    (saved: GQL.SavedFilterDataFragment, name: string) =>
+      saveFilterMutation({
+        variables: { input: buildRenameSavedFilterInput(saved, name) },
+      }),
+    [saveFilterMutation],
+  );
 };

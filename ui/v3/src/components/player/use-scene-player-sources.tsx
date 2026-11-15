@@ -745,6 +745,10 @@ export function useScenePlayerSources({
   const handleSeekPreview = useCallback(
     (time: number | null) => {
       if (time === null) {
+        // Cancellation ends the drag session here, before performSeek. Its own
+        // take() then finds nothing, so no freeze frame is captured: the
+        // restore target is the original position, not the drag frame on
+        // screen. Release goes through handleSeek, which takes its session.
         const preview = seekPreview.take();
         if (!preview) return;
         performSeek(preview.mediaTime + offsetStart, "seek", preview.wasPaused);

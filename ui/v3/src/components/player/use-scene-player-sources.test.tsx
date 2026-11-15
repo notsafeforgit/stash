@@ -178,6 +178,18 @@ async function flushMicrotasks() {
   for (let i = 0; i < 10; i++) await Promise.resolve();
 }
 
+/** Scrub surface as `SceneScrubPreview` lays it out while a remote preview shows. */
+function showScrubPreview() {
+  const surface = document.createElement("div");
+  surface.dataset.previewReady = "true";
+  surface.dataset.previewKind = "video";
+  const scrubVideo = document.createElement("video");
+  scrubVideo.dataset.scrubPreview = "";
+  surface.append(scrubVideo);
+  container.querySelector('[data-testid="root"]')?.append(surface);
+  return scrubVideo;
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -308,5 +320,57 @@ describe("readiness seek superseded by a same-load seek", () => {
 
     await act(async () => {});
     expect(latest.ready).toBe(false);
+  });
+});
+
+describe("drag preview commit and cancel", () => {
+  async function readyScene() {
+    await mount({ playbackRate: 1 });
+    await act(async () => {
+      await latest.handleCanPlay();
+    });
+    expect(latest.ready).toBe(true);
+  }
+
+  it("commits a release through the drag session exactly once", async () => {
+    await readyScene();
+    const scrubVideo = showScrubPreview();
+
+    await act(async () => {
+      latest.handleSeekPreview(300);
+    });
+    expect(media.engine.pauseBuffering).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      latest.handleSeek(300);
+    });
+
+    expect(media.engine.resumeBuffering).toHaveBeenCalledTimes(1);
+    expect(store.seek).toHaveBeenLastCalledWith(300);
+    expect(store.play).toHaveBeenCalledTimes(1);
+    // The release holds the frame that was on screen, not the stale main frame.
+    expect(canvasContext.drawImage.mock.calls[0]?.[0]).toBe(scrubVideo);
+  });
+
+  it("restores the original position once and does not capture the drag frame", async () => {
+    await readyScene();
+    showScrubPreview();
+    video.currentTime = 120;
+
+    await act(async () => {
+      latest.handleSeekPreview(300);
+    });
+    // A buffered in-element preview moved the main element away from the
+    // original position; cancelling must seek it back to 120.
+    video.currentTime = 150;
+    await act(async () => {
+      latest.handleSeekPreview(null);
+    });
+
+    expect(media.engine.pauseBuffering).toHaveBeenCalledTimes(1);
+    expect(media.engine.resumeBuffering).toHaveBeenCalledTimes(1);
+    expect(store.seek).toHaveBeenLastCalledWith(120);
+    // The restore target is not the drag frame on screen, so nothing is frozen.
+    expect(canvasContext.drawImage).not.toHaveBeenCalled();
   });
 });

@@ -145,6 +145,76 @@ func TestManualFileDiscoveryVersionSurvivesRegistrationAndDetectsHiddenFileChang
 	require.NotEqual(t, after.FileSignature, changed.FileSignature)
 }
 
+// Removing another hard link (a torrent client's copy, say), chmod or replacing
+// the file with an identical copy changes ctime or the inode but not the bytes.
+// Discovery re-submits such a file; the worker re-hashes it and must accept the
+// generation's earlier proof instead of failing. Changed bytes still fail.
+func TestManualFileReregistersIdenticalBytesAfterMetadataOnlyChanges(t *testing.T) {
+	f := newManualFileFixture(t, models.ArchiveImage)
+	effects := func(ctx context.Context, _ ingest.FileWork, _ ingest.IntakePublicationResult, guard ingest.FileEffectGuard) error {
+		return guard(ctx)
+	}
+	submit := func() *ingest.ManualFileStatus {
+		t.Helper()
+		request := f.request(t)
+		_, err := f.service.SubmitManualFile(t.Context(), request)
+		require.NoError(t, err)
+		processed, err := f.worker(t, effects).ProcessNext(t.Context())
+		require.NoError(t, err)
+		require.True(t, processed)
+		return f.status(t, request.RequestUUID)
+	}
+	proof := func(fileUUID string) *models.FileContentVerification {
+		t.Helper()
+		var current *models.FileContentVerification
+		require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+			var err error
+			current, err = f.service.Repo.FileContent.Current(ctx, fileUUID)
+			return err
+		}))
+		require.NotNil(t, current)
+		return current
+	}
+	first := submit()
+	require.Equal(t, "succeeded", first.State)
+	fileUUID := first.Publication.FileUUID
+	original := proof(fileUUID)
+	registered, err := f.service.PreviewManualFile(t.Context(), f.input)
+	require.NoError(t, err)
+
+	link := f.path + ".second-link"
+	require.NoError(t, os.Link(f.path, link))
+	require.NoError(t, os.Remove(link))
+	relinked, err := f.service.PreviewManualFile(t.Context(), f.input)
+	require.NoError(t, err)
+	require.NotEqual(t, registered.FileSignature, relinked.FileSignature, "a ctime change must be re-verified")
+	reverified := submit()
+	require.Equal(t, "succeeded", reverified.State, reverified.ErrorCode)
+	require.Equal(t, fileUUID, reverified.Publication.FileUUID)
+	require.Equal(t, original.Generation, proof(fileUUID).Generation, "identical bytes keep their generation")
+
+	info, err := os.Stat(f.path)
+	require.NoError(t, err)
+	body, err := os.ReadFile(f.path)
+	require.NoError(t, err)
+	copied := f.path + ".copy"
+	require.NoError(t, os.WriteFile(copied, body, 0600))
+	require.NoError(t, os.Chtimes(copied, info.ModTime(), info.ModTime()))
+	require.NoError(t, os.Rename(copied, f.path))
+	replaced := submit()
+	require.Equal(t, "succeeded", replaced.State, replaced.ErrorCode)
+	require.Equal(t, fileUUID, replaced.Publication.FileUUID)
+	require.Equal(t, original.Generation, proof(fileUUID).Generation)
+
+	body[len(body)-1] ^= 1
+	require.NoError(t, os.WriteFile(f.path, body, 0600))
+	require.NoError(t, os.Chtimes(f.path, info.ModTime(), info.ModTime()))
+	rewritten := submit()
+	require.Equal(t, "failed", rewritten.State)
+	require.Equal(t, "file_changed", rewritten.ErrorCode)
+	require.Equal(t, original.Content.SHA256, proof(fileUUID).Content.SHA256, "changed bytes never replace the verified content")
+}
+
 func TestManualFileImportsVideoAndImageWithPerformerPolicyWithoutProducer(t *testing.T) {
 	for _, kind := range []models.ArchiveEntityKind{models.ArchiveScene, models.ArchiveImage} {
 		t.Run(string(kind), func(t *testing.T) {

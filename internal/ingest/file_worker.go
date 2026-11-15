@@ -369,9 +369,13 @@ func (w *FileWorker) validatePublishedInTxn(ctx context.Context, claimed *models
 	if err != nil {
 		return err
 	}
-	snapshot := prepared.Snapshot()
+	// The proof binds this generation to the bytes this job hashed from its held
+	// descriptor; Revalidate above shows that descriptor is still the named file.
+	// Do not compare the proof's recorded inode/ctime with the current ones:
+	// re-registering identical bytes reuses the generation's original proof,
+	// recorded before a hard-link removal, chmod or identical copy changed them.
 	if proof == nil || proof.RootUUID != root.UUID || proof.Generation != published.Generation || proof.Content.UUID != published.ContentUUID || proof.Content.SHA256 != prepared.SHA256() ||
-		proof.Content.Size != work.Size || proof.Snapshot.Identity != snapshot.Identity || proof.Snapshot.ChangeToken != snapshot.ChangeToken || !proof.Snapshot.ModifiedAt.Equal(snapshot.ModifiedAt) {
+		proof.Content.Size != work.Size || proof.Content.Size != prepared.Snapshot().Size {
 		return models.ErrFileGenerationConflict
 	}
 	if err := prepared.verified.RevalidateAlias(ctx, *root, proof.RelativePath); err != nil {

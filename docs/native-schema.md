@@ -900,6 +900,11 @@ downloads or content revisions.
 
 Content verification records retain their file UUID/generation, reviewed root revision,
 relative path, descriptor identity, precise modification time, and change token.
+That snapshot describes the descriptor when it was verified. A metadata-only
+change (removing another hard link, chmod, or an identical copy with a new
+inode) changes ctime or identity but not the bytes: re-registration re-hashes
+the held descriptor and keeps the generation's original verification, without
+failing or advancing the generation. Changed bytes remain a content conflict.
 Current-content reads require an active file at that exact generation. Old
 verifications survive changes/deletion and canonical UUID adoption. Identical
 verified bytes share one content UUID without merging file rows, scenes, images,

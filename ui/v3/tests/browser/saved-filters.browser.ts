@@ -220,7 +220,7 @@ for (const failure of ["false", "network"] as const) {
   });
 }
 
-test("saved filter search, pin and delete actions are keyboard accessible", async ({
+test("saved filter search, rename, default, pin and delete actions are keyboard accessible", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 844 });
@@ -237,6 +237,17 @@ test("saved filter search, pin and delete actions are keyboard accessible", asyn
   await search.press("Tab");
   await expect(
     picker.getByRole("button", { name: "Short clips", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(
+    picker.getByRole("button", { name: "Rename Short clips", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(
+    picker.getByRole("button", {
+      name: "Set Short clips as default filter",
+      exact: true,
+    }),
   ).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(

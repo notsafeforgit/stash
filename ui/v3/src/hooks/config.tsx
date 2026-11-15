@@ -207,19 +207,6 @@ export const useConfigureScraping = () => {
   return [trackedMutate, result] as const;
 };
 
-export const useConfigureDLNA = () => {
-  const trackSave = useTrackedSave();
-  const [mutate, result] = useMutation(GQL.ConfigureDlnaDocument, {
-    update: (cache, mutationResult) =>
-      writeConfigKey(cache, "dlna", mutationResult.data?.configureDLNA),
-  });
-  const trackedMutate = useCallback<typeof mutate>(
-    (options) => trackSave(mutate(options)),
-    [mutate, trackSave],
-  );
-  return [trackedMutate, result] as const;
-};
-
 // configurePlugin returns one plugin's settings, not the plugins map.
 export const useConfigurePlugin = () => {
   const trackSave = useTrackedSave();

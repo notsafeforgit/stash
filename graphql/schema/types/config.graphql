@@ -552,34 +552,6 @@ type ConfigInterfaceResult {
   useStashHostedFunscript: Boolean
 }
 
-input ConfigDLNAInput {
-  serverName: String
-  "True if DLNA service should be enabled by default"
-  enabled: Boolean
-  "Defaults to 1338"
-  port: Int
-  "List of IPs whitelisted for DLNA service"
-  whitelistedIPs: [String!]
-  "List of interfaces to run DLNA on. Empty for all"
-  interfaces: [String!]
-  "Order to sort videos"
-  videoSortOrder: String
-}
-
-type ConfigDLNAResult {
-  serverName: String!
-  "True if DLNA service should be enabled by default"
-  enabled: Boolean!
-  "Defaults to 1338"
-  port: Int!
-  "List of IPs whitelisted for DLNA service"
-  whitelistedIPs: [String!]!
-  "List of interfaces to run DLNA on. Empty for all"
-  interfaces: [String!]!
-  "Order to sort videos"
-  videoSortOrder: String!
-}
-
 input ConfigScrapingInput {
   "Scraper user agent string"
   scraperUserAgent: String
@@ -630,7 +602,6 @@ input ConfigDefaultSettingsInput {
 type ConfigResult {
   general: ConfigGeneralResult!
   interface: ConfigInterfaceResult!
-  dlna: ConfigDLNAResult!
   scraping: ConfigScrapingResult!
   defaults: ConfigDefaultSettingsResult!
   ui: Map!

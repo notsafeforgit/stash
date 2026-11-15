@@ -22,12 +22,6 @@ mutation ConfigureInterface($input: ConfigInterfaceInput!) {
   }
 }
 
-mutation ConfigureDLNA($input: ConfigDLNAInput!) {
-  configureDLNA(input: $input) {
-    ...ConfigDLNAData
-  }
-}
-
 mutation ConfigureScraping($input: ConfigScrapingInput!) {
   configureScraping(input: $input) {
     ...ConfigScrapingData

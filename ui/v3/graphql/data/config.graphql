@@ -127,15 +127,6 @@ fragment ConfigInterfaceData on ConfigInterfaceResult {
   useStashHostedFunscript
 }
 
-fragment ConfigDLNAData on ConfigDLNAResult {
-  serverName
-  enabled
-  port
-  whitelistedIPs
-  interfaces
-  videoSortOrder
-}
-
 fragment ConfigScrapingData on ConfigScrapingResult {
   scraperUserAgent
   scraperCertCheck
@@ -232,9 +223,6 @@ fragment ConfigData on ConfigResult {
   }
   interface {
     ...ConfigInterfaceData
-  }
-  dlna {
-    ...ConfigDLNAData
   }
   scraping {
     ...ConfigScrapingData

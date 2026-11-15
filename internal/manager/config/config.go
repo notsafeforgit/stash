@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
@@ -289,18 +288,6 @@ const (
 
 	sslCertPath = "ssl_cert_path"
 	sslKeyPath  = "ssl_key_path"
-
-	// DLNA options
-	DLNAServerName         = "dlna.server_name"
-	DLNADefaultEnabled     = "dlna.default_enabled"
-	DLNADefaultIPWhitelist = "dlna.default_whitelist"
-	DLNAInterfaces         = "dlna.interfaces"
-
-	DLNAVideoSortOrder        = "dlna.video_sort_order"
-	dlnaVideoSortOrderDefault = "title"
-
-	DLNAPort        = "dlna.port"
-	DLNAPortDefault = 1338
 
 	// Logging options
 	LogFile               = "logfile"
@@ -1602,26 +1589,6 @@ func (i *Config) GetUIConfiguration() map[string]interface{} {
 	return i.forKey(UI).Cut(UI).Raw()
 }
 
-// GetMinimumPlayPercent returns the minimum percentage of a video that must be
-// watched before incrementing the play count. Returns 0 if not configured.
-func (i *Config) GetMinimumPlayPercent() int {
-	uiConfig := i.GetUIConfiguration()
-	if uiConfig == nil {
-		return 0
-	}
-	if val, ok := uiConfig["minimumPlayPercent"]; ok {
-		switch v := val.(type) {
-		case int:
-			return v
-		case float64:
-			return int(v)
-		case int64:
-			return int(v)
-		}
-	}
-	return 0
-}
-
 func (i *Config) SetUIConfiguration(v map[string]interface{}) {
 	i.Lock()
 	defer i.Unlock()
@@ -1849,71 +1816,6 @@ func (i *Config) GetDefaultGenerateSettings() *models.GenerateMetadataOptions {
 	}
 
 	return nil
-}
-
-// GetDLNAServerName returns the visible name of the DLNA server. If empty,
-// "stash" will be used.
-func (i *Config) GetDLNAServerName() string {
-	return i.getString(DLNAServerName)
-}
-
-// GetDLNADefaultEnabled returns true if the DLNA is enabled by default.
-func (i *Config) GetDLNADefaultEnabled() bool {
-	return i.getBool(DLNADefaultEnabled)
-}
-
-// GetDLNADefaultIPWhitelist returns a list of IP addresses/wildcards that
-// are allowed to use the DLNA service.
-func (i *Config) GetDLNADefaultIPWhitelist() []string {
-	return i.getStringSlice(DLNADefaultIPWhitelist)
-}
-
-// GetDLNAInterfaces returns a list of interface names to expose DLNA on. If
-// empty, runs on all interfaces.
-func (i *Config) GetDLNAInterfaces() []string {
-	return i.getStringSlice(DLNAInterfaces)
-}
-
-// GetDLNAPort returns the port to run the DLNA server on. If empty, 1338
-// will be used.
-func (i *Config) GetDLNAPort() int {
-	ret := i.getInt(DLNAPort)
-	if ret == 0 {
-		ret = DLNAPortDefault
-	}
-	return ret
-}
-
-// GetDLNAPortAsString returns the port to run the DLNA server on as a string.
-func (i *Config) GetDLNAPortAsString() string {
-	return ":" + strconv.Itoa(i.GetDLNAPort())
-}
-
-// GetDLNAActivityTrackingEnabled returns true if DLNA activity tracking is enabled.
-// This uses the same "trackActivity" UI setting that controls frontend play history tracking.
-// When enabled, scenes played via DLNA will have their play count and duration tracked.
-func (i *Config) GetDLNAActivityTrackingEnabled() bool {
-	uiConfig := i.GetUIConfiguration()
-	if uiConfig == nil {
-		return true // Default to enabled
-	}
-	if val, ok := uiConfig["trackActivity"]; ok {
-		if v, ok := val.(bool); ok {
-			return v
-		}
-	}
-	return true // Default to enabled
-}
-
-// GetVideoSortOrder returns the sort order to display videos. If
-// empty, videos will be sorted by titles.
-func (i *Config) GetVideoSortOrder() string {
-	ret := i.getString(DLNAVideoSortOrder)
-	if ret == "" {
-		ret = dlnaVideoSortOrderDefault
-	}
-
-	return ret
 }
 
 // GetLogFile returns the filename of the file to output logs to.

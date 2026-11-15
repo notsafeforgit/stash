@@ -54,7 +54,7 @@ func TestSettingsLateValidationDoesNotPublishOrRefresh(t *testing.T) {
 
 func TestSettingsWriteFailurePreservesAllSections(t *testing.T) {
 	t.Parallel()
-	for _, section := range []string{"general", "interface", "dlna", "scraping", "defaults", "plugin", "api key", "sharing", "enabled plugins", "plugin hook order"} {
+	for _, section := range []string{"general", "interface", "scraping", "defaults", "plugin", "api key", "sharing", "enabled plugins", "plugin hook order"} {
 		t.Run(section, func(t *testing.T) {
 			r, c, runtime := newSettingsResolver(t)
 			c.SetConfigFile(filepath.Join(t.TempDir(), "missing", "config.yml"))
@@ -66,8 +66,6 @@ func TestSettingsWriteFailurePreservesAllSections(t *testing.T) {
 				_, err = r.ConfigureGeneral(t.Context(), ConfigGeneralInput{Username: &changed})
 			case "interface":
 				_, err = r.ConfigureInterface(t.Context(), ConfigInterfaceInput{CSS: &changed, CSSEnabled: &yes})
-			case "dlna":
-				_, err = r.ConfigureDlna(t.Context(), ConfigDLNAInput{ServerName: &changed, Enabled: &yes})
 			case "scraping":
 				_, err = r.ConfigureScraping(t.Context(), ConfigScrapingInput{ScraperUserAgent: &changed})
 			case "defaults":

@@ -540,40 +540,6 @@ func (r *mutationResolver) ConfigureInterface(ctx context.Context, input ConfigI
 	return makeConfigInterfaceResult(r.settings.config.Snapshot()), nil
 }
 
-func (r *mutationResolver) ConfigureDlna(ctx context.Context, input ConfigDLNAInput) (*ConfigDLNAResult, error) {
-	err := r.settings.update(ctx, func(c *config.Config) (func(), error) {
-		setConfigString(c, config.DLNAServerName, input.ServerName)
-
-		if input.WhitelistedIPs != nil {
-			c.SetInterface(config.DLNADefaultIPWhitelist, input.WhitelistedIPs)
-		}
-
-		setConfigString(c, config.DLNAVideoSortOrder, input.VideoSortOrder)
-		setConfigInt(c, config.DLNAPort, input.Port)
-
-		refresh := false
-		if input.Enabled != nil {
-			c.SetBool(config.DLNADefaultEnabled, *input.Enabled)
-			refresh = true
-		}
-
-		if input.Interfaces != nil {
-			c.SetInterface(config.DLNAInterfaces, input.Interfaces)
-		}
-
-		return func() {
-			if refresh {
-				r.settings.runtime.RefreshDLNA()
-			}
-
-		}, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return makeConfigDLNAResult(r.settings.config.Snapshot()), nil
-}
-
 func (r *mutationResolver) ConfigureScraping(ctx context.Context, input ConfigScrapingInput) (*ConfigScrapingResult, error) {
 	err := r.settings.update(ctx, func(c *config.Config) (func(), error) {
 		refreshScraperCache := false

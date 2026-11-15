@@ -118,15 +118,6 @@ export const playerConfiguration: GQL.ConfigDataFragment = {
       gallery: false,
     },
   },
-  dlna: {
-    __typename: "ConfigDLNAResult",
-    serverName: "",
-    enabled: false,
-    port: 0,
-    whitelistedIPs: [],
-    interfaces: [],
-    videoSortOrder: "",
-  },
   scraping: {
     __typename: "ConfigScrapingResult",
     scraperUserAgent: null,

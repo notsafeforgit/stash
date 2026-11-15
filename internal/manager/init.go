@@ -11,7 +11,6 @@ import (
 
 	"github.com/remeh/sizedwaitgroup"
 	"github.com/stashapp/stash/internal/desktop"
-	"github.com/stashapp/stash/internal/dlna"
 	"github.com/stashapp/stash/internal/log"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/entityid"
@@ -77,14 +76,6 @@ func Initialize(cfg *config.Config, l *log.Logger) (*Manager, error) {
 		Repository: db.Group,
 	}
 
-	sceneServer := &SceneServer{
-		TxnManager:       repo.TxnManager,
-		SceneCoverGetter: repo.Scene,
-	}
-
-	dlnaRepository := dlna.NewRepository(repo)
-	dlnaService := dlna.NewService(dlnaRepository, cfg, sceneServer, repo.Scene, cfg.GetMinimumPlayPercent())
-
 	mgr := &Manager{
 		Config: cfg,
 		Logger: l,
@@ -101,8 +92,6 @@ func Initialize(cfg *config.Config, l *log.Logger) (*Manager, error) {
 		PluginCache:  pluginCache,
 		HookExecutor: pluginCache,
 		ScraperCache: scraperCache,
-
-		DLNAService: dlnaService,
 
 		Database:   db,
 		Repository: repo,
@@ -205,8 +194,6 @@ func (s *Manager) postInit(ctx context.Context) error {
 
 	s.RefreshScraperCache()
 	s.RefreshScraperSourceManager()
-
-	s.RefreshDLNA()
 
 	s.SetBlobStoreOptions()
 

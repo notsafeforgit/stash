@@ -68,7 +68,6 @@ func makeConfigResult(config *config.Config) *ConfigResult {
 	return &ConfigResult{
 		General:   makeConfigGeneralResult(config),
 		Interface: makeConfigInterfaceResult(config),
-		Dlna:      makeConfigDLNAResult(config),
 		Scraping:  makeConfigScrapingResult(config),
 		Defaults:  makeConfigDefaultsResult(config),
 		UI:        makeConfigUIResult(config),
@@ -224,18 +223,6 @@ func makeConfigInterfaceResult(config *config.Config) *ConfigInterfaceResult {
 		HandyKey:                &handyKey,
 		FunscriptOffset:         &scriptOffset,
 		UseStashHostedFunscript: &useStashHostedFunscript,
-	}
-}
-
-func makeConfigDLNAResult(config *config.Config) *ConfigDLNAResult {
-
-	return &ConfigDLNAResult{
-		ServerName:     config.GetDLNAServerName(),
-		Enabled:        config.GetDLNADefaultEnabled(),
-		Port:           config.GetDLNAPort(),
-		WhitelistedIPs: config.GetDLNADefaultIPWhitelist(),
-		Interfaces:     config.GetDLNAInterfaces(),
-		VideoSortOrder: config.GetVideoSortOrder(),
 	}
 }
 

@@ -20,7 +20,6 @@ type settingsRuntime interface {
 	SetBlobStoreOptions()
 	RefreshScraperSourceManager()
 	RefreshPluginSourceManager()
-	RefreshDLNA()
 	UIConfiguration(context.Context) (map[string]interface{}, error)
 }
 

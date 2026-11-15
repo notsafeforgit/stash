@@ -273,8 +273,6 @@ type Query {
   jobHistory(limit: Int! = 25, offset: Int! = 0): [Job!]!
   findJob(input: FindJobInput!): Job
 
-  dlnaStatus: DLNAStatus!
-
   # Version
   version: Version!
 
@@ -459,7 +457,6 @@ type Mutation {
   "Change general configuration options"
   configureGeneral(input: ConfigGeneralInput!): ConfigGeneralResult!
   configureInterface(input: ConfigInterfaceInput!): ConfigInterfaceResult!
-  configureDLNA(input: ConfigDLNAInput!): ConfigDLNAResult!
   configureScraping(input: ConfigScrapingInput!): ConfigScrapingResult!
   configureDefaults(
     input: ConfigDefaultSettingsInput!
@@ -613,15 +610,6 @@ type Mutation {
   stashBoxBatchStudioTag(input: StashBoxBatchTagInput!): String! @libraryScope(kind: "studio")
   "Run batch tag tag task. Returns the job ID."
   stashBoxBatchTagTag(input: StashBoxBatchTagInput!): String! @libraryScope(kind: "tag")
-
-  "Enables DLNA for an optional duration. Has no effect if DLNA is enabled by default"
-  enableDLNA(input: EnableDLNAInput!): Boolean!
-  "Disables DLNA for an optional duration. Has no effect if DLNA is disabled by default"
-  disableDLNA(input: DisableDLNAInput!): Boolean!
-  "Enables an IP address for DLNA for an optional duration"
-  addTempDLNAIP(input: AddTempDLNAIPInput!): Boolean!
-  "Removes an IP address from the temporary DLNA whitelist"
-  removeTempDLNAIP(input: RemoveTempDLNAIPInput!): Boolean!
 }
 
 type Subscription {

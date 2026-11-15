@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/remeh/sizedwaitgroup"
-	"github.com/stashapp/stash/internal/dlna"
 	"github.com/stashapp/stash/internal/log"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/ffmpeg"
@@ -85,8 +84,6 @@ type Manager struct {
 
 	PluginPackageManager  *pkg.Manager
 	ScraperPackageManager *pkg.Manager
-
-	DLNAService *dlna.Service
 
 	HookExecutor HookExecutor
 
@@ -178,19 +175,6 @@ func (s *Manager) RefreshStreamManager() {
 	cfg := s.Config
 	cacheDir := cfg.GetCachePath()
 	s.StreamManager = ffmpeg.NewStreamManager(cacheDir, s.FFMpeg, s.FFProbe, cfg, s.ReadLockManager)
-}
-
-// RefreshDLNA starts/stops the DLNA service as needed.
-func (s *Manager) RefreshDLNA() {
-	dlnaService := s.DLNAService
-	enabled := s.Config.GetDLNADefaultEnabled()
-	if !enabled && dlnaService.IsRunning() {
-		dlnaService.Stop(nil)
-	} else if enabled && !dlnaService.IsRunning() {
-		if err := dlnaService.Start(nil); err != nil {
-			logger.Warnf("error starting DLNA service: %v", err)
-		}
-	}
 }
 
 func createPackageManager(localPath string, srcPathGetter pkg.SourcePathGetter) *pkg.Manager {

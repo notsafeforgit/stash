@@ -5,7 +5,6 @@ go 1.27.1
 require (
 	github.com/99designs/gqlgen v0.17.95
 	github.com/WithoutPants/sortorder v0.0.0-20230616003020-921c9ef69552
-	github.com/anacrolix/dms v1.8.0
 	github.com/antchfx/htmlquery v1.3.6
 	github.com/asticode/go-astisub v0.45.0
 	github.com/chromedp/cdproto v0.0.0-20260912003405-686a5c723acc

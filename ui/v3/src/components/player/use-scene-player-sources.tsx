@@ -409,7 +409,7 @@ export function useScenePlayerSources({
     freezeFrameCanvas,
     captureFrame,
     clearCapturedFrame,
-    beginSourceRemount,
+    beginSourceRemount: beginSourceRemountFeedback,
     seekDisplayTarget,
     seekTargetRef,
     armSeekDisplay,
@@ -421,6 +421,19 @@ export function useScenePlayerSources({
     playbackKey,
     sourceKey: finalSrc,
   });
+
+  // Every source reload begins here. `currentLoadRef` publishes a new load
+  // only after React commits it, so a readiness seek that resolves between the
+  // request and that commit could otherwise be mistaken for the current load.
+  // This generation is bumped synchronously with the reload request.
+  const sourceGenerationRef = useRef(0);
+  const beginSourceRemount = useCallback(
+    (applyChanges: () => void) => {
+      sourceGenerationRef.current += 1;
+      beginSourceRemountFeedback(applyChanges);
+    },
+    [beginSourceRemountFeedback],
+  );
 
   // A metadata edit keeps every stream endpoint URL stable, but the bytes
   // behind it have changed. Bump the existing cachebuster and use the same
@@ -435,6 +448,7 @@ export function useScenePlayerSources({
 
     const s = storeRef.current;
     if (!s || !activeSrc) {
+      sourceGenerationRef.current += 1;
       setReloadNonce((nonce) => nonce + 1);
       return;
     }
@@ -620,10 +634,10 @@ export function useScenePlayerSources({
             pendingResumeRef.current?.wasPaused ??
             video?.paused ??
             store.state.paused);
+      // Read the live rate. A pending intent can predate a rate the user set
+      // while the source was still loading, and this may replace that intent.
       const playbackRate =
-        intent === "seek"
-          ? (pendingResumeRef.current?.playbackRate ?? store.state.playbackRate)
-          : undefined;
+        intent === "seek" ? store.state.playbackRate : undefined;
       if (transition.kind === "reload-source") {
         store.pause();
         beginSourceRemount(() => {
@@ -969,6 +983,7 @@ export function useScenePlayerSources({
     const pending = pendingResumeRef.current;
     const s = storeRef.current;
     if (!s || !finalSrc || currentLoadRef.current !== load) return;
+    const generation = sourceGenerationRef.current;
 
     let seekPromise: Promise<unknown> | undefined;
 
@@ -1026,29 +1041,41 @@ export function useScenePlayerSources({
       } catch {
         return;
       }
-      // Source-changed-again-while-seeking: a fresh source-change
-      // populated pendingResumeRef again. Its own canplay handler
-      // owns the overlay teardown — bail so we don't tear down
-      // through it.
-      if (pendingResumeRef.current !== pending) {
-        return;
-      }
+      // A reload requested during this seek has its own canplay, which owns
+      // readiness. Video.js resolves a superseded seek, so this promise can
+      // settle for a reload as well as for an ordinary newer seek.
+      if (sourceGenerationRef.current !== generation) return;
+      // Another readiness pass already completed this load.
+      if (pendingResumeRef.current === null) return;
     }
     if (!mountedRef.current || currentLoadRef.current !== load) return;
+
+    // A same-load seek (user seek, drag release, cancel restore) can supersede
+    // the readiness seek above. performSeek has already replaced the pending
+    // intent with that seek's newest target, pause state and rate, and it owns
+    // the loading feedback. Publish readiness with the newest intent instead of
+    // waiting for a canplay that will not come, and do not re-seek.
+    const intent = pendingResumeRef.current ?? pending;
+    const seekOwnsFeedback = intent !== pending;
     pendingResumeRef.current = null;
     loadRetryAttemptedRef.current = false;
     setLoadFailed(false);
     setReadyLoad(load);
-    clearCapturedFrame();
-    setReloading(false);
+    if (!seekOwnsFeedback) {
+      clearCapturedFrame();
+      setReloading(false);
+    }
+    if (seekOwnsFeedback && intent?.playbackRate != null) {
+      s.setPlaybackRate(intent.playbackRate);
+    }
 
     // Resume / pause based on the captured pre-swap state. The
     // `<video autoplay>` attribute only fires on the initial resource
     // selection; subsequent src reassignments (which is every in-place
     // swap here) don't trigger it. So we explicitly drive the play /
-    // pause decision from `pendingResumeRef.wasPaused`.
-    if (pending) {
-      if (pending.wasPaused) {
+    // pause decision from the newest pending intent.
+    if (intent) {
+      if (intent.wasPaused) {
         s.pause();
       } else {
         // A pause or newer source can cancel this request. If Safari denies

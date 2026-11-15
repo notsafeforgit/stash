@@ -96,6 +96,21 @@ export function buildRenameSavedFilterInput(
   };
 }
 
+/**
+ * Builds the default-filter criteria for a saved filter, echoing its stored
+ * criteria unchanged so the view default matches the saved filter exactly.
+ */
+export function buildDefaultFilterFromSavedFilter(
+  saved: GQL.SavedFilterDataFragment,
+): GQL.DefaultFilterInput {
+  return {
+    mode: saved.mode,
+    find_filter: storedFindFilter(saved.find_filter),
+    filter_ast: saved.filter_ast,
+    ui_options: saved.ui_options,
+  };
+}
+
 export const useRenameSavedFilter = () => {
   const [saveFilterMutation] = useSaveFilterMutation();
 

@@ -13,6 +13,7 @@ export function useDefaultFilterActions(): ReturnType<
     hasConflict: false,
     saving: false,
     setCurrent: unexpectedWrite,
+    setSaved: unexpectedWrite,
     clear: unexpectedWrite,
     canUseImported: true,
     useImported: unexpectedWrite,

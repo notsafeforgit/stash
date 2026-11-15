@@ -6,6 +6,7 @@ import {
   Pin,
   PinOff,
   Search,
+  Star,
   Trash2,
 } from "lucide-react";
 import { FormattedMessage, useIntl } from "react-intl";
@@ -35,6 +36,7 @@ export function SavedFilterPicker({
   onSelect,
   onTogglePinned,
   onRename,
+  onSetDefault,
   onDelete,
 }: {
   filters: readonly SavedFilterDataFragment[];
@@ -45,6 +47,8 @@ export function SavedFilterPicker({
   onTogglePinned: (id: string) => void;
   /** Resolves true when the rename was saved; the dialog then closes. */
   onRename: (filter: SavedFilterDataFragment, name: string) => Promise<boolean>;
+  /** Present only where the view supports a default filter. */
+  onSetDefault?: (filter: SavedFilterDataFragment) => void;
   onDelete: (filter: SavedFilterDataFragment) => Promise<void>;
 }) {
   const intl = useIntl();
@@ -144,6 +148,10 @@ export function SavedFilterPicker({
                           { id: "search_filter.rename_saved_filter" },
                           { name: filter.name },
                         );
+                        const defaultLabel = intl.formatMessage(
+                          { id: "search_filter.set_saved_filter_default" },
+                          { name: filter.name },
+                        );
                         const deleteLabel = intl.formatMessage(
                           { id: "search_filter.delete_saved_filter" },
                           { name: filter.name },
@@ -181,6 +189,18 @@ export function SavedFilterPicker({
                             >
                               <Pencil />
                             </Button>
+                            {onSetDefault && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-11"
+                                aria-label={defaultLabel}
+                                title={defaultLabel}
+                                onClick={() => onSetDefault(filter)}
+                              >
+                                <Star />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"

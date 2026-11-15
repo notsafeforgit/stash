@@ -20,7 +20,17 @@ export default defineConfig({
     { name: "chromium", use: { browserName: "chromium" } },
     {
       name: "webkit",
-      use: { browserName: "webkit" },
+      use: {
+        browserName: "webkit",
+        // Linux WebKit composites through Mesa's llvmpipe. On Intel Xeon CPUs
+        // (6975P-C, Platinum 8573C) the pinned image's Mesa 26.0.8 / LLVM 21
+        // JIT faults in an AVX2 gather while drawing video, and the web process
+        // dies with SIGSEGV. AMD runners are unaffected. Hiding AVX2 from
+        // llvmpipe keeps its JIT; reassess when updating the Playwright image.
+        launchOptions: {
+          env: { ...process.env, GALLIUM_OVERRIDE_CPU_CAPS: "avx" },
+        },
+      },
       // Concurrent Linux media pipelines can stall each other on CI runners.
       // Isolate playback/frame-timing checks while retaining browser shards.
       workers: 1,

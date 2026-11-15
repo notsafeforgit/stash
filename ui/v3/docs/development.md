@@ -211,6 +211,12 @@ Ubuntu 26.04 container. The image holds both browsers and their system media
 libraries; CI does not reinstall packages from changing Ubuntu repositories.
 WebKit needs the newer GStreamer media runtime: the 1.24 backend on Ubuntu 24.04
 can deadlock or crash during HLS EOF seeks even with a bare video element.
+The WebKit project launches with `GALLIUM_OVERRIDE_CPU_CAPS=avx`. On Intel Xeon
+runners the image's Mesa llvmpipe JIT otherwise faults in an AVX2 gather while
+compositing video. Playwright reports the web process's SIGSEGV as
+`Target crashed`. AMD runners do not show it. Hiding AVX2 keeps llvmpipe's JIT
+and stopped the crash in every probe repeat. Recheck whether it is still needed
+when the Playwright image changes.
 Chromium uses two workers per shard. WebKit uses one to avoid competing media
 pipelines during playback and frame-timing checks on small CI runners.
 The shard runner distributes adjacent independent tests across the four jobs,

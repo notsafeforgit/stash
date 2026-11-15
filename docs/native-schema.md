@@ -1854,7 +1854,7 @@ Application-only routes under `/api/v3/archive` are:
 | `GET /collections/{collection_uuid}/enrichment-targets` | The same bounded listing scoped to one collection. |
 | `GET /enrichment-targets/{target_uuid}` | Current target, original binding, retained URL and optional completion UUID. |
 | `GET /enrichment-targets/{target_uuid}/history` | Immutable schedule revisions after numeric `after`, using `limit` (1–100). |
-| `PUT /enrichment-targets/{target_uuid}/schedule` | Replace scheduling fields using `expected_revision` and `schedule`; stale revisions or ineligible pending bindings return 409. |
+| `PUT /enrichment-targets/{target_uuid}/schedule` | Replace scheduling fields using `expected_revision` and `schedule`; stale revisions or ineligible pending bindings return 409. A pending target that stays pending keeps the retry deadline of its queued, previously attempted job, so `not_before` may come back later than requested. |
 | `POST /enrichment-targets/{target_uuid}/retry` | Using `expected_revision`, release a held target or retry pending work whose bound job failed or was cancelled. Preserve priority and the later target/job retry deadline. Other states return 409. |
 | `GET /enrichment-completions/{completion_uuid}` | Original completion input and timestamp; 404 when no receipt committed. |
 

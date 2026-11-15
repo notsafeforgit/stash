@@ -171,6 +171,16 @@ func (s *EnrichmentWorkStore) Schedule(ctx context.Context, id string, expected 
 	if prior.State == schedule.State && prior.Priority == schedule.Priority && prior.NotBefore.Equal(schedule.NotBefore) && prior.Reason == schedule.Reason {
 		return prior, nil
 	}
+	job, err := enrichmentBoundJob(ctx, id, expected)
+	if err != nil {
+		return nil, err
+	}
+	// A pending target that stays pending keeps the retry deadline its queued job
+	// is still waiting for, as Retry does. Leaving pending discards it. A running
+	// job's available time has already passed, so it carries nothing.
+	if prior.State == "pending" && schedule.State == "pending" && job != nil && job.State == "queued" && job.Fence > 0 && job.AvailableAt.After(now) {
+		schedule.NotBefore = enrichmentWaitDeadline(schedule.NotBefore, job)
+	}
 	complete := enrichmentAtomic(ctx)
 	_, err = dbWrapper.Exec(ctx, "UPDATE enrichment_targets SET state=?,priority=?,not_before=?,reason=?,revision=revision+1,updated_at=? WHERE uuid=?",
 		schedule.State, schedule.Priority, schedule.NotBefore, schedule.Reason, now.UTC(), id)
@@ -179,7 +189,7 @@ func (s *EnrichmentWorkStore) Schedule(ctx context.Context, id string, expected 
 	}
 	ret, err := s.Target(ctx, id)
 	if err == nil {
-		err = cancelEnrichmentTargetJob(ctx, id, expected, now)
+		err = cancelEnrichmentJob(ctx, job, now)
 	}
 	*complete = err == nil
 	return ret, err

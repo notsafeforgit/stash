@@ -103,6 +103,127 @@ func (f *enrichmentExecutionFixture) claim(t *testing.T, id string, producer int
 	return job
 }
 
+// retryAfterFailure claims the admitted job and records a retryable failure, which leaves it queued until retryAt.
+func (f *enrichmentExecutionFixture) retryAfterFailure(t *testing.T, job *models.ArchiveJob, retryAt time.Time) *models.ArchiveJob {
+	t.Helper()
+	running := f.claim(t, job.UUID, 0)
+	var queued *models.ArchiveJob
+	require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		queued, err = f.repo.ArchiveJob.Finish(ctx, running.Lease(), f.now, models.ArchiveJobOutcome{State: "retry", ErrorCode: "rate_limited", RetryAt: retryAt, Result: []byte(`{}`)})
+		return err
+	}))
+	require.Equal(t, "queued", queued.State)
+	require.Equal(t, retryAt, queued.AvailableAt)
+	return queued
+}
+
+func (f *enrichmentExecutionFixture) requireCancelled(t *testing.T, id string) {
+	t.Helper()
+	status, err := f.worker.Find(t.Context(), f.tokens[0], id)
+	require.NoError(t, err)
+	require.Equal(t, "cancelled", status.State)
+}
+
+func TestEnrichmentJobsPriorityEditKeepsRetryDeadline(t *testing.T) {
+	f := newEnrichmentExecutionFixture(t)
+	retryAt := f.now.Add(time.Hour)
+	job := f.retryAfterFailure(t, f.admit(t), retryAt)
+
+	target, err := scheduleEnrichment(f.repo, f.target, models.EnrichmentSchedule{State: "pending", Priority: 80, NotBefore: f.target.NotBefore}, f.now)
+	require.NoError(t, err)
+	f.target = target
+	require.Equal(t, retryAt, target.NotBefore, "a priority edit must not release the retry backoff the cancelled job was waiting for")
+	f.requireCancelled(t, job.UUID)
+	require.NoError(t, f.repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		ready, err := f.repo.EnrichmentWork.Ready(ctx, f.collection.UUID, f.now, 10)
+		require.Empty(t, ready, "the target is not schedulable before its retry deadline")
+		return err
+	}))
+	_, err = f.worker.Admit(t.Context(), f.tokens[0], f.target.UUID, f.target.Revision, strings.Repeat("a", 64), "1.32.15-dev")
+	require.ErrorIs(t, err, models.ErrEnrichmentConflict, "readmission cannot start before the retry deadline")
+
+	f.now = retryAt
+	next := f.admit(t)
+	require.NotEqual(t, job.UUID, next.UUID)
+	require.Equal(t, retryAt, next.AvailableAt)
+	require.Zero(t, next.Failures, "the replacement starts a fresh failure count, as explicit retry does")
+}
+
+func TestEnrichmentJobsNoopScheduleKeepsRetryWait(t *testing.T) {
+	f := newEnrichmentExecutionFixture(t)
+	job := f.retryAfterFailure(t, f.admit(t), f.now.Add(time.Hour))
+	same, err := scheduleEnrichment(f.repo, f.target, models.EnrichmentSchedule{State: "pending", Priority: f.target.Priority, NotBefore: f.target.NotBefore}, f.now)
+	require.NoError(t, err)
+	require.Equal(t, f.target.Revision, same.Revision, "an identical schedule is not a revision")
+	status, err := f.worker.Find(t.Context(), f.tokens[0], job.UUID)
+	require.NoError(t, err)
+	require.Equal(t, "queued", status.State, "an identical schedule must not cancel the waiting job")
+}
+
+func TestEnrichmentJobsExclusionCancelsWithoutRetryDeadline(t *testing.T) {
+	f := newEnrichmentExecutionFixture(t)
+	job := f.retryAfterFailure(t, f.admit(t), f.now.Add(time.Hour))
+	original := f.target.NotBefore
+	excluded, err := scheduleEnrichment(f.repo, f.target, models.EnrichmentSchedule{State: "excluded", Priority: f.target.Priority, NotBefore: original, Reason: "manual_exclusion"}, f.now)
+	require.NoError(t, err)
+	require.Equal(t, "excluded", excluded.State)
+	require.Equal(t, original, excluded.NotBefore, "leaving pending does not carry the retry deadline")
+	f.requireCancelled(t, job.UUID)
+}
+
+func TestEnrichmentJobsExplicitLaterScheduleWinsOverRetryDeadline(t *testing.T) {
+	f := newEnrichmentExecutionFixture(t)
+	retryAt := f.now.Add(time.Hour)
+	job := f.retryAfterFailure(t, f.admit(t), retryAt)
+	later := retryAt.Add(2 * time.Hour)
+	target, err := scheduleEnrichment(f.repo, f.target, models.EnrichmentSchedule{State: "pending", Priority: f.target.Priority, NotBefore: later}, f.now)
+	require.NoError(t, err)
+	f.target = target
+	require.Equal(t, later, target.NotBefore, "a later owner time is kept instead of the earlier deadline")
+	f.requireCancelled(t, job.UUID)
+	_, err = f.worker.Admit(t.Context(), f.tokens[0], f.target.UUID, f.target.Revision, strings.Repeat("a", 64), "1.32.15-dev")
+	require.ErrorIs(t, err, models.ErrEnrichmentConflict)
+
+	f.now = later
+	require.Equal(t, later, f.admit(t).AvailableAt)
+}
+
+func TestEnrichmentJobsUnclaimedScheduleMayMoveEarlier(t *testing.T) {
+	f := newEnrichmentExecutionFixture(t)
+	job := f.admit(t)
+	// A never-claimed job has no retry deadline, so the owner may move its schedule earlier.
+	earlier := f.now.Add(-time.Hour)
+	target, err := scheduleEnrichment(f.repo, f.target, models.EnrichmentSchedule{State: "pending", Priority: 60, NotBefore: earlier}, f.now)
+	require.NoError(t, err)
+	require.Equal(t, earlier, target.NotBefore)
+	f.requireCancelled(t, job.UUID)
+}
+
+func TestEnrichmentJobsOwnerActionsAgreeOnRetryDeadline(t *testing.T) {
+	retryAt := time.Date(2026, 10, 3, 3, 0, 0, 0, time.UTC)
+
+	viaRetry := newEnrichmentExecutionFixture(t)
+	queued := viaRetry.retryAfterFailure(t, viaRetry.admit(t), retryAt)
+	require.NoError(t, viaRetry.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		_, err := viaRetry.repo.ArchiveJob.Cancel(ctx, queued.UUID, queued.Revision, viaRetry.now)
+		return err
+	}))
+	require.NoError(t, viaRetry.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		viaRetry.target, err = viaRetry.repo.EnrichmentWork.Retry(ctx, viaRetry.target.UUID, viaRetry.target.Revision, viaRetry.now)
+		return err
+	}))
+
+	viaSchedule := newEnrichmentExecutionFixture(t)
+	viaSchedule.retryAfterFailure(t, viaSchedule.admit(t), retryAt)
+	target, err := scheduleEnrichment(viaSchedule.repo, viaSchedule.target, models.EnrichmentSchedule{State: "pending", Priority: 90, NotBefore: viaSchedule.target.NotBefore}, viaSchedule.now)
+	require.NoError(t, err)
+
+	require.Equal(t, retryAt, viaRetry.target.NotBefore)
+	require.Equal(t, viaRetry.target.NotBefore, target.NotBefore, "explicit retry and schedule edits must agree on the deadline")
+}
+
 func TestEnrichmentJobsResumedObservationsRetainOriginalProducers(t *testing.T) {
 	f := newEnrichmentExecutionFixture(t)
 	job := f.admit(t)

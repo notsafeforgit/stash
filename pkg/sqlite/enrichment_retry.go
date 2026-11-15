@@ -7,19 +7,32 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func cancelEnrichmentTargetJob(ctx context.Context, id string, revision int, now time.Time) error {
+// enrichmentBoundJob returns the job bound to one exact target revision, if any.
+func enrichmentBoundJob(ctx context.Context, id string, revision int) (*models.ArchiveJob, error) {
 	binding, err := (&EnrichmentJobStore{}).TargetBinding(ctx, id, revision)
 	if err != nil || binding == nil {
-		return err
+		return nil, err
 	}
-	job, err := (&ArchiveJobStore{}).Find(ctx, binding.JobUUID)
-	if err != nil {
-		return err
+	return (&ArchiveJobStore{}).Find(ctx, binding.JobUUID)
+}
+
+// cancelEnrichmentJob cancels a queued or running job whose target revision was superseded.
+func cancelEnrichmentJob(ctx context.Context, job *models.ArchiveJob, now time.Time) error {
+	if job == nil || (job.State != "queued" && job.State != "running") {
+		return nil
 	}
-	if job != nil && (job.State == "queued" || job.State == "running") {
-		_, err = (&ArchiveJobStore{}).Cancel(ctx, job.UUID, job.Revision, now)
-	}
+	_, err := (&ArchiveJobStore{}).Cancel(ctx, job.UUID, job.Revision, now)
 	return err
+}
+
+// enrichmentWaitDeadline is the not_before an owner action keeps while the
+// target's job still owes a retry deadline. A later explicit time wins. Retry and
+// Schedule both use it, so neither owner action can shorten that backoff.
+func enrichmentWaitDeadline(notBefore time.Time, job *models.ArchiveJob) time.Time {
+	if job != nil && job.AvailableAt.After(notBefore) {
+		return job.AvailableAt.UTC()
+	}
+	return notBefore
 }
 
 // Retry is an explicit owner action. A timer or repeat admission cannot release
@@ -40,23 +53,14 @@ func (s *EnrichmentWorkStore) Retry(ctx context.Context, id string, expected int
 	}
 	deadline := prior.NotBefore
 	if prior.State == "pending" {
-		binding, err := (&EnrichmentJobStore{}).TargetBinding(ctx, id, expected)
-		if err != nil {
-			return nil, err
-		}
-		if binding == nil {
-			return nil, models.ErrEnrichmentConflict
-		}
-		job, err := (&ArchiveJobStore{}).Find(ctx, binding.JobUUID)
+		job, err := enrichmentBoundJob(ctx, id, expected)
 		if err != nil {
 			return nil, err
 		}
 		if job == nil || (job.State != "failed" && job.State != "cancelled") {
 			return nil, models.ErrEnrichmentConflict
 		}
-		if job.AvailableAt.After(deadline) {
-			deadline = job.AvailableAt
-		}
+		deadline = enrichmentWaitDeadline(prior.NotBefore, job)
 	}
 	if err := enrichmentEligible(ctx, prior.EnrichmentTargetInput); err != nil {
 		return nil, err

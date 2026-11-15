@@ -1834,7 +1834,9 @@
     "skip_back": "Skip back 10 seconds",
     "skip_forward": "Skip forward 10 seconds",
     "position": "Playback position",
-    "fine_seeking": "Fine seeking"
+    "fine_seeking": "Fine seeking",
+    "no_file": "No file",
+    "no_file_description": "This scene has no file to play."
   },
   "media_info": {
     "audio_codec": "Audio Codec",

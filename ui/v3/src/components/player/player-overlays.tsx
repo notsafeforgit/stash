@@ -12,9 +12,37 @@ import {
  * be reused if the parent ever creates more than one `createPlayer(...)`.
  */
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { FormattedMessage } from "react-intl";
 import type { CreatePlayerResult, VideoPlayerStore } from "@videojs/react";
 
 type PlayerInstance = CreatePlayerResult<VideoPlayerStore>;
+
+// ── No-file message ───────────────────────────────────────────────────────────
+// A scene without a playable file keeps the poster behind this message and
+// shows no controls. The player root stays mounted so a lightbox can move on.
+export function PlayerNoFileOverlay() {
+  return (
+    <div
+      role="status"
+      className="absolute inset-0 z-[1] flex items-center justify-center p-4 pointer-events-none"
+    >
+      <div className="max-w-xs rounded-md bg-black/70 px-4 py-3 text-center text-white">
+        <p className="font-medium">
+          <FormattedMessage
+            id="media_player.no_file"
+            defaultMessage="No file"
+          />
+        </p>
+        <p className="mt-1 text-sm text-white/80">
+          <FormattedMessage
+            id="media_player.no_file_description"
+            defaultMessage="This scene has no file to play."
+          />
+        </p>
+      </div>
+    </div>
+  );
+}
 
 // ── Poster overlay ────────────────────────────────────────────────────────────
 // Rendered above the <video> until the video has actually reached the

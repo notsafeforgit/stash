@@ -64,6 +64,7 @@ import {
   CanPlayEffect,
   ControlsVisibilityEffect,
   PlaybackRangeEffect,
+  PlayerNoFileOverlay,
   PlayerPoster,
   StartedEffect,
 } from "./player-overlays";
@@ -443,6 +444,9 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   );
 
   const file = scene.files[0];
+  // A scene without a file has no playable source. It shows its cover and a
+  // message in place of the controls, so the player root stays mounted.
+  const hasFile = scene.files.length > 0;
   const fileDuration = file?.duration ?? undefined;
   const sourceResolution = useMemo(
     () =>
@@ -1112,7 +1116,9 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               }
             />
 
-            {controls === "standard" && (
+            {!hasFile && <PlayerNoFileOverlay />}
+
+            {controls === "standard" && hasFile && (
               <PlayerControls
                 hotkeysEnabled={!suspended}
                 castingAllowed={castingAllowed}

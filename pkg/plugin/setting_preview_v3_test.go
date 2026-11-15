@@ -46,7 +46,7 @@ settings:
 	cfg, err := loadPluginFromYAMLFile(manifest)
 	require.NoError(t, err)
 	c := NewCache(previewServerConfig{})
-	c.plugins = []Config{*cfg}
+	c.setTestPlugins(*cfg)
 	c.RegisterRepository(repo)
 	c.RegisterSessionStore(session.NewStore(previewSessionConfig{}))
 	_, err = c.SettingPreviewV3(t.Context(), "fixture", "mappings", imageID)

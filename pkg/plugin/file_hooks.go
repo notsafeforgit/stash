@@ -20,8 +20,12 @@ type FileHookExecutor interface {
 	ExecutePostHooks(context.Context, int, hook.TriggerEnum, interface{}, []string)
 }
 
-func (c Cache) HasHooks(trigger hook.TriggerEnum) bool {
-	for _, p := range c.enabledPlugins() {
+func (c *Cache) HasHooks(trigger hook.TriggerEnum) bool {
+	return c.hasHooks(c.snapshot(), trigger)
+}
+
+func (c *Cache) hasHooks(r *pluginRegistry, trigger hook.TriggerEnum) bool {
+	for _, p := range c.enabledPlugins(r) {
 		if len(p.getHooks(trigger)) > 0 {
 			return true
 		}

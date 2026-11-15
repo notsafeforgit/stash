@@ -27,7 +27,7 @@ operations:
 	cfg, err := loadPluginFromYAMLFile(manifest)
 	require.NoError(t, err)
 	c := NewCache(previewServerConfig{})
-	c.plugins = []Config{*cfg}
+	c.setTestPlugins(*cfg)
 	c.RegisterSessionStore(session.NewStore(previewSessionConfig{}))
 	script := filepath.Join(dir, "operation.js")
 	require.NoError(t, os.WriteFile(script, []byte(`({Output: input.Args})`), 0600))

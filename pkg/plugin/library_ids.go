@@ -26,7 +26,7 @@ func hookEntityKind(trigger hook.TriggerEnum) models.ArchiveEntityKind {
 	return models.ArchiveEntityKind(strings.ToLower(name))
 }
 
-func (c Cache) publicHookContext(ctx context.Context, trigger hook.TriggerEnum, notice common.HookContext) (common.HookContext, error) {
+func (c *Cache) publicHookContext(ctx context.Context, trigger hook.TriggerEnum, notice common.HookContext) (common.HookContext, error) {
 	if _, err := entityid.From(ctx); err != nil {
 		ctx = entityid.WithRepository(ctx, c.repository)
 	}

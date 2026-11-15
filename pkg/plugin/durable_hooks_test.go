@@ -35,7 +35,7 @@ hooks:
 	cfg, err := loadPluginFromYAMLFile(manifest)
 	require.NoError(t, err)
 	c := NewCache(durableHookConfig{})
-	c.plugins = []Config{*cfg}
+	c.setTestPlugins(*cfg)
 	c.RegisterRepository(repo)
 	c.RegisterSessionStore(session.NewStore(previewSessionConfig{}))
 	script := filepath.Join(dir, "hook.js")
@@ -69,7 +69,7 @@ hooks:
 	cfg, err := loadPluginFromYAMLFile(manifest)
 	require.NoError(t, err)
 	c := NewCache(durableHookConfig{})
-	c.plugins = []Config{*cfg}
+	c.setTestPlugins(*cfg)
 	c.RegisterRepository(repo)
 	c.RegisterSessionStore(session.NewStore(previewSessionConfig{}))
 	ctx := session.AddVisitedPluginHook(t.Context(), cfg.id, hook.ImageUpdatePost)

@@ -17,6 +17,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/stashapp/stash/pkg/fsutil"
@@ -89,13 +91,36 @@ type ServerConfig interface {
 }
 
 // Cache stores plugin details.
+//
+// The loaded registry is published as an immutable snapshot. ReloadPlugins
+// builds a complete replacement and swaps it in atomically, so readers never
+// observe a partially loaded registry. A Cache must not be copied after use.
 type Cache struct {
 	config       ServerConfig
-	plugins      []Config
-	loadErrors   []PluginLoadErrorV3
+	registry     atomic.Pointer[pluginRegistry]
+	reloadMu     sync.Mutex
 	sessionStore *session.Store
 	gqlHandler   http.Handler
 	repository   models.Repository
+}
+
+// pluginRegistry is a snapshot of the loaded plugins and rejected manifests.
+// A published value is never modified.
+type pluginRegistry struct {
+	plugins    []Config
+	loadErrors []PluginLoadErrorV3
+}
+
+// emptyRegistry is the snapshot seen before the first reload.
+var emptyRegistry pluginRegistry
+
+// snapshot returns the published registry. Each method loads it once and
+// reads only from that value.
+func (c *Cache) snapshot() *pluginRegistry {
+	if r := c.registry.Load(); r != nil {
+		return r
+	}
+	return &emptyRegistry
 }
 
 // PluginLoadErrorV3 identifies a rejected manifest without making it executable.
@@ -104,8 +129,8 @@ type PluginLoadErrorV3 struct {
 	Message string `json:"message"`
 }
 
-func (c Cache) LoadErrors() []PluginLoadErrorV3 {
-	return slices.Clone(c.loadErrors)
+func (c *Cache) LoadErrors() []PluginLoadErrorV3 {
+	return slices.Clone(c.snapshot().loadErrors)
 }
 
 // NewCache returns a new Cache.
@@ -134,6 +159,10 @@ func (c *Cache) RegisterSessionStore(sessionStore *session.Store) {
 // ReloadPlugins clears the plugin cache and loads from the plugin path.
 // Rejected manifests are reported to the owner and never enter the runnable cache.
 func (c *Cache) ReloadPlugins() {
+	// Serialize reloads so the last one started is the last one published.
+	c.reloadMu.Lock()
+	defer c.reloadMu.Unlock()
+
 	path := c.config.GetPluginsPath()
 	// # 4484 - ensure plugin ids are unique
 	plugins := make([]Config, 0)
@@ -177,18 +206,17 @@ func (c *Cache) ReloadPlugins() {
 		report(path, err)
 	}
 
-	c.plugins = plugins
-	c.loadErrors = loadErrors
+	c.registry.Store(&pluginRegistry{plugins: plugins, loadErrors: loadErrors})
 }
 
-func (c Cache) enabledPlugins() []Config {
-	if len(c.plugins) == 0 {
+func (c *Cache) enabledPlugins(r *pluginRegistry) []Config {
+	if len(r.plugins) == 0 {
 		return nil
 	}
 	disabledPlugins := c.config.GetDisabledPlugins()
 
 	var ret []Config
-	for _, p := range c.plugins {
+	for _, p := range r.plugins {
 		disabled := slices.Contains(disabledPlugins, p.id)
 
 		if !disabled {
@@ -205,8 +233,8 @@ func (c Cache) enabledPlugins() []Config {
 // sorted by id for determinism. Configured plugin IDs that no longer
 // resolve to a loaded plugin are silently skipped, so the config is
 // tolerant of plugin churn.
-func (c Cache) enabledPluginsForHook(hookType hook.TriggerEnum) []Config {
-	plugins := c.enabledPlugins()
+func (c *Cache) enabledPluginsForHook(r *pluginRegistry, hookType hook.TriggerEnum) []Config {
+	plugins := c.enabledPlugins(r)
 	hookOrder := c.config.GetPluginHookOrder()
 	configured, ok := hookOrder[hookType.String()]
 	if !ok || len(configured) == 0 {
@@ -246,18 +274,19 @@ func (c Cache) enabledPluginsForHook(hookType hook.TriggerEnum) []Config {
 	return append(ordered, remainder...)
 }
 
-func (c Cache) pluginDisabled(id string) bool {
+func (c *Cache) pluginDisabled(id string) bool {
 	disabledPlugins := c.config.GetDisabledPlugins()
 
 	return slices.Contains(disabledPlugins, id)
 }
 
 // ListPlugins returns plugin details for all of the loaded plugins.
-func (c Cache) ListPlugins() []*Plugin {
+func (c *Cache) ListPlugins() []*Plugin {
+	r := c.snapshot()
 	disabledPlugins := c.config.GetDisabledPlugins()
 
 	var ret []*Plugin
-	for _, s := range c.plugins {
+	for _, s := range r.plugins {
 		p := s.toPlugin()
 
 		disabled := slices.Contains(disabledPlugins, p.ID)
@@ -271,9 +300,9 @@ func (c Cache) ListPlugins() []*Plugin {
 
 // GetPlugin returns the plugin with the given ID.
 // Returns nil if the plugin is not found.
-func (c Cache) GetPlugin(id string) *Plugin {
+func (c *Cache) GetPlugin(id string) *Plugin {
 	disabledPlugins := c.config.GetDisabledPlugins()
-	plugin := c.getPlugin(id)
+	plugin := c.getPlugin(c.snapshot(), id)
 	if plugin != nil {
 		p := plugin.toPlugin()
 
@@ -286,9 +315,9 @@ func (c Cache) GetPlugin(id string) *Plugin {
 }
 
 // ListPluginTasks returns all runnable plugin tasks in all loaded plugins.
-func (c Cache) ListPluginTasks() []*PluginTask {
+func (c *Cache) ListPluginTasks() []*PluginTask {
 	var ret []*PluginTask
-	for _, s := range c.enabledPlugins() {
+	for _, s := range c.enabledPlugins(c.snapshot()) {
 		ret = append(ret, s.getPluginTasks(true)...)
 	}
 
@@ -309,7 +338,7 @@ func buildPluginInput(plugin *Config, operation *OperationConfig, serverConnecti
 	}
 }
 
-func (c Cache) makeServerConnection(ctx context.Context) common.StashServerConnection {
+func (c *Cache) makeServerConnection(ctx context.Context) common.StashServerConnection {
 	cookie := c.sessionStore.MakePluginCookie(ctx)
 
 	serverConnection := common.StashServerConnection{
@@ -330,7 +359,7 @@ func (c Cache) makeServerConnection(ctx context.Context) common.StashServerConne
 // CreateTask runs the plugin operation for the pluginID and operation
 // name provided. Returns an error if the plugin or the operation could not be
 // resolved.
-func (c Cache) CreateTask(ctx context.Context, pluginID string, operationName *string, args OperationInput, progress chan float64) (Task, error) {
+func (c *Cache) CreateTask(ctx context.Context, pluginID string, operationName *string, args OperationInput, progress chan float64) (Task, error) {
 	serverConnection := c.makeServerConnection(ctx)
 
 	if c.pluginDisabled(pluginID) {
@@ -338,7 +367,7 @@ func (c Cache) CreateTask(ctx context.Context, pluginID string, operationName *s
 	}
 
 	// find the plugin and operation
-	plugin := c.getPlugin(pluginID)
+	plugin := c.getPlugin(c.snapshot(), pluginID)
 
 	if plugin == nil {
 		return nil, fmt.Errorf("no plugin with ID %s", pluginID)
@@ -363,7 +392,7 @@ func (c Cache) CreateTask(ctx context.Context, pluginID string, operationName *s
 	return task.createTask(), nil
 }
 
-func (c Cache) RunPlugin(ctx context.Context, pluginID string, args OperationInput) (interface{}, error) {
+func (c *Cache) RunPlugin(ctx context.Context, pluginID string, args OperationInput) (interface{}, error) {
 	serverConnection := c.makeServerConnection(ctx)
 
 	if c.pluginDisabled(pluginID) {
@@ -371,7 +400,7 @@ func (c Cache) RunPlugin(ctx context.Context, pluginID string, args OperationInp
 	}
 
 	// find the plugin
-	plugin := c.getPlugin(pluginID)
+	plugin := c.getPlugin(c.snapshot(), pluginID)
 
 	pluginInput := buildPluginInput(plugin, nil, serverConnection, args)
 
@@ -425,7 +454,7 @@ func waitForTask(ctx context.Context, task Task) error {
 	return nil
 }
 
-func (c Cache) ExecutePostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) {
+func (c *Cache) ExecutePostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) {
 	if err := c.executePostHooks(ctx, hookType, common.HookContext{
 		ParentHooks: parentHookSources(ctx),
 		ID:          id,
@@ -440,7 +469,7 @@ func (c Cache) ExecutePostHooks(ctx context.Context, id int, hookType hook.Trigg
 // ExecuteDurablePostHooks reports failures to the persisted caller. The event
 // identity stays the same across retries; delivery is at least once. Domain
 // changes have already committed and cannot be vetoed by a plugin.
-func (c Cache) ExecuteDurablePostHooks(ctx context.Context, eventID string, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) error {
+func (c *Cache) ExecuteDurablePostHooks(ctx context.Context, eventID string, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) error {
 	if eventID == "" {
 		return errors.New("durable hook requires an event identity")
 	}
@@ -454,7 +483,7 @@ func (c Cache) ExecuteDurablePostHooks(ctx context.Context, eventID string, id i
 // PrepareDurablePostHook freezes public relationship identities and the parent
 // hook chain at admission. The caller supplies the target UUID and stable event
 // ID when delivering each item. This runs inside its admission transaction.
-func (c Cache) PrepareDurablePostHook(ctx context.Context, hookType hook.TriggerEnum, input interface{}, inputFields []string) (common.HookContext, error) {
+func (c *Cache) PrepareDurablePostHook(ctx context.Context, hookType hook.TriggerEnum, input interface{}, inputFields []string) (common.HookContext, error) {
 	return c.publicHookContext(ctx, hookType, common.HookContext{
 		ParentHooks: parentHookSources(ctx), Type: hookType.String(), Input: input, InputFields: inputFields,
 	})
@@ -462,7 +491,7 @@ func (c Cache) PrepareDurablePostHook(ctx context.Context, hookType hook.Trigger
 
 // DeliverPreparedPostHook preserves the accepted UUID payload across restarts
 // and reestablishes cycle detection for plugin calls caused by this event.
-func (c Cache) DeliverPreparedPostHook(ctx context.Context, notice common.HookContext) error {
+func (c *Cache) DeliverPreparedPostHook(ctx context.Context, notice common.HookContext) error {
 	if notice.EventID == "" || notice.UUID == "" {
 		return errors.New("durable hook requires event and target identities")
 	}
@@ -476,7 +505,7 @@ func (c Cache) DeliverPreparedPostHook(ctx context.Context, notice common.HookCo
 	return c.deliverPostHooks(ctx, hook.TriggerEnum(notice.Type), notice, true)
 }
 
-func (c Cache) RegisterPostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) {
+func (c *Cache) RegisterPostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) {
 	if !c.HasHooks(hookType) {
 		return
 	}
@@ -492,7 +521,7 @@ func (c Cache) RegisterPostHooks(ctx context.Context, id int, hookType hook.Trig
 	})
 }
 
-func (c Cache) ExecuteSceneUpdatePostHooks(ctx context.Context, input models.SceneUpdateInput, inputFields []string) {
+func (c *Cache) ExecuteSceneUpdatePostHooks(ctx context.Context, input models.SceneUpdateInput, inputFields []string) {
 	id, err := strconv.Atoi(input.ID)
 	if err != nil {
 		logger.Errorf("error converting id in SceneUpdatePostHooks: %v", err)
@@ -506,12 +535,13 @@ func (c Cache) ExecuteSceneUpdatePostHooks(ctx context.Context, input models.Sce
 // that should not be hit under normal circumstances.
 const maxCyclicLoopDepth = 10
 
-func (c Cache) executePostHooks(ctx context.Context, hookType hook.TriggerEnum, hookContext common.HookContext) error {
+func (c *Cache) executePostHooks(ctx context.Context, hookType hook.TriggerEnum, hookContext common.HookContext) error {
 	return c.deliverPostHooks(ctx, hookType, hookContext, false)
 }
 
-func (c Cache) deliverPostHooks(ctx context.Context, hookType hook.TriggerEnum, hookContext common.HookContext, reportFailure bool) error {
-	if !c.HasHooks(hookType) {
+func (c *Cache) deliverPostHooks(ctx context.Context, hookType hook.TriggerEnum, hookContext common.HookContext, reportFailure bool) error {
+	r := c.snapshot()
+	if !c.hasHooks(r, hookType) {
 		return nil
 	}
 	var err error
@@ -521,7 +551,7 @@ func (c Cache) deliverPostHooks(ctx context.Context, hookType hook.TriggerEnum, 
 	}
 	visitedPluginHookCounts := getVisitedPluginHookCounts(ctx)
 
-	for _, p := range c.enabledPluginsForHook(hookType) {
+	for _, p := range c.enabledPluginsForHook(r, hookType) {
 		hooks := p.getHooks(hookType)
 		// don't revisit a plugin we've already visited
 		// only log if there's hooks that we're skipping
@@ -623,8 +653,8 @@ func getVisitedPluginHookCounts(ctx context.Context) visitedPluginHookCounts {
 	return visitedPluginHookCounts
 }
 
-func (c Cache) getPlugin(pluginID string) *Config {
-	for _, s := range c.plugins {
+func (c *Cache) getPlugin(r *pluginRegistry, pluginID string) *Config {
+	for _, s := range r.plugins {
 		if s.id == pluginID {
 			return &s
 		}

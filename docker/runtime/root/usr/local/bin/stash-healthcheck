@@ -1,0 +1,28 @@
+#!/bin/sh
+# Optional container health command that checks database state, not only a
+# listening HTTP server (the image's default HEALTHCHECK uses /healthz).
+#
+# Healthy: systemStatus is OK, or the database is waiting for or running a
+# migration (its schema differs from the application's), so a long migration
+# is not killed. Any other status, an HTTP error or no answer is unhealthy.
+# STASH_API_KEY is sent when set; STASH_PORT selects the port (default 9999).
+set -u
+port=${STASH_PORT:-9999}
+query='{"query":"{ systemStatus { status databaseSchema appSchema } }"}'
+if [ -n "${STASH_API_KEY:-}" ]; then
+  response=$(curl --silent --fail --max-time 8 -X POST -H 'Content-Type: application/json' \
+    -H "ApiKey: $STASH_API_KEY" -d "$query" "http://127.0.0.1:$port/graphql") || exit 1
+else
+  response=$(curl --silent --fail --max-time 8 -X POST -H 'Content-Type: application/json' \
+    -d "$query" "http://127.0.0.1:$port/graphql") || exit 1
+fi
+case $response in
+  *'"status":"OK"'*) exit 0 ;;
+  *'"status":"NEEDS_MIGRATION"'*)
+    database=$(printf '%s' "$response" | sed -n 's/.*"databaseSchema":\([0-9][0-9]*\).*/\1/p')
+    application=$(printf '%s' "$response" | sed -n 's/.*"appSchema":\([0-9][0-9]*\).*/\1/p')
+    if [ -n "$database" ] && [ -n "$application" ] && [ "$database" != "$application" ]; then
+      exit 0
+    fi ;;
+esac
+exit 1

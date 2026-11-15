@@ -94,6 +94,19 @@ def main():
         else:
             raise RuntimeError("Native server did not become healthy\n" + command("logs", name).stdout)
         assert command("exec", name, "cat", "/proc/1/comm").stdout.strip() == "stash"
+        # The optional database-aware health command must agree with systemStatus
+        # and fail when nothing answers on the selected port.
+        answer = command("exec", name, "curl", "--fail", "--silent", "--max-time", "5", "-X", "POST",
+                         "-H", "Content-Type: application/json",
+                         "-d", '{"query":"{ systemStatus { status databaseSchema appSchema } }"}',
+                         "http://127.0.0.1:9999/graphql").stdout
+        status = json.loads(answer)["data"]["systemStatus"]
+        healthy = status["status"] == "OK" or (
+            status["status"] == "NEEDS_MIGRATION" and status["databaseSchema"] != status["appSchema"])
+        check = command("exec", name, "/usr/local/bin/stash-healthcheck", check=False)
+        assert (check.returncode == 0) == healthy, (status, check.returncode)
+        closed = command("exec", "-e", "STASH_PORT=1", name, "/usr/local/bin/stash-healthcheck", check=False)
+        assert closed.returncode == 1, closed.returncode
         command("stop", "--time", "15", name)
         state = json.loads(command("inspect", name).stdout)[0]["State"]
         assert state["ExitCode"] == 0, state

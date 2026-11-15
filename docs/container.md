@@ -119,7 +119,12 @@ certificates under `/config/certs` (or `CUSTOM_CERT_PATH`) can likewise be added
 to system trust by a root-started container. For a non-root launch, mount a
 prepared trust bundle and set `SSL_CERT_FILE` instead.
 
-The image's health check uses `/healthz`. Operators can retain an authenticated
-schema-aware check. Image CI checks the exact validated binary, default and
+The image's health check uses `/healthz`, which answers whenever the HTTP server
+is up. For a database-aware check, set the container health command to
+`/usr/local/bin/stash-healthcheck` (for example Quadlet
+`HealthCmd=/usr/local/bin/stash-healthcheck`). It queries `systemStatus` on
+`STASH_PORT` and sends `STASH_API_KEY` when set. It reports healthy for `OK` and
+while a migration is pending (database and application schemas differ), and
+unhealthy for any other status or no answer. Image CI checks the exact validated binary, default and
 custom user IDs, supplementary groups, argument preservation, offline startup,
 media tools and graceful shutdown. GPU encoding is verified on a real GPU host.

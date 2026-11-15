@@ -44,6 +44,7 @@ import { lightboxAnimation, useLightboxMotion } from "./use-lightbox-motion";
 import { LightboxMotionSurface } from "./lightbox-motion-surface";
 import { useImageLightboxChrome } from "./use-image-lightbox-chrome";
 import { popupOwnsLightboxKeys } from "./lightbox-keyboard";
+import { followingSlide } from "./scene-advance";
 import { cn } from "@/lib/utils";
 
 // ── Persistence keys ───────────────────────────────────────────────────────────
@@ -247,16 +248,41 @@ export function MediaLightbox({
 
   // YARL controller — used to advance imperatively from the player's
   // auto-advance toggle (which fires on the video's `ended` event).
-  const handleNext = useCallback(
-    (slide: SceneSlide) => {
+  //
+  // Playback-driven advances name the slide they expect to arrive on. If that
+  // scene has no file it moves on at once, because `ended` never fires for it.
+  // A manual next lands on the no-file state instead.
+  const expectedAutoArrivalRef = useRef<unknown>(undefined);
+  const advanceFrom = useCallback(
+    (slide: SceneSlide, automatic: boolean) => {
       const controller = controllerRef.current;
       // The outgoing video remains alive during a swipe. Its late EOF must not
       // advance again after the user has already selected a different slide.
       const state = controller?.getLightboxState();
-      if (state?.currentSlide === slide && !state.animation?.increment)
-        controller?.next();
+      if (state?.currentSlide !== slide || state.animation?.increment) return;
+      if (automatic) {
+        const following = followingSlide(slides, slide, finite);
+        if (following === undefined) return;
+        expectedAutoArrivalRef.current = following;
+      }
+      controller?.next();
     },
-    [controllerRef],
+    [controllerRef, slides, finite],
+  );
+  const handleNext = useCallback(
+    (slide: SceneSlide) => advanceFrom(slide, false),
+    [advanceFrom],
+  );
+  const handleAutoAdvance = useCallback(
+    (slide: SceneSlide) => advanceFrom(slide, true),
+    [advanceFrom],
+  );
+  const handleNoFile = useCallback(
+    (slide: SceneSlide) => {
+      if (expectedAutoArrivalRef.current !== slide) return;
+      advanceFrom(slide, true);
+    },
+    [advanceFrom],
   );
 
   // Per-gesture wheel lockout — pin one trackpad swipe to one slide
@@ -391,6 +417,8 @@ export function MediaLightbox({
           loopEnabled={loopEnabled}
           onLoopToggle={handleLoopToggle}
           onNext={() => handleNext(slide)}
+          onAutoAdvance={() => handleAutoAdvance(slide)}
+          onNoFile={() => handleNoFile(slide)}
           onClose={touch ? requestClose : undefined}
         />
       );
@@ -400,6 +428,8 @@ export function MediaLightbox({
       loopEnabled,
       handleLoopToggle,
       handleNext,
+      handleAutoAdvance,
+      handleNoFile,
       touch,
       requestClose,
       SlideContent,

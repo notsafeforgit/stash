@@ -53,6 +53,10 @@ interface LightboxScenePlayerProps {
   /** Optional — only set on online slides where the carousel has a
    *  next-slide callback (auto-advance + last-marker bridge). */
   onNext?: () => void;
+  /** Playback-driven advance (ended, clip boundary). Skips fileless scenes. */
+  onAutoAdvance?: () => void;
+  /** Fires while this scene has no file, so the carousel can move past it. */
+  onNoFile?: () => void;
   /** Marker-clip slides only — restricts player UI to a clip window. */
   clipRange?: { start: number; end: number };
   /** Marker poster override; defaults to the slide's poster. */
@@ -84,6 +88,8 @@ export function LightboxScenePlayer({
   topOverlay,
   onControlsVisibilityChange,
   onNext,
+  onAutoAdvance,
+  onNoFile,
   clipRange,
   posterSrc,
   posterImage,
@@ -114,6 +120,8 @@ export function LightboxScenePlayer({
       onLoopToggle={onLoopToggle}
       onControlsVisibilityChange={onControlsVisibilityChange}
       onNext={onNext}
+      onAutoAdvance={onAutoAdvance}
+      onNoFile={onNoFile}
       clipRange={clipRange}
       posterSrc={posterSrc}
       posterImage={posterImage}

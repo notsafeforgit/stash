@@ -50,6 +50,10 @@ interface SceneSlideContentProps {
    *  `onNext`, which both lights up the auto-advance toggle and
    *  triggers the swipe when the video ends with auto-advance on. */
   onNext: () => void;
+  /** Playback-driven advance; the lightbox skips fileless scenes with it. */
+  onAutoAdvance?: () => void;
+  /** This slide's scene has no file; the lightbox may move past it. */
+  onNoFile?: () => void;
   onClose?: () => void;
 }
 
@@ -112,6 +116,8 @@ function ActiveSceneSlide({
   loopEnabled,
   onLoopToggle,
   onNext,
+  onAutoAdvance,
+  onNoFile,
   onClose,
 }: SceneSlideContentProps) {
   const msg = useMsg();
@@ -196,6 +202,8 @@ function ActiveSceneSlide({
           onToggleFullscreen={onToggleFullscreen}
           onControlsVisibilityChange={setChromeVisible}
           onNext={slide.offlineEntry ? undefined : onNext}
+          onAutoAdvance={slide.offlineEntry ? undefined : onAutoAdvance}
+          onNoFile={slide.offlineEntry ? undefined : onNoFile}
           onClose={onClose}
           initialTimestamp={
             slide.offlineEntry ? undefined : (marker?.seconds ?? 0)

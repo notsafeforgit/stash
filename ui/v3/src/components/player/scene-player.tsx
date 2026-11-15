@@ -156,6 +156,14 @@ interface ScenePlayerProps {
   maxLoopDuration?: number;
   onEnded?: () => void;
   onNext?: () => void;
+  /**
+   * Playback-initiated advance: the video ended, or a clip boundary reached
+   * with auto-advance on. Falls back to `onNext`. A lightbox uses it to skip
+   * scenes without a file; a manual next still lands on them.
+   */
+  onAutoAdvance?: () => void;
+  /** Reported while the scene has no playable file; the parent may move on. */
+  onNoFile?: () => void;
   onPrevious?: () => void;
   sendSetTimestamp?: (setter: (t: number) => void) => void;
   /**
@@ -350,6 +358,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   maxLoopDuration = 0,
   onEnded,
   onNext,
+  onAutoAdvance,
+  onNoFile,
   onPrevious,
   sendSetTimestamp,
   sendGetCurrentTime,
@@ -444,9 +454,13 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   );
 
   const file = scene.files[0];
-  // A scene without a file has no playable source. It shows its cover and a
-  // message in place of the controls, so the player root stays mounted.
   const hasFile = scene.files.length > 0;
+  // A scene without a file never fires `ended`. Report it so a lightbox can
+  // advance past it; the parent decides whether this arrival should skip.
+  const fileless = hasFile ? undefined : scene.id;
+  useEffect(() => {
+    if (fileless !== undefined && !suspended) onNoFile?.();
+  }, [fileless, suspended, onNoFile]);
   const fileDuration = file?.duration ?? undefined;
   const sourceResolution = useMemo(
     () =>
@@ -608,11 +622,11 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     if (endedHandledRef.current) return;
     endedHandledRef.current = true;
     if (autoAdvance && onNext) {
-      onNext();
+      (onAutoAdvance ?? onNext)();
       return;
     }
     onEnded?.();
-  }, [autoAdvance, onNext, onEnded]);
+  }, [autoAdvance, onNext, onAutoAdvance, onEnded]);
 
   const captions = useMemo(() => {
     const captionBasePath = scene.paths.caption;
@@ -1064,7 +1078,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               offsetStart={offsetStart}
               loopEnabled={loopEnabled}
               onLoop={handleLoop}
-              onAdvance={autoAdvance ? onNext : undefined}
+              onAdvance={autoAdvance ? (onAutoAdvance ?? onNext) : undefined}
               onStop={handleClipStop}
               onClipResume={handleClipResume}
             />

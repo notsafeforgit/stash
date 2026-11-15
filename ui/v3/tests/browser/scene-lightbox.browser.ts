@@ -518,6 +518,46 @@ test("same-scene marker navigation resets clip timestamps and end state", async 
   );
 });
 
+test("automatic advance skips a scene without a file and keeps playing", async ({
+  page,
+}) => {
+  // `ended` never fires for a fileless scene, so the lightbox must move past
+  // it rather than stall on its cover.
+  await page.addInitScript(() =>
+    localStorage.setItem("stash-player-auto-advance", "true"),
+  );
+  const video = await open(page, "?no-file=2");
+  await video.evaluate((v: HTMLVideoElement) => {
+    v.currentTime = v.duration - 0.3;
+  });
+  await expect(page.getByTestId("view")).toHaveText("2");
+  await expect(
+    page.locator(".yarl__slide_current [data-scene-player]"),
+  ).toHaveAttribute("data-playback-ready", "true");
+  await expect(video).toHaveJSProperty("paused", false);
+  await expect(
+    page
+      .locator(".yarl__slide_current")
+      .getByText("This scene has no file to play."),
+  ).toHaveCount(0);
+});
+
+test("manual navigation to a scene without a file shows the no-file state", async ({
+  page,
+}) => {
+  await open(page, "?no-file=2");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("view")).toHaveText("1");
+  await expect(
+    page
+      .locator(".yarl__slide_current")
+      .getByText("This scene has no file to play."),
+  ).toBeVisible();
+  await expect(
+    page.locator(".yarl__slide_current [data-scene-player]"),
+  ).toHaveAttribute("data-playback-ready", "false");
+});
+
 test("ended-driven auto-advance preserves the same unmuted player", async ({
   page,
 }) => {

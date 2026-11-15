@@ -90,6 +90,9 @@ const markerEndOffset = new URLSearchParams(location.search).has(
 )
   ? 0.25
   : 0;
+// `?no-file=<id>` gives that scene no playable file, as a library scene with
+// no media would have. The slide keeps its cover and sits in the lightbox.
+const noFileSceneId = new URLSearchParams(location.search).get("no-file");
 export const scenes = ["1", "2", "3", "slow"].map(
   (id): GQL.SceneDataFragment => {
     const scene = offlineEntryToSceneData(
@@ -99,39 +102,47 @@ export const scenes = ["1", "2", "3", "slow"].map(
     return {
       ...scene,
       preview_image: null,
-      files: scene.files.map((file) => ({
-        ...file,
-        frame_rate: 30,
-        video_stream_duration: 12,
-        frame_count: 360,
-        bit_depth: 8,
-        color_range: null,
-        color_space: null,
-        color_transfer: null,
-        color_primaries: null,
-      })),
-      sceneStreams: [
-        ...(id === "2"
+      files:
+        id === noFileSceneId
+          ? []
+          : scene.files.map((file) => ({
+              ...file,
+              frame_rate: 30,
+              video_stream_duration: 12,
+              frame_count: 360,
+              bit_depth: 8,
+              color_range: null,
+              color_space: null,
+              color_transfer: null,
+              color_primaries: null,
+            })),
+      sceneStreams:
+        id === noFileSceneId
           ? []
           : [
-              {
-                __typename: "SceneStreamEndpoint" as const,
-                url: url(`/scene/${id}/stream`),
-                mime_type: "video/mp4",
-                label: "Direct stream",
-              },
-            ]),
-        ...(!new URLSearchParams(location.search).has("direct-only")
-          ? [
-              {
-                __typename: "SceneStreamEndpoint" as const,
-                url: url(`/scene/${id}/stream.master.m3u8?resolution=LOW`),
-                mime_type: "application/vnd.apple.mpegurl",
-                label: "HLS (240p)",
-              },
-            ]
-          : []),
-      ],
+              ...(id === "2"
+                ? []
+                : [
+                    {
+                      __typename: "SceneStreamEndpoint" as const,
+                      url: url(`/scene/${id}/stream`),
+                      mime_type: "video/mp4",
+                      label: "Direct stream",
+                    },
+                  ]),
+              ...(!new URLSearchParams(location.search).has("direct-only")
+                ? [
+                    {
+                      __typename: "SceneStreamEndpoint" as const,
+                      url: url(
+                        `/scene/${id}/stream.master.m3u8?resolution=LOW`,
+                      ),
+                      mime_type: "application/vnd.apple.mpegurl",
+                      label: "HLS (240p)",
+                    },
+                  ]
+                : []),
+            ],
       scene_markers: [6, 8, 2].map((seconds, index) => ({
         __typename: "SceneMarker",
         preview_image: null,

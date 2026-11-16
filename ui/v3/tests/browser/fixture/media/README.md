@@ -7,11 +7,22 @@ ffmpeg -f lavfi -i color=c=slategray:s=160x90:r=30:d=12 \
   -f lavfi -i sine=frequency=440:sample_rate=48000:duration=12 \
   -c:v libx264 -profile:v main -pix_fmt yuv420p -bf 0 -g 60 -keyint_min 60 \
   -sc_threshold 0 -c:a aac -b:a 32k -movflags +faststart audio.mp4
-ffmpeg -i audio.mp4 -c copy -hls_time 2 -hls_list_size 0 \
+ffmpeg -i audio.mp4 -itsoffset 0.016 -i audio.mp4 -map 0:v -map 1:a \
+  -c:v copy -c:a aac -b:a 32k -ar 64000 -hls_time 2 -hls_list_size 0 \
   -hls_segment_type fmp4 -hls_playlist_type vod \
   -hls_segment_filename hls/segment-%d.m4s hls/stream.m3u8
 ffmpeg -i audio.mp4 -t 2 -c copy -movflags +faststart short.mp4
 ```
+
+The HLS rendition re-encodes its audio at 64 kHz, whose 1,024-sample AAC frames
+(16 ms) divide the two-second segments, and delays the audio input by the
+encoder's priming. Both tracks therefore start at 0 and at every segment
+boundary. A copied 48 kHz track starts the video 21 ms late. After an early
+`play()`, hls.js then seeks over that start gap while Linux WebKit's GStreamer
+MSE pipeline is still prerolling, and the flush can deadlock the web process
+(about one run in ten). Real streams can start with such gaps; Safari and
+Chromium seek over them normally, so the fixture avoids the engine deadlock
+rather than modelling it.
 
 `scrub/` contains the same synthetic video without audio, for the independent
 paused scrub-preview decoder:

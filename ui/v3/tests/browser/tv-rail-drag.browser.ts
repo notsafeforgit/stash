@@ -27,6 +27,15 @@ async function dragTouch(
         });
       }
       await whileDragging();
+      // Hold still before lifting, as a person dropping a row does. Lifting
+      // while moving lets Chromium start a fling; a tap during that fling only
+      // stops it and produces no click. Identical moves are coalesced, so
+      // alternate the samples by a hundredth of a pixel.
+      for (let sample = 0; sample < 3; sample++)
+        await input.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: to.x, y: to.y + (sample % 2) / 100 }],
+        });
     } finally {
       await input.send("Input.dispatchTouchEvent", {
         type: "touchEnd",

@@ -1803,7 +1803,18 @@
     "position": "Playback position",
     "fine_seeking": "Fine seeking",
     "no_file": "No file",
-    "no_file_description": "This scene has no file to play."
+    "no_file_description": "This scene has no file to play.",
+    "scrub_timings": {
+      "title": "Scrub preview timings",
+      "tier": "Tier",
+      "count": "Count",
+      "median": "Median",
+      "p90": "90th percentile",
+      "still_cache": "Cached still",
+      "still_network": "Fetched still",
+      "exact_frame": "Exact frame",
+      "main_buffer": "Buffered seek"
+    }
   },
   "media_info": {
     "audio_codec": "Audio Codec",

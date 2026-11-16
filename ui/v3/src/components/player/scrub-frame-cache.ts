@@ -1,29 +1,63 @@
-/** Temporary compressed snapshots, not a collection of decoded GPU textures.
- * Only the currently displayed image is decoded. No OPFS/database persistence. */
+/** Keyframe times are rounded to milliseconds by the server. */
+const SAME_FRAME_SECONDS = 0.002;
+/** The server returns the greatest keyframe at or before `t + 0.010`. */
+export const KEYFRAME_TOLERANCE_SECONDS = 0.01;
+
+export interface ScrubStill {
+  /** Scene time of the returned source keyframe. */
+  time: number;
+  /** Latest requested time known to resolve to this keyframe. */
+  until: number;
+  url: string;
+  bytes: number;
+  /** Background coverage, retained before foreground adjustments. */
+  coarse: boolean;
+}
+
+/** Temporary compressed keyframe stills, not a collection of decoded GPU
+ * textures. Only the currently displayed image is decoded. No OPFS/database
+ * persistence; canonical still URLs can still be reused from the HTTP cache. */
 export class ScrubFrameCache {
-  private frames: {
-    time: number;
-    url: string;
-    bytes: number;
-    coarse: boolean;
-  }[] = [];
+  private frames: ScrubStill[] = [];
   private bytes = 0;
 
   constructor(
     private readonly maxBytes = 4 * 1024 * 1024,
-    private readonly maxFrames = 96,
+    private readonly maxFrames = 256,
   ) {}
 
   get size() {
     return this.frames.length;
   }
 
-  has(time: number) {
-    return this.frames.some((frame) => Math.abs(frame.time - time) < 0.05);
+  get(time: number) {
+    return this.frames.find(
+      (frame) => Math.abs(frame.time - time) < SAME_FRAME_SECONDS,
+    );
   }
 
-  add(time: number, blob: Blob, coarse: boolean) {
-    if (blob.size > this.maxBytes || this.has(time)) return;
+  has(time: number) {
+    return this.get(time) !== undefined;
+  }
+
+  /** Without a keyframe index, a request for `t` that returned keyframe `k`
+   * establishes that every target in `[k, t]` resolves to the same still. */
+  covering(time: number) {
+    return this.frames.find(
+      (frame) =>
+        frame.time <= time + KEYFRAME_TOLERANCE_SECONDS &&
+        time <= frame.until + SAME_FRAME_SECONDS,
+    );
+  }
+
+  add(time: number, blob: Blob, coarse: boolean, until = time) {
+    const existing = this.get(time);
+    if (existing) {
+      existing.until = Math.max(existing.until, until);
+      existing.coarse ||= coarse;
+      return existing;
+    }
+    if (blob.size > this.maxBytes) return undefined;
     while (
       this.frames.length &&
       (this.bytes + blob.size > this.maxBytes ||
@@ -35,17 +69,20 @@ export class ScrubFrameCache {
       this.bytes -= old!.bytes;
       URL.revokeObjectURL(old!.url);
     }
-    this.frames.push({
+    const frame = {
       time,
+      until: Math.max(time, until),
       url: URL.createObjectURL(blob),
       bytes: blob.size,
       coarse,
-    });
+    };
+    this.frames.push(frame);
     this.bytes += blob.size;
+    return frame;
   }
 
   nearest(time: number, maxDistance: number) {
-    let best: (typeof this.frames)[number] | undefined;
+    let best: ScrubStill | undefined;
     for (const frame of this.frames)
       if (
         Math.abs(frame.time - time) <= maxDistance &&
@@ -62,8 +99,8 @@ export class ScrubFrameCache {
   }
 }
 
-/** Breadth-first coverage: the middle, quarters, eighths, etc. Fine sampling
- * follows the active gesture through the full-frame-rate scrub stream. */
+/** Breadth-first coverage: the middle, quarters, eighths, etc. Used as raw
+ * still request times when the server cannot supply a keyframe index. */
 export function scrubPreparationTimes(start: number, end: number): number[] {
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start)
     return [];

@@ -5,6 +5,7 @@ import { createPreparedScrubPreview } from "./prepared-scrub-preview";
 export function SceneScrubPreview({
   sceneId,
   source,
+  keyframes,
   time,
   start,
   end,
@@ -14,6 +15,8 @@ export function SceneScrubPreview({
 }: {
   sceneId: string;
   source: string;
+  /** Keyframe index and still endpoints; null leaves the still tier off. */
+  keyframes: { index: string; still: string } | null;
   time: number | null;
   start: number;
   end: number;
@@ -25,6 +28,8 @@ export function SceneScrubPreview({
   const controllerRef = useRef<ReturnType<
     typeof createPreparedScrubPreview
   > | null>(null);
+  const keyframeIndex = keyframes?.index ?? null;
+  const keyframeStill = keyframes?.still ?? null;
 
   useEffect(() => {
     const surface = surfaceRef.current;
@@ -33,6 +38,10 @@ export function SceneScrubPreview({
       surface,
       sceneId,
       source,
+      keyframes:
+        keyframeIndex && keyframeStill
+          ? { index: keyframeIndex, still: keyframeStill }
+          : null,
       start,
       end,
       offset,
@@ -44,13 +53,34 @@ export function SceneScrubPreview({
       controllerRef.current = null;
       controller.dispose();
     };
-  }, [sceneId, source, start, end, offset, onFailure, onReady]);
+  }, [
+    sceneId,
+    source,
+    keyframeIndex,
+    keyframeStill,
+    start,
+    end,
+    offset,
+    onFailure,
+    onReady,
+  ]);
   // The controller is replaced when its owner/source changes, even if the
   // pointer is still at the same timestamp; pass that timestamp to the new one.
   // biome-ignore lint/correctness/useExhaustiveDependencies: synchronize the replacement controller
   useEffect(() => {
     controllerRef.current?.preview(time);
-  }, [time, sceneId, source, start, end, offset, onFailure, onReady]);
+  }, [
+    time,
+    sceneId,
+    source,
+    keyframeIndex,
+    keyframeStill,
+    start,
+    end,
+    offset,
+    onFailure,
+    onReady,
+  ]);
 
   return (
     <div

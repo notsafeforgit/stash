@@ -43,6 +43,7 @@ import { bufferFeature } from "@videojs/core/dom";
 import { sceneBufferFeature } from "./scene-buffer-feature";
 import { SceneVideo } from "./scene-video";
 import { SceneScrubPreview } from "./scene-scrub-preview";
+import { ScrubTimingReadout } from "./scrub-timing-readout";
 import { PlatformMediaEffects } from "./platform-media-effects";
 import { objectTitle } from "@/core/files";
 import { cn } from "src/lib/utils";
@@ -687,6 +688,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     loadFailed,
     ready: sourceReady,
     scrubSource,
+    scrubKeyframes,
     scrubTime,
     scrubPreviewPending,
     handleScrubReady,
@@ -1098,6 +1100,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
                   key={`${playbackKey}:${file?.updated_at}`}
                   sceneId={scene.id}
                   source={scrubSource}
+                  keyframes={scrubKeyframes}
                   time={scrubTime}
                   start={clipRange?.start ?? 0}
                   end={clipRange?.end ?? fileDuration}
@@ -1227,6 +1230,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
                 {temporaryPlaybackRate}×
               </Badge>
             )}
+            <ScrubTimingReadout />
           </Container>
           {castingAllowed && !finalSrc?.startsWith("blob:") && <GoogleCast />}
         </Player.Player>

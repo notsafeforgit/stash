@@ -24,6 +24,15 @@ ffmpeg -i audio.mp4 -an -vf setpts=PTS-STARTPTS -r 30 -fps_mode cfr -c:v libx264
   -hls_segment_filename scrub/segment-%d.m4s scrub/stream.m3u8
 ```
 
+`keyframe.jpg` is the first frame of `audio.mp4`. `serveSceneMedia` returns it
+for every keyframe still request, with the two-second keyframe time in
+`X-Keyframe-Time`, and serves a matching keyframe index. Pass
+`keyframes: false` to answer both endpoints with 404, as an older server would:
+
+```sh
+ffmpeg -i audio.mp4 -frames:v 1 -q:v 8 keyframe.jpg
+```
+
 `loop-bframes.mp4` is a three-second moving pattern with reordered AVC frames.
 It reproduces a native-loop first-frame stall in WebKit. Loop tests wait for
 natural EOF and advancing frames on repeated returns, including when the actual

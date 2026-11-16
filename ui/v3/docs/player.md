@@ -33,6 +33,8 @@ next adapter upgrade instead of losing the engine's Safari seek fixes.
 | [scene-player-source-url.ts](../src/components/player/scene-player-source-url.ts) | Stream URLs, clip bounds, fragments, reload nonce |
 | [hls.ts](../src/components/player/hls.ts) | HLS timeline policy and engine helpers |
 | [buffered-seek-preview.ts](../src/components/player/buffered-seek-preview.ts) | Coalesced, buffered frame previews during a scrub drag |
+| [prepared-scrub-preview.ts](../src/components/player/prepared-scrub-preview.ts), [scrub-keyframes.ts](../src/components/player/scrub-keyframes.ts), [scrub-stream.ts](../src/components/player/scrub-stream.ts) | Remote scrub previews: keyframe stills, their index and cache, and the exact-frame preview stream |
+| [scrub-timings.ts](../src/components/player/scrub-timings.ts), [scrub-timing-readout.tsx](../src/components/player/scrub-timing-readout.tsx) | Per-tier scrub time-to-display measurements and the opt-in readout |
 | [use-player-transition-feedback.tsx](../src/components/player/use-player-transition-feedback.tsx) | Freeze frame, loading feedback, seek readiness |
 | [player-transcode-session.ts](../src/components/player/player-transcode-session.ts), [use-player-transcode-session.ts](../src/components/player/use-player-transcode-session.ts) | Own scoped HLS leases across playback and pause; TV retains nearby leases until window eviction or exit |
 | [prepare-player-source.ts](../src/components/player/prepare-player-source.ts) | Cancellable, bounded startup fetching for TV's nearby direct/HLS sources |
@@ -156,26 +158,61 @@ operations out of the planner so it remains testable without a media element.
 `PositionScrubber` separates its draft position from committed seeks. A drag
 temporarily pauses playback. Already-buffered frames use the main video, with
 eviction checks and coalesced seeks. Outside that buffer, authenticated library
-players use a separate silent 240p H.264 HLS preview at the source frame rate.
-It shares the normal timeline, touch precision zoom and media zoom surface;
-there is no thumbnail chooser. “Generate thumbnail from current” saves the
-committed main player's position as before.
+players use two further tiers: source keyframe stills for broad movement, then a
+separate silent 240p H.264 HLS preview at the source frame rate for the exact
+frame. Both share the normal timeline, touch precision zoom and media zoom
+surface; there is no thumbnail chooser. “Generate thumbnail from current” saves
+the committed main player's position as before.
 
-After 1.5 seconds of healthy main playback, the same silent decoder prepares
-coarse snapshots across the selected scene/marker, beginning near the playhead
-and then covering the midpoint, quarters, eighths, etc. Up to 64 samples give
-progressively finer coverage. Preparation skips fully buffered scenes, honors
+The keyframe tier uses `GET /scene/{id}/keyframes` (the primary file's keyframe
+times in scene time, with an opaque file `version`) and
+`GET /scene/{id}/keyframe?t=…&v=…`, a 240p JPEG of the greatest keyframe at or
+before `t` whose `X-Keyframe-Time` header names the frame returned.
+`scrubKeyframeURLs()` derives both from the same authenticated library HLS URL
+as `scrubStreamURL()`, keeping its authorization parameters and dropping session
+and clip bounds. Offline, share and blob players derive neither. A still costs
+roughly 50–150 ms of server work and 5–13 KB, against 500–800 ms before the
+preview stream's first frame.
+
+The index is optional and loaded once per scene file version: after the health
+gate below, or immediately on the first remote drag. A 404 or invalid response
+leaves the client requesting raw target times; a 503, error or 10-second
+timeout allows one retry. Lookups binary-search the greatest index time at or
+before the target, within the server's 10 ms tolerance. Requests repeat the
+index time and `v` exactly, so each keyframe has one canonical URL and the
+browser HTTP cache can reuse its immutable response on later visits. Without an
+index, responses are cached under the returned `X-Keyframe-Time`; a request for
+`t` returning keyframe `k` proves every target in `[k, t]` maps to that still.
+A still 404 turns the tier off for that preview; 503 backs off for its
+`Retry-After` (0.5–10 seconds); three consecutive errors or 5-second timeouts
+also turn it off. The preview stream is unaffected by any of these.
+
+After 1.5 seconds of healthy main playback, background preparation prefetches
+keyframe stills inside the selected scene/marker range: the playhead's
+keyframe, then the middle, quarters, eighths, etc. of the index (or the same
+breadth-first times, up to 64, without one), at most two requests at a time
+and 128 stills per preview. Background requests use low fetch priority.
+Preparation waits for the index request, skips fully buffered scenes, honors
 data-saving connections, and yields while the main video seeks or has less than
-eight seconds buffered ahead (unless paused or buffered through its end).
-Foreground scrubbing always takes priority. No separate chooser is involved.
+eight seconds buffered ahead (unless paused or buffered through its end);
+yielding also cancels its in-flight requests. Any drag, including one inside the
+main buffer, pauses it. It never starts the HLS preview session.
 
-Snapshots are JPEG blobs in a per-player memory cache, capped at 96 frames and
-4 MiB of compressed image data. Only the displayed still is decoded. Broad
-movement can show the nearest prepared sample immediately, while the silent
-video supplies the exact frame as the finger dwells. Fine decoded frames remain
-on screen during nearby adjustments; the still is not the saved cover. Release
-commits the selected timestamp to the main player before the existing thumbnail
-action can save its full-resolution frame.
+Stills are JPEG blobs in a per-player memory cache, capped at 256 stills and
+4 MiB of compressed image data; background coverage is evicted after foreground
+stills, and each evicted or cleared object URL is revoked. Only the displayed
+still is decoded. On each remote target, a cached still for its keyframe is
+shown immediately; otherwise the nearest cached still stands in while the
+keyframe is fetched. Foreground fetching is latest-wins: at most two foreground
+requests are in flight, a newer target replaces any target waiting for a slot,
+and a superseded response only populates the cache. Starting a drag cancels
+background requests it does not need. The silent video then supplies the exact
+frame as the finger dwells and replaces the still when decoded. Decoded frames
+remain on screen during nearby adjustments the preview stream has buffered;
+stills do not flash back over them. The still is `data-preview-kind="still"` for
+the freeze frame and is not the saved cover. Release commits the selected
+timestamp to the main player before the existing thumbnail action can save its
+full-resolution frame.
 
 Unbuffered fine seeks are throttled at 120 ms, with a fixed pending deadline;
 continuous movement cannot indefinitely postpone a request. The stream owns
@@ -190,20 +227,30 @@ media reattachment under the same preview lease. A second decoder failure or a
 fatal download error disables that preview; neither restarts the main player.
 HDR preview pixels are tone-mapped to SDR; the main stream's HDR mode is unchanged.
 Normal 240p encoding targets 1 Mbps, or 1.5 Mbps above 30 fps, while filling that
-window. It does not download a second copy of the entire video. Background
-sessions rotate after eight samples, releasing their encoded server segments
-while retaining the compressed snapshots; distant preparation cannot retain
-every sampled segment for the entire visit.
+window. It does not download a second copy of the entire video, and only a
+foreground gesture starts it.
 
-On release/cancel foreground fetching stops; healthy playback can resume remaining
-background samples. Idle MSE buffers and encoded segments expire after 30 seconds.
-Compressed snapshots survive decoder expiry, then expire after five minutes of
-paused inactivity. Navigation, suspension, unmount and backgrounding release
-both immediately; the server's idle reaper covers lost clients. Native HLS has no
-stop-loading API and releases after each background sample or gesture completion.
+On release/cancel foreground fetching stops, including in-flight still requests;
+healthy playback can resume remaining background stills. Idle MSE buffers and
+encoded segments expire after 30 seconds; an unhealthy or fully buffered main
+player releases an idle preview stream sooner. Compressed stills survive decoder
+expiry, then expire after five minutes of paused inactivity. Navigation,
+suspension, unmount and backgrounding release both immediately (the index is
+kept for the same file); the server's idle reaper covers lost clients. Native
+HLS has no stop-loading API and releases after each gesture completion.
 Offline/share players and unavailable preview endpoints retain buffered previews
 and ordinary final seeking. None of these previews becomes saved sprites or
 backup artwork.
+
+Each tier records its time to display in an in-memory ring of the latest 256
+measurements, exposed as `window.__stashScrubTimings` (`entries`, `summary()`
+with per-tier count/median/90th percentile, and `clear()`). Tiers are a cached
+keyframe still, a fetched keyframe still, the exact frame from the preview
+stream (from its target request until the decoded frame is shown) and a seek in
+the main player's buffer (until `seeked`). Nothing is sent anywhere. Setting
+`localStorage["stash.scrubDebug"] = "1"` adds a passive on-screen readout of the
+summary to players mounted afterwards; otherwise it neither subscribes nor
+renders. Use it to compare tiers on a physical phone.
 
 Classic MSE main-stream loading is suspended during the drag; Safari MMS and
 native HLS retain browser-owned loading. Release uses the normal seek policy
@@ -218,8 +265,8 @@ Touch scrubbing supports precision seeking in scene detail, both lightboxes and
 TV (including rotated controls). A 650 ms hold starts a preview without changing
 the timeline scale. Precision zoom requires a further 2-second stationary hold.
 When using the small preview stream, that hold starts only after its requested
-frame is decoded; streaming delays and cached coarse stills do not count toward
-it. Each further zoom requires another 2-second pause;
+frame is decoded; streaming delays and keyframe stills, cached or fetched, do
+not count toward it. Each further zoom requires another 2-second pause;
 the movement allowance tightens to 2 px at 4× and 1 px from 16× onward, so fine
 adjustments restart the dwell. Each new window anchors its dwell at the current
 finger position. Each dwell narrows the visible range

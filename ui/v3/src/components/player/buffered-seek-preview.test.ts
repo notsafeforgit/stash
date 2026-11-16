@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBufferedSeekPreview } from "./buffered-seek-preview";
+import { clearScrubTimings, scrubTimings } from "./scrub-timings";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
@@ -156,5 +157,28 @@ describe("buffered frame scrubbing", () => {
     f.preview.dispose();
     expect(f.seeks).toEqual([5]);
     expect(f.resume).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("main-buffer preview timings", () => {
+  beforeEach(() => clearScrubTimings());
+
+  it("measures each issued seek from its target request until the seek completes", () => {
+    const f = mediaFixture();
+    f.preview.preview(4);
+    vi.advanceTimersByTime(5);
+    f.preview.preview(6);
+    f.frame();
+    expect(f.seeks).toEqual([6]);
+    vi.advanceTimersByTime(30);
+    f.settle();
+    expect(scrubTimings()).toMatchObject([{ tier: "main-buffer", ms: 50 }]);
+    // A completion away from the issued target is not that target's frame.
+    f.preview.preview(8);
+    f.frame();
+    f.video.currentTime = 9;
+    f.settle();
+    expect(scrubTimings()).toHaveLength(1);
+    f.preview.dispose();
   });
 });

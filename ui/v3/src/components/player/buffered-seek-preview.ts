@@ -1,4 +1,5 @@
 import { isTimeBuffered, readTimeRanges } from "./buffered-ranges";
+import { recordScrubTiming } from "./scrub-timings";
 
 /** A drag previews decoded frames on the existing media element. Unbuffered
  * positions never trigger a seek, and newer positions replace queued work. */
@@ -10,6 +11,9 @@ export function createBufferedSeekPreview(onEnd?: () => void) {
     resumeBuffering: () => void;
   } | null = null;
   let pending: number | null = null;
+  /** When the pending target was requested, for time-to-display timings. */
+  let pendingAt = 0;
+  let issued: { target: number; at: number } | null = null;
   let frame: number | null = null;
 
   const schedule = () => {
@@ -26,20 +30,29 @@ export function createBufferedSeekPreview(onEnd?: () => void) {
       if (Math.abs(video.currentTime - target) < 0.001) return;
       try {
         video.currentTime = target;
+        issued = { target, at: pendingAt };
       } catch {
         // A source can become unavailable before the next frame. A preview
         // must never escalate to source recovery or start a transcode.
       }
     });
   };
+  const seeked = () => {
+    const video = session?.video;
+    if (issued && video && Math.abs(video.currentTime - issued.target) < 0.01)
+      recordScrubTiming("main-buffer", performance.now() - issued.at);
+    issued = null;
+    schedule();
+  };
 
   const take = () => {
     if (frame !== null) cancelAnimationFrame(frame);
     frame = null;
     pending = null;
+    issued = null;
     const previous = session;
     session = null;
-    previous?.video.removeEventListener("seeked", schedule);
+    previous?.video.removeEventListener("seeked", seeked);
     if (previous) onEnd?.();
     return previous;
   };
@@ -63,12 +76,14 @@ export function createBufferedSeekPreview(onEnd?: () => void) {
           resumeBuffering: suspendBuffering(),
         };
         video.pause();
-        video.addEventListener("seeked", schedule);
+        video.addEventListener("seeked", seeked);
       }
       // An independent scrub stream previews remote frames without moving or
       // refilling the high-resolution player. The same gesture owns pause,
       // cancellation and the single final committed seek in either mode.
-      pending = external ? null : mediaTime;
+      const next = external ? null : mediaTime;
+      if (next !== pending) pendingAt = performance.now();
+      pending = next;
       schedule();
     },
     /** An explicit play/pause command during the drag replaces its old intent. */

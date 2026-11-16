@@ -40,7 +40,7 @@ import { planSceneSeek, planSourceResume } from "./scene-player-transitions";
 import { getHlsEngine, flushAndRestartAt, suspendHlsBuffering } from "./hls";
 import { isTimeBuffered, readTimeRanges } from "./buffered-ranges";
 import { createBufferedSeekPreview } from "./buffered-seek-preview";
-import { scrubStreamURL } from "./scrub-stream";
+import { scrubKeyframeURLs, scrubStreamURL } from "./scrub-stream";
 import {
   computeInitialResume,
   filterSources,
@@ -134,6 +134,8 @@ interface UseScenePlayerSourcesArgs {
 
 interface UseScenePlayerSourcesResult {
   scrubSource: string | null;
+  /** Keyframe still endpoints, under the same access rule as `scrubSource`. */
+  scrubKeyframes: { index: string; still: string } | null;
   scrubTime: number | null;
   scrubPreviewPending: boolean;
   handleScrubReady: (time: number | null) => void;
@@ -221,6 +223,10 @@ export function useScenePlayerSources({
     suspended || failedScrubKey === playbackKey
       ? null
       : scrubStreamURL(scene.sceneStreams);
+  const scrubKeyframes = useMemo(
+    () => (scrubSource ? scrubKeyframeURLs(scene.sceneStreams) : null),
+    [scrubSource, scene.sceneStreams],
+  );
   const [loadFailed, setLoadFailed] = useState(false);
   const loadRetryAttemptedRef = useRef(false);
   // Presence of `clipRange` selects the trimmed-playlist code path
@@ -1112,6 +1118,7 @@ export function useScenePlayerSources({
 
   return {
     scrubSource,
+    scrubKeyframes,
     scrubTime,
     scrubPreviewPending:
       !!scrubSource && scrubTime !== null && scrubReadyTime !== scrubTime,

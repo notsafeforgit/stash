@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { createScrubStream, scrubStreamURL } from "./scrub-stream";
+import {
+  createScrubStream,
+  scrubKeyframeURLs,
+  scrubStreamURL,
+} from "./scrub-stream";
 
 const { instances } = vi.hoisted(() => ({
   instances: [] as {
@@ -101,6 +105,30 @@ it("requires a library HLS endpoint and preserves authorization without inheriti
   ).toBeNull();
 });
 
+it("derives keyframe endpoints from the same authenticated library stream only", () => {
+  const urls = scrubKeyframeURLs([
+    { url: "blob:https://stash.test/offline" },
+    {
+      url: "https://stash.test/base/scene/uuid/stream.master.m3u8?apikey=test-key&start=40&end=60&stream_session=main&v3_hls=1&resolution=ORIGINAL",
+    },
+  ])!;
+  const index = new URL(urls.index);
+  const still = new URL(urls.still);
+  expect(index.pathname).toBe("/base/scene/uuid/keyframes");
+  expect(still.pathname).toBe("/base/scene/uuid/keyframe");
+  expect([...index.searchParams]).toEqual([["apikey", "test-key"]]);
+  expect([...still.searchParams]).toEqual([["apikey", "test-key"]]);
+  for (const streams of [
+    [{ url: "blob:https://stash.test/offline" }],
+    [{ url: "https://stash.test/share/token/media/scene/stream.master.m3u8" }],
+    [{ url: "https://stash.test/share/token/scene/uuid/stream" }],
+    [{ url: "https://stash.test/scene/uuid/stream" }],
+    [{ url: "not a url" }],
+    [],
+  ])
+    expect(scrubKeyframeURLs(streams)).toBeNull();
+});
+
 it("does no work on a quick gesture and throttles unbuffered positions under an independent owner", () => {
   const f = fixture();
   f.preview(10);
@@ -168,10 +196,10 @@ it("starts requests during continuous motion without waiting for a quiet pointer
   expect(instances[0]!.startLoad).toHaveBeenLastCalledWith(60);
 });
 
-it("prepares silent frames without showing them and stops background loading after delivery", () => {
+it("stops loading once the requested frame is decoded and resumes for the next target", () => {
   const f = fixture();
-  f.prepare(40);
-  vi.advanceTimersByTime(0);
+  f.preview(40);
+  vi.advanceTimersByTime(120);
   Object.defineProperties(f.video, {
     readyState: { get: () => 4 },
     buffered: { get: () => ({ length: 1, start: () => 38, end: () => 50 }) },
@@ -179,7 +207,7 @@ it("prepares silent frames without showing them and stops background loading aft
   f.video.currentTime = 40;
   f.video.dispatchEvent(new Event("loadedmetadata"));
   f.video.dispatchEvent(new Event("loadeddata"));
-  expect(f.frames).toHaveBeenLastCalledWith(false, 40);
+  expect(f.frames).toHaveBeenLastCalledWith(true, 40);
   expect(instances[0]!.stopLoad).toHaveBeenCalled();
   f.preview(40.5);
   f.video.dispatchEvent(new Event("seeked"));
@@ -190,8 +218,8 @@ it("prepares silent frames without showing them and stops background loading aft
 
 it("leaves first-fragment positioning with hls.js until its append is complete", async () => {
   const f = fixture();
-  f.prepare(0.16);
-  vi.advanceTimersByTime(0);
+  f.preview(0.16);
+  vi.advanceTimersByTime(120);
   instances[0]!.hasEnoughToStart = false;
   Object.defineProperty(f.video, "readyState", { get: () => 3 });
   f.video.dispatchEvent(new Event("loadedmetadata"));
@@ -203,7 +231,7 @@ it("leaves first-fragment positioning with hls.js until its append is complete",
   f.video.currentTime = 0.16;
   instances[0]!.events.get("buffered")?.();
   await Promise.resolve();
-  expect(f.frames).toHaveBeenLastCalledWith(false, 0.16);
+  expect(f.frames).toHaveBeenLastCalledWith(true, 0.16);
   f.release();
   f.video.dispatchEvent(new Event("error"));
   expect(f.failure).not.toHaveBeenCalled();
@@ -211,8 +239,8 @@ it("leaves first-fragment positioning with hls.js until its append is complete",
 
 it("recovers one decoder failure under the same lease and stops after a repeated failure", () => {
   const f = fixture();
-  f.prepare(0.086);
-  vi.advanceTimersByTime(0);
+  f.preview(0.086);
+  vi.advanceTimersByTime(120);
   const engine = instances[0]!;
   f.video.dispatchEvent(new Event("error"));
   engine.events.get("error")?.("error", { fatal: true, type: "mediaError" });
@@ -233,8 +261,8 @@ it("recovers one decoder failure under the same lease and stops after a repeated
 
 it("cancels decoder recovery when the preview is released", () => {
   const f = fixture();
-  f.prepare(0.086);
-  vi.advanceTimersByTime(0);
+  f.preview(0.086);
+  vi.advanceTimersByTime(120);
   f.video.dispatchEvent(new Event("error"));
   f.release();
   vi.advanceTimersByTime(200);

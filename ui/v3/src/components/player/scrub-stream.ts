@@ -2,24 +2,19 @@ import { Hls } from "@videojs/hlsjs-video";
 import { isTimeBuffered, readTimeRanges } from "./buffered-ranges";
 import { PlayerTranscodeSession } from "./player-transcode-session";
 
-/** Only authenticated library sources expose this endpoint. Do not manufacture
- * library access from an offline blob or a guest/share media URL. */
-export function scrubStreamURL(
-  streams: readonly { url: string }[],
-): string | null {
+/** The silent preview and keyframe stills share one access rule: only an
+ * authenticated library HLS playback URL can derive them. Do not manufacture
+ * library access from an offline blob or a guest/share media URL. Auth query
+ * parameters survive; the main player's session and clip bounds do not. */
+function libraryStreamURL(streams: readonly { url: string }[]): URL | null {
   for (const stream of streams) {
     try {
       const url = new URL(stream.url);
       if (!/\/scene\/[^/]+\/stream(?:\.[\w.]+)?$/.test(url.pathname)) continue;
       if (!url.pathname.endsWith(".master.m3u8")) continue;
-      url.pathname = url.pathname.replace(
-        /\/stream[^/]+$/,
-        "/stream.scrub.master.m3u8",
-      );
       for (const key of ["start", "end", "stream_session", "v3_hls"])
         url.searchParams.delete(key);
-      url.searchParams.set("resolution", "LOW");
-      return url.toString();
+      return url;
     } catch {
       /* Not a server playback URL. */
     }
@@ -27,9 +22,41 @@ export function scrubStreamURL(
   return null;
 }
 
+export function scrubStreamURL(
+  streams: readonly { url: string }[],
+): string | null {
+  const url = libraryStreamURL(streams);
+  if (!url) return null;
+  url.pathname = url.pathname.replace(
+    /\/stream[^/]+$/,
+    "/stream.scrub.master.m3u8",
+  );
+  url.searchParams.set("resolution", "LOW");
+  return url.toString();
+}
+
+/** `/scene/{id}/keyframes` (index) and `/scene/{id}/keyframe` (still). Null
+ * leaves the keyframe tier off and the existing preview behaviour unchanged. */
+export function scrubKeyframeURLs(
+  streams: readonly { url: string }[],
+): { index: string; still: string } | null {
+  const url = libraryStreamURL(streams);
+  if (!url) return null;
+  // Stills use the scrub stream's fixed size; no rendition is selected.
+  url.searchParams.delete("resolution");
+  const endpoint = (name: string) => {
+    const result = new URL(url);
+    result.pathname = url.pathname.replace(/\/stream[^/]+$/, `/${name}`);
+    return result.toString();
+  };
+  return { index: endpoint("keyframes"), still: endpoint("keyframe") };
+}
+
 /** Buffered seeks reuse decoded low-resolution media. Unbuffered targets are
  * throttled, not debounced: continuous dragging must still request frames.
- * This video never joins the main Video.js store or browser media session. */
+ * Only a foreground gesture starts this session; background coverage uses
+ * keyframe stills. This video never joins the main Video.js store or browser
+ * media session. */
 export function createScrubStream(
   video: HTMLVideoElement,
   sceneId: string,
@@ -49,7 +76,6 @@ export function createScrubStream(
   let native = false;
   let disposed = false;
   let failed = false;
-  let foreground = false;
 
   const release = () => {
     clearTimeout(seekTimer);
@@ -123,9 +149,9 @@ export function createScrubStream(
     if (Math.abs(video.currentTime - target) < 0.05) {
       video.dataset.scrubTime = String(video.currentTime);
       // A paused preview must not continue filling after it has its frame.
-      // The next foreground target or background sample explicitly resumes it.
+      // The next target explicitly resumes it.
       engine?.stopLoad();
-      onFrame(foreground, video.currentTime);
+      onFrame(true, video.currentTime);
     } else seek();
   };
   const metadata = () => {
@@ -161,7 +187,7 @@ export function createScrubStream(
         });
         engine.on(Hls.Events.FRAG_BUFFERED, () => {
           // Finish the engine's append/position callbacks before we stop its
-          // loader or the coordinator requests the next background sample.
+          // loader or the coordinator requests the next target.
           queueMicrotask(showFrame);
         });
         engine.on(Hls.Events.ERROR, (_event, data) => {
@@ -181,7 +207,7 @@ export function createScrubStream(
       }
     } else {
       engine?.startLoad(target);
-      // Supersede a slow background seek when the user requests another area.
+      // Supersede a slow earlier seek when the user requests another area.
       // Waiting for its seeked event could otherwise starve the new target.
       seek(true);
     }
@@ -195,9 +221,8 @@ export function createScrubStream(
   video.addEventListener("error", mediaError);
   document.addEventListener("visibilitychange", hidden);
 
-  const update = (time: number | null, active: boolean) => {
+  const update = (time: number | null) => {
     target = time;
-    foreground = active;
     clearTimeout(idleTimer);
     if (time === null) {
       clearTimeout(seekTimer);
@@ -214,16 +239,13 @@ export function createScrubStream(
     } else if (seekTimer === undefined) {
       // Keep the existing deadline as the finger moves. The callback reads
       // the newest target instead of waiting indefinitely for a quiet pointer.
-      seekTimer = setTimeout(start, active ? 120 : 0);
+      seekTimer = setTimeout(start, 120);
     }
   };
 
   return {
     preview(time: number | null) {
-      update(time, time !== null);
-    },
-    prepare(time: number) {
-      update(time, false);
+      update(time);
     },
     release() {
       target = null;

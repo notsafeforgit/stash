@@ -16,7 +16,7 @@ it("covers the entire selected interval progressively with a bounded sample coun
   expect(scrubPreparationTimes(5, 5)).toEqual([]);
 });
 
-it("bounds compressed bytes and evicts fine samples before broad coverage", () => {
+it("bounds compressed bytes and evicts fine stills before broad coverage", () => {
   let id = 0;
   vi.spyOn(URL, "createObjectURL").mockImplementation(() => `blob:${++id}`);
   const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
@@ -30,14 +30,16 @@ it("bounds compressed bytes and evicts fine samples before broad coverage", () =
   expect(cache.has(11)).toBe(false);
   expect(cache.nearest(28, 3)?.time).toBe(30);
   expect(cache.nearest(20, 3)).toBeUndefined();
-  cache.add(30.01, blob, false);
+  // Millisecond-rounded keyframe times identify the same still.
+  expect(cache.add(30.001, blob, false)?.url).toBe("blob:3");
+  expect(cache.size).toBe(2);
   cache.add(40, new Blob(["12345678901"]), true);
   expect(cache.size).toBe(2);
   cache.clear();
   expect(revoke.mock.calls.flat()).toEqual(["blob:2", "blob:1", "blob:3"]);
 });
 
-it("also limits tiny frames by count and releases every object URL", () => {
+it("also limits tiny stills by count and releases every object URL", () => {
   let id = 0;
   vi.spyOn(URL, "createObjectURL").mockImplementation(() => `blob:${++id}`);
   const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
@@ -46,4 +48,31 @@ it("also limits tiny frames by count and releases every object URL", () => {
   expect(cache.size).toBe(3);
   cache.clear();
   expect(revoke).toHaveBeenCalledTimes(10);
+});
+
+it("defaults to about 256 ten-kilobyte stills within 4 MiB", () => {
+  vi.spyOn(URL, "createObjectURL").mockImplementation(() => "blob:still");
+  vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+  const cache = new ScrubFrameCache();
+  const still = new Blob([new Uint8Array(10 * 1024)]);
+  for (let time = 0; time < 300; time++) cache.add(time * 2, still, true);
+  expect(cache.size).toBe(256);
+  const bytes = new ScrubFrameCache();
+  const large = new Blob([new Uint8Array(64 * 1024)]);
+  for (let time = 0; time < 100; time++) bytes.add(time, large, true);
+  expect(bytes.size).toBe(64);
+});
+
+it("resolves raw targets through the keyframe interval each response proved", () => {
+  vi.spyOn(URL, "createObjectURL").mockImplementation(() => "blob:still");
+  const cache = new ScrubFrameCache();
+  // A request for 9.4 returned keyframe 8; a later request for 9.9 did too.
+  cache.add(8, new Blob(["x"]), false, 9.4);
+  expect(cache.covering(8)?.time).toBe(8);
+  expect(cache.covering(9.4)?.time).toBe(8);
+  expect(cache.covering(9.9)).toBeUndefined();
+  expect(cache.covering(7.9)).toBeUndefined();
+  cache.add(8, new Blob(["x"]), true, 9.9);
+  expect(cache.size).toBe(1);
+  expect(cache.covering(9.9)?.time).toBe(8);
 });

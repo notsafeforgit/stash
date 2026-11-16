@@ -60,7 +60,17 @@ for (const tv of [false, true]) {
         })
         .toBe(true);
       await expect(scrubber).toHaveAttribute("aria-busy", "true");
+      // A keyframe still covers the wait, but it is not the requested frame.
+      await expect
+        .poll(async () => {
+          await page.clock.runFor(50);
+          return player
+            .locator("[data-scrub-surface]")
+            .getAttribute("data-preview-kind");
+        })
+        .toBe("still");
       await page.clock.runFor(10_000);
+      await expect(scrubber).toHaveAttribute("aria-busy", "true");
       await expect(scrubber).not.toHaveAttribute("data-precision");
       release();
       await expect

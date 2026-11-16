@@ -279,10 +279,22 @@ export function MediaLightbox({
   );
   const handleNoFile = useCallback(
     (slide: SceneSlide) => {
-      if (expectedAutoArrivalRef.current !== slide) return;
-      advanceFrom(slide, true);
+      // The carousel settles on a slide when its track animation finishes,
+      // which can precede YARL clearing that navigation from its state. The
+      // player reports a fileless scene only once, so wait for YARL to finish
+      // arriving instead of letting advanceFrom drop the skip.
+      const skip = () => {
+        if (expectedAutoArrivalRef.current !== slide) return;
+        const state = controllerRef.current?.getLightboxState();
+        if (state?.currentSlide === slide && state.animation?.increment) {
+          requestAnimationFrame(skip);
+          return;
+        }
+        advanceFrom(slide, true);
+      };
+      skip();
     },
-    [advanceFrom],
+    [advanceFrom, controllerRef],
   );
 
   // Per-gesture wheel lockout — pin one trackpad swipe to one slide

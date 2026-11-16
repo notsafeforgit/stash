@@ -26,7 +26,7 @@ ARG STASH_VERSION
 RUN BUILD_DATE=$(date +"%Y-%m-%d %H:%M:%S") make ui-only
 
 # Build Backend
-FROM golang:1.27.1-alpine3.24 AS backend
+FROM golang:1.27.4-alpine3.24 AS backend
 RUN apk add --no-cache make alpine-sdk
 WORKDIR /stash
 COPY ./go* ./*.go Makefile gqlgen.yml .gqlgenc.yml /stash/

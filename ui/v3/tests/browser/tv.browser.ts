@@ -644,8 +644,13 @@ test("double-tap zoom owns the gesture without changing playback", async ({
     "paused",
     false,
   );
-  await surface.tap({ position: { x: 150, y: 250 } });
-  await surface.tap({ position: { x: 150, y: 250 } });
+  // Two raw touches, as a finger double-taps. `locator.tap()` first waits for
+  // actionability, which on a loaded CI runner took over 200 ms per tap and
+  // pushed the pair past the double-tap window.
+  const box = await surface.boundingBox();
+  if (!box) throw new Error("Missing TV play surface");
+  await page.touchscreen.tap(box.x + 150, box.y + 250);
+  await page.touchscreen.tap(box.x + 150, box.y + 250);
   await expect(
     page.getByRole("button", { name: "Reset zoom", exact: true }),
   ).toBeVisible();

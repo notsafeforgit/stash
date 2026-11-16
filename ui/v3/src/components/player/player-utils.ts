@@ -142,6 +142,35 @@ function videoCodecMp4Spec(codec: string | null | undefined): string | null {
   }
 }
 
+/** The `<video>` type that names a file's video codec, for the native
+ * decoder the direct stream plays through. */
+function directVideoType(codec: string | null | undefined): string | null {
+  switch (codec) {
+    case "vp9":
+    case "vp8":
+      return `video/webm; codecs="${codec}"`;
+    default: {
+      const spec = videoCodecMp4Spec(codec);
+      return spec ? `video/mp4; codecs="${spec}"` : null;
+    }
+  }
+}
+
+/**
+ * Whether the direct stream's video can be decoded natively. A browser that
+ * cannot decode the video track of a file whose audio it can decode plays the
+ * audio alone, without a media error (Chrome and Firefox on Linux with HEVC,
+ * for example). Only a definite `""` from `canPlayType` excludes the direct
+ * stream; unknown codecs keep it, and the load-time check in
+ * `use-scene-player-sources.tsx` still recovers if no picture decodes.
+ */
+export function canDecodeDirectVideo(
+  videoCodec: string | null | undefined,
+): boolean {
+  const type = directVideoType(videoCodec);
+  return !type || _probeVideo.canPlayType(type) !== "";
+}
+
 function audioCodecMp4Spec(codec: string | null | undefined): string | null {
   switch (codec) {
     case "aac":

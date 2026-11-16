@@ -4,7 +4,10 @@ import type { TvFeedItem } from "@/core/tv/feed-state";
 import type { TvSettings } from "@/core/tv/settings";
 import { tvPlaybackPlan } from "@/core/tv/playback-policy";
 import { PlayerTranscodeSession } from "@/components/player/player-transcode-session";
-import { probeCodecsDecodableInMp4 } from "@/components/player/player-utils";
+import {
+  canDecodeDirectVideo,
+  probeCodecsDecodableInMp4,
+} from "@/components/player/player-utils";
 import {
   filterSources,
   selectScenePlayerSource,
@@ -121,7 +124,13 @@ export class TvPreparedItem {
     ]);
     signal.throwIfAborted();
     const source = selectScenePlayerSource(
-      filterSources(scene.sceneStreams, canDecode, canDecodeVideo),
+      filterSources(
+        scene.sceneStreams,
+        canDecode,
+        canDecodeVideo,
+        undefined,
+        canDecodeDirectVideo(file?.video_codec),
+      ),
       this.settings.defaultQuality,
       { width: file?.width, height: file?.height },
     );

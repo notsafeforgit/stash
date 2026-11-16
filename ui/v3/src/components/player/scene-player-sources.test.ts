@@ -110,3 +110,20 @@ it("offers HDR only to capable displays and prefers it within the resolution cei
     )?.src,
   ).toBe(original.src);
 });
+
+it("plays the transcode instead of a direct stream whose video cannot decode", () => {
+  const raw = [direct, original, low].map((s) => ({ url: s.src }));
+  const best = { kind: "best" } as const;
+  expect(
+    selectScenePlayerSource(filterSources(raw, false, false), best, dimensions)
+      ?.src,
+  ).toBe(direct.src);
+  const undecodable = filterSources(raw, false, false, false, false);
+  expect(undecodable.map((source) => source.src)).toEqual([
+    original.src,
+    low.src,
+  ]);
+  expect(selectScenePlayerSource(undecodable, best, dimensions)?.src).toBe(
+    original.src,
+  );
+});

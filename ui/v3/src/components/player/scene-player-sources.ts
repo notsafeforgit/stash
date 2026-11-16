@@ -15,6 +15,7 @@ export {
  */
 
 import { isHlsPlaylist } from "./hls";
+import { isDirectStreamSrc } from "./scene-player-source-url";
 import {
   canPlayHDRHls,
   canPlaySource,
@@ -49,6 +50,9 @@ export function filterSources(
   canDecode: boolean,
   canDecodeVideo: boolean,
   canDecodeHDR: boolean = canPlayHDRHls(),
+  /** From `canDecodeDirectVideo`: false drops the direct stream, whose
+   *  undecodable video would otherwise play as audio alone. */
+  canDecodeDirect = true,
 ): PlayerSource[] {
   return streams
     .filter((s) => {
@@ -105,6 +109,7 @@ export function filterSources(
         }
         return true;
       }
+      if (!canDecodeDirect && isDirectStreamSrc(source.src)) return false;
       return canPlaySource(source);
     });
 }

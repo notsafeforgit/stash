@@ -35,6 +35,15 @@ ffmpeg -i audio.mp4 -an -vf setpts=PTS-STARTPTS -r 30 -fps_mode cfr -c:v libx264
   -hls_segment_filename scrub/segment-%d.m4s scrub/stream.m3u8
 ```
 
+`hevc.mp4` is `audio.mp4` with its video re-encoded to HEVC (`hvc1`), for the
+codec fallback test; Playwright's Chromium cannot decode it:
+
+```sh
+ffmpeg -i audio.mp4 -c:v libx265 -tag:v hvc1 \
+  -x265-params keyint=60:min-keyint=60:bframes=0:scenecut=0 \
+  -pix_fmt yuv420p -c:a copy -movflags +faststart hevc.mp4
+```
+
 `keyframe.jpg` is the first frame of `audio.mp4`. `serveSceneMedia` returns it
 for every keyframe still request, with the two-second keyframe time in
 `X-Keyframe-Time`, concatenates one copy per slot for batch requests (with

@@ -470,8 +470,19 @@ Run the relevant media tests when changing this pipeline, and verify physical
 iOS playback separately from Linux Chromium/WebKit fixtures.
 
 
+A file with video never plays as audio alone. When `canPlayType` rules out the
+file's video codec, the direct stream is not offered and the player starts on the
+H.264/AAC HLS transcode. Chrome and Firefox without an HEVC decoder are the
+common case: they would otherwise play the direct stream's audio with no picture
+and no media error. A browser can also over-report a codec. If a direct source
+then reaches its metadata with no video dimensions, the player treats it as a
+decoding failure.
+
 Native decoding or unsupported-format errors on a direct source fall back to the
 available H.264/AAC HLS source. This uses the normal source transition, preserves
 position and playback intent, and leaves the saved quality preference unchanged.
 The fallback also stays within the active TV or ordinary-player resolution ceiling.
 Network errors and revoked share requests do not trigger this codec fallback.
+[player-codec-fallback.browser.ts](../tests/browser/player-codec-fallback.browser.ts)
+plays an HEVC fixture in Chromium, which has no HEVC decoder, with and without an
+over-reported `canPlayType`.

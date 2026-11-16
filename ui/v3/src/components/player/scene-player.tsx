@@ -58,6 +58,7 @@ import type * as GQL from "src/core/generated-graphql";
 import {
   useCodecsDecodableInMp4,
   useVideoCodecDecodableInMp4,
+  canDecodeDirectVideo,
 } from "./player-utils";
 import type { IMarker } from "./player-utils";
 import { PlayerControls, type ClipBoundsEdit } from "./player-controls";
@@ -484,6 +485,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     file?.audio_codec,
   );
   const canDecodeVideoSnapshot = useVideoCodecDecodableInMp4(file?.video_codec);
+  const canDecodeDirect = canDecodeDirectVideo(file?.video_codec);
   const [decodeSnapshot, setDecodeSnapshot] = useState({
     sceneId: scene.id,
     playbackKey,
@@ -718,6 +720,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     initialTimestamp,
     canDecode,
     canDecodeVideo,
+    canDecodeDirect,
     frameRate: file?.frame_rate ?? undefined,
     fileDuration,
     fileWidth: file?.width ?? undefined,

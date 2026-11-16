@@ -117,6 +117,7 @@ function Harness({ initialTimestamp, playbackRate }: HarnessProps) {
     initialTimestamp,
     canDecode: true,
     canDecodeVideo: true,
+    canDecodeDirect: true,
     frameRate: 30,
     fileDuration: 600,
     fileWidth: 1920,

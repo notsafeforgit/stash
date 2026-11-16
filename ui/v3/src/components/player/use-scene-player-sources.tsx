@@ -74,6 +74,9 @@ interface UseScenePlayerSourcesArgs {
   /** Video-only fMP4 decode capability (gates the video-copy +
    *  AAC-transcode remux variant — audio is always AAC). */
   canDecodeVideo: boolean;
+  /** Native decode of the file's video codec (`canDecodeDirectVideo`).
+   *  False drops the direct stream, which would play as audio alone. */
+  canDecodeDirect: boolean;
   /** Source video frame rate. Parameterises the HLS strategy's
    *  segment-boundary floor — at non-integer NTSC rates (59.94 fps)
    *  the actual segment duration drifts from the nominal 2 s, and
@@ -195,6 +198,7 @@ export function useScenePlayerSources({
   initialTimestamp,
   canDecode,
   canDecodeVideo,
+  canDecodeDirect,
   frameRate,
   fileDuration,
   fileWidth,
@@ -237,7 +241,13 @@ export function useScenePlayerSources({
   const [manualSource, setManualSource] = useState<PlayerSource | null>(null);
 
   const sources = useMemo(() => {
-    const all = filterSources(scene.sceneStreams, canDecode, canDecodeVideo);
+    const all = filterSources(
+      scene.sceneStreams,
+      canDecode,
+      canDecodeVideo,
+      undefined,
+      canDecodeDirect,
+    );
     if (!isClipped) return all;
     // Marker / clip mode + iOS Safari: drop the direct-stream source
     // from the candidate pool. iOS Safari's `webkitEnterFullscreen`
@@ -260,6 +270,7 @@ export function useScenePlayerSources({
     scene.sceneStreams,
     canDecode,
     canDecodeVideo,
+    canDecodeDirect,
     isClipped,
     nativeFullscreenAllowed,
   ]);
@@ -922,36 +933,42 @@ export function useScenePlayerSources({
     },
   });
 
+  /** Switch to the H.264 transcode after the current direct or HDR source
+   *  turned out not to decode. */
+  const fallBackToCompatibility = useCallback(() => {
+    if (
+      !finalSrc ||
+      !activeSrc ||
+      (!isDirectStreamSrc(activeSrc) &&
+        hlsStreamTypeName(activeSrc) !== "hls-hevc") ||
+      currentLoadRef.current !== load
+    )
+      return;
+    const fallback = getCompatibilitySource(sources, qualityPreference, {
+      width: fileWidth,
+      height: fileHeight,
+    });
+    if (fallback) handleSourceChange(fallback, true);
+  }, [
+    finalSrc,
+    activeSrc,
+    load,
+    sources,
+    qualityPreference,
+    fileWidth,
+    fileHeight,
+    handleSourceChange,
+  ]);
+
   const handleMediaError = useCallback(
     (event: SyntheticEvent<HTMLVideoElement>) => {
-      if (
-        !finalSrc ||
-        !activeSrc ||
-        (!isDirectStreamSrc(activeSrc) &&
-          hlsStreamTypeName(activeSrc) !== "hls-hevc") ||
-        currentLoadRef.current !== load
-      )
-        return;
       const code = event.currentTarget.error?.code;
       // Native codec/container support can be over-reported. Recover only
       // decoding/format failures, not network errors or expired share access.
       if (code !== 3 && code !== 4) return;
-      const fallback = getCompatibilitySource(sources, qualityPreference, {
-        width: fileWidth,
-        height: fileHeight,
-      });
-      if (fallback) handleSourceChange(fallback, true);
+      fallBackToCompatibility();
     },
-    [
-      finalSrc,
-      activeSrc,
-      load,
-      sources,
-      qualityPreference,
-      fileWidth,
-      fileHeight,
-      handleSourceChange,
-    ],
+    [fallBackToCompatibility],
   );
 
   // Pre-position the `<video>` synchronously inside `loadedmetadata`,
@@ -973,6 +990,18 @@ export function useScenePlayerSources({
   // and the subtraction is a no-op.
   const handleLoadedMetadata = useCallback(
     (e: SyntheticEvent<HTMLVideoElement>) => {
+      // A browser that over-reports a video codec plays the direct stream's
+      // audio alone, with no media error: metadata arrives without a picture.
+      // A file with video never plays that way; use the transcode instead.
+      if (
+        activeSrc &&
+        isDirectStreamSrc(activeSrc) &&
+        (fileWidth ?? 0) > 0 &&
+        e.currentTarget.videoWidth === 0
+      ) {
+        fallBackToCompatibility();
+        return;
+      }
       e.currentTarget.playbackRate = playbackRateRef.current;
       const pending = pendingResumeRef.current;
       if (!pending || pending.seekTo == null || pending.seekTo <= 0) return;
@@ -986,7 +1015,14 @@ export function useScenePlayerSources({
         /* ignore — not seekable yet, canPlay path will retry */
       }
     },
-    [fileDuration, offsetStart, playbackRateRef],
+    [
+      activeSrc,
+      fileWidth,
+      fallBackToCompatibility,
+      fileDuration,
+      offsetStart,
+      playbackRateRef,
+    ],
   );
 
   const handleCanPlay = useCallback(async () => {

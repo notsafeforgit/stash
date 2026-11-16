@@ -14,7 +14,10 @@ export function SceneDetailFixture() {
   const scene = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const hls = params.has("hls") || params.has("hdr");
-    const landscape = hls || params.has("landscape");
+    // An HEVC file with a direct stream and an H.264 transcode; Playwright's
+    // Chromium cannot decode HEVC.
+    const hevc = params.has("hevc");
+    const landscape = hls || hevc || params.has("landscape");
     const scene = offlineEntryToSceneData(
       {
         scene_id: "detail",
@@ -28,8 +31,8 @@ export function SceneDetailFixture() {
         height: landscape ? 90 : 160,
         date: null,
         paths: { screenshot: null, preview: null, sprite: null, vtt: null },
-        format: "h264",
-        source_video_codec: "h264",
+        format: hevc ? "hevc" : "h264",
+        source_video_codec: hevc ? "hevc" : "h264",
         source_audio_codec: hls ? "" : "aac",
         resolution: "ORIGINAL",
         width_actual: landscape ? 160 : 90,
@@ -44,6 +47,22 @@ export function SceneDetailFixture() {
     );
     if (hls) {
       scene.sceneStreams = [
+        {
+          __typename: "SceneStreamEndpoint" as const,
+          url: new URL("/scene/detail/stream.master.m3u8", location.href).href,
+          mime_type: "application/vnd.apple.mpegurl",
+          label: "HLS",
+        },
+      ];
+    }
+    if (hevc) {
+      scene.sceneStreams = [
+        {
+          __typename: "SceneStreamEndpoint" as const,
+          url: new URL("/scene/detail/stream", location.href).href,
+          mime_type: "video/mp4",
+          label: "Direct stream",
+        },
         {
           __typename: "SceneStreamEndpoint" as const,
           url: new URL("/scene/detail/stream.master.m3u8", location.href).href,

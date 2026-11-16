@@ -76,6 +76,7 @@ for image publication and Quadlet restarts.
 make validate          # Parallel full gate; includes generation and validated UI build
 make it                # Go unit + integration tests only
 make pre-clients test-clients # Optional real-server tests of pinned external clients
+make test-media-image  # FFmpeg-backed Go tests inside the image's pinned Jellyfin FFmpeg
 make lint              # CI-pinned golangci-lint via go run
 make fmt               # Format Go source
 make validate-ui       # Biome, generation/types, formatting, locales, tests, native contracts

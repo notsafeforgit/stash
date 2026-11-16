@@ -2,10 +2,8 @@
 # One native image, including the hardware runtime formerly in stash-s6.
 FROM debian:trixie AS jellyfin-setup
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates gnupg
-COPY docker/runtime/jellyfin.sources /etc/apt/sources.list.d/jellyfin.sources
-RUN mkdir -p /etc/apt/keyrings \
-    && curl -fsSL --retry 3 https://repo.jellyfin.org/jellyfin_team.gpg.key -o /tmp/jellyfin.key \
-    && gpg --dearmor -o /etc/apt/keyrings/jellyfin.gpg /tmp/jellyfin.key
+COPY docker/runtime/jellyfin-ffmpeg.env docker/runtime/install-jellyfin-repo.sh /tmp/jellyfin/
+RUN sh /tmp/jellyfin/install-jellyfin-repo.sh debian trixie
 
 # Build patched HEIF/AVIF support against the runtime distribution.
 FROM debian:trixie AS heif
@@ -43,10 +41,12 @@ COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /uvx /usr/local/bin/
 COPY --from=jellyfin-setup /etc/apt/sources.list.d/jellyfin.sources /etc/apt/sources.list.d/jellyfin.sources
 COPY --from=jellyfin-setup /etc/apt/keyrings/jellyfin.gpg /etc/apt/keyrings/jellyfin.gpg
 COPY docker/native/install-intel-opencl.sh /tmp/install-intel-opencl.sh
-RUN sed -i 's/Components: main$/Components: main contrib non-free/' /etc/apt/sources.list.d/debian.sources \
+COPY docker/runtime/jellyfin-ffmpeg.env /tmp/jellyfin-ffmpeg.env
+RUN . /tmp/jellyfin-ffmpeg.env && rm /tmp/jellyfin-ffmpeg.env \
+    && sed -i 's/Components: main$/Components: main contrib non-free/' /etc/apt/sources.list.d/debian.sources \
     && apt-get update && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
-       ca-certificates curl jellyfin-ffmpeg8 libvips-tools libavif-bin libxml2 \
+       ca-certificates curl "jellyfin-ffmpeg8=${JELLYFIN_FFMPEG_VERSION}-trixie" libvips-tools libavif-bin libxml2 \
        libaom3 libdav1d7 libde265-0 libx265-215 libjpeg62-turbo libpng16-16t64 \
        locales nano translate-shell tzdata wget util-linux \
     && if [ "$(dpkg --print-architecture)" = amd64 ]; then \

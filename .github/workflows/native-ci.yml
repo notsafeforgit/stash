@@ -117,12 +117,8 @@ jobs:
           name: native-generated
       - name: Install media test runtime
         timeout-minutes: 15
-        run: |
-          # The Azure mirror repeatedly exhausted this step's download budget.
-          # Use the runner's existing Ubuntu archive/security fallback mirrors.
-          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y ffmpeg libavif-bin
+        # The image's pinned Jellyfin FFmpeg, not Ubuntu's distribution build.
+        run: sh scripts/install-media-test-runtime.sh
       - name: Go unit and integration tests
         run: |
           packages="$(python3 scripts/ci_go_packages.py other)"
@@ -164,11 +160,8 @@ jobs:
           cache-suffix: clients
           cache-dependency-glob: integration-clients.json
       - name: Install media fixture tools
-        run: |
-          # Match the backend job's Ubuntu mirror selection.
-          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y ffmpeg libavif-bin
+        timeout-minutes: 15
+        run: sh scripts/install-media-test-runtime.sh
       - run: make pre-clients test-clients
 
   binary:

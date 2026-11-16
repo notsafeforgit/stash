@@ -341,6 +341,12 @@ test:
 it:
 	go test -timeout $(GO_TEST_TIMEOUT) -tags "$(GO_BUILD_TAGS) integration" $(GO_TEST_FLAGS) $(GO_TEST_PACKAGES)
 
+# Runs the FFmpeg-backed Go tests inside the production image, with the FFmpeg
+# that ships (docker/runtime/jellyfin-ffmpeg.env) rather than the host's build.
+.PHONY: test-media-image
+test-media-image:
+	GO_BUILD_TAGS="$(GO_BUILD_TAGS)" sh scripts/test-media-image.sh $(MEDIA_TEST_IMAGE)
+
 .PHONY: list-test-packages
 list-test-packages:
 	@go list -tags "$(GO_BUILD_TAGS) integration" $(GO_TEST_PACKAGES)

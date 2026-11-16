@@ -51,9 +51,21 @@ distro plugins.
 
 The source-built libheif version is additional to the distro package metadata:
 use `heif-info --version` and `vips --version` to verify the loaded libraries.
-Build images with `--pull` to receive updates for FFmpeg, AV1/HEVC libraries,
-Python, and other distro packages. Update the source-build scripts explicitly
-when new libheif or libvips releases are required.
+Build images with `--pull` to receive updates for AV1/HEVC libraries, Python,
+and other distro packages. Update the source-build scripts explicitly when new
+libheif or libvips releases are required.
+
+FFmpeg is Jellyfin's build, pinned to one exact version in
+`docker/runtime/jellyfin-ffmpeg.env` together with the fingerprint of
+Jellyfin's repository signing key (`docker/runtime/install-jellyfin-repo.sh`
+refuses any other key). The image, the CI media tests
+(`scripts/install-media-test-runtime.sh` installs the same release on the
+Ubuntu runners) and `make test-media-image` all use that pin, so FFmpeg-backed
+tests exercise the FFmpeg that ships. `make test-media-image` builds the
+FFmpeg-dependent test packages on the host and runs them inside the image
+(`MEDIA_TEST_IMAGE`, default `ghcr.io/notsafeforgit/stash:develop`); run
+`make ui` first. Jellyfin's repository retains earlier releases, so a pinned
+version stays installable; bump it deliberately in that one file.
 Package installation also upgrades the base image's packages. Python package
 installation uses uv; the images no longer install or bootstrap distro pip.
 
@@ -69,10 +81,9 @@ every codec from upstream. The verified amd64 runtime versions are:
 
 | Runtime | FFmpeg | avifenc | Python |
 | --- | --- | --- | --- |
-| Stash / basic stash-s6, Alpine 3.24 | 8.1.2 | 1.4.1 | 3.14.7 |
-| stash-s6, Debian trixie | Jellyfin 8.1.2 | 1.2.1 | 3.14.7 |
-| stash-s6 with hardware support, Alpine 3.24 | Jellyfin 7.1.3 | 1.4.1 | 3.14.7 |
-| CUDA runtime packages, Ubuntu 24.04 | 6.1.1 (Ubuntu updates) | 1.0.4 | 3.12.3 |
+| Stash image (`docker/ghcr/Dockerfile`), Debian trixie | Jellyfin 8.1.3-2 (pinned) | 1.4.2 (source build) | 3.14.10 |
+| CI media tests, Ubuntu 24.04 runners | Jellyfin 8.1.3-2 (same pin) | Ubuntu package | runner default |
+| Optional local `make docker-cuda-build` image, Ubuntu 24.04 (not published) | 6.1.1 (Ubuntu updates) | 1.0.4 | 3.12.3 |
 
 ## shadcn practice
 

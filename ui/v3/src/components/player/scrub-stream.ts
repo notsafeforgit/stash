@@ -35,11 +35,12 @@ export function scrubStreamURL(
   return url.toString();
 }
 
-/** `/scene/{id}/keyframes` (index) and `/scene/{id}/keyframe` (still). Null
- * leaves the keyframe tier off and the existing preview behaviour unchanged. */
+/** `/scene/{id}/keyframes` (index), `/scene/{id}/keyframe` (one still) and
+ * `/scene/{id}/keyframes/stills` (a batch). Null leaves the keyframe tier off
+ * and the existing preview behaviour unchanged. */
 export function scrubKeyframeURLs(
   streams: readonly { url: string }[],
-): { index: string; still: string } | null {
+): { index: string; still: string; batch: string } | null {
   const url = libraryStreamURL(streams);
   if (!url) return null;
   // Stills use the scrub stream's fixed size; no rendition is selected.
@@ -49,7 +50,11 @@ export function scrubKeyframeURLs(
     result.pathname = url.pathname.replace(/\/stream[^/]+$/, `/${name}`);
     return result.toString();
   };
-  return { index: endpoint("keyframes"), still: endpoint("keyframe") };
+  return {
+    index: endpoint("keyframes"),
+    still: endpoint("keyframe"),
+    batch: endpoint("keyframes/stills"),
+  };
 }
 
 /** Buffered seeks reuse decoded low-resolution media. Unbuffered targets are

@@ -114,10 +114,12 @@ it("derives keyframe endpoints from the same authenticated library stream only",
   ])!;
   const index = new URL(urls.index);
   const still = new URL(urls.still);
+  const batch = new URL(urls.batch);
   expect(index.pathname).toBe("/base/scene/uuid/keyframes");
   expect(still.pathname).toBe("/base/scene/uuid/keyframe");
-  expect([...index.searchParams]).toEqual([["apikey", "test-key"]]);
-  expect([...still.searchParams]).toEqual([["apikey", "test-key"]]);
+  expect(batch.pathname).toBe("/base/scene/uuid/keyframes/stills");
+  for (const url of [index, still, batch])
+    expect([...url.searchParams]).toEqual([["apikey", "test-key"]]);
   for (const streams of [
     [{ url: "blob:https://stash.test/offline" }],
     [{ url: "https://stash.test/share/token/media/scene/stream.master.m3u8" }],

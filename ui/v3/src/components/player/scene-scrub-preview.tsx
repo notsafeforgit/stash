@@ -15,8 +15,8 @@ export function SceneScrubPreview({
 }: {
   sceneId: string;
   source: string;
-  /** Keyframe index and still endpoints; null leaves the still tier off. */
-  keyframes: { index: string; still: string } | null;
+  /** Keyframe index, still and batch endpoints; null leaves stills off. */
+  keyframes: { index: string; still: string; batch: string } | null;
   time: number | null;
   start: number;
   end: number;
@@ -30,6 +30,7 @@ export function SceneScrubPreview({
   > | null>(null);
   const keyframeIndex = keyframes?.index ?? null;
   const keyframeStill = keyframes?.still ?? null;
+  const keyframeBatch = keyframes?.batch ?? null;
 
   useEffect(() => {
     const surface = surfaceRef.current;
@@ -39,8 +40,8 @@ export function SceneScrubPreview({
       sceneId,
       source,
       keyframes:
-        keyframeIndex && keyframeStill
-          ? { index: keyframeIndex, still: keyframeStill }
+        keyframeIndex && keyframeStill && keyframeBatch
+          ? { index: keyframeIndex, still: keyframeStill, batch: keyframeBatch }
           : null,
       start,
       end,
@@ -58,6 +59,7 @@ export function SceneScrubPreview({
     source,
     keyframeIndex,
     keyframeStill,
+    keyframeBatch,
     start,
     end,
     offset,
@@ -75,6 +77,7 @@ export function SceneScrubPreview({
     source,
     keyframeIndex,
     keyframeStill,
+    keyframeBatch,
     start,
     end,
     offset,

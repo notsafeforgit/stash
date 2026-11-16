@@ -165,14 +165,19 @@ surface; there is no thumbnail chooser. “Generate thumbnail from current” sa
 the committed main player's position as before.
 
 The keyframe tier uses `GET /scene/{id}/keyframes` (the primary file's keyframe
-times in scene time, with an opaque file `version`) and
+times in scene time, with an opaque file `version`),
 `GET /scene/{id}/keyframe?t=…&v=…`, a 240p JPEG of the greatest keyframe at or
-before `t` whose `X-Keyframe-Time` header names the frame returned.
-`scrubKeyframeURLs()` derives both from the same authenticated library HLS URL
-as `scrubStreamURL()`, keeping its authorization parameters and dropping session
-and clip bounds. Offline, share and blob players derive neither. A still costs
-roughly 50–150 ms of server work and 5–13 KB, against 500–800 ms before the
-preview stream's first frame.
+before `t` whose `X-Keyframe-Time` header names the frame returned, and
+`GET /scene/{id}/keyframes/stills?v=…&t=t1,t2,…`, a batch of at most 16 exact
+index times. A batch body is the JPEGs concatenated in request order;
+`X-Keyframe-Times` and `X-Keyframe-Lengths` give each slot's frame time and
+byte length, with 0 for a failed slot. The client slices the body into one
+separate Blob per slot, never a sprite sheet, and checks that the lengths match
+the slot count and body size. `scrubKeyframeURLs()` derives all three from the
+same authenticated library HLS URL as `scrubStreamURL()`, keeping its
+authorization parameters and dropping session and clip bounds. Offline, share
+and blob players derive none. A still costs roughly 50–150 ms of server work
+and 5–13 KB, against 500–800 ms before the preview stream's first frame.
 
 The index is optional and loaded once per scene file version: after the health
 gate below, or immediately on the first remote drag. A 404 or invalid response
@@ -187,16 +192,31 @@ A still 404 turns the tier off for that preview; 503 backs off for its
 `Retry-After` (0.5–10 seconds); three consecutive errors or 5-second timeouts
 also turn it off. The preview stream is unaffected by any of these.
 
-After 1.5 seconds of healthy main playback, background preparation prefetches
-keyframe stills inside the selected scene/marker range: the playhead's
-keyframe, then the middle, quarters, eighths, etc. of the index (or the same
-breadth-first times, up to 64, without one), at most two requests at a time
-and 128 stills per preview. Background requests use low fetch priority.
-Preparation waits for the index request, skips fully buffered scenes, honors
-data-saving connections, and yields while the main video seeks or has less than
-eight seconds buffered ahead (unless paused or buffered through its end);
-yielding also cancels its in-flight requests. Any drag, including one inside the
-main buffer, pauses it. It never starts the HLS preview session.
+After 1.5 seconds of healthy main playback, background preparation requests
+batches, one at a time at low fetch priority, within a budget of 64 stills per
+scene. Batch composition is deterministic so the URLs stay canonical across
+visits: neither the playhead nor the marker range changes it. For an index of
+`n` keyframes, coverage level L has slots at positions `floor(k·n/(16·2^L))`
+for k in `[0, 16·2^L)`, without positions already in lower levels (or repeated
+within the level); batch b of a level is its slots `[16b, 16b + 16)`.
+Preparation walks levels 0, 1, 2… over the whole file and requests only batches
+with at least one slot inside the selected scene/marker range, stopping at the
+first batch that would exceed the budget. Files with at most 32 keyframes use
+their dense batches 0 and 1 instead. Batches whose stills are all cached are
+skipped; a saturated (503) batch is retried after its back-off, and one cancelled
+by yielding is requested again with the same URL. Preparation waits for the
+index request, skips fully buffered scenes, honors data-saving connections, and
+yields while the main video seeks or has less than eight seconds buffered ahead
+(unless paused or buffered through its end); yielding also cancels its
+in-flight requests. Any drag, including one inside the main buffer, pauses it.
+It never starts the HLS preview session.
+
+Without an index there are no batches: background preparation requests single
+stills for the playhead and the breadth-first `scrubPreparationTimes` (at most
+64 raw times), two at a time. A batch 404 likewise falls back to single
+canonical stills over the index, in the same breadth-first order within the
+64-still budget, and disables dense prefetch; three consecutive batch errors
+or 10-second timeouts do the same.
 
 Stills are JPEG blobs in a per-player memory cache, capped at 256 stills and
 4 MiB of compressed image data; background coverage is evicted after foreground
@@ -206,7 +226,19 @@ shown immediately; otherwise the nearest cached still stands in while the
 keyframe is fetched. Foreground fetching is latest-wins: at most two foreground
 requests are in flight, a newer target replaces any target waiting for a slot,
 and a superseded response only populates the cache. Starting a drag cancels
-background requests it does not need. The silent video then supplies the exact
+background requests and batches it does not need.
+
+Near the finger, dense batches cover consecutive index positions
+`[16m, 16m + 16)` at normal fetch priority. A foreground miss wants the dense
+batch containing the target's keyframe. A drag that slows to at most eight
+keyframes per second, or dwells for 250 ms, also wants it and its neighbour in
+the drag direction, so frame-level movement nearby is served from the cache. At
+most one dense batch is in flight; a newer finger position replaces those still
+waiting, and a fast pass over cached stills clears them. The single
+`keyframe?t=` request remains for the immediate miss. When a batch lands first
+it shows the target's still and cancels single requests it has answered.
+Release cancels dense batches with other foreground requests. The silent video
+then supplies the exact
 frame as the finger dwells and replaces the still when decoded. Decoded frames
 remain on screen during nearby adjustments the preview stream has buffered;
 stills do not flash back over them. The still is `data-preview-kind="still"` for

@@ -26,8 +26,10 @@ ffmpeg -i audio.mp4 -an -vf setpts=PTS-STARTPTS -r 30 -fps_mode cfr -c:v libx264
 
 `keyframe.jpg` is the first frame of `audio.mp4`. `serveSceneMedia` returns it
 for every keyframe still request, with the two-second keyframe time in
-`X-Keyframe-Time`, and serves a matching keyframe index. Pass
-`keyframes: false` to answer both endpoints with 404, as an older server would:
+`X-Keyframe-Time`, concatenates one copy per slot for batch requests (with
+`X-Keyframe-Times` and `X-Keyframe-Lengths`), and serves a matching keyframe
+index for the twelve-second media. Pass `keyframes: false` to answer all three
+endpoints with 404, as an older server would:
 
 ```sh
 ffmpeg -i audio.mp4 -frames:v 1 -q:v 8 keyframe.jpg

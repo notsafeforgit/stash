@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createPreparedScrubPreview } from "./prepared-scrub-preview";
+import { backgroundKeyframeBatches } from "./scrub-keyframes";
 import { clearScrubTimings, summarizeScrubTimings } from "./scrub-timings";
 
 const { streams } = vi.hoisted(() => ({
@@ -34,8 +35,13 @@ vi.mock("./scrub-stream", () => ({
 const KEYFRAMES = {
   index: "https://stash.test/scene/7/keyframes?apikey=key",
   still: "https://stash.test/scene/7/keyframe?apikey=key",
+  batch: "https://stash.test/scene/7/keyframes/stills?apikey=key",
 };
-const EVERY_TWO_SECONDS = Array.from({ length: 60 }, (_, index) => index * 2);
+const everyTwoSeconds = (count: number) =>
+  Array.from({ length: count }, (_, index) => index * 2);
+/** Level 0 and level 1 of the 60-keyframe fixture index, as scene times. */
+const LEVEL_0 = "0,6,14,22,30,36,44,52,60,66,74,82,90,96,104,112";
+const LEVEL_1 = "2,10,18,26,32,40,48,56,62,70,78,86,92,100,108,116";
 
 interface PendingFetch {
   url: URL;
@@ -48,14 +54,19 @@ let fetches: PendingFetch[] = [];
 const flush = async () => {
   for (let index = 0; index < 10; index++) await Promise.resolve();
 };
+const open = (entry: PendingFetch) => !entry.done && !entry.signal.aborted;
 const indexFetches = () =>
   fetches.filter((entry) => entry.url.pathname.endsWith("/keyframes"));
 const stillFetches = () =>
   fetches.filter((entry) => entry.url.pathname.endsWith("/keyframe"));
+const batchFetches = () =>
+  fetches.filter((entry) => entry.url.pathname.endsWith("/keyframes/stills"));
 const requestedTimes = () =>
   stillFetches().map((entry) => entry.url.searchParams.get("t"));
-const openStills = () =>
-  stillFetches().filter((entry) => !entry.done && !entry.signal.aborted);
+const batchTimes = () =>
+  batchFetches().map((entry) => entry.url.searchParams.get("t"));
+const openStills = () => stillFetches().filter(open);
+const openBatches = () => batchFetches().filter(open);
 const still = (time?: number): Partial<Response> => ({
   ok: true,
   status: 200,
@@ -65,7 +76,27 @@ const still = (time?: number): Partial<Response> => ({
   }),
   blob: async () => new Blob(["jpeg-bytes"], { type: "image/jpeg" }),
 });
-const keyframeIndex = (times = EVERY_TWO_SECONDS): Partial<Response> => ({
+/** A batch body with one four-byte still per slot; `failed` slots are empty. */
+const batch = (entry: PendingFetch, failed: number[] = []) => {
+  const times = entry.url.searchParams.get("t")!.split(",");
+  const lengths = times.map((_, slot): number =>
+    failed.includes(slot) ? 0 : 4,
+  );
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers({
+      "Content-Type": "image/jpeg",
+      "X-Keyframe-Times": times
+        .map((time, slot) => (failed.includes(slot) ? "" : time))
+        .join(","),
+      "X-Keyframe-Lengths": lengths.join(","),
+    }),
+    arrayBuffer: async () =>
+      new Uint8Array(lengths.reduce((sum, length) => sum + length, 0)).buffer,
+  } satisfies Partial<Response>;
+};
+const keyframeIndex = (times = everyTwoSeconds(60)): Partial<Response> => ({
   ok: true,
   status: 200,
   headers: new Headers({ "Content-Type": "application/json" }),
@@ -138,8 +169,12 @@ afterEach(() => {
 
 function fixture({
   keyframes = KEYFRAMES as typeof KEYFRAMES | null,
+  start = 0,
+  end = 120,
 }: {
   keyframes?: typeof KEYFRAMES | null;
+  start?: number;
+  end?: number;
 } = {}) {
   const root = document.createElement("div");
   root.dataset.scenePlayer = "";
@@ -162,8 +197,8 @@ function fixture({
     sceneId: "7",
     source: "https://stash.test/scene/7/stream.scrub.master.m3u8",
     keyframes,
-    start: 0,
-    end: 120,
+    start,
+    end,
     offset: 0,
     onFailure,
     onReady,
@@ -194,7 +229,7 @@ function fixture({
   };
 }
 
-it("waits for healthy playback, then loads the index once and prefetches canonical stills two at a time", async () => {
+it("waits for healthy playback, loads the index once and prefetches deterministic batches one at a time", async () => {
   const f = fixture();
   f.buffer(2);
   vi.advanceTimersByTime(3000);
@@ -206,38 +241,80 @@ it("waits for healthy playback, then loads the index once and prefetches canonic
   expect(indexFetches()).toHaveLength(1);
   expect(indexFetches()[0]!.url.searchParams.get("apikey")).toBe("key");
   // Background work waits for canonical index times.
-  expect(stillFetches()).toHaveLength(0);
+  expect(batchFetches()).toHaveLength(0);
   await respond(indexFetches()[0]!, keyframeIndex());
   expect(f.surface.dataset.keyframeIndex).toBe("ready");
-  // The playhead keyframe first, then the middle; never more than two.
-  expect(requestedTimes()).toEqual(["0", "60"]);
-  expect(stillFetches()[1]!.url.toString()).toBe(
-    "https://stash.test/scene/7/keyframe?apikey=key&t=60&v=file-1",
+  // Level 0 spans the whole file, whatever the playhead.
+  expect(batchFetches()[0]!.url.toString()).toBe(
+    `https://stash.test/scene/7/keyframes/stills?apikey=key&v=file-1&t=${LEVEL_0}`,
   );
-  expect(stillFetches()[1]!.priority).toBe("low");
-  await respond(stillFetches()[1]!, still(60));
-  expect(requestedTimes()).toEqual(["0", "60", "30"]);
-  await respond(stillFetches()[0]!, still(0));
-  await respond(stillFetches()[2]!, still(30));
-  expect(requestedTimes()).toEqual(["0", "60", "30", "90", "14"]);
-  expect(openStills()).toHaveLength(2);
-  expect(f.surface.dataset.previewFrames).toBe("3");
+  expect(batchFetches()[0]!.priority).toBe("low");
+  expect(stillFetches()).toHaveLength(0);
+  vi.advanceTimersByTime(1000);
+  expect(batchFetches()).toHaveLength(1);
+  // One separate still per slot; a failed (empty) slot is skipped.
+  await respond(batchFetches()[0]!, batch(batchFetches()[0]!, [3]));
+  expect(f.surface.dataset.previewFrames).toBe("15");
+  expect(URL.createObjectURL).toHaveBeenCalledTimes(15);
+  expect(batchTimes()).toEqual([LEVEL_0, LEVEL_1]);
+  expect(openBatches()).toHaveLength(1);
   // Prepared stills stay hidden, and no HLS session is started for them.
   expect(f.surface.style.opacity).not.toBe("1");
   expect(f.surface.dataset.previewReady).not.toBe("true");
   expect(streams).toHaveLength(0);
-  expect(indexFetches()).toHaveLength(1);
 
   // Yield immediately when the main player's headroom disappears.
   f.buffer(2);
   vi.advanceTimersByTime(500);
-  expect(openStills()).toHaveLength(0);
+  expect(openBatches()).toHaveLength(0);
   vi.advanceTimersByTime(5000);
-  expect(requestedTimes()).toHaveLength(5);
+  expect(batchFetches()).toHaveLength(2);
   expect(f.main.currentTime).toBe(0);
+  // The cancelled batch is requested again, with the same canonical URL.
   f.buffer(12);
   vi.advanceTimersByTime(2000);
-  expect(requestedTimes()).toEqual(["0", "60", "30", "90", "14", "44", "74"]);
+  expect(batchTimes()).toEqual([LEVEL_0, LEVEL_1, LEVEL_1]);
+  await respond(batchFetches()[2]!, batch(batchFetches()[2]!));
+  expect(f.surface.dataset.previewFrames).toBe("31");
+  expect(indexFetches()).toHaveLength(1);
+});
+
+it("stops background batches at 64 stills per scene", async () => {
+  const f = fixture({ end: 1200 });
+  await f.prepare(keyframeIndex(everyTwoSeconds(600)));
+  for (let request = 0; request < 4; request++) {
+    expect(openBatches()).toHaveLength(1);
+    const entry = openBatches()[0]!;
+    await respond(entry, batch(entry));
+  }
+  vi.advanceTimersByTime(10_000);
+  expect(batchFetches()).toHaveLength(4);
+  expect(f.surface.dataset.previewFrames).toBe("64");
+  expect(stillFetches()).toHaveLength(0);
+});
+
+it("requests only whole-file batches with a slot inside a marker range", async () => {
+  const f = fixture({ start: 40, end: 50 });
+  await f.prepare();
+  const expected = backgroundKeyframeBatches(60, 20, 24, 64);
+  for (const positions of expected) {
+    const entry = openBatches()[0]!;
+    expect(entry.url.searchParams.get("t")).toBe(
+      positions.map((position) => position * 2).join(","),
+    );
+    await respond(entry, batch(entry));
+  }
+  expect(batchFetches()).toHaveLength(expected.length);
+  expect(batchTimes()[0]).toBe(LEVEL_0);
+  for (const times of batchTimes())
+    expect(
+      times!
+        .split(",")
+        .map(Number)
+        .some((time) => time >= 40 && time <= 48),
+    ).toBe(true);
+  vi.advanceTimersByTime(5000);
+  expect(batchFetches()).toHaveLength(expected.length);
 });
 
 it("honours data saving, pauses during any drag and releases stills when hidden", async () => {
@@ -250,31 +327,30 @@ it("honours data saving, pauses during any drag and releases stills when hidden"
   expect(fetches).toHaveLength(0);
   Reflect.deleteProperty(navigator, "connection");
   await f.prepare();
-  await respond(stillFetches()[0]!, still(0));
-  await respond(stillFetches()[1]!, still(60));
-  expect(f.surface.dataset.previewFrames).toBe("2");
+  await respond(batchFetches()[0]!, batch(batchFetches()[0]!));
+  expect(f.surface.dataset.previewFrames).toBe("16");
   // A buffered main-player drag also takes priority over coverage.
   const scrubber = document.createElement("div");
   scrubber.dataset.positionScrubber = "";
   scrubber.dataset.dragging = "true";
   f.root.append(scrubber);
   vi.advanceTimersByTime(500);
-  expect(openStills()).toHaveLength(0);
-  const requested = stillFetches().length;
+  expect(openBatches()).toHaveLength(0);
+  const requested = batchFetches().length;
   vi.advanceTimersByTime(5000);
-  expect(stillFetches()).toHaveLength(requested);
+  expect(batchFetches()).toHaveLength(requested);
   scrubber.remove();
   vi.advanceTimersByTime(2000);
-  expect(openStills()).toHaveLength(2);
+  expect(openBatches()).toHaveLength(1);
 
   vi.spyOn(document, "hidden", "get").mockReturnValue(true);
   document.dispatchEvent(new Event("visibilitychange"));
-  expect(openStills()).toHaveLength(0);
+  expect(openBatches()).toHaveLength(0);
   expect(f.surface.dataset.previewFrames).toBe("0");
-  expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
-  const afterHidden = stillFetches().length;
+  expect(URL.revokeObjectURL).toHaveBeenCalledTimes(16);
+  const afterHidden = batchFetches().length;
   vi.advanceTimersByTime(3000);
-  expect(stillFetches()).toHaveLength(afterHidden);
+  expect(batchFetches()).toHaveLength(afterHidden);
   // The index is retained for the same file version.
   expect(indexFetches()).toHaveLength(1);
 });
@@ -283,11 +359,42 @@ it("expires prepared stills after five minutes of paused inactivity", async () =
   const f = fixture();
   f.pause(true);
   await f.prepare();
-  await respond(stillFetches()[0]!, still(0));
-  expect(f.surface.dataset.previewFrames).toBe("1");
+  await respond(batchFetches()[0]!, batch(batchFetches()[0]!));
+  expect(f.surface.dataset.previewFrames).toBe("16");
   vi.advanceTimersByTime(5 * 60_000);
   expect(f.surface.dataset.previewFrames).toBe("0");
   expect(URL.revokeObjectURL).toHaveBeenCalled();
+});
+
+it("backs off background batches while the server is saturated", async () => {
+  const f = fixture();
+  await f.prepare();
+  await respond(batchFetches()[0]!, status(503, { "Retry-After": "2" }));
+  vi.advanceTimersByTime(1500);
+  expect(batchFetches()).toHaveLength(1);
+  vi.advanceTimersByTime(1000);
+  expect(batchTimes()).toEqual([LEVEL_0, LEVEL_0]);
+  expect(f.surface.dataset.previewFrames).toBe("0");
+});
+
+it("falls back to canonical single stills when the batch endpoint is missing", async () => {
+  const f = fixture();
+  await f.prepare();
+  await respond(batchFetches()[0]!, status(404));
+  vi.advanceTimersByTime(500);
+  expect(batchFetches()).toHaveLength(1);
+  // The playhead keyframe first, then the middle; never more than two.
+  expect(requestedTimes()).toEqual(["0", "60"]);
+  expect(stillFetches()[1]!.url.toString()).toBe(
+    "https://stash.test/scene/7/keyframe?apikey=key&t=60&v=file-1",
+  );
+  expect(stillFetches()[1]!.priority).toBe("low");
+  await respond(stillFetches()[1]!, still(60));
+  expect(requestedTimes()).toEqual(["0", "60", "30"]);
+  // Dense prefetch near the finger is unavailable too.
+  f.preview(90.5);
+  vi.advanceTimersByTime(1000);
+  expect(batchFetches()).toHaveLength(1);
 });
 
 it("falls back to raw times without an index and caches by the returned keyframe time", async () => {
@@ -312,7 +419,9 @@ it("falls back to raw times without an index and caches by the returned keyframe
     "still-cache": { count: 1 },
     "still-network": { count: 1 },
   });
-  // A missing index is not requested again.
+  // No index means no batches, and a missing index is not requested again.
+  vi.advanceTimersByTime(1000);
+  expect(batchFetches()).toHaveLength(0);
   f.preview(null);
   vi.advanceTimersByTime(120_000);
   expect(indexFetches()).toHaveLength(1);
@@ -321,15 +430,17 @@ it("falls back to raw times without an index and caches by the returned keyframe
 it("shows the cached keyframe at or before the target, and only the decoded exact frame reports readiness", async () => {
   const f = fixture();
   await f.prepare();
-  await respond(stillFetches()[0]!, still(0));
-  await respond(stillFetches()[1]!, still(60));
-  const requested = stillFetches().length;
+  await respond(batchFetches()[0]!, batch(batchFetches()[0]!));
+  const requested = fetches.length;
   f.preview(61.5);
   expect(f.surface.dataset.previewKind).toBe("still");
   expect(f.surface.dataset.previewReady).toBe("true");
   expect(f.surface.style.opacity).toBe("1");
   expect(f.image.dataset.scrubTime).toBe("60");
-  expect(stillFetches()).toHaveLength(requested);
+  // A hit needs neither a single still nor a dense batch yet.
+  expect(fetches).toHaveLength(requested);
+  // The background level 1 batch has no slot for this target.
+  expect(openBatches()).toHaveLength(0);
   const stream = streams[0]!;
   expect(stream.preview).toHaveBeenLastCalledWith(61.5);
   // A keyframe still never counts toward the precision dwell.
@@ -347,7 +458,7 @@ it("shows the cached keyframe at or before the target, and only the decoded exac
   f.preview(62);
   expect(f.surface.dataset.previewKind).toBe("video");
   expect(f.onReady).toHaveBeenLastCalledWith(null);
-  expect(stillFetches()).toHaveLength(requested);
+  expect(stillFetches()).toHaveLength(0);
   stream.frame(true, 62);
   expect(f.onReady).toHaveBeenLastCalledWith(62);
   // A distant target shows its cached keyframe immediately.
@@ -375,11 +486,16 @@ it("fetches uncached stills latest-wins, with at most two foreground requests", 
   expect(requestedTimes()).toEqual(["10"]);
   expect(stillFetches()[0]!.priority).toBe("high");
   await respond(indexFetches()[0]!, keyframeIndex());
+  // The miss also wants the dense batch around the finger.
+  expect(batchTimes()).toEqual([everyTwoSeconds(16).join(",")]);
+  expect(batchFetches()[0]!.priority).toBe("auto");
   f.preview(20.5);
   f.preview(30.5);
   f.preview(40.5);
   expect(requestedTimes()).toEqual(["10", "20"]);
   expect(stillFetches()[1]!.url.searchParams.get("v")).toBe("file-1");
+  // At most one dense batch is in flight.
+  expect(openBatches()).toHaveLength(1);
   // A superseded response populates the cache without being displayed.
   await respond(stillFetches()[0]!, still(10));
   expect(f.surface.dataset.previewReady).not.toBe("true");
@@ -399,25 +515,72 @@ it("fetches uncached stills latest-wins, with at most two foreground requests", 
     "still-network": { count: 1 },
   });
   expect(f.onReady.mock.calls.every(([time]) => time === null)).toBe(true);
-  // Release stops foreground fetching.
+  // Release stops foreground fetching, including the dense batch.
   f.preview(80.2);
   expect(openStills()).toHaveLength(1);
+  expect(openBatches()).toHaveLength(1);
   f.preview(null);
   expect(openStills()).toHaveLength(0);
+  expect(openBatches()).toHaveLength(0);
   expect(f.surface.style.opacity).toBe("0");
 });
 
-it("prioritises the drag over background coverage it does not need", async () => {
+it("lets a dense batch that lands first satisfy the target and cancel its single request", async () => {
   const f = fixture();
-  await f.prepare();
-  const [first, second] = stillFetches();
-  f.preview(61);
-  expect(first!.signal.aborted).toBe(true);
-  // The background request for the dragged keyframe is retained.
-  expect(second!.signal.aborted).toBe(false);
-  expect(requestedTimes()).toEqual(["0", "60"]);
-  await respond(second!, still(60));
-  expect(f.image.dataset.scrubTime).toBe("60");
+  f.preview(10);
+  await respond(indexFetches()[0]!, keyframeIndex());
+  f.preview(20.5);
+  const single = stillFetches()[1]!;
+  expect(single.url.searchParams.get("t")).toBe("20");
+  const dense = batchFetches()[0]!;
+  await respond(dense, batch(dense));
+  expect(f.surface.dataset.previewKind).toBe("still");
+  expect(f.image.dataset.scrubTime).toBe("20");
+  expect(single.signal.aborted).toBe(true);
+  expect(f.surface.dataset.previewFrames).toBe("16");
+  expect(summarizeScrubTimings()["still-network"].count).toBe(1);
+});
+
+it("prefetches the dense neighbourhood when a drag slows or dwells, in its direction", async () => {
+  const f = fixture();
+  f.preview(5);
+  await respond(indexFetches()[0]!, keyframeIndex());
+  await respond(batchFetches()[0]!, batch(batchFetches()[0]!));
+  // A fast pass over cached stills does not prefetch.
+  f.preview(31);
+  expect(batchFetches()).toHaveLength(1);
+  // Dwelling prefetches the next dense batch in the drag direction.
+  vi.advanceTimersByTime(250);
+  expect(batchTimes()[1]).toBe(everyTwoSeconds(32).slice(16).join(","));
+  await respond(batchFetches()[1]!, batch(batchFetches()[1]!));
+  // Slowing to one keyframe in 200 ms over cached stills, before any dwell,
+  // prefetches ahead of the finger.
+  f.preview(58.5);
+  expect(batchFetches()).toHaveLength(2);
+  vi.advanceTimersByTime(200);
+  f.preview(60.5);
+  expect(batchTimes()[2]).toBe(everyTwoSeconds(48).slice(32).join(","));
+  expect(batchFetches()[2]!.priority).toBe("auto");
+  expect(stillFetches()).toHaveLength(1);
+});
+
+it("prioritises the drag over background batches it does not need", async () => {
+  const unrelated = fixture();
+  await unrelated.prepare();
+  const levelZero = batchFetches()[0]!;
+  unrelated.preview(3);
+  expect(levelZero.signal.aborted).toBe(true);
+  expect(requestedTimes()).toEqual(["2"]);
+
+  fetches = [];
+  const wanted = fixture();
+  await wanted.prepare();
+  const kept = batchFetches()[0]!;
+  // Level 0 includes the keyframe at 60 s, so the drag keeps it.
+  wanted.preview(61);
+  expect(kept.signal.aborted).toBe(false);
+  await respond(kept, batch(kept));
+  expect(wanted.image.dataset.scrubTime).toBe("60");
   expect(summarizeScrubTimings()["still-network"].count).toBe(1);
 });
 

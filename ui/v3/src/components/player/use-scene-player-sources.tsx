@@ -135,7 +135,7 @@ interface UseScenePlayerSourcesArgs {
 interface UseScenePlayerSourcesResult {
   scrubSource: string | null;
   /** Keyframe still endpoints, under the same access rule as `scrubSource`. */
-  scrubKeyframes: { index: string; still: string } | null;
+  scrubKeyframes: { index: string; still: string; batch: string } | null;
   scrubTime: number | null;
   scrubPreviewPending: boolean;
   handleScrubReady: (time: number | null) => void;

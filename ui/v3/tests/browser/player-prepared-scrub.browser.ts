@@ -10,7 +10,7 @@ test("prefetches keyframe stills before dragging and shows one while the exact f
   const scrubManifests: string[] = [];
   page.on("request", (request) => {
     const url = new URL(request.url());
-    if (/\/keyframes?$/.test(url.pathname)) keyframes.push(url);
+    if (/\/keyframes?(?:\/stills)?$/.test(url.pathname)) keyframes.push(url);
     if (url.pathname.endsWith("/stream.scrub.master.m3u8"))
       scrubManifests.push(request.url());
   });
@@ -33,7 +33,8 @@ test("prefetches keyframe stills before dragging and shows one while the exact f
     (video: HTMLVideoElement) => video.currentTime,
   );
   const surface = player.locator("[data-scrub-surface]");
-  // Every keyframe of the twelve-second scene, without an HLS session.
+  // Every keyframe of the twelve-second scene from one batch request, sliced
+  // into separate stills, without an HLS session.
   await expect(surface).toHaveAttribute("data-preview-frames", "6", {
     timeout: 15_000,
   });
@@ -41,20 +42,15 @@ test("prefetches keyframe stills before dragging and shows one while the exact f
   await expect(surface).toHaveCSS("opacity", "0");
   expect(scrubManifests).toEqual([]);
   await expect(player.locator("video[data-scrub-preview]")).toHaveCount(0);
-  const stills = keyframes.filter((url) => url.pathname.endsWith("/keyframe"));
-  expect(stills.map((url) => url.searchParams.get("t")).sort()).toEqual([
-    "0",
-    "10",
-    "2",
-    "4",
-    "6",
-    "8",
+  expect(keyframes.filter((url) => url.pathname.endsWith("/keyframe"))).toEqual(
+    [],
+  );
+  const batches = keyframes.filter((url) =>
+    url.pathname.endsWith("/keyframes/stills"),
+  );
+  expect(batches.map((url) => url.search)).toEqual([
+    `?v=${FIXTURE_KEYFRAME_VERSION}&t=0,2,4,6,8,10`,
   ]);
-  expect(
-    stills.every(
-      (url) => url.searchParams.get("v") === FIXTURE_KEYFRAME_VERSION,
-    ),
-  ).toBe(true);
   expect(
     keyframes.filter((url) => url.pathname.endsWith("/keyframes")),
   ).toHaveLength(1);
@@ -123,13 +119,14 @@ test("fetches an uncached keyframe during a drag and shows the debug readout whe
 }) => {
   await page.addInitScript(() => localStorage.setItem("stash.scrubDebug", "1"));
   await serveSceneMedia(page);
-  // Hold every still until the drag, so none is prepared in the background.
+  // Hold every still and batch until the drag, so none is prepared in the
+  // background.
   let release: () => void = () => {};
   const stills = new Promise<void>((resolve) => {
     release = resolve;
   });
   await page.route(
-    (url) => url.pathname.endsWith("/keyframe"),
+    (url) => /\/keyframe$|\/keyframes\/stills$/.test(url.pathname),
     async (route) => {
       await stills;
       // Background requests superseded by the drag are already cancelled.

@@ -62,6 +62,7 @@ the current architecture.
 | [Expiring shares](sharing.md) | Anonymous scoped media links, management, security boundaries and Caddy setup |
 | [TV mode](../ui/v3/docs/tv-mode.md) | Scene and marker feeds, quality settings, controls, shared activity, and implementation boundaries |
 | [Preview images](preview-images.md) | HDR AVIF, SDR fallbacks, generation requirements, and the v2.5 compatibility boundary |
+| [Keyframe scrub previews](keyframe-previews.md) | Keyframe index and still routes, scene time, versions, bounded caches and work limits |
 | [Read performance](read-performance.md) | Split list reads, batched counters, bounded caches, native search revision tracking, and dated measurements |
 | [Locales](../ui/v3/src/locales/README.md) | Translation files and message conventions |
 

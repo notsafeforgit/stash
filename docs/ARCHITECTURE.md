@@ -165,6 +165,7 @@ not made atomic by a SQLite transaction.
 | Stored artwork blobs | [BlobStore](../pkg/sqlite/blob.go), configured for database blobs or a separate filesystem location |
 | Generated media | Configured generated paths: covers, previews, sprites, transcodes, temporary downloads; generation and cleanup belong to manager/media services |
 | Search acceleration | Separate `<database>.search.sqlite` plus an in-memory exact-count cache; derived and rebuildable |
+| Keyframe scrub cache | `<cache>/keyframes.sqlite`: packed keyframe indexes and 240p stills of scrubbed scenes, byte-bounded with LRU eviction; derived and disposable ([keyframe previews](keyframe-previews.md)) |
 | Browser state | Apollo entity cache, URL/filter state, device preferences, and deployment-scoped offline IndexedDB/OPFS; detailed ownership is in the [frontend guide](../ui/v3/docs/architecture.md#state-configuration-and-type-boundaries) |
 
 [database.go](../pkg/sqlite/database.go) uses WAL mode with one write connection
@@ -414,6 +415,8 @@ playback adapts stored metadata to a local `blob:` source. Keep the player/store
 and native video stable through source changes. Session leases control encoder
 lifetime separately from URL reloads. The [player guide](../ui/v3/docs/player.md)
 maps both sides of this contract, including clip timelines and recovery.
+Library players scrub with a silent 240p HLS stream and
+[keyframe stills](keyframe-previews.md); neither is part of the share surface.
 [Preview images](preview-images.md) and [offline downloads](../ui/v3/docs/offline.md)
 cover their distinct generation and storage paths.
 

@@ -188,7 +188,11 @@ func TestShareHTTPScopesEveryMediaRoute(t *testing.T) {
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &content))
 	require.Len(t, content.Media, 1)
 	require.Equal(t, base+"media/"+shareTestKey(t, rs, "image", 1)+"/image", content.Media[0].Image)
-	for _, endpoint := range []string{"media/image-2/", "media/image-2/image", "media/" + shareTestKey(t, rs, "image", 1) + "/download", "graphql", "scene/1/stream", "../graphql", "media/" + shareTestKey(t, rs, "image", 1) + "/%2e%2e/download", "media//" + shareTestKey(t, rs, "image", 1) + "/", "media/" + shareTestKey(t, rs, "image", 1) + "/../../graphql"} {
+	// Library-only scrub previews are never part of the share surface.
+	for _, endpoint := range []string{"stream.scrub.master.m3u8", "stream.scrub.m3u8/video.m3u8", "keyframes", "keyframe?t=1"} {
+		require.Equal(t, http.StatusNotFound, get("media/"+shareTestKey(t, rs, "image", 1)+"/"+endpoint).Code, endpoint)
+	}
+	for _, endpoint := range []string{"media/image-2/", "media/image-2/image", "media/" + shareTestKey(t, rs, "image", 1) + "/download", "graphql", "scene/1/stream", "scene/1/keyframes", "../graphql", "media/" + shareTestKey(t, rs, "image", 1) + "/%2e%2e/download", "media//" + shareTestKey(t, rs, "image", 1) + "/", "media/" + shareTestKey(t, rs, "image", 1) + "/../../graphql"} {
 		require.Equal(t, http.StatusNotFound, get(endpoint).Code, endpoint)
 	}
 	_, err := rs.service.Update(context.Background(), row.ID, sharing.Options{Label: row.Label, ExpiresAt: time.Unix(row.ExpiresAt, 0), AllowDownload: true})

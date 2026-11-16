@@ -50,12 +50,24 @@ func authenticateSignedRequest(c *config.Config, r *http.Request) (string, bool)
 	}
 
 	// Verify the signature using the user's signing key
-	if _, err := signedurl.VerifyURL(r.URL.Path, q, secret); err != nil {
+	if _, err := signedurl.VerifyURL(signedScenePath(r.URL.Path), q, secret); err != nil {
 		logger.Warnf("signed URL verification failed: %v", err)
 		return "", false
 	}
 
 	return username, true
+}
+
+// signedScenePath maps keyframe previews onto the scene's stream prefix. They
+// are renditions of that stream, like the scrub stream (`stream.scrub.*`) a
+// signed stream URL already covers, so the player can derive their URLs from
+// its signed playback URL without another signature.
+func signedScenePath(requestPath string) string {
+	parts := strings.Split(strings.Trim(requestPath, "/"), "/")
+	if len(parts) == 3 && parts[0] == "scene" && (parts[2] == "keyframes" || parts[2] == "keyframe") {
+		return "/scene/" + parts[1] + "/stream"
+	}
+	return requestPath
 }
 
 func httpError(w http.ResponseWriter, r *http.Request, text string, status int) {

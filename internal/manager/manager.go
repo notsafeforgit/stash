@@ -19,6 +19,7 @@ import (
 	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/job"
+	"github.com/stashapp/stash/pkg/keyframecache"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/models/paths"
@@ -175,6 +176,10 @@ func (s *Manager) RefreshStreamManager() {
 	cfg := s.Config
 	cacheDir := cfg.GetCachePath()
 	s.StreamManager = ffmpeg.NewStreamManager(cacheDir, s.FFMpeg, s.FFProbe, cfg, s.ReadLockManager)
+	if cacheDir != "" {
+		// Opened on first use: only scrubbed scenes are ever indexed.
+		s.StreamManager.SetKeyframeStore(keyframecache.Open(filepath.Join(cacheDir, ffmpeg.KeyframeStoreFile), ffmpeg.KeyframeStoreBudgets()))
+	}
 }
 
 func createPackageManager(localPath string, srcPathGetter pkg.SourcePathGetter) *pkg.Manager {

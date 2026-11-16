@@ -87,9 +87,7 @@ func (f *FFMpeg) hlsHDRFilter(codec VideoCodec, color videoColorMetadata, fullhw
 		filter = filter.Append("hwmap=derive_device=" + device + ":reverse=1:extra_hw_frames=64")
 		filter = filter.Append("format=" + device)
 	} else {
-		filter = filter.Append("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709")
-		filter = filter.Append("tonemap=mobius:param=0.3:desat=2")
-		filter = filter.Append("zscale=t=bt709:m=bt709:r=limited,format=yuv420p")
+		filter = softwareToneMapFilter(filter)
 	}
 	// HDR side data describes the original signal, not these SDR pixels. Keep
 	// unrelated side data (captions, etc.) rather than dropping everything.
@@ -104,6 +102,14 @@ func (f *FFMpeg) hlsHDRFilter(codec VideoCodec, color videoColorMetadata, fullhw
 		filter = filter.Append("sidedata=mode=delete:type=" + kind)
 	}
 	return filter, true
+}
+
+// softwareToneMapFilter appends the CPU HLG/PQ to 8-bit BT.709 conversion to
+// a chain whose frames already carry their HDR tags (see hdrInputFilter).
+func softwareToneMapFilter(filter VideoFilter) VideoFilter {
+	filter = filter.Append("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709")
+	filter = filter.Append("tonemap=mobius:param=0.3:desat=2")
+	return filter.Append("zscale=t=bt709:m=bt709:r=limited,format=yuv420p")
 }
 
 func hlsSDRColorArgs() Args {

@@ -38,6 +38,7 @@ type StreamManager struct {
 	v3ClosedSessions map[v3StreamSessionKey]time.Time
 	streamsMutex     sync.Mutex
 	downloadProgress downloadProgressStore
+	keyframes        *keyframeService
 }
 
 type StreamManagerConfig interface {
@@ -64,6 +65,7 @@ func NewStreamManager(cacheDir string, encoder *FFMpeg, ffprobe *FFProbe, config
 		cancelFunc:       cancel,
 		runningStreams:   make(map[string]*runningStream),
 		v3RunningStreams: make(map[string]*v3RunningStream),
+		keyframes:        newKeyframeService(ctx, encoder, ffprobe),
 	}
 
 	go func() {
@@ -79,6 +81,14 @@ func NewStreamManager(cacheDir string, encoder *FFMpeg, ffprobe *FFProbe, config
 	}()
 
 	return ret
+}
+
+// SetKeyframeStore persists keyframe indexes and stills. The stream manager
+// closes it on shutdown. Without a store they are cached in memory only.
+func (sm *StreamManager) SetKeyframeStore(store KeyframeStore) {
+	if sm.keyframes != nil {
+		sm.keyframes.setStore(store)
+	}
 }
 
 // Stop cancels media processes without removing state still used by HTTP handlers.
@@ -103,6 +113,9 @@ func (sm *StreamManager) ShutdownContext(ctx context.Context) error {
 			defer close(sm.shutdownDone)
 			sm.stopAndRemoveAll()
 			sm.stopAndRemoveAllV3()
+			if sm.keyframes != nil {
+				sm.keyframes.closeStore()
+			}
 		}()
 	})
 	select {

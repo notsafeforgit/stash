@@ -98,6 +98,10 @@ func (rs sceneRoutes) Routes() chi.Router {
 		r.Get("/stream.scrub.m3u8/{track}/{segment}.m4s", scrubPreviewRequest(func(w http.ResponseWriter, r *http.Request) {
 			rs.streamV3Segment(w, r, ffmpeg.V3StreamTypeHLSScrub)
 		}))
+		// Coarse scrub tier: keyframe index and keyframe-only stills. Like the
+		// scrub stream they are library-only; share routes do not expose them.
+		r.Get("/keyframes", rs.KeyframeIndex)
+		r.Get("/keyframe", rs.Keyframe)
 		r.Get("/stream.hevc.master.m3u8", rs.StreamV3HLSHEVCMaster)
 		r.Get("/stream.hevc.m3u8/{track}.m3u8", rs.StreamV3HLSHEVCTrackPlaylist)
 		r.Get("/stream.hevc.m3u8/{track}/init.mp4", rs.StreamV3HLSHEVCInitSegment)

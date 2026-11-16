@@ -78,7 +78,12 @@ INSERT INTO galleries_images(gallery_id,image_id) VALUES(1,2056);`)
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
 	go func() { done <- f.service.Run(ctx) }()
-	t.Cleanup(func() { cancel(); <-done })
+	t.Cleanup(func() {
+		cancel()
+		if err := <-done; err != nil && !errors.Is(err, context.Canceled) {
+			t.Errorf("preparation worker: %v", err)
+		}
+	})
 	require.Eventually(t, func() bool {
 		row, err = f.service.Find(t.Context(), row.ID)
 		require.NoError(t, err)

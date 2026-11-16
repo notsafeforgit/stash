@@ -28,10 +28,11 @@ func (c *LockContext) Cancel() {
 	if c.cmd != nil {
 		// wait for the process to die before returning
 		// don't wait more than a few seconds
-		done := make(chan error)
+		// Closing the channel lets the waiter exit after a timeout too.
+		done := make(chan struct{})
 		go func() {
-			err := c.cmd.Wait()
-			done <- err
+			_ = c.cmd.Wait()
+			close(done)
 		}()
 
 		select {

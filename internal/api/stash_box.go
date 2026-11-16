@@ -30,7 +30,7 @@ func resolveStashBoxFn(indexField, endpointField string) func(index *int, endpoi
 
 		if index != nil {
 			if *index < 0 || *index >= len(boxes) {
-				return nil, fmt.Errorf("invalid %s %d", indexField, index)
+				return nil, fmt.Errorf("invalid %s %d", indexField, *index)
 			}
 
 			return boxes[*index], nil

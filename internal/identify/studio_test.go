@@ -113,8 +113,15 @@ func Test_createMissingStudio(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("createMissingStudio() = %d, want %d", got, tt.want)
+				t.Errorf("createMissingStudio() = %v, want %v", deref(got), deref(tt.want))
 			}
 		})
 	}
+}
+
+func deref[T any](v *T) any {
+	if v == nil {
+		return nil
+	}
+	return *v
 }

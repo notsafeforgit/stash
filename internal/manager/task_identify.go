@@ -227,7 +227,7 @@ func resolveStashBox(sb []*models.StashBox, source scraper.Source) (*models.Stas
 	if source.StashBoxIndex != nil {
 		index := source.StashBoxIndex
 		if *index < 0 || *index >= len(sb) {
-			return nil, fmt.Errorf("%w: invalid stash_box_index: %d", models.ErrScraperSource, index)
+			return nil, fmt.Errorf("%w: invalid stash_box_index: %d", models.ErrScraperSource, *index)
 		}
 
 		return sb[*index], nil

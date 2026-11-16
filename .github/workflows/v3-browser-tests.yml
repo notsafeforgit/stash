@@ -27,7 +27,7 @@ jobs:
     # Pin browsers and their system media libraries together, matching local
     # reproduction. Update this image alongside @playwright/test in ui/v3.
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-resolute@sha256:b022639ae9197f864040f92eef7b57c6d4b47db2190f77c909d8a5d902dd4b7e
+      image: mcr.microsoft.com/playwright:v1.65.1-resolute@sha256:dcf385f7a31aa1cbb0a7a0c97a539142bf70480b661f89f26a774ec1fe2edd1d
       options: --ipc=host
     timeout-minutes: 65
     strategy:

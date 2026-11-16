@@ -8,13 +8,13 @@ remain preserved in the frozen compatible release.
 
 | Area | Updated baseline |
 | --- | --- |
-| Backend | Go 1.27.1; gqlgen 0.17.95; go-sqlite3 1.14.52; refreshed module graph |
+| Backend | Go 1.27.4; gqlgen 0.17.98; go-sqlite3 1.14.53; refreshed module graph |
 | Codecs | libheif 1.23.4; libvips 8.18.6; current packages from Alpine 3.24 / the runtime's supported Debian or Ubuntu release |
-| UI | React 19.3; Base UI 1.8; shadcn 4.21; Tailwind 4.3 |
-| Tables | TanStack Table 9.2 with explicit features and server-controlled sorting |
-| GraphQL | Apollo 4.3; GraphQL 17; current Code Generator plugins |
-| Playback | Video.js 10.0.0-rc.2; scoped hls.js 1.7.3 override |
-| Tooling | Node 24 LTS (24.15 minimum); pnpm 12.4.2; TypeScript 7.0.2; Vite 8.3; Vitest 5; Biome 2.5 |
+| UI | React 19.3.1; Base UI 1.9; shadcn 4.23; Tailwind 4.3.5 |
+| Tables | TanStack Table 9.3 with explicit features and server-controlled sorting |
+| GraphQL | Apollo 4.3.8; GraphQL 17.1; Code Generator 7 (CLI) / 6 (TypeScript plugins) |
+| Playback | Video.js 10.4.0; scoped hls.js 1.7.4 override |
+| Tooling | Node 24 LTS (24.15 minimum); pnpm 12.21.0; TypeScript 7.0.2; Vite 8.3.8; Vitest 5.1; Biome 2.6; Playwright 1.65.1 |
 
 v3 uses TypeScript 7 for builds and app/browser type checks. Following
 [Microsoft's compatibility setup](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0),
@@ -84,6 +84,59 @@ every codec from upstream. The verified amd64 runtime versions are:
 | Stash image (`docker/ghcr/Dockerfile`), Debian trixie | Jellyfin 8.1.3-2 (pinned) | 1.4.2 (source build) | 3.14.10 |
 | CI media tests, Ubuntu 24.04 runners | Jellyfin 8.1.3-2 (same pin) | Ubuntu package | runner default |
 | Optional local `make docker-cuda-build` image, Ubuntu 24.04 (not published) | 6.1.1 (Ubuntu updates) | 1.0.4 | 3.12.3 |
+
+## 2026-11-15 refresh
+
+Player and engine updates with user-visible fixes:
+
+- Video.js 10.0.1 → 10.4.0. 10.1 stops extrapolating stalled native media
+  time and samples playback time on animation frames; 10.3 fixes CEA-608/708
+  captions on the hls.js path, re-rendered hls.js text tracks in Safari and
+  rendition ids, and reports a pending autoplay as starting; 10.4 adds text track
+  and time-slider marker APIs and applies media prop updates at commit. Stash
+  drives its own position slider, so 10.2's seek-while-dragging change to
+  `<TimeSlider>` does not apply.
+- hls.js override 1.7.3 → 1.7.4 (see [player](../ui/v3/docs/player.md)).
+- Base UI 1.8 → 1.9: drawer swipe and iOS keyboard fixes, combobox mount
+  performance and stale focus fixes. The WebKit touch-click patch is still
+  required and moves to `patches/@base-ui__react@1.9.0.patch` unchanged.
+- Go 1.27.1 → 1.27.4 for the net/http, crypto/tls, crypto/x509, cgo and go
+  command security fixes. golang.org/x modules, gqlgen 0.17.98 with
+  gqlparser 2.5.64, go-sqlite3 1.14.53 (fewer cgo crossings per step and an
+  error instead of a crash after `Close`), chi, koanf, gojq and surf move to
+  their current releases. golangci-lint 2.13.2 cannot read Go 1.27.4's export
+  data, so `make lint` moves to 2.15.0. Its newer vet and errcheck found two
+  error messages that printed a stash-box index pointer instead of the index,
+  and a lock wait that leaked its goroutine after the timeout.
+- Apollo, React, Tailwind, TanStack, Vite, Vitest, React Intl, Zod, dash.js,
+  GraphQL and graphql-ws take their current patch and minor releases. pnpm
+  12.21.0 includes the bundled node-gyp security update. Playwright 1.65.1
+  moves the pinned browser image to `v1.65.1-resolute` by digest. Its WebKit
+  27.2 mobile emulation, like 26.6, hides the Fullscreen API as on iPhone, but
+  now also deletes a page's own `Element.prototype.requestFullscreen` once the
+  document element exists. The TV rejection test therefore stubs
+  `HTMLElement.prototype`; the app's capability check is unchanged.
+- Biome 2.6 adds Markdown and YAML formatting, which stays disabled so
+  documentation tables and pnpm's workspace file are not rewritten, and the
+  `noComponentHookFactories` rule, which is off because typed factories run once
+  at module scope and tests declare local probe components.
+
+Deliberately unchanged:
+
+- chromedp 0.16 and its cdproto snapshot. chromedp 0.23 replaces its action
+  and command API with generics; moving the CDP scraper is a separate migration.
+- GraphQL Code Generator 8 and its TypeScript 7 plugins, released 2026-11-07
+  after a long alpha series. They only change generated types; adopt them with a
+  deliberate regeneration review.
+- goqu 9.19. 9.20 to 9.25 (2026-11-03 to 11-05) stop prefixing SQLite upserts
+  with `INSERT OR IGNORE`, so a custom field with a null value fails its NOT
+  NULL constraint instead of being skipped, and they change typed-nil
+  comparisons from `= NULL` to `IS NULL`. Their security fixes cover SQL Server
+  string interpolation and untrusted identifiers; Stash uses SQLite with
+  constant identifiers. Adopt them with a review of every upsert and nullable
+  comparison.
+- `@types/node` stays on the 24 line to match the Node 24 LTS runtime.
+- TypeScript 7.0.2 is already the current stable release.
 
 ## shadcn practice
 

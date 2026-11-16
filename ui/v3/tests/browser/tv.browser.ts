@@ -202,8 +202,14 @@ test("a rejected fullscreen request leaves the ordinary TV layout and hides the 
       configurable: true,
       value: true,
     });
-    Element.prototype.requestFullscreen = () =>
-      Promise.reject(new Error("Fullscreen unavailable"));
+    // WebKit's mobile emulation disables the Fullscreen API, as on iPhone, and
+    // removes Element.prototype.requestFullscreen once the document element is
+    // created, taking any replacement with it. HTMLElement.prototype is not
+    // managed by that setting and shadows the native method elsewhere.
+    Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
+      configurable: true,
+      value: () => Promise.reject(new Error("Fullscreen unavailable")),
+    });
   });
   await open(page);
   await page.getByRole("button", { name: "Playback", exact: true }).click();

@@ -45,14 +45,15 @@ minimumReleaseAgeExclude:
   - regjsparser@0.13.3
   - which-typed-array@1.1.24
 
-# The 10.0.1 adapter still pins hls.js 1.6.7. Retain the current stable engine,
-# including its Safari ManagedMediaSource seek and end-of-stream fixes.
+# The 10.4.0 adapter pins hls.js 1.7.3. 1.7.4 reloads a start fragment whose
+# request was aborted before anything buffered and cancels a pending
+# end-of-stream once playback leaves the end; both affect seeks and restarts.
 overrides:
-  "@videojs/hlsjs-video@10.0.1>hls.js": 1.7.3
+  "@videojs/hlsjs-video@10.4.0>hls.js": 1.7.4
   "unplugin>esbuild": ^0.28.1
   "tsx>esbuild": ^0.28.1
 
 # Keep touch-generated combobox clicks in WebKit; mousedown still retains focus.
 # Recheck entity-list-filters.browser.ts before removing this on an upgrade.
 patchedDependencies:
-  '@base-ui/react@1.8.0': patches/@base-ui__react@1.8.0.patch
+  '@base-ui/react@1.9.0': patches/@base-ui__react@1.9.0.patch

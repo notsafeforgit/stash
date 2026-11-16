@@ -187,10 +187,10 @@ MIME types, codec/GOP/resolution checks and original-file share behavior intact.
 **Icons — Lucide React**
 - Import named icons from `lucide-react`. Do not use other icon libraries.
 
-**Video player — Video.js v10 RC.2 (`@videojs/react`)**
+**Video player — Video.js 10.4 (`@videojs/react`)**
 - `createPlayer({ features: videoFeatures })` is called once at module scope to produce a typed `Player` root plus `usePlayer` / `useMedia` hooks. State lives in the root's internal store; access it via `Player.usePlayer(selector)` from any descendant. Import the shared `Container` separately from `@videojs/react`.
 - `SceneVideo` configures the packaged `<HlsJsVideo>` from `@videojs/react/media/hlsjs-video` for both direct and HLS sources. Its `HlsJsAdapter` retains one native video element while switching playback engines. Pass the direct source MIME type explicitly, including for blob URLs. The playback adapter and casting extension now live in separate, version-aligned `@videojs/hlsjs-video` and `@videojs/google-cast` packages. Compose `<GoogleCast>` from `@videojs/react/extensions/google-cast`.
-- RC.2’s split HLS package pins hls.js 1.6.7. A version-scoped pnpm override retains the project’s 1.7.3 engine; remove/reassess it when upgrading the adapter rather than silently downgrading playback fixes.
+- The 10.4.0 HLS adapter pins hls.js 1.7.3. A version-scoped pnpm override uses 1.7.4 for its start-fragment and end-of-stream fixes; remove/reassess it when upgrading the adapter rather than silently downgrading playback fixes.
 - Controls use a renderless `<Controls.Root>` around `<Controls.Content>`, which owns DOM props, styling and layout.
 - Player implementation: `src/components/player/scene-player.tsx` (player shell) and `src/components/player/player-controls.tsx` (controls overlay).
 

@@ -3,7 +3,7 @@
  */
 
 import { useMemo, useState, useCallback } from "react";
-import * as GQL from "src/core/generated-graphql";
+import type * as GQL from "src/core/generated-graphql";
 import {
   FilterMode,
   FilterGroupOperator,

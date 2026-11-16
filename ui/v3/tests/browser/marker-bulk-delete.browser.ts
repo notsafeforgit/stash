@@ -1,4 +1,4 @@
-import { type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { test, expect, holdForContextMenu } from "./test";
 import { DisplayMode } from "../../src/models/list-filter/types";
 import { encodeURLJSON } from "../../src/utils/url-json";

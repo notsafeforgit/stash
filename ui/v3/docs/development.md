@@ -10,7 +10,7 @@ architecture, compatibility, feature guides, and operations.
 Run the commands below from the Git root. Use Go matching
 [go.mod](../../../go.mod), a C compiler for SQLite/CGO, Make, Git, FFmpeg/ffprobe,
 libavif's `avifenc`/`avifdec` tools (Ubuntu package `libavif-bin`),
-and Node.js 24.15 or newer in the 24 LTS line. v3 pins pnpm 12.4.2. Let pnpm select the version from its `packageManager` field. v3's build-script policy and
+and Node.js 24.15 or newer in the 24 LTS line. v3 pins pnpm 12.21.0. Let pnpm select the version from its `packageManager` field. v3's build-script policy and
 scoped dependency overrides live in `pnpm-workspace.yaml`. `make lint` runs the
 CI-pinned Go linter through
 `go run`, so a separate golangci-lint installation is unnecessary.
@@ -216,7 +216,8 @@ runners the image's Mesa llvmpipe JIT otherwise faults in an AVX2 gather while
 compositing video. Playwright reports the web process's SIGSEGV as
 `Target crashed`. AMD runners do not show it. Hiding AVX2 keeps llvmpipe's JIT
 and stopped the crash in every probe repeat. Recheck whether it is still needed
-when the Playwright image changes.
+when the Playwright image changes. The v1.65.1 image ships the same Mesa 26.0.8
+and LLVM 21.1.8 as v1.63.0, so the workaround stays.
 Chromium uses two workers per shard. WebKit uses one to avoid competing media
 pipelines during playback and frame-timing checks on small CI runners.
 The shard runner distributes adjacent independent tests across the four jobs,

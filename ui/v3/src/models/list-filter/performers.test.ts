@@ -11,7 +11,7 @@ import {
   filterASTNodeToGraphQL,
   flattenFilterASTConditions,
 } from "./filter-ast";
-import { StringCriterion } from "./criteria/criterion";
+import type { StringCriterion } from "./criteria/criterion";
 
 const intl = createIntl({ locale: "en-GB", messages: flattenMessages(enGB) });
 

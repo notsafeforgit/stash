@@ -1,9 +1,17 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.7/schema.json",
   "json": {
     "parser": {
       "allowComments": true
     }
+  },
+  // Biome 2.6 added Markdown and YAML formatting. Documentation tables are kept
+  // as written, and pnpm owns pnpm-workspace.yaml.
+  "markdown": {
+    "formatter": { "enabled": false }
+  },
+  "yaml": {
+    "formatter": { "enabled": false }
   },
   "css": {
     "parser": {
@@ -46,6 +54,10 @@
       },
       "correctness": {
         "preset": "recommended",
+        // Typed factories (list item contexts, stored state) are called once at
+        // module scope, and tests define local probe components per case. The
+        // rule cannot tell either from a component created during render.
+        "noComponentHookFactories": "off",
         "useExhaustiveDependencies": {
           "level": "warn",
           "options": {

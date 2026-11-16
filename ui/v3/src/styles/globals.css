@@ -381,7 +381,7 @@ body.mobile-list-view .bottom-tab-bar {
 
 /* Suppress on mobile unless selected or in selecting mode */
 .entity-card.mobile:not(:focus-within)
-.entity-card-checkbox:not(.visible):not([data-selecting] *) {
+  .entity-card-checkbox:not(.visible):not([data-selecting] *) {
   display: none;
 }
 

@@ -213,8 +213,21 @@ for (const mode of [
         );
       }
       await drag.move(point(0.5));
-      // A deliberate fresh pause reaches the one-second window in these clips.
-      await page.clock.runFor(2000);
+      // A fresh pause starts only once its requested frame is decoded, which can
+      // land partway through a fixed clock step. Wait for that frame first, as
+      // the first hold does, then advance until the one-second window appears.
+      await expect
+        .poll(async () => {
+          await page.clock.runFor(50);
+          return scrubber.getAttribute("aria-busy");
+        })
+        .toBeNull();
+      await expect
+        .poll(async () => {
+          await page.clock.runFor(500);
+          return (await readout.textContent()) ?? "";
+        })
+        .toMatch(new RegExp(` · ${Math.round(duration)}×$`));
       expect(Number(await scrubber.getAttribute("aria-valuenow"))).toBeCloseTo(
         duration / 2,
         1,

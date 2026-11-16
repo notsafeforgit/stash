@@ -164,7 +164,9 @@ frame. Both share the normal timeline, touch precision zoom and media zoom
 surface; there is no thumbnail chooser. “Generate thumbnail from current” saves
 the committed main player's position as before.
 
-The keyframe tier uses `GET /scene/{id}/keyframes` (the primary file's keyframe
+The keyframe tier uses the server routes in
+[keyframe previews](../../../docs/keyframe-previews.md):
+`GET /scene/{id}/keyframes` (the primary file's keyframe
 times in scene time, with an opaque file `version`),
 `GET /scene/{id}/keyframe?t=…&v=…`, a 240p JPEG of the greatest keyframe at or
 before `t` whose `X-Keyframe-Time` header names the frame returned, and

@@ -68,8 +68,12 @@ func keyframeFixtures(t *testing.T, encoder, probe string) []keyframeFixture {
 	source := []string{"-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000", "-t", "5"}
 	mp4 := filepath.Join(dir, "gop.mp4")
 	runKeyframeTool(t, encoder, append(append(append([]string{}, source...), keyframeTestGOP...), "-c:a", "aac", mp4)...)
+	// Start the video a quarter second after the audio, so the container start
+	// precedes the first keyframe on every ffmpeg version. Older releases
+	// also shifted it by AAC priming; ffmpeg 8 no longer does.
 	mkv := filepath.Join(dir, "gop.mkv")
-	runKeyframeTool(t, encoder, append(append(append([]string{}, source...), keyframeTestGOP...), "-c:a", "aac", mkv)...)
+	delayed := append([]string{"-hide_banner", "-loglevel", "error", "-itsoffset", "0.25"}, source[3:]...)
+	runKeyframeTool(t, encoder, append(append(append([]string{}, delayed...), keyframeTestGOP...), "-c:a", "aac", mkv)...)
 	videoTS := filepath.Join(dir, "video.ts")
 	runKeyframeTool(t, encoder, "-hide_banner", "-loglevel", "error", "-i", mkv, "-map", "0:v", "-c", "copy", "-f", "mpegts", "-output_ts_offset", "10", videoTS)
 	avTS := filepath.Join(dir, "av.ts")
@@ -417,11 +421,11 @@ func TestKeyframeIndexPersistsAcrossManagers(t *testing.T) {
 	sm := newKeyframeTestManager(t, encoder, probe)
 	sm.SetKeyframeStore(keyframecache.Open(storePath, KeyframeStoreBudgets()))
 	first := getKeyframeIndex(t, sm, vf)
-	single := getKeyframe(t, sm, vf, "t=1.021&v="+first.Version)
+	single := getKeyframe(t, sm, vf, "t="+formatKeyframeTime(fixture.offsetMS+1001)+"&v="+first.Version)
 	requireKeyframeJPEG(t, single, fixture.offsetMS+1000, 426, 240)
 	// The batch reuses the single's still and stores the others.
 	batchMS := []int64{fixture.offsetMS + 3000, fixture.offsetMS + 1000, fixture.offsetMS}
-	batch := splitKeyframeStills(t, getKeyframeStills(t, sm, vf, "t=3.1,1.5,0&v="+first.Version), batchMS)
+	batch := splitKeyframeStills(t, getKeyframeStills(t, sm, vf, "t="+formatKeyframeTime(fixture.offsetMS+3100)+","+formatKeyframeTime(fixture.offsetMS+1500)+",0&v="+first.Version), batchMS)
 	require.Equal(t, single.Body.Bytes(), batch[1])
 	sm.Shutdown()
 
@@ -430,15 +434,15 @@ func TestKeyframeIndexPersistsAcrossManagers(t *testing.T) {
 	reopened := newKeyframeTestManager(t, "/nonexistent/ffmpeg", "/nonexistent/ffprobe")
 	reopened.SetKeyframeStore(keyframecache.Open(storePath, KeyframeStoreBudgets()))
 	require.Equal(t, first, getKeyframeIndex(t, reopened, vf))
-	w := getKeyframe(t, reopened, vf, "t=1.5&v="+first.Version)
+	w := getKeyframe(t, reopened, vf, "t="+formatKeyframeTime(fixture.offsetMS+1500)+"&v="+first.Version)
 	requireKeyframeJPEG(t, w, fixture.offsetMS+1000, 426, 240)
 	require.Equal(t, "private, max-age=31536000, immutable", w.Header().Get("Cache-Control"))
-	w = getKeyframeStills(t, reopened, vf, "t=0,3.5,1.021&v="+first.Version)
+	w = getKeyframeStills(t, reopened, vf, "t=0,"+formatKeyframeTime(fixture.offsetMS+3500)+","+formatKeyframeTime(fixture.offsetMS+1001)+"&v="+first.Version)
 	require.Equal(t, [][]byte{batch[2], batch[0], batch[1]}, splitKeyframeStills(t, w, []int64{batchMS[2], batchMS[0], batchMS[1]}))
 	require.Equal(t, "private, max-age=31536000, immutable", w.Header().Get("Cache-Control"))
 	require.Zero(t, reopened.keyframes.extractions.inUse())
 	// An uncached keyframe needs ffmpeg, which is missing here.
-	require.Equal(t, http.StatusInternalServerError, getKeyframeStills(t, reopened, vf, "t=2.5").Code)
+	require.Equal(t, http.StatusInternalServerError, getKeyframeStills(t, reopened, vf, "t="+formatKeyframeTime(fixture.offsetMS+2100)).Code)
 
 	// An unchanged ETag needs no index work.
 	r := httptest.NewRequest("GET", "/scene/s/keyframes", nil)

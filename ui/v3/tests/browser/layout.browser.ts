@@ -88,3 +88,36 @@ for (const width of [320, 390, 768, 1280]) {
     }
   });
 }
+
+test.describe("scene detail tabs", () => {
+  test.use({ viewport: { width: 1280, height: 844 } });
+
+  test("an overflowing strip starts at its first tab and scrolls to its last", async ({
+    page,
+  }) => {
+    await page.goto("/?media&scene-tabs");
+    const list = page.getByRole("tablist");
+    await expect(
+      page.getByRole("tab", { name: "Details", exact: true }),
+    ).toBeVisible();
+    // Which tabs lie wholly inside the strip's visible box.
+    const shown = () =>
+      list.evaluate((strip) => {
+        const box = strip.getBoundingClientRect();
+        return [...strip.querySelectorAll('[role="tab"]')]
+          .filter((tab) => {
+            const rect = tab.getBoundingClientRect();
+            return rect.left >= box.left - 0.5 && rect.right <= box.right + 0.5;
+          })
+          .map((tab) => tab.textContent?.trim());
+      });
+    expect(
+      await list.evaluate((strip) => strip.scrollWidth > strip.clientWidth),
+    ).toBe(true);
+    expect(await shown()).toContain("Details");
+    await list.evaluate((strip) => {
+      strip.scrollLeft = strip.scrollWidth;
+    });
+    await expect.poll(shown).toContain("Filters");
+  });
+});

@@ -44,7 +44,12 @@ export function DetailTabStrip({
         })
       }
       className={cn(
-        "w-full shrink-0 overflow-x-auto overflow-y-hidden",
+        // `justify-start` overrides the shadcn TabsList's `justify-center`:
+        // centred content that overflows spills past both edges, and a
+        // scroll container cannot scroll to the left spill, so the first
+        // tab would be cut off. Triggers are `flex-1`, so a strip that
+        // fits still fills the column either way.
+        "w-full shrink-0 justify-start overflow-x-auto overflow-y-hidden",
         // Pack tabs shoulder-to-shoulder before overflowing:
         //  - `gap-0` overrides the line-variant's 4 px inter-trigger gap
         //  - `[&>*]:px-1` shrinks each trigger's horizontal padding
@@ -52,8 +57,8 @@ export function DetailTabStrip({
         //  - `[&>*]:min-w-fit` stops triggers shrinking below their
         //    label width
         // 5 detail tabs in the 320 px scene sidebar fit at this density
-        // without scrolling; 6+ start scrolling, which is the right
-        // breakpoint for a 320 px column.
+        // without scrolling; 6+ (the scene's 7) start scrolling, which is
+        // the right breakpoint for a 320 px column.
         "gap-0 [&>*]:px-1 [&>*]:min-w-fit",
         // Hide the scrollbar (Firefox + WebKit) — the strip still
         // scrolls via swipe / shift-wheel / drag, just without a chunky

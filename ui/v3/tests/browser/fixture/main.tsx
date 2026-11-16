@@ -107,6 +107,17 @@ const sections = [
   { id: "groups", label: "Groups" },
 ];
 
+// The scene sidebar's sections: more than its 320 px column fits.
+const sceneSections = [
+  { id: "details", label: "Details" },
+  { id: "sources", label: "Sources" },
+  { id: "metadata-review", label: "Metadata review" },
+  { id: "markers", label: "Markers" },
+  { id: "file-info", label: "File Info" },
+  { id: "history", label: "History" },
+  { id: "filters", label: "Filters" },
+];
+
 function FixtureList({ name }: { name: string }) {
   const [filter, setFilter] = useState(
     () => new ListFilterModel(FilterMode.Performers),
@@ -201,10 +212,12 @@ function FixturePage() {
   const [favourite, setFavourite] = useState(false);
   const [backCount, setBackCount] = useState(0);
   const [actionOpen, setActionOpen] = useState(false);
-  const tabs = sections.map((section) => ({
-    ...section,
-    content: <FixtureList name={section.id} />,
-  }));
+  const tabs = (params.has("scene-tabs") ? sceneSections : sections).map(
+    (section) => ({
+      ...section,
+      content: <FixtureList name={section.id} />,
+    }),
+  );
   const toolbar = (
     <div className="flex flex-wrap gap-2">
       <Button onClick={() => setFavourite(!favourite)}>

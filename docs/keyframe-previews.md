@@ -4,8 +4,8 @@ The coarse scrub tier shows the source keyframe at or before the finger
 position while a drag moves quickly. The exact-frame tier, the silent 240p
 `stream.scrub.*` HLS session described in the
 [player guide](../ui/v3/docs/player.md), is unchanged and replaces the still
-once its frame decodes. Both routes use the scene's primary file, like the
-scrub stream. The server implementation is
+once its frame decodes. All three routes use the scene's primary file, like
+the scrub stream. The server implementation is
 [keyframe_service.go](../pkg/ffmpeg/keyframe_service.go) with its index scan
 and still extraction beside it; the routes are in
 [routes_scene_scrub.go](../internal/api/routes_scene_scrub.go).
@@ -60,6 +60,48 @@ A `t` before the first keyframe returns the first keyframe.
   server-wide extraction limit is reached; back off. 500: extraction failed;
   fall back to the other tiers.
 
+### `GET /scene/{sceneId}/keyframes/stills?t=<t1>,<t2>,…&v=<version>`
+
+Returns the keyframes for up to 16 comma-separated times in one response, for
+filling a thumbnail strip without a request per frame.
+
+- Each time resolves through the index exactly as `/keyframe` does: the
+  greatest keyframe ≤ `t` + 10 ms, or the first keyframe for an earlier `t`.
+  Times may repeat or resolve to the same keyframe; each keyframe is extracted
+  once.
+- The body is `application/octet-stream`: the slots' JPEGs concatenated in
+  request order, not a sprite sheet. `X-Keyframe-Times` lists each slot's
+  keyframe time (three decimals, scene time) and `X-Keyframe-Lengths` each
+  slot's byte length, both comma-separated and in request order.
+  `Access-Control-Expose-Headers` exposes both. A slot whose keyframe could not
+  be decoded has length 0 and the time of the index keyframe it resolved to.
+- `Cache-Control: private, max-age=31536000, immutable` when `v` equals the
+  current version and every slot has an image; otherwise `no-cache`.
+- A batch needs the index. Without a cached one the request waits up to
+  2 seconds for the scan, then returns 503 with `Retry-After: 2` while the
+  scan continues. There is no index-less fallback as for `/keyframe`; use
+  single stills meanwhile. 404: no primary file, the file is missing, or it
+  has no decodable keyframes. 503 with `Retry-After: 600`: the scan timed out.
+- 400: `t` is missing, lists more than 16 times, or any time is not a finite
+  number of seconds from 0 to 10⁷. 503 with `Retry-After: 1`: the extraction
+  limit is reached. 500: no slot could be decoded, including when the whole
+  request exceeds 10 seconds.
+- Stills already cached by either route are served without ffmpeg. The others
+  are decoded by one ffmpeg process, which a cancelled request kills.
+
+One process with one input per keyframe would keep every decoder alive until
+it exits: about 3 GB for sixteen 4K HEVC frames. Batches instead read the file
+through the concat demuxer, one short segment per keyframe, opened one after
+another and decoded by a single keyframe-only decoder, so a batch needs about
+the memory of one still. Each segment starts 131 ms before its keyframe's file
+timestamp (scene time plus the container start), like ffmpeg's own `-ss`
+allowance for B-frames, so MPEG-TS, which seeks by decode timestamp, does not
+resume after the keyframe. It ends 2 ms after the keyframe. Indexed containers
+resume at the preceding keyframe, which a `select` filter drops before scaling.
+The `metadata` filter logs each frame's segment, so every image is matched to
+its slot by its exact time; a frame more than 2 ms from its index time leaves
+the slot empty.
+
 Stills are 240p like the scrub stream and use its software sizing
 (`ScaleMax` at the LOW tier): the shorter display edge is scaled to 240 pixels,
 never upscaled, with an even longer edge. HDR (HLG/PQ) is tone mapped to SDR
@@ -80,7 +122,10 @@ can be negative when audio priming precedes the video). The scrub stream's
 `-ss`, so index times, still times and player times agree. The index scan and
 the still extraction both derive their times this way; still extraction runs
 with `-copyts` and reads the container start and decoded frame time from
-ffmpeg's own log, so the reported time is the frame actually returned.
+ffmpeg's own log, so the reported time is the frame actually returned. Frame
+times use showinfo's integer `pts` and time base: ffmpeg before 7.0 prints
+`pts_time` with six significant digits, which loses milliseconds after
+1000 seconds.
 
 Tests generate MP4, Matroska (negative container start) and MPEG-TS (10-second
 start offset, with and without audio) fixtures with a one-second GOP. They check
@@ -102,8 +147,9 @@ library. They are kept in a 64-entry memory LRU and in one SQLite file,
 `<cache>/keyframes.sqlite` (with its WAL), managed by
 [pkg/keyframecache](../pkg/keyframecache/store.go). An index is stored as
 delta-encoded millisecond varints (about two bytes per keyframe) plus the
-stream's color tags. Canonical stills are stored in the same file keyed by
-version and keyframe time. Indexes and stills have separate 64 MiB budgets,
+container start time and the stream's color tags. Canonical stills are stored
+in the same file keyed by version and keyframe time; single and batch requests
+share them. Indexes and stills have separate 64 MiB budgets,
 each evicted least-recently-used, so the file stays at about 128 MiB. The file is
 disposable: a corrupt or unreadable cache is deleted and recreated, and it is
 safe to delete while Stash is stopped.
@@ -116,8 +162,11 @@ safe to delete while Stash is stopped.
 | Index scan timeout | 60 s; a failed or timed-out file is not rescanned for 10 minutes |
 | Abandoned scan | cancelled 10 s after its last waiting request leaves |
 | Index request wait | 2 minutes including queueing |
-| Concurrent still extractions | 3 server-wide; more are refused with 503 |
+| Concurrent extractions | 3 server-wide; more are refused with 503 |
+| Batch share | a batch counts as one extraction but cannot take the last free one, which stays available to single stills |
 | Still extraction timeout | 5 s |
+| Batch size | 16 times |
+| Batch request timeout | 10 s, including up to 2 s waiting for the index |
 
 The scan is `ffprobe -select_streams v:0 -show_entries packet=pts_time,dts_time,flags`:
 nothing is decoded, but most containers still read every packet, so a long file
@@ -127,7 +176,7 @@ group. Debug logging reports each scan and still with its ffmpeg time.
 
 ## Access
 
-Both routes are library routes under the normal authentication middleware,
+All three routes are library routes under the normal authentication middleware,
 like `stream.scrub.*`. Shares use an explicit route allowlist that contains
 neither the scrub stream nor these routes, and offline players have no server
 URL. A signed playback URL signs the scene's `/scene/{id}/stream` prefix, which
@@ -141,4 +190,13 @@ parameters. A signature never covers another scene.
 fixtures and measures the complete still extraction, including process start.
 On a Ryzen 9 7950X3D with Fedora's ffmpeg 7.1 (about 65 ms of that is process
 start-up): 1080p H.264 98 ms, 1080p AV1 94 ms and 2160p HEVC 10-bit PQ 141 ms
-per still. Scanning a 60-second 1080p file takes 92 ms, mostly ffprobe start-up.
+per still. Scanning a 60-second 1080p file takes 92 ms, mostly ffprobe start-up;
+216,000 packets (two hours at 30 fps) take 0.6 s from the page cache. Scans of
+large files are otherwise limited by read throughput.
+
+A batch of 16 keyframes (`-bench KeyframeStills`) takes 210 ms for 1080p H.264
+and 321 ms for 2160p HEVC 10-bit PQ, against 1.62 s and 2.67 s for the same 16
+stills extracted one after another. On a two-hour MP4, whose sample tables each
+segment reparses, 16 keyframes spread over the file take 0.26 s. Peak memory is
+about 105 MB for a 1080p batch and 300 MB for a 4K HEVC batch, close to one
+4K still (285 MB); one input per keyframe needed 460 MB and 3.2 GB.

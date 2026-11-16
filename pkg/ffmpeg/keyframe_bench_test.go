@@ -62,6 +62,76 @@ func BenchmarkKeyframeStill(b *testing.B) {
 	}
 }
 
+// BenchmarkKeyframeStills compares one 16-keyframe batch with the same
+// keyframes extracted by 16 single-still processes run one after another.
+// Run with: go test ./pkg/ffmpeg -run '^$' -bench KeyframeStills
+func BenchmarkKeyframeStills(b *testing.B) {
+	encoder, probe := keyframeTestTools(b)
+	encoders := runKeyframeTool(b, encoder, "-hide_banner", "-encoders")
+	dir := b.TempDir()
+	pq := videoColorMetadata{Range: "tv", Space: "bt2020nc", Transfer: colorTransferPQ, Primaries: "bt2020"}
+	fixtures := []struct {
+		name          string
+		encoderName   string
+		width, height int
+		color         videoColorMetadata
+		args          []string
+	}{
+		{name: "1080p-h264", encoderName: "libx264", width: 1920, height: 1080, args: []string{"-c:v", "libx264", "-preset", "veryfast", "-g", "30"}},
+		{name: "2160p-hevc-pq", encoderName: "libx265", width: 3840, height: 2160, color: pq, args: []string{"-vf", "format=yuv420p10le", "-c:v", "libx265", "-preset", "ultrafast", "-x265-params", "keyint=30:min-keyint=30:scenecut=0:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc:log-level=error", "-color_primaries", "bt2020", "-color_trc", "smpte2084", "-colorspace", "bt2020nc"}},
+	}
+	f := NewEncoder(encoder)
+	for _, fixture := range fixtures {
+		if !bytes.Contains(encoders, []byte(fixture.encoderName)) {
+			b.Logf("%s is unavailable", fixture.encoderName)
+			continue
+		}
+		path := filepath.Join(dir, fixture.name+".mp4")
+		args := append([]string{"-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=" + strconv.Itoa(fixture.width) + "x" + strconv.Itoa(fixture.height) + ":rate=30", "-t", "17"}, fixture.args...)
+		runKeyframeTool(b, encoder, append(args, path)...)
+		index, err := NewFFProbe(probe).scanKeyframes(context.Background(), path, keyframeIndexTimeout)
+		if err != nil {
+			b.Fatal(err)
+		}
+		targets := index.times[1:17]
+		vf := &models.VideoFile{BaseFile: &models.BaseFile{Path: path}, Width: fixture.width, Height: fixture.height}
+		filter := keyframeStillFilter(vf, fixture.color, 240)
+
+		b.Run(fixture.name+"/batch16", func(b *testing.B) {
+			var ffmpegTime time.Duration
+			for b.Loop() {
+				stills, elapsed, err := f.extractKeyframeStills(context.Background(), path, index.startUS, targets, filter, keyframeBatchTimeout)
+				if err != nil {
+					b.Fatal(err)
+				}
+				for i, still := range stills {
+					if still == nil {
+						b.Fatalf("keyframe %d ms was not decoded", targets[i])
+					}
+				}
+				ffmpegTime += elapsed
+			}
+			b.ReportMetric(float64(ffmpegTime.Milliseconds())/float64(b.N), "ffmpeg-ms/op")
+		})
+		b.Run(fixture.name+"/singles16", func(b *testing.B) {
+			var ffmpegTime time.Duration
+			for b.Loop() {
+				for _, ms := range targets {
+					still, err := f.extractKeyframeStill(context.Background(), path, float64(ms)/1000-0.001, true, filter, keyframeStillTimeout)
+					if err != nil {
+						b.Fatal(err)
+					}
+					if got := int64(still.time*1000 + 0.5); got != ms {
+						b.Fatalf("decoded %d ms for %d ms", got, ms)
+					}
+					ffmpegTime += still.elapsed
+				}
+			}
+			b.ReportMetric(float64(ffmpegTime.Milliseconds())/float64(b.N), "ffmpeg-ms/op")
+		})
+	}
+}
+
 // BenchmarkKeyframeIndex measures the demux-only scan of a 60 s 1080p file.
 func BenchmarkKeyframeIndex(b *testing.B) {
 	encoder, probe := keyframeTestTools(b)

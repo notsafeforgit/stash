@@ -30,7 +30,7 @@ func TestKeyframeRoutesRequireStreamingAndAVideoFile(t *testing.T) {
 	streams := ffmpeg.NewStreamManager(t.TempDir(), nil, nil, nil, nil)
 	t.Cleanup(streams.Shutdown)
 	enabled := sceneRoutes{streamManager: func() *ffmpeg.StreamManager { return streams }}
-	for _, handler := range []http.HandlerFunc{enabled.KeyframeIndex, enabled.Keyframe} {
+	for _, handler := range []http.HandlerFunc{enabled.KeyframeIndex, enabled.Keyframe, enabled.KeyframeStills} {
 		w := httptest.NewRecorder()
 		handler(w, request())
 		require.Equal(t, http.StatusNotFound, w.Code)
@@ -85,9 +85,13 @@ func TestSignedStreamURLAuthorizesKeyframePreviews(t *testing.T) {
 		{"/scene/" + scene + "/stream.scrub.master.m3u8?resolution=LOW&" + signed, true},
 		{"/scene/" + scene + "/keyframes?" + signed, true},
 		{"/scene/" + scene + "/keyframe?t=1.5&v=abc&" + signed, true},
+		{"/scene/" + scene + "/keyframes/stills?t=1.5,3&v=abc&" + signed, true},
 		{"/scene/00000000-0000-4000-8000-000000000000/keyframes?" + signed, false},
+		{"/scene/00000000-0000-4000-8000-000000000000/keyframes/stills?t=1&" + signed, false},
+		{"/scene/" + scene + "/keyframes/other?" + signed, false},
 		{"/scene/" + scene + "/screenshot?" + signed, false},
 		{"/scene/" + scene + "/keyframes", false},
+		{"/scene/" + scene + "/keyframes/stills?t=1", false},
 	} {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, tc.path, nil))

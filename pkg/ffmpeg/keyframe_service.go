@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -57,10 +58,19 @@ const keyframeStillRevision = 1
 const (
 	// One demux scan at a time: it reads the whole file.
 	keyframeIndexConcurrency = 1
-	// Server-wide concurrent still extractions; more are refused with 503.
-	keyframeStillConcurrency = 3
-	keyframeIndexTimeout     = 60 * time.Second
-	keyframeStillTimeout     = 5 * time.Second
+	// Server-wide concurrent ffmpeg extractions, single or batch; more are
+	// refused with 503. A batch counts as one but may not take the last
+	// keyframeBatchReservedSlots, which stay available to single stills.
+	keyframeStillConcurrency   = 3
+	keyframeBatchReservedSlots = 1
+	// Most times one batch request may list.
+	keyframeBatchMaxStills = 16
+	keyframeIndexTimeout   = 60 * time.Second
+	keyframeStillTimeout   = 5 * time.Second
+	// Bound on a whole batch request, including its wait for the index.
+	keyframeBatchTimeout = 10 * time.Second
+	// A batch needs the index; it waits this long for one before 503.
+	keyframeBatchIndexWait = 2 * time.Second
 	// A scan continues this long after its last waiter leaves, so the steady
 	// stream of still requests during a drag can rejoin it.
 	keyframeIndexIdleGrace = 10 * time.Second
@@ -80,7 +90,44 @@ var (
 	errKeyframeIndexTimeout  = errors.New("keyframe index timed out")
 	errKeyframeIndexStopped  = errors.New("keyframe index work stopped")
 	errKeyframeBusy          = errors.New("keyframe extraction is saturated")
+	errKeyframeIndexPending  = errors.New("keyframe index is not ready")
+	errKeyframeExtraction    = errors.New("keyframe extraction failed")
 )
+
+// keyframeLimiter bounds concurrent ffmpeg extractions without queueing.
+type keyframeLimiter struct {
+	mu       sync.Mutex
+	active   int
+	capacity int
+	// Slots a batch may not take.
+	reserved int
+}
+
+func (l *keyframeLimiter) tryAcquire(batch bool) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	limit := l.capacity
+	if batch {
+		limit -= l.reserved
+	}
+	if l.active >= limit {
+		return false
+	}
+	l.active++
+	return true
+}
+
+func (l *keyframeLimiter) release() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.active--
+}
+
+func (l *keyframeLimiter) inUse() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.active
+}
 
 type keyframeFailure struct {
 	err   error
@@ -112,13 +159,15 @@ type keyframeService struct {
 	mu   sync.Mutex
 	jobs map[string]*keyframeIndexJob
 
-	indexSlots chan struct{}
-	stillSlots chan struct{}
+	indexSlots  chan struct{}
+	extractions *keyframeLimiter
 
 	indexTimeout   time.Duration
 	stillTimeout   time.Duration
+	batchTimeout   time.Duration
 	idleGrace      time.Duration
 	stillIndexWait time.Duration
+	batchIndexWait time.Duration
 	failureTTL     time.Duration
 	maxResolution  int
 	now            func() time.Time
@@ -138,11 +187,13 @@ func newKeyframeService(ctx context.Context, encoder *FFMpeg, probe *FFProbe) *k
 		stillWarnings:  stillWarnings,
 		jobs:           map[string]*keyframeIndexJob{},
 		indexSlots:     make(chan struct{}, keyframeIndexConcurrency),
-		stillSlots:     make(chan struct{}, keyframeStillConcurrency),
+		extractions:    &keyframeLimiter{capacity: keyframeStillConcurrency, reserved: keyframeBatchReservedSlots},
 		indexTimeout:   keyframeIndexTimeout,
 		stillTimeout:   keyframeStillTimeout,
+		batchTimeout:   keyframeBatchTimeout,
 		idleGrace:      keyframeIndexIdleGrace,
 		stillIndexWait: keyframeStillIndexWait,
+		batchIndexWait: keyframeBatchIndexWait,
 		failureTTL:     keyframeIndexFailureTTL,
 		maxResolution:  models.StreamingResolutionEnumLow.GetMaxResolution(),
 		now:            time.Now,
@@ -197,6 +248,11 @@ func newKeyframeSource(vf *models.VideoFile) (*keyframeSource, error) {
 	transfer := colorMetadataFromModel(vf).Transfer
 	sum := sha256.Sum256(fmt.Appendf(nil, "stash-keyframes|%d|%s|%s", keyframeStillRevision, indexKey, transfer))
 	return &keyframeSource{vf: vf, path: vf.Path, indexKey: indexKey, version: hex.EncodeToString(sum[:10])}, nil
+}
+
+// stillKey identifies the canonical still of an index keyframe.
+func (src *keyframeSource) stillKey(ms int64) string {
+	return src.version + "@" + strconv.FormatInt(ms, 10)
 }
 
 // cachedIndex returns an index from memory or the persistent store without
@@ -378,7 +434,7 @@ func (s *keyframeService) still(ctx context.Context, src *keyframeSource, t floa
 	store := s.getStore()
 	if index != nil {
 		target = index.atOrBefore(limit)
-		stillKey = src.version + "@" + strconv.FormatInt(target, 10)
+		stillKey = src.stillKey(target)
 		if store != nil {
 			if data, err := store.Get(ctx, KeyframeStoreStill, stillKey); err == nil && data != nil {
 				return &keyframeStillResult{jpeg: data, ms: target, canonical: true}, nil
@@ -386,12 +442,10 @@ func (s *keyframeService) still(ctx context.Context, src *keyframeSource, t floa
 		}
 	}
 
-	select {
-	case s.stillSlots <- struct{}{}:
-		defer func() { <-s.stillSlots }()
-	default:
+	if !s.extractions.tryAcquire(false) {
 		return nil, errKeyframeBusy
 	}
+	defer s.extractions.release()
 	if s.encoder == nil {
 		return nil, errors.New("ffmpeg is unavailable")
 	}
@@ -426,6 +480,110 @@ func (s *keyframeService) still(ctx context.Context, src *keyframeSource, t floa
 		}
 	}
 	return result, nil
+}
+
+// stills resolves each time through the index, like still, and returns its
+// keyframe per slot. Cached stills are reused; the others are extracted by one
+// ffmpeg process. A slot whose keyframe was not decoded has no image. Batches
+// require the index, because their extraction seeks to exact keyframes.
+func (s *keyframeService) stills(ctx context.Context, src *keyframeSource, times []float64) ([]keyframeStillResult, error) {
+	index := s.cachedIndex(ctx, src.indexKey)
+	if index == nil {
+		wait, cancel := context.WithTimeout(ctx, s.batchIndexWait)
+		var err error
+		index, err = s.index(wait, src)
+		cancel()
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			// The scan continues for the retry.
+			return nil, errKeyframeIndexPending
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	results := make([]keyframeStillResult, len(times))
+	images := map[int64][]byte{}
+	var missing []int64
+	store := s.getStore()
+	for i, t := range times {
+		target := index.atOrBefore(int64(math.Round(t*1000)) + keyframeTimeToleranceMS)
+		results[i].ms = target
+		if _, seen := images[target]; seen || slices.Contains(missing, target) {
+			continue
+		}
+		if store != nil {
+			if data, err := store.Get(ctx, KeyframeStoreStill, src.stillKey(target)); err == nil && data != nil {
+				images[target] = data
+				continue
+			}
+		}
+		missing = append(missing, target)
+	}
+
+	if len(missing) > 0 {
+		if err := s.extractStills(ctx, src, index, missing, images); err != nil {
+			// A refused or cancelled batch fails, as does one with nothing to
+			// serve; otherwise the cached slots are served and the rest are empty.
+			if len(images) == 0 || errors.Is(err, errKeyframeBusy) || errors.Is(err, context.Canceled) {
+				return nil, err
+			}
+			logger.Debugf("[keyframes] batch of %s: %v", src.path, err)
+		}
+	}
+	failed := 0
+	for i := range results {
+		results[i].jpeg = images[results[i].ms]
+		results[i].canonical = results[i].jpeg != nil
+		if results[i].jpeg == nil {
+			failed++
+		}
+	}
+	if failed == len(results) {
+		return nil, fmt.Errorf("%w: no keyframe decoded", errKeyframeExtraction)
+	}
+	return results, nil
+}
+
+// extractStills decodes the missing index keyframes with one ffmpeg process
+// and adds those decoded at their index time to images and the store.
+func (s *keyframeService) extractStills(ctx context.Context, src *keyframeSource, index *keyframeIndex, missing []int64, images map[int64][]byte) error {
+	if !s.extractions.tryAcquire(true) {
+		return errKeyframeBusy
+	}
+	defer s.extractions.release()
+	if s.encoder == nil {
+		return fmt.Errorf("%w: ffmpeg is unavailable", errKeyframeExtraction)
+	}
+	slices.Sort(missing)
+	filter := keyframeStillFilter(src.vf, mergeProbedColor(colorMetadataFromModel(src.vf), index.color), s.maxResolution)
+	stills, elapsed, err := s.encoder.extractKeyframeStills(ctx, src.path, index.startUS, missing, filter, s.batchTimeout)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return fmt.Errorf("%w: %w", errKeyframeExtraction, err)
+	}
+	store := s.getStore()
+	decoded, size := 0, 0
+	for i, jpeg := range stills {
+		if jpeg == nil {
+			continue
+		}
+		decoded++
+		size += len(jpeg)
+		images[missing[i]] = jpeg
+		if store != nil {
+			if err := store.Put(ctx, KeyframeStoreStill, src.stillKey(missing[i]), jpeg); err != nil && ctx.Err() == nil {
+				logger.Debugf("[keyframes] caching still: %v", err)
+			}
+		}
+	}
+	logger.Debugf("[keyframes] batch of %d stills of %s: %d decoded, ffmpeg %d ms, %d bytes", len(missing), src.path, decoded, elapsed.Milliseconds(), size)
+	return nil
 }
 
 // mergeProbedColor prefers tags observed in the file, as the scrub stream does.
@@ -560,6 +718,108 @@ func (sm *StreamManager) ServeKeyframe(w http.ResponseWriter, r *http.Request, v
 	w.Header().Set("X-Keyframe-Time", formatKeyframeTime(result.ms))
 	w.Header().Set("Access-Control-Expose-Headers", "X-Keyframe-Time")
 	_, _ = w.Write(result.jpeg)
+}
+
+// ServeKeyframeStills serves the keyframes of up to keyframeBatchMaxStills
+// comma-separated ?t= times as their JPEGs concatenated in request order.
+// X-Keyframe-Times lists each slot's keyframe time and X-Keyframe-Lengths its
+// byte length, 0 where extraction failed.
+func (sm *StreamManager) ServeKeyframeStills(w http.ResponseWriter, r *http.Request, vf *models.VideoFile) {
+	if sm.keyframes == nil {
+		http.Error(w, "keyframe previews unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	query := r.URL.Query()
+	times, err := parseKeyframeRequestTimes(query.Get("t"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	src, err := newKeyframeSource(vf)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), sm.keyframes.batchTimeout)
+	defer cancel()
+	results, err := sm.keyframes.stills(ctx, src, times)
+	if err != nil {
+		switch {
+		case r.Context().Err() != nil:
+			// The client went away; ffmpeg has already been stopped.
+		case errors.Is(err, errNoKeyframes):
+			http.Error(w, "keyframe index unavailable", http.StatusNotFound)
+		case errors.Is(err, errKeyframeBusy):
+			w.Header().Set("Retry-After", "1")
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		case errors.Is(err, errKeyframeExtraction), errors.Is(err, context.DeadlineExceeded):
+			if previous, _ := sm.keyframes.stillWarnings.ContainsOrAdd(src.version, struct{}{}); previous {
+				logger.Debugf("[keyframes] batch of %s failed: %v", src.path, err)
+			} else {
+				logger.Warnf("[keyframes] batch of %s failed: %v", src.path, err)
+			}
+			http.Error(w, "keyframe extraction failed", http.StatusInternalServerError)
+		default:
+			// The index is still being built, timed out or stopped.
+			retry := 30
+			switch {
+			case errors.Is(err, errKeyframeIndexPending):
+				retry = 2
+			case errors.Is(err, errKeyframeIndexTimeout):
+				retry = int(sm.keyframes.failureTTL / time.Second)
+			}
+			w.Header().Set("Retry-After", strconv.Itoa(retry))
+			http.Error(w, "keyframe index unavailable", http.StatusServiceUnavailable)
+		}
+		return
+	}
+	// Immutable only when every slot holds its index keyframe for the
+	// current version.
+	immutable := query.Get("v") == src.version
+	frameTimes := make([]string, len(results))
+	lengths := make([]string, len(results))
+	total := 0
+	for i, result := range results {
+		frameTimes[i] = formatKeyframeTime(result.ms)
+		lengths[i] = strconv.Itoa(len(result.jpeg))
+		total += len(result.jpeg)
+		immutable = immutable && result.canonical
+	}
+	if immutable {
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	} else {
+		w.Header().Set("Cache-Control", "no-cache")
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.Itoa(total))
+	w.Header().Set("X-Keyframe-Times", strings.Join(frameTimes, ","))
+	w.Header().Set("X-Keyframe-Lengths", strings.Join(lengths, ","))
+	w.Header().Set("Access-Control-Expose-Headers", "X-Keyframe-Times, X-Keyframe-Lengths")
+	for _, result := range results {
+		if _, err := w.Write(result.jpeg); err != nil {
+			return
+		}
+	}
+}
+
+// parseKeyframeRequestTimes parses a batch's comma-separated times.
+func parseKeyframeRequestTimes(value string) ([]float64, error) {
+	if value == "" {
+		return nil, errors.New("t is required")
+	}
+	parts := strings.Split(value, ",")
+	if len(parts) > keyframeBatchMaxStills {
+		return nil, fmt.Errorf("t lists more than %d times", keyframeBatchMaxStills)
+	}
+	times := make([]float64, len(parts))
+	for i, part := range parts {
+		t, err := parseKeyframeRequestTime(strings.TrimSpace(part))
+		if err != nil {
+			return nil, fmt.Errorf("time %d: %w", i+1, err)
+		}
+		times[i] = t
+	}
+	return times, nil
 }
 
 func parseKeyframeRequestTime(value string) (float64, error) {

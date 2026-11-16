@@ -21,7 +21,8 @@ var defaultBudgets = map[string]int64{kindIndex: 1 << 20, kindStill: 1 << 20}
 
 func TestStoreRoundTripsAndPersists(t *testing.T) {
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "keyframes.sqlite")
+	// The cache directory may not exist yet.
+	path := filepath.Join(t.TempDir(), "cache", "keyframes.sqlite")
 	store := Open(path, defaultBudgets)
 	missing, err := store.Get(ctx, kindIndex, "absent")
 	require.NoError(t, err)

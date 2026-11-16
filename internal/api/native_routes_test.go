@@ -34,6 +34,7 @@ func TestNativeSceneRoutesAvailableByDefault(t *testing.T) {
 		"/1/stream.fmp4.aac.m3u8/audio/0.m4s",
 		"/1/stream.scrub.master.m3u8",
 		"/1/keyframes",
+		"/1/keyframes/stills",
 		"/1/keyframe",
 		"/1/download.mp4",
 		"/1/download/progress",

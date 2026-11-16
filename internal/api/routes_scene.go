@@ -101,6 +101,7 @@ func (rs sceneRoutes) Routes() chi.Router {
 		// Coarse scrub tier: keyframe index and keyframe-only stills. Like the
 		// scrub stream they are library-only; share routes do not expose them.
 		r.Get("/keyframes", rs.KeyframeIndex)
+		r.Get("/keyframes/stills", rs.KeyframeStills)
 		r.Get("/keyframe", rs.Keyframe)
 		r.Get("/stream.hevc.master.m3u8", rs.StreamV3HLSHEVCMaster)
 		r.Get("/stream.hevc.m3u8/{track}.m3u8", rs.StreamV3HLSHEVCTrackPlaylist)

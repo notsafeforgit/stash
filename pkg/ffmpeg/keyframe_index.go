@@ -22,8 +22,9 @@ import (
 // change invalidates persisted indexes and every derived client version.
 const keyframeIndexRevision = 1
 
-// keyframeIndexEncoding is the packed format's leading byte.
-const keyframeIndexEncoding = 1
+// keyframeIndexEncoding is the packed format's leading byte. Entries with
+// another byte are discarded and rescanned.
+const keyframeIndexEncoding = 2
 
 // Larger indexes are thinned to a regular minimum spacing. Ordinary long-GOP
 // sources never reach this; all-intra sources would otherwise list every frame.
@@ -39,6 +40,9 @@ var errNoKeyframes = errors.New("no decodable keyframes in the first video strea
 // time minus the container's start time, in whole milliseconds.
 type keyframeIndex struct {
 	times []int64
+	// Container start time in microseconds: a keyframe's file timestamp is its
+	// scene time plus this. Batch extraction seeks by file timestamp.
+	startUS int64
 	// Stream color tags observed by the scan. Older library rows can lack
 	// them, so they decide whether stills need SDR tone mapping.
 	color videoColorMetadata
@@ -55,14 +59,15 @@ func (k *keyframeIndex) atOrBefore(ms int64) int64 {
 }
 
 // encodeKeyframeIndex packs the index as delta-encoded unsigned varints,
-// about two bytes per keyframe.
+// about two bytes per keyframe, after the color tags and container start.
 func encodeKeyframeIndex(k *keyframeIndex) []byte {
-	buf := make([]byte, 0, 32+2*len(k.times))
+	buf := make([]byte, 0, 40+2*len(k.times))
 	buf = append(buf, keyframeIndexEncoding)
 	for _, tag := range []string{k.color.Range, k.color.Space, k.color.Transfer, k.color.Primaries} {
 		buf = binary.AppendUvarint(buf, uint64(len(tag)))
 		buf = append(buf, tag...)
 	}
+	buf = binary.AppendVarint(buf, k.startUS)
 	buf = binary.AppendUvarint(buf, uint64(len(k.times)))
 	previous := int64(0)
 	for _, ms := range k.times {
@@ -89,6 +94,10 @@ func decodeKeyframeIndex(data []byte) (*keyframeIndex, error) {
 		}
 		tags[i] = string(tag)
 	}
+	startUS, err := binary.ReadVarint(r)
+	if err != nil || startUS < -maxContainerStartUS || startUS > maxContainerStartUS {
+		return nil, errors.New("invalid keyframe index start")
+	}
 	count, err := binary.ReadUvarint(r)
 	if err != nil || count == 0 || count > maxIndexedKeyframes || count > uint64(r.Len()) {
 		return nil, errors.New("invalid keyframe index length")
@@ -106,7 +115,7 @@ func decodeKeyframeIndex(data []byte) (*keyframeIndex, error) {
 	if r.Len() != 0 {
 		return nil, errors.New("trailing keyframe index data")
 	}
-	return &keyframeIndex{times: times, color: videoColorMetadata{Range: tags[0], Space: tags[1], Transfer: tags[2], Primaries: tags[3]}}, nil
+	return &keyframeIndex{times: times, startUS: startUS, color: videoColorMetadata{Range: tags[0], Space: tags[1], Transfer: tags[2], Primaries: tags[3]}}, nil
 }
 
 // scanKeyframes lists sync samples with a demux-only packet scan. Nothing is
@@ -197,7 +206,15 @@ func compactFields(fields string) map[string]string {
 	return values
 }
 
+// maxContainerStartUS bounds a plausible container start time (MPEG-TS
+// timestamps wrap after about 26.5 hours).
+const maxContainerStartUS = 1 << 47
+
 func newKeyframeIndex(raw []float64, start float64, color videoColorMetadata) (*keyframeIndex, error) {
+	startUS := int64(math.Round(start * 1e6))
+	if startUS < -maxContainerStartUS || startUS > maxContainerStartUS {
+		return nil, fmt.Errorf("%w: container start %f", errNoKeyframes, start)
+	}
 	times := make([]int64, 0, len(raw))
 	for _, pts := range raw {
 		ms := int64(math.Round((pts - start) * 1000))
@@ -221,5 +238,5 @@ func newKeyframeIndex(raw []float64, start float64, color videoColorMetadata) (*
 		}
 		times = thinned
 	}
-	return &keyframeIndex{times: slices.Clip(times), color: color}, nil
+	return &keyframeIndex{times: slices.Clip(times), startUS: startUS, color: color}, nil
 }

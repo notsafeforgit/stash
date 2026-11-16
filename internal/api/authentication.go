@@ -64,7 +64,11 @@ func authenticateSignedRequest(c *config.Config, r *http.Request) (string, bool)
 // its signed playback URL without another signature.
 func signedScenePath(requestPath string) string {
 	parts := strings.Split(strings.Trim(requestPath, "/"), "/")
-	if len(parts) == 3 && parts[0] == "scene" && (parts[2] == "keyframes" || parts[2] == "keyframe") {
+	if len(parts) < 3 || parts[0] != "scene" {
+		return requestPath
+	}
+	switch strings.Join(parts[2:], "/") {
+	case "keyframes", "keyframes/stills", "keyframe":
 		return "/scene/" + parts[1] + "/stream"
 	}
 	return requestPath

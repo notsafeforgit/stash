@@ -18,6 +18,11 @@ func (rs sceneRoutes) Keyframe(w http.ResponseWriter, r *http.Request) {
 	rs.serveKeyframes(w, r, (*ffmpeg.StreamManager).ServeKeyframe)
 }
 
+// KeyframeStills returns up to 16 keyframe stills in one response.
+func (rs sceneRoutes) KeyframeStills(w http.ResponseWriter, r *http.Request) {
+	rs.serveKeyframes(w, r, (*ffmpeg.StreamManager).ServeKeyframeStills)
+}
+
 func (rs sceneRoutes) serveKeyframes(w http.ResponseWriter, r *http.Request, serve func(*ffmpeg.StreamManager, http.ResponseWriter, *http.Request, *models.VideoFile)) {
 	scene := r.Context().Value(sceneKey).(*models.Scene)
 	streamManager := rs.streamManager()

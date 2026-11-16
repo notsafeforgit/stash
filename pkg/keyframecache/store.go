@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -241,6 +242,10 @@ func (s *Store) open() (*sql.DB, error) {
 }
 
 func (s *Store) openDatabase() (*sql.DB, error) {
+	// Stream sessions create the cache directory lazily, too.
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+		return nil, err
+	}
 	file, err := os.OpenFile(s.path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err

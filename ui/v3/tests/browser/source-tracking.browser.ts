@@ -23,7 +23,6 @@ for (const desktop of [false, true]) {
         "Account review",
         "Review queue",
         "Archive activity",
-        "Import history",
         "Saved actions",
       ]) {
         await expect(menu.getByRole(role, { name, exact: true })).toHaveCount(

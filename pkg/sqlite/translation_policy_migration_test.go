@@ -33,7 +33,7 @@ func TestTranslationPolicyMigrationPreservesLibraryAndRejectsCollisions(t *testi
 			raw := openRawDB(t, path)
 			defer raw.Close()
 			before := map[string][][]any{}
-			for _, table := range []string{"performers", "performer_names", "scenes", "images", "archive_entities", "source_posts", "source_captures", "source_collection_captures", "metadata_policies", "archive_jobs", "translation_requests", "translation_targets", "translation_target_history", "translation_activations"} {
+			for _, table := range []string{"performers", "performer_names", "scenes", "images", "archive_entities", "source_posts", "source_captures", "source_collection_captures", "metadata_policies", "archive_jobs", "translation_requests", "translation_targets", "translation_target_history"} {
 				before[table] = albumJobRows(t, raw, table)
 			}
 			if collision {

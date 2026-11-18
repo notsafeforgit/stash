@@ -8,6 +8,8 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// Upgrades crossing schema 1000121 still compact untouched catalog membership
+// groups exactly as before; schema 1000142 later drops the catalog tables.
 func init() {
 	RegisterTransactionalMigration(NativeSchemaBaseline+121, func(ctx context.Context, tx *sqlx.Tx) error {
 		return compactCatalogMemberships(ctx, tx, "")

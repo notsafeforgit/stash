@@ -40,8 +40,8 @@ list. Verify open findings against the code and tests before implementing them.
 Published artifacts and deployment are separate facts: use the operations release
 selection and verification records to establish what is installed, then live
 service state for current health. A Git commit or successful image build alone
-does not establish deployment. Routine improvements do not repeat catalog imports,
-library reconciliation or the completed native cutover.
+does not establish deployment. Routine improvements do not repeat library
+reconciliation or the completed native cutover.
 
 ## Runtime map
 
@@ -200,12 +200,9 @@ owns these decisions.
 
 Receipts and source evidence have different lifetimes from temporary staging.
 Completed enrichment releases verified staging while retaining publication proof.
-Consumed historical catalog payloads have a separate explicit, checkpointed
-[retirement operation](native-schema.md#consumed-catalog-payload-retention-1000132).
-It retains receipts and hashes and frees reusable SQLite pages; it does not
-shrink the database file or run on ordinary startup. Discovery listing/detail
-staging still has separate retention limits; do not generalize catalog or
-enrichment cleanup to every job payload.
+The frozen import staging was removed in schema 1000142; see
+[import history retirement](native-schema.md#import-history-retirement-schema-1000142).
+Do not generalize enrichment cleanup to every job payload.
 
 ### Historical bridge and native migration
 

@@ -116,11 +116,10 @@ type EnrichmentPublishedRecord struct {
 }
 
 // A verified legacy lookup adds a service identifier to the existing post.
-// The original discovery input and published checkpoint record retain its proof.
-type EnrichmentDiscoveryResolution struct {
+// The retained lookup row and published checkpoint record retain its proof.
+type EnrichmentIdentityResolution struct {
 	JobUUID            string    `json:"job_uuid" db:"job_uuid"`
-	SnapshotUUID       string    `json:"snapshot_uuid" db:"snapshot_uuid"`
-	SourceOrdinal      int64     `json:"source_ordinal" db:"source_ordinal"`
+	LookupID           int64     `json:"lookup_id" db:"lookup_id"`
 	CheckpointRevision int       `json:"checkpoint_revision" db:"checkpoint_revision"`
 	RecordOrdinal      int       `json:"record_ordinal" db:"record_ordinal"`
 	PostUUID           string    `json:"post_uuid" db:"post_uuid"`
@@ -153,9 +152,6 @@ type EnrichmentCheckpointRelease struct {
 }
 
 type EnrichmentJobReaderWriter interface {
-	AdmitHandoff(context.Context, string, string, time.Time) (*ArchiveJob, error)
-	HandoffJob(context.Context, string) (*ArchiveJob, error)
-	Seed(context.Context, string) (*CheckpointHandoffSeed, error)
 	Collections(context.Context, EnrichmentCollectionQuery, time.Time) ([]EnrichmentCollectionCandidate, error)
 	Ready(context.Context, string, string, string, int64, int, time.Time) ([]EnrichmentJobCandidate, error)
 	Maintain(context.Context, time.Time) (*EnrichmentMaintenanceResult, error)
@@ -173,8 +169,8 @@ type EnrichmentJobReaderWriter interface {
 	CheckpointHead(context.Context, string) (*EnrichmentCheckpoint, error)
 	CheckpointReceipts(context.Context, string, int, int) ([]EnrichmentCheckpointReceipt, error)
 	CheckpointRecords(context.Context, string, int, int) ([]EnrichmentCheckpointRecord, error)
-	ResolveDiscoveryIdentity(context.Context, EnrichmentJobLease, int, string, int, time.Time) (*EnrichmentDiscoveryResolution, error)
-	DiscoveryResolution(context.Context, string) (*EnrichmentDiscoveryResolution, error)
+	ResolveLookupIdentity(context.Context, EnrichmentJobLease, int, string, int, time.Time) (*EnrichmentIdentityResolution, error)
+	IdentityResolution(context.Context, string) (*EnrichmentIdentityResolution, error)
 	Publish(context.Context, EnrichmentJobLease, int, string, []string, time.Time) (*EnrichmentPublication, error)
 	Publication(context.Context, string) (*EnrichmentPublication, error)
 	PublishedRecords(context.Context, string, int, int) ([]EnrichmentPublishedRecord, error)

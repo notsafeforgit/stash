@@ -289,9 +289,9 @@ or a lock held by another process cannot establish the backup boundary.
 Restore this journal alongside the matching native database/media snapshot
 before restarting maintenance; do not copy a live database without its WAL.
 
-The client does not perform the old orphan-NFO/text cleanup. Retained sidecars
-need their verified native import and cleanup boundary, and direct/manual scan
-intake must remain available. Installed production launchers have not switched;
+The client does not perform orphan-NFO/text cleanup; the retired NFO cleanup
+command was removed in schema 1000142. Direct and manual scan intake must remain
+available. Installed production launchers have not switched;
 the final cutover must install the staged service/wrappers and maintenance
 inventory together with the native server and workers.
 

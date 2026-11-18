@@ -186,3 +186,14 @@ func TestUnavailableEnrichmentRetiresOnlyCompleteSavedPosts(t *testing.T) {
 		})
 	}
 }
+
+func readEnrichmentTarget(t *testing.T, repo models.Repository, id string) *models.EnrichmentTarget {
+	t.Helper()
+	var ret *models.EnrichmentTarget
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		ret, err = repo.EnrichmentWork.Target(ctx, id)
+		return err
+	}))
+	return ret
+}

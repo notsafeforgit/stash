@@ -87,8 +87,6 @@ func (s *ArchivePaginationStore) PageInfo(ctx context.Context, f models.ArchiveP
 			}
 		}
 		column, descending, numeric = "id", true, true
-	case "imports":
-		query, err = importSnapshotSelect(f.Kind)
 	case "shares":
 		var active *bool
 		if f.State != "" {

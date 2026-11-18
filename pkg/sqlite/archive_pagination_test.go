@@ -31,10 +31,7 @@ func TestArchivePaginationEmptyResourcesAndValidation(t *testing.T) {
 			require.Zero(t, info.Offset)
 		})
 	}
-	for _, kind := range []string{"catalog", "automation"} {
-		require.Zero(t, archivePageInfo(t, repo, models.ArchivePageFilter{Resource: "imports", Kind: kind}).Total)
-	}
-	for _, filter := range []models.ArchivePageFilter{{Resource: "arbitrary_table"}, {Resource: "media-roots", State: "invalid"}, {Resource: "jobs", Cursor: "-1"}, {Resource: "posts", Cursor: "bad"}, {Resource: "root-history"}, {Resource: "accounts", Scope: "bad"}} {
+	for _, filter := range []models.ArchivePageFilter{{Resource: "arbitrary_table"}, {Resource: "imports", Kind: "catalog"}, {Resource: "media-roots", State: "invalid"}, {Resource: "jobs", Cursor: "-1"}, {Resource: "posts", Cursor: "bad"}, {Resource: "root-history"}, {Resource: "accounts", Scope: "bad"}} {
 		err := repo.WithReadTxn(t.Context(), func(ctx context.Context) error { _, err := repo.ArchivePagination.PageInfo(ctx, filter); return err })
 		require.ErrorIs(t, err, models.ErrArchivePageInvalid)
 	}

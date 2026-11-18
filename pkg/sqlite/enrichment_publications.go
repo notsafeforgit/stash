@@ -50,19 +50,6 @@ func (s *EnrichmentJobStore) PublishedRecords(ctx context.Context, id string, af
 	if err != nil {
 		return nil, err
 	}
-	var retained []enrichmentRetainedRecord
-	if err := dbWrapper.Select(ctx, &retained, "SELECT ordinal,capture_uuid,digest FROM enrichment_job_retained_records WHERE job_uuid=? AND ordinal>? ORDER BY ordinal LIMIT ?", id, after, limit); err != nil {
-		return nil, err
-	}
-	byOrdinal := make(map[int]string, len(retained))
-	for _, record := range retained {
-		byOrdinal[record.Ordinal] = record.CaptureUUID
-	}
-	for i := range ret {
-		if id, ok := byOrdinal[ret[i].Ordinal]; ok {
-			ret[i].RetainedCapture = &id
-		}
-	}
 	return ret, err
 }
 
@@ -218,7 +205,7 @@ func (s *EnrichmentJobStore) Publish(ctx context.Context, lease models.Enrichmen
 	}
 	get := func(out any, query string, args ...any) error { return dbWrapper.Get(ctx, out, query, args...) }
 	selectRows := func(out any, query string, args ...any) error { return dbWrapper.Select(ctx, out, query, args...) }
-	if err := verifyEnrichmentTranscript(get, selectRows, job, work, transcript); err != nil {
+	if err := verifyEnrichmentTranscript(job, work, transcript); err != nil {
 		return nil, err
 	}
 	unique := make(map[string]bool)
@@ -234,7 +221,7 @@ func (s *EnrichmentJobStore) Publish(ctx context.Context, lease models.Enrichmen
 			if record.Ordinal != after+1 || record.Ordinal >= len(captures) {
 				return nil, models.ErrSourcePayloadCorrupt
 			}
-			input, post, err := enrichmentRecordCapture(get, selectRows, job.UUID, work, transcript, record, captures[:record.Ordinal])
+			input, post, err := enrichmentRecordCapture(job.UUID, work, transcript, record, captures[:record.Ordinal])
 			if err != nil {
 				return nil, err
 			}

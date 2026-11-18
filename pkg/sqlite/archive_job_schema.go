@@ -44,10 +44,10 @@ func validateAlbumJobSchema(conn *sqlx.DB, version uint, auditData bool) error {
 	if version >= NativeSchemaBaseline+51 {
 		allowed += ",'post.enrich'"
 	}
-	if version >= NativeSchemaBaseline+71 {
+	if version >= NativeSchemaBaseline+71 && version < importRetirementVersion {
 		allowed += ",'account.list_page'"
 	}
-	if version >= NativeSchemaBaseline+76 {
+	if version >= NativeSchemaBaseline+76 && version < importRetirementVersion {
 		allowed += ",'post.verify_candidate'"
 	}
 	if version >= NativeSchemaBaseline+92 {

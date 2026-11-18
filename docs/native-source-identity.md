@@ -2,11 +2,10 @@
 
 The native archive separates captured account identifiers, an account's owner,
 and performers depicted in media. `pkg/archive.ExtractCapturedAccount` implements
-the versioned `captured-account-v1` parser for producer and catalog-import work.
+the versioned `captured-account-v1` parser for producer work.
 It returns evidence; it does not allocate accounts, merge them, change ownership,
 or assign scene/image performers. Ingestion uses the publisher decisions described
-below to select an account from that evidence. Historical catalog identity imports
-have their own explicit review and receipt boundaries.
+below to select an account from that evidence.
 
 The input is a reconstructed capture object, bounded by the source JSON limit.
 The output contains a qualified namespace, optional display label, policy version,
@@ -15,8 +14,8 @@ An explicitly captured ID is required before pairing any handles with it. A
 missing ID returns no account claim; a malformed claimed identifier is an error
 that the caller must surface for review. Retained source data is not discarded
 or replaced by this derived result. Existing handle-only inventory records,
-explicit associations, and legacy keys still require their own lossless import;
-a nil parser result does not authorize discarding them.
+explicit associations, and legacy keys are retained as stored evidence; a nil
+parser result does not authorize discarding them.
 
 | Extractor | Account ID evidence | Additional captured identity |
 | --- | --- | --- |
@@ -119,7 +118,7 @@ The application-authenticated `/api/v3/archive` API exposes these reviews:
 
 Actions are `automatic`, `link`, `create`, `unlink`, and `inherit`. Only `link`
 accepts an account UUID. Explicit choices always use review provenance; producer
-credentials cannot perform these reviews. An imported account with only a handle
+credentials cannot perform these reviews. An account with only a handle
 can be confirmed by previewing a captured author ID against that account and
 applying `link`. This records the captured ID and handle with their source and
 observation time. Other retained captures can then be previewed and applied with
@@ -167,268 +166,11 @@ merge redirects, without the redundant “Original library ID” field. Internal
 `archive_entities.original_id` values are not URL aliases and are still used by
 media-conversion integrity checks; this change requires no database migration.
 
-## Importing the performer registry
-
-Schema 1000028 adds a reviewed import of a frozen registry's five performer
-identity tables and its two older `catalog_metadata_*` tables. Existing catalog
-performer UUIDs become the UUIDs of their explicitly bound native performers;
-the previous native UUIDs remain resolvable redirects. Local performer IDs,
-selected names, aliases, URLs and other library metadata are preserved. Saved
-catalog profiles, events, bindings and migration receipts remain inspectable
-as original evidence rather than overwriting newer selected metadata.
-
-The import requires the original registry database UUID, a stable snapshot UUID,
-capture time, and the explicit namespace identifying this Stash library. Only
-saved local bindings or an existing exact catalog UUID identify a performer.
-Unbound identities, missing/reused local IDs, multiple active bindings and UUID
-collisions become review records. Bindings for other libraries remain external
-evidence; their integer IDs are never interpreted as local Stash IDs. Historical
-catalog UUID redirects preserve an already-completed merge without deleting or
-recreating local performers. An old local merge ID that exists again is reported
-for review and is left intact.
-
-An optional, reviewed account map connects each exact old account key to a native
-source-account UUID. This is a one-time migration input, not a plugin setting or
-a second live ownership registry. Unmapped keys remain review records, including
-directory-derived labels whose service identity cannot be asserted. Captured
-account-identifier import follows in the registry step below. This performer
-operation does not infer native IDs, handles or service namespaces from a key.
-
-Saved associations and explicit unlinks become native ownership decisions only
-when both sides are resolved. A `migration_conflict` placeholder remains review,
-not a deliberate unlink. Existing native ownership choices are preserved: an
-equal choice maps to the existing decision, while a differing choice needs review.
-Several old keys mapped to one account coalesce equal choices and report
-contradictory ones. The `catalog-metadata-links-v1` receipt makes older plugin
-bindings superseded evidence, so they cannot resurrect later unlinks. A registry
-containing only the older plugin tables is retained for reconciliation.
-
-The application API exposes these maintenance operations:
-
-| Method and path under `/api/v3/archive` | Result |
-| --- | --- |
-| `POST /catalog-identity-imports/preview` | Current identity/ownership actions and every original row's proposed outcome, plus the reviewed plan digest |
-| `POST /catalog-identity-imports` | Apply `{binding, expected_plan_sha256}` atomically and return the immutable receipt |
-| `GET /catalog-identity-imports/{uuid}` | Original receipt, including its frozen plan |
-| `GET /catalog-identity-imports/{uuid}/records?after=0` | Up to 100 original rows with retained evidence, outcomes and native references |
-
-These routes require application authorization; producer ingest tokens grant
-no access. Changed identities, ownership, bindings or snapshot bytes invalidate
-an uncommitted preview. A successful retry returns the original receipt even
-after a subsequent native edit. A different snapshot cannot replay the same
-registry/namespace cutover. Resolving retained review items is subsequent native
-review work, not permission to reapply old choices. The transaction cannot commit
-part of an import even if a caller accidentally swallows a write error.
-
-`stash-import-catalog-identities` inventories every table/column in one read-only
-SQLite transaction. It rejects unknown shapes and inventories the remaining
-catalog/routing/identifier tables for their later import. Original embedded JSON
-text and large IDs survive unchanged. Limits are 10,000 retained rows and an
-8 MiB document; inputs exceeding these limits need an explicit migration plan.
-
-Prepare from a frozen copy with `--registry`, `--source`, `--snapshot`,
-`--captured-at`, `--namespace`, and optionally `--account-bindings`. Save the
-output privately. Then use `--binding saved.json --endpoint URL` to obtain the
-server preview. Apply that saved preview using the same binding and endpoint,
-`--apply --expected-sha256 PLAN_SHA256`; retry the exact same input after response
-loss. The Stash application key is read from `STASH_API_KEY` (or `--api-key-env`),
-never from the registry payload. Website credentials remain with the scraper.
-
-## Importing catalog accounts and groupings
-
-Schema 1000029 imports the remaining six registry families: `catalogs`, `routes`,
-`links`, `account_identifiers`, `account_identifier_checkpoints`, and
-`account_profile_urls`. It requires the completed performer import from the same
-frozen registry, with the same source UUID and capture time. Each import's retained
-table counts must match the other's external inventory. Keep that frozen database
-through both steps; matching counts alone do not establish a common snapshot.
-
-Captured, qualified account IDs establish native source accounts. Handles observed
-alongside those IDs become identifiers on the same account. Reused handles with
-different captured IDs remain ambiguous; matching labels never merge accounts.
-Different reference kinds, such as a TikTok numeric ID and `secUid`, resolve to
-one account only when existing native evidence already establishes that connection.
-Mirror account IDs stay qualified by mirror and service. Captured mirror public
-IDs can associate a saved locator in its evidenced catalog; mirror display names
-never become native handles. Existing exact ID matches and explicit account
-bindings from the performer import preserve the chosen native account and label.
-Conflicting native candidates remain visible for review.
-
-An old locator for a known native service can create a provisional account when
-no captured ID is available. Its evidence is marked `legacy-locator`; an old
-numeric-looking key is retained as `legacy_key`, not promoted to a verified ID.
-Unknown services and directory-derived labels remain review items. No website
-requests or name-based performer matches run during this import.
-
-Each surviving catalog becomes a disabled `legacy_catalog` source collection.
-Old catalog redirects map to that survivor, and all grouping/link history is
-retained. A collection's resolved account identifies its publisher; it does not
-assign depicted performers to its media. Aggregator and directory collections can
-have no account. Imported collections have no root, destination prefix or scrape
-URL: directory routes, media keys and identifier checkpoints are retained evidence
-for subsequent validated routing and catalog-content import. Importing a grouping
-does not activate a scrape or restore old process state.
-
-Resolved saved performer/account links and unlinks become native ownership
-decisions, with the same conflict and later-edit protections as the performer
-import. Source-qualified `catalog_account_mappings` and `catalog_collection_mappings`
-preserve the original migration associations for the remaining catalog import.
-They are immutable migration records, not plugin settings or another ownership
-authority. Subsequent native account consolidation resolves their original UUIDs.
-
-The application-authorized API follows the same guarded preview/apply contract:
-
-| Method and path under `/api/v3/archive` | Result |
-| --- | --- |
-| `POST /catalog-registry-imports/preview` | Account, legacy-key, collection and ownership actions; original row outcomes and plan digest |
-| `POST /catalog-registry-imports` | Atomically apply `{binding, expected_plan_sha256}` and return the immutable receipt |
-| `GET /catalog-registry-imports/{uuid}` | Original receipt and frozen plan |
-| `GET /catalog-registry-imports/{uuid}/records?after=0` | Up to 100 original rows, with native references and retained evidence |
-
-One source registry has one account/grouping cutover. Exact retries return the
-original receipt after restart or later native edits. A stale plan or changed
-snapshot conflicts; a failed write rolls back both domain records and receipts.
-Original evidence remains available even when an account, route or catalog needs
-review. Anonymised exports remove these receipts, mappings and source rows.
-
-`stash-import-catalog-registry` reads the six families in one read-only SQLite
-transaction and inventories the seven performer families. Limits are 25,000 rows
-and a 16 MiB document. Unknown table/column shapes, incomplete identifier families,
-duplicate row keys and broken catalog redirect graphs are rejected.
-
-Prepare with `--registry FROZEN_SQLITE --identity-import SAVED_IDENTITY_JSON
---snapshot UUID`. The saved identity binding, preview or receipt supplies the
-source UUID, performer-import UUID and capture time. Save the output privately,
-then preview with `--binding SAVED_REGISTRY_JSON --endpoint URL`. Apply the
-reviewed binding using `--apply --expected-sha256 PLAN_SHA256`; retry the same
-binding and digest after response loss. As above, authorization uses the Stash
-application key, not a producer token or website credential. Review resolution,
-source activation and the individual catalog bodies remain subsequent work.
-
-## Preparing individual catalog bodies
-
-The supported producer package now includes `stash-prepare-catalog`, the read-only
-input stage for catalog-body migration. Its versioned reader covers recognized
-SQLite catalog layouts for versions 1–3, including flat observations, shared
-observation/capture rows, separately referenced account profiles, older physical
-sidecars and normalized sidecar documents/sources. It checks the database lineage,
-column/key inventory, SQLite integrity and logical references independently of
-whether older schemas declared every foreign key. Unknown shapes stop preparation.
-
-A prepared snapshot retains every physical row, original JSON text and binary
-sidecar bytes in bounded, ordered chunks. Its manifest binds the original registry
-UUID, catalog ID, snapshot UUID, capture time, complete schema, table/chunk hashes,
-record counts, relationship counts and reconstructed capture hashes. Shared
-observations with detail rows produce only their original captures; a flat
-observation produces one capture. The shared observation's summary timestamp is
-not invented as an additional capture. Profile hashes and reference paths are
-validated before hydration, and `_reddit` parent patches preserve their original
-merge semantics. Reconstruction runs in memory and adds no stored payload copies.
-
-The CLI publishes a new private directory after flushing its contents and supports
-verification of the exact saved manifest after interruption or response loss.
-It performs no native database writes or identity/media decisions. The resulting
-chunks are the input to the native catalog importer, whose domain
-mappings, review outcomes and completion receipts remain separate work. See the
-[snapshot command and format](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#individual-catalog-snapshots).
-
-## Receiving catalog snapshots
-
-Native schema 1000030 adds bounded, resumable receipt of the prepared catalog
-bodies. The application API requires the manifest's original registry source and
-catalog ID to have an imported `catalog_collection_mappings` association. It binds
-one immutable snapshot to that source/catalog pair, registry receipt and native
-collection. A new UUID cannot silently replace an existing frozen input.
-
-| Method and path under `/api/v3/archive` | Result |
-| --- | --- |
-| `POST /catalog-snapshots` | Receive the original manifest bytes, or return current progress for an exact retry |
-| `PUT /catalog-snapshots/{uuid}/chunks/{index}` | Atomically receive the next ordered JSONL chunk and its receipt |
-| `GET /catalog-snapshots/{uuid}` | Bounded progress summary, original binding and explicitly pending families |
-
-Both writes require `X-Stash-Manifest-SHA256` with the reviewed manifest digest.
-The manifest uses `application/json` and is limited to 8 MiB; chunks use
-`application/x-ndjson` and at most 1,000 rows/16 MiB. The server independently
-checks recognized table/column/key shapes, unique SQLite key ordering, exact
-chunk and table hashes/counts, embedded JSON, binary sidecar checksums and catalog
-identity rows. Retained SQLite schema text is evidence and is never executed.
-Known sidecar views and their triggers are retained without copying view rows.
-
-`catalog_snapshots` holds the frozen manifest/binding and progress;
-`catalog_snapshot_chunks` holds immutable acknowledgements;
-`catalog_snapshot_tables` holds resumable table-hash checkpoints; and
-`catalog_snapshot_records` temporarily holds original JSONL rows, indexed by
-snapshot, table/key and ordinal. Original strings and binary encodings survive
-unchanged. Hash checkpoints allow bounded transactions even for a large catalog.
-A failed chunk rolls back its records, hashes and receipt together. Replaying an
-already received chunk returns current progress without duplicating rows.
-
-The `received` state proves byte receipt only. It always reports `imported:false`
-and lists every table in `pending_families`. Referential/capture reconstruction
-proofs in the manifest are still claims to reconcile through native domain
-importers before completion. Upload does not create posts, change selected fields,
-assign performers, scan files, or activate jobs. Native mappings and eventual
-retirement of temporary staged bodies remain required subsequent work; these
-tables do not become a parallel catalog authority. Anonymisation removes their
-private source evidence before deleting registry mappings.
-
-## Mapping catalog source evidence
-
-Native schema 1000031 maps received `posts`, `observations`,
-`observation_details` and `account_snapshots` into the native source evidence
-services. `catalog_evidence_imports` holds bounded progress;
-`catalog_evidence_posts` binds each original post key to its native identity or
-review reason; `catalog_evidence_records` retains one immutable disposition per
-original row, including its checksum and capture/profile mapping. Staged source
-bytes remain available while other catalog families still need import.
-
-| Method and path under `/api/v3/archive/catalog-snapshots/{uuid}` | Result |
-| --- | --- |
-| `GET /evidence-import` | Current evidence mapping checkpoint; 404 before the first committed batch |
-| `POST /evidence-import` | Advance with `expected_manifest_sha256` and the exact `after` ordinal |
-| `GET /evidence-import/records?after=0&limit=100` | Bounded original-row dispositions without payload bodies |
-
-These routes require application access. Each write processes at most 50 source
-records, stopping between records once decoded input reaches 16 MiB. Individual
-source rows and reconstructed payloads also have size bounds. Indexed dependency
-lookups load the relevant post, URLs, observation and profiles. Native writes and
-their checkpoint commit together. Following a lost response, read the checkpoint
-before submitting the next batch; a stale ordinal conflicts. Completed passes
-replay their original receipt.
-
-Qualified service IDs share native posts across catalogs. Mirror URLs preserve
-`mirror:coomer:onlyfans`, `mirror:kemono:patreon` and other mirror/service
-namespaces even when old catalog rows used a native service label. Unqualified
-local keys remain scoped to their physical catalog. Captured IDs from the
-[supported post adapters](native-ingestion.md) can qualify a local identity, but
-differing captured/catalog IDs, existing conflicting associations and forgotten
-posts produce review outcomes. No names,
-directory labels or content equality establish performer ownership.
-Completed import receipts keep their original outcomes; adding an adapter does
-not silently rerun earlier identity decisions.
-
-The reader reproduces the original Python checksum encoding before native
-conversion. Shared observations with detail rows receive a `shared` disposition;
-only their detail rows become captures. Flat observations become one capture.
-The native store deduplicates post revisions, payloads and profile bodies. An
-exact copied event can share a capture across catalogs only when its old capture
-ID and complete native event signature agree; differing payloads, provenance or
-capture times remain distinct. Historical collection provenance is pinned to the
-original imported collection revision. Unreferenced profile bodies are retained.
-
-A pass ends in `mapped` or `review`, always with `imported:false`. These states
-cover source evidence only; they do not complete the catalog migration. They do
-not select metadata, attach media, assign performers, construct galleries or
-activate source jobs. Subsequent importers and final reconciliation must cover
-the remaining families and resolve or retain review outcomes before staging can
-be retired. The snapshot receipt's `pending_families` remains the conservative
-whole-catalog inventory until that final coordination is implemented.
-
 ## Post links and their evidence
 
 Native schema 1000032 adds `SourcePostLinks` for post URLs, identifier evidence
-and unselected publisher claims. The schema-1000033 catalog relationship import
-uses these services to retain original catalog associations.
+and unselected publisher claims. The retained relationship evidence from schema
+1000033 uses these records; its import routes were retired in schema 1000142.
 
 `source_post_urls` stores each exact URL once per post. Repeated observations
 share that row and retain their own UUID, origin, basis, observation time and
@@ -549,7 +291,7 @@ unrelated posts' revision counters. A deferred foreign key prevents committing
 replacement proof without the replacement itself. Original decisions and
 capture ownership remain immutable, and exact media-decision retries survive
 later merges and restart. Existing associations to deleted media can be carried
-forward without restoring library records or making them eligible for imports.
+forward without restoring library records or making them eligible for new intake.
 
 The internal gallery choice operation requires the complete reviewed set of
 current associations, retires those associations and records one new choice.
@@ -603,7 +345,7 @@ Capture summaries share revision metadata and page the indexed ranges of the
 original members without reconstructing their payloads. Metadata policies use
 the same deduplicated current URLs while retaining the selected original capture
 and post as provenance. Original-owner evidence getters remain available to
-history, import recovery and complete merge comparison.
+history, recovery and complete merge comparison.
 
 Historical media matching uses the indexed evidence of every original post in
 the current identity. Equivalent source attachments can use original evidence
@@ -645,222 +387,12 @@ to their original post UUID after redirection. A definitively stale preview
 requires a new review. Merge history and notification retries are available
 without depending on the browser that performed the merge.
 
-## Mapping catalog relationships
-
-Native schema 1000033 maps `accounts`, `handles`, `posts`, `post_urls` and
-`post_aliases` after the snapshot's source-evidence pass has finished. Each
-`catalog_relation_records` receipt retains the original key, row checksum and
-complete source values alongside its native references or review reason. This
-keeps legacy basis, timestamps and unsupported values available beyond temporary
-staging. `catalog_relations_imports` checkpoints bounded progress atomically
-with the native writes and immutable receipts.
-
-| Source family | Native result |
-| --- | --- |
-| `accounts` | Observe the original legacy key on the account selected by the snapshot's frozen registry mapping. Retain old source IDs and identity basis as evidence; do not reinterpret them as captured service IDs. |
-| `handles` | Observe native handles at their original `first_observed` time. Mirror values become `legacy_label` references because these fields can contain display names. |
-| `post_urls` | Deduplicate the exact URL per mapped post, preserving separate evidence for each original catalog row. |
-| `post_aliases` | Add a physical-catalog-scoped legacy identifier with provenance; an alias already bound elsewhere requires review. |
-| `posts` | Retain the old account association as an unselected claim. An absent account yields `unassigned`; missing mappings or incompatible namespaces require review. |
-
-The association observation time is the frozen snapshot time. An old post's
-creation time cannot establish when its current account link was made; the
-original value remains in the receipt. Original account UUIDs survive account
-consolidation, while core lookups resolve their canonical account. Forgotten
-posts, invalid legacy values and unmapped dependencies retain review outcomes
-instead of creating new associations. No publisher selection, ownership choice,
-performer attribution, media intake or job activation occurs in this pass.
-
-| Method and path under `/api/v3/archive/catalog-snapshots/{uuid}` | Result |
-| --- | --- |
-| `GET /relations-import` | Current relationship checkpoint; 404 before the first committed batch |
-| `POST /relations-import` | Advance with `expected_manifest_sha256` and the exact `after` ordinal |
-| `GET /relations-import/records?after=0&limit=100` | Bounded summaries; keys exceeding 8 KiB are omitted with `key_omitted:true` |
-| `GET /relations-import/records/{ordinal}` | One full original key and source-values object, with its disposition and native references |
-
-These routes require application access. Writes process at most 50 rows, stopping
-between records after 16 MiB of decoded input. Each original row already meets
-the snapshot's 16 MiB limit. A late failure rolls back native writes, receipts and
-progress together. Resume a lost response by reading the committed checkpoint;
-completed passes replay unchanged. Startup verifies source-row correspondence,
-counts, checkpoint continuity and native evidence scope. Anonymisation removes
-these records before their source and account parents.
-
-The CLI is `stash-import-catalog-relations`; it revalidates the frozen snapshot
-and received-upload receipt before advancing. Exit 0 means mapped, exit 2 means
-completed with review outcomes, and exit 1 means failure or an unavailable
-response. An unassigned legacy post is counted separately from a conflict.
-Every receipt remains `imported:false`: captured publisher decisions, remaining
-catalog families and final semantic reconciliation are still required.
-
-## Selecting catalog capture publishers
-
-The subsequent explicit [catalog association repair](catalog-association-repair.md)
-also supports imported post-account claims and known gallery-dl author folders
-when captures have no author IDs. It records ordinary publisher decisions and
-optionally links a unique existing performer name/alias, preserving explicit
-unlinks and conflicting evidence. The capture-ID import described below keeps
-its original strict policy and immutable receipts.
-
-Native schema 1000034 applies the existing `captured-account-v1` policy after a
-snapshot's evidence and relationship passes have completed. It processes the
-original flat observations and detail captures; shared observation parents do
-not become extra captures. Decisions use each capture's reconstructed source
-payload and the same core service used by native ingestion.
-
-An actual captured author ID can link to a uniquely matching account. With no
-matching account or conflicting handle candidates, the core policy can create
-an account from that ID. A handle alone, the scraped feed's owner profile, the
-folder name or an old catalog association cannot establish the publisher. Mirror
-identities retain their service-qualified namespace. Source publishers remain
-separate from depicted performers and account ownership choices.
-
-| Receipt outcome | Meaning |
-| --- | --- |
-| `linked` | The core policy selected a publisher and retained its captured identifier evidence. `created_account` records whether it also created the account. |
-| `preserved` | A publisher link or explicit unlink already existed and remains unchanged. |
-| `review` | The capture could not be mapped, its identity is invalid, or identity candidates conflict. The receipt retains the decision context and candidate references. |
-| `unavailable` | The source has no qualifying captured identity, or the post was forgotten. No publisher is inferred. |
-
-Receipts reference the existing capture and historical decision, retaining a
-small context object rather than another copy of source payloads or profiles.
-They preserve the original account UUID and resolve its current canonical UUID
-when read. Later decisions do not rewrite these historical receipts.
-
-| Method and path under `/api/v3/archive/catalog-snapshots/{uuid}` | Result |
-| --- | --- |
-| `GET /publisher-import` | Current publisher checkpoint; 404 before the first committed batch |
-| `POST /publisher-import` | Advance with `expected_manifest_sha256` and the exact `after` ordinal |
-| `GET /publisher-import/records?after=0&limit=100` | Bounded summaries; source keys exceeding 8 KiB are omitted with `key_omitted:true` |
-| `GET /publisher-import/records/{ordinal}` | One full source key, disposition, native references and decision context |
-
-Application access is required. Each transaction handles at most 50 rows and
-checks a 16 MiB retained-payload threshold between rows. Decisions, account
-evidence, receipts and progress commit together; a late failure rolls back the
-whole batch. Lost responses resume from the committed checkpoint. Copied captures
-reuse their existing choices, and completed imports replay unchanged. Startup
-validates capture correspondence, counts, checkpoint continuity and decision
-scope. Anonymisation removes the receipts before their source parents.
-
-`stash-import-catalog-publishers` validates the frozen snapshot and completed
-upload before advancing. Exit 0 means the pass completed without review outcomes;
-this can include unavailable or preserved captures. Exit 2 means completed with
-review outcomes, and exit 1 means failure or an unavailable response. Every
-result remains `imported:false`: media, memberships, remaining histories and
-final semantic reconciliation still require their own migration work.
-
-## Mapping catalog attachment lists
-
-Native schema 1000035 maps explicit attachment evidence from actual flat/detail
-captures after a snapshot's evidence pass completes. It applies the shared
-`captured-attachments-v2` extractor to reconstructed payloads and verifies that
-the captured post identifier resolves to the already-mapped native post. Reddit
-gallery lists, direct Reddit media and retained Twitter extended-entities lists
-use their source positions and qualified media IDs. A shared observation parent
-is not an additional capture.
-
-Identical manifests share native storage, with each capture retaining its
-association. Compatible partial lists combine through the core automatic
-selection service, preserving missing slots and known counts. Migration choices
-carry `origin:migration`; pinned or disabled selections are protected. Conflicting
-lists remain available for review without replacing the current selection.
-Manifests and selections reference shared evidence rather than copying payloads.
-
-| Receipt outcome | Meaning |
-| --- | --- |
-| `mapped` | Source attachment evidence was retained and the automatic selection was updated or was already equivalent. `selection_changed` distinguishes those cases. |
-| `preserved` | The source manifest was retained while an existing pinned or disabled selection remained unchanged. |
-| `review` | Source evidence is unmapped, invalid, identifies a different post, disagrees with an existing capture manifest, or conflicts with the current attachment list. |
-| `unavailable` | No supported attachment-list evidence exists, or the post was forgotten. |
-
-Download counters, filenames, folder membership and captions cannot establish a
-source list. In the frozen migration corpus, older Twitter captures retain
-individual-file metadata without original extended-entities lists; this pass
-reports those as unavailable. The native scraper adapter retains the original
-lists for new captures. Legacy `appearances` and file associations are separate
-migration inputs and must still be handled, including unresolved evidence.
-
-| Method and path under `/api/v3/archive/catalog-snapshots/{uuid}` | Result |
-| --- | --- |
-| `GET /attachment-import` | Current checkpoint; 404 before the first committed batch |
-| `POST /attachment-import` | Advance with `expected_manifest_sha256` and the exact `after` ordinal |
-| `GET /attachment-import/records?after=0&limit=100` | Bounded summaries; keys exceeding 8 KiB use `key_omitted:true` |
-| `GET /attachment-import/records/{ordinal}` | Full source key, manifest/selection references and retained decision context |
-
-Application access is required. Transactions process at most 50 rows and check
-the 16 MiB retained-payload threshold between records. Source lists, selection
-decisions, receipts and progress commit atomically. Late errors roll back the
-whole batch. Lost responses resume from the committed ordinal; completed passes
-replay unchanged. Context retains at most 128 conflict samples and marks further
-conflicts with `conflicts_truncated:true`; complete source manifests remain
-available. Startup checks original-row correspondence, counts, checkpoint
-continuity and native reference scope. Anonymisation removes these receipts.
-
-`stash-import-catalog-attachments` validates the frozen local snapshot and upload
-receipt before advancing. Exit 0 means completed without review outcomes, exit 2
-means completed with review outcomes, and exit 1 means failure or an unavailable
-response. Every result remains `imported:false`. Source-list completeness is
-separate from file availability: this pass creates neither playable media nor
-galleries. Existing library metadata, attribution and gallery memberships remain
-unchanged while subsequent media/appearance mapping is completed.
-
-## Mapping catalog assets, files and appearances
-
-Schema 1000038 imports these three families after a snapshot's evidence pass.
-Application access is required. A reviewed binding identifies the logical media
-root and its revision, the snapshot collection's revision, and the historical
-library mount prefix. This mapping translates catalog-relative paths into the
-paths stored in Stash. It does not bind a live filesystem mount or activate a
-worker; the root and collection can remain disabled during rehearsal.
-
-| Operation | Contract |
-| --- | --- |
-| `POST /api/v3/archive/catalog-snapshots/{snapshot}/media-import` | Begin with `expected_manifest_sha256`, `root_uuid`, `root_revision`, `collection_revision` and `library_root_path`. Repeating the same binding returns its checkpoint; a different binding conflicts. |
-| `GET .../media-import` | Read the binding, current phase and outcome counters. |
-| `POST .../media-import/advance` | Send `expected_manifest_sha256` and `after`, the previously returned `processed_records` count. |
-| `GET .../media-import/records?after=ORDINAL&limit=100` | Read bounded summaries of original rows and their native references. |
-| `GET .../media-import/records/{ordinal}` | Read one complete source key and retained match/review context. |
-
-The phases are `assets`, `files`, `appearances`, then `complete`. Each transaction
-handles at most 50 source rows and checks a 16 MiB input threshold between rows.
-The resume checkpoint is the processed-record count across phases, since original
-catalog row ordinals are ordered differently. Original rows, native evidence and
-receipts commit together. A lost response resumes by reading the checkpoint;
-completed passes replay unchanged.
-
-Assets become shared source claims. Files become observations retaining their
-original state, role, size, timestamp and survivor path. A path-derived asset ID
-is not a content hash. Automatic matching uses literal paths under the reviewed
-mount, including explicit survivor paths, then existing server-verified SHA-256
-content. Multiple candidates or conflicting metadata require review. Original
-nanoseconds remain stored, while modification times are compared at the
-whole-second precision retained by Stash's file records. ZIP matches include
-archive and member identities and both generations.
-
-Appearances retain post-file evidence even when no playable media is available.
-A currently valid match with exactly one scene/image owner also adds post-media
-evidence. The original attachment key, source media ID, download position and
-source path remain attached to that evidence; download numbering does not become
-album order. Missing source paths can use a unique location sharing the same
-asset claim; ambiguous locations remain for review. Existing library values,
-performer attribution, attachment selections and galleries are preserved.
-Unindexed present files remain unavailable here and require normal media intake.
-
-`stash-import-catalog-media` validates the local frozen snapshot and its upload
-receipt before binding or advancing. Exit 0 means the pass completed without
-review outcomes, exit 2 means completed with review outcomes, and exit 1 means
-failure or an unavailable response. `unavailable` retains missing/pending media
-as evidence. Every result remains `imported:false` until the remaining catalog
-families and final reconciliation are complete. Database backups include the
-native evidence and receipts; anonymised exports remove them.
-
 ## Historical post collection membership
 
 Schema 1000039 adds `source_collection_post_evidence`. Each immutable membership
 names a post and a historical collection definition, with its own evidence UUID,
 origin, basis, observation time and provenance. It needs no scrape capture,
-media file or performer. One post can belong to several groups, and several
-catalog snapshots can independently support the same post/group relationship.
+media file or performer. One post can belong to several groups, and several retained sources can independently support the same post/group relationship.
 New evidence advances the post's review revision; exact replay does not. A
 forgotten post rejects new evidence while retaining historical replay.
 This supplements existing capture-to-collection membership and manual
@@ -879,41 +411,18 @@ These lists contain provenance records. Multiple records can support the same
 post/group relationship; a collection's distinct-post view should group those
 references without discarding their evidence.
 
-The catalog membership importer consumes only the original `memberships` rows
-after their snapshot's evidence pass has completed. A registry-qualified
-collection key maps to one native group across its downloaded catalogs. The
-mapping records the original kind and label and the first native definition.
-Later native renames and retirement leave that historical definition intact.
-Equal labels alone do not combine different source keys or separate registries.
+The retired catalog membership import mapped each registry-qualified collection key
+to one native group across its downloaded catalogs. The group keeps the original kind,
+label and first native definition; later renames or retirement leave that definition
+intact. Equal labels alone do not combine different source keys or registries. Legacy
+`creator` memberships, which meant that a directory name contained commas, map to
+directory groups without an owner. Other directory memberships map to directory groups,
+and subreddit memberships retain their kind and Reddit namespace. Imported groups start
+disabled, with no account, target URL or media root. Membership does not create an album
+or imply depicted performers, publishers, or ownership. Schema 1000142 retired the
+membership import routes and command; the groups and their evidence remain.
 
-Legacy `creator` meant that a directory name contained commas, so it maps to a
-directory group without assigning an owner. Other directory memberships map to
-directory groups; subreddit memberships retain their kind and Reddit namespace.
-Groups start disabled with no account, target URL or media root. Unsupported
-identities and conflicting definitions remain review records with their exact
-original values. Membership does not create an album or imply depicted
-performers, publishers, or ownership.
-
-The application-authenticated migration routes are:
-
-| Method | Endpoint | Result |
-| --- | --- | --- |
-| GET/POST | `/api/v3/archive/catalog-snapshots/{snapshot}/membership-import` | Read progress or advance a bounded transaction |
-| GET | `/api/v3/archive/catalog-snapshots/{snapshot}/membership-import/records` | Receipt summaries by original ordinal |
-| GET | `/api/v3/archive/catalog-snapshots/{snapshot}/membership-import/records/{ordinal}` | Original values and native references |
-
-POST requires `expected_manifest_sha256` and the last committed source ordinal
-as `after` (zero starts). Each transaction handles at most 50 rows and checks
-the 16 MiB work limit between rows; group creation, membership and receipts
-commit together. `stash-import-catalog-memberships` reads committed progress
-before resuming the same frozen manifest after a lost response. Exit codes are
-0 for mapped, 2 for review, and 1 for a failed/unavailable request. Original
-membership rows have no timestamp: the snapshot capture time describes when
-the evidence was retained, without inventing when the post joined the group.
-The result remains `imported:false` pending other catalog families and final
-reconciliation. Backups include the new records; anonymisation removes them.
-
-## Matching imported media to source albums
+## Matching media to source albums
 
 The core `SourceGallery.PreviewBackfill` service operates on one post's selected
 attachment list. It proposes media choices and shows the resulting gallery
@@ -927,7 +436,7 @@ Callers must choose a matching policy explicitly:
 
 | Policy | Accepted historical evidence |
 |---|---|
-| `source-identifiers-v1` | A retained qualified Reddit or Twitter media ID equal to the typed attachment ID, plus an imported file match for the same post |
+| `source-identifiers-v1` | A retained qualified Reddit or Twitter media ID equal to the typed attachment ID, plus a retained file match for the same post |
 | `legacy-reddit-filename-v1` | The identifier policy, plus the original Reddit `post-id_media-id_...` or `post-id_media-id.ext` filename convention when no explicit media ID was retained |
 | `legacy-twitter-filename-v1` | Recover missing partial order from original `<tweet-id>_<number>.<extension>` evidence and associate verified surviving media; preserve gaps, unknown total, existing selections and conflicting evidence |
 
@@ -963,5 +472,4 @@ reuses the same gallery. `gallery.AlbumBackfill` now admits the reviewed signatu
 as durable work, with publication and hook delivery tracked separately. Its
 [application API](native-ingestion.md#historical-source-album-backfill) supports
 status, cancellation and explicit retry. Schema 1000040 retains existing file
-jobs while admitting the new album job kind. The native UI, migration command
-and production activation remain subsequent work.
+jobs while admitting the new album job kind. 

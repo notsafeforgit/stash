@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDiscoveryDuplicatePublicationKeepsFirstIdentityAndCompletesMergedJobs(t *testing.T) {
+func TestLookupDuplicatePublicationKeepsFirstIdentityAndCompletesMergedJobs(t *testing.T) {
 	for _, mode := range []string{"legacy_first", "native_first", "already_merged"} {
 		t.Run(mode, func(t *testing.T) {
-			f := newDiscoveryExecutionFixture(t, nil)
+			f := newLookupExecutionFixture(t, nil)
 			existing := sourceTestPost(t, f.repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "abc123"}, "")
 			raw := openRawDB(t, f.db.DatabasePath())
 			defer raw.Close()
@@ -60,8 +60,8 @@ func TestDiscoveryDuplicatePublicationKeepsFirstIdentityAndCompletesMergedJobs(t
 	}
 }
 
-func TestDiscoveryDuplicatePublicationFailureRollsBackConsolidation(t *testing.T) {
-	f := newDiscoveryExecutionFixture(t, nil)
+func TestLookupDuplicatePublicationFailureRollsBackConsolidation(t *testing.T) {
+	f := newLookupExecutionFixture(t, nil)
 	sourceTestPost(t, f.repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "abc123"}, "")
 	job := f.admit(t)
 	running := f.claim(t, job.UUID, 0)

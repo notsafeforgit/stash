@@ -33,21 +33,6 @@ func TestArchiveActivityNormalizedSubjectsRetainOriginalBindings(t *testing.T) {
 			{Kind: "collection", UUID: f.collection.UUID, Revision: original},
 		})
 	})
-	t.Run("listing", func(t *testing.T) {
-		f := newListingFixture(t)
-		job := f.admit(t)
-		assertActivityReferences(t, f.repo, job, []models.ArchiveActivityReference{
-			{Kind: "collection", UUID: f.listing.CollectionUUID, Revision: f.listing.CollectionRevision},
-		})
-	})
-	t.Run("candidate", func(t *testing.T) {
-		f := newDetailFixture(t)
-		job := f.admit(t)
-		assertActivityReferences(t, f.repo, job, []models.ArchiveActivityReference{
-			{Kind: "post", UUID: f.target.PostUUID},
-			{Kind: "collection", UUID: f.listing.CollectionUUID, Revision: f.listing.CollectionRevision},
-		})
-	})
 	t.Run("shared translation", func(t *testing.T) {
 		_, repo := archiveTestDatabase(t)
 		service, _ := translationService(t, repo)

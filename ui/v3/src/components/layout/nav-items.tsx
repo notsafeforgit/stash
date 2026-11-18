@@ -136,14 +136,6 @@ export function useNavItems(opts?: {
           },
           {
             label: intl.formatMessage({
-              id: "import_history.title",
-              defaultMessage: "Import history",
-            }),
-            icon: <History className="size-4" />,
-            to: "/import-history",
-          },
-          {
-            label: intl.formatMessage({
               id: "saved_actions.title",
               defaultMessage: "Saved actions",
             }),

@@ -24,9 +24,6 @@ func (s *Server) configureSourceTracking(enabled bool) (*ingest.Service, *native
 
 	service := ingest.New(repo)
 	s.enrichmentMaintenance = &backgroundWorkerRuntime{worker: ingest.NewEnrichmentMaintenance(service)}
-	s.discoveryMaintenance = &backgroundWorkerRuntime{worker: ingest.NewDiscoveryMaintenance(service)}
-	s.discoveryComparison = &backgroundWorkerRuntime{worker: ingest.NewDiscoveryComparisonWorker(service)}
-	s.discoveryPublication = &backgroundWorkerRuntime{worker: ingest.NewDiscoveryPublicationWorker(service)}
 	if worker := mgr.NewIngestFileWorker(service); worker != nil {
 		s.ingestWorker = &backgroundWorkerRuntime{worker: worker}
 	}

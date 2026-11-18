@@ -190,9 +190,7 @@ func sourcePacingStarted(ctx context.Context, scope string, now time.Time) error
 func enrichmentPendingPacingReady(ctx context.Context, job, collection, rootScope string, now time.Time) (bool, error) {
 	var scopes []string
 	if err := dbWrapper.Select(ctx, &scopes, `SELECT DISTINCT source_scope_v1(json_extract(p.value,'$.url'))
- FROM (SELECT job_uuid,body FROM enrichment_checkpoints UNION ALL SELECT job_uuid,body FROM discovery_detail_checkpoints) h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?
- UNION SELECT scope FROM enrichment_job_seed_services WHERE job_uuid=?
- AND NOT EXISTS(SELECT 1 FROM enrichment_checkpoints WHERE job_uuid=?)`, job, job, job); err != nil {
+ FROM enrichment_checkpoints h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?`, job); err != nil {
 		return false, err
 	}
 	for _, scope := range scopes {
@@ -239,7 +237,7 @@ func sourcePacingEnrichmentFailure(ctx context.Context, job *models.ArchiveJob, 
 	}
 	scopes := map[string]bool{}
 	var pendingJSON string
-	err := dbWrapper.Get(ctx, &pendingJSON, "SELECT json_extract(body,'$.pending') FROM enrichment_checkpoints WHERE job_uuid=? UNION ALL SELECT json_extract(body,'$.pending') FROM discovery_detail_checkpoints WHERE job_uuid=?", job.UUID, job.UUID)
+	err := dbWrapper.Get(ctx, &pendingJSON, "SELECT json_extract(body,'$.pending') FROM enrichment_checkpoints WHERE job_uuid=?", job.UUID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return time.Time{}, err
 	}
@@ -285,7 +283,7 @@ func sourcePacingEnrichmentFailure(ctx context.Context, job *models.ArchiveJob, 
 }
 
 func sourcePacingMetadataFailure(ctx context.Context, job *models.ArchiveJob, code string, retry time.Time, now time.Time) (time.Time, error) {
-	if job.Kind == models.ArchiveJobEnrichPost || job.Kind == models.ArchiveJobVerifyCandidate {
+	if job.Kind == models.ArchiveJobEnrichPost {
 		return sourcePacingEnrichmentFailure(ctx, job, code, retry, now)
 	}
 	delay := sourcePacingDelay(code, retry, now)

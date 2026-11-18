@@ -36,7 +36,7 @@ func (db *Database) CompactCaptureContent(ctx context.Context, progress func(str
 		for _, query := range []string{
 			`DROP TRIGGER source_capture_immutable`,
 			`CREATE TEMP TABLE compact_protected(uuid TEXT PRIMARY KEY) WITHOUT ROWID`,
-			`INSERT OR IGNORE INTO compact_protected SELECT capture_uuid FROM source_capture_contexts UNION SELECT parent_capture_uuid FROM source_capture_contexts UNION SELECT capture_uuid FROM enrichment_published_records UNION SELECT capture_uuid FROM checkpoint_evidence_captures UNION SELECT capture_uuid FROM enrichment_completion_captures UNION SELECT legacy_capture_uuid FROM enrichment_completions WHERE legacy_capture_uuid IS NOT NULL UNION SELECT capture_uuid FROM discovery_published_records`,
+			`INSERT OR IGNORE INTO compact_protected SELECT capture_uuid FROM source_capture_contexts UNION SELECT parent_capture_uuid FROM source_capture_contexts UNION SELECT capture_uuid FROM enrichment_published_records UNION SELECT capture_uuid FROM enrichment_completion_captures UNION SELECT legacy_capture_uuid FROM enrichment_completions WHERE legacy_capture_uuid IS NOT NULL`,
 			`CREATE TEMP TABLE compact_old_revisions(uuid TEXT PRIMARY KEY) WITHOUT ROWID`,
 			`CREATE TEMP TABLE compact_old_payloads(digest TEXT PRIMARY KEY) WITHOUT ROWID`,
 			`CREATE TEMP TABLE compact_posts(uuid TEXT PRIMARY KEY) WITHOUT ROWID`,

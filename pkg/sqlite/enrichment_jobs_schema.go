@@ -199,7 +199,7 @@ func validateEnrichmentCheckpoints(conn *sqlx.DB) error {
 		if err != nil {
 			return err
 		}
-		if err := verifyEnrichmentTranscript(conn.Get, conn.Select, job, work, parsed); err != nil {
+		if err := verifyEnrichmentTranscript(job, work, parsed); err != nil {
 			return err
 		}
 		var records []struct {

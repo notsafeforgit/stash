@@ -360,11 +360,8 @@ func (s *EnrichmentWorkStore) Complete(ctx context.Context, input models.Enrichm
 		return nil, err
 	}
 	query, args, err := sqlx.In(`SELECT count(*) FROM source_captures c JOIN source_collection_captures b ON b.capture_uuid=c.uuid
- WHERE c.post_uuid=? AND b.collection_uuid=? AND b.collection_revision=? AND (c.origin IN ('gallery-dl','gallery-dl-enrichment')
- OR (c.origin='legacy-enrichment' AND EXISTS(SELECT 1 FROM enrichment_job_retained_records x
- JOIN enrichment_job_targets j ON j.job_uuid=x.job_uuid JOIN archive_jobs a ON a.uuid=j.job_uuid AND a.state='running'
- WHERE x.capture_uuid=c.uuid AND j.target_uuid=? AND j.target_revision=?))) AND c.uuid IN (?)`,
-		target.PostUUID, target.CollectionUUID, target.CollectionRevision, target.UUID, target.Revision, input.CaptureUUIDs)
+ WHERE c.post_uuid=? AND b.collection_uuid=? AND b.collection_revision=? AND c.origin IN ('gallery-dl','gallery-dl-enrichment') AND c.uuid IN (?)`,
+		target.PostUUID, target.CollectionUUID, target.CollectionRevision, input.CaptureUUIDs)
 	if err != nil {
 		return nil, err
 	}

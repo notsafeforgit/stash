@@ -18,6 +18,7 @@ import (
 // their own upgrade. Restore the actual scalar triggers from schema 1000012.
 func removeMetadataCurrentValuesSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeImportRetirementSchema(t, raw)
 	var present bool
 	require.NoError(t, raw.QueryRow("SELECT EXISTS(SELECT 1 FROM native_migration_history WHERE version=1000141)").Scan(&present))
 	if !present {

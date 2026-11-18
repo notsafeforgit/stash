@@ -98,7 +98,7 @@ func (c *EnrichmentCoordinator) Publish(ctx context.Context, token string, lease
 					return err
 				}
 				if !matches {
-					if _, err := c.Service.Repo.EnrichmentJob.ResolveDiscoveryIdentity(ctx, owned, expected, digest, record.Ordinal, c.Now()); err != nil {
+					if _, err := c.Service.Repo.EnrichmentJob.ResolveLookupIdentity(ctx, owned, expected, digest, record.Ordinal, c.Now()); err != nil {
 						return err
 					}
 					post, err = c.Service.Repo.SourceEvidence.FindPostByIdentifier(ctx, *reference)

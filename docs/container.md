@@ -74,9 +74,9 @@ schema, first follow the [schema promotion contract](native-schema.md).
 Keep the original database, configuration and artwork at one consistent backup
 boundary. Rehearse promotion on a copy and configure the native installation to
 use a separate database path. Startup requires an explicit migration; it does
-not silently promote an upstream database. Preserve any external catalogs and
-producer state until their optional import has been verified. A local library
-without these integrations needs no catalog import or scraper setup.
+not silently promote an upstream database. Preserve any external catalogs
+and producer state. A local library without these integrations needs no scraper
+setup.
 
 After native writes begin, switching back to an upstream or frozen binary is
 not a database downgrade. The [final compatible release guide](releases/v2.5-compatible-final.md)

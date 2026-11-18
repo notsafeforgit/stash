@@ -191,7 +191,7 @@ the shared desktop utility menu and mobile drawer. The existing Apollo performer
 picker resolves an explicit local selection to a native UUID/revision before a
 read-only ownership preview. Applying requires the preview digest.
 
-Account discovery uses bounded native keyset pages. Its selected-account editor
+The account list uses bounded native keyset pages. Its selected-account editor
 retains the loaded queue, updates only the affected card and uses the shared
 `useListScrollRestoration` hook when returning. Identifier evidence and ownership
 history load independently on expansion. Account ownership and depicted media
@@ -204,16 +204,6 @@ Only the selected active item polls. Failed refreshes retain the last successful
 same-scope result with a visible retry action; filter or item changes cannot
 inherit stale data or errors. Successful attempts and completed source runs are
 distinct. Existing domain review screens own mutation and recovery controls.
-
-The Import history route uses `import-history-api.ts` to inspect catalog and
-automation snapshots with bounded UUID pages and explicit selected details.
-Snapshot receipt, per-step import progress and current association review are
-separate states. Historical warning counts remain historical after a later
-resolution; retained operations do not imply active jobs. Step counters and
-technical identifiers use native expandable sections. The page shares the
-activity reader's cancellation and failed-refresh behavior and the existing
-list scroll restoration; switching import kind clears the previous scope.
-Desktop and mobile navigation use the same route registry.
 
 The Saved actions route uses `saved-actions.ts` to enumerate the current
 installation's browser outboxes. `reviewKeys` uses bounded IndexedDB key cursors;
@@ -233,8 +223,8 @@ checked count and may have an empty items array with a continuation cursor.
 The UI preserves that distinction, links to existing targeted review screens
 and retains its filter/cursor in the URL. It uses the shared activity reader,
 scroll restoration, desktop/mobile navigation and expandable technical details.
-Refresh recomputes current decisions; historical import warnings remain in
-Import history and local pending requests remain in Saved actions.
+Refresh recomputes current decisions; local pending requests remain in Saved
+actions.
 
 Historical metadata review offers Apply and Keep current value. Both save an
 exact request before transport and recover its original receipt after a lost

@@ -2,6 +2,8 @@ package sqlite_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -14,7 +16,6 @@ import (
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
-	"github.com/stashapp/stash/pkg/scrape"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
@@ -76,7 +77,7 @@ func TestTranslationWorkSharesResultsPreservesHoldsAndRestoresBackup(t *testing.
 	original := "  原文\x00\n\u2028\\u2028<&>  "
 	request := retainTranslationRequest(t, repo, original)
 	require.Equal(t, request, retainTranslationRequest(t, repo, original))
-	require.Equal(t, scrape.CatalogSnapshotSHA([]byte(original)), request.OriginalSHA256)
+	require.Equal(t, sha256Hex(original), request.OriginalSHA256)
 	now := time.Date(2026, 10, 2, 1, 2, 3, 123456789, time.UTC)
 	heldSchedule := models.TranslationTargetSchedule{State: "held", Priority: 25, NotBefore: now.Add(time.Hour)}
 	held := retainTranslationTarget(t, repo, models.TranslationTargetInput{RequestUUID: request.UUID, PostUUID: post.UUID, CollectionUUID: &collection.UUID, CollectionRevision: &collection.Revision, Field: "title", Origin: "migration"}, heldSchedule, now)
@@ -422,4 +423,9 @@ func TestTranslationWorkMigrationPreservesLibraryAndRollsBackCollision(t *testin
 			require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
 		})
 	}
+}
+
+func sha256Hex(text string) string {
+	sum := sha256.Sum256([]byte(text))
+	return hex.EncodeToString(sum[:])
 }

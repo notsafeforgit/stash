@@ -18,7 +18,7 @@ use a scene screenshot as their cover, and card counts include both kinds.
 references and a signature of gallery membership and selected ordering. The
 viewer stops if successive pages disagree. Reads use gallery membership indexes
 and the selected source lists without reconstructing capture payloads. This is
-a read API/UI change; no schema migration or catalog reimport is required.
+a read API/UI change; no schema migration is required.
 `pkg/archive.ExtractCapturedAlbum` derives the source list under
 `captured-attachments-v2`. Native intake and the application-authorized
 [historical album backfill](native-ingestion.md#historical-source-album-backfill)
@@ -166,7 +166,7 @@ relevant distinctions:
 
 Consequently, older Twitter captures containing only `num`, `count`, filenames,
 or a per-file media ID remain unresolved for automatic gallery creation. They
-are not guessed into complete source lists. Catalog import must report missing
+are not guessed into complete source lists. Ingestion must report missing
 evidence, use a verified retained source list where available, or offer review.
 Other extractors can supply the existing typed attachment-manifest contract;
 this parser does not assume their file counters have post-level semantics.
@@ -213,8 +213,9 @@ album worker. These records are included in normal database backups.
 
 `cmd/recover-twitter-albums` is isolated, offline upgrade tooling for files
 downloaded before native ingestion. It is not part of scanning or scraping and
-can be removed with the legacy import tools. It handles missing Twitter post IDs
-and anonymous catalog fragments that were created separately for each file.
+can be removed without affecting scanning or ingestion. It handles missing
+Twitter post IDs and anonymous catalog fragments that were created separately
+for each file.
 
 Supply a reviewed JSON array with `tweet_id` and `evidence` entries containing
 the current `file_uuid`, `media_uuid` and `generation`. Original, deduplicated

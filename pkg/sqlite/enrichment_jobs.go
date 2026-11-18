@@ -67,8 +67,7 @@ func enrichmentJobSubmissionGuard(ctx context.Context, request string) {
 			return models.ErrEnrichmentAtomic
 		}
 		if work.Handoff != nil {
-			_, err := (&EnrichmentJobStore{}).Seed(ctx, current.UUID)
-			return err
+			return models.ErrEnrichmentAtomic
 		}
 		return nil
 	})

@@ -38,7 +38,7 @@ explicit decisions and interrupted-upgrade recovery. See
 Before a production schema upgrade, rehearse the changed migration on a copy and
 retain a consistent recoverable backup. Publication, full restore drills and
 schema migration are separate operations. A normal native application update does
-not repeat a completed catalog import or initial cutover.
+not repeat a completed initial cutover.
 
 ## External deployment responsibilities
 

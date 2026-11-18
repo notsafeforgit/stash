@@ -69,7 +69,7 @@ func validJobKind(kind string) bool {
 	return kind == models.ArchiveJobVerifyMedia || kind == models.ArchiveJobBackfillAlbum || kind == models.ArchiveJobTranslateText || kind == models.ArchiveJobNotifyPostMerge || metadataJobKind(kind)
 }
 func metadataJobKind(kind string) bool {
-	return kind == models.ArchiveJobEnrichPost || kind == models.ArchiveJobListAccount || kind == models.ArchiveJobVerifyCandidate
+	return kind == models.ArchiveJobEnrichPost
 }
 func validJobState(state string) bool {
 	return state == "queued" || state == "running" || state == "succeeded" || state == "failed" || state == "cancelled"
@@ -148,17 +148,11 @@ func (s *ArchiveJobStore) Submit(ctx context.Context, input models.ArchiveJobSub
 	if err != nil {
 		return nil, err
 	}
-	if input.Kind == models.ArchiveJobVerifyCandidate {
-		discoveryDetailSubmissionGuard(ctx, input.RequestUUID)
-	}
 	if input.Kind == models.ArchiveJobTranslateText {
 		translationJobSubmissionGuard(ctx, input.RequestUUID)
 	}
 	if input.Kind == models.ArchiveJobEnrichPost {
 		enrichmentJobSubmissionGuard(ctx, input.RequestUUID)
-	}
-	if input.Kind == models.ArchiveJobListAccount {
-		discoveryJobSubmissionGuard(ctx, input.RequestUUID)
 	}
 	if input.Kind == models.ArchiveJobNotifyPostMerge {
 		postMergeNotificationSubmissionGuard(ctx, input.RequestUUID)
@@ -202,27 +196,11 @@ func (s *ArchiveJobStore) Submit(ctx context.Context, input models.ArchiveJobSub
 		}
 	} else {
 		var active int
-		if input.Kind == models.ArchiveJobVerifyCandidate {
-			if err := dbWrapper.Get(ctx, &active, "SELECT count(*) FROM (SELECT 1 FROM archive_jobs WHERE kind='post.verify_candidate' AND state IN ('queued','running') LIMIT ?)", archive.MaxDiscoveryDetailJobs); err != nil {
-				return nil, err
-			}
-			if active >= archive.MaxDiscoveryDetailJobs {
-				return nil, models.ErrArchiveJobCapacity
-			}
-		}
 		if input.Kind == models.ArchiveJobEnrichPost {
 			if err := dbWrapper.Get(ctx, &active, "SELECT count(*) FROM (SELECT 1 FROM archive_jobs WHERE kind='post.enrich' AND state IN ('queued','running') LIMIT ?)", archive.MaxEnrichmentJobs); err != nil {
 				return nil, err
 			}
 			if active >= archive.MaxEnrichmentJobs {
-				return nil, models.ErrArchiveJobCapacity
-			}
-		}
-		if input.Kind == models.ArchiveJobListAccount {
-			if err := dbWrapper.Get(ctx, &active, "SELECT count(*) FROM (SELECT 1 FROM archive_jobs WHERE kind='account.list_page' AND state IN ('queued','running') LIMIT ?)", archive.MaxDiscoveryJobs); err != nil {
-				return nil, err
-			}
-			if active >= archive.MaxDiscoveryJobs {
 				return nil, models.ErrArchiveJobCapacity
 			}
 		}
@@ -442,14 +420,7 @@ func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, own
 			return nil, err
 		}
 		*waiting = true
-		switch job.Kind {
-		case models.ArchiveJobVerifyCandidate:
-			discoveryDetailAttemptGuard(ctx, job.UUID, job.Fence+1)
-		case models.ArchiveJobListAccount:
-			discoveryJobAttemptGuard(ctx, job.UUID, job.Fence+1)
-		default:
-			enrichmentJobAttemptGuard(ctx, job.UUID, job.Fence+1)
-		}
+		enrichmentJobAttemptGuard(ctx, job.UUID, job.Fence+1)
 	}
 	// Do not commit the running head without its attempt, even if a caller
 	// catches a later error and tries to commit unrelated domain writes.
@@ -566,9 +537,7 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 		return nil, err
 	}
 	var complete *bool
-	if job.Kind == models.ArchiveJobListAccount || job.Kind == models.ArchiveJobVerifyCandidate {
-		complete = discoveryAtomic(ctx)
-	} else if job.Kind == models.ArchiveJobEnrichPost && outcome.State != "succeeded" {
+	if job.Kind == models.ArchiveJobEnrichPost && outcome.State != "succeeded" {
 		complete = sourcePacingAtomic(ctx)
 	}
 	requestBackoff := false

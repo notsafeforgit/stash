@@ -73,4 +73,4 @@ use the same validation workflow as the `develop` publisher. Production uses
 GitHub Actions-built GHCR images by verified digest; follow the
 [deployment runbook](v3-deployment.md). Report source push, publication and
 running deployment separately. Routine releases do not repeat a completed
-installation cutover, catalog import or full-library reconciliation.
+installation cutover or full-library reconciliation.

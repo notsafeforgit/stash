@@ -24,8 +24,6 @@ type ingestRoutes struct {
 	fileIngestion bool
 	runs          *ingest.RunCoordinator
 	enrichment    *ingest.EnrichmentCoordinator
-	discovery     *ingest.DiscoveryCoordinator
-	detail        *ingest.DiscoveryDetailCoordinator
 }
 
 // A producer token reaches only this router. Session cookies, general API keys,
@@ -68,8 +66,6 @@ func (rs *ingestRoutes) router() http.Handler {
 		r.Post("/runs/{run}/requests", rs.requestRunSource)
 		r.Post("/runs/{run}/requests/result", rs.reportRunSource)
 		rs.enrichmentRoutes(r)
-		rs.discoveryRoutes(r)
-		rs.discoveryDetailRoutes(r)
 	})
 	return r
 }
@@ -134,11 +130,11 @@ func ingestErrorCode(err error) (int, string) {
 		return http.StatusBadRequest, "invalid_event"
 	case errors.Is(err, models.ErrBackfillIncomplete):
 		return http.StatusConflict, "backfill_incomplete"
-	case errors.Is(err, models.ErrSourceRunConflict), errors.Is(err, models.ErrBackfillConflict), errors.Is(err, models.ErrScanJournalConflict), errors.Is(err, models.ErrCatalogIdentityImportConflict), errors.Is(err, models.ErrCatalogRegistryImportConflict), errors.Is(err, models.ErrCatalogSnapshotConflict), errors.Is(err, models.ErrAutomationSnapshotConflict):
+	case errors.Is(err, models.ErrSourceRunConflict), errors.Is(err, models.ErrBackfillConflict), errors.Is(err, models.ErrScanJournalConflict):
 		return http.StatusConflict, "conflict"
 	case ingest.IsConflict(err), errors.Is(err, models.ErrSourceDefinitionConflict), errors.Is(err, models.ErrFilePathChanged), errors.Is(err, models.ErrFileGenerationConflict):
 		return http.StatusConflict, "conflict"
-	case errors.Is(err, ingest.ErrInvalid), errors.Is(err, models.ErrSourceRunInvalid), errors.Is(err, models.ErrBackfillInvalid), errors.Is(err, models.ErrScanJournalInvalid), errors.Is(err, models.ErrCatalogIdentityImportInvalid), errors.Is(err, models.ErrCatalogRegistryImportInvalid), errors.Is(err, models.ErrCatalogSnapshotInvalid), errors.Is(err, models.ErrAutomationSnapshotInvalid):
+	case errors.Is(err, ingest.ErrInvalid), errors.Is(err, models.ErrSourceRunInvalid), errors.Is(err, models.ErrBackfillInvalid), errors.Is(err, models.ErrScanJournalInvalid):
 		return http.StatusBadRequest, "invalid_event"
 	case errors.Is(err, models.ErrSourceFileHistoryInvalid), errors.Is(err, models.ErrSourceFileEvidenceInvalid):
 		return http.StatusBadRequest, "invalid_event"
@@ -216,16 +212,6 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"enrichment_source_pacing_protocol":        1,
 		"enrichment_gap_protocol":                  1,
 		"max_enrichment_checkpoint_bytes":          archive.MaxEnrichmentTranscriptBytes,
-		"discovery_protocol":                       1,
-		"discovery_readiness_protocol":             1,
-		"discovery_dispatch_protocol":              1,
-		"discovery_collections_protocol":           1,
-		"discovery_source_pacing_protocol":         1,
-		"discovery_detail_protocol":                1,
-		"discovery_detail_collections_protocol":    1,
-		"discovery_detail_admission_protocol":      1,
-		"max_discovery_detail_bytes":               archive.MaxEnrichmentTranscriptBytes,
-		"max_discovery_page_bytes":                 archive.MaxDiscoveryPageBytes,
 		"receipt_semantics":                        "source.capture commits source evidence; attachment.download retains transfer reports; file.completed queues verification; poll file receipt status for media completion",
 	})
 }

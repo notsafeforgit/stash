@@ -38,10 +38,10 @@ the current architecture.
 | [Project policy](../PROJECT.md) | Standalone development, selected major-feature imports, contracts and releases |
 | [Migration maintenance](../pkg/sqlite/migrations/README.md) | Isolated upgrade readers, native migrations, and the tested direct native database baseline |
 | [Native schema promotion](native-schema.md) | Implemented lineage, one-time historical imports, promoted tables, and remaining model conversions |
-| [Native source identity](native-source-identity.md) | Captured account claims, service namespaces, and reviewed performer/account registry import |
+| [Native source identity](native-source-identity.md) | Captured account claims, service namespaces, publisher decisions and retained post evidence |
 | [Library identities](library-identities.md) | UUIDs across APIs, routes, plugins and saved references; internal database keys |
 | [Numeric ID audit](uuid-audit.md) | Corrected UUID boundary defects, intentional numeric domains and open task/protocol conversions |
-| [Imported catalog association repair](catalog-association-repair.md) | Backfill historical publishers and unique performer links from retained account and author-folder evidence |
+
 | [Native source collections](native-source-collections.md) | Collections, media-root bindings, metadata rules, draft previews and durable browser saves |
 | [Native local-file intake](native-manual-intake.md) | Reviewed purchased-media admission, durable file verification, recovery and cancellation |
 | [Native file deduplication](native-file-deduplication.md) | Verified redundant locations, preserved source evidence, journaled removal and host conversion boundary |

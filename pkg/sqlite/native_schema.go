@@ -118,11 +118,6 @@ AND NOT (type='index' AND tbl_name='schema_migrations'))`); err != nil {
 				return err
 			}
 		}
-		if version >= NativeSchemaBaseline+132 {
-			if err := validateImportPayloadRetentionSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
 		for _, name := range []string{"video_file_metadata", "image_file_metadata", "scene_cover_sources", "shares", "share_sessions", "file_deletions", "legacy_schema_history"} {
 			if !present[name] {
 				return fmt.Errorf("native database schema is incomplete: missing %s", name)
@@ -194,7 +189,11 @@ FROM pragma_table_info('file_moves')`); err != nil {
 			return errors.New("native database schema is incomplete: missing source_post_translation_display")
 		}
 		if version >= NativeSchemaBaseline+121 {
-			for _, name := range []string{"source_post_import_labels", "source_post_studios", "catalog_membership_compaction_guard"} {
+			names := []string{"source_post_studios"}
+			if version < importRetirementVersion {
+				names = append(names, "source_post_import_labels", "catalog_membership_compaction_guard")
+			}
+			for _, name := range names {
 				var exists bool
 				if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
 					return err
@@ -230,7 +229,7 @@ FROM pragma_table_info('file_moves')`); err != nil {
 			}
 		}
 		if version >= NativeSchemaBaseline+104 {
-			if err := validateWorkerPolicySchema(conn, auditData); err != nil {
+			if err := validateWorkerPolicySchema(conn, version >= importRetirementVersion, auditData); err != nil {
 				return err
 			}
 		}
@@ -246,7 +245,7 @@ FROM pragma_table_info('file_moves')`); err != nil {
 			}
 		}
 		if version >= NativeSchemaBaseline+1 {
-			if version >= NativeSchemaBaseline+100 {
+			if version >= NativeSchemaBaseline+100 && version < importRetirementVersion {
 				for _, name := range []string{"catalog_document_pending_imports", "catalog_nfo_compaction_guard"} {
 					var exists bool
 					if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
@@ -589,43 +588,8 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return err
 			}
 		}
-		if version >= NativeSchemaBaseline+28 {
-			if err := validateCatalogIdentitySchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+29 {
-			if err := validateCatalogRegistrySchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+30 {
-			if err := validateCatalogSnapshotSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+31 {
-			if err := validateCatalogEvidenceSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
 		if version >= NativeSchemaBaseline+32 {
 			if err := validateSourcePostLinksSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+33 {
-			if err := validateCatalogRelationsSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+34 {
-			if err := validateCatalogPublisherSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+35 {
-			if err := validateCatalogAttachmentSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
@@ -639,16 +603,6 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return err
 			}
 		}
-		if version >= NativeSchemaBaseline+39 {
-			if err := validateCatalogMembershipSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+38 {
-			if err := validateCatalogMediaSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
 		if version >= NativeSchemaBaseline+40 {
 			if err := validateAlbumJobSchema(conn, version, auditData); err != nil {
 				return err
@@ -659,16 +613,8 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return err
 			}
 		}
-		if version >= NativeSchemaBaseline+42 {
-			if err := validateCatalogDocumentSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
 		if version >= NativeSchemaBaseline+43 {
 			if err := validateSourceTranslationSchema(conn, auditData); err != nil {
-				return err
-			}
-			if err := validateCatalogTranslationSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
@@ -682,28 +628,13 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return err
 			}
 		}
-		if version >= NativeSchemaBaseline+46 {
-			if err := validateAutomationSnapshotSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+47 {
-			if err := validateAutomationTranslationSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+48 {
-			if err := validateTranslationActivationSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
 		if version >= NativeSchemaBaseline+49 {
 			if err := validateTranslationPolicySchema(conn, auditData); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+50 {
-			if err := validateEnrichmentWorkSchema(conn, version >= NativeSchemaBaseline+58, version >= NativeSchemaBaseline+65, auditData); err != nil {
+			if err := validateEnrichmentWorkSchema(conn, version >= NativeSchemaBaseline+58, version >= NativeSchemaBaseline+65 && version < importRetirementVersion, auditData); err != nil {
 				return err
 			}
 		}
@@ -824,53 +755,18 @@ AND EXISTS(SELECT 1 FROM pragma_index_info('shares_token_hash') WHERE name='toke
 			}
 		}
 		if version >= NativeSchemaBaseline+56 {
-			if err := validateSourceFairnessSchema(conn, version >= NativeSchemaBaseline+65, version >= NativeSchemaBaseline+76, auditData); err != nil {
+			if err := validateSourceFairnessSchema(conn, version >= NativeSchemaBaseline+65 && version < importRetirementVersion, version >= NativeSchemaBaseline+76 && version < importRetirementVersion, auditData); err != nil {
 				return err
 			}
 		}
 
-		if version >= NativeSchemaBaseline+57 {
-			if err := validateCatalogEnrichmentSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+58 {
-			if err := validateAutomationEnrichmentSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+59 {
-			if err := validateEnrichmentActivationSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+60 {
-			if err := validateAutomationCheckpointSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
 		if version >= NativeSchemaBaseline+61 {
 			if err := validateSourceCaptureTimeSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
-		if version >= NativeSchemaBaseline+62 {
-			if err := validateCheckpointEvidenceSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
 		if version >= NativeSchemaBaseline+63 {
 			if err := validateSourceCaptureContextSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+64 {
-			if err := validateCheckpointHandoffSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+65 {
-			if err := validateEnrichmentHandoffSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
@@ -949,59 +845,9 @@ AND EXISTS(SELECT 1 FROM pragma_index_info('shares_token_hash') WHERE name='toke
 				return err
 			}
 		}
-		if version >= NativeSchemaBaseline+69 {
-			if err := validateAutomationDiscoverySchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+70 {
-			if err := validateEnrichmentDiscoverySchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+71 {
-			if version >= NativeSchemaBaseline+84 {
-				if err := validateDiscoveryScopeSchema(conn, auditData); err != nil {
-					return fmt.Errorf("invalid discovery collection bindings: %w", err)
-				}
-			}
-			if err := validateDiscoveryJobSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+72 {
-			if err := validateDiscoveryMatchSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+73 {
-			if err := validateDiscoveryActivationSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+74 {
-			if err := validateDiscoveryPublicationSchema(conn, version >= NativeSchemaBaseline+77, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+75 {
-			if err := validateDiscoveryRecoverySchema(conn, auditData); err != nil {
-				return err
-			}
-		}
 
-		if version >= NativeSchemaBaseline+76 {
-			if err := validateDiscoveryDetailSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
 		if version >= NativeSchemaBaseline+79 {
 			if err := validateMetadataNameSchema(conn); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+80 {
-			if err := validateCatalogCleanupSchema(conn, auditData); err != nil {
 				return err
 			}
 		}
@@ -1015,13 +861,16 @@ AND EXISTS(SELECT 1 FROM pragma_index_info('shares_token_hash') WHERE name='toke
 				return err
 			}
 		}
-		if version >= NativeSchemaBaseline+83 {
-			if err := validateEnrichmentRebindSchema(conn, auditData); err != nil {
-				return fmt.Errorf("invalid enrichment collection rebindings: %w", err)
-			}
-		}
 		if version >= NativeSchemaBaseline+78 {
 			if err := validateMetadataPolicyImportSchema(conn, auditData); err != nil {
+				return err
+			}
+		}
+		if err := validateRetainedImportSchema(conn, version, auditData); err != nil {
+			return err
+		}
+		if version >= importRetirementVersion {
+			if err := validateEnrichmentIdentitySchema(conn, auditData); err != nil {
 				return err
 			}
 		}

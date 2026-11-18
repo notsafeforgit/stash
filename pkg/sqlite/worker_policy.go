@@ -120,36 +120,14 @@ WHERE kind=? AND state IN ('queued','running') AND state='running' ORDER BY id L
 }
 
 func metadataJobOriginalPolicy(ctx context.Context, job *models.ArchiveJob) (string, error) {
-	switch job.Kind {
-	case models.ArchiveJobEnrichPost:
-		work, err := archive.DecodeEnrichmentJob(job)
-		if err != nil {
-			return "", err
-		}
-		return work.PolicySHA256, nil
-	case models.ArchiveJobVerifyCandidate:
-		work, err := archive.DecodeDiscoveryDetailJob(job)
-		if err != nil {
-			return "", err
-		}
-		return work.PolicySHA256, nil
-	case models.ArchiveJobListAccount:
-		work, err := archive.DecodeDiscoveryJob(job)
-		if err != nil {
-			return "", err
-		}
-		listing, _, err := discoveryListingAtDigest(func(out any, query string, args ...any) error {
-			return dbWrapper.Get(ctx, out, query, args...)
-		}, work.ListingUUID, work.DefinitionSHA256)
-		if err != nil {
-			return "", err
-		}
-		if listing == nil || listing.Digest != work.DefinitionSHA256 {
-			return "", models.ErrDiscoveryConflict
-		}
-		return listing.PolicySHA256, nil
+	if job.Kind != models.ArchiveJobEnrichPost {
+		return "", nil
 	}
-	return "", nil
+	work, err := archive.DecodeEnrichmentJob(job)
+	if err != nil {
+		return "", err
+	}
+	return work.PolicySHA256, nil
 }
 
 func metadataAttemptPolicy(ctx context.Context, job *models.ArchiveJob, fence int64, original string) (string, error) {

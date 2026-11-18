@@ -12,9 +12,7 @@ imports that have no retained gallery-dl post capture; it does not refetch every
 downloaded post to refresh detail-only fields, later edits or profile changes.
 Running jobs and retained partial child transcripts are protected from reuse;
 their durable delivery/checkpoint path remains responsible for completion.
-Held, excluded and failed targets are not automatically reopened. Dispatch lists
-still omit `post.verify_candidate` and `account.list_page`, avoiding separate
-verification and duplicate profile listing requests.
+Held, excluded and failed targets are not automatically reopened. 
 
 Listing responses may omit detail-only fields. Existing original text, account
 data, attachment membership and reply relationships remain available when the

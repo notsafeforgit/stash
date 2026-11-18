@@ -1,9 +1,13 @@
 package sqlite_test
 
 import (
+	"context"
 	"errors"
+	"strings"
 	"testing"
 
+	"github.com/stashapp/stash/pkg/archive"
+	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
@@ -68,4 +72,24 @@ func TestEnrichmentPublicationMigrationPreservesStagedWorkAndRejectsUnverifiable
 			require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM pragma_foreign_key_check"))
 		})
 	}
+}
+
+// admitV1 admits a version-1 job, as producers did before policy pinning.
+func (f *enrichmentExecutionFixture) admitV1(t *testing.T) *models.ArchiveJob {
+	t.Helper()
+	input, err := archive.PrepareEnrichmentJob(models.EnrichmentJobArguments{Version: 1, TargetUUID: f.target.UUID, TargetRevision: f.target.Revision,
+		PostUUID: f.target.PostUUID, CollectionUUID: f.collection.UUID, CollectionRevision: f.collection.Revision, RootUUID: f.collection.RootUUID,
+		PolicySHA256: strings.Repeat("a", 64), ExtractorVersion: "1.32.15-dev"})
+	require.NoError(t, err)
+	input.Priority, input.AvailableAt = f.target.Priority, f.target.NotBefore
+	var job *models.ArchiveJob
+	require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		job, err = f.repo.ArchiveJob.Submit(ctx, input, f.now, 10000)
+		if err != nil {
+			return err
+		}
+		return f.repo.EnrichmentJob.Bind(ctx, job.UUID, f.now)
+	}))
+	return job
 }

@@ -64,9 +64,6 @@ type Server struct {
 	postMergeNotifications *backgroundWorkerRuntime
 	translationWorker      *backgroundWorkerRuntime
 	enrichmentMaintenance  *backgroundWorkerRuntime
-	discoveryMaintenance   *backgroundWorkerRuntime
-	discoveryComparison    *backgroundWorkerRuntime
-	discoveryPublication   *backgroundWorkerRuntime
 }
 
 // TODO - os.DirFS doesn't implement ReadDir, so re-implement it here
@@ -422,17 +419,11 @@ func (s *Server) Start() error {
 	s.postMergeNotifications.start()
 	s.translationWorker.start()
 	s.enrichmentMaintenance.start()
-	s.discoveryMaintenance.start()
-	s.discoveryComparison.start()
-	s.discoveryPublication.start()
 	defer s.ingestWorker.stop()
 	defer s.albumWorker.stop()
 	defer s.postMergeNotifications.stop()
 	defer s.translationWorker.stop()
 	defer s.enrichmentMaintenance.stop()
-	defer s.discoveryMaintenance.stop()
-	defer s.discoveryComparison.stop()
-	defer s.discoveryPublication.stop()
 	logger.Infof("stash is listening on " + s.Addr)
 	logger.Infof("stash is running at " + s.displayAddress)
 
@@ -459,7 +450,7 @@ func (s *Server) ShutdownContext(ctx context.Context) error {
 		s.requestCancel()
 	}
 	workers := []*backgroundWorkerRuntime{s.sharePreparation, s.ingestWorker, s.albumWorker, s.postMergeNotifications,
-		s.translationWorker, s.enrichmentMaintenance, s.discoveryMaintenance, s.discoveryComparison, s.discoveryPublication}
+		s.translationWorker, s.enrichmentMaintenance}
 	results := make(chan error, len(workers))
 	for _, worker := range workers {
 		go func() { results <- worker.shutdown(ctx) }()

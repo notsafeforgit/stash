@@ -56,7 +56,6 @@ func TestSourceTrackingDisabledDoesNotConstructWorkers(t *testing.T) {
 	for _, worker := range []*backgroundWorkerRuntime{
 		server.ingestWorker, server.albumWorker, server.postMergeNotifications,
 		server.translationWorker, server.enrichmentMaintenance,
-		server.discoveryMaintenance, server.discoveryComparison, server.discoveryPublication,
 	} {
 		require.Nil(t, worker)
 		worker.start()

@@ -35,8 +35,7 @@ func (s *EnrichmentWorkStore) ReuseCaptured(ctx context.Context, id string, expe
 	var protected bool
 	if err := dbWrapper.Get(ctx, &protected, `SELECT EXISTS(SELECT 1 FROM enrichment_job_targets t JOIN archive_jobs j ON j.uuid=t.job_uuid
  WHERE t.target_uuid=? AND t.target_revision=? AND (j.state='running'
- OR EXISTS(SELECT 1 FROM enrichment_checkpoints c WHERE c.job_uuid=j.uuid)
- OR EXISTS(SELECT 1 FROM enrichment_job_retained_records c WHERE c.job_uuid=j.uuid)))`, id, expected); err != nil {
+ OR EXISTS(SELECT 1 FROM enrichment_checkpoints c WHERE c.job_uuid=j.uuid)))`, id, expected); err != nil {
 		return nil, err
 	}
 	if protected {

@@ -8,6 +8,52 @@ The startup-versus-full-audit boundary below applies to the historical proof
 validation described throughout this guide. Deployment and one-time import
 completion belong to the installation's operations records.
 
+## Import history retirement (schema 1000142)
+
+Schema 1000142 removes the frozen catalog and automation import history from the
+application. The retired workflows are the catalog and automation staging uploads
+and their import passes, the catalog association repair, catalog payload
+retention, reviewed activation of imported translations, enrichment and checkpoint
+work, enrichment rebinding, enrichment handoffs, the discovery workflow, the
+`/import-history` page and API, the `imports` pagination resource and the
+`nfo-cleanup` command. The migration drops the staging, receipt, activation and
+handoff tables and views, together with `source_post_import_labels` and
+`source_cleanup_intents`. It also deletes the discovery archive jobs
+(`account.list_page` and `post.verify_candidate`) with their attempts and policy
+approvals.
+
+The native data the import produced stays ordinary data: posts, captures,
+identifiers, URLs, publisher decisions, attachments, post-media decisions,
+documents, translations, source files, observations and matches, and collection
+membership groups. `source_enrichment_receipts` remain because completions refer
+to them. `source_file_history` and its child tables are frozen evidence for
+metadata file-edit reviews; nothing writes new rows. Held translation targets are
+unchanged, since translation targets have no excluded state. Ordinary enrichment
+jobs, publications, checkpoints, pacing and fairness are unaffected.
+
+**Lookup carry-over.** A legacy-only post can still be enriched by its original
+finder lookup. The migration copies the mapped `lookup` finder rows of finished
+automation imports into `enrichment_identity_lookups`, keyed by post, collection
+and URL and holding the original finder values. It replaces
+`enrichment_discovery_resolutions` with `enrichment_identity_resolutions`, which
+references the retained `lookup_id`. Earlier discovery resolutions are dropped;
+the identifiers and evidence they published remain. Enrichment still corroborates the native
+identifier through that lookup, under the `retained-discovery-identity-v1` policy
+and its basis rules (`scrape.MatchDiscoveryLookup`). The enrichment job
+description carries the result as `identity_resolution`, which
+`GET /api/v3/archive/enrichment-jobs/{job}/identity-resolution` reads.
+
+**Target exclusion.** Unreleased held imported enrichment targets (origin
+`migration`) move to `excluded` with reason `import_retired`. Their history is
+kept, and they cannot be activated.
+
+**Space.** The migration does not shrink the database file. Freed pages become
+reusable. A database rebuild (Settings → Tasks → Optimise database, which runs
+`VACUUM`) returns the space. Older backups remain the only way to audit the
+October import.
+
+## Versioned migration notes
+
 Schema 1000141 stops retaining routine field-value history. Replacing a field
 choice deletes its superseded value, relationship references and automatic
 provenance links in the same transaction. The upgrade removes existing obsolete
@@ -199,8 +245,7 @@ semantics are frozen; new UI/API features must not change historical conversion.
 The [legacy upgrade policy](../PROJECT.md#legacy-upgrade-code) defines permitted fixes
 and removal prerequisites. Native bootstrap bypasses these readers; supported
 historical database/configuration upgrades still need them.
-The source/provenance services and catalog import remain separate work; the
-implemented native migrations are described below.
+The implemented native migrations are described below.
 The full [transition plan](native-archive-transition-plan.md) remains the
 acceptance requirement.
 
@@ -257,9 +302,7 @@ to 128 redirects and rejects an invalid chain.
 
 The archive repository can adopt a pre-existing catalog UUID with a revision
 check, retaining the generated UUID as a redirect and cascading existing UUID
-references. A UUID already assigned elsewhere requires reconciliation. Actual
-catalog import and native API/UI exposure remain separate work; creating this
-registry has not imported or modified the live catalogs. Anonymised exports
+references. A UUID already assigned elsewhere requires reconciliation. Native API/UI exposure remains separate work; creating this registry has not modified library data. Anonymised exports
 replace UUIDs while preserving the graph of redirects.
 
 Migration 1000005 adds native `source_accounts`, qualified
@@ -291,8 +334,7 @@ Ownership references the typed archive performer identity. UUID adoption follows
 foreign keys, merges resolve through retained redirects, and deletion retains
 the decision against the tombstone for review. New choices cannot use stale or
 deleted performer identities. Anonymised exports remove source account evidence
-and decisions. Account equivalence and catalog import are described in the
-later migration sections; native ownership review uses the API described below.
+and decisions. Account equivalence is described in the later migration sections; native ownership review uses the API described below.
 
 Migration 1000068 adds `account_ownership_reviews`, immutable receipts for
 explicit ownership choices through the native application API. Each receipt
@@ -309,7 +351,7 @@ ownership decision requires another preview. Evidence timestamp updates alone
 do not invalidate it. Linking an account records its owner; it does not assign
 depicted performers, alter source payloads, or consolidate service accounts.
 
-Discovery pages canonical accounts and bounded identifier summaries. Account
+The account list pages canonical accounts and bounded identifier summaries. Account
 details, identifier evidence and ownership history use selected-record lookups
 with independent pagination. Ambiguous identifiers remain multiple candidates.
 Full native audits validate receipt integrity before writes, and anonymisation removes
@@ -349,11 +391,10 @@ apart from credential/runtime filtering. Malformed or missing media IDs do not
 establish duplicate content. Normalization works on copies and never fetches
 URLs or alters extractor working metadata.
 
-`legacy-retained-v1` is reserved for trusted catalog import. It partitions old
+`legacy-retained-v1` is reserved for trusted historical evidence. It partitions old
 retained evidence without applying new pruning retroactively. Network ingestion
 must not expose this escape hatch. Unknown payload shapes stay whole rather
-than guessing which fields belong to a file. The import and network ingestion
-boundaries themselves are still subsequent work.
+than guessing which fields belong to a file. 
 
 Shared bodies and patches contain null profile placeholders. Separate RFC 6901
 references identify those placeholders; source JSON cannot impersonate an
@@ -361,9 +402,7 @@ internal sentinel. Reconstruction checks all references before substituting
 anything, verifies body hashes, rejects overlapping/unused references, and
 enforces a 4 MiB bound on stored and expanded capture data. Metadata projections
 are bounded at 256 KiB, depth at 64, and profile references at 1,024 per capture.
-Oversized historical records require an explicit import rejection/report or a
-versioned larger-object design, never silent truncation. The all-catalog import
-rehearsal must assess these limits before production cutover.
+Oversized historical records require an explicit rejection/report or a versioned larger-object design, never silent truncation.
 
 The native `json-v1` hash representation uses sorted map keys, UTF-8 without HTML
 escaping (except U+2028/U+2029), and exact numeric tokens. Duplicate keys, invalid
@@ -381,9 +420,7 @@ UUID fail. Reads verify decompressed length, payload checksums, profile hashes,
 and revision/capture signatures. This also detects lost profile references.
 Summary queries omit bodies and use bounded indexed keyset pagination. Retained
 evidence is immutable; a forgotten-post tombstone rejects new captures and
-resurrection. Purge/forget commands, account/capture associations, media
-appearances, source merging, API/UI exposure, and actual catalog import remain
-subsequent work. Anonymised exports remove source evidence and vacuum free pages.
+resurrection. Purge/forget commands, account/capture associations, media appearances, source merging, and API/UI exposure remain subsequent work. Anonymised exports remove source evidence and vacuum free pages.
 
 Schema 1000061 allows trusted imports to retain a missing observation time.
 Known observations keep their exact `captured_at` value and existing signatures;
@@ -399,9 +436,7 @@ tie-breaker; cursors retain the applicable timestamp.
 Publisher matching sends undated evidence to review. A reviewed account link
 can be saved without assigning invented first/last-observed times to its handles
 or IDs. Existing explicit decisions remain selected. Network producer captures
-continue requiring the worker's observation time. This schema change does not
-release imported collector checkpoints or start work; reviewed execution handoff
-remains separate. Migration retains all original capture UUIDs, rowids, signed
+continue requiring the worker's observation time. This schema change does not release collector checkpoints or start work. Migration retains all original capture UUIDs, rowids, signed
 values and relationships. Backup retains both forms of evidence; anonymisation
 removes them with the other source records.
 
@@ -463,8 +498,7 @@ membership. Nullable scope fields remain immutable; newly established provenance
 requires new evidence. Insertion advances the post and, when present, attachment
 revision in the same SQL statement. Retirement prevents new evidence while
 historical replay and archive UUID adoption remain supported. Full native audits validate
-the new scope, target kinds and required guards. Catalog path/asset matching and
-appearance import remain subsequent work.
+the new scope, target kinds and required guards. 
 
 Media choices are separate immutable decisions with a current head. They require
 the reviewed attachment and target-media revisions. Ingestion may select only
@@ -512,10 +546,7 @@ automatic source selection, or choose a capture as the new automatic starting
 point. None of these actions deletes captures, media, or galleries. Equivalent
 automatic replay keeps the previous decision and revision.
 
-Automatic migration decisions use the same combination and protection rules as
-ingestion, with `origin:migration` retained in the audit. The
-[catalog attachment importer](native-source-identity.md#mapping-catalog-attachment-lists)
-uses these services to recover source lists before file/media association.
+Automatic migration decisions use the same combination and protection rules as ingestion, with `origin:migration` retained in the audit.
 
 `post_attachment_decisions`, their manifest-reference rows, and the current head
 commit together. Foreign keys scope every reference to its source post, history
@@ -624,8 +655,7 @@ capture cited by the attachment selection. This initial implementation never
 overwrites existing gallery metadata or assigns depicted performers from the
 publisher. The scalar choice checkpoint below records the initial field
 provenance. Automatic reevaluation, relationship policies, URLs, mixed-media
-ordering controls, native API/UI, durable after-success delivery, and ingestion/catalog
-import integration remain required. Anonymised copies remove source association
+ordering controls, native API/UI, durable after-success delivery, and ingestion integration remain required. Anonymised copies remove source association
 and membership history before rekeying identities.
 
 Migration 1000011 extends `archive_entities` to tags, studios, and groups. These
@@ -821,8 +851,7 @@ binding or changing its label does not require its mount to be available.
 Portable imports can retain unbound logical roots for later deployment binding.
 
 Producer authorization, pinned work scopes, final-file stability/hash/probe
-checks, durable receipts, folder/batch metadata defaults, API/UI, and catalog
-import remain subsequent integration work. Producer capture intake is described
+checks, durable receipts, folder/batch metadata defaults, API/UI remain subsequent integration work. Producer capture intake is described
 below and in [native ingestion](native-ingestion.md). The migration fabricates no collections or intake
 history from existing paths. Anonymised exports remove root bindings, collection
 definitions, and intake provenance with the other private source evidence.
@@ -856,7 +885,7 @@ startup rejects unfinished writes, and full audits check publication consistency
 make exact replay return the original result, without restoring an old choice
 over a newer one. Anonymised exports remove these private histories before
 removing captures and accounts. Migration creates no publisher choices for
-existing captures; ingestion and catalog import must establish their evidence.
+existing captures; ingestion must establish their evidence.
 
 Migration 1000017 adds `ingest_producers`, `ingest_credentials`,
 `ingest_credential_scopes`, and immutable `ingest_receipts`. Credentials store
@@ -872,12 +901,10 @@ Receipt lookup uses the producer/event primary key; exact replay returns the
 original result and changed event bytes conflict. Historical collection
 definitions allow delayed metadata delivery within explicitly granted scope.
 Anonymised exports remove credentials and receipts before private source records.
-Migration creates no credentials, receipts, or imported catalog data.
+Migration creates no credentials, receipts, or imported data.
 
 The [protocol documentation](native-ingestion.md) lists current supported events
-and limits. File intake and its durable worker are described below. Producer
-outboxes, external worker lease enforcement, catalog import and native administration/review UI
-remain subsequent work.
+and limits. File intake and its durable worker are described below. Producer outboxes, external worker lease enforcement and native administration/review UI remain subsequent work.
 
 Migration 1000018 adds `files.generation`, `media_contents`, and immutable
 `file_content_versions`. These identities have separate purposes:
@@ -1127,25 +1154,6 @@ its normal archive stop rule. Exact-window retries preserve native checkpoints.
 The original snapshot remains immutable and normal database backups include both
 evidence and activation state. See the [application contract](native-ingestion.md#activating-retained-scan-requests).
 
-## Reviewed registry imports
-
-Migration 1000028 adds `catalog_identity_imports` and
-`catalog_identity_import_records` for frozen performer identities, saved local
-bindings, redirects, explicit account choices and older plugin evidence. Migration
-1000029 adds `catalog_registry_imports`, `catalog_registry_import_records`,
-`catalog_account_mappings` and `catalog_collection_mappings` for the complementary
-account, catalog and routing families. Both phases retain immutable original rows
-and guarded apply receipts; domain changes and receipts commit atomically.
-
-The second import references the first, validates their complementary inventories,
-and creates disabled logical collections without scrape targets or root bindings.
-Original source-qualified keys remain migration references to native accounts and
-collections. Captured IDs establish accounts, while uncertain locators remain
-provisional or unresolved. Imported publishers do not assign depicted performers.
-SQL guards and full data validation reconcile receipts, evidence counts and mappings.
-Normal database backups include these records; anonymisation removes them before
-source accounts and collections. See the [registry import contracts](native-source-identity.md#importing-the-performer-registry).
-
 ## Source file evidence
 
 Migration 1000037 adds four normal domain tables for file provenance:
@@ -1188,8 +1196,7 @@ for locations, edits, states and deduplication. An event pins the original
 collection/root revisions. Its source timestamp may be unknown; `observed_at`
 records receipt of the assertion, and `created_at` records native insertion.
 Signatures cover its provenance and complete child values. Partial event writes
-cannot commit, even when a caller discards a late error. Full native audits validate the
-graph, signatures and import receipts during migration and full snapshot verification.
+cannot commit, even when a caller discards a late error. Full native audits validate the graph, signatures and receipts during migration and full snapshot verification.
 
 Locations refer to source file observations, including unavailable files and
 ZIP members. Deduplication points to a declared content claim, which need not be
@@ -1219,20 +1226,10 @@ claim; importing history cannot replace it with a later duplicate-path value.
 Resolving and applying alternatives belongs to explicit metadata review. The
 existing Stash scene/image selections remain unchanged by this import.
 
-`catalog_file_history_imports` and `catalog_file_history_records` provide bounded,
-resumable mapping of the frozen `metadata_edits`, `file_events` and
-`dedupe_events` families after completed evidence/media mapping. Each source
-row receives one receipt, including invalid rows retained for review. The pass
-uses 50-record/16-MiB batches and the source ordinal as its cursor. It never
-executes retained SQL or reconstructs a filesystem operation. A completed pass
-retains `imported:false` until overall migration reconciliation is complete.
+Schema 1000142 retired the historical file-history import. These tables remain frozen evidence read by the metadata file-edit reviews below; nothing writes new rows.
 
 Application-authenticated API routes:
 
-- `GET/POST /api/v3/archive/catalog-snapshots/UUID/file-history-import` reads or
-  advances progress. POST requires `expected_manifest_sha256` and `after`.
-- `GET .../file-history-import/records?after=ORDINAL&limit=N` returns summaries;
-  `GET .../records/ORDINAL` returns one receipt and its original source values.
 - `GET /api/v3/archive/file-history/UUID` returns one complete event.
 - `GET /api/v3/archive/file-observations/UUID/history?after=UUID&limit=N` returns
   event summaries for that observation.
@@ -1240,19 +1237,17 @@ Application-authenticated API routes:
   deduplication event summaries for that claim.
 
 List limits are 1–100. There is no public history endpoint that deletes files or
-applies an edit. Ordinary database backup retains this graph; anonymisation
-removes the source history, import receipts and identifying values together.
+applies an edit. Ordinary database backup retains this graph; anonymisation removes the source history, receipts and identifying values together.
 
 ### Reviewing a retained metadata edit
 
 Schema 1000067 adds `metadata_file_edit_reviews`. Each immutable receipt joins
 one application request to its native field decision, source history entry,
-source field and file match. Import still leaves selected metadata unchanged.
+source field and file match. The migration still leaves selected metadata unchanged.
 The explicit review operation uses the normal typed field-decision writer and
 commits the chosen value, provenance and retry receipt in one transaction.
 
-Discovery starts at a selected scene/image's file associations and pages by
-`(history_uuid, match_uuid)`; it does not read the whole catalog library. Edits
+The review starts at a selected scene/image's file associations and pages by `(history_uuid, match_uuid)`; it does not read the whole history. Edits
 at an exact path and at a deduplicated predecessor remain separate alternatives.
 The user selects the scene/image explicitly, including when several existing
 entities share a file. Review does not merge those entities or propagate the
@@ -1335,8 +1330,7 @@ performers, or selected scene/image metadata. The six tables have distinct roles
 
 Content is bounded to 16 MiB; parser warnings and results are each bounded to
 4 MiB. JSON must be unambiguous, with valid Unicode and no duplicate object keys.
-The document identity includes exact parser JSON text so an import does not
-silently reserialize, reinterpret, or drop unknown legacy fields. Byte digests
+The document identity includes exact parser JSON text so retained bytes are not silently reserialized, reinterpret, or drop unknown legacy fields. Byte digests
 and interpretation identities are checked when read and during full native audits.
 Source timestamp spelling and precision are retained; an empty timestamp means
 unknown. Recorded-at timestamps separately identify native receipt time.
@@ -1358,45 +1352,7 @@ it by supplying its current revision. Historical head claims remain separate
 from the current native selection.
 
 These records live inside the normal library database and its SQLite snapshots.
-Anonymised exports remove all six tables' contents. The coordinated producer
-backup, portable export and UI remain subsequent parts of the transition.
-Applying this schema alone has not imported old NFO catalogs.
-
-### Historical document import
-
-Schema 1000042 adds `catalog_document_imports` and immutable per-row
-`catalog_document_records`. The application-authorized
-`stash-import-catalog-documents` command requires a received frozen snapshot and
-a completed evidence pass. It processes normalized documents, their path
-associations (or older flat sidecar rows), then explicit selected heads. Each
-transaction processes at most 50 rows, with a 16 MiB batch threshold. It commits
-domain facts and receipts together. Resume uses the **processed-record count**;
-the source ordinal resets between dependency phases.
-
-Original bytes and parser interpretations are shared across catalogs while
-collection/path/post associations remain distinct. The imported association
-refers to the registry-created collection revision 1, even if that collection
-has since been renamed, bound to a root, or retired. The importer reads retained
-snapshot data; it does not open media or NFO paths. Invalid native interpretations
-and missing post mappings retain review receipts with the original staged values.
-
-An explicit historical head takes precedence over the legacy reader's fallback.
-For a path without a head, that fallback orders `captured_at` text descending,
-then the content hash descending. Its claim is labeled `legacy_fallback`; an
-invalid explicit head requires review instead of silently selecting a fallback.
-Existing native selections and explicit unlinks are preserved, with differing
-historical claims retained for review. Later manual changes do not rewrite
-completed import receipts or their original decision references.
-
-Under `/api/v3/archive/catalog-snapshots/{snapshot_uuid}/document-import`,
-`GET` returns progress and `POST` advances with `expected_manifest_sha256` and
-`after`. `GET /records` returns bounded summaries, using source-ordinal `after`
-and a 1–100 `limit`; `GET /records/{ordinal}` includes one original source row.
-Exit 0 means mapped, exit 2 means completed with review outcomes, and exit 1
-means failure or an unavailable response. Completed passes still report
-`imported:false`; other catalog families and final reconciliation remain required.
-Full native audits verify phase coverage, counts and native reference scope. Normal
-SQLite backups retain these records; anonymised exports clear them.
+Anonymised exports remove all six tables' contents. 
 
 ### Document application API
 
@@ -1462,33 +1418,6 @@ an English filter. These routes retain evidence; they do not select translations
 or replace titles/details. Translation execution and provider state
 have a separate migration step. Normal SQLite backups include these records;
 anonymised exports clear private translation data.
-
-### Historical translation import
-
-`stash-import-catalog-translations` requires the same received frozen snapshot
-and completed evidence pass used by the other importers. It records immutable
-row outcomes in `catalog_translation_records` with resumable progress in
-`catalog_translation_imports`. Each transaction handles at most 50 records and
-a 16 MiB batch threshold. The checkpoint is the last source ordinal; results,
-provenance and receipts commit together. Collection scope stays at the original
-registry-created revision 1 across later renames, root binding or retirement.
-
-Legacy `input_hash` uses `catalog-json-sha256-v1`: SHA-256 of the original text's
-historical Python JSON encoding, not its raw UTF-8 bytes. The importer classifies
-it as `verified`, `missing`, `unverifiable` (no original text), or `mismatch`.
-Mismatches retain both the result and original assertion for review. Invalid
-provenance and missing/forgotten post mappings retain review receipts and any
-valid result without creating invalid post evidence. No missing language or
-provider is guessed, and importing does not start translation work or apply
-scene/image metadata.
-
-Under `/api/v3/archive/catalog-snapshots/{snapshot_uuid}/translation-import`,
-`GET` returns progress and `POST` advances with `expected_manifest_sha256` and
-`after`. `GET /records` returns bounded summaries with source-ordinal `after`
-and a 1–100 `limit`; `GET /records/{ordinal}` includes one original row.
-Completed passes remain `imported:false` until the entire migration is reconciled.
-Full native audits validate receipts against their staged source, result, post and
-collection references and recompute historical input-hash classifications.
 
 ## Translation requests, cache and targets
 
@@ -1623,140 +1552,9 @@ Additional application-authenticated operations under `/api/v3/archive` are:
 | `POST /translation-jobs/{job_uuid}/cancel` | Cancel using `expected_revision` and hold its unchanged pending targets atomically. |
 | `GET /translation-requests/{request_uuid}/jobs` | Bounded execution history using sequence `after` and `limit`. |
 
-Producer tokens cannot administer this work or choose executable paths. The
-frozen automation importer below maps historical requests, results and targets.
-Reviewed activation and automatic capture scheduling are documented below.
-Native review UI and production activation remain separate transition work.
+Producer tokens cannot administer this work or choose executable paths.
 
-## Frozen automation snapshot receipt
-
-Migration 1000046 retains a frozen automation database before native mapping or
-activation. `automation_snapshots` binds an exact manifest and original database
-checksum to an imported registry source. A source accepts one frozen snapshot
-in the target database. Exact replay resumes it; different snapshot identities
-or manifests cannot replace the retained source.
-
-`automation_snapshot_tables` records progress and hash state for all ten source
-families. `automation_snapshot_chunks` stores immutable chunk receipts, and
-`automation_snapshot_records` retains each original line, source key and ordinal.
-Chunk records, table hashes and the receiving checkpoint commit atomically.
-Indexed chunk/table ranges support bounded verification and later domain mapping.
-Full native audits verify manifest identity, registry references, original bytes, ordering,
-chunk receipts and table digests before accepting writes. Source schema SQL is
-retained as evidence and never executed. Anonymisation removes these records.
-
-Application-authenticated operations under `/api/v3/archive` are:
-
-| Route | Result |
-| --- | --- |
-| `POST /automation-snapshots` | Begin or replay the exact JSON manifest. Requires `X-Stash-Manifest-SHA256`; maximum 8 MiB. |
-| `PUT /automation-snapshots/{snapshot_uuid}/chunks/{chunk_index}` | Receive the next NDJSON chunk, or replay an already committed exact chunk. Requires the same manifest digest; maximum 16 MiB and 1,000 records. |
-| `GET /automation-snapshots/{snapshot_uuid}` | Inspect the immutable input identity and committed progress. |
-
-Encoded request bodies are rejected. Producer tokens cannot administer these
-routes. The supported client is `stash-upload-automation`; see
-[preparation and upload](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#frozen-automation-input).
-Both interrupted and completed receipts survive ordinary database backups.
-
-`receiving` and `received` describe transport only. Every family remains pending
-and `imported` remains false, including for a valid empty snapshot. Uploading
-creates no native translation, enrichment, discovery or maintenance work, and
-does not change library metadata. Historical domain mapping and explicit
-activation remain separate transition requirements.
-
-## Frozen automation translation mapping
-
-Migration 1000047 adds `automation_translation_imports` and immutable
-`automation_translation_records`. Each mapping references its original staged
-ordinal and, where proven, a shared request/cache, source-qualified post,
-registry collection revision and immutable target revision. A partial source
-index restricts bounded reads to the two translation families; unrelated
-automation rows do not become translation work.
-
-Requests use exact original text and the legacy English provider policy.
-Cache mapping checks the original job hash and typed schedule/result values.
-Invalid inputs and conflicting native cache choices receive explicit review
-outcomes. The raw source preserves attempt counts, errors and English rewrites;
-native unchanged results preserve original text. Provider capture time remains
-unknown rather than borrowing a job update timestamp.
-
-Unapplied targets enter `held`, retaining priority and a retry deadline rounded
-up to native millisecond precision. Proven applied targets become completed with
-migration evidence and no fabricated worker execution. Empty-text completion
-has no translation evidence. Exact post aliases coalesce to one target, and a
-later applied alias can complete an untouched hold created by the same import.
-Existing native targets and later revisions are preserved. Known catalog evidence
-imports must finish before resolving their post references; unresolved or
-forgotten posts retain review receipts.
-
-All domain writes and their receipts commit atomically in batches of at most
-200 source rows or 16 MiB. Full native audits check source scope, checkpoint counts,
-deterministic request/cache identities, original schedules, historical revisions
-and migration completion provenance. Ordinary backup/restore includes the source
-and its mappings; anonymisation removes both before dependent native work.
-
-Application-authenticated operations under
-`/api/v3/archive/automation-snapshots/{snapshot_uuid}/translation-import` are:
-
-| Route | Result |
-| --- | --- |
-| `GET` | Inspect the committed checkpoint and mapped/review counts. |
-| `POST` | Advance using `expected_manifest_sha256` and exact `after` ordinal; maximum body 4 KiB. |
-| `GET /records` | Bounded summaries with `after` and `limit` (1–100). |
-| `GET /records/{ordinal}` | Mapping and exact original source values. |
-
-Producer tokens cannot administer these routes. The supported command is
-`stash-import-automation-translations`. `mapped` or `review` completes this
-mapping pass only: `imported` remains false, and no active jobs, provider calls
-or selected library-field changes are created. Other automation families and
-final reconciliation remain transition work. Releasing imported holds is a
-separate reviewed operation, described below.
-
-## Reviewed translation activation
-
-Schema 1000048 adds immutable `translation_activations` and
-`translation_activation_targets`. Each activation identifies at most 100 exact
-held target revisions. Preview records their request, post, optional collection
-revision, field, priority and deadline in a hashed plan. Apply requires the same
-input and reviewed hash; every target becomes pending in one transaction while
-keeping its priority and deadline. A changed target or forgotten post rejects
-the entire batch. Activation does not admit execution jobs or invoke a provider.
-
-The caller chooses and durably saves the activation UUID before applying. Reuse
-that UUID, exact target revisions and plan hash after interruption. The original
-receipt remains valid even if a worker completes the targets or someone later
-holds them again; replay never repeats the release. A different input or hash
-cannot reuse an existing UUID. New scheduling choices require a new preview and
-operation UUID. The existing worker admits due targets through its normal limits
-and shared request cache.
-
-Application-authenticated routes under `/api/v3/archive` are:
-
-| Route | Contract |
-| --- | --- |
-| `POST /translation-activations/preview` | Input: `uuid`, `targets` containing `target_uuid` and `revision`, and an optional paired `snapshot_uuid`/`manifest_sha256`. Returns the normalized `input`, concrete `entries` and `plan_sha256`. |
-| `POST /translation-activations` | Body: saved `input` and `expected_plan_sha256`. Returns the immutable plan, activated target revisions and original `created_at`. |
-| `GET /translation-activations/{activation_uuid}` | Inspect the original receipt; 404 if no activation committed. This is release status, not execution completion. |
-| `GET /automation-snapshots/{snapshot_uuid}/translation-import/held-targets` | Requires `expected_manifest_sha256`; pages original hold receipts using source-ordinal `after` and `limit` (1–100). Reports current revisions and `eligible`, `changed`, `completed` or `post_forgotten`. |
-
-Supplying a snapshot restricts activation to its completed translation mapping
-and the exact revisions that mapping originally held. A later native hold cannot
-be released through the old migration receipt. Ordinary application review can
-preview a later held revision without the snapshot binding. Candidate paging
-uses an index over original held receipts; it neither scans other operational
-families nor guarantees that candidates remain unchanged until Apply.
-
-Requests are bounded to 128 KiB and duplicate target UUIDs are rejected. Producer
-tokens cannot administer these routes. Full native audits verify plan/input hashes,
-source bindings and the historical held-to-pending transitions, independently
-of current target states. Backup/restore retains activation receipts;
-anonymisation removes them before their referenced source/target histories.
-`stash-activate-automation-translations` saves bounded previews and operation
-identities in a private plan before applying. It validates every saved page,
-inspects existing receipts on resume and reports release separately from
-execution. See the [command and recovery contract](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#activate-imported-translation-holds).
-
-### Automatic source translation policies
+## Automatic source translation policies
 
 Schema 1000049 stores collection policies in `translation_policies` and immutable
 `translation_policy_revisions`. Each revision binds a reviewed collection
@@ -1859,9 +1657,7 @@ Application-only routes under `/api/v3/archive` are:
 | `GET /enrichment-completions/{completion_uuid}` | Original completion input and timestamp; 404 when no receipt committed. |
 
 Producer tokens cannot inspect or administer these routes. Cross-origin
-mutations are refused. There is no HTTP completion mutation. Retaining a pending
-target does not yet start execution: extraction dispatch, fenced publication,
-cooldown/source fairness, and legacy queue mapping remain transition work.
+mutations are refused. There is no HTTP completion mutation. Retaining a pending target does not start execution; the scoped producer API and worker below perform that work.
 
 ## Enrichment jobs and checkpoint ownership
 
@@ -1917,8 +1713,6 @@ The scoped [producer API](native-ingestion.md#producer-enrichment-api) and durab
 worker expose this coordinator. Checkpoint acceptance verifies the transcript and
 execution ownership. Publication is the
 separate operation below that verifies post identity and commits native captures.
-Cross-collection fairness and legacy queue conversion
-remain required before activation.
 
 ## Verified enrichment publication
 
@@ -1969,9 +1763,7 @@ Migration preserves queued, running, failed and cancelled schema-51 work; a
 schema-51 success assertion is refused because that schema had no verified
 publication path. Backup retains publication/provenance; anonymisation removes it.
 
-Schema 1000053 adds verified staging release below. The scoped producer routes
-and worker are implemented; remaining adapters and legacy queue conversion still
-precede production activation.
+Schema 1000053 adds verified staging release below. The scoped producer routes and worker are implemented; remaining adapters still precede production activation.
 
 ## Completed enrichment staging release
 
@@ -2038,7 +1830,7 @@ URLs while preserving jobs, attempts, checkpoint bytes and prior cooldowns.
 Existing running checkpoints gain child reservations; original root reservations
 are reconstructed for historical attempts. Full native audits check bindings and required
 objects. Ordinary backups retain scheduling state; anonymisation removes it with
-work history. This does not import legacy catalog cooldowns or scheduling history.
+work history. 
 
 Schema 1000055 adds `source_run_attempt_pacing` and
 `source_run_attempt_failures` for download-side linked services. Each attempt
@@ -2107,44 +1899,19 @@ historical scheduling interest or rewrite existing work. Full native audits vali
 service coverage, current queued-job bindings and the complete required-service
 set. Ordinary backups retain this state; anonymisation removes it. Producer
 outbox schema 10 adds rotation across local download/metadata profiles and
-permitted collections without changing the native database schema. Legacy
-scheduling import and live conversion remain required before activating
-production schedules.
+permitted collections without changing the native database schema. 
 
+## Retained enrichment receipts
 
-## Historical enrichment receipts
-
-Schema 1000057 adds `source_enrichment_receipts`, `catalog_enrichment_imports`
-and `catalog_enrichment_records`. The manifest-bound importer reads the optional
-legacy `enrichment_receipts` family after native post evidence has been mapped.
-Transactions use 50-record batches and a 16 MiB input budget, committing
-receipts and their cursor together. Exact replay returns the existing
-progress; stale cursors or changed manifest digests conflict.
-
-A receipt preserves its source version, exact completion timestamp, enriched
-attachment-link count and unresolved-child count. It binds the mapped native post
-to the catalog's historical collection revision 1, even if that collection is
-later edited or retired. The `catalog-enrichment-v1` policy identifies a legacy
-worker assertion. It does not imply complete child coverage, identify particular
-captures, or claim execution by a native worker. No jobs, targets, attempts,
-captures, post revisions or Stash media fields are created or changed.
-
-Malformed/unsupported receipts, unmapped posts and forgotten posts retain
-review outcomes and their original source values without a native receipt.
-Receipt identity includes its source/catalog, native scope and assertion; equal
-values in different catalogs do not silently acquire shared provenance. The
-snapshot importer currently accepts one frozen snapshot per source/catalog.
-Ordinary backups include the receipts and original source ledger; anonymisation
-removes both. Full native audits check progress, source scope, receipt identity, counts and
-original timestamps. Catalog-wide completion remains `imported:false`.
-
-Application APIs expose resumable progress and source records at
-`/api/v3/archive/catalog-snapshots/{snapshot}/enrichment-import`, its `/records`
-list and `/records/{ordinal}` detail. Native receipts are available at
-`/api/v3/archive/enrichment-receipts/{receipt}` and
-`/api/v3/archive/posts/{post}/enrichment-receipts` (UUID cursor, limit 1–100).
-These are historical inspection/import routes. Queue/cooldown migration and
-reviewed activation are separate operations.
+Schema 1000057 adds `source_enrichment_receipts`, the ledger of historical
+enrichment completions. A receipt keeps its source version, exact completion
+timestamp, enriched attachment-link count and unresolved-child count. It binds the
+mapped native post to the collection's historical revision 1, even if that
+collection is later edited or retired. The `catalog-enrichment-v1` policy marks a
+legacy worker assertion. It does not imply complete child coverage, identify
+particular captures or prove execution by a native worker. Existing completions
+that cite a receipt keep that reference. Nothing writes new receipts. The
+enrichment import pass and its receipt routes were retired in schema 1000142.
 
 ## Reviewed post-to-media associations
 
@@ -2204,320 +1971,7 @@ proof references keep their owners and remain exactly replayable. The migration
 does not merge posts, select media or start jobs; new requests separately require
 the current post UUID and a revalidated preview.
 
-## Historical metadata cleanup
-
-Schema 1000080 adds `source_cleanup_intents`, `catalog_cleanup_imports` and
-`catalog_cleanup_records`. The `catalog-cleanup-v1` pass retains the optional
-`metadata_prune_queue` family after snapshot receipt and post-evidence mapping.
-Each transaction processes at most 50 records or 16 MiB, with the held intent,
-source outcome and cursor committed together. Retry uses the original manifest
-digest and last source ordinal. Completed progress is read without another write.
-
-The old queue recorded a catalog metadata removal that still needed cleanup of
-background enrichment, discovery and translation targets in the separate
-automation database. Its consumer rechecked whether the post or an alias had
-been recreated before deleting those targets. An entry is historical evidence;
-it is not authorization to delete a media file or cancel current native work.
-
-Each valid entry becomes an immutable `held` intent of kind `background_targets`
-in the catalog's original collection revision 1. Its reference namespace includes
-the original registry source and catalog, and its value and timestamp preserve
-`post_key` and `pruned_at` exactly. Missing posts are expected; no native post is
-invented. Existing posts, captures, aliases, queued work and shared translation
-results remain untouched. Malformed entries retain their original source values
-and a review reason without creating an intent. Native retention execution and
-reviewed disposition remain separate work; these import routes cannot release
-or execute an intent.
-
-Progress ends as `retained` when every entry was held, including an absent or
-empty queue, or `review` when some rows need review. Both retain
-`imported:false`: this pass does not certify the whole catalog migration.
-Full native audits reconcile each intent with its immutable source record, original scope,
-timestamp and import counters. Ordinary archive backups include these tables;
-anonymisation removes their private values and migration receipts.
-
-Application-authenticated APIs expose GET/POST progress at
-`/api/v3/archive/catalog-snapshots/{snapshot}/cleanup-import`, bounded source
-summaries at `/records` and original values at `/records/{ordinal}`. Inspect a
-native intent through `/api/v3/archive/cleanup-intents/{intent}`, or list a
-collection's intents through
-`/api/v3/archive/collections/{collection}/cleanup-intents` using a UUID cursor and
-limit 1–100. These routes expose no delete, release or execution action.
-
-## Frozen enrichment work
-
-Schema 1000058 adds `automation_enrichment_imports` and
-`automation_enrichment_records`. The `automation-enrichment-v1` pass maps
-`enrichment_jobs`, `enrichment_cooldowns`, `enrichment_seed_progress` and
-`enrichment_source_progress` from the received automation snapshot. Catalog
-post evidence and historical receipt imports must finish first; coalesced work
-also requires completed catalog relationship mapping. Each transaction processes
-at most 200 source records or 16 MiB. Progress binds the exact manifest digest
-and source ordinal; replay reads terminal progress without repeating writes.
-
-Pending/retry jobs become held native enrichment targets. Priority, original
-attempt counts and deadlines remain available. The deadline includes the later
-of the job delay and its exact platform/account cooldown. Account pauses do not
-become service-wide native pauses. Unknown cooldown semantics require review.
-Seed completion remains a traversal cursor; source last-attempt timestamps
-remain progress evidence. Neither certifies completed enrichment. No native
-jobs or attempts are created, and no target is activated by this pass.
-
-Old `done` jobs require a catalog receipt for the same native post and historical
-collection revision. `already_native` requires an existing gallery-dl capture
-bound to that same scope. Completed imported targets reference those assertions
-through `enrichment_completions.legacy_receipt_uuid` or `legacy_capture_uuid`;
-they have zero new capture associations. The completion API reports `basis` as
-`legacy_receipt` or `legacy_capture`. Ordinary native completions retain their
-capture requirements and report `basis: captures`. These historical completions
-are private to the importer and do not invent native execution or collection
-coverage. Missing proof becomes review, preserving the original status.
-
-`coalesced` requires an explicit imported catalog alias to the same native post.
-It retains that alias proof without claiming the parent executed. Unsupported,
-excluded and unresolved work retains its original disposition. Legacy staged
-JSON stays in the immutable source record with its digest and a review outcome;
-it is neither discarded nor represented as a native owned checkpoint.
-
-Matching uses source-qualified catalog keys and imported aliases. A valid
-queued URL missing from the native post is retained with migration evidence
-whose observation time is explicitly the frozen snapshot boundary. This can
-advance the post's URL-evidence revision; it does not create a post-body revision
-or alter media metadata. New work does not overwrite existing native choices.
-Only holds created by this import at their unchanged revisions can combine
-their priority/deadline or finish using historical proof.
-
-Application APIs expose GET/POST
-`/api/v3/archive/automation-snapshots/{snapshot}/enrichment-import`, a `/records`
-list (ordinal cursor, limit 1–100), and `/records/{ordinal}` with original source
-values. Backups include these records; anonymisation removes them. Full native
-audits check progress, typed projections, source bindings, scoped proofs and native
-history. Overall migration remains `imported:false`; review resolution and
-reviewed activation are separate release requirements.
-
-### Reviewed enrichment activation
-
-Schema 1000059 adds immutable `enrichment_activations` and
-`enrichment_activation_targets` receipts. The application API provides
-`POST /api/v3/archive/enrichment-activations/preview`,
-`POST /api/v3/archive/enrichment-activations`, and
-`GET /api/v3/archive/enrichment-activations/{activation}`.
-
-Preview accepts an operation `uuid`, optional paired `snapshot_uuid` and
-`manifest_sha256`, and up to 100 selections containing `target_uuid`, `revision`
-and the explicitly chosen `collection_revision`. Snapshot selection requires a
-finished enrichment import and one of its unchanged original holds. An active
-post and the collection's current active revision are required. Preview includes
-the post revision, retained URL and URL UUID, original and destination collection
-revisions, release target/revision, policy, priority and exact retry deadline.
-Apply sends `{input, expected_plan_sha256}` and rechecks that entire preview in
-one transaction. Changed evidence, schedules, source definitions or destinations
-conflict without releasing part of a batch.
-
-Imported collections begin disabled. Review their definitions before activating
-work; enabling one creates a new collection revision. When the chosen active
-revision differs from the held target's historical revision, activation consumes
-the original hold as `excluded` with reason `activation_rebound` and creates a
-`review` target for the same post, URL, collection UUID and policy at the selected
-revision. Its priority and deadline are unchanged. A pre-existing destination
-is a conflict, preserving native choices. If the source revision is unchanged,
-the original target simply advances from held to pending. Receipts retain both
-the consumed and released target histories. They replay after completion, later
-holds, changed collection definitions or a forgotten post, without rescheduling
-work. Activation does not create a collector job or claim source execution.
-
-`GET /api/v3/archive/automation-snapshots/{snapshot}/enrichment-import/held-targets`
-uses `expected_manifest_sha256`, sparse `after` ordinals and `limit` (1–100).
-Indexed lookup emits the last original hold for each target once, even when
-several legacy aliases share it or coalescing did not change its revision.
-Candidates identify changed/completed work, forgotten posts, disabled/retired
-collections and occupied replacement targets. A later native hold cannot be
-selected merely by substituting its new revision in a snapshot-bound request.
-
-Plans and responses allow 8 MiB so a complete page of retained URLs, including
-JSON escaping, fits. Full native audits validate receipt hashes, original import ownership,
-source/destination identity, active historical collection definitions and exact
-held-to-pending or held-to-excluded/replacement histories. Backup retains the
-receipts and anonymisation removes them with source evidence. The bulk application
-client is `stash-activate-automation-enrichment`; source fetches remain separate
-metadata-only worker operations.
-
-### Reviewing unstarted enrichment after a collection change
-
-Schema 1000083 adds immutable `enrichment_rebindings` and
-`enrichment_rebinding_targets`. These review already-pending, unstarted work when
-its collection now has a newer definition. They preserve the existing held-work
-activation contract and its receipts.
-
-`GET /api/v3/archive/collections/{collection}/enrichment-rebind-candidates`
-requires the current `collection_revision` and accepts `limit` (1–100). The
-optional cursor is the paired `after_collection_revision` and `after_target`.
-An indexed lookup pages pending targets from older definitions of only this
-collection. Candidates include current post/collection state, the destination
-target UUID and `eligible`, `worker_history`, `replacement_exists`,
-`collection_disabled` or `post_forgotten` dispositions. Targets at the revision
-limit also remain in review. Any previous worker binding requires the existing
-checkpoint/recovery review, including a previous attempt whose current target
-revision has no job binding.
-
-`POST /api/v3/archive/enrichment-rebindings/preview` accepts an operation `uuid`,
-`collection_uuid`, current `collection_revision`, a reason of at most 4,096 UTF-8
-bytes, and 1–100 `{target_uuid, revision}` selections. It returns the exact current
-collection definition and a nested activation plan with source/post revision,
-URL, priority, retry deadline and destination UUID. Preview makes no writes.
-
-`POST /api/v3/archive/enrichment-rebindings` accepts
-`{input, expected_plan_sha256}`. Apply rechecks all selected work and records
-pending → held (`collection_rebind`) → excluded (`activation_rebound`) history
-for each old target, plus its new pending target, activation and review receipts
-in one transaction. Priority and retry deadline stay unchanged. Duplicate
-destinations, existing replacements, any worker history and stale source/target/
-collection revisions conflict without committing a partial hold. These operations
-do not admit jobs, enable profiles or policies, change selected metadata, or
-rewrite original provenance. Requests are bounded to 64 KiB and plans to 8 MiB.
-
-`GET /api/v3/archive/enrichment-rebindings/{uuid}` recovers the immutable receipt.
-Apply checks that receipt before current eligibility, so a lost response can be
-recovered after later holds, collection edits or source forgetting. A reused UUID
-with different input/digest conflicts. Full native audits validate the full original and
-intermediate target histories, nested activation, historical destination
-definition and absence of earlier worker bindings before writing. Backup/export
-includes both new tables; anonymisation removes them before activation history.
-The application client is `stash-review-enrichment-collections`.
-
-### Reviewing discovery collection bindings
-
-Schema 1000084 adds immutable `discovery_scope_reviews` and the derived
-`discovery_effective_listings` view. A review changes the collection revision and
-root of an unstarted search while retaining its UUID, source account and URL,
-extractor, policy, original creation time, retry deadline, saved cursor, legacy
-reference and recovery relationship. The original `discovery_listings` row is
-never rewritten. Historical activation and recovery receipts resolve the exact
-original or reviewed definition digest they recorded.
-
-`GET /api/v3/archive/collections/{collection}/discovery-scope-candidates` requires
-`collection_revision` and accepts a UUID `after` cursor and `limit` from 1–100.
-The limit bounds inspected definitions, including ineligible rows. Candidates
-report disabled/changed collections, changed source identity, superseded searches
-and any previous worker job. Cancelled or failed jobs still count as history.
-Changes to collection kind, namespace, target URL or account require a different
-source review; this operation approves directory/root associations and labels.
-
-`POST /api/v3/archive/discovery-scope-reviews/preview` accepts `uuid`,
-`listing_uuid`, `expected_definition_sha256`, `collection_revision` and `reason`.
-Its read-only plan includes the previous definition and review reference,
-destination collection, proposed definition digest and exact plan digest.
-`POST /api/v3/archive/discovery-scope-reviews` accepts
-`{input, expected_plan_sha256}` and records one atomic review. Reusing its UUID
-requires the same input and plan; replay recovers its receipt before checking
-current eligibility. `GET /api/v3/archive/discovery-scope-reviews/{review}`
-retrieves that immutable receipt after later work, edits or restart.
-
-Requests allow 16 KiB; saved native plans allow 128 KiB. An approved binding does
-not activate a root or admit a job. Worker authorization, readiness, fetching,
-detail verification and capture publication use the reviewed definition. A grant
-limited to the previous root cannot authorize a new root, and admission requires
-the reviewed definition digest. Read-only review retains
-its separate timing rules. Full native audits validate the review chain, historical
-collection definitions, plan/input/definition digests, effective projection and
-worker history. Anonymisation clears reviews with the discovery graph.
-
-The saved-plan application client is `stash-review-discovery-collections`.
-
-### Imported enrichment staging
-
-Schema 1000060 converts saved `enrichment_jobs.staged_json` into native migration
-evidence using `legacy-enrichment-staging-v1`. The original automation record,
-its source hash and the exact staged-text hash remain available. Conversion is
-resumable in batches of at most 100 records and 4 MiB of source data; sparse source
-ordinals and the frozen manifest digest fence each request. Both valid and
-malformed non-null staged values receive a conversion or review outcome.
-
-`automation_checkpoint_imports` records progress. Immutable
-`automation_checkpoint_records` bind each outcome to the original enrichment
-mapping. `automation_checkpoint_bodies` shares equal converted documents by hash.
-Converted bodies contain ordered source records referring to shared metadata
-bodies, optional shallow deltas, and explicit `_parent`/`_reddit` references.
-Expansion reproduces the retained source values, including exact JSON numbers,
-nulls and removed fields. The converter does not apply a newer source-retention
-policy to old staged bytes. Unknown fields/formats stay in review with their
-original evidence; partial conversion is not published.
-
-Observation times are explicitly `unrecorded`. The saved extractor version is a
-reported legacy value and may be absent. Pending child URLs retain their original
-parent metadata, depth and reason. Unresolved references stay unscoped because
-the old collector did not retain their parent; missing reasons stay absent.
-Neither job update times nor the snapshot boundary become invented observation
-times. This format is separate from owned native worker transcripts and is
-rejected by that transcript parser.
-
-The application routes are `GET` and `POST`
-`/api/v3/archive/automation-snapshots/{snapshot}/enrichment-checkpoints`, with
-`GET .../records?after=0&limit=100` and `GET .../records/{ordinal}` for inspection.
-POST accepts `{expected_manifest_sha256, after}` after enrichment mapping has
-finished. Record lists omit payloads; a selected record returns its converted
-body and exact original values. Repeating the completed cursor is read-only.
-`stash-import-enrichment-checkpoints` verifies the local frozen snapshot and the
-exact staged-record count, and resumes a committed response being lost.
-
-Conversion leaves posts, media, target choices, deadlines, captures and worker
-state unchanged. It does not resolve the original review hold or mark the full
-archive migration imported. Reviewed handoff of this retained evidence to native
-execution remains a separate operation. Backup includes the converted evidence;
-anonymisation removes it. Full native audits check complete source bindings, progress,
-hashes and deterministic conversion semantics, including review outcomes.
-
-### Accepting retained checkpoint evidence
-
-Schema 1000062 adds `checkpoint_evidence_acceptances` and
-`checkpoint_evidence_captures`. Application review can materialize the shared
-bodies of one converted legacy checkpoint as ordinary source captures. Original
-record slots, pending children and unscoped unresolved references remain in the
-converted evidence. Repeated slots share the same capture; each binding retains
-its original body index and exact reconstructed payload digest.
-
-These captures use origin `legacy-enrichment` and policy `legacy-retained-v1`.
-Their observation time is null; their recording time is when the archive accepted
-the evidence. The old reported extractor version remains optional. Missing source
-URLs, reasons, timestamps and producer ownership are not invented. Both parent
-references, shallow deltas, explicit nulls and exact JSON numbers are preserved.
-Every body must have a supported post identity and all must identify the same
-post. Unsupported or contradictory evidence remains available in migration review.
-
-The preview identifies the exact original snapshot/manifest, ordinal, target
-revision, source/staging/body hashes, post revision, shared capture UUIDs and
-counts of original records, pending children and unscoped references. A post
-with only catalog-local identifiers may acquire its first service identifier;
-`assign_post_identifier`, `post_namespace` and `post_value` show that change in
-the preview. An identifier already assigned to another post, or a different
-service identifier on the selected post, is a conflict. Acceptance cannot merge
-posts or silently replace a native identifier.
-
-All routes use application authentication under `/api/v3/archive`:
-
-| Route | Contract |
-| --- | --- |
-| `POST /checkpoint-evidence/preview` | Input: `uuid`, `snapshot_uuid`, `manifest_sha256`, `ordinal`, `target_revision`. Returns the review plan with `plan_sha256`; writes nothing. |
-| `POST /checkpoint-evidence` | Body: `input` with those same fields and `expected_plan_sha256`. Atomically accepts only the unchanged preview. |
-| `GET /checkpoint-evidence/{acceptance}` | Reads the acceptance by its input UUID, including `created_at`. Returns 404 if absent. |
-
-Only one acceptance can own an original snapshot ordinal. A duplicate operation
-UUID replays the original receipt after later target decisions; a different UUID
-cannot replace it. Changed previews return 409. Requests are bounded to 16 KiB,
-plans to 1 MiB, and reconstructed evidence to the existing per-payload and total
-expansion limits. Capture creation, optional post identifier assignment, original
-collection association and receipt bindings commit together, including when a
-caller catches a late write error.
-
-Acceptance leaves the target's review state, schedule and history unchanged. It
-does not create a worker job, complete enrichment, select publisher accounts or
-apply Stash metadata. Reviewed child execution uses the separate handoff below.
-Backup preserves acceptance and source evidence; anonymisation removes
-both. Full native audits recompute the original conversion and reconstructed capture hashes,
-check the original review history and collection associations, and reject altered
-evidence.
-
-### Original observation context and reviewed retry format
+## Original observation context
 
 Schema 1000063 adds `source_capture_contexts`. A new capture can embed an exact
 older capture at `/_parent` or `/_reddit`; the relationship records both capture
@@ -2542,534 +1996,7 @@ time, rather than the newer child's fetch time. An undated original remains a
 review case; explicit linking does not fabricate first/last observed dates.
 Feed-owner context does not replace the actual author of a social post.
 
-The Go/Python parser and isolated collector also understand the future reviewed
-retry format `stash-metadata-fetch-v2`. Its immutable prefix contains context
-records with `retained_capture` UUIDs, null observation times, full original
-payloads and no delta/parent indices. The accepted checkpoint converter builds
-this prefix and preserves scoped pending children. Original record slots and
-unscoped references remain in the frozen acceptance, without invented parents.
-Missing historical failure reasons become the handoff state `legacy_pending`;
-the historical reason itself remains unchanged in the acceptance.
-
-New child records have real observation times, obey current reduction and refer
-to earlier context records. They cannot refetch a root, use old evidence as a
-delta base, add unreviewed historical captures during retry, or insert another
-unbound inline parent. Repeated pending work is deduplicated without removing its
-original evidence. Both original parent branches survive; incompatible category
-chains, excessive depth and oversized documents remain review cases. Child-only
-retry inherits gallery-dl parent settings and reserves the contacted child
-service before initialization.
-
-Schema 1000065 connects this storage/collector contract to reviewed native
-execution, as described below. Evidence acceptance alone still leaves the target
-in review. Existing v1 receipts and release proofs retain their byte-for-byte
-checksum contracts.
-
-### Reviewing an exact checkpoint handoff
-
-Schema 1000064 adds immutable `checkpoint_handoffs`. This is an application
-review receipt for the starting context of child-only execution. It binds an
-existing evidence acceptance and its plan hash, the original target revision,
-the post's current revision, an active destination collection revision, the
-worker configuration hash and extractor version, the context retention policy,
-and the exact resume document's hash, size and counts. The preview identifies
-the target UUID/revision that subsequent admission would release, including a
-replacement target when the collection revision changed.
-
-Under `/api/v3/archive`, all four operations require application authentication:
-
-| Route | Contract |
-| --- | --- |
-| `POST /checkpoint-handoffs/preview` | Input: `uuid`, `evidence_uuid`, `evidence_plan_sha256`, `target_revision`, `collection_revision`, `policy_sha256`, `extractor_version`. Reads current post revision and returns `plan_sha256`; writes nothing. |
-| `POST /checkpoint-handoffs` | Body: `input` with those same fields and `expected_plan_sha256`. Saves only the unchanged review. |
-| `GET /checkpoint-handoffs/{handoff}` | Recovers the committed review, including `created_at`, using the input UUID. |
-| `GET /checkpoint-handoffs/{handoff}/seed` | Returns `handoff_uuid`, `plan_sha256`, `sha256` and `body`, reconstructed from frozen evidence and verified native captures. |
-
-The database stores the bounded plan, not another copy of the source payloads
-or resume document. Seed reconstruction verifies accepted capture UUIDs, raw
-payload hashes, historical extractor versions, metadata and original recording
-times. Missing or altered evidence is an integrity failure. A new runtime or
-configuration requires a new preview. Post, target and collection changes
-invalidate an uncommitted preview; an exact replay of an already committed
-operation recovers its original receipt after later edits. Historical receipt
-and seed lookup do not authorize executing a stale target.
-
-Pending children remain scoped to their retained parents. The plan separately
-counts original unscoped references; those stay in the frozen acceptance and
-are not silently given invented parents in the new worker document. Retained
-records keep null observation times and have no claimed observing producer.
-Requests are bounded to 16 KiB, plans to 1 MiB and reconstructed seeds to the
-collector's 32 MiB / 1,024-record limits. Invalid ancestry or oversized legacy
-evidence stays in review without truncation. Clients must preserve JSON numbers
-losslessly when decoding and replaying the seed; converting source IDs or numeric
-lexemes through floating point can change its exact checksum.
-
-Accepting this review does **not** release the original target, create a job,
-write a worker checkpoint/lease/receipt, or complete enrichment. The separate
-admission operation below consumes the review and binds its exact seed.
-Backup retains the review and its source evidence; anonymisation removes the
-execution bindings before the review. Full native audits reconstruct the seed
-and verify historical collection and evidence bindings.
-
-### Executing a reviewed checkpoint handoff
-
-Schema 1000065 adds `enrichment_handoff_jobs`, `enrichment_job_retained_records`
-and `enrichment_job_seed_services`. These contain one consumption receipt per
-handoff/job, bounded original capture UUIDs and record digests, and supported
-pending child services. They duplicate no source payloads. Migration does not
-release review holds or create jobs from saved legacy state.
-
-Producer admission revalidates the exact reviewed post/target/collection, logical
-root, runtime, configuration and plan hash. One transaction either releases the
-same target revision, or excludes the old target and creates the planned target
-for the newer collection revision, then submits and binds one job. A generic
-submission cannot omit the consumption receipt. A lost response replays the
-original job even after later completion, cancellation or collection changes;
-that recovery does not restart it.
-
-New native enrichment jobs use argument version 2 and pin
-`capture_policy: source-retention-v1+capture-context-v1`. A handoff job additionally
-pins `handoff: {uuid, plan_sha256, seed_sha256}`. Ordinary new jobs use the same
-capture contract without a handoff. Existing native v1 jobs, request UUIDs,
-acknowledgements, capture identities and release proofs remain valid; this is
-native execution history, not upstream UI/plugin compatibility.
-
-The scoped seed endpoint reconstructs and checks original evidence against that
-job. It is not a checkpoint acknowledgement or an invented producer attempt.
-Before the first checkpoint, scheduling and fairness account for pending Imgur
-and Redgifs services using the small service projection. A child-only failure
-without saved child failure evidence cannot pause the parent website. Once a
-real checkpoint exists, its pending services govern retries.
-
-The first checkpoint must extend the exact seed. Later checkpoints retain its
-immutable prefix and ordinary retry constraints. Each prefix record's
-`retained_capture` identifies its original native observation; `producer_uuid`
-on checkpoint/published records identifies the submitting producer, not an
-invented observer of historical data. Original missing observation/extractor
-information stays missing. Publication reuses those captures and associates them
-with the destination collection without rerunning their publisher/translation
-assessment as new observations. Retained evidence can complete a target only
-inside the bound job's verified atomic publication.
-
-Fresh child captures have their actual observation time, current extractor
-version, and a signed context binding to an earlier capture. Parent UUIDs affect
-capture identity even when their text is equal. Ordinary newly executed child
-captures receive the same context bindings. Version-2 staging release binds the
-job/seed/review hashes, original capture signatures, record delivery provenance,
-new observations and unresolved references. Unscoped legacy references remain
-in the original acceptance linked by the review; no parent or new failure is
-invented for them. Completed staging is released only after this proof verifies.
-
-Full native audits check both the retained seed projections and current checkpoint or
-released publication. Backups preserve these records and anonymisation removes
-them in dependency order. Dedicated checkpoint-handoff review UI remains separate
-from the implemented application API and client; deployment activation is an
-installation responsibility.
-
-## Frozen discovery and maintenance history
-
-Schema 1000069 adds `automation_discovery_imports` and
-`automation_discovery_records`. The `automation-discovery-v1` pass reads
-`discovery_accounts`, `discovery_targets`, `discovery_candidates` and
-`maintenance` from the received automation snapshot. The same snapshot's
-enrichment mapping must finish first. Each transaction processes at most 200
-source records or 16 MiB, committing typed associations and the exact manifest/
-source-ordinal checkpoint together. Failed writes roll back the whole batch,
-including when an outer transaction caller catches the error. Terminal replay
-returns the original progress without writes.
-
-Discovery is about identifying source posts for historical media, separately
-from performer ownership. Account continuations preserve their validated service,
-profile URL, listing/matching phase, historical attempts/pages and the later of
-their retry deadline and imported platform/account cooldowns. Cursor and staged
-page/detail digests reference original snapshot strings. The original account
-mapping remains available through later account consolidation; this pass cannot
-establish account equivalence, ownership or depicted-performer attribution.
-
-Pending targets bind their original account job, source-qualified post reference
-and historical collection revision. Candidates retain their URL, matching basis
-and payload digest, even when several URLs remain possible. Neither is an
-accepted post match. Existing lookup work references the corresponding enrichment
-record and exact URL instead of creating another target. Historical completion
-requires a same-post/collection receipt or capture; `already_native` requires a
-capture, and `coalesced` requires the imported alias proof. A completed listing
-does not certify that any target matched. Missing scope/proof and staged results
-requiring conversion receive explicit review outcomes.
-
-Known maintenance entries retain typed inventory watermarks, translation seed
-times, seed counts, source exclusions and pruning summaries. Nanosecond
-watermarks are decimal strings in the API to preserve integer precision.
-These are historical records, not live scheduling/retention policies, executable
-cursors or proof that native jobs completed. Unknown or malformed entries remain
-in the original ledger with a review reason.
-
-Application-authorized GET/POST
-`/api/v3/archive/automation-snapshots/{snapshot}/discovery-import` exposes the
-import; POST requires `expected_manifest_sha256` and `after`. `/records` accepts
-an ordinal cursor and limit 1–100. `/records/{ordinal}` returns original values
-on demand. Paged results contain compact projections and native associations;
-payloads are not copied from the snapshot into another document store.
-
-Foreign keys and immutable records retain source-family scope. Full native audits validate
-progress, recompute typed projections and digests, and check native account,
-post, collection and enrichment-proof bindings before writes. Normal database
-backups include the original snapshot and these associations; anonymisation
-removes the import before its dependencies. No jobs, captures, performer links,
-post identifiers or selected metadata are changed by this pass. The client is
-`stash-import-automation-discovery`; this staging phase reports `imported:false`.
-Reviewed discovery activation and execution use the separate services below.
-
-## Verified legacy discovery identities
-
-Schema 1000070 adds `enrichment_discovery_resolutions` and an indexed lookup of
-mapped discovery inputs. During enrichment publication, a legacy-only post can
-receive a native Reddit/Twitter identifier without changing its UUID. Exactly
-one completed discovery mapping must bind the original post, collection UUID
-and exact candidate URL. Reviewed collection revision changes retain that scope.
-
-The `retained-discovery-identity-v1` policy checks the fetched post's service ID
-against the candidate URL and requires corroboration: every retained strict
-Twitter filename identifies that post; its captured publisher matches a saved
-account identifier; or original text/title and its UTC publication date match
-the historical evidence. Text normalization preserves the original finder's
-HTML removal, NFKC case folding and Unicode word comparison, with minimum
-lengths of 40 characters for text or 20 for titles. A feed's profile object,
-translated text, a URL alone or approximate similarity cannot prove identity.
-
-The resolution references the frozen snapshot ordinal, published checkpoint
-record and identifier evidence, retaining the post's prior revision and the
-versioned matching basis. It does not copy source payloads. Original observation
-time comes from the capture; resolution time records the transaction. The
-identifier, captures, resolution, job result and target completion commit
-together. A deferred foreign key and pre-commit verification prevent a caller
-from committing the identity mutation without the complete publication.
-
-When the corroborated ID already belongs to another post, publication consolidates
-the duplicate into the first stored identity. Compatible choices use their normal
-union; conflicting selections, gallery links and media choices retain the first
-post's choices. Existing media metadata keeps its first-seen policy. Distinct source
-posts can continue to share media and galleries. Jobs staged before consolidation
-can finish against their original owner once both posts share a canonical identity.
-Original identifiers, observations and capture owners remain unchanged.
-
-Unknown or multiply mapped inputs still require review. Publication rolls back
-and the controlled failure retains its checkpoint for later inspection. Duplicate
-consolidation and checkpoint publication commit together; no performer assignment
-is inferred. Full native audits verify the original snapshot bytes, reconstructed
-native capture, matching basis, identifier receipt and publication binding even
-after compact staging has been released. Anonymisation removes resolutions
-before their dependencies; ordinary database backups retain them.
-
-The migration itself leaves existing jobs, identifiers and selected metadata
-unchanged. It does not activate workers or prove historical listing coverage.
-Candidate-detail execution and reviewed post consolidation are described below;
-external caller activation belongs to deployment.
-
-### Account-listing candidate evidence
-
-The pure `retained-discovery-listing-v1` matcher compares retained held targets
-with compact Reddit/Twitter listing records. It has no database writes. A
-corroborated candidate requires exact original title plus UTC source date,
-original text plus date, a distinct title and longer original text, or an
-original qualified post URL plus date. Text uses the retained Unicode word
-normalization and minimum lengths of 20 for titles, 40 for dated text and 64
-for text corroborating a distinct title. Duplicate title/text does not count as
-two facts. Media URLs, scrape/profile URLs, translated text, observed capture
-time and approximate captions cannot supply that proof. A contradictory captured
-publisher ID rejects the candidate.
-
-An exact title without corroboration stays `title-needs-verification`. Detail
-responses must be checked against the unchanged original target: confirming the
-inferred post URL or publisher cannot upgrade it through the separate lookup
-policy's filename/account shortcuts. Neither result accepts a post identity.
-The eventual publication service must check complete enumeration, all competing
-candidates, current native choices and identifier ownership atomically.
-
-Page matching groups media and parent-context records by qualified post ID,
-retaining their original record ordinals. It does not copy post/profile payloads.
-Several attachments from one post produce one candidate; separate posts with
-the same caption remain separate candidates. A stronger record can corroborate
-the same post's weak title, while a final or empty page never becomes a match
-on its own.
-
-Schema 1000072 binds each reviewed held target in `discovery_match_targets` to
-its original frozen record SHA-256, existing legacy-backed listing and exact
-native post revision. Unconverted historical candidate rows block binding;
-resuming from an old cursor cannot silently omit them. Migration creates no
-bindings or jobs. Bindings are idempotent, and later source or post edits stop
-fresh comparison without invalidating historical receipts.
-
-`discovery_match_pages` records each target/page comparison and its original
-page and result hashes. `discovery_match_evidence` keeps record ordinals and the
-comparison basis; it does not copy the source payload. The original page body
-is shared by every target that compares it. `discovery_match_candidates` groups
-qualified post IDs across pages, retaining first, strongest and latest evidence.
-Further media from one post do not become competing candidates. A stronger
-record can promote that post's provisional result, while all earlier evidence
-and distinct competing IDs remain available.
-
-Receipt, evidence, grouping and target cursor commit in one managed transaction.
-An interrupted write rolls back all four, even if its caller catches the error.
-Independent callers and retries return the original receipt. Each listing
-allows at most 10,000 bound targets; each target allows 4,096 distinct candidate
-posts. Exceeding a limit preserves the source page and prior progress and fails
-without truncating candidates or advancing the cursor.
-
-The application runs a comparison worker over explicitly bound targets and
-already retained pages. Its pending index bounds inspection to 32 target rows
-per step, including waiting and stale targets. Decoding and comparison use a
-read transaction; the subsequent short write rechecks the original target,
-page, native post revision and active collection/account/root before committing.
-The saved target cursor survives restart. This worker makes no source requests,
-does not admit listing jobs and does not publish identities or selected metadata.
-
-`enumeration_complete` on a match target means comparison reached the retained
-listing's final cursor. It does not certify coverage of earlier historical
-pages, choose a unique identity, complete an import, or authorize release of
-source evidence. Historical-coverage reconciliation and weak-candidate detail
-execution remain necessary before those candidates can publish.
-Full native audits verify original target bindings, page/result digests, record
-references and candidate aggregates. Normal backups retain the entire graph;
-anonymised exports remove it before removing its source evidence.
-
-The application review derives coverage and blockers from these indexed records
-in one read transaction. It distinguishes received and compared batches, missing
-history before a saved cursor, weak/competing candidates and changed native
-choices. It also reports when a sole candidate's identifier already belongs to
-another post, including a forgotten one. It loads no source bodies and creates
-no stored review state. An empty blocker list is not identity acceptance or
-metadata publication. See the [review response](native-ingestion.md#reviewed-discovery-activation).
-
-### Reviewed discovery activation
-
-Schema 1000073 retains immutable `discovery_activations` and
-`discovery_activation_targets` receipts. A preview selects an exact imported
-manifest, legacy-backed listing definition and up to 1,000 original target
-ordinals/hashes. It resolves current native post revisions and pins them in the
-reviewed plan. The original account hash, saved cursor, historical page count,
-retry deadline, collection/root revision, worker policy and extractor remain
-part of the same review. Existing compatible listing and target bindings can be
-reused by another explicitly reviewed batch.
-
-Apply requires the preview hash and repeats its source/revision checks. It
-commits the shared listing, every selected target and the immutable operation
-receipt atomically. A late failure rolls back the whole batch; a changed native
-post or collection requires another preview. The same operation UUID and request
-return their original receipt after a lost response, later comparison progress,
-post forgetting or collection retirement. Different inputs cannot reuse that
-operation UUID. Full native snapshot/upgrade audits check the original receipt graph and
-anonymised exports remove it before removing comparison bindings.
-
-Activation creates no page jobs, fetches no source data and chooses no post
-identity. Scoped producers separately admit due listings. Application-only
-routes expose preview/apply/replay, retained listing summaries and the comparison
-targets, candidates and original record references. Producer tokens cannot use
-these review routes. See [activation API](native-ingestion.md#reviewed-discovery-activation).
-The operator command saves reviewed activations and recovers their original
-receipts. Missing-history searches can use reviewed recovery below. Detail
-execution is implemented below; dedicated discovery activation UI and verified
-discovery staging release remain open.
-
-### Verified discovery publication
-
-Schema 1000074 adds immutable `discovery_match_publications` and
-`discovery_published_records`. Application publication accepts only a completely
-compared search retained from its beginning, one strong candidate, unchanged
-native choices and an unclaimed qualified post ID. Preparation decodes the
-original frozen target and strongest page under a read transaction. The write
-rechecks those bindings and commits identity/URL evidence, native capture-domain
-effects and the receipt together. Caught errors and failed commit checks roll
-back partial identities and metadata. Shared capture services retain publisher,
-album and translation behavior without a synthetic producer delivery receipt.
-
-The receipt pins the target revision, strongest page hash, matching basis and
-actual corroborating record ordinal. Record associations preserve original
-observing producer, times and parent contexts through deterministic capture IDs.
-All observations for the selected post on that page are published; unrelated
-posts remain staged. Native captures retain normalized shared bodies, profiles
-and patches. Original imported post UUIDs and legacy keys remain valid, and a
-source ID already owned by another post requires explicit consolidation.
-
-Replay returns the same receipt after lost responses, restarts and later native
-edits. Full native audits reconstruct the original proof and verify every capture,
-collection association, identity/URL evidence row and record mapping. Ordinary
-backups retain the graph; anonymisation deletes publication children before their
-dependencies. Publication does not release page bodies, finish catalog import or
-assign depicted performers. Automatic dispatch uses the same service. Actual
-source coverage and verified staging release remain transition work. Automatic
-candidate-detail admission is described below.
-
-### Reviewed discovery history recovery
-
-Schema 1000075 adds `discovery_listing_recoveries` and
-`discovery_recovery_targets`. Each original legacy search with missing historical
-batches may have one replacement beginning at the first page. The new definition
-pins the original listing UUID/digest and keeps the same frozen account reference,
-source account, collection and profile URL. Explicit review chooses the current
-collection/root and worker policy; original retry deadlines remain lower bounds.
-Definitions without recovery retain their original serialized form and digest.
-
-The ordinary activation preview/apply service commits the new definition,
-selected target links and immutable receipt atomically. It waits for running
-producers, cancels queued predecessor work and prevents further predecessor
-admissions/pages. Existing attempt/page/candidate evidence remains retained, and
-its pending comparisons may finish. Each replacement target preserves the same
-original source ordinal, hash and post UUID; it cannot invent a new association.
-
-Read-only reviews expose both search references. A new complete strong match
-cannot publish while the predecessor has uncompared retained pages or a differing
-candidate. Publication reconstruction checks those same facts during full audits, after
-which later native edits can still replay the original receipt. Foreign keys,
-unique predecessor constraints, mutation guards and full graph audits preserve
-these relationships. Backups include both searches; anonymisation removes recovery
-links before their dependencies. New fetching supplies current evidence, not a
-claim that missing historical bodies were recovered or all past posts still exist.
-
-## Durable account listing pages
-
-Schema 1000071 stores immutable discovery definitions in `discovery_listings`.
-Each binds a native source account, exact collection revision and logical root,
-Reddit submitted or Twitter timeline URL, worker policy/runtime, initial cursor
-and not-before deadline. A fresh listing starts without a cursor. Resuming a
-frozen listing requires a `discovery_listing_legacy` reference proving the
-original account, profile, collection, cursor, historical page count and mapped
-cooldown. Unconverted staged results cannot be discarded by starting a listing.
-Historical page counts remain historical assertions, not native page receipts.
-
-Each `account.list_page` archive job fetches **one page**: one batch of source
-posts and the cursor for requesting the next batch. The
-`discovery_listing_jobs` binding retains its generation and requested page
-ordinal; `discovery_job_attempts` records the authenticated producer for each
-fenced attempt. Failed attempts retry the same page with backoff. An explicit
-retry of exhausted or cancelled work retains earlier pages and deadlines.
-Successful nonfinal pages permit a new job for the next cursor. A final page
-ends enumeration, including when that page contains no records.
-
-`discovery_pages` retains one compact `stash-discovery-page-v1` body per page,
-with an immutable digest, original producer/attempt and small receipt. The page
-must continue the exact saved cursor, profile and runtime. Repeated cursors,
-gaps, future observation times and writes after completion are rejected. Page
-retention, job success and reservation release commit together; generic job
-success cannot bypass that receipt. Lost acknowledgements replay the original
-receipt without restoring the old lease or contacting the source again.
-
-Listings share service reservations, cooldowns, collection exclusion and bounded
-download preference with enrichment and downloads. Releasing after each page
-allows a download turn before the next page. The original job and pacing rows,
-indexes and guards survive migration. Admission allows at most 16 active listing
-jobs, 10,000 new pages per listing and 2 GiB of retained discovery bodies across
-the database. Each page retains the 4,096-record, 32 MiB compact and 128 MiB
-expanded limits. Capacity exhaustion is an explicit failure, never a completed
-listing or discarded page.
-
-The internal coordinator authenticates collection/root grants and rechecks the
-original lease deadline, credential and source definition through commit.
-Descriptions return the requested job's original input cursor even after later
-pages advance the listing. Controlled failure receipts preserve the original
-attempt and cannot prolong cooldowns on replay. Full native audits validate definitions,
-import provenance, generations, cursor chains, page bodies and completion proofs.
-Anonymisation removes these records before their dependencies; ordinary database
-backups include them.
-
-Page success proves retained enumeration data only. It does not match candidate
-posts, publish native captures, assign performers or complete catalog migration.
-The [scoped worker API](native-ingestion.md#account-listing-discovery) exposes
-admission of existing definitions, owned attempts, page delivery and failure
-receipts. It cannot create definitions or activate imported work. Durable
-producer delivery, selected-job execution and shared profile/collection dispatch
-are implemented, along with the native candidate comparison worker described
-above. Reviewed activation and publication of complete, unique strong matches
-are implemented, through both the application endpoint and a bounded server
-worker. Both use the same atomic publication checks and receipts. Candidate-detail
-execution and reviewed post consolidation have their own services below.
-Historical coverage is evidence-dependent; verified discovery staging release
-remains unimplemented.
-
-### Durable candidate detail comparisons
-
-Schema 1000076 adds the `post.verify_candidate` job kind. Its immutable
-`discovery_detail_jobs` binding selects a target revision and candidate sequence,
-with a generation for explicit retries. Job arguments pin the frozen source
-hash, native post revision, original listing definition/page hashes, selected
-post identifier and URL, collection revision/root, capture policy and the detail
-worker's runtime/policy. This URL is a candidate fetch destination; admission
-never creates a native post URL or identifier.
-
-`discovery_detail_attempts` authenticates each fenced attempt. The
-`discovery_detail_checkpoints`, `discovery_detail_checkpoint_receipts` and
-`discovery_detail_checkpoint_records` tables retain one current compact body,
-small immutable acknowledgements and original per-record observation provenance.
-A resumed checkpoint must extend the previous records and resolve or retain
-its pending children. Empty responses are retained as uncorroborated evidence.
-Limits are 32 active jobs, 128 checkpoint revisions per job, 1,024 records and
-32 MiB per compact body, and 2 GiB total retained detail bodies. Storage includes
-failed, cancelled and completed work until a verified release is implemented.
-
-`discovery_detail_results` retains the comparison against the original frozen
-target and listing. A successful job means that comparison completed, including
-an uncorroborated result. It does not accept an identity, remove another candidate,
-publish captures or finish an import. Publication review can use a corroborated
-result under schema 1000077 below. Pending child
-requests prevent completion. The result contains hashes and record ordinals;
-metadata remains in the shared compact checkpoint. Original attempt receipts
-remain replayable after expiry, cancellation, later source edits and restart.
-
-Detail jobs share collection exclusion, website reservations, child-service
-cooldowns and bounded download preference with existing metadata/download jobs.
-Application maintenance recovers expired ownership and cancels stale work.
-A new target revision can replace its obsolete selected job while preserving
-retry deadlines and old evidence. Explicit retry creates a new generation and
-cannot acknowledge the predecessor's checkpoint. The scoped worker coordinator
-rechecks credentials, source choices and the original lease deadline at commit.
-
-The migration preserves all prior jobs, attempts, receipts and pacing rows.
-Full native audits check job bindings, generation continuity, checkpoint accounting,
-record hashes/times and rederive completed comparisons.
-Normal database backups contain these records; anonymisation removes their
-private source bodies and associations. The Python producer executes and recovers
-these jobs. Verified staging release remains open.
-
-Automatic detail admission uses the existing collection/listing and
-listing/snapshot/source-ordinal indexes, plus the candidate job-history index
-from schema 1000077. No additional native schema is required. Each inspection
-visits at most 32 definitions and 32 targets and advances past ineligible rows.
-Only a fully compared, unique weak candidate with no other review blockers can
-be automatically admitted through the selected producer profile. Any earlier job
-for the same target/candidate requires explicit review or retry, preserving
-negative results, terminal states and retry delays across comparison revisions.
-Admission repeats the read-only eligibility check transactionally and before
-commit; exact original admission replay remains available after later edits.
-
-### Publication from authenticated detail evidence
-
-Schema 1000077 extends `discovery_match_publications` with nullable
-`detail_job_uuid`, referencing the immutable `discovery_detail_results` receipt.
-Existing listing publications retain every original value and their policy.
-Detail publications use `retained-discovery-detail-publication-v1`; record ordinals
-refer to the saved detail transcript. Both paths share the same native identity,
-capture, publisher, album and translation transaction.
-
-Review selects the latest completed result for the sole weak candidate through
-an index on its target/candidate history. A negative result is retained, rather
-than searching backwards for positive evidence. It never drops a candidate or
-changes `needs_detail`. A completed detail may precede later listing comparisons,
-provided its original target, source, candidate, post revision, collection and
-page bindings remain valid. Missing historical batches, competing candidates,
-uncompared predecessor pages, changed native choices and an identifier owned by
-another post still block publication.
-
-Publication explicitly pins the detail job. Preparation rederives its comparison
-from original frozen input and authenticated checkpoint bytes, then prepares
-captures using each record's original observing producer and timestamp. The
-publication receipt and identity evidence reference that proof. The server
-rechecks current eligibility inside the transaction and verifies every native
-capture and association before commit. Response replay retains the selected
-proof even after later edits; it never reruns a fetch or repeats capture effects.
-Full native audits reconstruct both kinds of publication. Anonymisation deletes publication
-children before detail results. This migration does not release staged evidence,
-enable live scrapers or complete the broader catalog import.
-
-### Attachment download reports
+## Attachment download reports
 
 Migration 1000087 extends ingestion receipts with `attachment.download` and adds
 `source_attachment_downloads`. It preserves all prior receipts and adds no report
@@ -3180,36 +2107,3 @@ expire. Rollbacks retain cached counts. Schema changes, untracked external write
 and tracking failures conservatively invalidate the cache. Relative-time and
 nondeterministic queries remain uncached. Worker bookkeeping does not invalidate
 unrelated library totals.
-
-## Consumed catalog payload retention (1000132)
-
-Catalog staging now separates the lifetime of source JSON from durable import
-receipts. An explicit, resumable maintenance operation can retire payloads for
-`account_snapshots`, `observations`, `observation_details`, `assets`, `files` and
-`appearances` after all eleven catalog consumers have finished without historical
-reviews. Individual media rows must have mapped successfully; unavailable inputs
-remain intact. Automation inputs and other catalog families remain retained
-because activation, provenance validation or detail readers still consume them.
-
-The migration adds the lifecycle but does not retire any data. Each transaction
-handles at most 512 records and 16 MiB of source payloads. It verifies original
-hashes and manifest keys, replaces eligible JSON with `{}`, and commits its
-checkpoint atomically. Retries return the committed checkpoint; interruption
-leaves a valid native database that can resume. Snapshot, chunk and row identities,
-original hashes, original byte counts and import outcomes remain unchanged.
-The asset reference needed by media receipt validation is copied exactly into
-`retained_asset_id` under a database transition guard. Canonical source evidence,
-media, galleries and domain receipts are not rewritten. Original snapshot chunk
-retries still verify against their immutable receipt hashes.
-
-Stored record validation accepts the JSON objects produced by historical NFO
-compaction as well as the original JSONL rows. It checks their exact retained
-bytes and digest before validating keys and values against the manifest. Incoming
-snapshot chunks continue to require JSONL framing.
-
-`catalog_payload_retirements` records the policy, manifest hash, ordinal checkpoint
-and released payload bytes. Database guards allow only the defined transition;
-native backup validation checks the resulting receipts. A partial index covers
-retired rows so validation need not scan all retained source JSON. Released bytes describe
-removed JSON, not a reduction in the SQLite file's length: freed space is reused
-by later writes. Maintenance does not run `VACUUM` or rebuild the library.

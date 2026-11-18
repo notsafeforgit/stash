@@ -128,7 +128,7 @@ func verifyEnrichmentPublicationCheckpoint(get enrichmentGet, selectRows enrichm
 	if transcript.URL != sourceURL {
 		return nil, models.ErrSourcePayloadCorrupt
 	}
-	if err := verifyEnrichmentTranscript(get, selectRows, job, work, transcript); err != nil {
+	if err := verifyEnrichmentTranscript(job, work, transcript); err != nil {
 		return nil, err
 	}
 	var records []models.EnrichmentPublishedRecord
@@ -140,7 +140,7 @@ func verifyEnrichmentPublicationCheckpoint(get enrichmentGet, selectRows enrichm
 	}
 	captures := make([]string, len(records))
 	for i, record := range records {
-		input, post, err := enrichmentRecordCapture(get, selectRows, job.UUID, work, transcript, record.EnrichmentCheckpointRecord, captures[:i])
+		input, post, err := enrichmentRecordCapture(job.UUID, work, transcript, record.EnrichmentCheckpointRecord, captures[:i])
 		if err != nil {
 			return nil, err
 		}

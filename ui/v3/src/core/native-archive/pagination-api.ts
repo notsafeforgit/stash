@@ -11,7 +11,6 @@ export type ArchivePageQuery = {
     | "runs"
     | "job-attempts"
     | "run-attempts"
-    | "imports"
     | "root-history"
     | "collection-history"
     | "policy-history"

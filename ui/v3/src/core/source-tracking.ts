@@ -4,7 +4,6 @@ const SOURCE_TRACKING_PATHS = new Set([
   "/collections",
   "/review-queue",
   "/archive-activity",
-  "/import-history",
   "/saved-actions",
 ]);
 

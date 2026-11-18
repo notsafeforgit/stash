@@ -33,10 +33,9 @@ eligible work after restart with persistent producer pagination/backoff. Caller
 snapshots now preserve URL lists and time windows before lookup; resolution
 commits each selected collection/revision and source ticket atomically in the
 producer outbox. Whole-call inspection requires source coverage for every
-original ticket. Host/n8n clients, reviewed historical imports and native
-administration/review interfaces are implemented. Installation-specific activation,
-schedules and deployment status belong to each deployment's operations records,
-not an application-wide pending cutover.
+original ticket. Host/n8n clients and native administration/review interfaces are implemented.
+Installation-specific schedules and deployment status belong to each deployment's
+operations records.
 Root, collection and policy administration endpoints are described below.
 
 ## Performer links from captured profiles
@@ -369,7 +368,7 @@ from source traversal completion.
 
 These routes live under `/api/v3/archive` with normal application authentication
 and same-origin checks. Scoped producer tokens do not authorize these operations.
-The [matching policies](native-source-identity.md#matching-imported-media-to-source-albums)
+The [matching policies](native-source-identity.md#matching-media-to-source-albums)
 use retained evidence and current library records; they perform no downloads or
 filesystem inspection and do not require FFmpeg.
 
@@ -535,7 +534,7 @@ storage. The server validates it again: secrets, redundant media renditions,
 and irrelevant profile noise are not silently accepted. The source is structured
 JSON, not an escaped JSON string. The server partitions and deduplicates post,
 profile, and per-file data itself. Producers cannot supply arbitrary storage
-patches, precomputed profile bodies, or the trusted legacy-import policy.
+patches, precomputed profile bodies, or the trusted historical-evidence policy.
 
 Post identity is verified against captured evidence, preserving exact large
 integers and rejecting disagreeing identifiers:
@@ -730,7 +729,7 @@ result and target completion together. Ordinary job success cannot bypass that
 proof. Exact completion replay survives expiry and later source edits without
 applying a new policy. Unresolved external references remain explicit limitations.
 
-Legacy-only posts with a retained discovery lookup can gain their Reddit/Twitter
+Legacy-only posts with a retained finder lookup (see [import history retirement](native-schema.md#import-history-retirement-schema-1000142)) can gain their Reddit/Twitter
 identifier during this same publication transaction. The candidate URL must
 identify the fetched post and agree with independently retained account,
 filename, or original text/date evidence. The existing post UUID remains intact;
@@ -738,8 +737,8 @@ an identifier already owned by another post requires review. Missing or
 ambiguous proof returns HTTP 422 `post_identity_requires_review`, records a
 terminal unsuccessful attempt and keeps the checkpoint available. It does not
 complete the target or refetch automatically. The scoped job description includes
-`discovery_resolution` after success; application users can inspect the same
-proof through `/api/v3/archive/enrichment-jobs/{job}/discovery-resolution`.
+`identity_resolution` after success; application users can inspect the same
+proof through `/api/v3/archive/enrichment-jobs/{job}/identity-resolution`.
 
 Successful publication verifies and releases the compact staging body atomically,
 retaining native captures, acknowledgement/provenance rows, unresolved references
@@ -771,9 +770,7 @@ Capabilities advertise `enrichment_protocol: 2`, `enrichment_dispatch_protocol: 
 | `POST /collections/{uuid}/ready` | `{limit, after?}` selects up to 100 eligible **unadmitted** targets; `after` contains the previous priority, `not_before` and UUID |
 | `POST /collections/{uuid}/jobs/ready` | `{policy_sha256, extractor_version, after, limit}` discovers eligible admitted jobs, ordered after their integer sequence; returns `{sequence, uuid}` candidates |
 | `POST /targets/{uuid}/jobs` | `{expected_revision, policy_sha256, extractor_version}` admits or replays the job bound to that target revision |
-| `POST /handoffs/{uuid}/jobs` | `{expected_plan_sha256, policy_sha256, extractor_version}` atomically consumes an application-reviewed checkpoint handoff or recovers its original job |
-| `GET /jobs/{uuid}` | Returns `{job, target, discovery_resolution?}`, including immutable source URL/input, current scheduling state and any verified legacy identity proof |
-| `GET /jobs/{uuid}/seed` | Verified `{handoff_uuid, plan_sha256, sha256, body}` for the job's retained handoff, or null for an ordinary job; requires the job's producer scope |
+| `GET /jobs/{uuid}` | Returns `{job, target, identity_resolution?}`, including immutable source URL/input, current scheduling state and any verified legacy identity proof |
 | `POST /jobs/{uuid}/claim` | `{expected_revision, owner_uuid, policy_sha256, extractor_version, lease_seconds}` claims the selected job; unchanged but unavailable work returns 204 |
 | `POST /jobs/{uuid}/renew` | `{owner_uuid, fence, lease_seconds}` renews current ownership |
 | `POST /jobs/{uuid}/source` | `{owner_uuid, fence, url}` reserves the main service or a supported linked service before extractor initialization; returns `{job_uuid, fence, ready}` |
@@ -793,15 +790,7 @@ counts, source URL and runtime before resuming. The Python lease helper uses
 the server's HTTP date and monotonic request start, stops further extraction
 when renewal fails, and does not extend ownership based on its local wall clock.
 
-Argument version 2 pins capture-context semantics; an optional `handoff` pins
-the reviewed seed. A new ordinary job uses a `stash-metadata-fetch-v1` transcript;
-a handoff job uses `stash-metadata-fetch-v2`, preserving original captures in its
-immutable prefix. The worker reads a seed only when it has no native checkpoint,
-then creates its first real checkpoint at expected revision zero. Seed reads
-carry no lease/attempt or checkpoint revision. A saved local delivery is recovered
-before another seed read or fetch. Original native version-1 jobs remain readable
-and executable under their frozen identity/proof contract. See
-[reviewed execution](native-schema.md#executing-a-reviewed-checkpoint-handoff).
+Argument version 2 pins capture-context semantics. New jobs produce `stash-metadata-fetch-v1` transcripts. The parser still validates `stash-metadata-fetch-v2` retained transcripts, which the retired checkpoint handoff produced. Original native version-1 jobs remain readable and executable under their frozen identity/proof contract.
 
 Retryable failure codes are `rate_limited`, `extraction_failed`, `timeout`,
 `worker_failed` and `source_busy`. Server backoff starts at five minutes and increases by actual failure;
@@ -820,14 +809,13 @@ An unavailable individual post has one bounded exception: `access_denied` or
 retained metadata already contains a title, description and valid date, every
 associated media record is actively linked, and its registered files still exist
 with their recorded nonzero sizes. The failed attempt remains failed; no fresh
-capture or enrichment completion is invented. Partial checkpoints, handoffs,
-missing fields/files, ambiguous associations and authentication/challenge errors
+capture or enrichment completion is invented. Partial checkpoints, missing fields/files, ambiguous associations and authentication/challenge errors
 remain review work. This rule does not change account monitoring or downloads.
 
 An owner can schedule a fresh target revision with the reason
 `reviewed_single_retry_saved_metadata` to accept incomplete saved text or dates
 after that attempt returns `access_denied` or `not_found`. The same active-media,
-file-verification, checkpoint and handoff checks apply. The target then becomes
+file-verification and checkpoint checks apply. The target then becomes
 excluded with `reviewed_saved_metadata_accepted`. Authentication and challenge
 failures still require review.
 
@@ -907,8 +895,7 @@ The native server runs enrichment maintenance every 30 seconds independently of
 media and translation workers. It cancels stale source/target work, recovers
 expired attempts without consuming failures and preserves checkpoint/receipt evidence. Claims
 and source reservations also recover conflicting expired work; discovery remains
-read-only. Stash never contacts websites for these operations. Legacy queue import
-is a separate, explicit upgrade path; native dispatch does not replay it.
+read-only. Stash never contacts websites for these operations. 
 
 The Python selected-job executor now journals stable claim requests, returned
 checkpoint bytes and pending publication/failure operations in producer outbox
@@ -926,349 +913,6 @@ Producer schema 10 adds persistent rotation across local download/metadata
 profiles and automatically discovered collections. Global pending-delivery
 recovery runs before loading website profiles. See
 [dispatch across local profiles](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#dispatch-across-local-profiles).
-
-### Legacy enrichment preparation
-
-The native migration preparation policy `automation-enrichment-v1` interprets
-frozen enrichment jobs, cooldowns, seed/source progress and catalog completion
-receipts. It preserves original attempt counts, priorities, times and status
-meanings. Decimal retry deadlines round upward to milliseconds without a floating
-point conversion. Matching platform and account cooldowns can extend a job's
-deadline; neither can shorten an existing native deadline. Platform labels remain
-historical labels: mirror OnlyFans/Fansly traffic belongs to Coomer and mirror
-Patreon traffic to Kemono according to the actual source URL. Account denials do
-not become service-wide outages.
-
-Preparation returns migration candidates. Pending/retry jobs are candidates for
-held work. `done` requires the original catalog receipt, `already_native` requires
-a retained gallery-dl capture, and `coalesced` requires the imported post alias.
-Source enumeration completion and the last attempted platform are historical
-progress, not evidence of downloaded or enriched media. Explicit exclusions stay
-excluded; missing URLs and identity conflicts remain reviewable. Original staged
-metadata retains its exact digest and requires conversion/review before it can
-become a native checkpoint, even if its queue row says `done`.
-
-The preparation functions alone create no native targets or execution history.
-The domain importer still needs to bind native posts/collections, preserve queued
-URL evidence, resolve historical proofs and map scheduling state before reviewed
-activation. Missing receipts in an older catalog snapshot cannot be inferred from
-a later automation row's success label. Production cutover uses coordinated fresh
-inputs; a rehearsal made from snapshots taken at different times cannot certify
-completion of that later work.
-
-## Account listing discovery
-
-Here, a **page** is one batch of post metadata returned during an account search.
-It can contain several posts, and each post can have several media records. A
-**cursor** is the source's bookmark for requesting the next batch. An imported
-cursor or page count records earlier progress; it does not recreate those
-batches' metadata. Missing batch records limit what the archive can verify about
-that search and do not establish that media downloads were missed.
-
-The shared page parser, selected-job producer executor and scoped discovery
-worker API are implemented. Schema 1000071 retains pinned listing definitions,
-producer-owned attempts and immutable compact page receipts. Each leased
-`account.list_page` job finishes after one retained page, releasing the shared
-service reservation before the next page can run. Earlier pages and imported
-cursors survive retries; final enumeration and candidate matching are separate
-outcomes. See the [storage and scheduling contract](native-schema.md#durable-account-listing-pages).
-
-Capabilities advertise `discovery_protocol: 1`, `discovery_readiness_protocol: 1`,
-`discovery_dispatch_protocol: 1`, `discovery_collections_protocol: 1`,
-`discovery_source_pacing_protocol: 1` and `max_discovery_page_bytes: 33554432`.
-The following routes live under `/api/v3/ingest/discovery` and use the existing
-producer bearer credentials and collection/root grants. Authentication runs
-before reading page bodies; session cookies and application API keys cannot
-authorize these operations. Existing enrichment endpoints remain post-only.
-
-| Route | Request and result |
-| --- | --- |
-| `POST /collections/ready` | Optional UUID `after` and `limit` (1–100, default 50). Returns ordered `{uuid}` containers with listing definitions, under current collection/root grants. This does not assert that a listing is ready for a particular policy/runtime. |
-| `POST /collections/{collection}/jobs/ready` | Requires `policy_sha256` and `extractor_version`, with integer `after` and `limit` (1–100, default 50). Returns due queued `{uuid, sequence}` candidates from the bounded active queue. |
-| `POST /collections/{collection}/listings/ready` | Requires policy/runtime, optional UUID `after` and `limit`. Returns `{listings: [{uuid, definition_sha256}], after, has_more}` for definitions eligible to admit a page. The cursor tracks inspected definitions, including ineligible ones. |
-| `POST /listings/{listing}/jobs` | Requires `expected_definition_sha256`, `policy_sha256` and `extractor_version`. Admits or replays the current page job for an existing definition. After a successful nonfinal page, it admits the next page; after final success it returns that completed job. |
-| `GET /jobs/{job}` | Returns `{job, listing, cursor, receipt}`. The input cursor belongs to this particular page job, even after later jobs advance the listing. The optional receipt belongs only to this job. |
-| `POST /jobs/{job}/claim` | Requires `expected_revision`, stable `owner_uuid`, policy/runtime and `lease_seconds` between 5 and 900. Returns the running job or HTTP 204 while unavailable. Reusing the original owner recovers a lost claim response. |
-| `POST /jobs/{job}/renew` | Requires `owner_uuid`, `fence` and `lease_seconds`. Renews only the authenticated producer's current attempt. |
-| `POST /jobs/{job}/source` | Requires `owner_uuid`, `fence` and the exact listing `url`. Returns `{job_uuid, fence, ready}` for the held service reservation. Unrelated profiles and child services are rejected. |
-| `POST /jobs/{job}/page` | Requires `owner_uuid`, `fence`, the requested `ordinal` and an object-valued `body`. Commits the page receipt and job success together. |
-| `POST /jobs/{job}/failure` | Requires `owner_uuid`, `fence` and a controlled `error_code`. Returns the original immutable attempt outcome, including on replay after a successor succeeds. |
-
-The route supplies job identity and the credential supplies producer identity;
-requests cannot substitute either in their bodies. Unknown or duplicate JSON
-keys, compressed requests and oversized envelopes are rejected. The page body limit
-is 32 MiB, with 4,096 extra bytes allowed for its request envelope. Send that body
-as JSON, preserving source number tokens; do not encode it as an escaped string.
-The receipt's SHA-256 covers its native canonical page body, not the envelope.
-The wire and persisted forms retain compact shared metadata and original observation
-times. Descriptions return references and a small receipt rather than repeating
-the page body.
-
-Controlled retry codes are `rate_limited`, `timeout`, `extraction_failed`,
-`worker_failed` and `source_busy`; exhausting the attempt budget becomes a
-failure. Terminal codes are `authentication`, `access_denied`, `challenge`,
-`not_found`, `unsupported_extractor`, `result_too_large`, `invalid_checkpoint`,
-`not_a_post_url`, `runtime_changed`, `unsupported_profile` and
-`pagination_stalled`. Shared source cooldowns still apply. Failure replay cannot
-extend the deadline or finish another attempt.
-
-Changed definitions/cursors return HTTP 409 `discovery_work_changed`; stale or
-foreign attempt ownership returns HTTP 409 `lease_lost`. Invalid discovery data
-returns HTTP 400 `invalid_discovery_work`; malformed envelopes use the common
-HTTP 400 response. Missing records return 404, scope violations 403, and capacity
-exhaustion 429. Responses retain `Cache-Control: no-store`.
-
-The supported Python `DiscoveryClient` validates definition digests, original
-cursor bindings and receipt ownership before accepting responses. Its shared
-`JobLease` uses the server clock and stable owner identity for renewal and lost
-claim recovery. The producer retains claim intents, exact page bytes and
-acknowledgements in a durable local discovery journal. Its capacity reservations
-share the existing download/enrichment budget. Body removal requires a matching
-receipt; a terminal job description cannot discard pending local evidence.
-Source number tokens and Unicode survive native canonical page encoding.
-See [producer discovery](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#account-listing-page-collector)
-for the client contract and dispatch commands.
-
-Collection discovery uses current active source/root definitions and indexed
-collection/root grants. Each grant contributes at most `limit` containers before
-deduplication and the final limit; no listing or page bodies are loaded. A root
-grant includes later registered collections, and no longer includes a collection
-moved to another root. Disabled sources and containers without listings are
-excluded. Follow each container with policy/runtime-specific readiness; a
-container can contain only stale or completed definitions.
-
-Job and listing readiness require the collection's current grant and exact
-policy/runtime; they never admit or claim work. Listing scans inspect at most `limit` definitions
-plus one lookahead using the collection/UUID index. An empty `listings` array
-with `has_more: true` must advance using the returned `after`. Candidates skip
-future deadlines, stale sources, active/failed/cancelled jobs and completed
-listings. A succeeded nonfinal page permits admission of the next page. These
-reads use small receipt summaries without loading retained page bodies; admission
-and claim revalidate all selected work. Multiple calls do not form a snapshot.
-
-Application-owned maintenance runs with the HTTP server every 30 seconds,
-independently of connected producers. It inspects only the bounded active queue,
-cancels jobs after collection revision/state/root changes, disabled roots or
-account consolidation, and expires abandoned claims with the existing attempt
-budget and retry backoff. A future deadline is not a source change. Maintenance
-preserves fetched pages, original producer attempts and receipt replay. It
-neither creates new listing definitions nor contacts a source website.
-
-A separate application worker compares retained batches with explicitly bound
-historical targets. Native schema 1000072 saves each target's comparison cursor,
-original page references and candidates grouped by qualified post ID. Comparison
-runs under a read transaction, followed by a short revision-checked commit.
-Restart continues from the saved cursor; later native source/post changes stop
-new comparison while preserving earlier receipts. This processing does not
-change the producer's page acknowledgement, publish a post identity or certify
-historical listing coverage. See [candidate storage](native-schema.md#account-listing-candidate-evidence).
-
-These endpoints do not create listing definitions, activate imported work,
-explicitly retry a terminal job or accept a candidate match. The selected-job producer worker delivers
-saved evidence before claiming or fetching; its delivery-only CLI needs no
-website profile and cannot claim another attempt. A listing profile explicitly
-binds `account.list_page`, separately from enrichment policies. Producer schema
-12 adds durable per-collection/policy cursors and backoff for `dispatch-discovery`.
-Each invocation replays saved deliveries before resuming owned work, visiting
-due jobs and admitting an eligible existing definition. Omitting the profile
-permits delivery only. A lost admission is recovered through the ready-job index;
-filtered empty pages advance using their inspection cursor. An idle dispatch
-does not establish enumeration completion. Schema 13 integrates `account.list_page`
-profiles into `dispatch-all`, with durable collection/profile rotation and separate
-saved-delivery cursors for discovery and enrichment. Both saved deliveries run
-before website profiles load, preserving recovery when access bindings are
-unavailable. Selection commits before execution, so continuously busy profiles
-cannot reset the traversal after restart. Reviewed activation and publication of
-complete, unique corroborated matches are implemented, including background publication
-from listing evidence or authenticated detail results. Actual coverage and automatic
-candidate admission remain necessary before
-host/n8n callers switch to native discovery. In particular, a
-retained nonfinal page is successful page delivery, not successful enumeration
-or a completed catalog import.
-
-### Reviewed discovery activation
-
-These application-authenticated routes live under `/api/v3/archive`; scoped
-producer credentials do not grant review or source administration.
-
-| Route | Behavior |
-| --- | --- |
-| `POST /discovery-activations/preview` | Preview one legacy-backed listing and 1–1,000 exact original target references. |
-| `POST /discovery-activations` | Apply `{input, expected_plan_sha256}` atomically, or replay the same saved operation. |
-| `GET /discovery-activations/{activation}` | Return the immutable activation receipt. |
-| `GET /discovery-listings/{listing}` | Inspect the original definition, including saved cursor and historical page count. |
-| `GET /discovery-listings/{listing}/pages` | Page through compact received-page receipts without loading source bodies. |
-| `GET /discovery-match-targets/{target}` | Inspect the original target binding and durable comparison progress. |
-| `GET /discovery-match-targets/{target}/review` | Inspect current coverage, candidate counts and blockers without fetching or changing metadata. |
-| `POST /discovery-match-targets/{target}/detail-preview` | Compare a supplied metadata-fetch transcript against one original weak candidate, without retaining it or changing the review. |
-| `POST /discovery-match-targets/{target}/publication` | Publish a complete unique match with `{expected_target_revision}` and, for detail corroboration, the review's `detail_job_uuid`; replay requires the same proof. |
-| `GET /discovery-match-targets/{target}/publication` | Retrieve the accepted identity and native publication receipt. |
-| `GET /discovery-match-targets/{target}/publication/records` | Inspect original page or detail-transcript record ordinals and their native capture UUIDs. |
-| `GET /discovery-match-targets/{target}/candidates` | Inspect distinct candidate post IDs and their strongest retained evidence. |
-| `GET /discovery-match-candidates/{candidate}/evidence` | Inspect each original page's basis and record ordinals. |
-
-The preview input contains an operation `uuid`, `manifest_sha256`, a complete
-`listing` definition and `targets: [{source_ordinal, source_sha256}]`. The listing
-requires its original `legacy` snapshot/account reference, saved cursor/history
-and preserved retry deadline, with the explicitly selected current collection,
-root, worker policy and extractor. Preview derives current post UUIDs/revisions
-and includes them in its plan hash. Save the complete returned plan before Apply;
-after a lost response, inspect or retry that same operation and expected hash.
-An exact replay remains valid after later native edits, while changed input or
-new activation against stale source state returns `409 discovery_work_changed`.
-
-`GET /collections/{collection}` retrieves the selected collection's current
-definition directly for review, including its revision, state and root binding.
-It uses application authentication and returns 404 for an unknown UUID.
-
-List routes accept nonnegative `after` and `limit` from 1 to 100. Candidate
-pagination uses `sequence`; page/evidence pagination uses the original page
-ordinal. All responses disable caching. A receipt proves only that reviewed
-bindings were retained. Producer admission, fetched-page receipts, compared
-listing completion and accepted post identity remain distinct states. Historical
-page counts do not become native receipt counts, and activation never certifies
-historical coverage or completed catalog import. The
-[`stash-activate-automation-discovery` operator command](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#reviewed-discovery-activation)
-saves a private, digest-bound review file and recovers the original operation
-after a lost Apply response. Reviewed recovery of missing-history searches is
-described below. The review UI, detail execution and staging release remain open.
-
-The detail-preview input is `{expected_target_revision, candidate_sequence,
-extractor_version, body}`. `body` is the compact metadata-fetch JSON object,
-limited to 32 MiB; it is not an escaped string. The server loads the selected
-candidate's original page and frozen catalog evidence through indexed reads in
-one read transaction. The response has `preview_only: true`, compact `evidence`
-and the unchanged current `blockers`. Evidence includes page/transcript hashes,
-the selected post ID, record ordinals and, when corroborated, the witness ordinal
-and basis. It does not repeat the source payload or include worker settings.
-
-`evidence.status` is `corroborated`, `uncorroborated` or `pending`. The requested
-URL/runtime and every returned post must match the selection. Original caption,
-date or source-URL evidence must independently corroborate it; confirming the
-inferred URL, account or filename alone is insufficient. A contradictory
-publisher or another post in the response is rejected. Pending child requests
-remain pending; unresolved references remain explicit. A failed or changed
-detail response cannot remove a competing candidate.
-
-Preview bytes have no authenticated producer receipt. Even a corroborated
-preview leaves `detail_required` and other blockers intact. This endpoint does
-not fetch a website, create a job, accept an identity or publish captures. Only a
-saved, authenticated detail result can supply publication proof.
-
-The target review uses one database snapshot. `coverage.retained_pages` counts
-received batches of source posts, while `target.last_page` counts batches already
-compared against that target. `coverage.retained_complete` means the saved search
-reached its final cursor. `coverage.complete` additionally requires comparison
-through that cursor, no initial saved cursor and no missing historical batches.
-A resumed search can finish and still report `history_not_retained`; its original
-page count supplies no metadata with which to check competing matches. Complete
-coverage describes that retained search, not all posts a source ever hosted.
-
-`candidate_count` groups distinct source post IDs, and `detail_candidate_count`
-counts candidates whose original listing evidence is weak; corroboration does
-not rewrite that evidence. A single candidate is included with its existing
-native post, if any, and its latest completed `detail` result when available.
-Only a corroborated result clears `detail_required`; all other blockers remain.
-A newer negative result cannot be bypassed by selecting an older positive one.
-Multiple candidates
-remain available through the paginated candidates route. The `blockers` array
-can contain:
-
-| Blocker | Meaning |
-| --- | --- |
-| `history_not_retained` | The search resumes after batches whose source bodies are unavailable. |
-| `listing_incomplete` | The retained search has not reached its final cursor. |
-| `comparison_pending` | Received batches remain to be compared with the target. |
-| `source_changed` | The original account, collection revision or root is no longer eligible. |
-| `post_changed` | The reviewed post revision or active state changed. |
-| `post_already_identified` | The target already has an identifier outside the imported catalog namespace. |
-| `no_candidate` | The complete retained search produced no candidate. |
-| `competing_candidates` | More than one distinct post remains a candidate. |
-| `detail_required` | Weak listing evidence lacks usable authenticated corroboration for a sole candidate. |
-| `identifier_in_use` | The sole candidate's identifier belongs to another native post, including a forgotten post. |
-| `search_replaced` | A reviewed recovery search replaced this listing; its original evidence is retained. |
-| `earlier_comparison_pending` | The predecessor search still has retained batches to compare with this target. |
-| `earlier_candidates_differ` | The predecessor contains a candidate other than the new search's sole candidate. |
-
-Before publication, an empty blocker list identifies a unique listing candidate
-for further publication validation. This response accepts no identity, publishes
-no capture and supplies no durable approval token. Later changes require another
-review. After publication, the review includes its immutable `publication`
-receipt and clears blockers; later native edits do not undo committed work.
-Review reads compact receipts and references without loading source page bodies.
-
-Publication is application-authorized and makes no source request. It requires
-the exact completed target revision, a search retained from its beginning, one
-corroborated candidate, unchanged native source/post choices and an unclaimed source
-post identifier. It reparses the original evidence and selects the observation
-that actually supplied the matching basis. An earlier title-only observation
-cannot acquire the corroborating observation's time.
-
-Identity and canonical URL evidence, all selected-post observations from the
-candidate's strongest page (or the selected detail transcript), publisher/album/translation effects and the receipt
-commit together. The original producer, observation times, shared payload/profile
-data and parent context remain intact. Other posts on that page remain staged.
-The operation preserves the existing legacy post UUID and keys; a source ID owned
-by another post returns a conflict for explicit consolidation review. It neither
-downloads media nor chooses depicted performers.
-
-For a weak candidate, send `detail_job_uuid` from the review's `detail.job_uuid`.
-Preparation reconstructs its comparison from the frozen source, original listing
-page and retained checkpoint. A detail completed before later listing comparisons
-can remain valid for the same candidate and native post revision. Its original
-`needs_detail` flag remains true. The publication uses policy
-`retained-discovery-detail-publication-v1` and retains `detail_job_uuid`; its record
-ordinals and corroborating timestamp refer to that transcript, not the weak listing
-record. Pending children cannot supply completion; unresolved child references
-stay in the retained evidence. Neither detail nor listing bodies are released.
-
-Recover a lost response with GET or repeat the same POST. Replay returns the
-original receipt even after a later source edit or post tombstone; a different
-target revision or detail job cannot reuse it. GET returns 404 before publication. Record
-pagination uses zero-based `record_ordinal`, with `after=-1` by default and
-`limit` from 1 to 100. These associations prove native capture publication only;
-they do not release listing staging or declare the whole catalog import complete.
-
-The server also publishes eligible matches automatically after comparison. Its
-worker inspects at most 32 target rows at a time, skips published and blocked
-targets, and calls the same publication service with the target's current
-revision and selected detail result where needed. It rereads and validates the evidence before committing, so readiness
-cannot authorize a changed match. A competing worker shares the original receipt.
-Targets requiring review retain their evidence without holding up ready targets.
-Comparison and publication pause after a traversal finds no work, and resume
-from durable progress after restart. Neither worker admits a source job or
-contacts a website.
-
-### Recovering a search with missing historical batches
-
-Use the same discovery activation routes and saved-plan command with a new
-listing UUID and `recovery_of: {listing_uuid, sha256}` pointing to the original
-listing definition. Retain its `legacy` reference, account, collection and
-profile URL; select current collection/root and worker policy values explicitly.
-Set `initial_cursor` to null and `historical_pages` to zero for the new search.
-Its deadline must preserve both the original listing deadline and the latest
-attempt's available time. Each selected target must already be bound to the
-original search. Further target batches can reuse this recovery's exact listing
-definition; a second replacement of the original is rejected.
-
-Preview and Apply reject an active producer attempt. Once it finishes or queue
-maintenance recovers its expired lease, Apply can cancel queued predecessor work
-and commit the replacement, original-target links and activation receipt together.
-The original search stops admitting work. Its cursor, historical count, attempts,
-pages, comparisons and candidate references remain intact. Retry a failed page
-of the recovery through the ordinary job retry path.
-
-The target review returns `recovery_from` with the original listing/target UUIDs,
-uncompared batch count and earlier candidate counts. The original target review
-exposes `replacement_listing_uuid`. Retained earlier batches must finish
-comparison, and differing candidates require review even if the fresh search
-finds only one match. The same checks protect automatic/manual publication and
-full snapshot/upgrade verification. A recovery with no earlier conflict can publish only after
-the fresh search itself finishes and all its batches have been compared.
-
-This obtains new complete search evidence without inventing lost historical
-bodies. It cannot prove that a service still exposes posts deleted or hidden
-since the earlier scrape. Ordinary database backups retain both searches.
 
 ## Completed file events
 
@@ -1437,7 +1081,7 @@ collection/root labels, original producer/run/capture references and separate fi
 verification status. Latest recorded transfer means first receipt order, not
 latest source-clock time, all active attempts, or current file availability.
 [Album cards and download history](native-source-albums.md#download-reports-in-the-application)
-use these views. Actual native host/n8n activation remains cutover work.
+use these views. 
 
 ## Source-run coordination
 
@@ -1722,11 +1366,9 @@ the immutable upgrade history without changing any existing job or admission.
 
 Schema 1000104 provides the same separation for metadata workers. The owner-only
 `POST /api/v3/ingest-admin/metadata-policy-upgrades` takes `request_uuid`, `kind`
-(`post.enrich`, `account.list_page`, or `post.verify_candidate`),
+(`post.enrich`),
 `original_policy_sha256`, `expected_policy_sha256`, `policy_sha256`, and `reason`.
-The approval covers exactly that kind and original profile, including future
-pages of an existing listing. It does not rewrite job arguments or listing
-digests. A currently running job under that profile prevents approval; saved
+The approval covers exactly that kind and original profile, It does not rewrite job arguments. A currently running job under that profile prevents approval; saved
 checkpoints, cursors, review decisions, grants and retry deadlines stay intact.
 Claims require the approved `execution_policy_sha256`; each attempt retains the
 policy it actually used. Completed attempts are never relabeled by later
@@ -2087,7 +1729,7 @@ Schema 1000079 adds case-insensitive name/alias indexes for studios, tags and
 groups. These and the existing performer-name index use SQLite `NOCASE` (ASCII
 case folding); non-ASCII spelling remains exact. Shared lookups report up to 100
 candidates with an explicit overflow flag, deduplicating repeated spellings of
-one entity before applying the limit. Retained catalog-edit review uses the same
+one entity before applying the limit. Retained file-edit review uses the same
 resolver. Neither path chooses between a canonical name and a colliding alias,
 creates missing entities, or uses approximate matches.
 
@@ -2508,8 +2150,7 @@ use; populated source coverage and the broader review UI are release gates.
 ### Historical metadata review API
 
 These application-authenticated routes live under `/api/v3/archive`; producer
-tokens do not grant access. The backend supports explicit review of imported
-catalog edits. Scene and image pages expose these choices in their **Metadata
+tokens do not grant access. The backend supports explicit review of retained file edits. Scene and image pages expose these choices in their **Metadata
 review** section, available through desktop tabs and the mobile section menu.
 
 | Route | Result |
@@ -2957,8 +2598,8 @@ advertise `source_backfill_protocol: 1`.
 
 Historical import accepts `root_uuid`, a stable input-database `source_uuid`,
 `table` and the full source `record`. Only `backfill_completion` and
-`legacy_backfill_skip` are handled by this importer. Other catalog/journal
-families retain their separate migration requirements. Imported decisions never
+`legacy_backfill_skip` are handled by this importer. Other journal families
+are not handled by this importer. Imported decisions never
 manufacture source windows, and producer tokens cannot submit legacy assertions.
 See the [maintenance importer](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#backfill-journal-import)
 for read-only preflight and resumable batches. The [native n8n adapter](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#native-n8n-backfills)
@@ -3053,99 +2694,6 @@ Current workers require it and send `recovery_protocol: 1` when claiming a run.
 An older worker cannot claim recovered work: otherwise it could ignore the replay
 policy and incorrectly stop at archived items. Recovery policy remains fixed
 throughout the lease. Ordinary non-recovery requests keep the source-run protocol.
-
-### Candidate detail worker API
-
-The scoped producer API advertises `discovery_detail_protocol: 1` and
-`max_discovery_detail_bytes`. Routes below use the prefix
-`/api/v3/ingest/discovery-details` and the same bearer-only producer authentication,
-collection/root grants, strict JSON envelopes and no-store responses as listing
-workers. Website credentials remain in the external worker environment.
-
-| Operation | Route | Input |
-| --- | --- | --- |
-| Admit selected candidate | `POST /targets/{target}/jobs` | `expected_target_revision`, `candidate_sequence`, `policy_sha256`, `extractor_version`, optional `automatic` |
-| Find collections to inspect | `POST /collections/inspect` | `policy_sha256`, `extractor_version`, `after`, `limit` |
-| Inspect automatic candidates | `POST /collections/{collection}/candidates` | `after`, `limit` |
-| Find queued jobs | `POST /collections/{collection}/jobs/ready` | `policy_sha256`, `extractor_version`, `after`, `limit` |
-| Inspect original job | `GET /jobs/{job}` | None |
-| Claim | `POST /jobs/{job}/claim` | `expected_revision`, `owner_uuid`, `policy_sha256`, `extractor_version`, `lease_seconds` |
-| Renew | `POST /jobs/{job}/renew` | `owner_uuid`, `fence`, `lease_seconds` |
-| Reserve website service | `POST /jobs/{job}/source` | `owner_uuid`, `fence`, `url` |
-| Save checkpoint | `POST /jobs/{job}/checkpoint` | `owner_uuid`, `fence`, `expected_revision`, `body` |
-| Resume saved checkpoint | `GET /jobs/{job}/checkpoint` | None |
-| Complete comparison | `POST /jobs/{job}/complete` | `owner_uuid`, `fence`, `checkpoint_revision`, `checkpoint_sha256` |
-| Read completed result | `GET /jobs/{job}/result` | None |
-| Record controlled failure | `POST /jobs/{job}/failure` | `owner_uuid`, `fence`, `error_code` |
-| Explicitly retry failed/cancelled job | `POST /jobs/{job}/retry` | `{}` |
-
-Admission binds an existing weak candidate and the original listing evidence.
-The detail runtime/policy is explicitly selected; it need not equal the listing
-worker's policy. Exact admission replay returns its original job. Claims use
-5–900 second leases, check the authenticated producer and runtime, and return
-204 when scheduling prevents ownership. Readiness is a bounded active-job lookup;
-it does not claim work or load source bodies.
-
-`body` is a compact `stash-metadata-fetch-v1` JSON object for the exact canonical
-Reddit/Twitter post, at most 32 MiB. Checkpoints retain original record producers
-and times across attempt failover. A changed post/runtime, rewritten earlier
-record or unresolved pending request cannot become completed evidence. Empty
-responses can complete with `uncorroborated`. An unchanged original checkpoint
-acknowledgement can be recovered after its lease expires without granting a new
-lease. The server chooses retry delays and shared website cooldowns; failure
-requests contain controlled codes, not raw extractor output.
-
-Completion compares the retained transcript with the original frozen target and
-listing. Its immutable response includes the job, checkpoint revision, completing
-fence and compact `evidence` (`corroborated` or `uncorroborated`). Replay and
-`GET .../result` return that original result. A successful comparison does not
-publish metadata, accept a post identity or clear the current review blockers.
-The application `detail-preview` endpoint remains a separate read-only operation;
-supplied preview bytes cannot acknowledge a producer job.
-
-The backend and Python detail worker are implemented. Producer schema 14 retains
-claims, exact checkpoint bytes, completion/failure intents and comparison receipts
-separately from enrichment publications. `deliver-detail` recovers persisted
-operations without loading website settings. `post.verify_candidate` profiles
-participate in `dispatch-all`, with independent delivery and collection cursors.
-See the [producer commands](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/README.md#candidate-detail-worker).
-
-`POST /api/v3/ingest/discovery-details/collections/ready` accepts
-`policy_sha256`, `extractor_version`, `after` (a collection UUID) and `limit`.
-Its sorted `{uuid}` entries come from the bounded active detail jobs and current
-collection/root grants; it reads no transcript bodies and cannot admit work.
-The capability is `discovery_detail_collections_protocol: 1`.
-
-Automatic admission requires `discovery_detail_admission_protocol: 1` and a
-selected `post.verify_candidate` worker profile. `/collections/inspect` returns
-permitted active containers with retained listings, including containers that
-still have blocked or empty work. It does not promise a runnable job.
-`/collections/{collection}/candidates` returns `{candidates, after, has_more}`.
-Its cursor is `{listing_uuid, source_ordinal}`; each request inspects at most 32
-listing definitions and 32 targets through the existing indexes. `after`
-advances over inspected rows even when no candidates are eligible. Resume while
-`has_more` is true; a shorter candidate array does not mean traversal finished.
-
-Each candidate supplies its cursor, target UUID/revision, candidate sequence,
-post namespace/value and canonical fetch URL. Eligibility requires a completed
-retained comparison, exactly one weak candidate, and no review blocker other
-than missing detail. Existing detail-job history for that candidate, including
-an earlier target revision, prevents automatic readmission. Failed/cancelled
-work needs explicit retry; completed comparisons remain available for review.
-Missing history, competing candidates, earlier recovery evidence, changed
-source/post choices and identifier ownership remain blockers.
-
-The producer checks the selected profile's URL support and sends
-`automatic:true` with admission. The server repeats eligibility inside its
-transaction and before commit. Exact original admission still replays after
-later changes. Producer schema 15 adds a durable candidate cursor, preserving
-all schema-14 journals and retry delays. Saved delivery and existing jobs run
-first; an uncertain admission is recovered through the ready-job pass. Complete
-container traversals pause before polling again.
-
-Authenticated results feed the guarded native publication service above.
-Candidate-detail staging remains retained; verified release of that staging is
-still unimplemented. This is separate from implemented enrichment checkpoint release.
 
 ## Reviewed post merges
 
@@ -3264,57 +2812,6 @@ separate from verified library media intake. Selected queued/running details
 also poll; attempts load on expansion. Failed refreshes retain the last
 successful view with an error and Retry, while changed filters discard old data.
 
-## Import history
-
-`/import-history` in the desktop utility menu and mobile drawer inspects retained
-catalog and automation imports. Application-session GET routes under
-`/api/v3/archive` expose compact snapshot summaries and import-step progress:
-
-| Route | Result |
-| --- | --- |
-| `/import-history/{kind}` | Snapshots for `catalog` or `automation` |
-| `/import-history/{kind}/{snapshot}` | One snapshot and its import-step counters |
-
-Snapshot lists use ascending UUID keyset order, not capture-time order. Omit
-`after` for the first page; subsequent pages use the last snapshot UUID. `limit`
-defaults to 25 and is bounded to 1–100. Unknown filters, repeated or empty query
-values, invalid kinds and malformed UUIDs are rejected. The detail route accepts
-no query parameters. These readers do not upload input, run importers or activate
-retained jobs and policies.
-
-Received chunks, records and bytes describe snapshot transfer only. Each domain
-importer has separate progress; a missing row means it has not run, even when
-its input may be empty. Catalog imports have eleven steps and automation imports
-have four. Completed progress retains the outcome at import time. In particular,
-`historical_review_records` does not decrease when an account or media association
-is resolved later. It is not the number of current unresolved conflicts.
-Retained cleanup or operational records also do not imply active work.
-
-Summaries omit manifests, raw input, payloads and settings. Selected details use
-a fixed number of progress lookups. Catalog labels and collection links refer
-to the current collection revision; snapshot identity and capture time remain
-unchanged. The UI expands import steps and technical identifiers on demand,
-keeps successful same-scope results after a failed refresh and preserves list
-position when returning from a selected snapshot. Current associations are
-reviewed through their domain screens rather than by editing historical receipts.
-
-Consumed catalog JSON can be retired through the authenticated maintenance route
-`/api/v3/archive/import-history/{kind}/{snapshot}/payload-retention`. `GET` returns
-eligibility, retained-input reasons, candidate record/byte totals and any existing
-checkpoint. It accepts no query parameters. Automation inputs remain ineligible;
-catalog snapshots require all eleven consumers to finish without historical
-reviews. Unavailable media inputs and families still needed by validators are
-retained. See [the retention contract](native-schema.md#consumed-catalog-payload-retention-1000132).
-
-For an eligible catalog snapshot, `POST` requires `{"after":0,"limit":512}` for
-the initial batch. Continue with the returned `last_ordinal` until `state` is
-`complete`. Limits are 1–512 records and each batch also has a 16 MiB payload
-budget. Repeating an older checkpoint returns committed progress; a checkpoint
-ahead of the server or ineligible input returns 409. Each batch is atomic and
-safe to resume after a lost response or process interruption. The operation
-removes only redundant staged JSON and records released payload bytes; it does
-not rerun imports, change media metadata or shrink the database file.
-
 ## Saved application actions
 
 `/saved-actions` in the desktop utility menu and mobile drawer discovers actions
@@ -3380,8 +2877,7 @@ controls. The URL retains the kind and cursor, and returning restores list
 position. Failed refreshes keep successful same-scope results; a filter change
 cannot display a late response from the previous scope. An empty intermediate
 media page offers **Continue checking**. Explicit refresh removes items whose
-decisions have since been resolved. Import history retains historical warnings,
-and Saved actions retains uncertain browser submissions independently.
+decisions have since been resolved. Saved actions retains uncertain browser submissions independently.
 
 ### Shared post content and repeat observations
 
@@ -3428,6 +2924,6 @@ album evidence, profile references, observation times and explicit library edits
 stay attached. Original service text takes precedence over translated NFO display
 text; translation results remain separate. Publication dates still fill gaps.
 The operation runs in one transaction and is safe to repeat. It reports captures
-still bound to exact-byte import/context proofs or translation inputs, and HTML
+still bound to exact-byte context proofs or translation inputs, and HTML
 captions carrying different inline media, rather than invalidating their links.
 Those are retained for their active references, not to provide caption history.

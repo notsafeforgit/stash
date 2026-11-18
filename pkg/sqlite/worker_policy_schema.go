@@ -3,11 +3,12 @@ package sqlite
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 )
 
-func validateWorkerPolicySchema(conn *sqlx.DB, auditData bool) error {
+func validateWorkerPolicySchema(conn *sqlx.DB, retired, auditData bool) error {
 	for _, name := range []string{"metadata_worker_policy_upgrades", "metadata_worker_policy_head", "metadata_worker_policy_valid",
 		"metadata_worker_policy_immutable", "metadata_worker_policy_retained", "metadata_worker_attempt_policies",
 		"metadata_worker_attempt_policy_valid", "metadata_worker_attempt_policy_immutable", "metadata_worker_attempt_policy_retained"} {
@@ -23,7 +24,7 @@ func validateWorkerPolicySchema(conn *sqlx.DB, auditData bool) error {
 	if !auditData {
 		return nil
 	}
-	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM metadata_worker_policy_upgrades p
+	query := `SELECT EXISTS(SELECT 1 FROM metadata_worker_policy_upgrades p
 WHERE p.expected_policy_sha256!=coalesce((SELECT prior.policy_sha256 FROM metadata_worker_policy_upgrades prior
 WHERE prior.kind=p.kind AND prior.original_policy_sha256=p.original_policy_sha256 AND prior.id<p.id ORDER BY prior.id DESC LIMIT 1),p.original_policy_sha256)
 OR p.created_at_ms<coalesce((SELECT prior.created_at_ms FROM metadata_worker_policy_upgrades prior
@@ -37,7 +38,16 @@ OR a.original_policy_sha256 IS NOT CASE WHEN j.kind='account.list_page'
   ELSE json_extract(j.arguments,'$.policy_sha256') END
 OR (a.approval_uuid IS NULL AND a.policy_sha256!=a.original_policy_sha256)
 OR (a.approval_uuid IS NOT NULL AND (p.request_uuid IS NULL OR p.kind!=j.kind OR p.original_policy_sha256!=a.original_policy_sha256
-OR p.policy_sha256!=a.policy_sha256 OR p.created_at_ms>t.started_at_ms)))`); err != nil {
+OR p.policy_sha256!=a.policy_sha256 OR p.created_at_ms>t.started_at_ms)))`
+	if retired {
+		// Import retirement removed discovery jobs together with their approvals.
+		query = strings.Replace(query, `WHERE j.kind NOT IN ('post.enrich','account.list_page','post.verify_candidate')
+OR a.original_policy_sha256 IS NOT CASE WHEN j.kind='account.list_page'
+  THEN (SELECT json_extract(d.definition,'$.policy_sha256') FROM discovery_listings d WHERE d.uuid=json_extract(j.arguments,'$.listing_uuid'))
+  ELSE json_extract(j.arguments,'$.policy_sha256') END`, `WHERE j.kind!='post.enrich' OR a.original_policy_sha256 IS NOT json_extract(j.arguments,'$.policy_sha256')`, 1)
+		query += ` OR EXISTS(SELECT 1 FROM metadata_worker_policy_upgrades WHERE kind!='post.enrich')`
+	}
+	if err := conn.Get(&invalid, query); err != nil {
 		return err
 	}
 	if invalid {

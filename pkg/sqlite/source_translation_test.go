@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
-	"github.com/stashapp/stash/pkg/scrape"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
@@ -53,7 +52,7 @@ func TestSourceTranslationsShareResultsWithoutInferringLanguagesOrApplyingMetada
 	result := retainTranslation(t, repo, input)
 	require.Equal(t, result, retainTranslation(t, repo, input))
 	require.Equal(t, input, result.SourceTranslationInput)
-	require.Equal(t, scrape.CatalogSnapshotSHA([]byte(*input.OriginalText)), *result.OriginalSHA256)
+	require.Equal(t, sha256Hex(*input.OriginalText), *result.OriginalSHA256)
 	var assertions []*models.SourceTranslationEvidence
 	for _, owner := range []string{post.UUID, other.UUID} {
 		evidence := models.SourceTranslationEvidence{UUID: uuid.NewString(), TranslationUUID: result.UUID, PostUUID: owner, Origin: "migration", Provenance: "legacy-original-plot-and-plot",

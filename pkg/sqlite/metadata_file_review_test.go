@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/pkg/archive"
@@ -211,9 +212,26 @@ func TestMetadataFileReviewMigrationPreservesFieldsAndSourceEvidence(t *testing.
 	require.NoError(t, f.db.Open(f.db.DatabasePath()))
 }
 
-func TestMetadataFileReviewUsesImportedAlternativesAndBoundedDiscovery(t *testing.T) {
-	f := fileHistoryImportFixture(t, 0, nil)
-	advanceFileHistory(t, f, 0)
+func TestMetadataFileReviewUsesHistoricalAlternativesAndBoundedDiscovery(t *testing.T) {
+	f, _ := metadataFileReviewFixture(t, `{"title":"Exact path title"}`)
+	file := archiveFind(t, f.repo, models.ArchiveFile, 21)
+	history := func(observation models.SourceFileObservation, reference, edits string) {
+		t.Helper()
+		parsed, err := archive.CatalogFileEdits([]byte(edits))
+		require.NoError(t, err)
+		recordFileHistory(t, f.repo, models.SourceFileHistory{UUID: uuid.NewString(), Kind: "metadata_edit", CollectionUUID: f.collection.UUID,
+			CollectionRevision: f.collection.Revision, RootUUID: f.root.UUID, RootRevision: f.root.Revision, ReferenceNamespace: "source:fixture",
+			ReferenceValue: reference, Origin: "migration", ObservedAt: observation.ObservedAt.Add(time.Hour), Edits: parsed,
+			Locations: []models.SourceFileHistoryLocation{{Position: 0, RelativePath: observation.RelativePath, ObservationUUID: &observation.UUID}}})
+	}
+	history(f.observation, "edit-2", `{"title":"Second edit title"}`)
+	// A deduplicated source path whose surviving file is the same library file.
+	survivor := f.observation
+	survivor.UUID, survivor.RelativePath, survivor.State, survivor.SurvivorPath = uuid.NewString(), "duplicate/video.mp4", "deduplicated", &f.observation.RelativePath
+	recordFileObservation(t, f.repo, survivor)
+	recordFileMatch(t, f.repo, models.SourceFileMatch{UUID: uuid.NewString(), ObservationUUID: survivor.UUID,
+		FileUUID: file.UUID, Generation: 1, LibraryRootPath: "/identity-fixture", Basis: "survivor-path", Origin: "migration"})
+	history(survivor, "edit-3", `{"title":"Later duplicate title"}`)
 	entity := archiveFind(t, f.repo, models.ArchiveScene, 31)
 	before := metadataState(t, f.repo, entity.UUID, "title")
 	afterHistory, afterMatch := "", ""

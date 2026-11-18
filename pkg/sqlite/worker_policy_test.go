@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/stashapp/stash/internal/ingest"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
@@ -104,9 +103,8 @@ func TestMetadataWorkerRepairPreservesCheckpointAdmissionAndAttemptPolicy(t *tes
 		require.Len(t, attempts, 2)
 		require.Equal(t, input.OriginalPolicySHA256, attempts[0].PolicySHA256)
 		require.Equal(t, input.PolicySHA256, attempts[1].PolicySHA256)
-		otherKind, err := f.repo.WorkerPolicy.Resolve(ctx, models.ArchiveJobListAccount, input.OriginalPolicySHA256)
-		require.NoError(t, err)
-		require.Equal(t, input.OriginalPolicySHA256, otherKind)
+		_, err = f.repo.WorkerPolicy.Resolve(ctx, "account.list_page", input.OriginalPolicySHA256)
+		require.ErrorIs(t, err, models.ErrEnrichmentInvalid, "retired discovery jobs have no worker policy")
 		otherProfile, err := f.repo.WorkerPolicy.Resolve(ctx, input.Kind, strings.Repeat("d", 64))
 		require.NoError(t, err)
 		require.Equal(t, strings.Repeat("d", 64), otherProfile)
@@ -164,62 +162,4 @@ UPDATE schema_migrations SET version=1000103`)
 		require.Equal(t, strings.Repeat("a", 64), attempts[0].PolicySHA256)
 		return nil
 	}))
-}
-
-func TestMetadataWorkerRepairResumesListingCursorAndFuturePages(t *testing.T) {
-	f := newListingFixture(t)
-	f.admit(t)
-	first := f.claim(t, 0)
-	cursor := map[string]string{"after": "t3_next"}
-	_, err := f.append(t, models.DiscoveryJobLease{ArchiveJobLease: first.Lease(), ProducerUUID: f.producers[0].UUID}, 1,
-		listingContinuation(t, f.page, nil, cursor, false))
-	require.NoError(t, err)
-	f.now = f.now.Add(2 * time.Hour)
-	input := metadataRepair(models.ArchiveJobListAccount)
-	_, err = approveMetadataRepair(t, f.repo, f.now, input)
-	require.NoError(t, err)
-	worker := ingest.NewDiscoveryCoordinator(f.service)
-	worker.Now = func() time.Time { return f.now }
-	job, err := worker.Admit(t.Context(), f.tokens[0], f.listing.UUID, f.listing.Digest, input.PolicySHA256, f.listing.ExtractorVersion)
-	require.NoError(t, err)
-	described, err := worker.Describe(t.Context(), f.tokens[0], job.UUID)
-	require.NoError(t, err)
-	require.Equal(t, f.listing, described.Listing)
-	require.Equal(t, cursor, described.Cursor)
-	require.Equal(t, input.PolicySHA256, job.ExecutionPolicySHA256)
-	second, err := worker.Claim(t.Context(), f.tokens[0], job.UUID, job.Revision, uuid.NewString(), input.PolicySHA256, f.listing.ExtractorVersion, time.Minute)
-	require.NoError(t, err)
-	require.NotNil(t, second)
-	_, err = f.append(t, models.DiscoveryJobLease{ArchiveJobLease: second.Lease(), ProducerUUID: f.producers[0].UUID}, 2,
-		listingContinuation(t, f.page, cursor, nil, true))
-	require.NoError(t, err)
-	require.NoError(t, f.repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
-		pages, err := f.repo.DiscoveryJob.Pages(ctx, f.listing.UUID, 0, 10)
-		require.NoError(t, err)
-		require.Len(t, pages, 2)
-		require.Equal(t, first.UUID, pages[0].JobUUID)
-		require.Equal(t, second.UUID, pages[1].JobUUID)
-		old, err := f.repo.ArchiveJob.Find(ctx, first.UUID)
-		require.NoError(t, err)
-		require.Equal(t, input.OriginalPolicySHA256, old.ExecutionPolicySHA256)
-		return nil
-	}))
-}
-
-func TestMetadataWorkerRepairKeepsDetailReviewUnaccepted(t *testing.T) {
-	f := newDetailFixture(t)
-	job := f.admit(t)
-	before := f.review(t)
-	input := metadataRepair(models.ArchiveJobVerifyCandidate)
-	input.OriginalPolicySHA256, input.ExpectedPolicySHA256 = f.input.PolicySHA256, f.input.PolicySHA256
-	_, err := approveMetadataRepair(t, f.repo, f.now, input)
-	require.NoError(t, err)
-	current, err := f.worker.Find(t.Context(), f.tokens[0], job.UUID)
-	require.NoError(t, err)
-	require.Equal(t, job.Arguments, current.Arguments)
-	f.now = f.now.Add(2 * time.Hour)
-	running, err := f.worker.Claim(t.Context(), f.tokens[0], job.UUID, current.Revision, uuid.NewString(), input.PolicySHA256, f.input.ExtractorVersion, time.Minute)
-	require.NoError(t, err)
-	require.NotNil(t, running)
-	require.Equal(t, before, f.review(t), "approving worker code must not accept a proposed post identity")
 }

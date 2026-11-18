@@ -25,12 +25,6 @@ JOIN translation_targets t ON t.uuid=b.target_uuid WHERE b.job_uuid=?`
 	case models.ArchiveJobEnrichPost:
 		bound = `SELECT t.post_uuid,t.collection_uuid,t.collection_revision FROM enrichment_job_targets b
 JOIN enrichment_targets t ON t.uuid=b.target_uuid WHERE b.job_uuid=?`
-	case models.ArchiveJobListAccount:
-		bound = `SELECT NULL AS post_uuid,d.collection_uuid,d.collection_revision FROM discovery_listing_jobs b
-JOIN discovery_listings d ON d.uuid=b.listing_uuid WHERE b.job_uuid=?`
-	case models.ArchiveJobVerifyCandidate:
-		bound = `SELECT t.post_uuid,d.collection_uuid,d.collection_revision FROM discovery_detail_jobs b
-JOIN discovery_match_targets t ON t.uuid=b.target_uuid JOIN discovery_listings d ON d.uuid=t.listing_uuid WHERE b.job_uuid=?`
 	default:
 		return ret, nil
 	}

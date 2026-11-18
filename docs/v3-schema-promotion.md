@@ -10,7 +10,7 @@
 
 The [native archive and independent fork transition plan](native-archive-transition-plan.md)
 now covers the full requested transition, including all current sidecars,
-catalog import, gallery-dl/n8n ingestion, backups, and deployment. This document
+catalog data, gallery-dl/n8n ingestion, backups, and deployment. This document
 is the earlier schema-focused outline. Its preservation requirements still
 apply, but its table inventory and compatibility timeline are not the complete
 implementation scope. No production migration has been executed by these plans.

@@ -62,5 +62,5 @@ them during execution. Those implementations provide the pattern for the
 remaining deferred-task conversions.
 
 No database schema change is required for these fixes. Production validation
-must not create test performers, merge real records, replay catalog imports or
-run full-library reconciliation.
+must not create test performers, merge real records or run full-library
+reconciliation.

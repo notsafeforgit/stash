@@ -89,22 +89,9 @@ func enrichmentReleaseProof(get enrichmentGet, selectRows enrichmentSelect, publ
 	if len(records) != publication.RecordCount || len(records) < 1 || len(records) > archive.MaxEnrichmentCaptures {
 		return "", models.ErrSourcePayloadCorrupt
 	}
-	var seed *archive.EnrichmentTranscript
+	// Checkpoint handoff seeds were retired with the import history.
 	if work.Handoff != nil {
-		value, err := readEnrichmentSeed(get, selectRows, job, work)
-		if err != nil {
-			return "", err
-		}
-		if value == nil {
-			return "", models.ErrSourcePayloadCorrupt
-		}
-		seed, err = archive.ParseEnrichmentTranscript(value.Body)
-		if err != nil {
-			return "", err
-		}
-		if len(records) < len(seed.Records) {
-			return "", models.ErrSourcePayloadCorrupt
-		}
+		return "", models.ErrSourcePayloadCorrupt
 	}
 	signatures := make(map[string]string)
 	preceding := make(map[string]bool)
@@ -120,18 +107,10 @@ func enrichmentReleaseProof(get enrichmentGet, selectRows enrichmentSelect, publ
 		if err != nil {
 			return "", err
 		}
-		retained := seed != nil && i < len(seed.Records)
 		if capture == nil || capture.PostUUID != work.PostUUID {
 			return "", models.ErrSourcePayloadCorrupt
 		}
-		if retained {
-			digest, err := seed.RecordDigest(i)
-			if err != nil || digest != record.Digest || seed.Records[i].RetainedCapture == nil || *seed.Records[i].RetainedCapture != capture.UUID ||
-				capture.Origin != "legacy-enrichment" || capture.RetentionPolicy != "legacy-retained-v1" || !capture.CapturedAt.IsZero() || capture.RecordedAt == nil {
-				return "", models.ErrSourcePayloadCorrupt
-			}
-			records[i].RetainedCapture = seed.Records[i].RetainedCapture
-		} else if capture.Origin != "gallery-dl" || capture.ExtractorVersion == nil || *capture.ExtractorVersion != work.ExtractorVersion ||
+		if capture.Origin != "gallery-dl" || capture.ExtractorVersion == nil || *capture.ExtractorVersion != work.ExtractorVersion ||
 			(capture.RetentionPolicy != archive.SourceRetentionVersion && (work.Version != 2 || capture.RetentionPolicy != archive.CaptureContextPolicy)) {
 			return "", models.ErrSourcePayloadCorrupt
 		}
@@ -143,7 +122,7 @@ func enrichmentReleaseProof(get enrichmentGet, selectRows enrichmentSelect, publ
 		if err != nil || post == nil {
 			return "", models.ErrSourcePayloadCorrupt
 		}
-		if work.Version == 2 && !retained {
+		if work.Version == 2 {
 			parent := ""
 			if len(capture.Contexts) != 0 {
 				if len(capture.Contexts) != 1 || !preceding[capture.Contexts[0].ParentUUID] {

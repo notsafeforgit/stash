@@ -14,8 +14,6 @@ const (
 	ArchiveJobBackfillAlbum   = "album.backfill"
 	ArchiveJobTranslateText   = "text.translate"
 	ArchiveJobEnrichPost      = "post.enrich"
-	ArchiveJobListAccount     = "account.list_page"
-	ArchiveJobVerifyCandidate = "post.verify_candidate"
 	ArchiveJobNotifyPostMerge = "post.merge_notify"
 )
 

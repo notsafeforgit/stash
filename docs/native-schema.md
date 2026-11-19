@@ -1537,6 +1537,12 @@ whole request has a five-minute deadline, at most 128 chunks and the existing
 truncated. Unix cancellation kills the process group, including descendants.
 No-text work avoids the subprocess; confirmed target-language text preserves
 the exact original, including HTML and whitespace, as `unchanged`.
+When Bing rewrites a chunk before translating it, its response adds a
+`translationSrcText` element naming the text it actually translated. It spells
+out numerals ("3" becomes "three") and reads romanised words as Chinese ("Jin"
+becomes 金, translated as "gold"). That output translates other text, so the
+chunk keeps its readable source text and the result claims no source language.
+An element that only echoes the chunk keeps Bing's translation.
 
 Additional application-authenticated operations under `/api/v3/archive` are:
 

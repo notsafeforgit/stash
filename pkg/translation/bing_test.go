@@ -44,6 +44,19 @@ func TestMain(m *testing.M) {
 			fmt.Print(`[{"detectedLanguage":{"language":""},"translations":[]}]`)
 		case "undetected":
 			fmt.Print(`[{"translations":[{"text":"☀️🌦️","to":"en"}],"usedLLM":true}]`)
+		case "rewritten":
+			// Responses recorded from Bing on 2026-11-18: a second element names
+			// the source it translated when that differs from the input.
+			switch payload := os.Args[len(os.Args)-1]; {
+			case payload == "3":
+				fmt.Print(`[{"translations":[{"text":"three","to":"en"}],"usedLLM":true},{"translationSrcText":"three"}]`)
+			case payload == "Jin":
+				fmt.Print(`[{"translations":[{"text":"gold","to":"en"}],"detectedLanguage":{"language":"zh-cn"}},{"translationSrcText":"金"}]`)
+			case strings.HasPrefix(payload, " https://"):
+				fmt.Print(`[{"translations":[{"text":"link","to":"en"}],"detectedLanguage":{"language":"en"}},{"translationSrcText":"link"}]`)
+			default:
+				fmt.Printf(`[{"translations":[{"text":"Same text","to":"en"}],"detectedLanguage":{"language":"ja"}},{"translationSrcText":%q}]`, strings.TrimSpace(payload))
+			}
 		case "partially_detected":
 			if os.Args[len(os.Args)-1] == "☀️" {
 				fmt.Print(`[{"translations":[{"text":"☀️","to":"en"}]}]`)
@@ -188,6 +201,39 @@ func TestBingProviderAllowsUndetectedLanguageWithoutInventingOne(t *testing.T) {
 	require.Equal(t, "First chunk\n☀️", *result.TranslatedText)
 }
 
+func TestBingProviderKeepsTextBingRewroteBeforeTranslating(t *testing.T) {
+	provider, path := bingFixture(t, "rewritten")
+	for _, test := range []struct{ original, output string }{
+		{"3", "3"},
+		{"<p>Jin</p>", "Jin"},
+	} {
+		result, err := provider.Translate(t.Context(), bingRequest(test.original))
+		require.NoError(t, err, test.original)
+		require.Equal(t, "translated", result.Status, test.original)
+		require.Nil(t, result.SourceLanguage, "a detection of the rewritten text says nothing about %q", test.original)
+		require.Equal(t, test.output, *result.TranslatedText, "the translation of other text is not kept")
+	}
+
+	result, err := provider.Translate(t.Context(), bingRequest("同じ"))
+	require.NoError(t, err)
+	require.Equal(t, "Same text", *result.TranslatedText, "an echo of the unchanged source keeps the translation")
+	require.Equal(t, "ja", *result.SourceLanguage)
+
+	require.NoError(t, os.Remove(path))
+	original := strings.Repeat("界", 1000) + "https://example.invalid/page"
+	result, err = provider.Translate(t.Context(), bingRequest(original))
+	require.NoError(t, err)
+	require.Nil(t, result.SourceLanguage, "one rewritten chunk leaves the whole source language unknown")
+	require.Equal(t, "Same text\nhttps://example.invalid/page", *result.TranslatedText, "the kept chunk drops the URL protection prefix")
+	body, err := os.ReadFile(path)
+	require.NoError(t, err)
+	rows := strings.Split(strings.TrimSpace(string(body)), "\n")
+	require.Len(t, rows, 2)
+	var second []string
+	require.NoError(t, json.Unmarshal([]byte(rows[1]), &second))
+	require.Equal(t, " https://example.invalid/page", second[len(second)-1])
+}
+
 func TestBingProviderUTF16LimitPreservesCompleteInput(t *testing.T) {
 	for _, test := range []struct {
 		name   string
@@ -241,7 +287,27 @@ func TestBingProviderRejectsCorruptUnicodeAndConflictingKeys(t *testing.T) {
 		`[{"detectedLanguage":{"language":"ja"},"translations":[{"to":"en","text":"first","text":"second"}]}]`,
 		"[{\"detectedLanguage\":{\"language\":\"ja\"},\"translations\":[{\"to\":\"en\",\"text\":\"\xff\"}]}]",
 	} {
-		_, _, err := decodeBingResult([]byte(raw), "en")
+		_, _, err := decodeBingResult([]byte(raw), "en", bingChunk{Text: "source", Payload: "source"})
 		require.ErrorIs(t, err, ErrProviderResponse)
 	}
+}
+
+func TestBingProviderRejectsUnexpectedSourceElements(t *testing.T) {
+	translated := `{"detectedLanguage":{"language":"ja"},"translations":[{"to":"en","text":"Translated"}]}`
+	for _, raw := range []string{
+		`[` + translated + `,{"usedLLM":true}]`,
+		`[` + translated + `,{"translationSrcText":"source","translations":[{"to":"en","text":"Other"}]}]`,
+		`[` + translated + `,{"translationSrcText":"source","detectedLanguage":{"language":"en"}}]`,
+		`[` + translated + `,{"translationSrcText":"source"},{"translationSrcText":"source"}]`,
+		`[{"detectedLanguage":{"language":"ja"},"translations":[{"to":"en","text":"Translated"}],"translationSrcText":"source"}]`,
+		`[{"translationSrcText":"source"}]`,
+		`[]`,
+	} {
+		_, _, err := decodeBingResult([]byte(raw), "en", bingChunk{Text: "source", Payload: "source"})
+		require.ErrorIs(t, err, ErrProviderResponse, raw)
+	}
+	language, output, err := decodeBingResult([]byte(`[`+translated+`,{"translationSrcText":" source "}]`), "en", bingChunk{Text: "source", Payload: "source"})
+	require.NoError(t, err)
+	require.Equal(t, "ja", language)
+	require.Equal(t, "Translated", output)
 }

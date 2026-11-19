@@ -49,13 +49,20 @@ func languageBase(value string) string {
 	return strings.Split(strings.ReplaceAll(strings.ToLower(strings.TrimSpace(value)), "_", "-"), "-")[0]
 }
 
-func bingTextChunks(source string) ([]string, error) {
+// bingChunk is one provider request: Text is the readable source it covers and
+// Payload is the argument sent, which may carry a URL-protection prefix.
+type bingChunk struct {
+	Text    string
+	Payload string
+}
+
+func bingTextChunks(source string) ([]bingChunk, error) {
 	// The Bing web endpoint used by translate-shell limits each request to
 	// 1,000 UTF-16 units. Count supplementary characters (including emoji) twice,
 	// and include the space that prevents translate-shell from fetching a URL.
 	const maxUnits, maxChunks = 1000, 128
 	chars := []rune(source)
-	chunks := []string{}
+	chunks := []bingChunk{}
 	for offset := 0; offset < len(chars); {
 		if len(chunks) == maxChunks {
 			return nil, ErrProviderInput
@@ -77,7 +84,8 @@ func bingTextChunks(source string) ([]string, error) {
 			units += width
 			end++
 		}
-		chunks = append(chunks, prefix+string(chars[offset:end]))
+		text := string(chars[offset:end])
+		chunks = append(chunks, bingChunk{Text: text, Payload: prefix + text})
 		offset = end
 	}
 	return chunks, nil
@@ -112,14 +120,14 @@ func (b *BingTranslateShell) Translate(ctx context.Context, request models.Trans
 	outputBytes := 0
 	unchanged := true
 	for _, chunk := range chunks {
-		body, err := b.runChunk(bounded, request.TargetLanguage, chunk)
+		body, err := b.runChunk(bounded, request.TargetLanguage, chunk.Payload)
 		if err != nil {
 			if ctx.Err() != nil {
 				return ret, ctx.Err()
 			}
 			return ret, err
 		}
-		language, output, err := decodeBingResult(body, request.TargetLanguage)
+		language, output, err := decodeBingResult(body, request.TargetLanguage, chunk)
 		if err != nil {
 			return ret, err
 		}
@@ -158,7 +166,7 @@ func (b *BingTranslateShell) Translate(ctx context.Context, request models.Trans
 	return ret, nil
 }
 
-func decodeBingResult(raw []byte, target string) (string, string, error) {
+func decodeBingResult(raw []byte, target string, chunk bingChunk) (string, string, error) {
 	// Reject invalid Unicode and duplicate keys before json.Unmarshal can
 	// replace bytes or silently choose one of two provider assertions.
 	wrapped := append(append([]byte(`{"results":`), raw...), '}')
@@ -166,23 +174,43 @@ func decodeBingResult(raw []byte, target string) (string, string, error) {
 		return "", "", ErrProviderResponse
 	}
 	var results []struct {
-		DetectedLanguage struct {
+		DetectedLanguage *struct {
 			Language string `json:"language"`
 		} `json:"detectedLanguage"`
 		Translations []struct {
 			To   string `json:"to"`
 			Text string `json:"text"`
 		} `json:"translations"`
+		TranslationSrcText *string `json:"translationSrcText"`
+	}
+	if err := json.Unmarshal(raw, &results); err != nil || len(results) < 1 || len(results) > 2 || results[0].TranslationSrcText != nil {
+		return "", "", ErrProviderResponse
+	}
+	// Bing appends the source it actually translated when it rewrote the input:
+	// it spells out numerals ("3" -> "three") and reads romanised words as
+	// Chinese ("Jin" -> "金" -> "gold"). That output translates other text, so
+	// keep the chunk as sent and claim no source language.
+	rewritten := false
+	if len(results) == 2 {
+		source := results[1]
+		if source.TranslationSrcText == nil || source.DetectedLanguage != nil || source.Translations != nil {
+			return "", "", ErrProviderResponse
+		}
+		rewritten = strings.TrimSpace(*source.TranslationSrcText) != strings.TrimSpace(chunk.Payload)
 	}
 	// Bing can return a valid target-language result without detecting a source
 	// language, for example for emoji. Preserve that uncertainty instead of
 	// failing the job or claiming the source already uses the target language.
-	if err := json.Unmarshal(raw, &results); err != nil || len(results) != 1 {
-		return "", "", ErrProviderResponse
-	}
 	for _, output := range results[0].Translations {
 		if output.To == target && strings.TrimSpace(output.Text) != "" {
-			return results[0].DetectedLanguage.Language, output.Text, nil
+			if rewritten {
+				return "", chunk.Text, nil
+			}
+			language := ""
+			if results[0].DetectedLanguage != nil {
+				language = results[0].DetectedLanguage.Language
+			}
+			return language, output.Text, nil
 		}
 	}
 	return "", "", ErrProviderResponse

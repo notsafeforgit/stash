@@ -448,3 +448,70 @@ func TestPostConsolidationLeavesThreadAlbumToThreadSync(t *testing.T) {
 		})
 	}
 }
+
+// A reply that already has its own album can still be merged while its thread
+// needs review, when the merge changes no album membership. Disagreeing
+// captures of the thread root keep every gallery change waiting for that
+// review, so the album stays exactly as it was.
+func TestPostConsolidationKeepsLinkedAlbumUnchangedWhenThreadNeedsReview(t *testing.T) {
+	for _, intoReply := range []bool{false, true} {
+		t.Run(fmt.Sprintf("into_reply_%t", intoReply), func(t *testing.T) {
+			db, repo := archiveTestDatabase(t)
+			imported := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "legacy:catalog:fixture", Value: "first"}, "")
+			reply := threadPost(t, repo, "102", "100", "100", "99", "99")
+			selection := selectAlbum(t, repo, reply, models.SourceAttachmentManifestInput{Complete: true, Entries: []models.SourceAttachmentEntry{
+				albumEntry(0, "native:twitter", "502", "image"), albumEntry(1, "native:twitter", "503", "video"),
+			}})
+			chooseAlbumMedia(t, repo, selection.Entries[0].Attachment.UUID, models.ArchiveImage, 41)
+			chooseAlbumMedia(t, repo, selection.Entries[1].Attachment.UUID, models.ArchiveScene, 32)
+			album := syncSourceGallery(t, repo, reply)
+			require.True(t, album.Created)
+			threadPost(t, repo, "100", "100", "", "88", "")
+			require.Equal(t, "review", sourceGalleryPreview(t, repo, reply).Action)
+
+			input := models.PostConsolidationReviewInput{SourceUUID: reply, DestinationUUID: imported.UUID, Reason: "Keep first stored post"}
+			if intoReply {
+				input.SourceUUID, input.DestinationUUID = imported.UUID, reply
+			}
+			var preview *models.PostConsolidationReviewPreview
+			require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+				var err error
+				preview, err = repo.SourceEvidence.PreviewConsolidationReview(ctx, input)
+				return err
+			}))
+			require.True(t, preview.Ready)
+			require.Empty(t, preview.Blockers)
+			require.Equal(t, "sync", preview.Album.Action)
+			require.Equal(t, album.GalleryUUID, preview.Album.GalleryUUID)
+			require.Empty(t, preview.Album.Add)
+			require.Empty(t, preview.Album.Remove)
+			raw := openRawDB(t, db.DatabasePath())
+			defer raw.Close()
+			tables := []string{"galleries", "galleries_images", "scenes_galleries"}
+			before := map[string][][]any{}
+			for _, table := range tables {
+				before[table] = albumJobRows(t, raw, table)
+			}
+			require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+				result, _, err := repo.SourceEvidence.ApplyConsolidationReview(ctx, models.PostConsolidationReviewApplyInput{
+					PostConsolidationReviewInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest}, time.Now())
+				require.NoError(t, err)
+				require.Equal(t, "sync", result.Result.Gallery.Action)
+				require.Equal(t, album.GalleryUUID, result.Result.Gallery.GalleryUUID)
+				require.False(t, result.Result.Gallery.Changed())
+				require.Empty(t, result.Result.NotificationJobUUID)
+				return err
+			}))
+			for _, table := range tables {
+				require.Equal(t, before[table], albumJobRows(t, raw, table), table)
+			}
+			require.Equal(t, "review", sourceGalleryPreview(t, repo, input.DestinationUUID).Action, "thread evidence still requires review before gallery changes")
+			require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+				identity, err := repo.SourceEvidence.PostIdentity(ctx, input.SourceUUID)
+				require.NoError(t, err)
+				require.Equal(t, input.DestinationUUID, identity.CanonicalUUID)
+				return nil
+			}))
+		})
+	}
+}

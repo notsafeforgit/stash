@@ -2749,7 +2749,11 @@ leaves the thread's shared gallery alone: its album effect is `ineligible` and
 no gallery membership changes. A single-post review never grows into the whole
 thread. Thread gallery planning then treats the merged post as one thread
 member, and the thread's next capture publication or an album backfill builds
-or updates the shared gallery.
+or updates the shared gallery. While the thread itself needs review, for
+example because captures disagree about its root, the merge still makes no
+gallery change: a post whose linked album already matches keeps it (`sync`
+with nothing added or removed), and a merge that would change an album is
+refused.
 
 Apply repeats the preview input with `request_uuid` and `digest`. It revalidates
 current heads and library revisions before publishing any effect. It returns

@@ -247,6 +247,29 @@ func (s *SourceEvidenceStore) publishConsolidatedAlbum(ctx context.Context, inpu
 		result.Gallery = models.PostConsolidationGalleryResult{Action: "ineligible", Added: []string{}, Removed: []string{}}
 		return nil
 	}
+	// While the merged post's thread needs review, its album accepts no
+	// gallery changes. A plan that keeps the post's linked album as it is
+	// completes when the post's own choices agree; the album stays unchanged.
+	if preview.Action == "review" && planned.preview.Album.Action == "sync" &&
+		len(planned.preview.Album.Add) == 0 && len(planned.preview.Album.Remove) == 0 {
+		own, err := gallery.previewSinglePost(ctx, input.DestinationUUID, nil, nil, false)
+		if err != nil {
+			return err
+		}
+		actual := &postConsolidationPlan{preview: &models.PostConsolidationReviewPreview{}, selection: selection}
+		if err := actual.setAlbumPlan(own); err != nil {
+			return err
+		}
+		if reflect.DeepEqual(actual.preview.Album, planned.preview.Album) {
+			result.Gallery = models.PostConsolidationGalleryResult{GalleryUUID: planned.preview.Album.GalleryUUID, Action: "sync",
+				Added: []string{}, Removed: []string{}}
+			association, err := gallery.Association(ctx, input.DestinationUUID)
+			if err == nil && association != nil {
+				result.GalleryDecisionUUID = association.UUID
+			}
+			return err
+		}
+	}
 	actual := &postConsolidationPlan{preview: &models.PostConsolidationReviewPreview{}, selection: selection}
 	if err := actual.setAlbumPlan(preview); err != nil {
 		return err

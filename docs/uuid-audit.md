@@ -25,13 +25,13 @@ photo bytes and follows the surviving route.
 
 ## Remaining work identified
 
-These are open findings, not completed conversions.
+These are open findings, not completed conversions. The DLNA protocol finding
+closed when the DLNA server was removed on 2026-11-15.
 
 | Priority | Boundary | Evidence and recommended change |
 | --- | --- | --- |
 | High | Deferred generation/export/provider operations | [`task_generate.go`](../internal/manager/task_generate.go), [`task_export.go`](../internal/manager/task_export.go) and provider batch admission in [`manager_tasks.go`](../internal/manager/manager_tasks.go) retain converted numeric selections beyond the request. The public request accepts UUIDs correctly, but later work can still hold stale local keys. Identify's queued selection is now fixed, but [`SceneIdentifier`](../internal/identify/identify.go) still holds a scene model across its network scrape before applying results. Retain UUIDs across queue/network boundaries and re-resolve/check identity when applying work; test deletion/reuse and merges while a job waits. This risk was found by tracing code, not by changing production records. |
 | Medium | Scraper subprocess protocol | [`script.go`](../pkg/scraper/script.go) still serializes local scene/gallery/image IDs and file/ZIP IDs as numeric strings. A script cannot safely reuse those as native GraphQL IDs. Convert both script inputs and matched `stored_id` outputs together, inventory installed scripts and test the process boundary. A one-sided input change would leave internal scraper matching inconsistent. |
-| Medium | DLNA protocol | [`cds.go`](../internal/dlna/cds.go) emits numeric scene and category object IDs; [`dms.go`](../internal/dlna/dms.go) parses numeric scene parameters. Convert object browsing, category filters, metadata, artwork and streaming together. Preserve explicitly supported old media links and test real UPnP request/response payloads. Root IDs, pagination and ratings remain protocol values. |
 | Medium | ID range predicates | The shared filter adapter translates public UUIDs to numeric `id` criterion operands, including range comparisons. UUID order is not repository-key order; missing-reference sentinels also need operator-specific treatment. Define equality/membership semantics for public identity filters, with explicit handling of existing saved predicates, before removing numeric range behavior. |
 
 ## Numeric values deliberately retained

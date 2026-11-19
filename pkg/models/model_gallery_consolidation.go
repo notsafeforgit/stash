@@ -23,3 +23,12 @@ type GalleryConsolidationResult struct {
 	MergedUUIDs []string `json:"merged_uuids"`
 	Added       []string `json:"added"`
 }
+
+// ThreadGalleryConsolidationResult reports a reviewed thread consolidation:
+// the albums combined into GalleryUUID, then the thread's own album sync.
+type ThreadGalleryConsolidationResult struct {
+	GalleryConsolidationResult
+	ThreadAction  string   `json:"thread_action"`
+	ThreadAdded   []string `json:"thread_added"`
+	ThreadRemoved []string `json:"thread_removed"`
+}

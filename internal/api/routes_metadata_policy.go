@@ -155,6 +155,8 @@ func (rs *nativeArchiveRoutes) routerWithSourceTracking(enabled bool) http.Handl
 	r.Post("/source-galleries/studios/reconcile", rs.reconcileSourceGalleryStudios)
 	r.Get("/entities/{entity}/gallery-consolidation", rs.previewGalleryConsolidation)
 	r.Post("/entities/{entity}/gallery-consolidation", rs.applyGalleryConsolidation)
+	r.Get("/posts/{post}/thread-album-consolidation", rs.previewThreadGalleryConsolidation)
+	r.Post("/posts/{post}/thread-album-consolidation", rs.applyThreadGalleryConsolidation)
 	r.Get("/posts/{post}/media/{entity}", rs.postMediaAssociation)
 	r.Get("/posts/{post}/media/{entity}/review", rs.postMediaReview)
 	r.Get("/entities/{entity}/source-posts", rs.mediaSourcePosts)

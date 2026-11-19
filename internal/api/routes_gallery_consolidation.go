@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -42,6 +43,55 @@ func (rs *nativeArchiveRoutes) applyGalleryConsolidation(w http.ResponseWriter, 
 	})
 	if err != nil {
 		nativeArchiveError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, ret)
+}
+
+var threadGalleryFields = []string{"image_ids", "scene_ids", "alternate_titles", "performer_ids", "tag_ids", "urls"}
+
+func threadGalleryError(w http.ResponseWriter, err error) {
+	if errors.Is(err, models.ErrNotFound) {
+		ingestJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
+		return
+	}
+	albumError(w, err)
+}
+
+func (rs *nativeArchiveRoutes) previewThreadGalleryConsolidation(w http.ResponseWriter, r *http.Request) {
+	var ret *models.GalleryConsolidationPreview
+	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		ret, err = rs.repo.SourceGallery.PreviewThreadConsolidation(ctx, chi.URLParam(r, "post"))
+		return err
+	})
+	if err != nil {
+		threadGalleryError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, ret)
+}
+
+func (rs *nativeArchiveRoutes) applyThreadGalleryConsolidation(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Signature string `json:"signature"`
+	}
+	if err := readIngestJSON(w, r, 4096, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	var ret *models.ThreadGalleryConsolidationResult
+	err := rs.repo.WithTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		ret, err = rs.repo.SourceGallery.ConsolidateThread(ctx, chi.URLParam(r, "post"), input.Signature)
+		changed := err == nil && (len(ret.MergedUUIDs) > 0 || len(ret.ThreadAdded) > 0 || len(ret.ThreadRemoved) > 0)
+		if changed && ret.GalleryUUID != "" && rs.notifyMetadata != nil {
+			err = rs.notifyMetadata(ctx, metadata.Input{EntityUUID: ret.GalleryUUID}, threadGalleryFields)
+		}
+		return err
+	})
+	if err != nil {
+		threadGalleryError(w, err)
 		return
 	}
 	ingestJSON(w, http.StatusOK, ret)

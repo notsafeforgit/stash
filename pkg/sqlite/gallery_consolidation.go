@@ -47,19 +47,32 @@ func (s *SourceGalleryStore) PreviewConsolidation(ctx context.Context, value str
 	if e == nil || e.Kind != models.ArchiveGallery || e.State != models.ArchiveEntityActive {
 		return nil, models.ErrSourceGalleryConflict
 	}
-	var rows []struct {
-		UUID     string `db:"uuid"`
-		Revision int    `db:"revision"`
-		LocalID  int    `db:"local_id"`
-		Title    string `db:"title"`
-	}
+	var rows []galleryConsolidationRow
 	if err := dbWrapper.Select(ctx, &rows, overlappingSourceGalleriesQuery, *e.LocalID); err != nil {
 		return nil, err
 	}
 	if len(rows) > 1024 {
 		return nil, models.ErrSourceAlbumLimit
 	}
-	p := &models.GalleryConsolidationPreview{GalleryUUID: e.UUID, Galleries: []models.GalleryConsolidationMember{}, Conflicts: []string{}}
+	p, heads, err := galleryConsolidationPreview(ctx, e.UUID, rows)
+	if err != nil {
+		return nil, err
+	}
+	p.Signature, err = sourceSignature("stash-overlapping-galleries-v1", []any{p, heads})
+	return p, err
+}
+
+type galleryConsolidationRow struct {
+	UUID     string `db:"uuid"`
+	Revision int    `db:"revision"`
+	LocalID  int    `db:"local_id"`
+	Title    string `db:"title"`
+}
+
+// galleryConsolidationPreview counts the union of the named albums, in order,
+// and reports curated fields that would conflict. The first album survives.
+func galleryConsolidationPreview(ctx context.Context, gallery string, rows []galleryConsolidationRow) (*models.GalleryConsolidationPreview, []sourceGalleryDecisionRow, error) {
+	p := &models.GalleryConsolidationPreview{GalleryUUID: gallery, Galleries: []models.GalleryConsolidationMember{}, Conflicts: []string{}}
 	for _, row := range rows {
 		p.Galleries = append(p.Galleries, models.GalleryConsolidationMember{UUID: row.UUID, Revision: row.Revision, LocalID: row.LocalID, Title: row.Title})
 	}
@@ -69,17 +82,17 @@ func (s *SourceGalleryStore) PreviewConsolidation(ctx context.Context, value str
 		ids := galleryConsolidationIDs(p)
 		in := getInBinding(len(ids))
 		if err := dbWrapper.Get(ctx, &p.ImageCount, "SELECT count(DISTINCT image_id) FROM galleries_images WHERE gallery_id IN "+in, ids...); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if err := dbWrapper.Get(ctx, &p.SceneCount, "SELECT count(DISTINCT scene_id) FROM scenes_galleries WHERE gallery_id IN "+in, ids...); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if p.ImageCount+p.SceneCount > maxSourceGalleryMembers {
-			return nil, models.ErrSourceAlbumLimit
+			return nil, nil, models.ErrSourceAlbumLimit
 		}
 		if err := dbWrapper.Select(ctx, &heads, `SELECT d.* FROM post_gallery_links l JOIN post_gallery_decisions d ON d.uuid=l.decision_uuid
 JOIN archive_entities a ON a.uuid=l.gallery_uuid WHERE a.gallery_id IN `+in+` ORDER BY d.post_uuid`, ids...); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		// Captions and dates remain on their source posts. Conflicting curated
 		// fields require review instead of silently dropping a user's edit.
@@ -89,7 +102,7 @@ JOIN archive_entities a ON a.uuid=l.gallery_uuid WHERE a.gallery_id IN `+in+` OR
 				for _, row := range rows {
 					state, err := (&MetadataFieldStore{}).State(ctx, row.UUID, "studio")
 					if err != nil {
-						return nil, err
+						return nil, nil, err
 					}
 					if state.Protected {
 						choices[string(state.Value)] = true
@@ -102,7 +115,7 @@ JOIN archive_entities a ON a.uuid=l.gallery_uuid WHERE a.gallery_id IN `+in+` OR
 			}
 			var count int
 			if err := dbWrapper.Get(ctx, &count, "SELECT count(DISTINCT "+field+") FROM galleries WHERE id IN "+in+" AND "+field+" IS NOT NULL AND "+field+"!=''", ids...); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			if count > 1 {
 				p.Conflicts = append(p.Conflicts, field)
@@ -110,14 +123,13 @@ JOIN archive_entities a ON a.uuid=l.gallery_uuid WHERE a.gallery_id IN `+in+` OR
 		}
 		var custom []string
 		if err := dbWrapper.Select(ctx, &custom, "SELECT field FROM gallery_custom_fields WHERE gallery_id IN "+in+" GROUP BY field HAVING count(DISTINCT value)>1 ORDER BY field", ids...); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for _, f := range custom {
 			p.Conflicts = append(p.Conflicts, "custom_fields."+f)
 		}
 	}
-	p.Signature, err = sourceSignature("stash-overlapping-galleries-v1", []any{p, heads})
-	return p, err
+	return p, heads, nil
 }
 
 func (s *SourceGalleryStore) Consolidate(ctx context.Context, value, signature string) (*models.GalleryConsolidationResult, error) {

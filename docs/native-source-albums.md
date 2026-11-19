@@ -126,6 +126,18 @@ galleries consolidate when they share media; thread evidence alone does not
 merge previously separate galleries. Manual gallery choices, exclusions and
 deletions remain protected. Thread planning is bounded to 256 posts.
 
+When a thread's posts already hold separate source albums, the owner can review
+and combine them. `GET /api/v3/archive/posts/{uuid}/thread-album-consolidation`
+previews the thread's source albums, earliest post first, with the union's
+image and scene counts and any conflicting curated fields. `POST` to the same
+URL with that preview's `signature` combines them into the first album, using
+the same merge as overlapping albums, then runs the thread's ordinary album
+sync. The response adds `thread_action`, `thread_added` and `thread_removed`.
+Each post keeps its gallery choice's origin, and old album links redirect.
+An album that a post outside the thread also uses, a thread that needs review,
+or a post with no thread returns `album_preview_changed`. Like every source
+album route, these exist only while source tracking is enabled.
+
 Schema 1000105 begins recording these relationships on incoming native captures;
 it does not scan historical catalogs or infer reply relationships from filenames.
 The read-only endpoint is `GET /api/v3/archive/posts/{uuid}/thread`, with optional

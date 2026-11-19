@@ -118,6 +118,10 @@ type SourceGalleryReaderWriter interface {
 	ReconcileStudios(context.Context, []string) ([]SourceGalleryAttributionResult, error)
 	PreviewConsolidation(context.Context, string) (*GalleryConsolidationPreview, error)
 	Consolidate(context.Context, string, string) (*GalleryConsolidationResult, error)
+	// PreviewThreadConsolidation lists the source albums one evidenced
+	// self-reply thread holds; ConsolidateThread combines them and syncs it.
+	PreviewThreadConsolidation(context.Context, string) (*GalleryConsolidationPreview, error)
+	ConsolidateThread(context.Context, string, string) (*ThreadGalleryConsolidationResult, error)
 	AlternateTitles(context.Context, int) ([]string, error)
 	LibraryMedia(context.Context, int, int, int) (*GalleryMediaReferences, error)
 	FilenameBackfillPosts(context.Context, string, int) ([]SelectedSourcePost, error)

@@ -1913,6 +1913,34 @@ set. Ordinary backups retain this state; anonymisation removes it. Producer
 outbox schema 10 adds rotation across local download/metadata profiles and
 permitted collections without changing the native database schema. 
 
+## Background metadata (schema 1000143)
+
+Metadata turns take whole-service time from downloads, while a running download
+often leaves its shared request slots unused, for example while it fetches
+media files. Schema 1000143 adds `enrichment_background_attempts`, which marks
+current `post.enrich` attempts that use that spare request capacity instead.
+
+A worker opts in by claiming with `background: true` when capabilities report
+`enrichment_background_protocol: 1`; it should run only
+metadata work, so no download it would otherwise start waits for it. Such a
+claim never registers turn interest or changes turn counters. It takes an
+ordinary metadata turn only when one is available without waiting. Otherwise it
+starts a background attempt only beside a download already running on the
+service, with no other metadata job on that service, no running download of the
+same collection, no cooldown on the service or its retained child services,
+and no collection cooldown.
+
+Downloads and turn scheduling ignore background attempts, except that metadata
+for the same collection stays exclusive. Each background request still uses the
+shared request spacing, Retry-After budget and backoff probes. It also waits
+(`wait_ms` 5000) while a download request is waiting for that service, or while
+an ordinary metadata attempt holds it. Once the attempt has been running for a
+metadata turn length (180 seconds) and still has to wait, it receives a zero
+wait and yields with `budget_yield`, keeping its checkpoint and failure count.
+The marker records only the job and fence; it is immutable, requires the
+current running attempt, and is removed by anonymisation. Full native audits
+check that every marker belongs to a metadata attempt.
+
 ## Retained enrichment receipts
 
 Schema 1000057 adds `source_enrichment_receipts`, the ledger of historical

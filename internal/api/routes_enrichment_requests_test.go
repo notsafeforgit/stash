@@ -33,3 +33,17 @@ func TestEnrichmentRequestAPIKeepsRecoveryPriorityAndFencesResults(t *testing.T)
 	require.False(t, grant.Ready)
 	require.Positive(t, grant.WaitMS)
 }
+
+func TestEnrichmentBackgroundClaimAPIIsExplicitAndAdvertised(t *testing.T) {
+	f := newEnrichmentHTTPFixture(t)
+	require.Contains(t, string(f.request(t, "GET", "/capabilities", nil, 200)), `"enrichment_background_protocol":1`)
+	base := "/enrichment/targets/" + f.target.UUID
+	job := enrichmentHTTPValue[models.ArchiveJob](t, f.request(t, "POST", base+"/jobs", map[string]any{
+		"expected_revision": f.target.Revision, "policy_sha256": strings.Repeat("a", 64), "extractor_version": "1.32.15-dev"}, 200))
+	claim := map[string]any{"expected_revision": job.Revision, "owner_uuid": uuid.NewString(), "policy_sha256": strings.Repeat("a", 64),
+		"extractor_version": "1.32.15-dev", "lease_seconds": 60, "background": "yes"}
+	f.request(t, "POST", "/enrichment/jobs/"+job.UUID+"/claim", claim, 400)
+	claim["background"] = true
+	running := enrichmentHTTPValue[models.ArchiveJob](t, f.request(t, "POST", "/enrichment/jobs/"+job.UUID+"/claim", claim, 200))
+	require.Equal(t, "running", running.State, "an idle service gives a background claim an ordinary turn")
+}

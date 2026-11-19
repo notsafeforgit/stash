@@ -166,6 +166,7 @@ func (rs *ingestRoutes) claimEnrichment(w http.ResponseWriter, r *http.Request) 
 		PolicySHA256     string `json:"policy_sha256"`
 		ExtractorVersion string `json:"extractor_version"`
 		LeaseSeconds     int    `json:"lease_seconds"`
+		Background       bool   `json:"background"`
 	}
 	if err := readIngestJSON(w, r, 4096, &input); err != nil {
 		ingestError(w, err)
@@ -175,7 +176,11 @@ func (rs *ingestRoutes) claimEnrichment(w http.ResponseWriter, r *http.Request) 
 		ingestError(w, ingest.ErrInvalid)
 		return
 	}
-	value, err := rs.enrichmentWorker().Claim(r.Context(), ingestToken(r), chi.URLParam(r, "job"), input.ExpectedRevision, input.OwnerUUID, input.PolicySHA256, input.ExtractorVersion, time.Duration(input.LeaseSeconds)*time.Second)
+	claim := rs.enrichmentWorker().Claim
+	if input.Background {
+		claim = rs.enrichmentWorker().ClaimBackground
+	}
+	value, err := claim(r.Context(), ingestToken(r), chi.URLParam(r, "job"), input.ExpectedRevision, input.OwnerUUID, input.PolicySHA256, input.ExtractorVersion, time.Duration(input.LeaseSeconds)*time.Second)
 	if err == nil && value == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return

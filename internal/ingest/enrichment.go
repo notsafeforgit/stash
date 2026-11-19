@@ -143,6 +143,17 @@ func (c *EnrichmentCoordinator) Find(ctx context.Context, token, id string) (*mo
 }
 
 func (c *EnrichmentCoordinator) Claim(ctx context.Context, token, id string, expected int64, owner, policy, extractor string, duration time.Duration) (*models.ArchiveJob, error) {
+	return c.claim(ctx, token, id, expected, owner, policy, extractor, duration, false)
+}
+
+// ClaimBackground lets a metadata-only worker use spare request capacity: it
+// never waits for a metadata turn and, beside a running download, starts an
+// attempt whose requests yield to downloads. See docs/native-schema.md.
+func (c *EnrichmentCoordinator) ClaimBackground(ctx context.Context, token, id string, expected int64, owner, policy, extractor string, duration time.Duration) (*models.ArchiveJob, error) {
+	return c.claim(ctx, token, id, expected, owner, policy, extractor, duration, true)
+}
+
+func (c *EnrichmentCoordinator) claim(ctx context.Context, token, id string, expected int64, owner, policy, extractor string, duration time.Duration, background bool) (*models.ArchiveJob, error) {
 	if !ValidUUID(owner) || expected < 1 || duration < 5*time.Second || duration > 15*time.Minute {
 		return nil, ErrInvalid
 	}
@@ -158,7 +169,11 @@ func (c *EnrichmentCoordinator) Claim(ctx context.Context, token, id string, exp
 		if current.State == "running" && current.OwnerUUID == owner && current.LeaseUntil != nil && c.Now().Before(*current.LeaseUntil) {
 			result, err = c.Service.Repo.EnrichmentJob.CheckLease(ctx, models.EnrichmentJobLease{ArchiveJobLease: current.Lease(), ProducerUUID: credential.ProducerUUID}, c.Now())
 		} else {
-			result, err = c.Service.Repo.ArchiveJob.ClaimByID(ctx, id, expected, owner, c.Now(), duration)
+			if background {
+				result, err = c.Service.Repo.EnrichmentJob.ClaimBackground(ctx, id, expected, owner, c.Now(), duration)
+			} else {
+				result, err = c.Service.Repo.ArchiveJob.ClaimByID(ctx, id, expected, owner, c.Now(), duration)
+			}
 			if err == nil && result != nil {
 				err = c.Service.Repo.EnrichmentJob.BindAttempt(ctx, models.EnrichmentJobLease{ArchiveJobLease: result.Lease(), ProducerUUID: credential.ProducerUUID}, c.Now())
 			}

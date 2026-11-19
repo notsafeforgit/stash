@@ -360,10 +360,14 @@ ORDER BY j.priority DESC,j.available_at_ms,j.id LIMIT 1`, kind, now.UnixMilli())
 	if err != nil || job == nil {
 		return job, err
 	}
-	return s.claim(ctx, job, owner, now, duration)
+	return s.claim(ctx, job, owner, now, duration, false)
 }
 
 func (s *ArchiveJobStore) ClaimByID(ctx context.Context, id string, revision int64, owner string, now time.Time, duration time.Duration) (*models.ArchiveJob, error) {
+	return s.claimByID(ctx, id, revision, owner, now, duration, false)
+}
+
+func (s *ArchiveJobStore) claimByID(ctx context.Context, id string, revision int64, owner string, now time.Time, duration time.Duration, idle bool) (*models.ArchiveJob, error) {
 	if err := managedArchiveJobWrite(ctx); err != nil {
 		return nil, err
 	}
@@ -388,11 +392,15 @@ WHERE j.uuid=? AND j.state='queued' AND j.available_at_ms<=? AND j.failures<j.ma
 	if err != nil || job == nil {
 		return job, err
 	}
-	return s.claim(ctx, job, owner, now, duration)
+	return s.claim(ctx, job, owner, now, duration, idle)
 }
 
-func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, owner string, now time.Time, duration time.Duration) (*models.ArchiveJob, error) {
+// An idle claim never registers turn interest. It takes an ordinary metadata
+// turn only when one is available without waiting, otherwise a background
+// attempt beside a running download (see source_background.go).
+func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, owner string, now time.Time, duration time.Duration, idle bool) (*models.ArchiveJob, error) {
 	var pacingScope string
+	background := false
 	if metadataJobKind(job.Kind) {
 		collection, err := metadataJobCollection(ctx, job, now)
 		if err != nil {
@@ -406,15 +414,19 @@ func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, own
 			return nil, err
 		}
 		waiting := sourcePacingAtomic(ctx)
-		if err := sourceEnrichmentWaiting(ctx, job, now); err != nil {
-			return nil, err
+		if !idle {
+			if err := sourceEnrichmentWaiting(ctx, job, now); err != nil {
+				return nil, err
+			}
 		}
 		ready, err := sourcePacingReadyFor(ctx, pacingScope, collection, true, job.UUID, "", now)
-		if err != nil || !ready {
-			*waiting = err == nil
-			return nil, err
+		if err == nil && ready {
+			ready, err = enrichmentPendingPacingReady(ctx, job.UUID, collection, pacingScope, now)
 		}
-		ready, err = enrichmentPendingPacingReady(ctx, job.UUID, collection, pacingScope, now)
+		if err == nil && !ready && idle && job.Kind == models.ArchiveJobEnrichPost {
+			ready, err = sourceBackgroundClaimReady(ctx, pacingScope, collection, job.UUID, now)
+			background = ready
+		}
 		if err != nil || !ready {
 			*waiting = err == nil
 			return nil, err
@@ -441,7 +453,11 @@ func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, own
 	if err := bindMetadataAttemptPolicy(ctx, job, job.Fence+1); err != nil {
 		return nil, err
 	}
-	if pacingScope != "" {
+	if background {
+		if err := markBackgroundMetadataAttempt(ctx, job.UUID, job.Fence+1, now); err != nil {
+			return nil, err
+		}
+	} else if pacingScope != "" {
 		if err := sourceAttemptTurnStarted(ctx, job.UUID, job.Fence+1, true, false, now); err != nil {
 			return nil, err
 		}

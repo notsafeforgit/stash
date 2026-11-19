@@ -47,14 +47,26 @@ func sourcePacingReady(ctx context.Context, scope, collection string, enrichment
 }
 
 func sourcePacingReadyFor(ctx context.Context, scope, collection string, enrichment bool, ignoreJob, ignoreRun string, now time.Time) (bool, error) {
+	if enrichment && ignoreJob != "" {
+		background, err := backgroundMetadataAttempt(ctx, ignoreJob)
+		if err != nil || background {
+			if err != nil {
+				return false, err
+			}
+			return sourceBackgroundReady(ctx, scope, collection, ignoreJob, now)
+		}
+	}
+	// A background metadata attempt excludes only its own collection's metadata;
+	// downloads and turns on its service ignore it.
 	var busy bool
 	if err := dbWrapper.Get(ctx, &busy, `SELECT
  EXISTS(SELECT 1 FROM source_pacing WHERE scope=? AND (available_at_ms>? OR last_started_at_ms>?))
  OR EXISTS(SELECT 1 FROM archive_jobs j INDEXED BY archive_jobs_active_work
   JOIN enrichment_attempt_pacing p ON p.job_uuid=j.uuid AND p.fence=j.fence
-  JOIN archive_job_attempts a ON a.job_uuid=j.uuid AND a.fence=j.fence
+  JOIN archive_job_attempts a ON a.job_uuid=j.uuid AND a.fence=j.fence `+backgroundAttemptJoin+`
   WHERE j.kind IN ('post.enrich','account.list_page','post.verify_candidate') AND j.state IN ('queued','running') AND j.state='running'
-   AND j.uuid!=? AND (? OR j.kind!='post.enrich' OR a.started_at_ms>?) AND (p.scope=? OR json_extract(j.arguments,'$.collection_uuid')=?))
+   AND j.uuid!=? AND (? OR j.kind!='post.enrich' OR (a.started_at_ms>? AND b.job_uuid IS NULL))
+   AND ((p.scope=? AND b.job_uuid IS NULL) OR json_extract(j.arguments,'$.collection_uuid')=?))
  OR EXISTS(SELECT 1 FROM source_runs r INDEXED BY source_runs_expired
   JOIN source_run_attempt_pacing p ON p.run_uuid=r.uuid AND p.fence=r.fence AND p.reserved=1
   WHERE r.state='running' AND r.uuid!=? AND (p.scope=? OR r.collection_uuid=?) AND (? OR r.operation='enrich'))`,
@@ -175,8 +187,14 @@ func reserveMetadataSource(ctx context.Context, job *models.ArchiveJob, collecti
 	if err := sourcePacingStarted(ctx, scope, now); err != nil {
 		return false, err
 	}
-	if err := sourceTurnStarted(ctx, scope, true, now); err != nil {
+	background, err := backgroundMetadataAttempt(ctx, job.UUID)
+	if err != nil {
 		return false, err
+	}
+	if !background {
+		if err := sourceTurnStarted(ctx, scope, true, now); err != nil {
+			return false, err
+		}
 	}
 	*complete = true
 	return true, nil

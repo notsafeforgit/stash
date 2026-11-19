@@ -375,6 +375,7 @@ func buildSchemaTemplate(version int) ([]schemaObject, error) {
 // definitions and the replacement identity lookup tables are removed.
 func removeImportRetirementSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeBackgroundMetadataSchema(t, raw)
 	var present bool
 	require.NoError(t, raw.QueryRow("SELECT EXISTS(SELECT 1 FROM native_migration_history WHERE version=1000142)").Scan(&present))
 	if !present {

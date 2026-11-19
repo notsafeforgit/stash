@@ -771,7 +771,7 @@ Capabilities advertise `enrichment_protocol: 2`, `enrichment_dispatch_protocol: 
 | `POST /collections/{uuid}/jobs/ready` | `{policy_sha256, extractor_version, after, limit}` discovers eligible admitted jobs, ordered after their integer sequence; returns `{sequence, uuid}` candidates |
 | `POST /targets/{uuid}/jobs` | `{expected_revision, policy_sha256, extractor_version}` admits or replays the job bound to that target revision |
 | `GET /jobs/{uuid}` | Returns `{job, target, identity_resolution?}`, including immutable source URL/input, current scheduling state and any verified legacy identity proof |
-| `POST /jobs/{uuid}/claim` | `{expected_revision, owner_uuid, policy_sha256, extractor_version, lease_seconds}` claims the selected job; unchanged but unavailable work returns 204 |
+| `POST /jobs/{uuid}/claim` | `{expected_revision, owner_uuid, policy_sha256, extractor_version, lease_seconds, background?}` claims the selected job; unchanged but unavailable work returns 204. `background: true` asks for [background metadata](native-schema.md#background-metadata-schema-1000143) |
 | `POST /jobs/{uuid}/renew` | `{owner_uuid, fence, lease_seconds}` renews current ownership |
 | `POST /jobs/{uuid}/source` | `{owner_uuid, fence, url}` reserves the main service or a supported linked service before extractor initialization; returns `{job_uuid, fence, ready}` |
 | `GET /jobs/{uuid}/checkpoint` | Current receipt plus compact `body`, or null when absent/released |
@@ -844,6 +844,9 @@ An enrichment start resets download preference. Stale/held work and
 cooling dependencies cannot reserve unrelated services. A retry reserves its
 retained pending child services at claim time. See the
 [scheduling contract](native-schema.md#bounded-source-preference).
+A dedicated metadata-only worker can instead claim with `background: true` to
+use spare request capacity beside a running download; see
+[background metadata](native-schema.md#background-metadata-schema-1000143).
 
 Before initializing a newly discovered Redgifs or Imgur child extractor, the
 worker calls `/source` using its current lease. The route accepts the job's main

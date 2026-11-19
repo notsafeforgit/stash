@@ -101,9 +101,10 @@ func sourceEnrichmentTurn(ctx context.Context, scope, collection, requester stri
 		var busy bool
 		err = dbWrapper.Get(ctx, &busy, `SELECT EXISTS(SELECT 1 FROM archive_jobs a INDEXED BY archive_jobs_active_work
  JOIN enrichment_attempt_pacing p ON p.job_uuid=a.uuid AND p.fence=a.fence
+ LEFT JOIN enrichment_background_attempts b ON b.job_uuid=a.uuid AND b.fence=a.fence
  WHERE a.kind IN ('post.enrich','account.list_page','post.verify_candidate') AND a.state IN ('queued','running') AND a.state='running'
- AND (json_extract(a.arguments,'$.collection_uuid')=? OR EXISTS(
-  SELECT 1 FROM source_enrichment_waiter_scopes w WHERE w.job_uuid=? AND w.scope=p.scope)))
+ AND (json_extract(a.arguments,'$.collection_uuid')=? OR (b.job_uuid IS NULL AND EXISTS(
+  SELECT 1 FROM source_enrichment_waiter_scopes w WHERE w.job_uuid=? AND w.scope=p.scope))))
  OR EXISTS(SELECT 1 FROM source_runs r INDEXED BY source_runs_expired
  JOIN source_run_attempt_pacing p ON p.run_uuid=r.uuid AND p.fence=r.fence AND p.reserved=1
  WHERE r.state='running' AND r.operation='enrich' AND (r.collection_uuid=? OR EXISTS(

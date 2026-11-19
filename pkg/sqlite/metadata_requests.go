@@ -78,6 +78,20 @@ func (s *EnrichmentJobStore) RequestSource(ctx context.Context, lease models.Enr
 		result.Ready = true
 		return result, nil
 	}
+	background, err := backgroundMetadataAttempt(ctx, job.UUID)
+	if err != nil {
+		return nil, err
+	}
+	if background {
+		wait, held, err := sourceBackgroundRequestWait(ctx, scope, job, now)
+		if err != nil {
+			return nil, err
+		}
+		if held {
+			result.WaitMS = wait
+			return result, nil
+		}
+	}
 	complete := sourcePacingAtomic(ctx)
 	if _, err := dbWrapper.Exec(ctx, "INSERT OR IGNORE INTO source_request_budgets(scope) VALUES(?)", scope); err != nil {
 		return nil, err

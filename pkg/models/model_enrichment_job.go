@@ -158,6 +158,10 @@ type EnrichmentJobReaderWriter interface {
 	Bind(context.Context, string, time.Time) error
 	Binding(context.Context, string) (*EnrichmentJobBinding, error)
 	TargetBinding(context.Context, string, int) (*EnrichmentJobBinding, error)
+	// ClaimBackground claims the selected revision like ArchiveJob.ClaimByID,
+	// without registering turn interest. When no ordinary metadata turn is free
+	// it may start a background attempt beside a running download instead.
+	ClaimBackground(context.Context, string, int64, string, time.Time, time.Duration) (*ArchiveJob, error)
 	BindAttempt(context.Context, EnrichmentJobLease, time.Time) error
 	Attempt(context.Context, string, int64) (*EnrichmentJobAttempt, error)
 	CheckLease(context.Context, EnrichmentJobLease, time.Time) (*ArchiveJob, error)

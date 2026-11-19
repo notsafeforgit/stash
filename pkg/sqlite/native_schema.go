@@ -760,6 +760,11 @@ AND EXISTS(SELECT 1 FROM pragma_index_info('shares_token_hash') WHERE name='toke
 			}
 		}
 
+		if version >= NativeSchemaBaseline+143 {
+			if err := validateBackgroundMetadataSchema(conn, auditData); err != nil {
+				return err
+			}
+		}
 		if version >= NativeSchemaBaseline+61 {
 			if err := validateSourceCaptureTimeSchema(conn, auditData); err != nil {
 				return err

@@ -211,6 +211,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"enrichment_dispatch_protocol":             1,
 		"enrichment_source_pacing_protocol":        1,
 		"enrichment_gap_protocol":                  1,
+		"enrichment_background_protocol":           1,
 		"max_enrichment_checkpoint_bytes":          archive.MaxEnrichmentTranscriptBytes,
 		"receipt_semantics":                        "source.capture commits source evidence; attachment.download retains transfer reports; file.completed queues verification; poll file receipt status for media completion",
 	})

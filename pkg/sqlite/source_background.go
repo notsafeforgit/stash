@@ -11,11 +11,14 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-// Background metadata uses spare request capacity beside a running download.
+// Background metadata uses idle request capacity beside a running download.
 // A worker opts in per claim. The claim registers no turn interest and starts
 // no turn, downloads do not wait for it, and each of its requests waits while a
-// download or a turn-holding metadata job is waiting for the same service. The
-// shared request spacing, Retry-After budget and cooldowns still apply.
+// download or a turn-holding metadata job is waiting for the same service, or
+// while a download request was granted there within two request spacings. A
+// download's own pause between requests is shorter than that, so background
+// requests use only real gaps and do not take the slot a download is about to
+// need. The shared request spacing, Retry-After budget and cooldowns still apply.
 
 const backgroundAttemptJoin = "LEFT JOIN enrichment_background_attempts b ON b.job_uuid=j.uuid AND b.fence=j.fence"
 
@@ -108,18 +111,21 @@ func markBackgroundMetadataAttempt(ctx context.Context, job string, fence int64,
 }
 
 // sourceBackgroundRequestWait returns whether a background request must wait
-// for a preferred requester. Until sourceBackgroundYield the job keeps polling;
-// after that it yields (zero wait) so the job returns to the queue.
+// for downloads or a turn-holding metadata job. Until sourceBackgroundYield the
+// job keeps polling; after that it yields (zero wait) so the job returns to the
+// queue.
 func sourceBackgroundRequestWait(ctx context.Context, scope string, job *models.ArchiveJob, now time.Time) (int64, bool, error) {
 	stamp := now.UnixMilli()
-	var preferred bool
-	if err := dbWrapper.Get(ctx, &preferred, `SELECT
+	var held bool
+	if err := dbWrapper.Get(ctx, &held, `SELECT
  EXISTS(SELECT 1 FROM source_request_permits p JOIN source_runs r ON r.uuid=p.run_uuid AND r.fence=p.fence
   WHERE p.scope=? AND p.granted_at_ms IS NULL AND p.touched_at_ms>? AND r.state='running' AND r.lease_until_ms>?)
+ OR EXISTS(SELECT 1 FROM source_request_permits p WHERE p.scope=? AND p.granted_at_ms>?)
  OR EXISTS(SELECT 1 FROM archive_jobs j INDEXED BY archive_jobs_active_work
   JOIN enrichment_attempt_pacing p ON p.job_uuid=j.uuid AND p.fence=j.fence `+backgroundAttemptJoin+`
   WHERE j.kind='post.enrich' AND j.state IN ('queued','running') AND j.state='running'
-   AND j.uuid!=? AND p.scope=? AND b.job_uuid IS NULL)`, scope, stamp-60000, stamp, job.UUID, scope); err != nil || !preferred {
+   AND j.uuid!=? AND p.scope=? AND b.job_uuid IS NULL)`, scope, stamp-60000, stamp,
+		scope, stamp-2*requestInterval(scope), job.UUID, scope); err != nil || !held {
 		return 0, false, err
 	}
 	var started int64

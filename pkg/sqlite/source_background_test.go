@@ -87,9 +87,13 @@ func TestBackgroundMetadataUsesIdleRequestsBesideDownloads(t *testing.T) {
 	require.False(t, clock.Ready)
 	require.Positive(t, clock.WaitMS)
 	f.now = f.now.Add(5 * time.Second)
-	require.True(t, backgroundRequest(t, f, bg).Ready)
+	cadence := backgroundRequest(t, f, bg)
+	require.False(t, cadence.Ready, "a download granted within two spacings keeps the next slot for its next request")
+	require.EqualValues(t, 5000, cadence.WaitMS)
+	f.now = f.now.Add(5 * time.Second)
+	require.True(t, backgroundRequest(t, f, bg).Ready, "after two idle spacings the slot goes to background metadata")
 
-	for elapsed := 10 * time.Second; elapsed < 2*time.Minute; elapsed += 50 * time.Second {
+	for elapsed := 15 * time.Second; elapsed < 2*time.Minute; elapsed += 50 * time.Second {
 		var err error
 		bg, err = f.worker.Renew(t.Context(), f.tokens[0], bg.Lease(), time.Minute)
 		require.NoError(t, err)

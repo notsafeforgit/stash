@@ -1933,8 +1933,13 @@ and no collection cooldown.
 Downloads and turn scheduling ignore background attempts, except that metadata
 for the same collection stays exclusive. Each background request still uses the
 shared request spacing, Retry-After budget and backoff probes. It also waits
-(`wait_ms` 5000) while a download request is waiting for that service, or while
-an ordinary metadata attempt holds it. Once the attempt has been running for
+(`wait_ms` 5000) while a download request is waiting for that service, while an
+ordinary metadata attempt holds it, or while any download request was granted
+there within two request spacings (40 seconds on Twitter). A download's own
+pause between requests is shorter than that, so background requests use only
+real gaps such as media fetches; without this rule they took the slot during
+each download pause and cut Twitter download requests by about a third. Once the
+attempt has been running for
 two minutes and still has to wait, it receives a zero wait and yields with
 `budget_yield`, keeping its checkpoint and failure count. Two minutes leaves the
 worker's whole-fetch deadline (one 180-second metadata turn) a minute of

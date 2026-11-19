@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/stashapp/stash/pkg/models"
 )
@@ -11,17 +12,7 @@ func (p *postConsolidationPlan) prepareAlbum(ctx context.Context) error {
 	if len(p.preview.Blockers) != 0 {
 		return nil
 	}
-	post := p.snapshot.Identity.Destination
-	ret := &models.SourceGalleryPreview{PostUUID: post.UUID, PostRevision: post.Revision, Action: "ineligible",
-		Entries: []models.SourceAlbumEntry{}, Add: []models.ArchiveEntity{}, Remove: []models.ArchiveEntity{}}
-	if choice := p.preview.Gallery; choice != nil {
-		ret.Association = &models.SourceGalleryDecision{PostUUID: post.UUID, State: choice.State}
-		if choice.State == "linked" {
-			id := choice.GalleryUUID
-			ret.Association.GalleryUUID = &id
-		}
-	}
-	ready, err := sourceGalleryPreviewReady(ctx, ret)
+	ret, ready, err := p.mergedPostAlbum(ctx, nil, false)
 	if err != nil {
 		return err
 	}
@@ -31,6 +22,103 @@ func (p *postConsolidationPlan) prepareAlbum(ctx context.Context) error {
 		}
 		return p.setAlbumPlan(ret)
 	}
+	// After the merge, the ordinary preview of a post in a self-reply thread is
+	// the thread album, whichever merged post carried the thread. A reviewed
+	// merge concerns the duplicate posts, not their neighbouring replies, so it
+	// leaves that album to the independent thread operation and makes no
+	// gallery change. Predict the post-merge preview the same way to decide.
+	destination := p.snapshot.Identity.Destination.UUID
+	members, err := p.mergedThreadMembers(ctx)
+	if errors.Is(err, models.ErrSourceGalleryConflict) || errors.Is(err, models.ErrSourceAlbumLimit) {
+		// A thread that needs review keeps the single-post plan; the merge
+		// applies only when that plan makes no gallery change.
+		return p.setAlbumPlan(ret)
+	}
+	if err != nil {
+		return err
+	}
+	if len(members) > 1 {
+		gallery := &SourceGalleryStore{}
+		thread, err := gallery.combineThread(ctx, ret, members, func(ctx context.Context, post string, shared *models.ArchiveEntity, eligibility bool) (*models.SourceGalleryPreview, error) {
+			if post == destination {
+				merged, _, err := p.mergedPostAlbum(ctx, shared, true)
+				return merged, err
+			}
+			return gallery.previewSinglePost(ctx, post, nil, shared, true)
+		})
+		if err != nil {
+			return err
+		}
+		if thread, err = sourceGalleryLocalMinimum(thread); err != nil {
+			return err
+		}
+		if len(thread.ThreadPlans) > 0 {
+			post := p.snapshot.Identity.Destination
+			deferred, err := finishSourceGalleryPreview(&models.SourceGalleryPreview{PostUUID: post.UUID, PostRevision: post.Revision,
+				Action: "ineligible", Entries: []models.SourceAlbumEntry{}, Add: []models.ArchiveEntity{}, Remove: []models.ArchiveEntity{}})
+			if err != nil {
+				return err
+			}
+			return p.setAlbumPlan(deferred)
+		}
+	}
+	return p.setAlbumPlan(ret)
+}
+
+// mergedThreadMembers returns the thread members as sourceThreadMembers will
+// read them after the merge: the merged identity carries the thread row of
+// either post, both rows conflict, and the source's place belongs to the
+// destination.
+func (p *postConsolidationPlan) mergedThreadMembers(ctx context.Context) ([]sourceThreadRow, error) {
+	source, destination := p.snapshot.Identity.Source.UUID, p.snapshot.Identity.Destination.UUID
+	sourceRow, err := sourceThreadForPost(ctx, source)
+	if err != nil {
+		return nil, err
+	}
+	destinationRow, err := sourceThreadForPost(ctx, destination)
+	if err != nil {
+		return nil, err
+	}
+	var members []sourceThreadRow
+	switch {
+	case sourceRow != nil && destinationRow != nil:
+		return nil, models.ErrSourceGalleryConflict
+	case destinationRow != nil:
+		members, err = sourceThreadMembers(ctx, destination)
+	case sourceRow != nil:
+		members, err = sourceThreadMembers(ctx, source)
+	}
+	for i := range members {
+		if members[i].PostUUID == source {
+			members[i].PostUUID = destination
+		}
+	}
+	return members, err
+}
+
+// mergedPostAlbum previews the destination's own album with the merge's
+// resulting selection, gallery and media choices, as previewSinglePost would
+// read them once the merge is published. ready is false when the gallery
+// association prevents album changes.
+func (p *postConsolidationPlan) mergedPostAlbum(ctx context.Context, shared *models.ArchiveEntity, forceAlbum bool) (*models.SourceGalleryPreview, bool, error) {
+	post := p.snapshot.Identity.Destination
+	ret := &models.SourceGalleryPreview{PostUUID: post.UUID, PostRevision: post.Revision, Action: "ineligible",
+		Entries: []models.SourceAlbumEntry{}, Add: []models.ArchiveEntity{}, Remove: []models.ArchiveEntity{}}
+	if choice := p.preview.Gallery; choice != nil {
+		// publishGalleryChoice records the merged choice as a review decision.
+		ret.Association = &models.SourceGalleryDecision{PostUUID: post.UUID, State: choice.State, Origin: "review"}
+		if choice.State == "linked" {
+			id := choice.GalleryUUID
+			ret.Association.GalleryUUID = &id
+		}
+	}
+	ready, err := sourceGalleryPreviewReady(ctx, ret)
+	if err != nil || !ready {
+		return ret, false, err
+	}
+	if shared != nil && ret.Gallery == nil {
+		ret.Gallery = shared
+	}
 	owners := map[string]bool{}
 	for _, member := range p.snapshot.Identity.Members {
 		owners[member.UUID] = true
@@ -38,14 +126,16 @@ func (p *postConsolidationPlan) prepareAlbum(ctx context.Context) error {
 	// The selected gallery already belongs to a member of this merge. Other
 	// posts may share it; the ordinary membership preview preserves their media.
 	if p.selection == nil {
-		return p.setAlbumPlan(ret)
+		ret, err = finishSourceGalleryPreview(ret)
+		return ret, true, err
 	}
-	ready, err = sourceGallerySelectPreview(ctx, ret, p.selection, owners, false)
+	selected, err := sourceGallerySelectPreview(ctx, ret, p.selection, owners, forceAlbum)
 	if err != nil {
-		return err
+		return nil, true, err
 	}
-	if !ready {
-		return p.setAlbumPlan(ret)
+	if !selected {
+		ret, err = finishSourceGalleryPreview(ret)
+		return ret, true, err
 	}
 	byReference := map[models.SourcePostIdentifier]models.PostConsolidationAttachmentChoice{}
 	for _, choice := range p.preview.Attachments {
@@ -63,10 +153,7 @@ func (p *postConsolidationPlan) prepareAlbum(ctx context.Context) error {
 		postChoices = append(postChoices, sourcePostMediaRow{PostUUID: post.UUID, MediaUUID: choice.MediaUUID, State: choice.State})
 	}
 	ret, err = sourceGalleryMembershipPreview(ctx, ret, p.selection, choices, postChoices, owners)
-	if err != nil {
-		return err
-	}
-	return p.setAlbumPlan(ret)
+	return ret, true, err
 }
 
 func postConsolidationGalleryClaimed(ctx context.Context, gallery string, owners []string) (bool, error) {

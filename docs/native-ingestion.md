@@ -2744,6 +2744,13 @@ Exceeding a complete-review bound returns `post_comparison_limit`, never a
 truncated permission to merge. Conflicting qualified upstream IDs return
 `post_identity_conflict`.
 
+When the merged post belongs to a captured Twitter self-reply thread, the merge
+leaves the thread's shared gallery alone: its album effect is `ineligible` and
+no gallery membership changes. A single-post review never grows into the whole
+thread. Thread gallery planning then treats the merged post as one thread
+member, and the thread's next capture publication or an album backfill builds
+or updates the shared gallery.
+
 Apply repeats the preview input with `request_uuid` and `digest`. It revalidates
 current heads and library revisions before publishing any effect. It returns
 `preview_changed` if the reviewed state changed. Exact committed retries recover

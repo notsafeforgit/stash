@@ -10,18 +10,40 @@ import (
 	"github.com/stashapp/stash/pkg/txn"
 )
 
+// sourceThreadMemberPreview previews one thread member's own album. The first,
+// eligibility pass reads every member without a shared gallery; the second
+// places eligible members in the thread's shared gallery.
+type sourceThreadMemberPreview func(ctx context.Context, post string, shared *models.ArchiveEntity, eligibility bool) (*models.SourceGalleryPreview, error)
+
 func (s *SourceGalleryStore) previewThread(ctx context.Context, value string, proposed map[string]sourceAlbumMediaChoice, members []sourceThreadRow) (*models.SourceGalleryPreview, error) {
 	current, err := s.previewSinglePost(ctx, value, proposed, nil, false)
 	if err != nil {
 		return nil, err
 	}
+	return s.combineThread(ctx, current, members, func(ctx context.Context, post string, shared *models.ArchiveEntity, eligibility bool) (*models.SourceGalleryPreview, error) {
+		if eligibility {
+			return s.previewSinglePost(ctx, post, nil, nil, true)
+		}
+		var choices map[string]sourceAlbumMediaChoice
+		if post == current.PostUUID {
+			choices = proposed
+		}
+		return s.previewSinglePost(ctx, post, choices, shared, true)
+	})
+}
+
+// combineThread joins the members' own album previews into the thread album.
+// current is the requested post's own preview; member supplies each member's.
+// A reviewed post merge supplies its planned destination here, so the plan and
+// the post-merge thread preview are computed the same way.
+func (s *SourceGalleryStore) combineThread(ctx context.Context, current *models.SourceGalleryPreview, members []sourceThreadRow, member sourceThreadMemberPreview) (*models.SourceGalleryPreview, error) {
 	if current.Action == "disabled" || current.Action == "review" || (current.Association != nil && current.Association.Origin != "source") {
 		return current, nil
 	}
 	var shared *models.ArchiveEntity
 	var eligible []sourceThreadRow
-	for _, member := range members {
-		p, err := s.previewSinglePost(ctx, member.PostUUID, nil, nil, true)
+	for _, row := range members {
+		p, err := member(ctx, row.PostUUID, nil, true)
 		if err != nil {
 			return nil, err
 		}
@@ -43,7 +65,7 @@ func (s *SourceGalleryStore) previewThread(ctx context.Context, value string, pr
 			}
 			shared = p.Gallery
 		}
-		eligible = append(eligible, member)
+		eligible = append(eligible, row)
 	}
 	if len(eligible) < 2 {
 		return current, nil
@@ -57,12 +79,8 @@ func (s *SourceGalleryStore) previewThread(ctx context.Context, value string, pr
 	adds, removes, wanted := map[string]models.ArchiveEntity{}, map[string]models.ArchiveEntity{}, map[string]bool{}
 	var signatures []string
 	offset := 0
-	for _, member := range eligible {
-		var choices map[string]sourceAlbumMediaChoice
-		if member.PostUUID == current.PostUUID {
-			choices = proposed
-		}
-		p, err := s.previewSinglePost(ctx, member.PostUUID, choices, shared, true)
+	for _, row := range eligible {
+		p, err := member(ctx, row.PostUUID, shared, false)
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +135,8 @@ func (s *SourceGalleryStore) previewThread(ctx context.Context, value string, pr
 	if _, err := finishSourceGalleryPreview(&ret); err != nil {
 		return nil, err
 	}
-	ret.Signature, err = sourceSignature("stash-thread-gallery-preview-v1", []any{ret.Signature, signatures, eligible})
+	signature, err := sourceSignature("stash-thread-gallery-preview-v1", []any{ret.Signature, signatures, eligible})
+	ret.Signature = signature
 	return &ret, err
 }
 

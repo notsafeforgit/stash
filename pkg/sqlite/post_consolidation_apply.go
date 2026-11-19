@@ -240,6 +240,13 @@ func (s *SourceEvidenceStore) publishConsolidatedAlbum(ctx context.Context, inpu
 	if err != nil {
 		return err
 	}
+	// A merged post in a self-reply thread previews the thread album. The plan
+	// left that album to the independent thread operation (prepareAlbum).
+	if planned.preview.Album.Action == "ineligible" && planned.preview.Album.GalleryUUID == "" &&
+		len(planned.preview.Album.Add) == 0 && len(planned.preview.Album.Remove) == 0 && len(preview.ThreadPlans) > 0 {
+		result.Gallery = models.PostConsolidationGalleryResult{Action: "ineligible", Added: []string{}, Removed: []string{}}
+		return nil
+	}
 	actual := &postConsolidationPlan{preview: &models.PostConsolidationReviewPreview{}, selection: selection}
 	if err := actual.setAlbumPlan(preview); err != nil {
 		return err

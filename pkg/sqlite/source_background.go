@@ -2,6 +2,8 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,6 +18,12 @@ import (
 // shared request spacing, Retry-After budget and cooldowns still apply.
 
 const backgroundAttemptJoin = "LEFT JOIN enrichment_background_attempts b ON b.job_uuid=j.uuid AND b.fence=j.fence"
+
+// sourceBackgroundYield is how long a background attempt may wait behind
+// downloads before its next request is refused and it returns to the queue. It
+// is shorter than a metadata turn, which is also the worker's whole-fetch
+// deadline, so the job learns to yield well before that deadline can expire.
+const sourceBackgroundYield = 2 * time.Minute
 
 func (s *EnrichmentJobStore) ClaimBackground(ctx context.Context, id string, revision int64, owner string, now time.Time, duration time.Duration) (*models.ArchiveJob, error) {
 	return (&ArchiveJobStore{}).claimByID(ctx, id, revision, owner, now, duration, true)
@@ -100,8 +108,8 @@ func markBackgroundMetadataAttempt(ctx context.Context, job string, fence int64,
 }
 
 // sourceBackgroundRequestWait returns whether a background request must wait
-// for a preferred requester. Within its first metadata turn length the job keeps
-// polling; after that it yields (zero wait) so the job returns to the queue.
+// for a preferred requester. Until sourceBackgroundYield the job keeps polling;
+// after that it yields (zero wait) so the job returns to the queue.
 func sourceBackgroundRequestWait(ctx context.Context, scope string, job *models.ArchiveJob, now time.Time) (int64, bool, error) {
 	stamp := now.UnixMilli()
 	var preferred bool
@@ -118,10 +126,33 @@ func sourceBackgroundRequestWait(ctx context.Context, scope string, job *models.
 	if err := dbWrapper.Get(ctx, &started, "SELECT started_at_ms FROM archive_job_attempts WHERE job_uuid=? AND fence=?", job.UUID, job.Fence); err != nil {
 		return 0, false, err
 	}
-	if stamp-started >= sourceMetadataTurn.Milliseconds() {
+	if stamp-started >= sourceBackgroundYield.Milliseconds() {
 		return 0, true, nil
 	}
 	return 5000, true, nil
+}
+
+// A background attempt that times out after it was told to yield ran out its own
+// fetch deadline while waiting behind downloads. That says nothing about the
+// website: the job keeps its failure and retry delay, but the service is not
+// paused. Its downloads still report a real outage, and an earlier timeout
+// keeps the ordinary service pause.
+func sourceBackgroundOverrun(ctx context.Context, job string, fence int64, code string, now time.Time) (bool, error) {
+	if code != "timeout" {
+		return false, nil
+	}
+	var started int64
+	err := dbWrapper.Get(ctx, &started, `SELECT a.started_at_ms FROM archive_job_attempts a
+ JOIN enrichment_background_attempts b ON b.job_uuid=a.job_uuid AND b.fence=a.fence
+ JOIN archive_jobs j ON j.uuid=a.job_uuid AND j.fence=a.fence
+ WHERE a.job_uuid=? AND a.fence=? AND j.kind='post.enrich'`, job, fence)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return now.UnixMilli()-started >= sourceBackgroundYield.Milliseconds(), nil
 }
 
 func validateBackgroundMetadataSchema(conn *sqlx.DB, auditData bool) error {

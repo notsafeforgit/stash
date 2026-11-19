@@ -1934,9 +1934,16 @@ Downloads and turn scheduling ignore background attempts, except that metadata
 for the same collection stays exclusive. Each background request still uses the
 shared request spacing, Retry-After budget and backoff probes. It also waits
 (`wait_ms` 5000) while a download request is waiting for that service, or while
-an ordinary metadata attempt holds it. Once the attempt has been running for a
-metadata turn length (180 seconds) and still has to wait, it receives a zero
-wait and yields with `budget_yield`, keeping its checkpoint and failure count.
+an ordinary metadata attempt holds it. Once the attempt has been running for
+two minutes and still has to wait, it receives a zero wait and yields with
+`budget_yield`, keeping its checkpoint and failure count. Two minutes leaves the
+worker's whole-fetch deadline (one 180-second metadata turn) a minute of
+headroom. A background attempt that reports `timeout` after that point overran
+its own deadline while waiting, not the website: it keeps the failure and retry
+delay but does not start the one-hour service pause that other metadata
+timeouts do. An earlier timeout, and every download timeout, still pauses the
+service. The first deployment yielded at 180 seconds; one attempt reached the
+worker deadline first and paused Twitter for an hour.
 The marker records only the job and fence; it is immutable, requires the
 current running attempt, and is removed by anonymisation. Full native audits
 check that every marker belongs to a metadata attempt.

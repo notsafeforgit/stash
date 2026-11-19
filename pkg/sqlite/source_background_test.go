@@ -2,6 +2,7 @@ package sqlite_test
 
 import (
 	"database/sql"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -88,7 +89,7 @@ func TestBackgroundMetadataUsesIdleRequestsBesideDownloads(t *testing.T) {
 	f.now = f.now.Add(5 * time.Second)
 	require.True(t, backgroundRequest(t, f, bg).Ready)
 
-	for elapsed := 10 * time.Second; elapsed < 3*time.Minute; elapsed += 50 * time.Second {
+	for elapsed := 10 * time.Second; elapsed < 2*time.Minute; elapsed += 50 * time.Second {
 		var err error
 		bg, err = f.worker.Renew(t.Context(), f.tokens[0], bg.Lease(), time.Minute)
 		require.NoError(t, err)
@@ -100,7 +101,7 @@ func TestBackgroundMetadataUsesIdleRequestsBesideDownloads(t *testing.T) {
 	require.False(t, downloadRequest(t, d, run, uuid.NewString()).Ready)
 	yield := backgroundRequest(t, f, bg)
 	require.False(t, yield.Ready)
-	require.Zero(t, yield.WaitMS, "after a metadata turn length, waiting behind downloads yields the job")
+	require.Zero(t, yield.WaitMS, "after two minutes, well inside the worker's fetch deadline, waiting behind downloads yields the job")
 	_, err := f.worker.Fail(t.Context(), f.tokens[0], bg.Lease(), "budget_yield")
 	require.NoError(t, err)
 	current, err := f.worker.Find(t.Context(), f.tokens[0], job.UUID)
@@ -141,4 +142,53 @@ func TestBackgroundMetadataKeepsCooldownsAndDownloadPreference(t *testing.T) {
 	newPacingDownload(t, f, "https://reddit.com/user/queued")
 	require.Nil(t, tryBackgroundEnrichment(t, f, job), "a queued download is served first when none is running")
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM archive_job_attempts WHERE job_uuid='"+job.UUID+"'"))
+}
+
+func TestBackgroundTimeoutAfterYieldDoesNotPauseTheService(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		elapsed time.Duration
+		overrun bool
+	}{
+		{name: "early timeout is a site timeout", elapsed: 30 * time.Second},
+		{name: "timeout after the yield is the worker's own deadline", elapsed: 150 * time.Second, overrun: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newEnrichmentExecutionFixture(t)
+			job := f.admit(t)
+			d := newPacingDownload(t, f, "https://reddit.com/user/other")
+			run := d.claim(t)
+			require.NotNil(t, run)
+			raw := openRawDB(t, f.db.DatabasePath())
+			defer raw.Close()
+			bg := tryBackgroundEnrichment(t, f, job)
+			require.NotNil(t, bg)
+			require.EqualValues(t, 1, queryUint(t, raw, "SELECT count(*) FROM enrichment_background_attempts"))
+			for elapsed := time.Duration(0); elapsed < tc.elapsed; elapsed += 50 * time.Second {
+				step := min(50*time.Second, tc.elapsed-elapsed)
+				f.now = f.now.Add(step)
+				var err error
+				bg, err = f.worker.Renew(t.Context(), f.tokens[0], bg.Lease(), time.Minute)
+				require.NoError(t, err)
+				run, err = d.coordinator.Renew(t.Context(), d.token, run.Lease(), time.Minute)
+				require.NoError(t, err)
+			}
+			before := f.now
+			_, err := f.worker.Fail(t.Context(), f.tokens[0], bg.Lease(), "timeout")
+			require.NoError(t, err)
+			current, err := f.worker.Find(t.Context(), f.tokens[0], job.UUID)
+			require.NoError(t, err)
+			require.Equal(t, "queued", current.State)
+			paused := queryUint(t, raw, "SELECT count(*) FROM source_pacing WHERE scope='service:reddit' AND available_at_ms>"+
+				strconv.FormatInt(before.Add(30*time.Minute).UnixMilli(), 10))
+			require.Equal(t, 1, current.Failures, "a timeout keeps its failure and retry delay")
+			if tc.overrun {
+				require.Zero(t, paused, "a background overrun does not pause downloads on the service")
+				next := newPacingDownload(t, f, "https://reddit.com/user/next")
+				require.NotNil(t, next.claim(t), "the service stays available to downloads")
+			} else {
+				require.EqualValues(t, 1, paused, "an early timeout still pauses the service")
+			}
+		})
+	}
 }

@@ -556,9 +556,13 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 	if job.Kind == models.ArchiveJobEnrichPost && outcome.State != "succeeded" {
 		complete = sourcePacingAtomic(ctx)
 	}
-	requestBackoff := false
+	requestBackoff, overrun := false, false
 	if metadataJobKind(job.Kind) && outcome.State == "retry" {
 		requestBackoff, err = sourceAttemptBackoff(ctx, job.UUID, job.Fence, true)
+		if err != nil {
+			return nil, err
+		}
+		overrun, err = sourceBackgroundOverrun(ctx, job.UUID, job.Fence, outcome.ErrorCode, now)
 		if err != nil {
 			return nil, err
 		}
@@ -581,7 +585,7 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 	if requestBackoff {
 		available = now.UnixMilli()
 	}
-	if metadataJobKind(job.Kind) && outcome.State != "succeeded" && !requestBackoff {
+	if metadataJobKind(job.Kind) && outcome.State != "succeeded" && !requestBackoff && !overrun {
 		retry, err := sourcePacingMetadataFailure(ctx, job, outcome.ErrorCode, time.UnixMilli(available), now)
 		if err != nil {
 			return nil, err

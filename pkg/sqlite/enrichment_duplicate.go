@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -54,6 +55,11 @@ func (s *EnrichmentJobStore) consolidateDiscoveryDuplicate(ctx context.Context, 
 	_, _, err = (&SourceEvidenceStore{gallery: s.gallery}).ApplyConsolidationReview(ctx,
 		models.PostConsolidationReviewApplyInput{PostConsolidationReviewInput: input,
 			RequestUUID: uuid.NewSHA1(uuid.MustParse(job), []byte("discovery-duplicate-v1")).String(), Digest: plan.preview.Digest}, now)
+	if errors.Is(err, models.ErrPostConsolidationReviewConflict) || errors.Is(err, models.ErrSourcePostIdentityConflict) {
+		// The plan was prepared in this transaction, so a refused apply fails
+		// again on every retry. Stop automatic retries for owner review.
+		return models.ErrEnrichmentIdentityReview
+	}
 	return err
 }
 

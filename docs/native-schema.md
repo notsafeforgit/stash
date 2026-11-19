@@ -42,6 +42,12 @@ identifier through that lookup, under the `retained-discovery-identity-v1` polic
 and its basis rules (`scrape.MatchDiscoveryLookup`). The enrichment job
 description carries the result as `identity_resolution`, which
 `GET /api/v3/archive/enrichment-jobs/{job}/identity-resolution` reads.
+A corroborated identifier that already belongs to another post merges the
+duplicate into the first stored post, using the reviewed post merge inside the
+publication transaction. When that merge's own checks refuse it, for example
+because the merged gallery needs review, the job fails with
+`post_identity_conflict` and keeps its checkpoint for review. Retrying would
+prepare and refuse the same merge again.
 
 **Target exclusion.** Unreleased held imported enrichment targets (origin
 `migration`) move to `excluded` with reason `import_retired`. Their history is

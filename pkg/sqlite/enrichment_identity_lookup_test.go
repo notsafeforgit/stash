@@ -356,3 +356,50 @@ func TestImportRetirementMigrationRetainsLookupsAndExcludesHeldTargets(t *testin
 	require.EqualValues(t, 1, queryUint(t, raw, "SELECT count(*) FROM enrichment_identity_resolutions"))
 	require.False(t, errors.Is(f.db.AuditForTesting(path), models.ErrSourcePayloadCorrupt))
 }
+
+// A corroborated duplicate whose reviewed merge cannot apply stops automatic
+// retries for owner review. Every retry would prepare and refuse the same plan.
+func TestLookupPublicationRefusedDuplicateMergeRequiresReview(t *testing.T) {
+	const tweetURL = "https://x.com/i/web/status/102"
+	f := newEnrichmentExecutionFixtureForPost(t, models.SourcePostIdentifier{Namespace: "legacy:catalog:" + lookupCatalog, Value: lookupPostKey}, tweetURL,
+		models.SourceCollectionDefinition{Label: "Fixture account", Kind: "feed", Namespace: "native:twitter", State: "active", TargetURL: "https://x.com/juniper"})
+	raw := openRawDB(t, f.db.DatabasePath())
+	defer raw.Close()
+	_, err := raw.Exec("INSERT INTO enrichment_identity_lookups(post_uuid,collection_uuid,url,source_values) VALUES(?,?,?,?)",
+		f.target.PostUUID, f.collection.UUID, tweetURL, lookupSourceValues(t, func(e map[string]any) {
+			e["platform"], e["account_key"], e["candidate_url"] = "twitter", "twitter:id:99", tweetURL
+		}))
+	require.NoError(t, err)
+	// The tweet was captured natively later as a two-image reply. Its thread
+	// root has another author, so the merged post's gallery needs review and
+	// the merge's planned album cannot apply.
+	later := threadPost(t, f.repo, "102", "100", "101", "99", "99")
+	selection := selectAlbum(t, f.repo, later, models.SourceAttachmentManifestInput{Complete: true, Entries: []models.SourceAttachmentEntry{
+		albumEntry(0, "native:twitter", "502", "image"), albumEntry(1, "native:twitter", "503", "video"),
+	}})
+	chooseAlbumMedia(t, f.repo, selection.Entries[0].Attachment.UUID, models.ArchiveImage, 41)
+	chooseAlbumMedia(t, f.repo, selection.Entries[1].Attachment.UUID, models.ArchiveScene, 31)
+	threadPost(t, f.repo, "100", "100", "", "88", "")
+	f.complete, err = json.Marshal(archive.EnrichmentTranscript{Schema: archive.EnrichmentTranscriptSchema, URL: f.target.URL,
+		RetentionPolicy: archive.SourceRetentionVersion, ExtractorVersion: "1.32.15-dev", Pending: []archive.EnrichmentReference{}, Unresolved: []archive.EnrichmentReference{},
+		Records: []archive.EnrichmentRecord{{Kind: "post", Patch: map[string]any{"category": "twitter", "tweet_id": "102", "conversation_id": "100",
+			"reply_id": "101", "reply_user_id": "99", "author": map[string]any{"id": "99", "name": "juniper"}, "source_extractor_url": f.target.URL},
+			Removed: []string{}, ObservedAt: "2026-10-03T01:00:00Z"}}})
+	require.NoError(t, err)
+
+	job := f.admit(t)
+	running := f.claim(t, job.UUID, 0)
+	head, err := f.worker.Checkpoint(t.Context(), f.tokens[0], running.Lease(), 0, f.complete)
+	require.NoError(t, err)
+	_, err = f.worker.Publish(t.Context(), f.tokens[0], running.Lease(), head.Revision, head.Digest)
+	require.ErrorIs(t, err, models.ErrEnrichmentIdentityReview)
+	current, err := f.worker.Find(t.Context(), f.tokens[0], job.UUID)
+	require.NoError(t, err)
+	require.Equal(t, "failed", current.State, "automatic retries stop")
+	require.Equal(t, "post_identity_conflict", current.ErrorCode)
+	retained, err := f.worker.CheckpointHead(t.Context(), f.tokens[0], job.UUID)
+	require.NoError(t, err)
+	require.NotNil(t, retained, "the fetched evidence stays staged for review")
+	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM enrichment_publications"))
+	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM source_post_consolidations"), "the refused merge rolled back")
+}

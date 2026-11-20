@@ -1,0 +1,165 @@
+/* ui-sdk renders popups in place, in the top layer, and web.css draws their
+   look. These rules add motion, the side sheet and drawer backdrop
+   appearances, and the grip, which web.css doesn't draw. */
+@layer components {
+  [data-slot="dialog-backdrop"] {
+    transition: opacity 150ms ease-out;
+
+    &:is([data-starting-style], [data-ending-style]) {
+      opacity: 0;
+    }
+  }
+
+  /* Call sites size dialogs with max-width utilities, as they did with shadcn. */
+  [data-slot="dialog-content"]:not([data-side]) {
+    width: calc(100% - 2rem);
+    max-width: 28rem;
+    transition:
+      opacity 150ms ease-out,
+      scale 150ms ease-out;
+
+    &:is([data-starting-style], [data-ending-style]) {
+      opacity: 0;
+      scale: 0.95;
+    }
+  }
+
+  /* A sheet is a dialog placed at an edge. Below sm it covers the viewport. */
+  [data-slot="dialog-content"][data-side] {
+    inset-block: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    overflow-x: hidden;
+    border: 0;
+    border-radius: 0;
+    transition:
+      opacity 200ms ease-in-out,
+      translate 200ms ease-in-out;
+
+    @media (min-width: 40rem) {
+      width: 75%;
+      max-width: 24rem;
+    }
+
+    &:is([data-starting-style], [data-ending-style]) {
+      opacity: 0;
+    }
+
+    &[data-side="right"] {
+      left: auto;
+      right: 0;
+      border-left: 1px solid var(--ui-border);
+
+      &:is([data-starting-style], [data-ending-style]) {
+        translate: 2.5rem 0;
+      }
+    }
+
+    &[data-side="left"] {
+      left: 0;
+      right: auto;
+      border-right: 1px solid var(--ui-border);
+
+      &:is([data-starting-style], [data-ending-style]) {
+        translate: -2.5rem 0;
+      }
+    }
+  }
+
+  [data-slot="popover-content"] {
+    transform-origin: var(--transform-origin);
+    transition:
+      opacity 100ms ease-out,
+      scale 100ms ease-out;
+
+    &:is([data-starting-style], [data-ending-style]) {
+      opacity: 0;
+      scale: 0.95;
+    }
+  }
+
+  [data-slot="tooltip-content"] {
+    transform-origin: var(--transform-origin);
+    transition:
+      opacity 150ms ease-out,
+      scale 150ms ease-out;
+
+    &:is([data-starting-style], [data-ending-style]) {
+      opacity: 0;
+      scale: 0.9;
+    }
+
+    &[data-instant] {
+      transition: none;
+    }
+  }
+
+  /* The drawer's safe-area bottom and sides come from its wrapper's utilities.
+     web.css's six-unit padding would add to them. */
+  [data-slot="drawer-content"] {
+    padding: 0;
+  }
+
+  /* The drawer manages backdrop opacity, so these set only the colour. The
+     blurred backdrop keeps its own GPU layer: iOS Safari drops backdrop-filter
+     during heavy layout, and the page would flash through. */
+  [data-slot="drawer-backdrop"][data-appearance="blurred"] {
+    background: rgb(0 0 0 / 0.1);
+    will-change: backdrop-filter;
+    transform: translateZ(0);
+
+    @supports (backdrop-filter: blur(1px)) {
+      backdrop-filter: blur(4px);
+    }
+  }
+
+  [data-slot="drawer-backdrop"][data-appearance="dimmed"] {
+    background: rgb(0 0 0 / 0.4);
+  }
+
+  [data-slot="drawer-grip"] {
+    position: relative;
+    flex-shrink: 0;
+    height: 1.75rem;
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 2.75rem;
+      height: 0.25rem;
+      translate: -50% -50%;
+      border-radius: 9999px;
+      background: color-mix(
+        in oklab,
+        var(--ui-muted-foreground) 40%,
+        transparent
+      );
+    }
+  }
+}
+
+/* Side sheets sit at the viewport edges, outside the shell's padding. Their own
+   edge padding must survive callers using p-0 to compose headers, scrollers and
+   footers, so these rules stay unlayered. */
+[data-slot="dialog-content"][data-side="left"],
+[data-slot="dialog-content"][data-side="right"] {
+  padding-top: var(--safe-area-top);
+  padding-bottom: var(--safe-area-bottom);
+}
+[data-slot="dialog-content"][data-side="left"] {
+  padding-left: var(--safe-area-left);
+}
+[data-slot="dialog-content"][data-side="right"] {
+  padding-right: var(--safe-area-right);
+}
+@media (max-width: 639px) {
+  [data-slot="dialog-content"][data-side="left"],
+  [data-slot="dialog-content"][data-side="right"] {
+    padding-inline: var(--safe-area-left) var(--safe-area-right);
+  }
+}

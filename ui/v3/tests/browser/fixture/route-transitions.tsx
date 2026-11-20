@@ -7,7 +7,7 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { useState } from "react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { installRouteTransitions } from "@/core/route-transitions";
 import { RouteViewport } from "@/components/layout/route-viewport";
@@ -46,14 +46,18 @@ function TransitionList() {
       <h1>Entities</h1>
       <div className="grid grid-cols-3 gap-4">
         {Array.from({ length: 60 }, (_, index) => (
-          <Link<typeof transitionRouter, string, "/transitions/$entityId">
+          <Button
             key={index}
-            className={buttonVariants({ variant: "outline" })}
-            to="/transitions/$entityId"
-            params={{ entityId: String(index + 1) }}
+            variant="outline"
+            render={
+              <Link<typeof transitionRouter, string, "/transitions/$entityId">
+                to="/transitions/$entityId"
+                params={{ entityId: String(index + 1) }}
+              />
+            }
           >
             Entity {index + 1}
-          </Link>
+          </Button>
         ))}
       </div>
       <Link<typeof transitionRouter, string, "/transitions/$entityId">
@@ -94,13 +98,17 @@ function TransitionDetail() {
         >
           Back to list
         </Button>
-        <Link<typeof transitionRouter, string, "/transitions/$entityId">
-          className={buttonVariants({ variant: "outline" })}
-          to="/transitions/$entityId"
-          params={{ entityId: "2" }}
+        <Button
+          variant="outline"
+          render={
+            <Link<typeof transitionRouter, string, "/transitions/$entityId">
+              to="/transitions/$entityId"
+              params={{ entityId: "2" }}
+            />
+          }
         >
           Next entity
-        </Link>
+        </Button>
         <Button
           onClick={() =>
             transitionRouter.navigate({

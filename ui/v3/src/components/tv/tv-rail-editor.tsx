@@ -314,7 +314,6 @@ function RailRow({
         </div>
         <div className="flex items-center justify-between gap-2">
           <Toggle
-            type="button"
             variant="outline"
             className="h-11 min-w-24 shrink-0 px-3 text-muted-foreground data-pressed:border-primary/40 data-pressed:bg-primary/10 data-pressed:text-primary"
             pressed={entry.pinned}

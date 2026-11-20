@@ -51,21 +51,17 @@ function Fixture() {
         onToggleExpanded={() => setExpanded(!expanded)}
       />
       <PinButton pinned={pinned} onToggle={() => setPinned(!pinned)} />
-      <Pagination>
+      <Pagination page={page} pageCount={2} onPageChange={setPage}>
         <PaginationContent>
           {[1, 2].map((number) => (
             <PaginationItem key={number}>
-              <PaginationLink
-                aria-label={`Page ${number}`}
-                isActive={page === number}
-                onClick={() => setPage(number)}
-              >
+              <PaginationLink page={number} aria-label={`Page ${number}`}>
                 {number}
               </PaginationLink>
             </PaginationItem>
           ))}
           <PaginationItem>
-            <PaginationNext disabled={page === 2} onClick={() => setPage(2)} />
+            <PaginationNext />
           </PaginationItem>
         </PaginationContent>
       </Pagination>

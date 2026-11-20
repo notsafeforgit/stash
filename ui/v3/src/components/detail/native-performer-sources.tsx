@@ -17,7 +17,7 @@ import {
   AccountService,
   PerformerName,
 } from "../archive/accounts/shared";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -341,13 +341,17 @@ export function NativePerformerSources({
                   )}
                 </EmptyDescription>
               </EmptyHeader>
-              <Link
-                className={buttonVariants({ variant: "outline" })}
-                to="/account-review"
-                search={{ ownership: "all", q: "", namespace: "" }}
+              <Button
+                variant="outline"
+                render={
+                  <Link
+                    to="/account-review"
+                    search={{ ownership: "all", q: "", namespace: "" }}
+                  />
+                }
               >
                 {msg("performer_sources.open_review", "Open account review")}
-              </Link>
+              </Button>
             </Empty>
           )}
           {data.items.map((account) => (
@@ -366,18 +370,22 @@ export function NativePerformerSources({
                 </Badge>
               </CardContent>
               <CardFooter>
-                <Link
-                  className={buttonVariants({ variant: "outline" })}
-                  to="/account-review"
-                  search={{
-                    ownership: "all",
-                    q: "",
-                    namespace: account.namespace,
-                    account: account.uuid,
-                  }}
+                <Button
+                  variant="outline"
+                  render={
+                    <Link
+                      to="/account-review"
+                      search={{
+                        ownership: "all",
+                        q: "",
+                        namespace: account.namespace,
+                        account: account.uuid,
+                      }}
+                    />
+                  }
                 >
                   {msg("performer_sources.manage", "Manage account link")}
-                </Link>
+                </Button>
               </CardFooter>
             </Card>
           ))}

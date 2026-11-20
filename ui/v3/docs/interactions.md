@@ -173,10 +173,10 @@ outside swipes leave it open and retain native list scrolling. The shared
 `useOutsideTap` waits for click before dismissing and consumes the gesture's
 compatibility mouse events, avoiding early focus changes and click-through.
 It does not add a backdrop or lock scrolling. Mouse and keyboard interactions
-continue through Base UI, including Escape and focus restoration.
+continue through ui-sdk, including Escape and focus restoration.
 
 An active list query keeps Search highlighted even when its input is closed.
-Tap opens the input; long press opens the existing Base UI context menu anchored
+Tap opens the input; a touch long press opens the search menu anchored
 above the Search button, independent of the finger's position within it, with the
 full query and Edit search/Clear search actions. Clearing only changes the query
 and resets pagination, preserving sort and other filter criteria. Filters and
@@ -198,10 +198,10 @@ remain available; a subsequent tap can activate the item. Swipes keep native
 scrolling, and taps on the row's Clear/Close controls work immediately. Inline
 entity search uses the same policy on touch devices with wider layouts.
 
-Drawer motion uses `transform` for dragging and enter/exit animations. Do not
-combine it with the separate CSS `translate` property on the popup: Base UI
-supplies an inline transform while dragging, and the two translations add
-together instead of tracking the pointer one-to-one.
+ui-sdk's Drawer drives dragging, enter/exit motion and its spring itself, with
+the pointer driver. Leave the popup's `transform` and `translate` to it. Mark a
+scroller inside a drawer with `data-drawer-no-drag` so scrolling it cannot start
+a dismiss drag.
 
 The app, login and offline document heads resolve the saved/system appearance
 before React starts. Keep the document canvas and fixed body the same opaque
@@ -232,8 +232,9 @@ and settings. Physical iPhone keyboard animation still requires device validatio
 React portals move controls into the footer's typed slots while preserving
 their tab, list, and action contexts. Only the active list publishes controls;
 previously visited panels stay mounted with their filters and state intact.
-The mobile picker uses the same Base UI tab state as desktop, with vertical
-triggers in an upward popover, and brings a chosen section into view. The
+The mobile picker uses the same tab state as desktop. Its vertical triggers sit
+in an upward popover, activate when chosen rather than on focus, and bring the
+chosen section into view. The
 section popover and action drawer keep their portal targets mounted so tabs
 and action dialogs survive closing them. `entity-actions-menu.tsx` renders shared
 typed action definitions as desktop dropdowns or direct mobile rows. Desktop

@@ -105,7 +105,6 @@ for (const mode of [
   "lightbox marker",
   "TV scene",
   "TV marker",
-  "TV rotated",
 ]) {
   test(`${mode} holds to magnify the timeline and commits a precise touch seek`, async ({
     page,
@@ -117,7 +116,6 @@ for (const mode of [
     const tv = mode.startsWith("TV");
     const lightbox = mode.startsWith("lightbox");
     const marker = mode.endsWith("marker");
-    const rotated = mode === "TV rotated";
     await page.goto(
       tv
         ? `/tv-fixture/tv?paused${marker ? "&markers" : ""}`
@@ -136,13 +134,6 @@ for (const mode of [
         .click();
     await expect(player).toHaveAttribute("data-playback-ready", "true");
     await video.evaluate((element: HTMLVideoElement) => element.pause());
-    if (rotated) {
-      await page.keyboard.press("o");
-      await expect(page.locator("[data-tv]")).toHaveAttribute(
-        "data-tv-rotation",
-        "clockwise",
-      );
-    }
     const scrubber = player.getByRole("slider", { name: "Playback position" });
     await player.hover();
     await scrubber.focus();
@@ -153,10 +144,10 @@ for (const mode of [
       Number(await scrubber.getAttribute("aria-valuenow"));
     const bar = await scrubber.boundingBox();
     if (!bar) throw new Error("Missing scrubber");
-    const point = (ratio: number) =>
-      rotated
-        ? { x: bar.x + 2, y: bar.y + bar.height * ratio }
-        : { x: bar.x + bar.width * ratio, y: bar.y + bar.height - 2 };
+    const point = (ratio: number) => ({
+      x: bar.x + bar.width * ratio,
+      y: bar.y + bar.height - 2,
+    });
     await page.clock.pauseAt(new Date("2026-01-01T00:01:00Z"));
     const drag = await dragInput(
       page,
@@ -196,17 +187,15 @@ for (const mode of [
         .locator("[data-position-scrubber-thumb]")
         .boundingBox();
       if (!label || !thumb) throw new Error("Missing precision readout");
-      // Keep the time and zoom clear of the thumb, including rotated TV.
+      // Keep the time and zoom clear of the thumb.
       expect(
-        rotated
-          ? label.x - (thumb.x + thumb.width / 2)
-          : thumb.y + thumb.height / 2 - (label.y + label.height),
+        thumb.y + thumb.height / 2 - (label.y + label.height),
       ).toBeGreaterThanOrEqual(60);
       // Small, slow seeking movements must keep the initial zoom level. Use
       // explicit gesture time so CI input latency cannot become another dwell.
       for (let step = 1; step <= 4; step++) {
         await page.clock.runFor(300);
-        const ratio = 0.5 + (step * 3) / (rotated ? bar.height : bar.width);
+        const ratio = 0.5 + (step * 3) / bar.width;
         await drag.move(point(ratio));
         await expect(readout).toContainText(
           new RegExp(` · ${Math.round(duration / initialSpan)}×$`),

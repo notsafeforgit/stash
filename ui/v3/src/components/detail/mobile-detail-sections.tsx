@@ -81,7 +81,6 @@ export function MobileDetailSections({
           <PopoverTitle className="sr-only">{label}</PopoverTitle>
           <TabsList
             aria-label={label}
-            activateOnFocus={false}
             className="h-auto w-full flex-col items-stretch gap-1 p-0"
           >
             {tabs.map((tab) => (

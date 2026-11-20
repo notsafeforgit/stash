@@ -5,8 +5,8 @@
  * directly to the <video> element inside the scene player.
  * An inline SVG element handles the advanced colour-matrix and gamma filters.
  *
- * The approach mirrors v2.5's SceneVideoFilterPanel but uses shadcn/Base UI
- * Slider components and React-managed SVG instead of imperative DOM creation.
+ * The approach mirrors v2.5's SceneVideoFilterPanel but uses the Slider
+ * wrapper and React-managed SVG instead of imperative DOM creation.
  */
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -119,8 +119,8 @@ function FilterRow({
         max={max}
         step={step}
         className={cn(
-          "[&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-track][data-horizontal]]:h-1.5",
-          "md:[&_[data-slot=slider-thumb]]:size-3 md:[&_[data-slot=slider-track][data-horizontal]]:h-1",
+          "[&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-track][data-orientation=horizontal]]:h-1.5",
+          "md:[&_[data-slot=slider-thumb]]:size-3 md:[&_[data-slot=slider-track][data-orientation=horizontal]]:h-1",
         )}
         onValueChange={(v) => {
           const next = typeof v === "number" ? v : v[0];

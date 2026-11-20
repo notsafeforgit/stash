@@ -14,7 +14,6 @@ import { useMemo } from "react";
 import { useIntl } from "react-intl";
 import {
   Combobox,
-  ComboboxCollection,
   ComboboxContent,
   ComboboxEmpty,
   ComboboxInput,
@@ -83,38 +82,30 @@ export function CountrySelect({
         showClear={!!value}
       />
       <ComboboxContent>
+        {/* The render function receives only the filtered items. Mapping
+            `countries.map(...)` statically would render all 250 entries
+            whatever the query. */}
         <ComboboxList>
-          {/* `<ComboboxCollection>` walks the *filtered* item list
-              produced by Base UI's collator-based filter (driven by
-              `itemToStringLabel`). Mapping `countries.map(...)`
-              statically would render all 250 entries up-front and
-              the typed-input filter would do nothing — items would
-              be shown regardless of query. */}
-          <ComboboxCollection>
-            {(code: string) => (
-              <ComboboxItem key={code} value={code}>
-                <span
-                  aria-hidden
-                  className="text-base leading-none w-5 shrink-0"
-                >
-                  {countryCodeToFlag(code)}
-                </span>
-                <span className="min-w-0 truncate">
-                  {getCountryByISO(code, intl.locale) ?? code}
-                </span>
-                <span className="ml-auto text-xs text-muted-foreground tabular-nums shrink-0">
-                  {code}
-                </span>
-              </ComboboxItem>
-            )}
-          </ComboboxCollection>
-          <ComboboxEmpty>
-            {intl.formatMessage({
-              id: "no_results_found",
-              defaultMessage: "No results found",
-            })}
-          </ComboboxEmpty>
+          {(code: string) => (
+            <ComboboxItem key={code} value={code}>
+              <span aria-hidden className="text-base leading-none w-5 shrink-0">
+                {countryCodeToFlag(code)}
+              </span>
+              <span className="min-w-0 truncate">
+                {getCountryByISO(code, intl.locale) ?? code}
+              </span>
+              <span className="ml-auto text-xs text-muted-foreground tabular-nums shrink-0">
+                {code}
+              </span>
+            </ComboboxItem>
+          )}
         </ComboboxList>
+        <ComboboxEmpty>
+          {intl.formatMessage({
+            id: "no_results_found",
+            defaultMessage: "No results found",
+          })}
+        </ComboboxEmpty>
       </ComboboxContent>
     </Combobox>
   );

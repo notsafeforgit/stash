@@ -9,7 +9,7 @@ import { ApolloProvider, useQuery } from "@apollo/client/react";
 import { useState } from "react";
 import { DeleteDialog } from "@/components/detail/delete-dialog";
 import { useBulkMediaDelete } from "@/components/detail/use-bulk-media-delete";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 
 declare global {
   interface Window {

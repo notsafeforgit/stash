@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { Copy, Download } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import type { EntityAction } from "@/components/detail/entity-actions-menu";
 import {
   canCopyImage,
@@ -28,34 +28,37 @@ export function useImageFileActions(
     setBusy(true);
     // Start copying synchronously, while the browser still sees the gesture.
     const operation = kind === "copy" ? copyImage(source) : saveImage(source);
-    toast.promise(operation, {
-      toasterId,
-      loading: intl.formatMessage(
-        kind === "copy"
-          ? { id: "image_file.copying", defaultMessage: "Copying image…" }
-          : { id: "image_file.saving", defaultMessage: "Preparing image…" },
-      ),
-      success: intl.formatMessage(
-        kind === "copy"
-          ? { id: "image_file.copied", defaultMessage: "Image copied" }
-          : {
-              id: "image_file.saved",
-              defaultMessage: "Image download started",
-            },
-      ),
-      error: intl.formatMessage(
-        kind === "copy"
-          ? {
-              id: "image_file.copy_failed",
-              defaultMessage:
-                "Could not copy the image. Try Save image instead.",
-            }
-          : {
-              id: "image_file.save_failed",
-              defaultMessage: "Could not save the image. Please try again.",
-            },
-      ),
-    });
+    toast.promise(
+      operation,
+      {
+        loading: intl.formatMessage(
+          kind === "copy"
+            ? { id: "image_file.copying", defaultMessage: "Copying image…" }
+            : { id: "image_file.saving", defaultMessage: "Preparing image…" },
+        ),
+        success: intl.formatMessage(
+          kind === "copy"
+            ? { id: "image_file.copied", defaultMessage: "Image copied" }
+            : {
+                id: "image_file.saved",
+                defaultMessage: "Image download started",
+              },
+        ),
+        error: intl.formatMessage(
+          kind === "copy"
+            ? {
+                id: "image_file.copy_failed",
+                defaultMessage:
+                  "Could not copy the image. Try Save image instead.",
+              }
+            : {
+                id: "image_file.save_failed",
+                defaultMessage: "Could not save the image. Please try again.",
+              },
+        ),
+      },
+      { toasterId },
+    );
     void operation
       .finally(() => {
         pending.current = false;

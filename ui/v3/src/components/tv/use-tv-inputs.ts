@@ -9,8 +9,6 @@ import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useOverlayShortcutsBlocked } from "@/components/shortcut-provider";
 import { useScenePlayerControls } from "@/components/player/scene-player-controls";
 import { DOUBLE_TAP_MAX_MS } from "@/components/player/video-frame-zoom";
-import type { TvRotation } from "@/core/tv/settings";
-import { tvCoordinates } from "./use-tv-presentation";
 
 export type TvInputCommand =
   | { type: "navigate"; direction: -1 | 1 }
@@ -23,7 +21,6 @@ export type TvInputCommand =
         | "fullscreen"
         | "info"
         | "completion"
-        | "rotation"
         | "subtitles"
         | "visibility";
     }
@@ -32,7 +29,6 @@ export type TvInputCommand =
 export function useTvInputs({
   surface,
   selectionKey,
-  rotation,
   blocked,
   dispatch,
   drag,
@@ -40,7 +36,6 @@ export function useTvInputs({
 }: {
   surface: RefObject<HTMLDivElement | null>;
   selectionKey: string;
-  rotation: TvRotation;
   blocked: boolean;
   dispatch: (command: TvInputCommand) => void;
   drag: (offset: number) => void;
@@ -49,7 +44,6 @@ export function useTvInputs({
   const controls = useScenePlayerControls();
   const overlaysBlocked = useOverlayShortcutsBlocked();
   const latest = useCommittedRef({
-    rotation,
     blocked,
     dispatch,
     drag,
@@ -129,7 +123,7 @@ export function useTvInputs({
     [controls, endHold, overlaysBlocked],
   );
   const tap = useCallback(
-    (event: ReactMouseEvent<HTMLButtonElement>) => {
+    (event: ReactMouseEvent<HTMLElement>) => {
       const candidate = completedTap.current;
       cancelTap();
       if (latest.current.blocked || overlaysBlocked()) return;
@@ -277,11 +271,10 @@ export function useTvInputs({
         event.preventDefault();
         return;
       }
-      const delta = tvCoordinates(
-        event.clientX - pointer.x,
-        event.clientY - pointer.y,
-        latest.current.rotation,
-      );
+      const delta = {
+        x: event.clientX - pointer.x,
+        y: event.clientY - pointer.y,
+      };
       if (!pointer.moved && Math.max(Math.abs(delta.x), Math.abs(delta.y)) < 10)
         return;
       cancelTap();
@@ -309,11 +302,10 @@ export function useTvInputs({
       endHold();
       if (element.hasPointerCapture(event.pointerId))
         element.releasePointerCapture(event.pointerId);
-      const delta = tvCoordinates(
-        event.clientX - current.x,
-        event.clientY - current.y,
-        latest.current.rotation,
-      );
+      const delta = {
+        x: event.clientX - current.x,
+        y: event.clientY - current.y,
+      };
       if (held || blockedNow() || event.defaultPrevented) return;
       if (current.moved) {
         event.preventDefault();
@@ -342,11 +334,7 @@ export function useTvInputs({
         wheelTotal = 0;
       }
       wheelLast = now;
-      const delta = tvCoordinates(
-        event.deltaX,
-        event.deltaY,
-        latest.current.rotation,
-      );
+      const delta = { x: event.deltaX, y: event.deltaY };
       if (Math.abs(delta.y) < Math.abs(delta.x)) return;
       event.preventDefault();
       wheelTotal +=
@@ -408,7 +396,6 @@ export function useTvInputs({
           f: "fullscreen",
           i: "info",
           l: "completion",
-          o: "rotation",
           s: "subtitles",
           h: "visibility",
         } as const;

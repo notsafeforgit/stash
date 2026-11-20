@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "src/components/ui/dropdown-menu";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import ImageUtils from "src/utils/image";
 import { errorToString } from "src/utils/errors";
 

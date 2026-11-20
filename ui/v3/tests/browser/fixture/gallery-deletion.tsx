@@ -10,7 +10,7 @@ import { createRoot } from "react-dom/client";
 import { IntlProvider } from "react-intl";
 import { GalleryDeleteDialog } from "@/components/detail/gallery-delete-dialog";
 import { Button } from "@/components/ui/button";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import messages from "@/locales/en-GB.json";
 import flattenMessages from "@/utils/flatten-messages";
 import "./style.css";

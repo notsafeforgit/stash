@@ -106,16 +106,21 @@ test("drawers track a downward drag and dismiss", async ({ page }) => {
   const y = bounds.y + bounds.height / 2;
   await page.mouse.move(x, y);
   await page.mouse.down();
-  // Base UI establishes the drag origin on the first movement.
-  const dragY = y + 1;
-  await page.mouse.move(x, dragY);
-  await expect(drawer).toHaveAttribute("data-swiping", "");
+  // A drag starts only after a small movement threshold, so move until it
+  // starts and measure the drawer from that pointer position.
+  let dragY = y;
+  while ((await drawer.getAttribute("data-dragging")) === null) {
+    if (dragY - y > 100) throw new Error("Drawer did not start dragging");
+    dragY += 1;
+    await page.mouse.move(x, dragY);
+  }
+  await expect(drawer).toHaveAttribute("data-dragging", "");
   const initialTop = await drawer.evaluate(
     (element) => element.getBoundingClientRect().top,
   );
   for (const distance of [60, 120, 180]) {
     await page.mouse.move(x, dragY + distance, { steps: 4 });
-    await expect(drawer).toHaveAttribute("data-swiping", "");
+    await expect(drawer).toHaveAttribute("data-dragging", "");
     // Measure the rendered position: `translate` and `transform` can each
     // look correct in isolation while composing into twice the movement.
     await expect
@@ -244,8 +249,8 @@ test("active search can be previewed, edited and cleared without changing sort",
       (element) => element.scrollWidth <= element.clientWidth,
     ),
   ).toBe(true);
-  // Base UI intentionally ignores outside presses for 500ms after a long press
-  // opens the menu, so that releasing the opening gesture cannot dismiss it.
+  // Wait out any grace period in which a menu opened by a long press ignores
+  // outside presses, so releasing the opening gesture cannot dismiss it.
   await page.clock.runFor(500);
   await page.touchscreen.tap(8, 8);
   await expect(menu).toBeHidden();
@@ -458,7 +463,10 @@ test("Actions retains action state and closes before opening the editor", async 
     page.getByRole("button", { name: "Favourited", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Edit", exact: true }).tap();
-  await expect(more).toHaveAttribute("aria-expanded", "false");
+  await expect(
+    page.getByRole("dialog", { name: "Entity actions", exact: true }),
+  ).toBeHidden();
+  await expect(more).not.toHaveAttribute("aria-expanded", "true");
   await page.getByRole("button", { name: "Close editor" }).tap();
   await expect(page.getByRole("button", { name: "Close editor" })).toBeHidden();
   await expectCompactRow(detailFooter(page));
@@ -483,7 +491,7 @@ test("direct filters preserve the active list's filter context", async ({
       exact: true,
       includeHidden: true,
     }),
-  ).toHaveAttribute("aria-expanded", "false");
+  ).not.toHaveAttribute("aria-expanded", "true");
 });
 
 test("standalone lists provide page jumping, view options, and navigation", async ({
@@ -508,6 +516,10 @@ test("standalone lists provide page jumping, view options, and navigation", asyn
     page.getByRole("dialog", { name: "View options", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
+  // The closing drawer's modal layer takes presses until its exit finishes.
+  await expect(
+    page.getByRole("dialog", { name: "View options", exact: true }),
+  ).toBeHidden();
   await expect(row.getByRole("button")).toHaveCount(6);
   await expect(row.getByRole("button").first()).toHaveAccessibleName(
     "Open navigation menu",

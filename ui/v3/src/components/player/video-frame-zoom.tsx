@@ -1,5 +1,4 @@
 import { useCommittedRef } from "@/hooks/use-committed-ref";
-import { presentationCoordinates } from "@/core/presentation-coordinates";
 /**
  * Pinch-to-zoom + pan wrapper for the video frame.
  *
@@ -169,7 +168,6 @@ function panEnd(t: PanTracker): boolean {
 export function VideoFrameZoom({
   children,
   enabled = true,
-  presentationRotation = 0,
   transform,
   onTransformChange,
   onActiveGesture,
@@ -182,7 +180,6 @@ export function VideoFrameZoom({
    * and leave a focused viewer without reparenting its `<video>` element.
    */
   enabled?: boolean;
-  presentationRotation?: 0 | 90 | -90;
   transform: ZoomTransform;
   onTransformChange: (t: ZoomTransform) => void;
   /**
@@ -204,7 +201,6 @@ export function VideoFrameZoom({
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const transformRef = useCommittedRef(transform);
-  const rotationRef = useCommittedRef(presentationRotation);
 
   const onTransformChangeRef = useCommittedRef(onTransformChange);
 
@@ -274,11 +270,10 @@ export function VideoFrameZoom({
       const el = wrapperRef.current;
       if (!el) return { x: 0, y: 0 };
       const rect = el.getBoundingClientRect();
-      return presentationCoordinates(
-        clientX - rect.left - rect.width / 2,
-        clientY - rect.top - rect.height / 2,
-        rotationRef.current,
-      );
+      return {
+        x: clientX - rect.left - rect.width / 2,
+        y: clientY - rect.top - rect.height / 2,
+      };
     }
 
     // Clamp pan so the scaled frame's edges never reveal letterbox
@@ -289,10 +284,8 @@ export function VideoFrameZoom({
       const el = wrapperRef.current;
       if (!el) return { scale, x, y };
       const rect = el.getBoundingClientRect();
-      const maxX =
-        ((rotationRef.current ? rect.height : rect.width) * (scale - 1)) / 2;
-      const maxY =
-        ((rotationRef.current ? rect.width : rect.height) * (scale - 1)) / 2;
+      const maxX = (rect.width * (scale - 1)) / 2;
+      const maxY = (rect.height * (scale - 1)) / 2;
       return {
         scale,
         x: Math.max(-maxX, Math.min(maxX, x)),
@@ -319,8 +312,7 @@ export function VideoFrameZoom({
 
     function applyPanDelta(dx: number, dy: number) {
       const cur = transformRef.current;
-      const delta = presentationCoordinates(dx, dy, rotationRef.current);
-      setTransform(constrain(cur.scale, cur.x + delta.x, cur.y + delta.y));
+      setTransform(constrain(cur.scale, cur.x + dx, cur.y + dy));
     }
 
     const isScaled = () => transformRef.current.scale > 1.001;

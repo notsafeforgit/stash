@@ -2,7 +2,7 @@ import { useCommittedRef } from "@/hooks/use-committed-ref";
 /**
  * Shared building blocks for the Settings pages. Each row renders a
  * label + optional description on the left and a control on the right,
- * using the shadcn Field primitives, and writes through the supplied
+ * using the Field primitives, and writes through the supplied
  * `onChange` immediately (switch / select) or on commit (text / number /
  * list inputs commit on blur or Enter). Persistence feedback comes from
  * the global save-indicator, so rows don't render their own spinners.

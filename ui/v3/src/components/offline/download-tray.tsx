@@ -157,7 +157,7 @@ export function DownloadTray({ mobile = false }: { mobile?: boolean }) {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        data-base-ui-swipe-ignore=""
+        data-drawer-no-drag=""
         className="w-80 max-w-[calc(100vw-1rem)] max-h-[min(28rem,var(--available-height))] overflow-y-auto p-0 gap-0"
       >
         <PopoverHeader className="flex flex-row items-center justify-between gap-2 border-b border-border px-3 py-2">
@@ -280,12 +280,12 @@ function ActiveRow({
             : "offline.background.foreground",
         })}
       </p>
-      {/* Base UI Progress: pass the live percentage as `value`, or
-          `null` to flip into indeterminate mode (Base UI then drops
-          the inline width on the indicator and our CSS keyframe
-          sweep takes over). Composed via Track + Indicator so the
-          indeterminate variant can apply the sweep class to the
-          indicator only — width=auto on the Track. */}
+      {/* Progress: pass the live percentage as `value`, or `null` to
+          flip into indeterminate mode (the indicator then has no
+          inline width, and our CSS keyframe sweep takes over).
+          Composed via Track + Indicator so the indeterminate variant
+          can apply the sweep class to the indicator only — width=auto
+          on the Track. */}
       <Progress
         value={percent}
         aria-valuetext={summary}

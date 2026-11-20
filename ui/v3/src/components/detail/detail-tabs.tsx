@@ -60,6 +60,7 @@ export function DetailTabs({ tabs, activeTab, onTabChange }: DetailTabsProps) {
       value={resolvedActiveTab}
       onValueChange={handleTabChange}
       orientation={mobile ? "vertical" : "horizontal"}
+      activation={mobile ? "manual" : "automatic"}
       className="flex-col md:flex-1 md:min-h-0 max-md:min-h-[100cqh]"
     >
       {mobile ? (

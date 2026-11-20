@@ -147,7 +147,6 @@ function MobileSettingsNav({
                   {SETTINGS_NAV_ITEMS.map((item) => (
                     <DropdownMenuItem
                       key={item.to}
-                      nativeButton={false}
                       render={
                         <Link
                           to={item.to}

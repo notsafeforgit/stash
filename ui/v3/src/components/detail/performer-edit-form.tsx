@@ -2,7 +2,7 @@ import {
   ProviderMetadataDraft,
   type ProviderPatch,
 } from "@/components/scrape/provider-metadata";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { z } from "zod";
 import { useForm } from "@tanstack/react-form";
 import { useLazyQuery } from "@apollo/client/react";
@@ -37,9 +37,11 @@ import { RatingSystem } from "src/components/ui/rating-system";
 import {
   Field,
   FieldError,
-  FieldLabel,
-  FieldTitle,
   FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+  FieldTitle,
 } from "src/components/ui/field";
 import {
   Select,
@@ -386,6 +388,7 @@ function PerformerNamesField({
   disabled,
 }: PerformerNamesFieldProps) {
   const intl = useIntl();
+  const canonicalLabelId = useId();
   const canonicalNameLabel =
     canonicalName ||
     intl.formatMessage({
@@ -420,7 +423,7 @@ function PerformerNamesField({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">
+        <span id={canonicalLabelId} className="text-sm text-muted-foreground">
           {intl.formatMessage({
             id: "canonical_name",
             defaultMessage: "Canonical name",
@@ -435,7 +438,10 @@ function PerformerNamesField({
           }}
           disabled={disabled}
         >
-          <SelectTrigger className="min-w-48 flex-1">
+          <SelectTrigger
+            aria-labelledby={canonicalLabelId}
+            className="min-w-48 flex-1"
+          >
             <SelectValue>{canonicalNameLabel}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -821,13 +827,13 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
                 nameField.state.meta.isTouched &&
                 nameField.state.meta.errors.length > 0;
               return (
-                <Field data-invalid={hasError ? "true" : undefined}>
-                  <FieldLabel>
+                <FieldSet data-invalid={hasError ? "true" : undefined}>
+                  <FieldLegend variant="label">
                     {intl.formatMessage({
                       id: "names_and_aliases",
                       defaultMessage: "Names and aliases",
                     })}
-                  </FieldLabel>
+                  </FieldLegend>
                   <form.Subscribe
                     selector={(state) => ({
                       aliases: state.values.aliases,
@@ -876,7 +882,7 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
                       e != null ? { message: String(e) } : undefined,
                     )}
                   />
-                </Field>
+                </FieldSet>
               );
             }}
           </form.Field>
@@ -931,16 +937,16 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
           {/* URLs */}
           <form.Field name="urls">
             {(field) => (
-              <Field>
-                <FieldLabel>
+              <FieldSet>
+                <FieldLegend variant="label">
                   {intl.formatMessage({ id: "urls", defaultMessage: "URLs" })}
-                </FieldLabel>
+                </FieldLegend>
                 <UrlListField
                   value={field.state.value}
                   onChange={field.handleChange}
                   disabled={busy}
                 />
-              </Field>
+              </FieldSet>
             )}
           </form.Field>
 
@@ -1450,29 +1456,29 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
           {/* Custom fields */}
           <form.Field name="custom_fields">
             {(field) => (
-              <Field>
-                <FieldLabel>
+              <FieldSet>
+                <FieldLegend variant="label">
                   {intl.formatMessage({ id: "custom_fields.title" })}
-                </FieldLabel>
+                </FieldLegend>
                 <CustomFieldsField
                   value={field.state.value}
                   onChange={field.handleChange}
                   disabled={busy}
                 />
-              </Field>
+              </FieldSet>
             )}
           </form.Field>
 
           {/* Stash IDs */}
           <form.Field name="stash_ids">
             {(field) => (
-              <Field>
-                <FieldLabel>
+              <FieldSet>
+                <FieldLegend variant="label">
                   {intl.formatMessage({
                     id: "stash_ids",
                     defaultMessage: "Stash IDs",
                   })}
-                </FieldLabel>
+                </FieldLegend>
                 <StashIdsField
                   value={field.state.value}
                   onChange={field.handleChange}
@@ -1480,7 +1486,7 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
                   searchType="performer"
                   searchQuery={form.state.values.name}
                 />
-              </Field>
+              </FieldSet>
             )}
           </form.Field>
         </FieldGroup>

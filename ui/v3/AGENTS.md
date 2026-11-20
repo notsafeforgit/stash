@@ -8,7 +8,7 @@ Native Stash is a standalone project. Read root-level `CLAUDE.md` and `PROJECT.m
 
 ## Project Structure
 
-File-based TanStack routes live in `src/routes/`; feature components are in `src/components/`, with shadcn/Base UI primitives in `src/components/ui/`. Domain/Apollo helpers live in `src/core/`; shared hooks, models, plugins, utilities, styles, and locales use their matching `src/` directories. Operations are under `graphql/`, static assets under `public/`, and current architecture under `docs/architecture.md`; historical plans are under `docs/archive/`. Backend schemas and services are at root `graphql/schema/`, `internal/`, and `pkg/`. The [documentation index](../../docs/README.md) identifies current guides and future plans.
+File-based TanStack routes live in `src/routes/`; feature components are in `src/components/`, with the shared ui-sdk wrappers in `src/components/ui/`. Domain/Apollo helpers live in `src/core/`; shared hooks, models, plugins, utilities, styles, and locales use their matching `src/` directories. Operations are under `graphql/`, static assets under `public/`, and current architecture under `docs/architecture.md`; historical plans are under `docs/archive/`. Backend schemas and services are at root `graphql/schema/`, `internal/`, and `pkg/`. The [documentation index](../../docs/README.md) identifies current guides and future plans.
 
 ## Build, Test, and Development Commands
 
@@ -35,6 +35,10 @@ Display localized labels for built-in options everywhere, including dropdowns, s
 Co-locate Vitest files as `*.test.ts(x)` and cover regressions and user behavior. For Go integration changes, run focused root tests such as `go test ./ui` plus affected packages. Do not hand-edit generated GraphQL types, `src/routeTree.gen.ts`, or `settings-search-index.gen.ts`.
 
 Preserve the [interaction policy](docs/architecture.md#interaction-and-accessibility): general page pinch and double-tap zoom remain disabled, while custom media zoom remains available. Interface text is non-selectable except inputs, editable regions, technical output, and values explicitly marked with `data-selectable-text` or `selectableText`. Keep labels and surrounding controls outside those exceptions.
+
+## ui-sdk
+
+Before using ui-sdk (`@ui-sdk/react`, `@ui-sdk/core`), follow the `ui-sdk` skill if it is installed, and read `node_modules/@ui-sdk/react/docs/llms.txt`. To build a new component, also search `node_modules/@ui-sdk/react/docs/core.md` by heading, and read `rendering.md` next to it. Only `src/components/ui/` imports `@ui-sdk/*`; elsewhere use its wrappers. `web.css` loads from `src/styles/globals.css` in the `components` layer, below Tailwind utilities, with the `ui-sdk` layer declared first; wrapper styles beyond it live in `src/styles/components/*.css`. Unit tests get ui-sdk's jsdom stubs from `src/test-utils/vitest-setup.ts`.
 
 ## Commits & Pull Requests
 

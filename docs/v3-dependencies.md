@@ -10,7 +10,7 @@ remain preserved in the frozen compatible release.
 | --- | --- |
 | Backend | Go 1.27.4; gqlgen 0.17.98; go-sqlite3 1.14.53; refreshed module graph |
 | Codecs | libheif 1.23.4; libvips 8.18.6; current packages from Alpine 3.24 / the runtime's supported Debian or Ubuntu release |
-| UI | React 19.3.1; Base UI 1.9; shadcn 4.23; Tailwind 4.3.5 |
+| UI | React 19.3.1; ui-sdk 0.1.0-beta.10 (`@ui-sdk/react`, `@ui-sdk/core`); Tailwind 4.3.5 |
 | Tables | TanStack Table 9.3 with explicit features and server-controlled sorting |
 | GraphQL | Apollo 4.3.8; GraphQL 17.1; Code Generator 7 (CLI) / 6 (TypeScript plugins) |
 | Playback | Video.js 10.4.0; scoped hls.js 1.7.4 override |
@@ -138,17 +138,22 @@ Deliberately unchanged:
 - `@types/node` stays on the 24 line to match the Node 24 LTS runtime.
 - TypeScript 7.0.2 is already the current stable release.
 
-## shadcn practice
+## ui-sdk practice
 
-Base UI is [shadcn's current default](https://ui.shadcn.com/docs/changelog/2026-07-base-ui-default).
-Keep using local wrappers. Updating the CLI does not update copied component
-source: review `shadcn add --dry-run` and `--diff` before applying changes.
+`src/components/ui/` wraps ui-sdk parts; the look comes from
+`@ui-sdk/core/web.css`, with `--ui-*` tokens mapped to the Stash palette in
+`globals.css` and wrapper styles in `src/styles/components/`. Both packages are
+beta releases pinned to the same exact version: update them together, and read
+the release notes and the docs that ship in `node_modules/@ui-sdk/react/docs`
+for the new version, not the website.
 
-Preserve shortcut suppression, lightbox portal targets, localized labels, and
-mobile scrolling. This refresh merges button hover, field and checkbox/switch
-focus, calendar classes, and Base UI's underlying fixes. Keep the app's tab
-orientation and drawer behavior when reviewing registry defaults. Test focus
-return, nested overlays, mobile scrolling, and playback after primitive updates.
+After an update, check web.css for changed sizes and drawn icons (a doubled
+chevron or check means a wrapper renders its own), the `data-slot` names
+`docs/theming.md` lists for custom.css, and the `host.ui` plugin exports.
+Preserve shortcut suppression, lightbox overlay containers, localized labels,
+the anchored long-press search menu and drawer scrolling with
+`data-drawer-no-drag`. Run the browser suites in Chromium and WebKit, and test
+focus return, nested overlays, mobile scrolling and playback.
 
 ## Refresh checks
 

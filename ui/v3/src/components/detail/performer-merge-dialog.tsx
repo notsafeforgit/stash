@@ -31,7 +31,7 @@ import {
   ComboboxGroup,
   ComboboxInput,
   ComboboxItem,
-  ComboboxLabel,
+  ComboboxGroupLabel,
   ComboboxList,
   ComboboxSeparator,
 } from "src/components/ui/combobox";
@@ -147,10 +147,8 @@ export function PerformerMergeDialog({
     [knownLabels],
   );
 
-  // Pass the visible item ids to the root so Base UI can compute
-  // `filteredItems` and only render <ComboboxEmpty> when the list really is
-  // empty. We disable the internal filter (`filter={null}`) because the
-  // results are already filtered server-side via `serverQuery`.
+  // The server has already filtered these ids by `serverQuery`, so the
+  // combobox runs no local filter (`filter={null}`).
   const allItemIds = useMemo(
     () => [...sourceOptions.map((o) => o.id), ...options.map((o) => o.id)],
     [sourceOptions, options],
@@ -370,7 +368,7 @@ export function PerformerMergeDialog({
         showCloseButton={false}
         // Cap the whole dialog so the header and actions remain visible
         // when the resolution fields scroll, including with mobile chrome.
-        className="max-h-[calc(100dvh-2rem)] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-2xl"
+        className="grid max-h-[calc(100dvh-2rem)] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-2xl"
       >
         <DialogHeader>
           <DialogTitle>
@@ -483,12 +481,12 @@ export function PerformerMergeDialog({
                           {isBulk && (
                             <>
                               <ComboboxGroup>
-                                <ComboboxLabel>
+                                <ComboboxGroupLabel>
                                   {intl.formatMessage({
                                     id: "dialogs.merge_scene.from_selection",
                                     defaultMessage: "From selection",
                                   })}
-                                </ComboboxLabel>
+                                </ComboboxGroupLabel>
                                 {sourceOptions.map((opt) => (
                                   <ComboboxItem key={opt.id} value={opt.id}>
                                     <PerformerOptionItem option={opt} />
@@ -501,12 +499,12 @@ export function PerformerMergeDialog({
                           {options.length > 0 && (
                             <ComboboxGroup>
                               {isBulk && (
-                                <ComboboxLabel>
+                                <ComboboxGroupLabel>
                                   {intl.formatMessage({
                                     id: "dialogs.merge_scene.search_results",
                                     defaultMessage: "Search results",
                                   })}
-                                </ComboboxLabel>
+                                </ComboboxGroupLabel>
                               )}
                               {options.map((opt) => (
                                 <ComboboxItem key={opt.id} value={opt.id}>
@@ -540,11 +538,8 @@ export function PerformerMergeDialog({
                         </ComboboxList>
                       </ComboboxContent>
                     </Combobox>
-                    {/* Reserve a constant-height slot for the validation
-                        error so toggling it on/off doesn't change the
-                        dialog's height (Base UI re-centers vertically on
-                        height changes — without this the dialog visibly
-                        jumps when the user picks / clears a performer). */}
+                    {/* Reserve a fixed-height slot for the validation error:
+                        the dialog is centered, so a height change makes it jump. */}
                     <div className="min-h-5 text-sm">
                       {isInvalid && (
                         <FieldError errors={field.state.meta.errors} />

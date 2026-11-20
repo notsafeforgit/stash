@@ -12,7 +12,7 @@ import { createCache } from "@/core/create-client";
 import type * as GQL from "@/core/generated-graphql";
 import { FilterMode } from "@/core/generated-graphql";
 import { savedFiltersLink } from "./saved-filters";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { ConfigurationProvider } from "@/hooks/config";
 import { images } from "./image-lightbox";
 import { scenes } from "./scene-lightbox";

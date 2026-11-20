@@ -192,9 +192,9 @@ export function EntityActionButton({
       size={mobile ? "default" : size}
       className={cn(className, mobile && "h-11 w-full justify-start")}
       aria-label={label}
-      onClick={(event) => {
+      onClick={(event, details) => {
         if (mobile) chrome?.setPanel(null);
-        onClick?.(event);
+        onClick?.(event, details);
       }}
     >
       <Icon data-icon="inline-start" />

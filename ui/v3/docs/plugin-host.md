@@ -199,9 +199,12 @@ catalog loading is the plugin's responsibility.
 
 ### Curated UI exports (`host.ui`)
 
-A curated subset of shadcn/Base UI primitives. Their API shape is part of host
-v1; internal DOM structure and classes are not an unrestricted extension API.
-The current set:
+A curated subset of the host's UI wrappers, built on ui-sdk and styled by its
+`web.css`. Their API shape is part of host v1; internal DOM structure and
+classes are not an unrestricted extension API. For a link that looks like a
+button, pass a `host.router.Link` element as `Button`'s `render` prop;
+`buttonVariants()` remains for v1 plugins and returns matching classes for an
+element that isn't a `Button`. The current set:
 
 | Group | Exports |
 |---|---|

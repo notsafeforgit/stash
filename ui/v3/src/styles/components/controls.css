@@ -1,0 +1,26 @@
+/* web.css draws these controls. Toggle sizes come from button.css, which also
+   matches toggle slots. */
+@layer components {
+  [data-slot="switch"][data-size="sm"] {
+    width: calc(var(--ui-spacing) * 6);
+    height: calc(var(--ui-spacing) * 3.5);
+  }
+
+  [data-slot="switch"][data-size="sm"] > [data-slot="switch-thumb"] {
+    width: calc(var(--ui-spacing) * 2);
+    height: calc(var(--ui-spacing) * 2);
+  }
+
+  /* web.css gives sliders a 12rem minimum. App sliders sit in narrow phone
+     grids where that overflows, so the minimum is reset. */
+  [data-slot="slider"] {
+    min-width: 0;
+  }
+
+  /* On touch screens web.css widens a label around a control with an ::after
+     drawn over it. The control stays on top, so a press on it reaches it. */
+  :is(label, [data-slot="label"])
+    > :is([data-slot="checkbox"], [data-slot="radio"], [data-slot="switch"]) {
+    z-index: 1;
+  }
+}

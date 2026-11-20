@@ -1,31 +1,42 @@
 import type * as React from "react";
-import { Drawer as DrawerPrimitive } from "@base-ui/react/drawer";
+import {
+  Drawer as DrawerPrimitive,
+  DrawerBackdrop as DrawerBackdropPrimitive,
+  DrawerClose,
+  DrawerContent as DrawerContentPrimitive,
+  DrawerDescription,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@ui-sdk/react/drawer";
 
 import { cn } from "@/lib/utils";
 import {
   type ShortcutOverlayRootProps,
   useOverlayOpenState,
 } from "@/components/shortcut-provider";
+import {
+  type OpenChangeArgs,
+  useOverlayContainerElement,
+} from "./overlay-container";
 
 export type DrawerBackdrop = "blurred" | "dimmed";
 
+type DrawerRootProps = React.ComponentProps<typeof DrawerPrimitive> &
+  ShortcutOverlayRootProps;
+
+// Pointer dragging keeps the swipe model these sheets were tuned with, where
+// scrollers opt out with data-drawer-no-drag. `auto` would switch touch bottom
+// sheets to native scroll-snap, which needs device validation first.
 function Drawer({
   open,
   defaultOpen,
   onOpenChange,
   blocksListShortcuts,
+  driver = "pointer",
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root> &
-  ShortcutOverlayRootProps) {
-  const overlayProps = useOverlayOpenState<
-    Parameters<
-      NonNullable<
-        React.ComponentProps<typeof DrawerPrimitive.Root>["onOpenChange"]
-      >
-    > extends [boolean, ...infer Rest]
-      ? Rest
-      : never
-  >({
+}: DrawerRootProps) {
+  const container = useOverlayContainerElement();
+  const overlayProps = useOverlayOpenState<OpenChangeArgs<DrawerRootProps>>({
     open,
     defaultOpen,
     onOpenChange,
@@ -33,62 +44,26 @@ function Drawer({
   });
 
   return (
-    <DrawerPrimitive.Root data-slot="drawer" {...overlayProps} {...props} />
+    <DrawerPrimitive
+      container={container}
+      driver={driver}
+      {...overlayProps}
+      {...props}
+    />
   );
-}
-
-function DrawerTrigger({
-  ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Trigger>) {
-  return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />;
-}
-
-function DrawerPortal({
-  ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Portal>) {
-  return <DrawerPrimitive.Portal data-slot="drawer-portal" {...props} />;
-}
-
-function DrawerClose({
-  ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Close>) {
-  return <DrawerPrimitive.Close data-slot="drawer-close" {...props} />;
 }
 
 function DrawerOverlay({
   className,
   appearance = "blurred",
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Backdrop> & {
+}: React.ComponentProps<typeof DrawerBackdropPrimitive> & {
   appearance?: DrawerBackdrop;
 }) {
   return (
-    <DrawerPrimitive.Backdrop
-      data-slot="drawer-overlay"
-      // `transform: translateZ(0)` + `will-change: backdrop-filter` keeps
-      // the overlay on its own GPU layer so the blur stays stable while
-      // the page behind it is re-rendering (e.g. when the user changes
-      // zoom from inside the drawer). Without this, iOS Safari (and to a
-      // lesser extent Chrome) briefly drops the backdrop-filter during
-      // heavy layout updates and the unblurred content flashes through.
-      style={
-        appearance === "blurred"
-          ? {
-              willChange: "backdrop-filter",
-              transform: "translateZ(0)",
-            }
-          : undefined
-      }
-      className={cn(
-        "fixed inset-0 z-50",
-        appearance === "blurred"
-          ? "bg-black/10 supports-backdrop-filter:backdrop-blur-xs"
-          : "bg-black/40",
-        "transition-opacity",
-        appearance === "blurred" ? "duration-300" : "duration-100",
-        "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
-        className,
-      )}
+    <DrawerBackdropPrimitive
+      data-appearance={appearance}
+      className={className}
       {...props}
     />
   );
@@ -97,40 +72,26 @@ function DrawerOverlay({
 function DrawerContent({
   className,
   children,
-  keepMounted,
   backdrop = "blurred",
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Popup> & {
-  keepMounted?: boolean;
+}: Omit<React.ComponentProps<typeof DrawerContentPrimitive>, "children"> & {
+  children?: React.ReactNode;
   backdrop?: DrawerBackdrop;
 }) {
   return (
-    <DrawerPortal keepMounted={keepMounted}>
+    <>
       <DrawerOverlay appearance={backdrop} />
-      <DrawerPrimitive.Viewport className="fixed inset-0 z-50 flex items-end justify-center">
-        <DrawerPrimitive.Popup
-          data-slot="drawer-content"
-          className={cn(
-            "group/drawer-content flex h-auto w-full flex-col bg-popover text-sm text-popover-foreground",
-            "rounded-t-xl border-t max-h-[80svh] min-h-0 pb-[max(0.5rem,var(--safe-area-bottom))] pl-[var(--safe-area-left)] pr-[var(--safe-area-right)]",
-            // Base UI writes an inline transform during a drag. Using the
-            // separate translate property would apply that movement twice.
-            "[transform:translateY(var(--drawer-swipe-movement-y,0px))] transition-transform duration-200 ease-out data-swiping:transition-none motion-reduce:transition-none",
-            "data-[starting-style]:[transform:translateY(100%)] data-[ending-style]:[transform:translateY(100%)]",
-            className,
-          )}
-          {...props}
-        >
-          <div
-            aria-hidden="true"
-            className="flex h-7 shrink-0 items-center justify-center"
-          >
-            <div className="h-1 w-11 rounded-full bg-muted-foreground/40" />
-          </div>
-          {children}
-        </DrawerPrimitive.Popup>
-      </DrawerPrimitive.Viewport>
-    </DrawerPortal>
+      <DrawerContentPrimitive
+        className={cn(
+          "max-h-[80svh] min-h-0 pb-[max(0.5rem,var(--safe-area-bottom))] pl-[var(--safe-area-left)] pr-[var(--safe-area-right)]",
+          className,
+        )}
+        {...props}
+      >
+        <div aria-hidden="true" data-slot="drawer-grip" />
+        {children}
+      </DrawerContentPrimitive>
+    </>
   );
 }
 
@@ -157,38 +118,8 @@ function DrawerFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function DrawerTitle({
-  className,
-  ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Title>) {
-  return (
-    <DrawerPrimitive.Title
-      data-slot="drawer-title"
-      className={cn(
-        "font-heading text-base font-medium text-foreground",
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
-function DrawerDescription({
-  className,
-  ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Description>) {
-  return (
-    <DrawerPrimitive.Description
-      data-slot="drawer-description"
-      className={cn("text-sm text-muted-foreground", className)}
-      {...props}
-    />
-  );
-}
-
 export {
   Drawer,
-  DrawerPortal,
   DrawerOverlay,
   DrawerTrigger,
   DrawerClose,

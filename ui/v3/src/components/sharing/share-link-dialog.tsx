@@ -39,7 +39,7 @@ export function ShareLinkDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto]">
+      <DialogContent className="grid max-h-[calc(100dvh-2rem)] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto]">
         <DialogHeader>
           <DialogTitle>
             {msg("sharing.link_ready", "Your share link is ready")}

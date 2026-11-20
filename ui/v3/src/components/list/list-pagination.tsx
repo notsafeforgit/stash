@@ -21,8 +21,12 @@ import {
   Pagination,
   PaginationContent,
   PaginationEllipsis,
+  PaginationFirst,
   PaginationItem,
+  PaginationLast,
   PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
 } from "src/components/ui/pagination";
 
 // ── Page-jump popover ────────────────────────────────────────────────────────
@@ -120,37 +124,38 @@ export const ListPagination: React.FC<ListPaginationProps> = ({
   const pageWindow = getPageWindow(currentPage, totalPages);
 
   return (
-    <Pagination className="w-auto">
+    <Pagination
+      className="w-auto"
+      page={currentPage}
+      pageCount={totalPages}
+      onPageChange={onChangePage}
+    >
       <PaginationContent className="gap-0.5">
         {/* First page */}
         <PaginationItem>
-          <PaginationLink
-            size="icon-sm"
-            disabled={currentPage === 1}
-            onClick={() => onChangePage(1)}
+          <PaginationFirst
+            className="size-7 min-w-0 p-0"
             aria-label={intl.formatMessage({ id: "pagination.first" })}
           >
             <ChevronsLeft className="size-3.5" />
-          </PaginationLink>
+          </PaginationFirst>
         </PaginationItem>
 
         {/* Previous (icon only) */}
         <PaginationItem>
-          <PaginationLink
-            size="icon-sm"
-            disabled={currentPage === 1}
-            onClick={() => onChangePage(currentPage - 1)}
+          <PaginationPrevious
+            className="size-7 min-w-0 p-0"
             aria-label={intl.formatMessage({
               id: "pagination.previous",
               defaultMessage: "Previous",
             })}
           >
             <ChevronLeft className="size-3.5" />
-          </PaginationLink>
+          </PaginationPrevious>
         </PaginationItem>
 
         {/* Page numbers — auto-width so 4-digit page numbers don't crop into
-            the icon-sm fixed square. Min width keeps single-digit buttons
+            the icon-sized square. Min width keeps single-digit buttons
             visually balanced next to the icon arrows. */}
         {pageWindow.map((page, i) =>
           page === null ? (
@@ -165,8 +170,7 @@ export const ListPagination: React.FC<ListPaginationProps> = ({
                     ref={triggerRef}
                     render={
                       <PaginationLink
-                        isActive
-                        size="sm"
+                        page={page}
                         className="min-w-7 px-1.5 text-xs tabular-nums"
                       >
                         {page}
@@ -189,9 +193,8 @@ export const ListPagination: React.FC<ListPaginationProps> = ({
                 </Popover>
               ) : (
                 <PaginationLink
-                  size="sm"
+                  page={page}
                   className="min-w-7 px-1.5 text-xs tabular-nums"
-                  onClick={() => onChangePage(page)}
                 >
                   {page}
                 </PaginationLink>
@@ -202,29 +205,25 @@ export const ListPagination: React.FC<ListPaginationProps> = ({
 
         {/* Next (icon only) */}
         <PaginationItem>
-          <PaginationLink
-            size="icon-sm"
-            disabled={currentPage === totalPages}
-            onClick={() => onChangePage(currentPage + 1)}
+          <PaginationNext
+            className="size-7 min-w-0 p-0"
             aria-label={intl.formatMessage({
               id: "pagination.next",
               defaultMessage: "Next",
             })}
           >
             <ChevronRight className="size-3.5" />
-          </PaginationLink>
+          </PaginationNext>
         </PaginationItem>
 
         {/* Last page */}
         <PaginationItem>
-          <PaginationLink
-            size="icon-sm"
-            disabled={currentPage === totalPages}
-            onClick={() => onChangePage(totalPages)}
+          <PaginationLast
+            className="size-7 min-w-0 p-0"
             aria-label={intl.formatMessage({ id: "pagination.last" })}
           >
             <ChevronsRight className="size-3.5" />
-          </PaginationLink>
+          </PaginationLast>
         </PaginationItem>
       </PaginationContent>
     </Pagination>

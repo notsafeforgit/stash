@@ -14,7 +14,7 @@ import { SceneCard } from "@/components/cards/scene-card";
 import { FrontPage } from "@/components/frontpage/front-page";
 import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
 import { RouteViewport } from "@/components/layout/route-viewport";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { ConfigurationProvider } from "@/hooks/config";
 import { Route as SceneDetailRoute } from "@/routes/scenes/$sceneId";
 import { createCache } from "@/core/create-client";

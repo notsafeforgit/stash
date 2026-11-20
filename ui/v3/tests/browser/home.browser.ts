@@ -71,9 +71,10 @@ for (const theme of ["light", "dark"] as const) {
     });
     await menu.tap();
     const navigation = page.locator("[data-mobile-navigation]");
-    const backdrop = page.locator('[data-slot="drawer-overlay"]');
+    const backdrop = page.locator('[data-slot="drawer-backdrop"]');
     await expect(backdrop).toHaveCSS("backdrop-filter", "none");
-    await expect(backdrop).toHaveCSS("will-change", "auto");
+    // The drawer hints opacity itself; only the blurred backdrop takes a filter layer.
+    await expect(backdrop).not.toHaveCSS("will-change", /backdrop-filter/);
     await navigation.getByRole("link", { name: "Scenes", exact: true }).tap();
     await expect(page).toHaveURL(/\/home-fixture\/scenes$/);
     await expect
@@ -107,7 +108,7 @@ for (const theme of ["light", "dark"] as const) {
         new RegExp(`/home-fixture/${target.toLowerCase()}$`),
       );
       expect(
-        await page.locator('[data-slot="drawer-overlay"]').count(),
+        await page.locator('[data-slot="drawer-backdrop"]').count(),
       ).toBeLessThanOrEqual(1);
     }
     await expect(navigation).toHaveCount(0);
@@ -262,7 +263,11 @@ test("returning Home restores cached random rows and both scroll positions witho
     true,
   );
   await page.getByRole("button", { name: "Open navigation menu" }).click();
-  await page.getByRole("link", { name: "Scenes", exact: true }).click();
+  // The open drawer makes the tab bar inert, which role queries still match.
+  await page
+    .locator("[data-mobile-navigation]")
+    .getByRole("link", { name: "Scenes", exact: true })
+    .click();
   await expect(home).toHaveCount(0);
   const paintedCards = page.evaluate(
     () =>

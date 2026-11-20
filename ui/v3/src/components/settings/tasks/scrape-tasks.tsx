@@ -8,7 +8,7 @@ import {
   archivePageInfoPath,
   createArchivePaginationAPI,
 } from "@/core/native-archive/pagination-api";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardHeader,
@@ -72,11 +72,16 @@ function ScrapeTaskStatus() {
           <>
             <div className="flex flex-wrap gap-2">
               {states.map((state, index) => (
-                <Link
+                <Button
                   key={state}
-                  to="/archive-activity"
-                  search={{ view: "runs", state }}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                  variant="outline"
+                  size="sm"
+                  render={
+                    <Link
+                      to="/archive-activity"
+                      search={{ view: "runs", state }}
+                    />
+                  }
                 >
                   {intl.formatMessage(
                     {
@@ -88,7 +93,7 @@ function ScrapeTaskStatus() {
                       count: read.current?.totals[index]?.total ?? 0,
                     },
                   )}
-                </Link>
+                </Button>
               ))}
             </div>
             {read.current.running.length > 0 && (
@@ -135,13 +140,12 @@ function ScrapeTaskStatus() {
         )}
       </CardContent>
       <CardFooter className="flex flex-wrap gap-2">
-        <Link
-          to="/archive-activity"
-          search={{ view: "runs" }}
-          className={buttonVariants({ variant: "outline" })}
+        <Button
+          variant="outline"
+          render={<Link to="/archive-activity" search={{ view: "runs" }} />}
         >
           {msg("scrape_tasks.open", "View all scrape runs")}
-        </Link>
+        </Button>
         <Button variant="outline" onClick={reload} disabled={read.busy}>
           {msg("archive_activity.refresh", "Refresh")}
         </Button>

@@ -1,108 +1,71 @@
 import type * as React from "react";
 import { FormattedMessage } from "react-intl";
-import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
+import { XIcon } from "lucide-react";
+import { DialogContent as DialogContentPrimitive } from "@ui-sdk/react/dialog";
 
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { XIcon } from "lucide-react";
 import {
-  type ShortcutOverlayRootProps,
-  useOverlayOpenState,
-} from "@/components/shortcut-provider";
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogOverlay,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { type OverlayFocus, overlayFocus } from "./overlay-container";
 
-function Sheet<Payload = unknown>({
-  open,
-  defaultOpen,
-  onOpenChange,
-  blocksListShortcuts,
-  ...props
-}: SheetPrimitive.Root.Props<Payload> & ShortcutOverlayRootProps) {
-  const overlayProps = useOverlayOpenState<
-    Parameters<
-      NonNullable<SheetPrimitive.Root.Props<Payload>["onOpenChange"]>
-    > extends [boolean, ...infer Rest]
-      ? Rest
-      : never
-  >({
-    open,
-    defaultOpen,
-    onOpenChange,
-    blocksListShortcuts,
-  });
+// A sheet is a modal dialog placed at an edge, so it uses the Dialog primitive.
+// ui-sdk's Drawer takes its edge on the root, which would move the side API off
+// SheetContent, and adds swipe-to-dismiss that side sheets never had.
+const Sheet = Dialog;
 
-  return <SheetPrimitive.Root data-slot="sheet" {...overlayProps} {...props} />;
-}
-
-function SheetTrigger({ ...props }: SheetPrimitive.Trigger.Props) {
-  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />;
-}
-
-function SheetClose({ ...props }: SheetPrimitive.Close.Props) {
-  return <SheetPrimitive.Close data-slot="sheet-close" {...props} />;
-}
-
-function SheetPortal({ ...props }: SheetPrimitive.Portal.Props) {
-  return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />;
-}
-
-function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
-  return (
-    <SheetPrimitive.Backdrop
-      data-slot="sheet-overlay"
-      className={cn(
-        "fixed inset-0 z-50 bg-black/10 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-xs",
-        className,
-      )}
-      {...props}
-    />
-  );
-}
+type SheetContentProps = Omit<
+  React.ComponentProps<typeof DialogContentPrimitive>,
+  "children" | "initialFocus" | "finalFocus"
+> & {
+  children?: React.ReactNode;
+  side?: "top" | "right" | "bottom" | "left";
+  showCloseButton?: boolean;
+  overlayClassName?: string;
+  initialFocus?: OverlayFocus;
+  finalFocus?: OverlayFocus;
+};
 
 function SheetContent({
   className,
   children,
   side = "right",
   showCloseButton = true,
+  overlayClassName,
+  initialFocus,
+  finalFocus,
   ...props
-}: SheetPrimitive.Popup.Props & {
-  side?: "top" | "right" | "bottom" | "left";
-  showCloseButton?: boolean;
-}) {
+}: SheetContentProps) {
   return (
-    <SheetPortal>
-      <SheetOverlay />
-      <SheetPrimitive.Popup
-        data-slot="sheet-content"
+    <>
+      <DialogOverlay className={overlayClassName} />
+      <DialogContentPrimitive
         data-side={side}
-        className={cn(
-          // Right-side (and left-side) sheets are full-width on mobile so
-          // the underlying page (list view + chrome bar) is fully covered;
-          // at sm+ they revert to the 3/4-width side-panel form factor.
-          "fixed z-50 flex flex-col gap-4 overflow-x-hidden bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg transition duration-200 ease-in-out data-ending-style:opacity-0 data-starting-style:opacity-0 data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=bottom]:data-ending-style:translate-y-[2.5rem] data-[side=bottom]:data-starting-style:translate-y-[2.5rem] data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-full data-[side=left]:sm:w-3/4 data-[side=left]:border-r data-[side=left]:data-ending-style:translate-x-[-2.5rem] data-[side=left]:data-starting-style:translate-x-[-2.5rem] data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-full data-[side=right]:sm:w-3/4 data-[side=right]:border-l data-[side=right]:data-ending-style:translate-x-[2.5rem] data-[side=right]:data-starting-style:translate-x-[2.5rem] data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=top]:data-ending-style:translate-y-[-2.5rem] data-[side=top]:data-starting-style:translate-y-[-2.5rem] data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm",
-          className,
-        )}
+        className={className}
+        initialFocus={overlayFocus(initialFocus)}
+        finalFocus={overlayFocus(finalFocus)}
         {...props}
       >
         {children}
         {showCloseButton && (
-          <SheetPrimitive.Close
-            data-slot="sheet-close"
-            render={
-              <Button
-                variant="ghost"
-                className="absolute top-[calc(0.75rem+var(--safe-area-top))] right-[max(0.75rem,var(--safe-area-right))]"
-                size="icon-sm"
-              />
-            }
+          <DialogClose
+            data-variant="ghost"
+            data-size="icon-sm"
+            className="absolute top-[calc(0.75rem+var(--safe-area-top))] right-[max(0.75rem,var(--safe-area-right))]"
           >
             <XIcon />
             <span className="sr-only">
               <FormattedMessage id="actions.close" defaultMessage="Close" />
             </span>
-          </SheetPrimitive.Close>
+          </DialogClose>
         )}
-      </SheetPrimitive.Popup>
-    </SheetPortal>
+      </DialogContentPrimitive>
+    </>
   );
 }
 
@@ -126,39 +89,13 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function SheetTitle({ className, ...props }: SheetPrimitive.Title.Props) {
-  return (
-    <SheetPrimitive.Title
-      data-slot="sheet-title"
-      className={cn(
-        "font-heading text-base font-medium text-foreground",
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
-function SheetDescription({
-  className,
-  ...props
-}: SheetPrimitive.Description.Props) {
-  return (
-    <SheetPrimitive.Description
-      data-slot="sheet-description"
-      className={cn("text-sm text-muted-foreground", className)}
-      {...props}
-    />
-  );
-}
-
 export {
   Sheet,
-  SheetTrigger,
-  SheetClose,
+  DialogTrigger as SheetTrigger,
+  DialogClose as SheetClose,
   SheetContent,
   SheetHeader,
   SheetFooter,
-  SheetTitle,
-  SheetDescription,
+  DialogTitle as SheetTitle,
+  DialogDescription as SheetDescription,
 };

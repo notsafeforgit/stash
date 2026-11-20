@@ -1,6 +1,6 @@
 const POPUP_ROLES = '[role="menu"], [role="alertdialog"], [role="listbox"]';
 
-/** Touch-opened Base UI menus may leave focus on body in Safari. Their open
+/** Touch-opened menus may leave focus on body in Safari. Their open
  * state, not just focus, must keep the lightbox from consuming Escape/arrows.
  * Tooltips are intentionally excluded: they don't own viewer navigation. */
 export function popupOwnsLightboxKeys() {

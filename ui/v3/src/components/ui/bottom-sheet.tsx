@@ -21,31 +21,10 @@ export function BottomSheetHeader({
   );
 }
 
-export function BottomSheetTitle({
-  className,
-  ...props
-}: React.ComponentProps<typeof DrawerTitle>) {
-  return (
-    <DrawerTitle
-      data-slot="bottom-sheet-title"
-      className={className}
-      {...props}
-    />
-  );
-}
-
-export function BottomSheetDescription({
-  className,
-  ...props
-}: React.ComponentProps<typeof DrawerDescription>) {
-  return (
-    <DrawerDescription
-      data-slot="bottom-sheet-description"
-      className={className}
-      {...props}
-    />
-  );
-}
+export {
+  DrawerTitle as BottomSheetTitle,
+  DrawerDescription as BottomSheetDescription,
+};
 
 export interface BottomSheetProps {
   open: boolean;
@@ -60,7 +39,7 @@ export interface BottomSheetProps {
 }
 
 /**
- * A mobile-optimised bottom sheet backed by Base UI Drawer.
+ * A mobile-optimised bottom sheet backed by ui-sdk Drawer.
  * Slides in with CSS transitions; drag the panel down to dismiss.
  */
 export function BottomSheet({
@@ -79,10 +58,7 @@ export function BottomSheet({
       blocksListShortcuts={blocksListShortcuts}
       onOpenChangeComplete={onOpenChangeComplete}
     >
-      <DrawerContent
-        backdrop={backdrop}
-        className={cn("bg-background outline-none", className)}
-      >
+      <DrawerContent backdrop={backdrop} className={className}>
         {children}
       </DrawerContent>
     </Drawer>

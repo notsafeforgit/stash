@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useMsg } from "@/hooks/message";
-import { cn } from "@/lib/utils";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { PostEmpty, PostSection } from "../posts/shared";
 import { AlbumReadError, SourceAlbum } from "./ordered";
@@ -52,23 +51,23 @@ export function GallerySourceAlbums({
           }
         >
           <div className="flex flex-col gap-4">
-            <Link
-              className={cn(
-                buttonVariants({
-                  variant: "outline",
-                  className: "self-start",
-                }),
-              )}
-              to="/source-posts"
-              search={{
-                post: post.uuid,
-                mode: "all",
-                value: "",
-                namespace: "",
-              }}
+            <Button
+              variant="outline"
+              className="self-start"
+              render={
+                <Link
+                  to="/source-posts"
+                  search={{
+                    post: post.uuid,
+                    mode: "all",
+                    value: "",
+                    namespace: "",
+                  }}
+                />
+              }
             >
               {msg("source_albums.open_post", "Open source post")}
-            </Link>
+            </Button>
             <SourceAlbum
               post={post.uuid}
               endpoint={result.endpoint}

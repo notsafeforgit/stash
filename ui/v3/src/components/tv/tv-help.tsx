@@ -118,12 +118,12 @@ export default function TvHelp({ close }: { close: () => void }) {
               </tr>
               <tr>
                 <td>
-                  <FormattedMessage id="tv.text.f_o" defaultMessage="F / O" />
+                  <FormattedMessage id="tv.text.f" defaultMessage="F" />
                 </td>
                 <td>
                   <FormattedMessage
-                    id="tv.text.fullscreen_or_rotate_the_presentation"
-                    defaultMessage="Fullscreen when supported / rotate the presentation"
+                    id="tv.text.fullscreen_when_supported"
+                    defaultMessage="Fullscreen when supported"
                   />
                 </td>
               </tr>

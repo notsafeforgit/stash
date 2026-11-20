@@ -1,0 +1,264 @@
+/* web.css draws the base look of these parts. This adds what it lacks: the
+   horizontal and responsive Field rows, the Stash field separator, input
+   groups with their adornments, and the defaults the shadcn wrappers carried.
+   Call-site classes are utilities, so they still win over these defaults. */
+@layer components {
+  [data-slot="field"][data-orientation="horizontal"] {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  [data-slot="field"][data-orientation="horizontal"]:has(
+    > [data-slot="field-content"]
+  ) {
+    align-items: flex-start;
+  }
+
+  [data-slot="field"][data-orientation="horizontal"]
+    > [data-slot="field-label"] {
+    flex: auto;
+  }
+
+  [data-slot="field-group"]:has(
+    > [data-slot="field"][data-orientation="responsive"]
+  ) {
+    container-type: inline-size;
+  }
+
+  @container (min-width: 28rem) {
+    [data-slot="field"][data-orientation="responsive"] {
+      flex-direction: row;
+      align-items: center;
+    }
+
+    [data-slot="field"][data-orientation="responsive"]
+      > [data-slot="field-label"] {
+      flex: auto;
+    }
+  }
+
+  [data-slot="field"]:is([data-disabled=""], [data-disabled="true"])
+    :is([data-slot="field-label"], [data-slot="field-title"]) {
+    opacity: 0.5;
+  }
+
+  [data-slot="field-label"][data-invalid]:not([data-invalid="false"]) {
+    color: var(--ui-destructive);
+  }
+
+  [data-slot="field-legend"][data-variant="label"] {
+    font-size: calc(var(--ui-font-size) - 0.0625rem);
+    font-weight: 500;
+  }
+
+  [data-slot="field-content"] {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: calc(var(--ui-spacing) * 0.5);
+    min-width: 0;
+    line-height: 1.375;
+  }
+
+  [data-slot="field-title"] {
+    display: flex;
+    width: fit-content;
+    align-items: center;
+    gap: calc(var(--ui-spacing) * 2);
+    color: var(--ui-foreground);
+    font-size: calc(var(--ui-font-size) - 0.0625rem);
+    font-weight: 500;
+    line-height: 1.375;
+  }
+
+  [data-slot="field-separator"] {
+    position: relative;
+    height: calc(var(--ui-spacing) * 5);
+    margin-block: calc(var(--ui-spacing) * -2);
+    font-size: var(--ui-font-size);
+  }
+
+  [data-slot="field-separator-content"] {
+    position: relative;
+    display: block;
+    width: fit-content;
+    margin-inline: auto;
+    padding-inline: calc(var(--ui-spacing) * 2);
+    background: var(--ui-background);
+    color: var(--ui-muted-foreground);
+  }
+
+  [data-slot="label"] {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--ui-spacing) * 2);
+    color: var(--ui-foreground);
+    font-size: calc(var(--ui-font-size) - 0.0625rem);
+    font-weight: 500;
+  }
+
+  :is([data-slot="input"], [data-slot="textarea"])[aria-invalid="true"] {
+    border-color: var(--ui-destructive);
+  }
+
+  [data-slot="input-group"] {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    height: calc(var(--ui-spacing) * 8);
+    border: 1px solid var(--ui-input);
+    border-radius: var(--ui-radius);
+    background: var(--ui-background);
+    color: var(--ui-foreground);
+    font-size: var(--ui-font-size);
+
+    &:has(> [data-slot="textarea"]) {
+      height: auto;
+    }
+
+    &:has(> [data-align="block-start"], > [data-align="block-end"]) {
+      flex-direction: column;
+      align-items: stretch;
+      height: auto;
+    }
+
+    &:has(:disabled) {
+      opacity: 0.5;
+    }
+
+    &:has([aria-invalid="true"]) {
+      border-color: var(--ui-destructive);
+    }
+
+    &:has(:is([data-slot="input"], [data-slot="textarea"]):focus-visible) {
+      border-color: var(--ui-ring-border);
+      outline: 4px solid var(--ui-ring);
+      outline-offset: 0;
+    }
+
+    > :is([data-slot="input"], [data-slot="textarea"]) {
+      flex: 1 1 auto;
+      min-width: 0;
+      height: 100%;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      outline: none;
+    }
+
+    > [data-slot="textarea"] {
+      height: auto;
+      padding-block: calc(var(--ui-spacing) * 2);
+      resize: none;
+    }
+  }
+
+  [data-slot="input-group-addon"] {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--ui-spacing) * 2);
+    color: var(--ui-muted-foreground);
+    font-size: var(--ui-font-size);
+    font-weight: 500;
+    cursor: text;
+
+    &[data-align="inline-start"] {
+      order: -1;
+      padding-inline-start: calc(var(--ui-spacing) * 2);
+    }
+
+    &[data-align="inline-end"] {
+      order: 1;
+      padding-inline-end: calc(var(--ui-spacing) * 2);
+    }
+
+    &[data-align="block-start"],
+    &[data-align="block-end"] {
+      width: 100%;
+      justify-content: flex-start;
+      padding-inline: calc(var(--ui-spacing) * 2.5);
+    }
+
+    &[data-align="block-start"] {
+      order: -1;
+      padding-block-start: calc(var(--ui-spacing) * 2);
+    }
+
+    &[data-align="block-end"] {
+      order: 1;
+      padding-block-end: calc(var(--ui-spacing) * 2);
+    }
+  }
+
+  [data-slot="input-group-text"] {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--ui-spacing) * 2);
+    color: var(--ui-muted-foreground);
+    font-size: var(--ui-font-size);
+  }
+
+  [data-slot="input-clear"] {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--ui-spacing) * 6);
+    height: calc(var(--ui-spacing) * 6);
+    margin-inline-end: calc(var(--ui-spacing) * 1.5);
+    padding: 0;
+    border: 0;
+    border-radius: max(0px, calc(var(--ui-radius) - 3px));
+    background: transparent;
+    color: var(--ui-muted-foreground);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--ui-muted);
+      color: var(--ui-foreground);
+    }
+  }
+
+  [data-slot="tabs-tab"] {
+    flex: 1 1 0%;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  [data-slot="tabs-tab"][data-orientation="vertical"] {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  [data-slot="tabs-list"] {
+    width: fit-content;
+    justify-content: center;
+  }
+
+  [data-slot="tabs-list"][data-variant="default"] {
+    padding: 3px;
+    border: 0;
+    border-radius: var(--ui-radius);
+    background: var(--ui-muted);
+  }
+
+  [data-slot="tabs-list"][data-variant="default"] > [data-slot="tabs-tab"] {
+    height: calc(var(--ui-spacing) * 6);
+    margin-bottom: 0;
+    border: 0;
+    border-radius: max(0px, calc(var(--ui-radius) - 3px));
+  }
+
+  [data-slot="tabs-list"][data-variant="default"]
+    > [data-slot="tabs-tab"][data-selected] {
+    background: var(--ui-background);
+    color: var(--ui-foreground);
+  }
+
+  [data-slot="tabs-panel"] {
+    flex: 1 1 0%;
+  }
+}

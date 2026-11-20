@@ -1,0 +1,179 @@
+/* web.css draws the select and combobox chevrons, the item checks and the
+   trigger overlaid on an input. These rules add the parts it has no look for:
+   group labels, separators, chips and clear buttons, and a clear button that
+   takes the trigger's place. */
+@layer components {
+  [data-slot="select-trigger"][data-size="sm"] {
+    height: calc(var(--ui-spacing) * 7);
+  }
+
+  :is([data-slot="select-group-label"], [data-slot="combobox-group-label"]) {
+    padding: calc(var(--ui-spacing) * 1.5) calc(var(--ui-spacing) * 2)
+      calc(var(--ui-spacing) * 1);
+    color: var(--ui-muted-foreground);
+    font-size: calc(var(--ui-font-size) - 0.125rem);
+  }
+
+  :is([data-slot="select-separator"], [data-slot="combobox-separator"]) {
+    height: 1px;
+    margin-block: var(--ui-spacing);
+    margin-inline: calc(var(--ui-spacing) * -1);
+    background: var(--ui-border);
+  }
+
+  [data-slot="combobox-content"] {
+    overflow: hidden;
+  }
+
+  /* Empty messages show only while no option matches. */
+  [data-slot="combobox-empty"]:not([data-empty]) {
+    display: none;
+  }
+
+  [data-slot="combobox-clear"] {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--ui-spacing) * 8);
+    height: calc(var(--ui-spacing) * 8);
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius);
+    background: transparent;
+    color: var(--ui-muted-foreground);
+    cursor: pointer;
+
+    &:hover:not([data-disabled]) {
+      color: var(--ui-foreground);
+    }
+
+    &[data-disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    & > svg {
+      width: 1rem;
+      height: 1rem;
+    }
+  }
+
+  [data-slot="combobox-field"] {
+    & > [data-slot="combobox-input"] {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    & > [data-slot="combobox-clear"] {
+      margin-inline-start: calc(var(--ui-spacing) * -8);
+    }
+  }
+
+  [data-slot="combobox-chips"] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ui-spacing);
+    min-height: calc(var(--ui-spacing) * 8);
+    padding: var(--ui-spacing) calc(var(--ui-spacing) * 1.5);
+    border: 1px solid var(--ui-input);
+    border-radius: var(--ui-radius);
+    background: var(--ui-background);
+    color: var(--ui-foreground);
+    font-size: var(--ui-font-size);
+
+    &:focus-within {
+      border-color: var(--ui-ring-border);
+    }
+
+    &:has([aria-invalid="true"]) {
+      border-color: var(--ui-destructive);
+    }
+
+    &[data-disabled] {
+      opacity: 0.5;
+    }
+
+    & [data-slot="combobox-input"] {
+      flex: 1 1 4rem;
+      min-width: 4rem;
+      height: auto;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      outline: none;
+    }
+
+    & > [data-slot="combobox-clear"] {
+      width: calc(var(--ui-spacing) * 6);
+      height: calc(var(--ui-spacing) * 6);
+    }
+  }
+
+  [data-slot="combobox-chip"] {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ui-spacing);
+    max-width: 100%;
+    min-width: 0;
+    height: calc(var(--ui-spacing) * 5.25);
+    padding-inline: calc(var(--ui-spacing) * 1.5);
+    border-radius: var(--ui-radius);
+    background: var(--ui-muted);
+    color: var(--ui-foreground);
+    font-size: calc(var(--ui-font-size) - 0.125rem);
+    font-weight: 500;
+
+    & > span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    &[data-disabled] {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+  }
+
+  [data-slot="combobox-chip-remove"] {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--ui-spacing) * 4);
+    height: calc(var(--ui-spacing) * 4);
+    margin-inline-end: calc(var(--ui-spacing) * -1);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    opacity: 0.5;
+    cursor: pointer;
+
+    &:hover:not([data-disabled]) {
+      opacity: 1;
+    }
+
+    &[data-disabled] {
+      pointer-events: none;
+    }
+
+    & > svg {
+      width: 0.75rem;
+      height: 0.75rem;
+    }
+  }
+
+  [data-slot="combobox-field"] {
+    &:has(> [data-slot="combobox-trigger"], > [data-slot="combobox-clear"])
+      > [data-slot="combobox-input"] {
+      padding-inline-end: calc(var(--ui-spacing) * 8);
+    }
+
+    &:has(> [data-slot="combobox-clear"]) > [data-slot="combobox-trigger"] {
+      display: none;
+    }
+  }
+}

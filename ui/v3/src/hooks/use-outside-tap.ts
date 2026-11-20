@@ -24,7 +24,7 @@ export function useOutsideTap(options: {
       )
         return;
       gesture = { x: event.clientX, y: event.clientY, moved: !event.isPrimary };
-      // Stop list selection/long-press handlers and Base UI's early dismissal.
+      // Stop list selection/long-press handlers and the popup's own dismissal.
       // Do not preventDefault: the browser must still be able to start scrolling.
       event.stopImmediatePropagation();
     }
@@ -45,8 +45,8 @@ export function useOutsideTap(options: {
     function touch(event: TouchEvent) {
       if (!gesture) return;
       if (event.touches.length > 1) gesture.moved = true;
-      // Base UI otherwise treats an outside touchmove as dismissal. Native
-      // scrolling does not depend on these events reaching JavaScript handlers.
+      // Keep a touch that turns into a scroll from the popup's own dismissal.
+      // Native scrolling does not depend on these events reaching JavaScript.
       event.stopImmediatePropagation();
     }
 
@@ -67,7 +67,7 @@ export function useOutsideTap(options: {
         latest.current.onDismiss();
     }
 
-    // Window capture precedes both React's delegated handlers and Base UI's
+    // Window capture precedes both React's delegated handlers and a popup's
     // document listeners, regardless of which component mounted first.
     window.addEventListener("pointerdown", start, true);
     window.addEventListener("pointermove", move, true);
@@ -97,7 +97,7 @@ export function useOutsideTap(options: {
   }, [latest]);
 }
 
-/** Keep Base UI's keyboard/focus behavior, but consume outside touch activation. */
+/** Keep the popover's keyboard/focus behavior, but consume outside touch activation. */
 export function usePopoverOutsideTap(open: boolean, onDismiss: () => void) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);

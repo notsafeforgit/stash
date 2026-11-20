@@ -1,0 +1,94 @@
+/* Calendars, date fields, ratings, pagination steps and toasts. web.css draws
+   the look; these add what it lacks. Toasts are here because they share the
+   date and rating controls' safe-area and touch sizing. */
+@layer components {
+  /* Dropdown caption: a month and a year select between Previous and Next. */
+  [data-slot="calendar-selects"] {
+    display: flex;
+    grid-column: 2;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--ui-spacing) * 1.5);
+  }
+
+  :is([data-slot="calendar-month-select"], [data-slot="calendar-year-select"]) {
+    height: calc(var(--ui-spacing) * 7);
+    padding-inline: calc(var(--ui-spacing) * 2);
+    border: 1px solid var(--ui-input);
+    border-radius: var(--ui-radius);
+    background: var(--ui-background);
+    color: var(--ui-foreground);
+    font: inherit;
+    font-size: var(--ui-font-size);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+
+    &[data-disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  /* Touch rating: 44px hit areas around a star that keeps its size. */
+  [data-slot="rating"][data-size="touch"] > [data-slot="rating-item"] {
+    width: 2.75rem;
+    height: 2.75rem;
+
+    &::before {
+      inset: 0.75rem;
+    }
+  }
+
+  [data-slot="rating-value"] {
+    color: var(--ui-muted-foreground);
+    font-size: var(--ui-font-size);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* web.css styles previous, next and each link, not the first and last steps. */
+  [data-slot="pagination-first"],
+  [data-slot="pagination-last"] {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--ui-spacing) * 1.5);
+    min-width: calc(var(--ui-spacing) * 8);
+    height: calc(var(--ui-spacing) * 8);
+    padding-inline: calc(var(--ui-spacing) * 2);
+    border: 1px solid transparent;
+    border-radius: var(--ui-radius);
+    background: transparent;
+    color: var(--ui-foreground);
+    font: inherit;
+    font-size: var(--ui-font-size);
+    cursor: pointer;
+    user-select: none;
+
+    &:hover:not([aria-disabled="true"]) {
+      background: var(--ui-muted);
+    }
+
+    &[aria-disabled="true"] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  /* Toasts stay clear of the status bar, the home indicator and the side insets. */
+  [data-slot="toast-region"] {
+    margin: max(1rem, var(--safe-area-top)) max(1rem, var(--safe-area-right))
+      max(1rem, var(--safe-area-bottom)) max(1rem, var(--safe-area-left));
+    max-width: calc(
+      100vw -
+      max(1rem, var(--safe-area-left)) -
+      max(1rem, var(--safe-area-right))
+    );
+  }
+
+  [data-slot="toast"] > svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+  }
+}

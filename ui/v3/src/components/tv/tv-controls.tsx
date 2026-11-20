@@ -43,7 +43,7 @@ import {
   type TvActionKind,
   type TvRailEntry,
 } from "@/core/tv/action-config";
-import type { TvMode, TvRotation, TvSettings } from "@/core/tv/settings";
+import type { TvMode, TvSettings } from "@/core/tv/settings";
 import type { TvFeedItem, TvFeedSnapshot } from "@/core/tv/feed-state";
 import type { PlaybackRange } from "@/core/marker-range";
 import { useMsg } from "@/hooks/message";
@@ -297,8 +297,6 @@ export function TvControls({
   settings,
   surface,
   root,
-  rotation,
-  setRotation,
   togglePresentation,
   canFullscreen,
   fullscreen,
@@ -325,8 +323,6 @@ export function TvControls({
   settings: TvSettings;
   surface: RefObject<HTMLDivElement | null>;
   root: RefObject<HTMLDivElement | null>;
-  rotation: TvRotation;
-  setRotation: (rotation: TvRotation) => void;
   togglePresentation: () => true;
   canFullscreen: boolean;
   fullscreen: boolean;
@@ -410,9 +406,6 @@ export function TvControls({
       case "fit":
         setFit((value) => (value === "contain" ? "cover" : "contain"));
         return;
-      case "rotation":
-        setRotation(rotation === "normal" ? "clockwise" : "normal");
-        return;
       case "fullscreen":
         togglePresentation();
         return;
@@ -460,7 +453,6 @@ export function TvControls({
   const input = useTvInputs({
     surface,
     selectionKey: item.key,
-    rotation,
     blocked:
       panel.kind !== "closed" || folder !== null || mutations.busy || leaving,
     drag,

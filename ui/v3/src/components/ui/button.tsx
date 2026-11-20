@@ -1,62 +1,99 @@
-import { Button as ButtonPrimitive } from "@base-ui/react/button";
-import { cva, type VariantProps } from "class-variance-authority";
-
+import { Button as ButtonPrimitive } from "@ui-sdk/react/button";
+import type * as React from "react";
 import { cn } from "@/lib/utils";
 
-const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
-        outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
-        ghost:
-          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
-        // Media gesture surfaces keep their keyboard/disabled semantics without
-        // painting a theme-dependent hover fill over the image or video.
-        transparent: "bg-transparent",
-        destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default:
-          "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        icon: "size-8",
-        "icon-xs":
-          "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm":
-          "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
-        "icon-lg": "size-9",
-        "icon-xl": "size-20 [&_svg:not([class*='size-'])]:size-10",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  },
-);
+type ButtonVariant =
+  | "default"
+  | "outline"
+  | "secondary"
+  | "ghost"
+  | "transparent"
+  | "destructive"
+  | "link";
+
+type ButtonSize =
+  | "default"
+  | "xs"
+  | "sm"
+  | "lg"
+  | "icon"
+  | "icon-xs"
+  | "icon-sm"
+  | "icon-lg"
+  | "icon-xl";
+
+type ButtonProps = React.ComponentProps<typeof ButtonPrimitive> & {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+};
+
+const buttonBase =
+  "inline-flex shrink-0 items-center justify-center gap-1.5 h-8 px-3 border rounded-[var(--ui-radius)] text-[length:var(--ui-font-size)] font-medium whitespace-nowrap cursor-pointer select-none focus-visible:outline-4 focus-visible:outline-offset-0 focus-visible:outline-[color:var(--ui-ring)] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 has-[>[data-icon=inline-start]]:ps-2.5 has-[>[data-icon=inline-end]]:pe-2.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
+
+const buttonVariantClasses: Record<ButtonVariant, string> = {
+  default:
+    "border-[color:var(--ui-primary)] bg-[color:var(--ui-primary)] text-[color:var(--ui-primary-foreground)] hover:bg-[color-mix(in_oklab,var(--ui-primary)_85%,var(--ui-background))]",
+  outline:
+    "border-[color:var(--ui-input)] bg-[color:var(--ui-background)] text-[color:var(--ui-foreground)] hover:bg-[color:var(--ui-muted)]",
+  secondary:
+    "border-transparent bg-[color:var(--ui-muted)] text-[color:var(--ui-foreground)] hover:bg-[color-mix(in_oklab,var(--ui-muted),var(--ui-foreground)_6%)]",
+  ghost:
+    "border-transparent bg-transparent text-[color:var(--ui-foreground)] hover:bg-[color:var(--ui-muted)] aria-expanded:bg-[color:var(--ui-muted)]",
+  transparent:
+    "border-transparent bg-transparent text-[color:var(--ui-foreground)]",
+  destructive:
+    "border-[color-mix(in_oklab,var(--ui-destructive)_30%,var(--ui-background))] bg-[color-mix(in_oklab,var(--ui-destructive)_8%,var(--ui-background))] text-[color:var(--ui-destructive)] hover:bg-[color-mix(in_oklab,var(--ui-destructive)_14%,var(--ui-background))]",
+  link: "h-auto border-transparent bg-transparent px-0 text-[color:var(--ui-primary)] underline-offset-4 hover:underline",
+};
+
+const buttonSizeClasses: Record<ButtonSize, string> = {
+  default: "",
+  xs: "h-6 gap-1 px-2 text-xs [&_svg:not([class*='size-'])]:size-3",
+  sm: "h-7 gap-1 px-2.5 [&_svg:not([class*='size-'])]:size-3.5",
+  lg: "h-9",
+  icon: "size-8 p-0",
+  "icon-xs": "size-6 p-0 [&_svg:not([class*='size-'])]:size-3",
+  "icon-sm": "size-7 p-0",
+  "icon-lg": "size-9 p-0",
+  "icon-xl": "size-20 p-0 [&_svg:not([class*='size-'])]:size-10",
+};
+
+/* For plugin elements that aren't a Button: the same look as Button, as classes. Host code uses Button. */
+function buttonVariants({
+  variant = "default",
+  size = "default",
+  className,
+}: {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  className?: string;
+} = {}): string {
+  return cn(
+    buttonBase,
+    buttonSizeClasses[size],
+    buttonVariantClasses[variant],
+    className,
+  );
+}
 
 function Button({
-  className,
   variant = "default",
   size = "default",
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonProps) {
   return (
     <ButtonPrimitive
-      data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      data-variant={variant === "default" ? "solid" : variant}
+      data-size={size === "default" ? undefined : size}
       {...props}
     />
   );
 }
 
-export { Button, buttonVariants };
+export {
+  Button,
+  buttonVariants,
+  type ButtonProps,
+  type ButtonSize,
+  type ButtonVariant,
+};

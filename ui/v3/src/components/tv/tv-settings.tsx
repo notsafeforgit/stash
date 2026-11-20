@@ -17,7 +17,7 @@ import {
 import { tvSortOptions } from "@/core/tv/feed-query";
 import { tvModeLabels } from "./tv-action-labels";
 import { TvFilterSelect } from "@/components/tv/tv-filter-select";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
@@ -74,9 +74,9 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">{msg("tv.title", "TV")}</h2>
-        <Link to="/tv" className={buttonVariants({ variant: "outline" })}>
+        <Button variant="outline" render={<Link to="/tv" />}>
           {msg("tv.open", "Open TV")}
-        </Link>
+        </Button>
       </div>
       <SettingsSection title={msg("tv.settings.feed", "Feed")}>
         <SettingSelect
@@ -421,33 +421,6 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
           label={msg("tv.settings.ui_visible", "Show controls initially")}
           checked={values.uiVisible}
           onChange={(value) => set("uiVisible", value)}
-        />
-        <SettingSelect
-          label={msg("tv.settings.rotation", "Rotation on this browser")}
-          description={msg(
-            "tv.settings.rotation_description",
-            "Saved only for this browser and server. The video remains inline, with the TV controls available.",
-          )}
-          value={adapter.rotation}
-          options={[
-            { value: "normal", label: msg("tv.text.normal_2", "Normal") },
-            {
-              value: "clockwise",
-              label: msg("tv.text.clockwise", "Clockwise"),
-            },
-            {
-              value: "counterclockwise",
-              label: msg("tv.text.counterclockwise", "Counterclockwise"),
-            },
-          ]}
-          onChange={(value) => {
-            if (
-              value === "normal" ||
-              value === "clockwise" ||
-              value === "counterclockwise"
-            )
-              adapter.setRotation(value);
-          }}
         />
       </SettingsSection>
       <SettingsSection title={msg("tv.settings.rail", "Action rail")}>

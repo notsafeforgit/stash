@@ -362,7 +362,7 @@ interface SceneRowContextMenuProps {
 /**
  * Wraps a scene-table row's JSX with the same context menu the card view
  * uses. The trigger element (`children`) becomes the right-click target via
- * Base UI's `render` prop, so it stays a `<tr>` in the DOM (no wrapping
+ * the trigger's `render` prop, so it stays a `<tr>` in the DOM (no wrapping
  * `<div>` that would break table semantics).
  */
 export function SceneRowContextMenu({

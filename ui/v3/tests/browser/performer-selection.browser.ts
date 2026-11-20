@@ -150,7 +150,7 @@ for (const layout of ["embedded", "standalone", "desktop"]) {
         .getByRole("button", { name: "Create share", exact: true })
         .tap();
       await expect(
-        page.locator('[data-sonner-toast][data-front="true"]'),
+        page.locator('[data-slot="toast"][data-front]'),
       ).toContainText("Unable to create complete snapshot");
       expect(
         await page.evaluate(

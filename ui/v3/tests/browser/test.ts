@@ -55,6 +55,13 @@ export const test = base.extend<{ expectedConsoleErrors: string[] }>({
   },
 });
 
+// A closed dialog's backdrop keeps taking presses while it fades out.
+export async function expectBackdropSettled(page: Page) {
+  await expect(
+    page.locator('[data-slot="dialog-backdrop"][data-closed]'),
+  ).toHaveCount(0);
+}
+
 export function detailFooter(page: Page) {
   return page.locator("[data-mobile-detail-footer]");
 }
@@ -115,7 +122,11 @@ export async function chooseSection(page: Page, name: string) {
   await expect(trigger).toHaveText(name);
 }
 
-/** Exercise Base UI's touch gesture in both engines (Playwright only exposes tap). */
+/**
+ * Exercise a touch long press on a context menu in both engines (Playwright
+ * only exposes tap). The menu's hold binding listens for pointer events with
+ * pointerType "touch", so the gesture is a pointer down, then a pointer up.
+ */
 export async function holdForContextMenu(
   trigger: Locator,
   menu: Locator,
@@ -123,20 +134,31 @@ export async function holdForContextMenu(
 ) {
   await trigger.evaluate((element, position) => {
     const bounds = element.getBoundingClientRect();
-    // WebKit doesn't expose a constructible Touch. Supply the coordinates that
-    // the real primitive consumes without replacing its event handlers/timer.
-    const touch = {
-      clientX: bounds.x + bounds.width * position.x,
-      clientY: bounds.y + bounds.height * position.y,
-    } satisfies Pick<Touch, "clientX" | "clientY">;
-    const event = new Event("touchstart", { bubbles: true });
-    Object.defineProperty(event, "touches", { value: [touch] });
-    element.dispatchEvent(event);
+    element.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        buttons: 1,
+        isPrimary: true,
+        pointerId: 1,
+        pointerType: "touch",
+        clientX: bounds.x + bounds.width * position.x,
+        clientY: bounds.y + bounds.height * position.y,
+      }),
+    );
   }, position);
   await expect(menu).toBeVisible();
-  await trigger.dispatchEvent("touchend", {
-    touches: [],
-    targetTouches: [],
-    changedTouches: [],
+  await trigger.evaluate((element) => {
+    element.dispatchEvent(
+      new PointerEvent("pointerup", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        isPrimary: true,
+        pointerId: 1,
+        pointerType: "touch",
+      }),
+    );
   });
 }

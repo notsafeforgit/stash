@@ -17,8 +17,10 @@ import { Textarea } from "src/components/ui/textarea";
 import {
   Field,
   FieldError,
-  FieldLabel,
   FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "src/components/ui/field";
 import { RatingSystem } from "src/components/ui/rating-system";
 import { DatePicker } from "src/components/ui/date-picker";
@@ -452,16 +454,16 @@ export function GroupEditForm(props: GroupEditFormProps) {
           {/* URLs */}
           <form.Field name="urls">
             {(field) => (
-              <Field>
-                <FieldLabel>
+              <FieldSet>
+                <FieldLegend variant="label">
                   {intl.formatMessage({ id: "urls", defaultMessage: "URLs" })}
-                </FieldLabel>
+                </FieldLegend>
                 <UrlListField
                   value={field.state.value}
                   onChange={field.handleChange}
                   disabled={busy}
                 />
-              </Field>
+              </FieldSet>
             )}
           </form.Field>
 
@@ -564,16 +566,16 @@ export function GroupEditForm(props: GroupEditFormProps) {
           {/* Custom fields */}
           <form.Field name="custom_fields">
             {(field) => (
-              <Field>
-                <FieldLabel>
+              <FieldSet>
+                <FieldLegend variant="label">
                   {intl.formatMessage({ id: "custom_fields.title" })}
-                </FieldLabel>
+                </FieldLegend>
                 <CustomFieldsField
                   value={field.state.value}
                   onChange={field.handleChange}
                   disabled={busy}
                 />
-              </Field>
+              </FieldSet>
             )}
           </form.Field>
         </FieldGroup>

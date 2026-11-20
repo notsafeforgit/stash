@@ -83,7 +83,7 @@ export function BulkEditSheet({
                 sticking to horizontal when a trackpad gesture starts with
                 even a tiny sideways component.
               - Vertical: stops at-boundary overscroll from chaining up
-                into Base UI's body scroll lock (which would silently
+                into the sheet's body scroll lock (which would silently
                 swallow the gesture and skip the rubberband); rubberband
                 now renders consistently for both momentum and direct
                 push gestures. */}

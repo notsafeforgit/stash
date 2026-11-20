@@ -3,29 +3,40 @@ import { act, useState, type ComponentProps } from "react";
 import { createRoot } from "react-dom/client";
 import { IntlProvider } from "react-intl";
 import { expect, it, vi } from "vitest";
-import type { Combobox } from "@/components/ui/combobox";
+import type {
+  Combobox,
+  ComboboxInputValueChangeDetails,
+} from "@/components/ui/combobox";
 import { CustomFieldNameInput } from "./custom-field-name-input";
 
-type InputChangeDetails = Parameters<
-  NonNullable<ComponentProps<typeof Combobox<string>>["onInputValueChange"]>
+type ValueChangeDetails = Parameters<
+  NonNullable<ComponentProps<typeof Combobox<string>>["onValueChange"]>
 >[1];
 
 function inputDetails(
   reason: "input-change" | "input-clear",
-): InputChangeDetails {
+): ComboboxInputValueChangeDetails {
   return {
     reason,
     event: new Event("input"),
-    trigger: undefined,
+    source: "programmatic",
     cancel() {},
-    allowPropagation() {},
-    isCanceled: false,
-    isPropagationAllowed: false,
+    canceled: false,
+  };
+}
+
+function valueDetails(): ValueChangeDetails {
+  return {
+    reason: "item-press",
+    source: "programmatic",
+    cancel() {},
+    canceled: false,
   };
 }
 
 // Exercise the controlled combobox contract without popup layout/animations.
-// Base UI's real locale-aware filter is retained.
+// Filtering is ui-sdk's own and runs against the query, which must be the
+// typed name, so the mock reports the query and the full option list.
 vi.mock("@/components/ui/combobox", async () => {
   const actual = await vi.importActual<
     typeof import("@/components/ui/combobox")
@@ -35,7 +46,7 @@ vi.mock("@/components/ui/combobox", async () => {
     Combobox: ({
       inputValue,
       value,
-      filteredItems,
+      items,
       onInputValueChange,
       onValueChange,
     }: ComponentProps<typeof Combobox<string>>) => (
@@ -51,9 +62,8 @@ vi.mock("@/components/ui/combobox", async () => {
           }
         />
         <output data-testid="selection">{value ?? "none"}</output>
-        <output data-testid="suggestions">
-          {JSON.stringify(filteredItems)}
-        </output>
+        <output data-testid="query">{inputValue}</output>
+        <output data-testid="options">{JSON.stringify(items)}</output>
         <button
           type="button"
           onClick={() => onInputValueChange?.("", inputDetails("input-clear"))}
@@ -62,9 +72,7 @@ vi.mock("@/components/ui/combobox", async () => {
         </button>
         <button
           type="button"
-          onClick={() =>
-            onValueChange?.("obsolete", inputDetails("input-change"))
-          }
+          onClick={() => onValueChange?.("obsolete", valueDetails())}
         >
           Choose suggestion
         </button>
@@ -73,7 +81,7 @@ vi.mock("@/components/ui/combobox", async () => {
   };
 });
 
-it("preserves free names through query resets and filters from the latest typed name", async () => {
+it("preserves free names through query resets and queries from the latest typed name", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const container = document.createElement("div");
   document.body.append(container);
@@ -122,9 +130,9 @@ it("preserves free names through query resets and filters from the latest typed 
     await act(async () => container.querySelectorAll("button")[0]?.click());
     expect(input.value).toBe("a new field");
     await type("obso");
-    expect(
-      container.querySelector('[data-testid="suggestions"]')?.textContent,
-    ).toBe('["obsolete"]');
+    expect(container.querySelector('[data-testid="query"]')?.textContent).toBe(
+      "obso",
+    );
     await act(async () => container.querySelectorAll("button")[1]?.click());
     expect(input.value).toBe("obsolete");
     expect(
@@ -132,8 +140,11 @@ it("preserves free names through query resets and filters from the latest typed 
     ).toBe("obsolete");
     await type("");
     expect(input.value).toBe("");
+    expect(container.querySelector('[data-testid="query"]')?.textContent).toBe(
+      "",
+    );
     expect(
-      container.querySelector('[data-testid="suggestions"]')?.textContent,
+      container.querySelector('[data-testid="options"]')?.textContent,
     ).toBe('["score","obsolete"]');
   } finally {
     await act(async () => root.unmount());

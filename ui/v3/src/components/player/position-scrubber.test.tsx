@@ -89,25 +89,23 @@ async function wait(ms: number) {
 const time = (slider: HTMLElement) =>
   Number(slider.getAttribute("aria-valuenow"));
 
-for (const direction of ["right", "down", "up"] as const) {
-  it(`hands cross-axis drags to the feed without seeking when facing ${direction}`, async () => {
-    const pan = { onDrag: vi.fn(), onEnd: vi.fn(), onCancel: vi.fn() };
-    const slider = await render({ direction, crossAxisPan: pan });
-    const x = direction === "right" ? 200 : direction === "down" ? 280 : 120;
-    const y = direction === "right" ? 120 : 200;
-    await pointer(slider, "pointerdown");
-    await pointer(slider, "pointermove", x, y);
-    expect(pan.onDrag).toHaveBeenLastCalledWith(-80);
-    await wait(2000);
-    expect(preview).not.toHaveBeenCalled();
-    expect(vibrate).not.toHaveBeenCalled();
-    await pointer(slider, "pointerup", x, y);
-    expect(pan.onEnd).toHaveBeenCalledExactlyOnceWith(-80);
-    expect(seek).not.toHaveBeenCalled();
-    expect(pan.onCancel).not.toHaveBeenCalled();
-    expect(slider.hasAttribute("data-dragging")).toBe(false);
-  });
-}
+it("hands cross-axis drags to the feed without seeking", async () => {
+  const pan = { onDrag: vi.fn(), onEnd: vi.fn(), onCancel: vi.fn() };
+  const slider = await render({ crossAxisPan: pan });
+  const x = 200;
+  const y = 120;
+  await pointer(slider, "pointerdown");
+  await pointer(slider, "pointermove", x, y);
+  expect(pan.onDrag).toHaveBeenLastCalledWith(-80);
+  await wait(2000);
+  expect(preview).not.toHaveBeenCalled();
+  expect(vibrate).not.toHaveBeenCalled();
+  await pointer(slider, "pointerup", x, y);
+  expect(pan.onEnd).toHaveBeenCalledExactlyOnceWith(-80);
+  expect(seek).not.toHaveBeenCalled();
+  expect(pan.onCancel).not.toHaveBeenCalled();
+  expect(slider.hasAttribute("data-dragging")).toBe(false);
+});
 
 it("keeps horizontal scrubbing after the gesture is claimed, even if the finger then moves vertically", async () => {
   const pan = { onDrag: vi.fn(), onEnd: vi.fn(), onCancel: vi.fn() };
@@ -134,33 +132,31 @@ it("cancels an interrupted feed drag and accepts the next seek tap", async () =>
   expect(seek).toHaveBeenCalledExactlyOnceWith(60);
 });
 
-for (const direction of ["right", "down", "up"] as const) {
-  it(`anchors successive touch zooms and commits the precise time when seeking ${direction}`, async () => {
-    const slider = await render({ direction });
-    await pointer(slider, "pointerdown");
-    expect(time(slider)).toBe(60);
-    expect(preview).not.toHaveBeenCalled();
-    await wait(2650);
-    expect(time(slider)).toBe(60);
-    expect(slider.hasAttribute("data-precision")).toBe(true);
-    expect(preview).toHaveBeenLastCalledWith(60);
-    expect(seek).not.toHaveBeenCalled();
-    await wait(2000);
-    // 120 seconds -> 30 -> 7.5. A quarter-width move now seeks 1.875s.
-    const x = direction === "right" ? 300 : 200;
-    const y = direction === "down" ? 300 : direction === "up" ? 100 : 200;
-    await pointer(slider, "pointermove", x, y);
-    expect(time(slider)).toBe(61.875);
-    await pointer(slider, "pointerup", x, y);
-    expect(seek).toHaveBeenCalledExactlyOnceWith(61.875);
-    expect(slider.hasAttribute("data-precision")).toBe(false);
-    expect(slider.hasAttribute("data-dragging")).toBe(false);
-    await wait(2000);
-    expect(vibrate).toHaveBeenCalledTimes(2);
-    await pointer(slider, "pointerdown", 100, 100);
-    expect(time(slider)).toBe(direction === "up" ? 90 : 30);
-  });
-}
+it("anchors successive touch zooms and commits the precise time", async () => {
+  const slider = await render();
+  await pointer(slider, "pointerdown");
+  expect(time(slider)).toBe(60);
+  expect(preview).not.toHaveBeenCalled();
+  await wait(2650);
+  expect(time(slider)).toBe(60);
+  expect(slider.hasAttribute("data-precision")).toBe(true);
+  expect(preview).toHaveBeenLastCalledWith(60);
+  expect(seek).not.toHaveBeenCalled();
+  await wait(2000);
+  // 120 seconds -> 30 -> 7.5. A quarter-width move now seeks 1.875s.
+  const x = 300;
+  const y = 200;
+  await pointer(slider, "pointermove", x, y);
+  expect(time(slider)).toBe(61.875);
+  await pointer(slider, "pointerup", x, y);
+  expect(seek).toHaveBeenCalledExactlyOnceWith(61.875);
+  expect(slider.hasAttribute("data-precision")).toBe(false);
+  expect(slider.hasAttribute("data-dragging")).toBe(false);
+  await wait(2000);
+  expect(vibrate).toHaveBeenCalledTimes(2);
+  await pointer(slider, "pointerdown", 100, 100);
+  expect(time(slider)).toBe(30);
+});
 
 it("starts the stationary preview before counting a deliberate zoom hold", async () => {
   const slider = await render({ duration: 132 });
@@ -239,35 +235,24 @@ it("does not revive a cancelled gesture when a late preview becomes ready", asyn
   expect(slider.hasAttribute("data-dragging")).toBe(false);
 });
 
-for (const direction of ["right", "down", "up"] as const) {
-  it(`keeps the magnified scale while making one-pixel adjustments ${direction}`, async () => {
-    const slider = await render({ duration: 132, direction });
-    await pointer(slider, "pointerdown");
-    await wait(2650);
-    await wait(2000);
-    // At 16x, small movements are deliberate seeks, not a continuing hold.
-    for (let step = 1; step <= 12; step++) {
-      await wait(300);
-      await pointer(
-        slider,
-        "pointermove",
-        direction === "right" ? 200 + step : 200,
-        direction === "down"
-          ? 200 + step
-          : direction === "up"
-            ? 200 - step
-            : 200,
-      );
-      expect(vibrate).toHaveBeenCalledTimes(2);
-      expect(time(slider)).toBeCloseTo(66 + (step / 400) * 8.25);
-    }
-    // A fresh stationary pause can still request the next level.
-    await wait(1999);
+it("keeps the magnified scale while making one-pixel adjustments", async () => {
+  const slider = await render({ duration: 132 });
+  await pointer(slider, "pointerdown");
+  await wait(2650);
+  await wait(2000);
+  // At 16x, small movements are deliberate seeks, not a continuing hold.
+  for (let step = 1; step <= 12; step++) {
+    await wait(300);
+    await pointer(slider, "pointermove", 200 + step, 200);
     expect(vibrate).toHaveBeenCalledTimes(2);
-    await wait(1);
-    expect(vibrate).toHaveBeenCalledTimes(3);
-  });
-}
+    expect(time(slider)).toBeCloseTo(66 + (step / 400) * 8.25);
+  }
+  // A fresh stationary pause can still request the next level.
+  await wait(1999);
+  expect(vibrate).toHaveBeenCalledTimes(2);
+  await wait(1);
+  expect(vibrate).toHaveBeenCalledTimes(3);
+});
 
 it("allows subpixel jitter while holding a magnified timeline", async () => {
   const slider = await render({ duration: 132 });

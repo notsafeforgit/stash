@@ -349,7 +349,9 @@ it("previews the raw mapping draft with sample JSON without saving it", async ()
     "A quoted title",
   );
   expect(control("jq expression").value).toBe(expression);
-  const trigger = container.querySelector('[data-slot="collapsible-trigger"]');
+  const trigger = Array.from(container.querySelectorAll("button")).find(
+    (element) => element.textContent === "Preview mappings",
+  );
   expect(trigger?.getAttribute("aria-expanded")).toBe("true");
   expect(
     document.getElementById(trigger?.getAttribute("aria-controls") ?? ""),

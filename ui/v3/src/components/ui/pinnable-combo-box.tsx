@@ -1,6 +1,5 @@
 import React from "react";
-import { CheckIcon, Pin } from "lucide-react";
-import { Combobox as ComboboxPrimitive } from "@base-ui/react";
+import { Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIntl } from "react-intl";
 import { Button } from "@/components/ui/button";
@@ -8,8 +7,9 @@ import {
   Combobox,
   ComboboxContent,
   ComboboxGroup,
+  ComboboxGroupLabel,
   ComboboxInput,
-  ComboboxLabel,
+  ComboboxItem,
   ComboboxList,
   ComboboxSeparator,
 } from "@/components/ui/combobox";
@@ -75,7 +75,7 @@ export interface PinnableComboBoxProps {
   pinnedValues?: string[];
   pinnedSectionLabel?: string;
   allSectionLabel?: string;
-  side?: "top" | "bottom" | "left" | "right" | "inline-start" | "inline-end";
+  side?: "top" | "bottom" | "left" | "right";
   align?: "start" | "end" | "center";
   disabled?: boolean;
   triggerClassName?: string;
@@ -132,6 +132,7 @@ export function PinnableComboBox({
         if (v !== null) onSelect(v);
       }}
       onInputValueChange={(v: string) => setQuery(v)}
+      filter={false}
       onOpenChange={(nextOpen, details) => {
         setOpen(nextOpen);
         // Typing can open the popup after the input callback has set its query.
@@ -159,7 +160,7 @@ export function PinnableComboBox({
           {pinned.length > 0 && (
             <>
               <ComboboxGroup>
-                <ComboboxLabel>{pinnedSectionLabel}</ComboboxLabel>
+                <ComboboxGroupLabel>{pinnedSectionLabel}</ComboboxGroupLabel>
                 {pinned.map((option) =>
                   renderItem(option, pinnedValues, renderItemAddon),
                 )}
@@ -169,7 +170,7 @@ export function PinnableComboBox({
           )}
           <ComboboxGroup>
             {allSectionLabel && (
-              <ComboboxLabel>{allSectionLabel}</ComboboxLabel>
+              <ComboboxGroupLabel>{allSectionLabel}</ComboboxGroupLabel>
             )}
             {unpinned.map((option) =>
               renderItem(option, pinnedValues, renderItemAddon),
@@ -188,18 +189,9 @@ function renderItem(
 ) {
   const isPinned = pinnedValues?.includes(option.value) ?? false;
   return (
-    <ComboboxPrimitive.Item
-      key={option.value}
-      value={option.value}
-      className="relative flex w-full cursor-pointer select-none items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden data-highlighted:bg-accent data-highlighted:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-    >
-      <span className="flex min-w-0 items-center gap-2">
-        <ComboboxPrimitive.ItemIndicator className="flex size-4 shrink-0 items-center justify-center">
-          <CheckIcon className="size-4" />
-        </ComboboxPrimitive.ItemIndicator>
-        <span className="truncate">{option.label}</span>
-      </span>
+    <ComboboxItem key={option.value} value={option.value} label={option.label}>
+      <span className="min-w-0 truncate">{option.label}</span>
       {renderItemAddon?.(option.value, isPinned)}
-    </ComboboxPrimitive.Item>
+    </ComboboxItem>
   );
 }

@@ -16,7 +16,7 @@ import {
   EntityListPage,
   type EntityListPageConfig,
 } from "@/components/list/entity-list-page";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { createCache } from "@/core/create-client";
 import * as GQL from "@/core/generated-graphql";
 import { objectTitle } from "@/core/files";

@@ -1,6 +1,8 @@
 # Native v3 TV mode implementation plan
 
-Status: **implemented**. See [TV mode](tv-mode.md) for the current behavior,
+Status: **implemented**. Forced presentation rotation (TV-13) was later
+removed; a phone turned sideways uses the ordinary landscape layout. See
+[TV mode](tv-mode.md) for the current behavior,
 module boundaries, and verification coverage. This document retains the
 accepted implementation contract and its starting context. The user selected a native feature in the v3
 rewrite, with a separate navigation item and the major Stash TV capabilities

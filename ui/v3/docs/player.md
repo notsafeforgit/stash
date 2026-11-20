@@ -298,7 +298,7 @@ Releasing at a preview target still being decoded reuses the pending native seek
 it does not issue a second seek to the same time.
 
 Touch scrubbing supports precision seeking in scene detail, both lightboxes and
-TV (including rotated controls). A 650 ms hold starts a preview without changing
+TV. A 650 ms hold starts a preview without changing
 the timeline scale. Precision zoom requires a further 2-second stationary hold.
 When using the small preview stream, that hold starts only after its requested
 frame is decoded; streaming delays and keyframe stills, cached or fetched, do

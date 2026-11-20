@@ -3,7 +3,7 @@ import { IntlProvider } from "react-intl";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ShareViewer } from "@/components/sharing/share-viewer";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import messages from "@/locales/en-GB.json";
 import flattenMessages from "@/utils/flatten-messages";
 import { installPagePinchZoomGuard } from "@/lib/prevent-page-pinch-zoom";

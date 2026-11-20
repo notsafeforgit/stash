@@ -1,34 +1,42 @@
 import * as React from "react";
-import type { Toggle as TogglePrimitive } from "@base-ui/react/toggle";
-import { ToggleGroup as ToggleGroupPrimitive } from "@base-ui/react/toggle-group";
-import type { VariantProps } from "class-variance-authority";
+import { ToggleGroup as ToggleGroupPrimitive } from "@ui-sdk/react/toggle";
 
 import { cn } from "@/lib/utils";
-import { Toggle, type toggleVariants } from "@/components/ui/toggle";
+import {
+  Toggle,
+  type ToggleProps,
+  type ToggleSize,
+  type ToggleVariant,
+} from "@/components/ui/toggle";
 
-const ToggleGroupContext = React.createContext<
-  VariantProps<typeof toggleVariants>
->({
-  size: "default",
-  variant: "default",
-});
+type ToggleGroupContextValue = {
+  variant?: ToggleVariant;
+  size?: ToggleSize;
+};
 
-function ToggleGroup<Value extends string>({
+const ToggleGroupContext = React.createContext<ToggleGroupContextValue>({});
+
+type ToggleGroupProps<Value extends string = string> = Omit<
+  React.ComponentProps<typeof ToggleGroupPrimitive<Value>>,
+  "children" | "className"
+> &
+  ToggleGroupContextValue & {
+    children?: React.ReactNode;
+    className?: string;
+  };
+
+function ToggleGroup<Value extends string = string>({
   className,
   variant,
   size,
   children,
   ...props
-}: ToggleGroupPrimitive.Props<Value> & VariantProps<typeof toggleVariants>) {
+}: ToggleGroupProps<Value>) {
   return (
-    <ToggleGroupPrimitive
-      data-slot="toggle-group"
+    <ToggleGroupPrimitive<Value>
       data-variant={variant}
       data-size={size}
-      className={cn(
-        "group/toggle-group flex w-fit items-center rounded-md data-[variant=outline]:shadow-xs",
-        className,
-      )}
+      className={cn("w-fit", className)}
       {...props}
     >
       <ToggleGroupContext.Provider value={{ variant, size }}>
@@ -38,32 +46,18 @@ function ToggleGroup<Value extends string>({
   );
 }
 
-function ToggleGroupItem<Value extends string>({
-  className,
-  children,
+function ToggleGroupItem<Value extends string = string>({
   variant,
   size,
   ...props
-}: TogglePrimitive.Props<Value> & VariantProps<typeof toggleVariants>) {
+}: ToggleProps<Value>) {
   const context = React.useContext(ToggleGroupContext);
-  const resolvedVariant = context.variant ?? variant;
-  const resolvedSize = context.size ?? size;
-
   return (
     <Toggle<Value>
-      data-slot="toggle-group-item"
-      data-variant={resolvedVariant}
-      data-size={resolvedSize}
-      variant={resolvedVariant}
-      size={resolvedSize}
-      className={cn(
-        "shrink-0 rounded-none shadow-none first:rounded-l-md last:rounded-r-md focus:z-10 focus-visible:z-10 data-[variant=outline]:border-l-0 data-[variant=outline]:first:border-l",
-        className,
-      )}
+      variant={context.variant ?? variant}
+      size={context.size ?? size}
       {...props}
-    >
-      {children}
-    </Toggle>
+    />
   );
 }
 

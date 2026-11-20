@@ -1,9 +1,12 @@
 import type React from "react";
 import { useMemo, useState } from "react";
+import { useIntl } from "react-intl";
 import { ChevronUp, ChevronDown, Clock } from "lucide-react";
 import { secondsToTimestamp, timestampToSeconds } from "src/utils/duration";
 import { Input } from "src/components/ui/input";
 import { Button } from "src/components/ui/button";
+import { FieldError } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 
 interface Props {
   disabled?: boolean;
@@ -18,6 +21,8 @@ interface Props {
 
 const includeMS = true;
 
+// Time Input has no milliseconds, and Number Input formats only with Intl
+// options, so the hh:mm:ss.ms text stays a plain text field here.
 export const DurationInput: React.FC<Props> = ({
   disabled,
   value,
@@ -28,6 +33,7 @@ export const DurationInput: React.FC<Props> = ({
   allowNegative = false,
   error,
 }) => {
+  const intl = useIntl();
   const [tmpValue, setTmpValue] = useState<string>();
 
   function onChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -74,10 +80,13 @@ export const DurationInput: React.FC<Props> = ({
 
   return (
     <div
-      className={`duration-input flex items-center gap-1 ${className ?? ""}`}
+      data-slot="duration-input"
+      className={cn("duration-input flex items-center gap-1", className)}
     >
       <Input
         type="text"
+        aria-label={placeholderText}
+        aria-invalid={error ? true : undefined}
         disabled={disabled}
         value={inputValue}
         onChange={onChange}
@@ -85,10 +94,14 @@ export const DurationInput: React.FC<Props> = ({
         placeholder={placeholderText}
       />
       {!disabled && (
-        <div className="flex flex-col">
+        <div data-slot="duration-input-steps" className="flex flex-col">
           <Button
             variant="outline"
-            size="icon"
+            size="icon-xs"
+            aria-label={intl.formatMessage({
+              id: "duration_input.increase",
+              defaultMessage: "Increase",
+            })}
             className="h-4 w-6 rounded-b-none"
             onClick={increment}
             tabIndex={-1}
@@ -97,7 +110,11 @@ export const DurationInput: React.FC<Props> = ({
           </Button>
           <Button
             variant="outline"
-            size="icon"
+            size="icon-xs"
+            aria-label={intl.formatMessage({
+              id: "duration_input.decrease",
+              defaultMessage: "Decrease",
+            })}
             className="h-4 w-6 rounded-t-none border-t-0"
             onClick={decrement}
             tabIndex={-1}
@@ -110,14 +127,18 @@ export const DurationInput: React.FC<Props> = ({
         <Button
           variant="outline"
           size="icon"
-          className="h-8 w-8 shrink-0"
+          aria-label={intl.formatMessage({
+            id: "duration_input.use_current_time",
+            defaultMessage: "Use current time",
+          })}
+          className="shrink-0"
           onClick={onReset}
           tabIndex={-1}
         >
           <Clock className="size-4" />
         </Button>
       )}
-      {error && <div className="text-destructive text-sm">{error}</div>}
+      {error && <FieldError>{error}</FieldError>}
     </div>
   );
 };

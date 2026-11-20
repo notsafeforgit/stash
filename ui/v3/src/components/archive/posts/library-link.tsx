@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { PostLibraryItem } from "@/core/native-archive/source-post-api";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export function LibraryLink({
   item,
@@ -15,36 +14,44 @@ export function LibraryLink({
   sources?: boolean;
 }) {
   if (item.state !== "active") return null;
-  const className = cn(buttonVariants({ variant: "outline" }));
   if (item.kind === "scene")
     return (
-      <Link
-        className={className}
-        to="/scenes/$sceneId"
-        params={{ sceneId: item.uuid }}
-        search={sources ? { tab: "source-review" } : {}}
+      <Button
+        variant="outline"
+        render={
+          <Link
+            to="/scenes/$sceneId"
+            params={{ sceneId: item.uuid }}
+            search={sources ? { tab: "source-review" } : {}}
+          />
+        }
       >
         {children}
-      </Link>
+      </Button>
     );
   if (item.kind === "image")
     return (
-      <Link
-        className={className}
-        to="/images/$imageId"
-        params={{ imageId: item.uuid }}
-        search={sources ? { tab: "source-review" } : {}}
+      <Button
+        variant="outline"
+        render={
+          <Link
+            to="/images/$imageId"
+            params={{ imageId: item.uuid }}
+            search={sources ? { tab: "source-review" } : {}}
+          />
+        }
       >
         {children}
-      </Link>
+      </Button>
     );
   return (
-    <Link
-      className={className}
-      to="/galleries/$galleryId"
-      params={{ galleryId: item.uuid }}
+    <Button
+      variant="outline"
+      render={
+        <Link to="/galleries/$galleryId" params={{ galleryId: item.uuid }} />
+      }
     >
       {children}
-    </Link>
+    </Button>
   );
 }

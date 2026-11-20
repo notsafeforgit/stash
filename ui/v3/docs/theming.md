@@ -40,6 +40,15 @@ through Vite, Tailwind, PostCSS, or a Sass compiler.
 - Unprefixed `--primary`, `--background`, etc. remain in some direct CSS uses.
   Keep their overrides aligned when changing the corresponding color.
 
+Components also read ui-sdk's `--ui-*` tokens from `web.css`. globals.css points
+`--ui-background`, `--ui-foreground`, `--ui-muted`, `--ui-border`,
+`--ui-primary`, `--ui-primary-foreground` and `--ui-destructive` at the matching
+`--color-*` tokens, and `--ui-radius` at `--radius`, so overriding those also
+restyles the components. `--ui-input`, `--ui-ring`, `--ui-ring-border` and
+`--ui-muted-foreground` keep web.css's values for contrast; override them
+directly to change control edges, focus rings or hint text. web.css documents
+the full set at the top of `node_modules/@ui-sdk/core/dist/web.css`.
+
 The source's `@theme` and `@theme inline` directives run at **build time**. Do not
 put `@theme` or `@apply` in `custom.css`; browsers do not compile them. Runtime
 color tokens are complete CSS colors, usually OKLCH, not HSL channel tuples.
@@ -113,35 +122,37 @@ separate DOM slot.
 
 Examples present in the current wrappers:
 
-- `[data-slot="button"]`
+- `[data-slot="button"]`, which a trigger rendered through `Button` also carries
 - `[data-slot="card"]`, `[data-slot="card-header"]`, `[data-slot="card-content"]`
-- `[data-slot="dialog-content"]`, `[data-slot="dialog-overlay"]`
-- `[data-slot="dropdown-menu-content"]`, `[data-slot="dropdown-menu-item"]`
-- `[data-slot="combobox-trigger"]`, `[data-slot="combobox-list"]`
+- `[data-slot="dialog-content"]`, `[data-slot="dialog-backdrop"]`; sheets are
+  `[data-slot="dialog-content"][data-side]`
+- `[data-slot="menu-content"]`, `[data-slot="menu-item"]` for dropdown and context menus
+- `[data-slot="combobox-input"]`, `[data-slot="combobox-trigger"]`, `[data-slot="combobox-list"]`
 - `[data-slot="select-trigger"]`, `[data-slot="select-content"]`
 - `[data-slot="checkbox"]`, `[data-slot="tooltip-content"]`
-- `[data-slot="sheet-content"]`, `[data-slot="drawer-content"]`
+- `[data-slot="drawer-content"]`, `[data-slot="toast"]`
+- `[data-slot="tabs-tab"]`, `[data-slot="tabs-panel"]`
 
-`ComboboxInput` renders through the input-group wrappers, so it does not add a
-`combobox-input` slot of its own.
+ui-sdk sets each part's `data-slot` (`<component>-<part>`), and a part rendered as
+another component through `render` carries that component's slot. Read the slot
+from the rendered page before writing a selector.
 
-### Base UI state attributes
+### ui-sdk state attributes
 
-State attributes depend on the primitive. For example, dropdown popups use
-`[data-open]` / `[data-closed]`, submenu triggers can use `[data-popup-open]`, and
-items expose attributes such as `[data-disabled]` or `[data-highlighted]`.
-Positioned popups use `data-side` values such as `top`, `bottom`, `left`, or `right`
-(and logical sides where supported).
+State shows as presence attributes: popups and their triggers use `[data-open]`
+and `[data-closed]`, items `[data-highlighted]`, `[data-selected]` or
+`[data-checked]`, and disabled parts `[data-disabled]`. Positioned popups add
+`data-side` (`top`, `bottom`, `left` or `right`) and expose `--anchor-width`,
+`--available-height` and `--transform-origin`.
 
 ```css
-[data-slot="dropdown-menu-content"][data-open] {
+[data-slot="menu-content"][data-open] {
   outline: 1px solid var(--color-border);
 }
 ```
 
-Do not assume Radix-style `[data-state="open"]` applies to Base UI popups. Some
-Stash wrappers define their own `data-state`, so inspect the actual component
-before writing a state selector.
+Do not assume Radix-style `[data-state="open"]`. Each component page in
+`node_modules/@ui-sdk/react/docs/components/` lists its attributes.
 
 ### Stash hooks and interaction policy
 

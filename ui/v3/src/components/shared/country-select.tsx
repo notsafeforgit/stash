@@ -8,7 +8,7 @@ interface Props {
   value?: string;
   onChange?: (value: string) => void;
   disabled?: boolean;
-  // menuPortalTarget accepted but ignored — PinnableComboBox uses a Radix Portal
+  // menuPortalTarget accepted but ignored — PinnableComboBox's popup mounts in the body
   menuPortalTarget?: HTMLElement | null;
 }
 

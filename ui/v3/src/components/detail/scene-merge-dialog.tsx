@@ -34,7 +34,7 @@ import {
   ComboboxGroup,
   ComboboxInput,
   ComboboxItem,
-  ComboboxLabel,
+  ComboboxGroupLabel,
   ComboboxList,
   ComboboxSeparator,
 } from "src/components/ui/combobox";
@@ -92,9 +92,8 @@ export function SceneMergeDialog({
   const [mergeScene] = useEntityMutation(GQL.SceneMergeDocument);
 
   // ── Search UI state (transient — not part of form data) ────────────────────
-  // We let Base UI Combobox manage `inputValue` itself (via `itemToStringLabel`
-  // for the selected value, plus the user's typing). We only react to
-  // `onInputValueChange` to drive the server query for the async search.
+  // The combobox fills its input from `itemToStringLabel` and typing;
+  // `onInputValueChange` only drives the server query.
   const [serverQuery, setServerQuery] = useState("");
   const debouncedSetServerQuery = useDebounce(setServerQuery, 250);
 
@@ -150,10 +149,8 @@ export function SceneMergeDialog({
     [sources, intl],
   );
 
-  // Cached id→label map so the selected scene's label survives even after
-  // the search results refetch. `itemToStringLabel` reads from this so
-  // Base UI can render the picked scene's title in the input even when
-  // it's no longer in the current results array.
+  // Cached id→label map, so the selected scene's title still shows after the
+  // search results refetch drops it.
   const [knownLabels, rememberLabels] = useLabelCache(
     [...options, ...sourceOptions].map((option) => [option.id, option.label]),
   );
@@ -162,10 +159,8 @@ export function SceneMergeDialog({
     [knownLabels],
   );
 
-  // Pass the visible item ids to the root so Base UI can compute
-  // `filteredItems` and only render <ComboboxEmpty> when the list really is
-  // empty. We disable the internal filter (`filter={null}`) because the
-  // results are already filtered server-side via `serverQuery`.
+  // The server has already filtered these ids by `serverQuery`, so the
+  // combobox runs no local filter (`filter={null}`).
   const allItemIds = useMemo(
     () => [...sourceOptions.map((o) => o.id), ...options.map((o) => o.id)],
     [sourceOptions, options],
@@ -350,7 +345,7 @@ export function SceneMergeDialog({
         showCloseButton={false}
         // Cap the whole dialog so the header and actions remain visible
         // when the resolution fields scroll, including with mobile chrome.
-        className="max-h-[calc(100dvh-2rem)] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-2xl"
+        className="grid max-h-[calc(100dvh-2rem)] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-2xl"
       >
         <DialogHeader>
           <DialogTitle>
@@ -467,12 +462,12 @@ export function SceneMergeDialog({
                           {isBulk && (
                             <>
                               <ComboboxGroup>
-                                <ComboboxLabel>
+                                <ComboboxGroupLabel>
                                   {intl.formatMessage({
                                     id: "dialogs.merge_scene.from_selection",
                                     defaultMessage: "From selection",
                                   })}
-                                </ComboboxLabel>
+                                </ComboboxGroupLabel>
                                 {sourceOptions.map((opt) => (
                                   <ComboboxItem key={opt.id} value={opt.id}>
                                     <SceneOptionItem option={opt} />
@@ -485,12 +480,12 @@ export function SceneMergeDialog({
                           {options.length > 0 && (
                             <ComboboxGroup>
                               {isBulk && (
-                                <ComboboxLabel>
+                                <ComboboxGroupLabel>
                                   {intl.formatMessage({
                                     id: "dialogs.merge_scene.search_results",
                                     defaultMessage: "Search results",
                                   })}
-                                </ComboboxLabel>
+                                </ComboboxGroupLabel>
                               )}
                               {options.map((opt) => (
                                 <ComboboxItem key={opt.id} value={opt.id}>
@@ -524,11 +519,8 @@ export function SceneMergeDialog({
                         </ComboboxList>
                       </ComboboxContent>
                     </Combobox>
-                    {/* Reserve a constant-height slot for the validation
-                        error so toggling it on/off doesn't change the
-                        dialog's height (Base UI re-centers vertically on
-                        height changes — without this the dialog visibly
-                        jumps when the user picks / clears a scene). */}
+                    {/* Reserve a fixed-height slot for the validation error:
+                        the dialog is centered, so a height change makes it jump. */}
                     <div className="min-h-5 text-sm">
                       {isInvalid && (
                         <FieldError errors={field.state.meta.errors} />

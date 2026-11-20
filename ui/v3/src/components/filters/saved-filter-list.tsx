@@ -1,16 +1,16 @@
-import { useId } from "react";
+import { useId, useRef, useState } from "react";
 import { useForm, useStore } from "@tanstack/react-form";
 import { FormattedMessage, useIntl } from "react-intl";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  Combobox,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
-  useComboboxFilter,
-} from "@/components/ui/combobox";
+  createListboxController,
+  Listbox,
+  ListboxItem,
+  ListboxItemIndicator,
+  matchRanges,
+} from "@/components/ui/listbox";
 import {
   Dialog,
   DialogContent,
@@ -25,9 +25,18 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
-import type { FilterMode } from "@/core/generated-graphql";
+import type {
+  FilterMode,
+  FindSavedFiltersQuery,
+} from "@/core/generated-graphql";
 import { useFindSavedFilters } from "@/core/saved-filters";
 import { findSavedFilterByName } from "./saved-filter-name";
+
+type SavedFilterItem = FindSavedFiltersQuery["findSavedFilters"][number];
+
+function matchesName(name: string, query: string) {
+  return query === "" || matchRanges(name, query, "contains").length > 0;
+}
 
 export function SaveFilterDialog({
   mode,
@@ -42,10 +51,13 @@ export function SaveFilterDialog({
   const nameId = useId();
   const hintId = useId();
   const statusId = useId();
-  const { contains } = useComboboxFilter({ locale: intl.locale });
+  const nameRef = useRef<HTMLInputElement>(null);
   const { data, previousData } = useFindSavedFilters(mode);
   const savedFilters =
     data?.findSavedFilters ?? previousData?.findSavedFilters ?? [];
+  const [suggestions] = useState(() =>
+    createListboxController<SavedFilterItem>(),
+  );
   const form = useForm({
     defaultValues: { name: "", selectedId: null as string | null },
     validators: {
@@ -68,7 +80,7 @@ export function SaveFilterDialog({
   const selected =
     savedFilters.find((filter) => filter.id === values.selectedId) ?? null;
   const filteredItems = savedFilters.filter((filter) =>
-    contains(filter.name, values.name.trim()),
+    matchesName(filter.name, values.name.trim()),
   );
   function namedFilter(name: string) {
     return findSavedFilterByName(savedFilters, name, intl.locale);
@@ -84,7 +96,7 @@ export function SaveFilterDialog({
     >
       <DialogContent
         showCloseButton={false}
-        className="h-[min(32rem,calc(100dvh-2rem))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden"
+        className="grid h-[min(32rem,calc(100dvh-2rem))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden"
       >
         <DialogHeader>
           <DialogTitle>
@@ -99,68 +111,84 @@ export function SaveFilterDialog({
           }}
         >
           <FieldGroup className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            <Field data-disabled={isSaving} data-invalid={nameTaken}>
-              <FieldLabel htmlFor={nameId}>
-                <FormattedMessage id="filter_name" />
-              </FieldLabel>
-              <Combobox
-                inline
-                open
-                items={savedFilters}
-                filteredItems={filteredItems}
-                value={selected}
-                inputValue={values.name}
-                itemToStringLabel={(filter) => filter.name}
-                itemToStringValue={(filter) => filter.id}
-                isItemEqualToValue={(filter, value) => filter.id === value.id}
-                onValueChange={(filter) => {
-                  if (!filter) return;
-                  form.setFieldValue("name", filter.name);
-                  form.setFieldValue("selectedId", filter.id);
-                }}
-                onInputValueChange={(name, details) => {
-                  // Popup/selection resets must not erase a freely typed name.
-                  // Only an explicit item selection authorizes an overwrite.
-                  if (
-                    details.reason === "input-change" ||
-                    details.reason === "input-clear"
-                  ) {
-                    form.setFieldValue("name", name);
-                    form.setFieldValue("selectedId", null);
-                  }
-                }}
-                disabled={isSaving}
-              >
-                <ComboboxInput
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Field data-disabled={isSaving} data-invalid={nameTaken}>
+                <FieldLabel htmlFor={nameId}>
+                  <FormattedMessage id="filter_name" />
+                </FieldLabel>
+                <Input
                   id={nameId}
+                  value={values.name}
+                  onChange={(event) => {
+                    // Typing is the only path that edits the name freely; a
+                    // suggestion choice below sets the saved filter instead.
+                    form.setFieldValue("name", event.target.value);
+                    form.setFieldValue("selectedId", null);
+                  }}
                   placeholder={intl.formatMessage({
                     id: "search_filter.save_name_placeholder",
                   })}
                   aria-describedby={`${hintId} ${statusId}`}
                   aria-invalid={nameTaken}
                   disabled={isSaving}
-                  showTrigger={false}
                   autoFocus
+                  ref={nameRef}
+                  onKeyDown={(event) => {
+                    // As in a combobox: ArrowDown moves into the suggestions.
+                    const [first] = filteredItems;
+                    if (event.key !== "ArrowDown" || !first) return;
+                    event.preventDefault();
+                    suggestions.highlight(first);
+                    suggestions.focus();
+                  }}
                 />
-                {/* Keep results and feedback inside a stable dialog, including
-                    when the query has no matches or selects an overwrite. */}
-                <div className="flex h-48 shrink-0 flex-col overflow-hidden rounded-md border">
-                  <ComboboxEmpty className="flex shrink-0 px-2 empty:p-0">
+              </Field>
+              {/* Keep results and feedback inside a stable dialog, including
+                  when the query has no matches or selects an overwrite. */}
+              <div className="flex h-48 shrink-0 flex-col overflow-hidden rounded-md border">
+                {filteredItems.length === 0 && (
+                  <div className="flex shrink-0 px-2">
                     <FormattedMessage id="search_filter.save_no_matches" />
-                  </ComboboxEmpty>
-                  <ComboboxList className="min-h-0 max-h-none flex-1">
-                    {(filter: (typeof savedFilters)[number]) => (
-                      <ComboboxItem
-                        key={filter.id}
-                        value={filter}
-                        className="min-h-11"
-                      >
-                        {filter.name}
-                      </ComboboxItem>
-                    )}
-                  </ComboboxList>
-                </div>
-              </Combobox>
+                  </div>
+                )}
+                <Listbox<SavedFilterItem>
+                  controller={suggestions}
+                  aria-label={intl.formatMessage({
+                    id: "search_filter.saved_filters",
+                  })}
+                  // Arrows only move focus; Enter or a press chooses.
+                  activation="manual"
+                  className="h-full w-full min-h-0 max-w-none flex-1 overflow-y-auto rounded-none border-0 p-0"
+                  disabled={isSaving}
+                  value={selected}
+                  itemToValue={(filter) => filter.id}
+                  isItemEqualToValue={(filter, value) => filter.id === value.id}
+                  onValueChange={(filter, details) => {
+                    if (!filter) return;
+                    form.setFieldValue("name", filter.name);
+                    form.setFieldValue("selectedId", filter.id);
+                    // Keep the name focused after a choice, as a combobox does.
+                    if (details.reason === "item-press")
+                      nameRef.current?.focus();
+                  }}
+                >
+                  {filteredItems.map((filter, index) => (
+                    <ListboxItem
+                      key={filter.id}
+                      value={filter}
+                      className="min-h-11"
+                      onKeyDown={(event) => {
+                        if (event.key !== "ArrowUp" || index !== 0) return;
+                        event.preventDefault();
+                        nameRef.current?.focus();
+                      }}
+                    >
+                      {filter.name}
+                      <ListboxItemIndicator />
+                    </ListboxItem>
+                  ))}
+                </Listbox>
+              </div>
               <FieldDescription id={hintId}>
                 <FormattedMessage id="search_filter.save_name_help" />
               </FieldDescription>
@@ -179,7 +207,7 @@ export function SaveFilterDialog({
                   </FieldDescription>
                 )}
               </div>
-            </Field>
+            </div>
           </FieldGroup>
           <DialogFooter className="shrink-0 flex-row *:flex-1 sm:*:flex-none">
             <Button

@@ -144,6 +144,7 @@ export const MultiSelectFilter = <
       {!isNullOrNotNull && (
         <Combobox<string, true>
           multiple
+          filter={false}
           open={comboboxOpen}
           onOpenChange={setComboboxOpen}
           inputValue={inputValue}
@@ -160,7 +161,7 @@ export const MultiSelectFilter = <
         >
           <ComboboxChips ref={anchor}>
             {criterion.value.items.map((item) => (
-              <ComboboxChip key={item.id}>
+              <ComboboxChip key={item.id} value={item.id}>
                 {item.label || labels.get(item.id) || item.id}
               </ComboboxChip>
             ))}

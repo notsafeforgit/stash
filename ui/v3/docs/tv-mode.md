@@ -13,7 +13,7 @@ Saved search, criteria groups and sort retain the library's filter semantics.
 Build include/exclude combinations in the app's saved-filter editor and select
 that filter in TV. Choose **Random** in **Sort order** for a seeded order
 that stays stable as you keep scrolling. Matching orientation
-uses the viewing surface, including forced rotation, and includes square videos.
+follows the viewport and includes square videos.
 
 **Extra scenes in marker mode** optionally selects a saved scene filter. Marker
 mode includes every matching marker plus whole scenes from that extra filter
@@ -86,7 +86,7 @@ audio for the current viewing session and carries across item changes. Browsers
 may still require muted autoplay. Temporary holds never replace the saved
 playback rate.
 Playback menus include captions and supported device playback controls.
-Fit/fill, zoom, rotation, left-handed actions, and hiding controls are available.
+Fit/fill, zoom, left-handed actions, and hiding controls are available.
 Navigation, mute and restore-controls stay reachable in the bottom
 dock with chrome hidden. Pinned actions use that dock; the remaining action
 rail is bounded above it, on the preferred hand's side.
@@ -105,7 +105,8 @@ supports it. When unavailable or rejected, the action is hidden and TV retains
 its ordinary inline layout. There is no simulated immersive fallback.
 TV never requests native video fullscreen, including on iOS Safari. Browser
 bars may remain visible. Dialogs and menus use a portal inside the presentation
-surface, and rotated slider and zoom gestures map to its coordinates. Dialogs
+surface. TV has no rotated presentation: a phone turned sideways gets the
+ordinary landscape layout, as a desktop window does. Dialogs
 keep Close reachable below a bounded scroller; long titles, descriptions and
 tag/performer labels wrap without horizontal overflow.
 
@@ -137,7 +138,7 @@ Long titles and tags wrap beside the action rail. Vertical swipes and wheel
 gestures navigate the feed across the video, metadata, action buttons and footer.
 Swiping a button does not activate it; tapping still does. The timeline chooses
 the gesture's initial direction: across its track seeks, while perpendicular
-movement navigates the feed, including in rotated presentation. Open menus and
+movement navigates the feed. Open menus and
 dialogs keep their own scrolling. Hiding the controls hides the metadata too.
 The O-counter has a numeric badge and an anchored, nonmodal popover for Add O,
 Decrement O and Reset O. Badges show four digits in full and cap larger values
@@ -157,7 +158,7 @@ reorder, pinned entries,
 one-level folders, moving actions into/out of folders, custom labels, curated
 icons, quick tags, and quick markers. Visibility remains at the top level.
 Presets require real tag IDs. Only the versioned `tv` configuration
-key is saved; local rotation is scoped to the backend URL in browser storage.
+key is saved; saved rails drop the retired Rotate presentation action.
 The shared save indicator reports progress. Failed saves retain the draft and
 offer Retry; incomplete presets remain editable until valid. Invalid/future settings remain
 recoverable until an explicit reset. The main settings search includes TV rows.
@@ -223,7 +224,7 @@ quality limits, ranges, paging, stale responses, and tombstones.
 `core/scene-activity.test.ts` covers accounting, serialized writes, uncertain
 responses, minimum-play qualification, and disabled tracking.
 `tests/browser/tv.browser.ts` exercises real synthetic media, bounded rendering,
-inline presentation, rotation, quality continuity, hold controls, autoplay,
+inline presentation, quality continuity, hold controls, autoplay,
 settings persistence/failure, and activity. The lightbox browser fixture also
 verifies shared online activity. Existing app/player/browser regressions remain
 part of the gate. `TestMarkerQueryASTOrientation` verifies the additive marker

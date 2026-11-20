@@ -1,6 +1,7 @@
 import { useState, type ComponentType } from "react";
 import { useIntl } from "react-intl";
-import { Star, X } from "lucide-react";
+import { Rating } from "@ui-sdk/react/rating";
+import { X } from "lucide-react";
 import { useConfigurationContextOptional } from "@/hooks/config";
 import { useMsg } from "@/hooks/message";
 import {
@@ -58,78 +59,11 @@ function RatingSlider({
       onValueChange={(next) =>
         onChange(Array.isArray(next) ? (next[0] ?? value) : next)
       }
-      onValueCommitted={(next) =>
+      onValueCommit={(next) =>
         onCommit(Array.isArray(next) ? (next[0] ?? value) : next)
       }
       onPointerCancel={onCancel}
     />
-  );
-}
-
-function RatingStars({
-  value,
-  onSetRating,
-  disabled,
-  valueRequired,
-  size,
-}: {
-  value: number | null;
-  onSetRating: (value: number | null) => void;
-  disabled: boolean;
-  valueRequired: boolean;
-  size: "default" | "touch";
-}) {
-  const intl = useIntl();
-  const [hoverStar, setHoverStar] = useState<number>();
-  return (
-    <div className="inline-flex items-center gap-1">
-      {Array.from({ length: 5 }, (_, index) => index + 1).map((star) => {
-        const fill =
-          Math.max(0, Math.min(1, (hoverStar ?? value ?? 0) - star + 1)) * 100;
-        return (
-          <Button
-            key={star}
-            type="button"
-            variant="transparent"
-            size="icon-sm"
-            disabled={disabled}
-            className={cn("relative p-0", size === "touch" && "size-11")}
-            onMouseEnter={() => !disabled && setHoverStar(star)}
-            onMouseLeave={() => setHoverStar(undefined)}
-            onFocus={() => !disabled && setHoverStar(star)}
-            onBlur={() => setHoverStar(undefined)}
-            onClick={() => {
-              onSetRating(star === value && !valueRequired ? null : star);
-              setHoverStar(undefined);
-            }}
-            aria-label={intl.formatMessage(
-              {
-                id: "rating_control.stars",
-                defaultMessage: "{count, plural, one {# star} other {# stars}}",
-              },
-              { count: star },
-            )}
-          >
-            <span className="relative block size-5">
-              <Star
-                className="size-5 text-muted-foreground"
-                strokeWidth={1.5}
-              />
-              <span
-                aria-hidden
-                className="absolute inset-y-0 left-0 overflow-hidden"
-                style={{ width: `${fill}%` }}
-              >
-                <Star
-                  className="size-5 shrink-0 fill-yellow-400 text-yellow-400"
-                  strokeWidth={1.5}
-                />
-              </span>
-            </span>
-          </Button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -163,23 +97,35 @@ export function RatingSystem({
     );
   };
   const showNumber = !stars || precision !== RatingStarPrecision.Full;
+  const label = msg("rating", "Rating");
   return (
-    <FieldSet
-      aria-label={msg("rating", "Rating")}
-      className="flex min-w-0 flex-col gap-1"
-    >
+    <FieldSet aria-label={label} className="flex min-w-0 flex-col gap-1">
       <div className="flex min-w-0 flex-wrap items-center gap-1">
         {stars && (
-          <RatingStars
+          <Rating
+            aria-label={onSetRating ? label : undefined}
+            data-size={size === "touch" ? "touch" : undefined}
             value={rating}
-            onSetRating={setRating}
-            disabled={readonly}
-            valueRequired={valueRequired}
-            size={size}
+            max={5}
+            step={precision === RatingStarPrecision.Half ? 0.5 : 1}
+            disabled={disabled}
+            readOnly={!onSetRating}
+            deselectable={!valueRequired}
+            getValueLabel={(count) =>
+              intl.formatMessage(
+                {
+                  id: "rating_control.stars",
+                  defaultMessage:
+                    "{count, plural, one {# star} other {# stars}}",
+                },
+                { count },
+              )
+            }
+            onValueChange={setRating}
           />
         )}
         {showNumber && (
-          <span className="text-sm tabular-nums text-muted-foreground">
+          <span data-slot="rating-value">
             {rating == null
               ? "—"
               : intl.formatNumber(rating, {
@@ -193,7 +139,7 @@ export function RatingSystem({
             type="button"
             variant="ghost"
             size="icon-xs"
-            className={size === "touch" ? "size-11" : undefined}
+            className={cn(size === "touch" && "size-11")}
             disabled={disabled}
             onClick={() => setRating(null)}
             aria-label={msg("rating_control.clear", "Clear rating")}
@@ -208,7 +154,7 @@ export function RatingSystem({
           min={valueRequired ? step : 0}
           max={stars ? 5 : 10}
           step={step}
-          label={msg("rating", "Rating")}
+          label={label}
           disabled={readonly}
           onChange={setPreview}
           onCommit={setRating}

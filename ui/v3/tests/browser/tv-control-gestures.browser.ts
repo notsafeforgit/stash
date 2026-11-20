@@ -124,68 +124,37 @@ for (const surface of [
   }
 }
 
-for (const rotation of ["normal", "clockwise", "counterclockwise"] as const) {
-  test(`the ${rotation} timeline separates seeking from feed navigation`, async ({
-    page,
-    context,
-    browserName,
-  }) => {
-    await open(page);
-    if (rotation !== "normal") {
-      await page.keyboard.press("o");
-      if (rotation === "counterclockwise")
-        await page.evaluate(() => {
-          const key = Object.keys(localStorage).find((key) =>
-            key.startsWith("stash:tv:rotation:v1:"),
-          );
-          if (!key) throw new Error("Missing rotation setting");
-          const newValue = JSON.stringify("counterclockwise");
-          localStorage.setItem(key, newValue);
-          window.dispatchEvent(new StorageEvent("storage", { key, newValue }));
-        });
-      await expect(page.locator("[data-tv]")).toHaveAttribute(
-        "data-tv-rotation",
-        rotation,
-      );
-    }
-    const slider = page.locator("[data-position-scrubber]");
-    const bounds = await slider.boundingBox();
-    if (!bounds) throw new Error("Missing timeline");
-    const start = {
-      x: bounds.x + bounds.width / 2,
-      y: bounds.y + bounds.height / 2,
-    };
-    const point = (along: number, across: number) => ({
-      x:
-        start.x +
-        (rotation === "normal"
-          ? along
-          : rotation === "clockwise"
-            ? -across
-            : across),
-      y:
-        start.y +
-        (rotation === "normal"
-          ? across
-          : rotation === "clockwise"
-            ? along
-            : -along),
-    });
-    await swipe(page, context, browserName, start, point(60, 0));
-    await expect
-      .poll(async () => Number(await slider.getAttribute("aria-valuenow")))
-      .toBeGreaterThan(6);
-    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
-      "data-playback-key",
-      /scene:1$/,
-    );
-    await swipe(page, context, browserName, start, point(0, -120));
-    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
-      "data-playback-key",
-      /scene:2$/,
-    );
+test("the timeline separates seeking from feed navigation", async ({
+  page,
+  context,
+  browserName,
+}) => {
+  await open(page);
+  const slider = page.locator("[data-position-scrubber]");
+  const bounds = await slider.boundingBox();
+  if (!bounds) throw new Error("Missing timeline");
+  const start = {
+    x: bounds.x + bounds.width / 2,
+    y: bounds.y + bounds.height / 2,
+  };
+  const point = (along: number, across: number) => ({
+    x: start.x + along,
+    y: start.y + across,
   });
-}
+  await swipe(page, context, browserName, start, point(60, 0));
+  await expect
+    .poll(async () => Number(await slider.getAttribute("aria-valuenow")))
+    .toBeGreaterThan(6);
+  await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+    "data-playback-key",
+    /scene:1$/,
+  );
+  await swipe(page, context, browserName, start, point(0, -120));
+  await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+    "data-playback-key",
+    /scene:2$/,
+  );
+});
 
 test.describe("TV menu wheel input", () => {
   test.use({ isMobile: false });

@@ -63,7 +63,7 @@ import { imageTitle } from "src/core/files";
 import { galleryLabel } from "src/lib/gallery-utils";
 import { cn } from "src/lib/utils";
 import { Spinner } from "src/components/ui/spinner";
-import { Toaster } from "src/components/ui/sonner";
+import { Toaster } from "src/components/ui/toaster";
 import { Button } from "src/components/ui/button";
 import { Switch } from "src/components/ui/switch";
 import { NumberInput } from "src/components/filters/number-input";
@@ -1119,11 +1119,8 @@ export function ImageLightbox({
       e.preventDefault();
       requestClose();
     }
-    // Capture phase on `document` so we run before Base UI Tooltip's
-    // useDismiss listener (also on `document`, bubble phase) — its
-    // default `escapeKeyBubbles: false` calls `stopPropagation()` on
-    // the open tooltip, which would otherwise swallow our Escape until
-    // the user pressed it twice.
+    // Capture phase on `document`, so an open tooltip's own Escape
+    // handling can't stop the event before the viewer sees it.
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [deleteTarget, open, requestClose]);
@@ -1221,6 +1218,9 @@ export function ImageLightbox({
         carousel={finite ? { finite: true } : undefined}
         controller={{
           ref: controllerRef,
+          // The document handler above owns Escape. Popup keys bubble through
+          // React to YARL, which would close the viewer as a menu closes.
+          closeOnEscape: false,
           disableSwipeNavigation: isSingleSlideMode,
           // YARL otherwise calls preventDefault() on horizontal wheel events
           // (via a non-passive native listener) so its swipe controller can

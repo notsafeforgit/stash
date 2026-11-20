@@ -11,7 +11,13 @@ import { Input } from "src/components/ui/input";
 import { Textarea } from "src/components/ui/textarea";
 import { Switch } from "src/components/ui/switch";
 import { RatingSystem } from "src/components/ui/rating-system";
-import { Field, FieldLabel, FieldGroup } from "src/components/ui/field";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "src/components/ui/field";
 import {
   type EntityOption,
   EntitySingleSelect,
@@ -280,16 +286,16 @@ export function ImageEditForm({ image, onSaved }: ImageEditFormProps) {
           {/* URLs */}
           <form.Field name="urls">
             {(field) => (
-              <Field>
-                <FieldLabel>
+              <FieldSet>
+                <FieldLegend variant="label">
                   {intl.formatMessage({ id: "urls", defaultMessage: "URLs" })}
-                </FieldLabel>
+                </FieldLegend>
                 <UrlListField
                   value={field.state.value}
                   onChange={field.handleChange}
                   disabled={busy}
                 />
-              </Field>
+              </FieldSet>
             )}
           </form.Field>
 
@@ -491,16 +497,16 @@ export function ImageEditForm({ image, onSaved }: ImageEditFormProps) {
           {/* Custom fields */}
           <form.Field name="custom_fields">
             {(field) => (
-              <Field>
-                <FieldLabel>
+              <FieldSet>
+                <FieldLegend variant="label">
                   {intl.formatMessage({ id: "custom_fields.title" })}
-                </FieldLabel>
+                </FieldLegend>
                 <CustomFieldsField
                   value={field.state.value}
                   onChange={field.handleChange}
                   disabled={busy}
                 />
-              </Field>
+              </FieldSet>
             )}
           </form.Field>
         </FieldGroup>

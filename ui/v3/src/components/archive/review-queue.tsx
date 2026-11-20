@@ -19,7 +19,7 @@ import {
 import { createSubscriptionAPI } from "@/core/native-archive/subscription-api";
 import { refreshReviewAttention } from "@/hooks/use-review-attention";
 import { useListScrollRestoration } from "@/components/list/use-list-scroll-restoration";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardHeader,
@@ -37,26 +37,38 @@ import { PostEmpty, PostSection } from "./posts/shared";
 
 function ReviewLink({ item }: { item: ReviewQueueItem }) {
   const msg = useMsg();
-  const className = buttonVariants({ variant: "outline" });
   if (item.account)
     return (
-      <Link
-        className={className}
-        to="/account-review"
-        search={{ account: item.uuid, ownership: "all", q: "", namespace: "" }}
+      <Button
+        variant="outline"
+        render={
+          <Link
+            to="/account-review"
+            search={{
+              account: item.uuid,
+              ownership: "all",
+              q: "",
+              namespace: "",
+            }}
+          />
+        }
       >
         {msg("review_queue.review_account", "Review account owner")}
-      </Link>
+      </Button>
     );
   if (item.post)
     return (
-      <Link
-        className={className}
-        to="/source-posts"
-        search={{ post: item.uuid, mode: "all", value: "", namespace: "" }}
+      <Button
+        variant="outline"
+        render={
+          <Link
+            to="/source-posts"
+            search={{ post: item.uuid, mode: "all", value: "", namespace: "" }}
+          />
+        }
       >
         {msg("review_queue.review_post", "Review post media")}
-      </Link>
+      </Button>
     );
   return null;
 }
@@ -234,13 +246,17 @@ function HeldSourceCard({
         >
           {msg("review_queue.dismiss_source", "Dismiss")}
         </Button>
-        <Link
-          className={buttonVariants({ variant: "ghost" })}
-          to="/collections"
-          search={{ collection: source.uuid, q: "", state: "", kind: "" }}
+        <Button
+          variant="ghost"
+          render={
+            <Link
+              to="/collections"
+              search={{ collection: source.uuid, q: "", state: "", kind: "" }}
+            />
+          }
         >
           {msg("review_queue.manage_source", "Manage source")}
-        </Link>
+        </Button>
         {busy && (
           <Spinner aria-label={msg("review_queue.saving", "Saving decision")} />
         )}

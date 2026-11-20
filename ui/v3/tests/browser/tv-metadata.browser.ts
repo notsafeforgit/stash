@@ -300,9 +300,7 @@ for (const device of ["mobile", "desktop"] as const) {
       await open(page);
       const dialog = await openRating(page);
       await expect(dialog.getByRole("slider")).toHaveCount(0);
-      await dialog
-        .getByRole("button", { name: "4 stars", exact: true })
-        .click();
+      await dialog.getByRole("radio", { name: "4 stars", exact: true }).click();
       await expectRating(page, 80);
       await dialog
         .getByRole("button", { name: "Clear rating", exact: true })
@@ -404,23 +402,22 @@ test("the shared decimal slider previews locally and persists one value on relea
       ),
     )
     .toBe(1);
-  const value = Number(await slider.getAttribute("aria-valuenow"));
+  // The thumb is a native range input, so its value is the input's.
+  const value = Number(await slider.inputValue());
   expect(value).toBeGreaterThan(7);
   expect(value).toBeLessThan(9);
 });
 
-for (const rotated of [false, true]) {
-  test(`compact left-handed TV metadata${rotated ? " with rotation" : ""} keeps controls on screen`, async ({
+// A phone turned sideways gets a landscape viewport, not a rotated surface.
+for (const viewport of [
+  { width: 320, height: 568 },
+  { width: 568, height: 320 },
+]) {
+  test(`compact left-handed TV metadata at ${viewport.width}x${viewport.height} keeps controls on screen`, async ({
     page,
   }, testInfo) => {
-    await page.setViewportSize({ width: 320, height: 568 });
+    await page.setViewportSize(viewport);
     await open(page, "left-handed&count=1234&metadata&decimal");
-    if (rotated) {
-      await page.getByRole("button", { name: "Playback", exact: true }).click();
-      await page
-        .getByRole("menuitem", { name: "Rotate presentation", exact: true })
-        .click();
-    }
     const infoButton = page.getByRole("button", {
       name: "Information",
       exact: true,
@@ -441,8 +438,8 @@ for (const rotated of [false, true]) {
     if (!box) throw new Error("Missing counter bounds");
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.y).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(320);
-    expect(box.y + box.height).toBeLessThanOrEqual(568);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
     await page.keyboard.press("Escape");
     const rating = await openRating(page);
     const slider = rating.getByRole("slider");

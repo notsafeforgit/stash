@@ -226,7 +226,7 @@ function ShareForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[calc(100dvh-2rem)] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-xl"
+        className="grid max-h-[calc(100dvh-2rem)] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-xl"
       >
         <DialogHeader>
           <DialogTitle>
@@ -523,7 +523,6 @@ function ShareForm({
                   </ToggleGroup>
                   <DateInput
                     isTime
-                    captionLayout="label"
                     value={field.state.value}
                     invalid={field.state.meta.errors.length > 0}
                     disabledDays={(date) =>

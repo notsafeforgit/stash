@@ -1,45 +1,55 @@
 import type React from "react";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useIntl } from "react-intl";
-import { format } from "date-fns";
-import { ChevronDownIcon } from "lucide-react";
+import { DateInput as DateInputRoot } from "@ui-sdk/react/date-input";
+import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { DatePicker } from "@/components/ui/date-picker";
+import { FieldError } from "@/components/ui/field";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface Props {
   className?: string;
   disabled?: boolean;
   invalid?: boolean;
   disabledDays?: (date: Date) => boolean;
+  /** "YYYY-MM-DD", or "YYYY-MM-DD HH:MM" when isTime is set */
   value: string;
   isTime?: boolean;
-  captionLayout?: React.ComponentProps<typeof Calendar>["captionLayout"];
   onValueChange(value: string): void;
   placeholder?: string;
   error?: string;
 }
 
-function parseDate(value: string): Date | undefined {
-  // Accept YYYY-MM-DD or YYYY-MM-DD HH:MM
-  const datePart = value.trim().slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return undefined;
-  const d = new Date(datePart + "T00:00:00");
-  return Number.isNaN(d.getTime()) ? undefined : d;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_PATTERN = /^\d{2}:\d{2}$/;
+
+/** Reads the value as Date Input's ISO form. Partial or invalid text is null. */
+function toSegmentValue(value: string, isTime: boolean): string | null {
+  const text = value.trim();
+  const date = text.slice(0, 10);
+  if (!DATE_PATTERN.test(date)) return null;
+  if (!isTime) return date;
+  const time = text.slice(11, 16);
+  return TIME_PATTERN.test(time) ? `${date}T${time}` : null;
 }
 
-function formatDate(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function fromSegmentValue(value: string | null, isTime: boolean): string {
+  if (value === null) return "";
+  return isTime ? value.replace("T", " ") : value;
+}
+
+/** Calendar and Date Input match unavailable dates by their ISO day. */
+function toUnavailable(disabledDays?: (date: Date) => boolean) {
+  return disabledDays
+    ? (iso: string) => disabledDays(new Date(`${iso.slice(0, 10)}T00:00:00`))
+    : undefined;
 }
 
 export const DateInput: React.FC<Props> = ({
@@ -48,116 +58,94 @@ export const DateInput: React.FC<Props> = ({
   invalid,
   disabledDays,
   value,
-  isTime,
-  captionLayout = "dropdown",
+  isTime = false,
   onValueChange,
   placeholder,
   error,
 }) => {
   const intl = useIntl();
-  const dateId = useId();
-  const timeId = useId();
   const [open, setOpen] = useState(false);
+  const label =
+    placeholder ?? intl.formatMessage({ id: "date", defaultMessage: "Date" });
+  const unavailable = toUnavailable(disabledDays);
 
-  const selected = parseDate(value);
-  // Extract HH:MM from "YYYY-MM-DD HH:MM"
-  const timePart = value.trim().slice(11);
-
-  function handleDaySelect(day: Date | undefined) {
-    if (!day) return;
-    const dateStr = formatDate(day);
-    onValueChange(isTime && timePart ? `${dateStr} ${timePart}` : dateStr);
-    setOpen(false);
-  }
-
-  function handleTimeChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const dateStr = selected ? formatDate(selected) : "";
-    onValueChange(dateStr ? `${dateStr} ${e.target.value}` : e.target.value);
-  }
-
-  // Placeholder applies to the date-picker button. When `isTime` is true the
-  // time is entered in a separate sibling input, so the date button should
-  // still display only the date format, not "YYYY-MM-DD HH:MM".
-  const placeholderText =
-    placeholder ?? intl.formatMessage({ id: "date_format" });
-
-  const datePicker = (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <Button
-            variant="outline"
-            id={dateId}
-            disabled={disabled}
-            aria-invalid={invalid}
-            className={cn(
-              "min-w-0 w-full justify-between",
-              !isTime && className,
-            )}
-          />
-        }
-      >
-        <span className="truncate">
-          {selected ? format(selected, "PP") : placeholderText}
-        </span>
-        <ChevronDownIcon data-icon="inline-end" />
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-auto max-h-(--available-height) max-w-(--available-width) overflow-y-auto overscroll-contain p-0"
-        align="start"
-      >
-        <Calendar
-          mode="single"
-          selected={selected}
-          captionLayout={captionLayout}
-          defaultMonth={selected}
-          onSelect={handleDaySelect}
-          disabled={disabledDays}
-        />
-      </PopoverContent>
-    </Popover>
-  );
-
-  if (isTime) {
+  if (!isTime) {
     return (
       <>
-        <FieldGroup
-          className={cn(
-            "flex-row flex-wrap gap-2 [container-type:normal]",
-            className,
-          )}
-        >
-          <Field className="min-w-0 flex-1 basis-40" data-invalid={invalid}>
-            <FieldLabel htmlFor={dateId}>
-              {intl.formatMessage({ id: "date", defaultMessage: "Date" })}
-            </FieldLabel>
-            {datePicker}
-          </Field>
-          <Field className="min-w-0 flex-1 basis-40" data-invalid={invalid}>
-            <FieldLabel htmlFor={timeId}>
-              {intl.formatMessage({ id: "time", defaultMessage: "Time" })}
-            </FieldLabel>
-            <Input
-              type="time"
-              id={timeId}
-              step="60"
-              value={timePart}
-              disabled={disabled || !selected}
-              aria-invalid={invalid}
-              onChange={handleTimeChange}
-              className="appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-            />
-          </Field>
-        </FieldGroup>
-        {error && <div className="text-sm text-destructive">{error}</div>}
+        <DatePicker
+          className={className}
+          value={value}
+          onChange={onValueChange}
+          disabled={disabled}
+          invalid={invalid}
+          placeholder={placeholder}
+          unavailable={unavailable}
+        />
+        {error && <FieldError>{error}</FieldError>}
       </>
     );
   }
 
+  const text = value.trim();
+  const day = DATE_PATTERN.test(text.slice(0, 10)) ? text.slice(0, 10) : null;
+  const time = text.slice(11, 16);
+
+  // A Date Input with a time can't show a bare date, so a day picked before
+  // any time is set starts at midnight. A chosen time is kept.
+  function pickDay(next: string) {
+    onValueChange(`${next} ${TIME_PATTERN.test(time) ? time : "00:00"}`);
+    setOpen(false);
+  }
+
   return (
     <>
-      {datePicker}
-      {error && <div className="text-sm text-destructive">{error}</div>}
+      <div
+        data-slot="date-time-input"
+        className={cn("flex items-center gap-1", className)}
+      >
+        <DateInputRoot
+          className="min-w-0 flex-1"
+          aria-label={label}
+          {...(invalid ? { "data-invalid": true } : {})}
+          value={toSegmentValue(value, true)}
+          onValueChange={(next) => onValueChange(fromSegmentValue(next, true))}
+          granularity="minute"
+          locale={intl.locale}
+          disabled={disabled}
+          unavailable={unavailable}
+        />
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="shrink-0"
+                aria-label={intl.formatMessage({
+                  id: "actions.choose_date",
+                  defaultMessage: "Choose a date",
+                })}
+                disabled={disabled}
+              >
+                <CalendarIcon />
+              </Button>
+            }
+          />
+          <PopoverContent align="end" className="w-auto p-0">
+            <Calendar
+              captionLayout="dropdown"
+              locale={intl.locale}
+              value={day}
+              unavailable={unavailable}
+              onValueChange={(next) => {
+                if (typeof next === "string") pickDay(next);
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+      {error && <FieldError>{error}</FieldError>}
     </>
   );
 };

@@ -80,7 +80,7 @@ test("mobile image cards and table rows expose file actions through long press",
   await holdForContextMenu(
     page
       .getByTestId("image-card")
-      .locator('[data-slot="context-menu-trigger"]'),
+      .locator('[data-slot="menu-context-trigger"]'),
     fileMenu(page),
   );
   await expect(

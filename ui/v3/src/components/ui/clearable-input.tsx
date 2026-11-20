@@ -1,13 +1,9 @@
 import type React from "react";
 import { useRef } from "react";
+import { InputClear } from "@ui-sdk/react/input";
 import { X } from "lucide-react";
 import { useIntl } from "react-intl";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from "@/components/ui/input-group";
+import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
 
 export interface IClearableInput {
   className?: string;
@@ -32,12 +28,6 @@ export const ClearableInput: React.FC<IClearableInput> = ({
   const intl = useIntl();
   const ownRef = useRef<HTMLInputElement>(null);
   const inputRef = focus ? focus[0] : ownRef;
-  const queryClearShowing = !!value;
-
-  function onClearQuery() {
-    setValue("");
-    inputRef.current?.focus();
-  }
 
   function onInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Escape") {
@@ -59,19 +49,12 @@ export const ClearableInput: React.FC<IClearableInput> = ({
         onChange={(e) => setValue(e.currentTarget.value)}
         onKeyDown={onInputKeyDown}
       />
-      {queryClearShowing && (
-        <InputGroupAddon align="inline-end">
-          <InputGroupButton
-            type="button"
-            size="icon-xs"
-            onClick={onClearQuery}
-            title={intl.formatMessage({ id: "actions.clear" })}
-            aria-label={intl.formatMessage({ id: "actions.clear" })}
-          >
-            <X />
-          </InputGroupButton>
-        </InputGroupAddon>
-      )}
+      <InputClear
+        aria-label={intl.formatMessage({ id: "actions.clear" })}
+        title={intl.formatMessage({ id: "actions.clear" })}
+      >
+        <X aria-hidden="true" />
+      </InputClear>
     </InputGroup>
   );
 };

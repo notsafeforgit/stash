@@ -8,10 +8,11 @@ import {
   ContextMenuGroup,
   ContextMenuItem,
   ContextMenuLabel,
-  ContextMenuTrigger,
+  createContextMenuController,
 } from "@/components/ui/context-menu";
+import { useTouchHold } from "@/components/ui/touch-hold";
 
-/** Tap to type; the primitive's long press previews the active query. */
+/** Tap to type; a long press previews the active query above the button. */
 export function MobileSearchButton({
   query,
   buttonRef,
@@ -26,37 +27,43 @@ export function MobileSearchButton({
   onClear: () => void;
 }) {
   const intl = useIntl();
+  const [preview] = useState(() => createContextMenuController());
   const [previewOpen, setPreviewOpen] = useState(false);
   const summary = query
     ? intl.formatMessage({ id: "list.active_search" }, { query })
     : undefined;
 
+  // The preview is anchored to the button, so its placement does not depend on
+  // where the finger lands.
+  const openPreview = () => {
+    const button = buttonRef.current;
+    if (button) void preview.open({ anchor: button });
+  };
+  useTouchHold(buttonRef, { disabled: !query, onHold: openPreview });
+
   return (
-    <ContextMenu
-      open={previewOpen}
-      onOpenChange={setPreviewOpen}
-      disabled={!query}
-    >
-      <ContextMenuTrigger
-        render={
-          <Button
-            ref={buttonRef}
-            variant={query ? "secondary" : "ghost"}
-            size="icon-lg"
-            className="size-11 shrink-0"
-            aria-label={intl.formatMessage({ id: "search" })}
-            aria-description={summary}
-            onClick={() => {
-              // Releasing a long press must not also open the keyboard.
-              if (!previewOpen) onOpen();
-            }}
-          />
-        }
+    <ContextMenu controller={preview} onOpenChange={setPreviewOpen}>
+      <Button
+        ref={buttonRef}
+        variant={query ? "secondary" : "ghost"}
+        size="icon-lg"
+        className="size-11 shrink-0"
+        aria-label={intl.formatMessage({ id: "search" })}
+        aria-description={summary}
+        onClick={() => {
+          // Releasing a long press must not also open the keyboard.
+          if (!previewOpen) onOpen();
+        }}
+        onContextMenu={(event) => {
+          // Right click and the context-menu key open the same preview.
+          if (!query) return;
+          event.preventDefault();
+          openPreview();
+        }}
       >
         <Search />
-      </ContextMenuTrigger>
+      </Button>
       <ContextMenuContent
-        anchor={buttonRef}
         side="top"
         align="center"
         alignOffset={0}

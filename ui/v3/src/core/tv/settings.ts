@@ -58,45 +58,73 @@ export const tvSettingsSchema = z.object({
 });
 export type TvSettings = z.infer<typeof tvSettingsSchema>;
 
+// Rotate presentation was retired. Drop it from saved rails and folders before
+// validation, since the action schema no longer accepts it.
+function withoutRetiredActions(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null || !("rail" in raw)) return raw;
+  const { rail } = raw;
+  if (!Array.isArray(rail)) return raw;
+  const retired = (action: unknown) =>
+    typeof action === "object" &&
+    action !== null &&
+    "kind" in action &&
+    action.kind === "rotation";
+  return {
+    ...raw,
+    rail: rail.flatMap((entry: unknown) => {
+      if (typeof entry !== "object" || entry === null) return [entry];
+      if ("action" in entry && retired(entry.action)) return [];
+      if ("actions" in entry && Array.isArray(entry.actions))
+        return [
+          { ...entry, actions: entry.actions.filter((a) => !retired(a)) },
+        ];
+      return [entry];
+    }),
+  };
+}
+
 // Zod strips retired feed rules, paging preferences and session limits.
 // Version 1 also had a shuffle override. Preserve its effective sort choice.
-const persistedTvSettingsSchema = z.union([
-  tvSettingsSchema,
-  z
-    .union([
-      tvSettingsSchema.extend({
-        version: z.union([z.literal(2), z.literal(3), z.literal(4)]),
-      }),
-      tvSettingsSchema
-        .extend({ version: z.literal(1), shuffle: z.boolean() })
-        .transform(({ shuffle, ...settings }) => ({
+const persistedTvSettingsSchema = z.preprocess(
+  withoutRetiredActions,
+  z.union([
+    tvSettingsSchema,
+    z
+      .union([
+        tvSettingsSchema.extend({
+          version: z.union([z.literal(2), z.literal(3), z.literal(4)]),
+        }),
+        tvSettingsSchema
+          .extend({ version: z.literal(1), shuffle: z.boolean() })
+          .transform(({ shuffle, ...settings }) => ({
+            ...settings,
+            sort: shuffle ? "random" : settings.sort,
+          })),
+      ])
+      .transform(
+        (settings): TvSettings => ({
           ...settings,
-          sort: shuffle ? "random" : settings.sort,
-        })),
-    ])
-    .transform(
-      (settings): TvSettings => ({
-        ...settings,
-        version: 5,
-        // Retire the formerly required default gear once. Preserve customized
-        // shortcuts, and allow new version-4 settings actions in any position.
-        rail:
-          settings.version === 4
-            ? settings.rail
-            : settings.rail.filter(
-                (entry) =>
-                  !(
-                    entry.type === "action" &&
-                    entry.pinned &&
-                    entry.action.kind === "settings" &&
-                    entry.action.id === "settings" &&
-                    entry.action.icon === "default" &&
-                    entry.action.label === ""
-                  ),
-              ),
-      }),
-    ),
-]);
+          version: 5,
+          // Retire the formerly required default gear once. Preserve customized
+          // shortcuts, and allow new version-4 settings actions in any position.
+          rail:
+            settings.version === 4
+              ? settings.rail
+              : settings.rail.filter(
+                  (entry) =>
+                    !(
+                      entry.type === "action" &&
+                      entry.pinned &&
+                      entry.action.kind === "settings" &&
+                      entry.action.id === "settings" &&
+                      entry.action.icon === "default" &&
+                      entry.action.label === ""
+                    ),
+                ),
+        }),
+      ),
+  ]),
+);
 
 export const defaultTvSettings: TvSettings = {
   version: 5,
@@ -136,12 +164,6 @@ export function decodeTvSettings(raw: unknown): TvSettingsResult {
       };
 }
 
-export const tvRotationSchema = z.enum([
-  "normal",
-  "clockwise",
-  "counterclockwise",
-]);
-export type TvRotation = z.infer<typeof tvRotationSchema>;
 export const tvSearchSchema = z.object({
   mode: tvModeSchema.optional(),
   filter: z.union([z.enum(["default", "all"]), libraryIdSchema]).optional(),

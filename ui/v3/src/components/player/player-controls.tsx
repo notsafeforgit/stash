@@ -551,9 +551,8 @@ interface ControlBarProps {
   controlsHidden: boolean;
   /** Notifies the parent when any popup menu (speed/quality) opens or
    *  closes. Used so the parent can suppress its click-anywhere
-   *  play/pause toggle for the click that dismisses the menu — Base UI's
-   *  internal backdrop sits below YARL's lightbox portal so the close-
-   *  click bubbles through to the player otherwise. */
+   *  play/pause toggle for the click that dismisses the menu: the menus
+   *  are non-modal, so the close-click reaches the player otherwise. */
   onMenuOpenChange?: (open: boolean) => void;
   clipBoundsEdit?: ClipBoundsEdit;
 }
@@ -1128,9 +1127,8 @@ export function PlayerControls({
 
   // Track popup menu (speed/quality) open state. Used for two things:
   //   1. Suppress the click-anywhere play/pause toggle while a menu is
-  //      open and for a short grace period after it closes — Base UI's
-  //      internal backdrop absorbs the dismiss-click normally, but inside
-  //      YARL's lightbox portal the click leaks through to the player.
+  //      open and for a short grace period after it closes: the menus
+  //      are non-modal, so the dismiss-click reaches the player.
   //   2. Pin the control bar visible while a menu is open, so the user
   //      can move the pointer off the player onto the menu without the
   //      bar fading out from under their selection.
@@ -1435,9 +1433,9 @@ export function PlayerControls({
             // playback or seeks. Stopping propagation in the capture
             // phase prevents the inner button onClicks from firing as
             // well as our own onClick below. The 300ms grace inside
-            // `isMenuActive()` covers the gap between Base UI's
-            // outside-click handler firing on pointerdown and React's
-            // click event arriving here.
+            // `isMenuActive()` covers the gap between the menu closing
+            // on the outside press and React's click event arriving
+            // here.
             if (isMenuActive()) {
               e.stopPropagation();
               e.preventDefault();

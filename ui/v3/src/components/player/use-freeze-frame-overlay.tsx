@@ -39,6 +39,12 @@ interface UseFreezeFrameOverlayResult {
   clear: () => void;
 }
 
+// WebKit reports a failed load when a poster's object URL is revoked while the
+// poster still loads, so release it once that load has settled.
+function releasePosterUrl(url: string) {
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export function useFreezeFrameOverlay({
   rootRef,
   fileWidth,
@@ -144,7 +150,7 @@ export function useFreezeFrameOverlay({
           if (liveVideo !== video) return;
           const url = URL.createObjectURL(blob);
           if (lastPosterUrlRef.current) {
-            URL.revokeObjectURL(lastPosterUrlRef.current);
+            releasePosterUrl(lastPosterUrlRef.current);
           }
           lastPosterUrlRef.current = url;
           if (liveVideo instanceof HTMLVideoElement) {
@@ -175,7 +181,7 @@ export function useFreezeFrameOverlay({
       video.removeAttribute("poster");
     }
     if (lastPosterUrlRef.current) {
-      URL.revokeObjectURL(lastPosterUrlRef.current);
+      releasePosterUrl(lastPosterUrlRef.current);
       lastPosterUrlRef.current = null;
     }
   }, [rootRef]);

@@ -1,18 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TvRotation } from "@/core/tv/settings";
-import { presentationCoordinates } from "@/core/presentation-coordinates";
-
-export function tvCoordinates(
-  x: number,
-  y: number,
-  rotation: TvRotation,
-): { x: number; y: number } {
-  return presentationCoordinates(
-    x,
-    y,
-    rotation === "clockwise" ? 90 : rotation === "counterclockwise" ? -90 : 0,
-  );
-}
 
 export function useTvPresentation() {
   const root = useRef<HTMLDivElement>(null);
@@ -69,20 +55,6 @@ export function useTvPresentation() {
       if (document.fullscreenElement === element)
         void document.exitFullscreen().catch(() => {});
     };
-  }, []);
-  // A transformed presentation establishes the fixed containing block for its
-  // portals. Size from this viewport only; never rotate body or patch events.
-  useEffect(() => {
-    const element = root.current;
-    if (!element) return;
-    const update = () => {
-      element.style.setProperty("--tv-width", `${element.clientWidth}px`);
-      element.style.setProperty("--tv-height", `${element.clientHeight}px`);
-    };
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    update();
-    return () => observer.disconnect();
   }, []);
   return { root, surface, portals, mode, toggle, exit, canFullscreen };
 }

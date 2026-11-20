@@ -67,6 +67,8 @@ for (const width of [320, 390, 768, 1280]) {
             )
             .toBe(true);
           await page.keyboard.press("Escape");
+          // A modal drawer takes presses until it has finished closing.
+          await expect(popup).toBeHidden();
           await back.click();
           await expect(page.getByTestId("viewport")).toHaveAttribute(
             "data-back-count",

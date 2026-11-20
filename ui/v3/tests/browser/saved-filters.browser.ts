@@ -1,8 +1,18 @@
-import type { Page } from "@playwright/test";
-import { test, expect, expectTouchTargets } from "./test";
+import type { Locator, Page } from "@playwright/test";
+import {
+  test,
+  expect,
+  expectBackdropSettled,
+  expectTouchTargets,
+} from "./test";
 
 const favouriteId = "00000000-0000-4000-8000-000000009001";
 const shortId = "00000000-0000-4000-8000-000000009002";
+
+async function expectClosed(page: Page, dialog: Locator) {
+  await expect(dialog).toBeHidden();
+  await expectBackdropSettled(page);
+}
 
 async function openFilters(page: Page, kind = "image") {
   await page.addInitScript(() => {
@@ -80,7 +90,7 @@ for (const kind of ["image", "scene", "marker"]) {
       await confirmation
         .getByRole("button", { name: "Cancel", exact: true })
         .tap();
-      await expect(confirmation).toBeHidden();
+      await expectClosed(page, confirmation);
       await expect(trigger).toBeFocused();
       await trigger.tap();
       await picker
@@ -89,7 +99,7 @@ for (const kind of ["image", "scene", "marker"]) {
       await confirmation
         .getByRole("button", { name: "Delete", exact: true })
         .tap();
-      await expect(confirmation).toBeHidden();
+      await expectClosed(page, confirmation);
       await expect(trigger).toBeFocused();
       await expect(page).toHaveURL(filteredURL);
       await trigger.tap();
@@ -107,7 +117,7 @@ for (const kind of ["image", "scene", "marker"]) {
       await activeConfirmation
         .getByRole("button", { name: "Delete", exact: true })
         .tap();
-      await expect(activeConfirmation).toBeHidden();
+      await expectClosed(page, activeConfirmation);
       await expect(page).toHaveURL(filteredURL);
       await expect(conditions).toHaveCount(1);
       expect(
@@ -187,6 +197,7 @@ for (const failure of ["false", "network"] as const) {
     await confirmation
       .getByRole("button", { name: "Cancel", exact: true })
       .tap();
+    await expectClosed(page, confirmation);
     await page
       .getByRole("button", { name: "Saved filters", exact: true })
       .tap();
@@ -206,7 +217,7 @@ for (const failure of ["false", "network"] as const) {
     await confirmation
       .getByRole("button", { name: "Delete", exact: true })
       .tap();
-    await expect(confirmation).toBeHidden();
+    await expectClosed(page, confirmation);
     await page
       .getByRole("button", { name: "Saved filters", exact: true })
       .tap();
@@ -312,20 +323,20 @@ test("saving and overwriting still work after removing a preset", async ({
     exact: true,
   });
   await confirmation.getByRole("button", { name: "Delete", exact: true }).tap();
-  await expect(confirmation).toBeHidden();
+  await expectClosed(page, confirmation);
   await page.getByRole("button", { name: "Save filter", exact: true }).tap();
   const save = page.getByRole("dialog", {
     name: "Save filter",
     exact: true,
   });
-  const name = save.getByRole("combobox", { name: "Filter name", exact: true });
+  const name = save.getByRole("textbox", { name: "Filter name", exact: true });
   await name.fill("Short");
   await expect(
     page.getByRole("option", { name: "Short clips", exact: true }),
   ).toHaveCount(0);
   await name.fill("New preset");
   await save.getByRole("button", { name: "Save", exact: true }).tap();
-  await expect(save).toBeHidden();
+  await expectClosed(page, save);
   await page.getByRole("button", { name: "New preset", exact: true }).tap();
   await expect(
     picker.getByRole("button", { name: "New preset", exact: true }),
@@ -350,7 +361,7 @@ async function openSaveFilter(page: Page, kind = "image") {
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Save filter", exact: true }).tap();
   const dialog = page.getByRole("dialog", { name: "Save filter", exact: true });
-  const name = dialog.getByRole("combobox", {
+  const name = dialog.getByRole("textbox", {
     name: "Filter name",
     exact: true,
   });
@@ -435,7 +446,8 @@ for (const viewport of [
     await expect(save).toBeDisabled();
     await expectStable();
     await name.press("ArrowDown");
-    await name.press("Enter");
+    // Enter goes to the focused suggestion; name.press would refocus the input.
+    await page.keyboard.press("Enter");
     await expect(save).toBeEnabled();
     await expectStable();
     if (viewport.height >= 568) {
@@ -472,7 +484,8 @@ for (const kind of ["image", "scene", "marker"]) {
       page.getByRole("option", { name: "Short clips", exact: true }),
     ).toBeVisible();
     await name.press("ArrowDown");
-    await name.press("Enter");
+    // Enter goes to the focused suggestion; name.press would refocus the input.
+    await page.keyboard.press("Enter");
     await expect(name).toHaveValue("Short clips");
     await expect(
       dialog.getByText('Saved filter "Short clips" will be overwritten.', {

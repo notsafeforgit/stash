@@ -80,7 +80,7 @@ interface SavedFilterRowItemProps {
   content: ISavedFilterRow;
   savedFilters: GQL.SavedFilterDataFragment[];
   onRemove: () => void;
-  dragHandleProps: React.HTMLAttributes<HTMLButtonElement>;
+  dragHandleProps: React.HTMLAttributes<HTMLElement>;
 }
 
 function SavedFilterRowItem({
@@ -119,7 +119,7 @@ interface RowItemShellProps {
   label: string;
   badge?: string;
   onRemove: () => void;
-  dragHandleProps: React.HTMLAttributes<HTMLButtonElement>;
+  dragHandleProps: React.HTMLAttributes<HTMLElement>;
 }
 
 function RowItemShell({
@@ -201,7 +201,7 @@ function SortableRow({
   const dragHandleProps = {
     ...attributes,
     ...listeners,
-  } as React.HTMLAttributes<HTMLButtonElement>;
+  } as React.HTMLAttributes<HTMLElement>;
 
   if (content.__typename === "SavedFilter") {
     return (

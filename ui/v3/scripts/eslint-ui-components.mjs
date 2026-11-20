@@ -17,9 +17,9 @@ export default {
     messages: {
       control: "Use a shared UI component instead of a bare <{{tag}}>.",
       primitive:
-        "Import Base UI primitives only in src/components/ui; use its shared wrappers here.",
-      radix:
-        "This application uses Base UI shadcn components; use the shared UI layer instead of Radix.",
+        "Import ui-sdk only in src/components/ui; use its shared wrappers here.",
+      foreign:
+        "This application builds its UI on ui-sdk; use the shared UI layer instead of {{name}}.",
       dialog: "Use a shared dialog instead of a blocking browser {{name}}().",
     },
   },
@@ -30,9 +30,16 @@ export default {
     function checkSource(node, source) {
       const name = source?.value;
       if (typeof name !== "string") return;
-      if (name.startsWith("@radix-ui/")) {
-        context.report({ node, messageId: "radix" });
-      } else if (name.startsWith("@base-ui/") && !shared) {
+      const foreign = ["@radix-ui/", "@base-ui/"].find((prefix) =>
+        name.startsWith(prefix),
+      );
+      if (foreign) {
+        context.report({
+          node,
+          messageId: "foreign",
+          data: { name: foreign.slice(0, -1) },
+        });
+      } else if (name.startsWith("@ui-sdk/") && !shared) {
         context.report({ node, messageId: "primitive" });
       }
     }

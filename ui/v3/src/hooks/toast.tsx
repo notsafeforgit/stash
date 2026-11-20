@@ -1,11 +1,11 @@
-import { toast, type ExternalToast } from "sonner";
+import { toast, type ToastOptions } from "@/components/ui/toast";
 import { errorToString } from "src/utils/errors";
 
 const Toast = {
-  success(message: string, options?: ExternalToast) {
+  success(message: string, options?: ToastOptions) {
     return toast.success(message, options);
   },
-  error(error: unknown, options?: ExternalToast) {
+  error(error: unknown, options?: ToastOptions) {
     return toast.error(errorToString(error), options);
   },
   /**

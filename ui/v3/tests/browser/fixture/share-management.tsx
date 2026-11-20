@@ -4,7 +4,7 @@ import { ApolloProvider } from "@apollo/client/react";
 import { IntlProvider } from "react-intl";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { SharesSettings } from "@/components/sharing/shares-settings";
 import { useShareAction } from "@/components/sharing/share-action";
 import { Button } from "@/components/ui/button";

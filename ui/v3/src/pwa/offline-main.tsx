@@ -13,7 +13,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { ScenePlayer } from "@/components/player/scene-player";
 import { useOfflineEntries } from "@/components/offline/use-offline-entries";
 import { useOpfsBlobUrl } from "@/components/offline/use-opfs-blob";

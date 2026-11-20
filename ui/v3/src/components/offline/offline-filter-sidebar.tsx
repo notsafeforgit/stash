@@ -218,6 +218,7 @@ function IdLabelMultiSelect({
   return (
     <Combobox<string, true>
       multiple
+      filter={false}
       autoHighlight={inputValue.length > 0}
       value={value}
       onValueChange={(ids: string[]) => {
@@ -231,7 +232,9 @@ function IdLabelMultiSelect({
     >
       <ComboboxChips ref={anchor}>
         {value.map((id) => (
-          <ComboboxChip key={id}>{labelMap.get(id) ?? id}</ComboboxChip>
+          <ComboboxChip key={id} value={id}>
+            {labelMap.get(id) ?? id}
+          </ComboboxChip>
         ))}
         <ComboboxChipsInput placeholder={`${placeholder}…`} />
         {value.length > 0 && <ComboboxClear />}

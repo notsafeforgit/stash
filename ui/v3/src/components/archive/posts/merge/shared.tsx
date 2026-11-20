@@ -4,7 +4,7 @@ import type {
   PostMergeEntity,
   PostMergePost,
 } from "@/core/native-archive/post-consolidation-schema";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import { LibraryLink } from "../library-link";
 import { NativeArchiveError } from "@/core/native-archive/client";
@@ -164,13 +164,17 @@ export function MergePostLink({
   children: ReactNode;
 }) {
   return (
-    <Link
-      className={buttonVariants({ variant: "outline" })}
-      to="/source-posts"
-      search={{ mode: "all", value: "", namespace: "", post: id }}
+    <Button
+      variant="outline"
+      render={
+        <Link
+          to="/source-posts"
+          search={{ mode: "all", value: "", namespace: "", post: id }}
+        />
+      }
     >
       {children}
-    </Link>
+    </Button>
   );
 }
 

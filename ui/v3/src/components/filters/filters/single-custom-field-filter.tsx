@@ -13,7 +13,6 @@ import {
   ComboboxContent,
   ComboboxList,
   ComboboxItem,
-  ComboboxCollection,
   ComboboxEmpty,
 } from "src/components/ui/combobox";
 import { Spinner } from "src/components/ui/spinner";
@@ -152,13 +151,11 @@ export const SingleCustomFieldFilter: React.FC<
                   })}
                 </ComboboxEmpty>
                 <ComboboxList>
-                  <ComboboxCollection>
-                    {(name: string) => (
-                      <ComboboxItem key={name} value={name}>
-                        {name}
-                      </ComboboxItem>
-                    )}
-                  </ComboboxCollection>
+                  {(name: string) => (
+                    <ComboboxItem key={name} value={name}>
+                      {name}
+                    </ComboboxItem>
+                  )}
                 </ComboboxList>
               </>
             )}

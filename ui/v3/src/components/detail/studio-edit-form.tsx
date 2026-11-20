@@ -18,9 +18,11 @@ import { Switch } from "src/components/ui/switch";
 import {
   Field,
   FieldError,
-  FieldLabel,
-  FieldTitle,
   FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+  FieldTitle,
 } from "src/components/ui/field";
 import { RatingSystem } from "src/components/ui/rating-system";
 import {
@@ -544,16 +546,16 @@ export function StudioEditForm(props: StudioEditFormProps) {
           {/* URLs */}
           <form.Field name="urls">
             {(field) => (
-              <Field>
-                <FieldLabel>
+              <FieldSet>
+                <FieldLegend variant="label">
                   {intl.formatMessage({ id: "urls", defaultMessage: "URLs" })}
-                </FieldLabel>
+                </FieldLegend>
                 <UrlListField
                   value={field.state.value}
                   onChange={field.handleChange}
                   disabled={busy}
                 />
-              </Field>
+              </FieldSet>
             )}
           </form.Field>
 
@@ -579,13 +581,13 @@ export function StudioEditForm(props: StudioEditFormProps) {
           {/* Stash IDs */}
           <form.Field name="stash_ids">
             {(field) => (
-              <Field>
-                <FieldLabel>
+              <FieldSet>
+                <FieldLegend variant="label">
                   {intl.formatMessage({
                     id: "stash_ids",
                     defaultMessage: "Stash IDs",
                   })}
-                </FieldLabel>
+                </FieldLegend>
                 <StashIdsField
                   value={field.state.value}
                   onChange={field.handleChange}
@@ -593,23 +595,23 @@ export function StudioEditForm(props: StudioEditFormProps) {
                   searchType="studio"
                   searchQuery={form.state.values.name}
                 />
-              </Field>
+              </FieldSet>
             )}
           </form.Field>
 
           {/* Custom fields */}
           <form.Field name="custom_fields">
             {(field) => (
-              <Field>
-                <FieldLabel>
+              <FieldSet>
+                <FieldLegend variant="label">
                   {intl.formatMessage({ id: "custom_fields.title" })}
-                </FieldLabel>
+                </FieldLegend>
                 <CustomFieldsField
                   value={field.state.value}
                   onChange={field.handleChange}
                   disabled={busy}
                 />
-              </Field>
+              </FieldSet>
             )}
           </form.Field>
         </FieldGroup>

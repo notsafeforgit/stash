@@ -410,6 +410,8 @@ test("gallery continuation toggle persists and turning it off loops only the ope
   await page.getByRole("button", { name: "View options", exact: true }).click();
   await expect(toggle).not.toBeChecked();
   await page.keyboard.press("Escape");
+  // A modal sheet takes presses until it has finished closing.
+  await expect(toggle).toBeHidden();
   await page.getByRole("button", { name: "View gallery", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Lightbox", exact: true });
   const next = viewer.getByRole("button", { name: "Next", exact: true });

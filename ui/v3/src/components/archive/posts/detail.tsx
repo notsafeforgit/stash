@@ -18,7 +18,7 @@ import {
   LinkState,
   PostContent,
 } from "@/components/detail/native-sources/history";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -176,18 +176,22 @@ function PostPublishers({ id, api }: { id: string; api: SourcePostAPI }) {
               />
             </CardContent>
             <CardFooter>
-              <Link
-                className={buttonVariants({ variant: "outline" })}
-                to="/account-review"
-                search={{
-                  account: account.uuid,
-                  namespace: account.namespace,
-                  q: "",
-                  ownership: "all",
-                }}
+              <Button
+                variant="outline"
+                render={
+                  <Link
+                    to="/account-review"
+                    search={{
+                      account: account.uuid,
+                      namespace: account.namespace,
+                      q: "",
+                      ownership: "all",
+                    }}
+                  />
+                }
               >
                 {msg("source_posts.review_account", "Review account")}
-              </Link>
+              </Button>
             </CardFooter>
           </Card>
         )}

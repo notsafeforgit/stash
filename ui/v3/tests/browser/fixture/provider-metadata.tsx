@@ -5,7 +5,7 @@ import { SceneEditForm } from "@/components/detail/scene-edit-form";
 import { PerformerEditForm } from "@/components/detail/performer-edit-form";
 import { ProviderMetadataHistory } from "@/components/detail/provider-metadata-history";
 import { ConfigurationProvider } from "@/hooks/config";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { playerConfiguration } from "./player-configuration";
 import { scenes } from "./scene-lightbox";
 import { performers } from "./merge-dialogs";

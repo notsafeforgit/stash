@@ -35,13 +35,11 @@ export function SpeedMenu({
   const rate = Player.usePlayer((s) => s.playbackRate);
   const store = Player.usePlayer();
 
-  // `modal={false}`: Base UI's default modal behaviour locks document
-  // scroll and inserts a scrollbar-gutter compensator on body, which
-  // on mobile triggers a viewport recalc around the address bar and
-  // produces a black flash + content shift inside YARL's lightbox.
-  // Outside-click suppression for the player's tap-to-play handler
-  // is already handled by `isMenuActive()` upstream, so we don't
-  // need the modal scroll lock or the InternalBackdrop overlay here.
+  // `modal={false}`: a modal menu locks document scroll, which on
+  // mobile caused a viewport recalc around the address bar and a
+  // black flash + content shift inside YARL's lightbox. Outside-click
+  // suppression for the player's tap-to-play handler is already
+  // handled by `isMenuActive()` upstream.
   return (
     <DropdownMenu modal={false} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger
@@ -73,7 +71,7 @@ export function SpeedMenu({
             <DropdownMenuRadioItem
               key={s}
               value={String(s)}
-              closeOnClick
+              closeOnSelect
               className={cn(
                 "text-white/70 focus:bg-white/10 focus:text-white",
                 s === rate && "font-medium text-white",
@@ -172,7 +170,7 @@ export function QualityMenu({
               <DropdownMenuRadioItem
                 key={s.src}
                 value={key}
-                closeOnClick
+                closeOnSelect
                 className={cn(
                   "text-white/70 focus:bg-white/10 focus:text-white",
                   isActive && "font-medium text-white",

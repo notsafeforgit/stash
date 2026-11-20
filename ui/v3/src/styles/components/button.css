@@ -1,0 +1,124 @@
+/* web.css draws outline, solid and destructive buttons. These add the other
+   variants and sizes, also for parts like DialogClose that take them directly. */
+@layer components {
+  /* Buttons keep their size as flex items; a column with a max height must not shrink them. */
+  [data-slot="button"] {
+    flex-shrink: 0;
+  }
+
+  :is(
+    [data-slot="button"],
+    [data-slot$="-trigger"],
+    [data-slot$="-close"],
+    [data-slot="toggle"]
+  ) {
+    &[data-variant="secondary"] {
+      border-color: transparent;
+      background: var(--ui-muted);
+
+      &:hover:not([data-disabled]) {
+        background: color-mix(
+          in oklab,
+          var(--ui-muted),
+          var(--ui-foreground) 6%
+        );
+      }
+    }
+
+    &:is(
+        [data-variant="ghost"],
+        [data-variant="transparent"],
+        [data-variant="link"]
+      ) {
+      border-color: transparent;
+      background: transparent;
+    }
+
+    &[data-variant="ghost"]:is(
+        :hover:not([data-disabled]),
+        [aria-expanded="true"]
+      ) {
+      background: var(--ui-muted);
+    }
+
+    &:is([data-variant="transparent"], [data-variant="link"]):hover {
+      background: transparent;
+    }
+
+    &[data-variant="link"] {
+      height: auto;
+      padding-inline: 0;
+      color: var(--ui-primary);
+      text-underline-offset: 4px;
+
+      &:hover:not([data-disabled]) {
+        text-decoration: underline;
+      }
+    }
+
+    &:has(> [data-icon="inline-start"]) {
+      padding-inline-start: calc(var(--ui-spacing) * 2.5);
+    }
+
+    &:has(> [data-icon="inline-end"]) {
+      padding-inline-end: calc(var(--ui-spacing) * 2.5);
+    }
+
+    &[data-size="xs"] {
+      height: calc(var(--ui-spacing) * 6);
+      gap: var(--ui-spacing);
+      padding-inline: calc(var(--ui-spacing) * 2);
+      font-size: 0.75rem;
+    }
+
+    &[data-size="sm"] {
+      height: calc(var(--ui-spacing) * 7);
+      gap: var(--ui-spacing);
+      padding-inline: calc(var(--ui-spacing) * 2.5);
+    }
+
+    &[data-size="lg"] {
+      height: calc(var(--ui-spacing) * 9);
+    }
+
+    &[data-size^="icon"] {
+      width: calc(var(--ui-spacing) * 8);
+      padding: 0;
+    }
+
+    &[data-size="icon-xs"] {
+      width: calc(var(--ui-spacing) * 6);
+      height: calc(var(--ui-spacing) * 6);
+    }
+
+    &[data-size="icon-sm"] {
+      width: calc(var(--ui-spacing) * 7);
+      height: calc(var(--ui-spacing) * 7);
+    }
+
+    &[data-size="icon-lg"] {
+      width: calc(var(--ui-spacing) * 9);
+      height: calc(var(--ui-spacing) * 9);
+    }
+
+    &[data-size="icon-xl"] {
+      width: calc(var(--ui-spacing) * 20);
+      height: calc(var(--ui-spacing) * 20);
+    }
+
+    &:is([data-size="xs"], [data-size="icon-xs"]) > svg {
+      width: 0.75rem;
+      height: 0.75rem;
+    }
+
+    &[data-size="sm"] > svg {
+      width: 0.875rem;
+      height: 0.875rem;
+    }
+
+    &[data-size="icon-xl"] > svg {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+  }
+}

@@ -189,6 +189,7 @@ function MediaDetailContent({
       value={activeTab}
       onValueChange={handleTabChange}
       orientation={mobile ? "vertical" : "horizontal"}
+      activation={mobile ? "manual" : "automatic"}
       className="flex-col flex-1 min-h-0 gap-0 overflow-hidden"
     >
       {title && !primaryFocusMode && (

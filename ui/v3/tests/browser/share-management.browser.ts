@@ -1,6 +1,6 @@
 import { libraryID } from "../fixtures/library";
 import * as GQL from "../../src/core/generated-graphql";
-import { test, expect } from "./test";
+import { test, expect, expectBackdropSettled } from "./test";
 import { z } from "zod";
 import type { Locator } from "@playwright/test";
 
@@ -465,27 +465,40 @@ for (const viewport of [
     ).toBeVisible();
     await expectDialogFits(form);
 
-    await form.getByLabel("Time", { exact: true }).fill("");
-    await form.getByLabel("Date", { exact: true }).click();
+    const expiry = form.getByRole("group", { name: "Date", exact: true });
+    const hour = expiry.getByRole("spinbutton", { name: "hour", exact: true });
+    const minute = expiry.getByRole("spinbutton", {
+      name: "minute",
+      exact: true,
+    });
+    await hour.press("Delete");
+    await minute.press("Delete");
+    await expect(
+      form.getByRole("button", { name: "Create share", exact: true }),
+    ).toBeDisabled();
+    await form
+      .getByRole("button", { name: "Choose a date", exact: true })
+      .click();
     const calendar = page.locator('[data-slot="popover-content"]');
     await expect(calendar).toBeInViewport({ ratio: 1 });
     await expect(
-      calendar.getByRole("button", {
-        name: "Sunday, September 20th, 2026",
+      calendar.getByRole("gridcell", {
+        name: "Sunday, 20 September 2026",
         exact: true,
       }),
-    ).toBeDisabled();
+    ).toHaveAttribute("aria-disabled", "true");
     await calendar
-      .getByRole("button", {
-        name: "Wednesday, September 23rd, 2026",
+      .getByRole("gridcell", {
+        name: "Wednesday, 23 September 2026",
         exact: true,
       })
       .click();
     await expect(calendar).toBeHidden();
-    await expect(
-      form.getByRole("button", { name: "Create share", exact: true }),
-    ).toBeDisabled();
-    await form.getByLabel("Time", { exact: true }).fill("13:45");
+    // A day picked before any time starts at midnight, as the Date Input does.
+    await expect(hour).toHaveValue("00");
+    await expect(minute).toHaveValue("00");
+    await hour.pressSequentially("13");
+    await minute.pressSequentially("45");
     await expect(
       form.getByRole("button", { name: "Custom", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
@@ -511,6 +524,7 @@ for (const viewport of [
       await page.evaluate(() => new Date("2026-09-23T13:45").toISOString()),
     );
     await page.keyboard.press("Escape");
+    await expectBackdropSettled(page);
     await expect(page.getByText("2 media items")).toBeVisible();
     await page.getByRole("button", { name: "Operations", exact: true }).click();
     await page
@@ -525,6 +539,7 @@ for (const viewport of [
       .getByRole("dialog")
       .getByRole("button", { name: "Save", exact: true })
       .click();
+    await expectBackdropSettled(page);
     await expect(
       page.getByText("Updated share", { exact: true }),
     ).toBeVisible();
@@ -533,6 +548,7 @@ for (const viewport of [
       .getByRole("menuitem", { name: "Revoke share", exact: true })
       .click();
     await page.getByRole("button", { name: "Confirm", exact: true }).click();
+    await expectBackdropSettled(page);
     await expect(
       page.getByText("No active shares", { exact: true }),
     ).toBeVisible();
@@ -544,6 +560,7 @@ for (const viewport of [
       .getByRole("menuitem", { name: "Delete share", exact: true })
       .click();
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expectBackdropSettled(page);
     expect(shares).toHaveLength(1);
     await page.getByRole("button", { name: "Operations", exact: true }).click();
     await page
@@ -738,13 +755,16 @@ for (const width of [320, 1280]) {
       path: testInfo.outputPath("cleanup-confirmation.png"),
     });
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expectBackdropSettled(page);
     expect(cleanupCalls).toBe(0);
     expect(shares).toHaveLength(52);
     await cleanup.click();
     const confirm = dialog.getByRole("button", { name: "Delete", exact: true });
     await confirm.click();
     await expect(
-      page.getByText("Cleanup interrupted", { exact: true }),
+      page
+        .getByRole("region", { name: "Notifications" })
+        .getByText("Cleanup interrupted", { exact: true }),
     ).toBeVisible();
     await expect(dialog).toBeVisible();
     await expect(confirm).toBeEnabled();
@@ -759,11 +779,14 @@ for (const width of [320, 1280]) {
     await expect.poll(() => finishCleanup !== undefined).toBe(true);
     finishCleanup?.();
     await expect(dialog).toBeHidden();
+    await expectBackdropSettled(page);
     await expect(
       page.getByText("No inactive shares", { exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByText("Deleted 51 inactive shares", { exact: true }),
+      page
+        .getByRole("region", { name: "Notifications" })
+        .getByText("Deleted 51 inactive shares", { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Previous", exact: true }),

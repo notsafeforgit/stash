@@ -8,7 +8,6 @@ import {
   PositionScrubber,
   type ScrubberCrossAxisPan,
 } from "@/components/player/position-scrubber";
-import { useTvRotation } from "./tv-slider";
 import { useSpriteInfo } from "@/hooks/use-sprite-info";
 import type { PlaybackRange } from "@/core/marker-range";
 import type { TvScene } from "./use-tv-mutations";
@@ -34,7 +33,6 @@ export function TvTimeline({
   const position = useScenePlayerValue("displayPosition");
   const bufferedRanges = useScenePlayerValue("bufferedRanges");
   const previewPending = useScenePlayerValue("previewPending");
-  const rotation = useTvRotation();
   const controls = useScenePlayerControls();
   const [draft, setDraft] = useState<number | null>(null);
   const [previewOpened, setPreviewOpened] = useState(false);
@@ -115,20 +113,13 @@ export function TvTimeline({
         </span>
       </div>
       <PositionScrubber
-        key={`${scene.id}:${range.start}:${range.end}:${rotation}`}
+        key={`${scene.id}:${range.start}:${range.end}`}
         value={value}
         duration={duration}
         crossAxisPan={crossAxisPan}
         bufferedRanges={bufferedRanges}
         previewPending={previewPending}
         bufferedOffset={-range.start}
-        direction={
-          rotation === "normal"
-            ? "right"
-            : rotation === "clockwise"
-              ? "down"
-              : "up"
-        }
         onPreviewChange={(visible) => {
           if (visible) setPreviewOpened(true);
           setPreviewVisible(visible);

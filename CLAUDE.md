@@ -163,19 +163,21 @@ MIME types, codec/GOP/resolution checks and original-file share behavior intact.
 - Validate with Zod schemas passed to `validators: { onChange: schema }`.
 - Access fields via `form.Field` render-prop pattern; never manage form state manually with `useState`.
 
-**UI components — shadcn + Base UI**
-- shadcn components live in `src/components/ui/`. These wrap `@base-ui/react` primitives with Tailwind styling.
-- **Never use bare HTML form elements.** Always use the shadcn wrappers:
-  - `<input>` → `<Input>` from `src/components/ui/input.tsx` (wraps `@base-ui/react/input`)
-  - `<select>` → `<Select>` from `src/components/ui/select.tsx` (wraps `@base-ui/react/select`)
+**UI components — ui-sdk**
+- Shared wrappers live in `src/components/ui/`, built on `@ui-sdk/react` parts and styled by `@ui-sdk/core/web.css`. Before changing them, follow the `ui-sdk` skill and read `ui/v3/node_modules/@ui-sdk/react/docs/llms.txt` (see `ui/v3/AGENTS.md`). Only `src/components/ui/` imports `@ui-sdk/*`; `lint:contracts` enforces this and rejects Base UI and Radix.
+- **Never use bare HTML form elements.** Always use the shared wrappers:
+  - `<input>` → `<Input>` from `src/components/ui/input.tsx`
+  - `<select>` → `<Select>` from `src/components/ui/select.tsx`
   - `<textarea>` → `<Textarea>` from `src/components/ui/textarea.tsx`
-  - `<button>` → `<Button>` from `src/components/ui/button.tsx`
+  - `<button>` → `<Button>` from `src/components/ui/button.tsx`; a link styled as a button is `<Button render={<Link … />}>`
   - `<input type="checkbox">` → `<Checkbox>` from `src/components/ui/checkbox.tsx`
-  - Searchable dropdowns → `<Combobox>` from `src/components/ui/combobox.tsx` (wraps `@base-ui/react/combobox`)
+  - Searchable dropdowns → `<Combobox>` from `src/components/ui/combobox.tsx`
   - Custom selects / dropdowns → `<Select>` or `<DropdownMenu>` accordingly
 - Loading state → `<Spinner>` from `src/components/ui/spinner.tsx` (CSS border animation, no icon dependency)
-- Overlays: `<Sheet>` (side panel), `<Drawer>` (Base UI drawer), `<BottomSheet>` for mobile
-- When using Base UI `Popup`/`Positioner`, add `data-base-ui-swipe-ignore=""` to fix scroll issues on mobile
+- Overlays: `<Sheet>` (side panel), `<Drawer>` (ui-sdk drawer), `<BottomSheet>` for mobile. Toasts use `toast()` from `src/components/ui/toast.tsx`.
+- Mark a scroller inside a drawer with `data-drawer-no-drag` so scrolling it does not start a dismiss drag on mobile.
+- A `Field` names every control inside it, overriding their `aria-label`s. Give each `Field` one control; label a group of controls with `FieldSet` and `FieldLegend`.
+- Style parts through their `data-slot` and state attributes. Wrapper styles beyond web.css live in `src/styles/components/*.css`, in `@layer components`; `--ui-*` tokens map to the Stash palette in `globals.css`.
 
 **Styling — Tailwind CSS v4**
 - Utility-first; no custom SCSS.

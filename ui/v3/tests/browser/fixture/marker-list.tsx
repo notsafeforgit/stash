@@ -5,7 +5,7 @@ import { createCache } from "@/core/create-client";
 import { Route as markersRoute } from "@/routes/scenes/markers";
 import { scenes } from "./scene-lightbox";
 import type { FilterAstNodeInput } from "@/core/generated-graphql";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { FilterMode } from "@/core/generated-graphql";
 import { savedFiltersLink } from "./saved-filters";
 

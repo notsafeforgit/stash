@@ -9,9 +9,8 @@ import {
 } from "@/core/tv/settings";
 import { resolveTvQuery } from "@/core/tv/feed-query";
 import { TvPage } from "@/components/tv/tv-page";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { createTvRotationStore } from "@/hooks/use-tv-settings";
 
 export const Route = createFileRoute("/tv")({
   validateSearch: (search) => tvSearchSchema.parse(search),
@@ -37,15 +36,12 @@ export const Route = createFileRoute("/tv")({
       <Button onClick={reset}>
         <FormattedMessage id="tv.text.retry" defaultMessage="Retry" />
       </Button>
-      <Link
-        to="/settings/tv"
-        className={buttonVariants({ variant: "outline" })}
-      >
+      <Button variant="outline" render={<Link to="/settings/tv" />}>
         <FormattedMessage
           id="tv.text.tv_settings"
           defaultMessage="TV settings"
         />
-      </Link>
+      </Button>
       <Link to="/scenes">
         <FormattedMessage
           id="tv.text.back_to_scenes"
@@ -88,9 +84,9 @@ export const Route = createFileRoute("/tv")({
           : undefined;
     const random = crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
     const seed = search.seed ?? random % 2147483647;
-    const portrait = window.matchMedia("(orientation: portrait)").matches;
-    const rotated = createTvRotationStore().getSnapshot() !== "normal";
-    const orientation = portrait !== rotated ? "portrait" : "landscape";
+    const orientation = window.matchMedia("(orientation: portrait)").matches
+      ? "portrait"
+      : "landscape";
     const query = await resolveTvQuery(
       client,
       config,

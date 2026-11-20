@@ -29,7 +29,7 @@ export function DetailTabStrip({
 }: DetailTabStripProps) {
   const intl = useIntl();
   return (
-    // `w-full` overrides the shadcn TabsList's default `w-fit`: without
+    // `w-full` overrides the TabsList's default `w-fit`: without
     // it the strip sizes to its content's intrinsic width, which means
     // `overflow-x-auto` has no constraint to overflow against and the
     // tabs spill out of the parent (clipped by the sidebar's
@@ -44,7 +44,7 @@ export function DetailTabStrip({
         })
       }
       className={cn(
-        // `justify-start` overrides the shadcn TabsList's `justify-center`:
+        // `justify-start` overrides the TabsList's `justify-center`:
         // centred content that overflows spills past both edges, and a
         // scroll container cannot scroll to the left spill, so the first
         // tab would be cut off. Triggers are `flex-1`, so a strip that

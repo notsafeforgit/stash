@@ -21,7 +21,7 @@ import { tvPlaybackPlan, type TvPlaybackPlan } from "@/core/tv/playback-policy";
 import type { TvSearch, TvSettings } from "@/core/tv/settings";
 import { ScenePlayer } from "@/components/player/scene-player";
 import { PreviewImage } from "@/components/shared/preview-image";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Empty,
@@ -37,7 +37,6 @@ import {
   useContentReveal,
 } from "@/components/layout/content-reveal";
 import { useConfigurationContext } from "@/hooks/config";
-import { useTvSettings } from "@/hooks/use-tv-settings";
 import { useMsg } from "@/hooks/message";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { cn } from "@/lib/utils";
@@ -46,7 +45,6 @@ import { useTvPresentation } from "./use-tv-presentation";
 import { useTvNavigation } from "./use-tv-navigation";
 import { TvControls } from "./tv-controls";
 import { TvNavigationButton } from "./tv-navigation-button";
-import { TvRotationProvider } from "./tv-slider";
 import { useScenePlayerValue } from "@/components/player/scene-player-controls";
 import { useTvMediaWindow } from "./use-tv-media-window";
 import { tvFeedSwitchLabels } from "./tv-action-labels";
@@ -142,11 +140,6 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
     exit: exitPresentation,
     canFullscreen,
   } = useTvPresentation();
-  const { rotation, setRotation: storeRotation } = useTvSettings();
-  const setRotation = (next: typeof rotation) => {
-    storeRotation(next);
-    if (settings.orientation === "match") void router.invalidate();
-  };
   useEffect(() => {
     if (settings.orientation !== "match") return;
     const orientation = window.matchMedia("(orientation: portrait)");
@@ -324,7 +317,6 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
       ref={presentationRoot}
       data-tv
       data-tv-presentation={presentationMode}
-      data-tv-rotation={rotation}
       className={cn(
         "tv-viewport relative isolate size-full min-h-0 overflow-clip bg-black",
         presentationMode !== "normal" && "fixed inset-0 z-40 h-dvh",
@@ -338,215 +330,201 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
         data-tv-surface
       >
         <OverlayContainerProvider container={presentationPortals}>
-          <TvRotationProvider value={rotation}>
-            <div ref={strip} className="absolute inset-0" data-tv-strip>
-              <div
-                className="absolute inset-0 -translate-y-full"
-                data-tv-slot="previous"
-                aria-hidden
-              >
-                <Poster item={snapshot.items[snapshot.selected - 1]} />
-              </div>
-              <div className="absolute inset-0" data-tv-slot="active">
-                {playerScene && (
-                  <ScenePlayer
-                    scene={playerScene}
-                    playbackKey={currentKey}
-                    suspended={pending || leaving}
-                    transcodeSession={transcodeSession}
-                    controls="external"
-                    nativeFullscreenAllowed={false}
-                    presentationRotation={
-                      rotation === "clockwise"
-                        ? 90
-                        : rotation === "counterclockwise"
-                          ? -90
-                          : 0
-                    }
-                    initiallyMuted={settings.startMuted}
-                    qualityPreference={settings.defaultQuality}
-                    initialTimestamp={
-                      planReady
-                        ? snapshot.playback &&
-                          snapshot.playback.key === active?.key
-                          ? snapshot.playback.position
-                          : plan.range.start
-                        : undefined
-                    }
-                    clipRange={planReady ? plan.range : undefined}
-                    autoplay={settings.autoplay}
-                    autostartEnabled={
-                      settings.autoplay &&
-                      (configuration.interface.autostartVideo ?? true)
-                    }
-                    completionMode={completion}
-                    onCompletionModeChange={setCompletion}
-                    onNext={
-                      interactionBlocked ? undefined : () => selection.move(1)
-                    }
-                    onPrevious={
-                      interactionBlocked ? undefined : () => selection.move(-1)
-                    }
-                    fill
-                    enablePinchZoom
-                    preload="metadata"
-                    onToggleFullscreenOverride={togglePresentation}
-                    posterSrc={marker?.screenshot}
-                    posterImage={marker?.preview_image}
-                    activityScope={
-                      active?.kind === "scene"
-                        ? {
-                            kind: "online-scene",
-                            sceneId: active.sceneId,
-                            visitKey: currentKey,
-                          }
-                        : { kind: "marker" }
-                    }
-                    topOverlay={
-                      active && (
-                        <>
-                          <TvMediaReady onReady={onMediaReady} />
-                          <TvControls
-                            scene={playerScene}
-                            item={active}
-                            range={range}
-                            settings={settings}
-                            surface={presentationSurface}
-                            root={presentationRoot}
-                            rotation={rotation}
-                            setRotation={setRotation}
-                            togglePresentation={togglePresentation}
-                            canFullscreen={canFullscreen}
-                            fullscreen={presentationMode === "fullscreen"}
-                            exitPresentation={exitPresentation}
-                            openNavigation={openNavigation}
-                            toggleFeed={toggleFeed}
-                            feedMode={query.mode}
-                            navigateItem={selection.move}
-                            drag={selection.drag}
-                            cancelDrag={selection.cancel}
-                            snapshot={snapshot}
-                            changed={changed}
-                            retry={() => {
-                              void controller.load();
-                            }}
-                            reshuffle={reshuffle}
-                            completion={completion}
-                            setCompletion={setCompletion}
-                            remember={remember}
-                            leaving={leaving}
-                            onInteractionBlockedChange={setInteractionBlocked}
-                          />
-                        </>
-                      )
-                    }
-                  />
-                )}
-                {pending && active && (
-                  <div className="pointer-events-none absolute inset-0">
-                    <Poster item={active} />
-                  </div>
-                )}
-              </div>
-              <div
-                className="absolute inset-0 translate-y-full"
-                data-tv-slot="next"
-                aria-hidden
-              >
-                <Poster item={next} />
-              </div>
+          <div ref={strip} className="absolute inset-0" data-tv-strip>
+            <div
+              className="absolute inset-0 -translate-y-full"
+              data-tv-slot="previous"
+              aria-hidden
+            >
+              <Poster item={snapshot.items[snapshot.selected - 1]} />
             </div>
-            {(!active || pending) && (
-              <div className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-background/60 p-4">
-                <div className="tv-footer absolute bottom-0 left-0 p-3">
-                  <TvNavigationButton onClick={openNavigation} />
+            <div className="absolute inset-0" data-tv-slot="active">
+              {playerScene && (
+                <ScenePlayer
+                  scene={playerScene}
+                  playbackKey={currentKey}
+                  suspended={pending || leaving}
+                  transcodeSession={transcodeSession}
+                  controls="external"
+                  nativeFullscreenAllowed={false}
+                  initiallyMuted={settings.startMuted}
+                  qualityPreference={settings.defaultQuality}
+                  initialTimestamp={
+                    planReady
+                      ? snapshot.playback &&
+                        snapshot.playback.key === active?.key
+                        ? snapshot.playback.position
+                        : plan.range.start
+                      : undefined
+                  }
+                  clipRange={planReady ? plan.range : undefined}
+                  autoplay={settings.autoplay}
+                  autostartEnabled={
+                    settings.autoplay &&
+                    (configuration.interface.autostartVideo ?? true)
+                  }
+                  completionMode={completion}
+                  onCompletionModeChange={setCompletion}
+                  onNext={
+                    interactionBlocked ? undefined : () => selection.move(1)
+                  }
+                  onPrevious={
+                    interactionBlocked ? undefined : () => selection.move(-1)
+                  }
+                  fill
+                  enablePinchZoom
+                  preload="metadata"
+                  onToggleFullscreenOverride={togglePresentation}
+                  posterSrc={marker?.screenshot}
+                  posterImage={marker?.preview_image}
+                  activityScope={
+                    active?.kind === "scene"
+                      ? {
+                          kind: "online-scene",
+                          sceneId: active.sceneId,
+                          visitKey: currentKey,
+                        }
+                      : { kind: "marker" }
+                  }
+                  topOverlay={
+                    active && (
+                      <>
+                        <TvMediaReady onReady={onMediaReady} />
+                        <TvControls
+                          scene={playerScene}
+                          item={active}
+                          range={range}
+                          settings={settings}
+                          surface={presentationSurface}
+                          root={presentationRoot}
+                          togglePresentation={togglePresentation}
+                          canFullscreen={canFullscreen}
+                          fullscreen={presentationMode === "fullscreen"}
+                          exitPresentation={exitPresentation}
+                          openNavigation={openNavigation}
+                          toggleFeed={toggleFeed}
+                          feedMode={query.mode}
+                          navigateItem={selection.move}
+                          drag={selection.drag}
+                          cancelDrag={selection.cancel}
+                          snapshot={snapshot}
+                          changed={changed}
+                          retry={() => {
+                            void controller.load();
+                          }}
+                          reshuffle={reshuffle}
+                          completion={completion}
+                          setCompletion={setCompletion}
+                          remember={remember}
+                          leaving={leaving}
+                          onInteractionBlockedChange={setInteractionBlocked}
+                        />
+                      </>
+                    )
+                  }
+                />
+              )}
+              {pending && active && (
+                <div className="pointer-events-none absolute inset-0">
+                  <Poster item={active} />
                 </div>
-                <Empty>
-                  <EmptyHeader>
-                    <EmptyTitle>
-                      {snapshot.status === "loading" || loading
-                        ? msg("tv.loading", "Loading TV…")
-                        : plan?.kind === "invalid"
+              )}
+            </div>
+            <div
+              className="absolute inset-0 translate-y-full"
+              data-tv-slot="next"
+              aria-hidden
+            >
+              <Poster item={next} />
+            </div>
+          </div>
+          {(!active || pending) && (
+            <div className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-background/60 p-4">
+              <div className="tv-footer absolute bottom-0 left-0 p-3">
+                <TvNavigationButton onClick={openNavigation} />
+              </div>
+              <Empty>
+                <EmptyHeader>
+                  <EmptyTitle>
+                    {snapshot.status === "loading" || loading
+                      ? msg("tv.loading", "Loading TV…")
+                      : plan?.kind === "invalid"
+                        ? msg(
+                            "tv.text.cannot_play_this_item",
+                            "Cannot play this item",
+                          )
+                        : error || snapshot.status === "error"
                           ? msg(
-                              "tv.text.cannot_play_this_item",
-                              "Cannot play this item",
+                              "tv.text.could_not_load_tv",
+                              "Could not load TV",
                             )
-                          : error || snapshot.status === "error"
+                          : active
                             ? msg(
-                                "tv.text.could_not_load_tv",
-                                "Could not load TV",
+                                "tv.text.media_unavailable",
+                                "Media unavailable",
                               )
-                            : active
-                              ? msg(
-                                  "tv.text.media_unavailable",
-                                  "Media unavailable",
-                                )
-                              : msg(
-                                  "tv.text.no_matching_items",
-                                  "No matching items",
-                                )}
-                    </EmptyTitle>
-                    <EmptyDescription>
-                      {plan?.kind === "invalid"
-                        ? plan.reason
-                        : (error?.message ??
-                          snapshot.error ??
-                          msg(
-                            "tv.text.choose_another_filter_retry_or_continue_to_the_next_item",
-                            "Choose another filter, retry, or continue to the next item.",
-                          ))}
-                    </EmptyDescription>
-                  </EmptyHeader>
-                  <EmptyContent>
-                    <Button variant="outline" onClick={toggleFeed}>
-                      <FormattedMessage {...tvFeedSwitchLabels[query.mode]} />
-                    </Button>
-                    {snapshot.status === "loading" || loading ? (
-                      <Spinner />
-                    ) : (
-                      <Button
-                        onClick={() => {
-                          if (active) void refetch();
-                          else void controller.load();
-                        }}
-                      >
-                        <FormattedMessage
-                          id="tv.text.retry"
-                          defaultMessage="Retry"
-                        />
-                      </Button>
-                    )}
-                    {active && (
-                      <Button
-                        variant="outline"
-                        onClick={() => controller.select(1)}
-                      >
-                        <FormattedMessage
-                          id="tv.text.skip_item"
-                          defaultMessage="Skip item"
-                        />
-                      </Button>
-                    )}
-                    <Link
-                      to="/settings/tv"
-                      className={buttonVariants({ variant: "outline" })}
+                            : msg(
+                                "tv.text.no_matching_items",
+                                "No matching items",
+                              )}
+                  </EmptyTitle>
+                  <EmptyDescription>
+                    {plan?.kind === "invalid"
+                      ? plan.reason
+                      : (error?.message ??
+                        snapshot.error ??
+                        msg(
+                          "tv.text.choose_another_filter_retry_or_continue_to_the_next_item",
+                          "Choose another filter, retry, or continue to the next item.",
+                        ))}
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button variant="outline" onClick={toggleFeed}>
+                    <FormattedMessage {...tvFeedSwitchLabels[query.mode]} />
+                  </Button>
+                  {snapshot.status === "loading" || loading ? (
+                    <Spinner />
+                  ) : (
+                    <Button
+                      onClick={() => {
+                        if (active) void refetch();
+                        else void controller.load();
+                      }}
                     >
                       <FormattedMessage
-                        id="tv.text.tv_settings"
-                        defaultMessage="TV settings"
+                        id="tv.text.retry"
+                        defaultMessage="Retry"
                       />
-                    </Link>
-                  </EmptyContent>
-                </Empty>
-              </div>
-            )}
-            <ContentReveal ref={feedReveal} tone="media" />
-            <div
-              ref={presentationPortals}
-              className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto"
-              data-tv-portals
-            />
-          </TvRotationProvider>
+                    </Button>
+                  )}
+                  {active && (
+                    <Button
+                      variant="outline"
+                      onClick={() => controller.select(1)}
+                    >
+                      <FormattedMessage
+                        id="tv.text.skip_item"
+                        defaultMessage="Skip item"
+                      />
+                    </Button>
+                  )}
+                  <Button variant="outline" render={<Link to="/settings/tv" />}>
+                    <FormattedMessage
+                      id="tv.text.tv_settings"
+                      defaultMessage="TV settings"
+                    />
+                  </Button>
+                </EmptyContent>
+              </Empty>
+            </div>
+          )}
+          <ContentReveal ref={feedReveal} tone="media" />
+          <div
+            ref={presentationPortals}
+            className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto"
+            data-tv-portals
+          />
         </OverlayContainerProvider>
       </div>
     </div>

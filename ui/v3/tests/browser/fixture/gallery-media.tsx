@@ -6,7 +6,7 @@ import {
 } from "@/core/generated-graphql";
 import { ConfigurationProvider } from "@/hooks/config";
 import { sourceTrackingConfiguration } from "./player-configuration";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { galleryCover } from "@/lib/gallery-utils";
 import { AssociationFixtureProvider } from "./association-provider";
 import { EntityListPage } from "@/components/list/entity-list-page";

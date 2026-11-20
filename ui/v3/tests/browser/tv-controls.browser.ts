@@ -15,9 +15,6 @@ async function expectDockPaddingInert(page: Page, touch: boolean) {
   });
   const points = await page.locator("[data-tv-dock]").evaluate((dock) => {
     const bounds = dock.getBoundingClientRect();
-    const rotation = dock
-      .closest("[data-tv]")
-      ?.getAttribute("data-tv-rotation");
     const width = dock.clientWidth;
     const height = dock.clientHeight;
     // Side gutters beside the scrubber, the gap above it, and bottom padding
@@ -28,13 +25,7 @@ async function expectDockPaddingInert(page: Page, touch: boolean) {
       { x: width / 2, y: 1 },
       { x: 30, y: height - 2 },
       { x: width / 2, y: height - 2 },
-    ].map(({ x, y }) =>
-      rotation === "clockwise"
-        ? { x: bounds.right - y, y: bounds.top + x }
-        : rotation === "counterclockwise"
-          ? { x: bounds.left + y, y: bounds.bottom - x }
-          : { x: bounds.left + x, y: bounds.top + y },
-    );
+    ].map(({ x, y }) => ({ x: bounds.left + x, y: bounds.top + y }));
   });
   for (const point of points) {
     if (touch) await page.touchscreen.tap(point.x, point.y);
@@ -198,51 +189,5 @@ for (const viewport of [
         page.getByRole("link", { name: "Scenes", exact: true }),
       ).toBeVisible();
     });
-  });
-}
-
-for (const rotation of ["clockwise", "counterclockwise"]) {
-  test(`rotating ${rotation} keeps the dock padding outside playback gestures`, async ({
-    page,
-  }) => {
-    await serveSceneMedia(page, "portrait");
-    await page.goto("/tv-fixture/tv?paused&portrait");
-    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
-      "data-playback-ready",
-      "true",
-    );
-    await page
-      .locator("[data-tv]")
-      .evaluate((element) =>
-        element.style.setProperty("--safe-area-bottom", "34px"),
-      );
-    await page.keyboard.press("o");
-    if (rotation === "counterclockwise") {
-      // The shortcut toggles normal/clockwise. Exercise the other persisted
-      // presentation direction through the existing rotation preference.
-      await page.evaluate(() => {
-        const key = Object.keys(localStorage).find((key) =>
-          key.startsWith("stash:tv:rotation:v1:"),
-        );
-        if (!key) throw new Error("Missing TV rotation preference");
-        const newValue = JSON.stringify("counterclockwise");
-        localStorage.setItem(key, newValue);
-        window.dispatchEvent(new StorageEvent("storage", { key, newValue }));
-      });
-    }
-    await expect(page.locator("[data-tv]")).toHaveAttribute(
-      "data-tv-rotation",
-      rotation,
-    );
-    await expectDockPaddingInert(page, true);
-    await page
-      .getByRole("button", { name: "Show or hide controls", exact: true })
-      .click();
-    await expectDockPaddingInert(page, true);
-    await page.touchscreen.tap(195, 422);
-    await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
-      "paused",
-      false,
-    );
   });
 }

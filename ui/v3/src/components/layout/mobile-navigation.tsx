@@ -27,8 +27,7 @@ export function MobileNavigationProvider({
     releaseMotion.current ??= holdRouteMotion(router);
     setOpen(true);
   }, [router]);
-  const onOpenChangeComplete = useCallback((isOpen: boolean) => {
-    if (isOpen) return;
+  const onClosed = useCallback(() => {
     releaseMotion.current?.();
     releaseMotion.current = undefined;
   }, []);
@@ -37,11 +36,7 @@ export function MobileNavigationProvider({
   return (
     <MobileNavigationContext value={openNavigation}>
       {children}
-      <MobileNavSheet
-        open={open}
-        onOpenChange={setOpen}
-        onOpenChangeComplete={onOpenChangeComplete}
-      />
+      <MobileNavSheet open={open} onOpenChange={setOpen} onClosed={onClosed} />
     </MobileNavigationContext>
   );
 }

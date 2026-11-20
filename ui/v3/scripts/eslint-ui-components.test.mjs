@@ -23,7 +23,7 @@ tester.run("shared UI boundaries", rule, {
     },
     {
       filename: shared,
-      code: 'import { Button } from "@base-ui/react/button"; const x = <Button />;',
+      code: 'import { Button } from "@ui-sdk/react/button"; const x = <Button />;',
     },
     {
       filename: "/project/src/components/ui/textarea.tsx",
@@ -59,17 +59,20 @@ tester.run("shared UI boundaries", rule, {
       errors: [{ messageId: "control" }],
     },
     ...[
-      'import { Button as RawButton } from "@base-ui/react/button";',
-      'export { Button } from "@base-ui/react/button";',
-      'export * from "@base-ui/react";',
-      'const x = import("@base-ui/react/button");',
-      'const x = require("@base-ui/react/button");',
+      'import { Button as RawButton } from "@ui-sdk/react/button";',
+      'export { Button } from "@ui-sdk/react/button";',
+      'export * from "@ui-sdk/core";',
+      'const x = import("@ui-sdk/react/button");',
+      'const x = require("@ui-sdk/react/button");',
     ].map((code) => ({ filename, code, errors: [{ messageId: "primitive" }] })),
-    {
+    ...[
+      'import * as Dialog from "@radix-ui/react-dialog";',
+      'import { Button } from "@base-ui/react/button";',
+    ].map((code) => ({
       filename: shared,
-      code: 'import * as Dialog from "@radix-ui/react-dialog";',
-      errors: [{ messageId: "radix" }],
-    },
+      code,
+      errors: [{ messageId: "foreign" }],
+    })),
     ...[
       'window.confirm("Delete?")',
       'alert("Failed")',

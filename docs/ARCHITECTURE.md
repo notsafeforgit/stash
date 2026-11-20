@@ -86,7 +86,7 @@ custom UI does not change the backend API or database lineage.
 | [main.tsx](../ui/v3/src/main.tsx) → [app.tsx](../ui/v3/src/app.tsx) | Main v3 app: Apollo, system status, configuration/locales, plugin registration, then TanStack Router |
 | [offline-main.tsx](../ui/v3/src/pwa/offline-main.tsx) | Standalone offline library/player; boots from bundled assets and local downloads without the main app's server or plugin gates |
 | [share-main.tsx](../ui/v3/src/share-main.tsx) | Guest viewer; uses scoped share JSON/media endpoints without owner configuration, plugins, or the owner's Apollo session |
-| [login-main.tsx](../ui/v3/src/login-main.tsx) | Standalone login using the shared Base UI controls, public login translations and the session endpoint; does not load owner configuration or plugins |
+| [login-main.tsx](../ui/v3/src/login-main.tsx) | Standalone login using the shared UI controls, public login translations and the session endpoint; does not load owner configuration or plugins |
 
 [vite.config.ts](../ui/v3/vite.config.ts) builds the four v3 HTML entries and
 their shared chunks. During development, Vite serves the UI on port 3002 and

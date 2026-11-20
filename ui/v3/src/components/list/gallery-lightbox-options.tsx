@@ -33,7 +33,7 @@ export function GalleryLightboxOptions({
   };
   if (inline)
     return (
-      <div data-base-ui-swipe-ignore="">
+      <div data-drawer-no-drag="">
         <SettingSwitch
           label={label}
           description={msg(

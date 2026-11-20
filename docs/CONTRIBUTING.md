@@ -33,7 +33,7 @@ invented source post. Source publishers remain distinct from depicted performers
 Core services own identities, associations, durable work and archive integrity.
 Plugins extend the application through its versioned contract.
 
-Use the shared React application and shadcn/Base UI components for desktop and
+Use the shared React application and its ui-sdk components for desktop and
 mobile. Keep individual operations bounded to relevant records; long operations
 need durable progress and safe retries. Convert actual API clients together
 when changing a contract. Preserve intentional share/media URLs, offline use,

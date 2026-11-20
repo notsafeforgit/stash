@@ -1,0 +1,16 @@
+/* Menus render through web.css. These add the inset option, which web.css
+   has no variant for, and keep the long-press context menu's native drag
+   suppressed on the rows and cards that open it. */
+@layer components {
+  [data-slot="menu-item"][data-inset],
+  [data-slot="menu-checkbox-item"][data-inset],
+  [data-slot="menu-radio-item"][data-inset],
+  [data-slot="menu-group-label"][data-inset] {
+    padding-inline-start: calc(var(--ui-spacing) * 7);
+  }
+
+  [data-slot="menu-context-trigger"] img,
+  [data-slot="menu-context-trigger"] a {
+    -webkit-user-drag: none;
+  }
+}

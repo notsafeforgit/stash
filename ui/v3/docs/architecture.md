@@ -9,8 +9,8 @@ guides. The [original plan](archive/rewrite-plan.md) and
 
 ## Compatibility boundary
 
-v3 uses React, TypeScript, TanStack Router, Apollo Client, shadcn components
-built on Base UI, Tailwind, and Video.js. [package.json](../package.json) and
+v3 uses React, TypeScript, TanStack Router, Apollo Client, ui-sdk components
+styled by its `web.css`, Tailwind, and Video.js. [package.json](../package.json) and
 [pnpm-workspace.yaml](../pnpm-workspace.yaml) own versions and overrides.
 The project owns its native schema and API contracts. Compatibility
 with upstream v2.5 is frozen at `v2.5-compatible-final`, which retains the
@@ -274,7 +274,7 @@ current and proposed source positions before selecting a pinned list, allowing
 compatible future updates, or disabling selection. Repeated positions and gaps
 remain visible; source evidence is separate from download state and gallery
 membership. Lists, history and large reference sets expand independently through
-the shared Base UI wrappers.
+the shared UI wrappers.
 
 The deployment-scoped IndexedDB journal saves the exact request before Apply and
 serializes competing tabs. Opening reads only; explicit recovery verifies the
@@ -673,7 +673,7 @@ text. Suggestions for additions use `customFieldNames`, excluding names
 already present in the target.
 
 `custom-field-name-input.tsx` keeps free text separate from selected suggestions.
-It filters from the current form value using Base UI's locale-aware filter and
+It filters from the current form value with ui-sdk's default `contains` filter and
 ignores the popup's internal query resets. When changing the editor, check
 keyboard selection, freely entered names, and immediate reopening after Tab;
 a popup's closing animation must not freeze suggestions or erase a draft name.
@@ -715,7 +715,7 @@ snapshots. See the [backend job flow](../../../docs/ARCHITECTURE.md#editing-and-
 
 ## Interaction and accessibility
 
-Interactive application controls use the shared shadcn/Base UI layer, including
+Interactive application controls use the shared ui-sdk layer, including
 filter clear/expand/pin controls, pagination and custom lightbox toolbar buttons.
 Folder expansion exposes a localized accessible name and expanded state; removal
 buttons name their selected folder. Offline download deletion uses the shared
@@ -724,6 +724,15 @@ confirmation/dismissal during the operation. The production ESLint component
 boundary and its AST tests prevent bare controls, direct primitive imports and
 browser dialogs from silently returning. Native textarea markup lives only in
 its canonical wrapper; semantic links, forms and media elements are intentional.
+
+The wrappers mount every popup into `document.body` through
+`useOverlayContainerElement`, as the earlier portals did, so a table row, link
+or card never contains a popup's DOM, styles or native listeners; TV's
+`OverlayContainerProvider` keeps them inside its presentation surface. React
+events still bubble from a popup to its React ancestors. A ui-sdk `Field` names
+every control inside it through `aria-labelledby`, which outranks a control's
+own `aria-label`, so give each `Field` one control and put a labelled group of
+controls, like a URL list or custom fields, in a `FieldSet` with a `FieldLegend`.
 
 Detailed motion, mobile layout, and dismissal contracts live in
 [interactions.md](interactions.md).

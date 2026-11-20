@@ -30,7 +30,7 @@ the current architecture.
 | [Optional integrations](optional-integrations.md) | Local-library defaults, opt-in source tracking, and independent host-owned S3 backup |
 | [Gallery-dl quickstart](https://github.com/notsafeforgit/stash-integrations/blob/main/integrations/gallery-dl/QUICKSTART.md) | Set up a standalone downloader, import source URLs, resume work and optionally schedule dispatch without n8n or S3 |
 | [v3 development](../ui/v3/docs/development.md) | Local setup, generation, builds, and validation order |
-| [v3 dependencies](v3-dependencies.md) | Dependency versions, native security updates, and shadcn maintenance |
+| [v3 dependencies](v3-dependencies.md) | Dependency versions, native security updates, and ui-sdk maintenance |
 | [v3 frontend architecture](../ui/v3/docs/architecture.md) | Startup, module/state ownership, typed list sources, cache updates, and extension points |
 | [Player architecture](../ui/v3/docs/player.md) | Media lifetime, source/seek policy, recovery, transcode sessions, and backend HLS boundaries |
 | [Interaction and layout contracts](../ui/v3/docs/interactions.md) | Motion, dialogs, editing shells, mobile navigation, keyboard layout, and focus |

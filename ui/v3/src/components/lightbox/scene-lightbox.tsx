@@ -360,7 +360,7 @@ export function MediaLightbox({
 
   // Document-level navigation also handles focus restored to body after menus
   // or left on the media surface, outside YARL's keyboard sensor container.
-  // Skip when `defaultPrevented` (a Base UI menu, dialog, or the player's
+  // Skip when `defaultPrevented` (a menu, dialog, or the player's
   // own escape consumer already handled it) or when focus is on an editable
   // input/menu surface that should own its keyboard interaction.
   useEffect(() => {
@@ -401,12 +401,8 @@ export function MediaLightbox({
         controllerRef.current?.next();
       }
     }
-    // Capture phase on `document` so we run before Base UI Tooltip's
-    // useDismiss listener (also on `document`, bubble phase) — its
-    // default `escapeKeyBubbles: false` calls `stopPropagation()` on
-    // the open tooltip, which would otherwise swallow the first
-    // Escape after focus lands on a chip (the second press worked
-    // because the tooltip had closed and Base UI's listener was gone).
+    // Capture phase on `document`, so an open tooltip's own Escape
+    // handling can't stop the event before the viewer sees it.
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [open, requestClose, isSingleSlide, finite, controllerRef]);
@@ -477,6 +473,9 @@ export function MediaLightbox({
       carousel={{ finite, preload: 1, ...(touch && { padding: 0 }) }}
       controller={{
         ref: controllerRef,
+        // The document handler above owns Escape. Popup keys bubble through
+        // React to YARL, which would close the viewer as a menu closes.
+        closeOnEscape: false,
         disableSwipeNavigation: isSingleSlide && !finite,
       }}
       toolbar={{

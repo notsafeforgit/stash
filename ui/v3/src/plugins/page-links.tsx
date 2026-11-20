@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { getRegisteredNavItems, getRegisteredRoutes } from "./registry";
 
 /** Surface registered pages where users manage the owning plugin. */
@@ -20,10 +20,11 @@ export function PluginPageLinks({ pluginId }: { pluginId: string }) {
   return (
     <div className="flex flex-wrap gap-2">
       {pages.map((page) => (
-        <Link
+        <Button
           key={page.to}
-          to={page.to}
-          className={buttonVariants({ variant: "outline", size: "sm" })}
+          variant="outline"
+          size="sm"
+          render={<Link to={page.to} />}
         >
           {intl.formatMessage(
             { id: "config.plugins.open_page", defaultMessage: "Open {page}" },
@@ -34,7 +35,7 @@ export function PluginPageLinks({ pluginId }: { pluginId: string }) {
                   : page.label,
             },
           )}
-        </Link>
+        </Button>
       ))}
     </div>
   );

@@ -1002,6 +1002,23 @@ export function useScenePlayerSources({
         fallBackToCompatibility();
         return;
       }
+      // WebKitGTK (GStreamer) can report a direct file as a fraction of a
+      // second when the player attaches while it loads; it then never plays.
+      // Reload it once at the same scene time.
+      const reported = e.currentTarget.duration;
+      if (
+        activeSrc &&
+        isDirectStreamSrc(activeSrc) &&
+        fileDuration != null &&
+        fileDuration > 2 &&
+        Number.isFinite(reported) &&
+        reported < 1 &&
+        !loadRetryAttemptedRef.current
+      ) {
+        loadRetryAttemptedRef.current = true;
+        forceRemountAt(pendingResumeRef.current?.seekTo ?? offsetStart);
+        return;
+      }
       e.currentTarget.playbackRate = playbackRateRef.current;
       const pending = pendingResumeRef.current;
       if (!pending || pending.seekTo == null || pending.seekTo <= 0) return;
@@ -1020,6 +1037,7 @@ export function useScenePlayerSources({
       fileWidth,
       fallBackToCompatibility,
       fileDuration,
+      forceRemountAt,
       offsetStart,
       playbackRateRef,
     ],

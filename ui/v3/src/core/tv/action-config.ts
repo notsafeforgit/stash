@@ -14,7 +14,6 @@ export const tvActionKinds = [
   "marker",
   "quick-marker",
   "delete",
-  "rotation",
   "fullscreen",
   "volume",
   "fit",
@@ -55,7 +54,6 @@ export const tvActionSchema = z.discriminatedUnion("kind", [
       "tags",
       "marker",
       "delete",
-      "rotation",
       "fullscreen",
       "volume",
       "fit",
@@ -202,7 +200,6 @@ export const defaultTvRail: TvRailEntry[] = [
       "quality",
       "completion",
       "fit",
-      "rotation",
       "fullscreen",
       "help",
     ].map((kind) =>

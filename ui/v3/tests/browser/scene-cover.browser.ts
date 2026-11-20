@@ -376,6 +376,8 @@ for (const width of [390, 1280]) {
                   page.evaluate(() => window.coverFixture.generations.length),
                 )
                 .toBe(1);
+              // A closing modal dialog takes presses until its exit finishes.
+              await expect(dialog).toBeHidden();
             } else if (kind === "saved") {
               await action(page, mobile, "Regenerate selected cover");
               await expect
@@ -455,6 +457,12 @@ for (const width of [390, 1280]) {
         async ({ page }) => {
           await page.goto("/scene-cover-fixture/scenes/1");
           const video = page.locator("video[data-playback-video]");
+          // Press Play only once the source is loaded, as the other cases do.
+          await expect
+            .poll(() =>
+              video.evaluate((element: HTMLVideoElement) => element.readyState),
+            )
+            .toBeGreaterThanOrEqual(2);
           await page
             .locator("[data-scene-player]")
             .getByRole("button", { name: "Play", exact: true })
@@ -577,7 +585,9 @@ for (const width of [390, 1280]) {
             .getByRole("button", { name: "Performer 1", exact: true })
             .click();
           await expect(
-            page.getByText("Image update failed", { exact: true }),
+            page
+              .getByRole("region", { name: "Notifications" })
+              .getByText("Image update failed", { exact: true }),
           ).toBeVisible();
           await expect(dialog).toBeVisible();
           await page.evaluate(() => {
@@ -649,7 +659,7 @@ for (const width of [390, 1280]) {
                 view === "card"
                   ? page
                       .getByTestId("scene-card")
-                      .locator('[data-slot="context-menu-trigger"]')
+                      .locator('[data-slot="menu-context-trigger"]')
                   : page.getByTestId("scene-row");
               const firstImage = page.getByTestId("performer-image-1");
               const secondImage = page.getByTestId("performer-image-2");
@@ -737,6 +747,13 @@ for (const width of [390, 1280]) {
             );
             const video = page.locator("video[data-playback-video]");
             const player = page.locator("[data-scene-player]");
+            await expect
+              .poll(() =>
+                video.evaluate(
+                  (element: HTMLVideoElement) => element.readyState,
+                ),
+              )
+              .toBeGreaterThanOrEqual(2);
             await player
               .getByRole("button", { name: "Play", exact: true })
               .first()

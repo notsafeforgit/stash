@@ -2,44 +2,51 @@ import { Link } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { useMsg } from "@/hooks/message";
 import type { ActivitySubject } from "@/core/native-archive/activity-schema";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { LibraryLink } from "../posts/library-link";
 
 export function ActivitySubjectLink({ subject }: { subject: ActivitySubject }) {
   const msg = useMsg();
   const intl = useIntl();
-  const className = buttonVariants({ variant: "outline" });
   if (subject.kind === "post")
     return (
-      <Link
-        className={className}
-        to="/source-posts"
-        search={{
-          mode: "all",
-          value: "",
-          namespace: "",
-          post: subject.requested_uuid,
-        }}
+      <Button
+        variant="outline"
+        render={
+          <Link
+            to="/source-posts"
+            search={{
+              mode: "all",
+              value: "",
+              namespace: "",
+              post: subject.requested_uuid,
+            }}
+          />
+        }
       >
         <span className="whitespace-normal wrap-anywhere">
           {subject.title ||
             msg("source_review.untitled", "Untitled source post")}
           {subject.title_truncated ? "…" : ""}
         </span>
-      </Link>
+      </Button>
     );
   if (subject.kind === "collection")
     return (
       <div className="flex flex-col gap-1">
-        <Link
-          className={className}
-          to="/collections"
-          search={{ q: "", kind: "", state: "", collection: subject.uuid }}
+        <Button
+          variant="outline"
+          render={
+            <Link
+              to="/collections"
+              search={{ q: "", kind: "", state: "", collection: subject.uuid }}
+            />
+          }
         >
           <span className="whitespace-normal wrap-anywhere">
             {subject.title}
           </span>
-        </Link>
+        </Button>
         <span className="text-sm text-muted-foreground">
           {intl.formatMessage(
             {

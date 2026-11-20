@@ -112,12 +112,7 @@ export function ShareDownload({ media }: { media: SharedMedia }) {
   const intl = useIntl();
   if (!media.download) return null;
   return (
-    <Button
-      variant="outline"
-      nativeButton={false}
-      role="link"
-      render={<a href={media.download} download />}
-    >
+    <Button variant="outline" render={<a href={media.download} download />}>
       <Download data-icon="inline-start" />
       {intl.formatMessage({
         id: "sharing.download_original",

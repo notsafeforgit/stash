@@ -55,6 +55,9 @@ test("saves an optional scene filter and plays whole scenes inside the marker fe
 
   await page.getByRole("button", { name: "Navigation", exact: true }).click();
   await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Navigation", exact: true }),
+  ).toBeHidden();
   await page
     .getByRole("main")
     .getByRole("link", { name: "TV", exact: true })

@@ -286,6 +286,27 @@ describe("TV settings validation", () => {
     },
   );
 
+  it("drops the retired rotate action from the rail and its folders", () => {
+    const rotate = { kind: "rotation", icon: "default", label: "" };
+    const rail = defaultTvRail.map((entry) =>
+      entry.type === "folder" && entry.id === "playback"
+        ? {
+            ...entry,
+            actions: [...entry.actions, { ...rotate, id: "rotation" }],
+          }
+        : entry,
+    );
+    expect(
+      decodeTvSettings({
+        ...defaultTvSettings,
+        rail: [
+          ...rail,
+          { type: "action", pinned: true, action: { ...rotate, id: "rotate" } },
+        ],
+      }),
+    ).toEqual({ kind: "ready", settings: defaultTvSettings });
+  });
+
   it.each([1, 2, 3, 4])(
     "adds the startup mute default to version %i without resetting preferences",
     (version) => {

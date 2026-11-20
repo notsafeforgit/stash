@@ -13,7 +13,7 @@ import {
   type SourceReviewAPI,
 } from "@/core/native-archive/source-review-api";
 import { AccountService } from "@/components/archive/accounts/shared";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -359,13 +359,12 @@ export function SourcePostCard({
         </Collapsible>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Link
-          className={buttonVariants({ variant: "outline" })}
-          to="/source-posts"
-          search={{ post: a.post_uuid }}
+        <Button
+          variant="outline"
+          render={<Link to="/source-posts" search={{ post: a.post_uuid }} />}
         >
           {msg("source_posts.open", "Open post")}
-        </Link>
+        </Button>
         <Collapsible
           className="w-full"
           open={reviewOpen}

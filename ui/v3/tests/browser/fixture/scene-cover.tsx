@@ -15,7 +15,7 @@ import { SceneRowContextMenu } from "@/components/cards/use-scene-context-menu";
 import { ScenePlayer } from "@/components/player/scene-player";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
 import { SceneGenerateDialog } from "@/components/detail/scene-generate-dialog";
 import { LibraryTasks } from "@/components/settings/tasks/library-tasks";

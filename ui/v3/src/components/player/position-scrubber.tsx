@@ -38,14 +38,13 @@ export interface ScrubberCrossAxisPan {
 
 /** The video scrubber shared by standard controls and TV. All times are in
  * the caller's display coordinates; seeking into a scene stays at its boundary.
- * Pointer drags can preview buffered frames and commit once, including when rotated. */
+ * Pointer drags can preview buffered frames and commit once. */
 export function PositionScrubber({
   value,
   duration,
   bufferedRanges = [],
   bufferedOffset = 0,
   disabled = false,
-  direction = "right",
   markers,
   clipBoundsEdit,
   onSeek,
@@ -61,7 +60,6 @@ export function PositionScrubber({
   /** Translate buffered scene times into this segment's display coordinates. */
   bufferedOffset?: number;
   disabled?: boolean;
-  direction?: "right" | "down" | "up";
   markers?: ReactNode;
   clipBoundsEdit?: ClipBoundsEdit;
   onSeek: (time: number) => void;
@@ -116,12 +114,7 @@ export function PositionScrubber({
   };
   const pointerRatio = (event: React.PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    const ratio =
-      direction === "right"
-        ? (event.clientX - rect.left) / Math.max(1, rect.width)
-        : (direction === "down"
-            ? event.clientY - rect.top
-            : rect.bottom - event.clientY) / Math.max(1, rect.height);
+    const ratio = (event.clientX - rect.left) / Math.max(1, rect.width);
     return Math.max(0, Math.min(1, ratio));
   };
   const position = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -135,9 +128,7 @@ export function PositionScrubber({
     );
   };
   const crossAxisOffset = (event: React.PointerEvent<HTMLDivElement>) =>
-    direction === "right"
-      ? event.clientY - origin.current.y
-      : (event.clientX - origin.current.x) * (direction === "down" ? -1 : 1);
+    event.clientY - origin.current.y;
   const clearDwell = useCallback(() => {
     if (dwellTimer.current !== null) clearTimeout(dwellTimer.current);
     dwellTimer.current = null;
@@ -223,12 +214,13 @@ export function PositionScrubber({
       aria-valuetext={`${precisionRange ? formatDurationMs(displayTime) : formatTime(displayTime)} / ${formatTime(duration)}`}
       aria-disabled={unavailable}
       aria-busy={previewPending || undefined}
-      aria-orientation={direction === "right" ? "horizontal" : "vertical"}
+      aria-orientation="horizontal"
       data-position-scrubber
       data-dragging={dragTime !== null || undefined}
       data-precision={precisionRange ? true : undefined}
+      // Stays above the coarse-pointer touch areas ui-sdk gives the buttons below it.
       className={cn(
-        "group/scrubber relative flex h-8 w-full min-w-[4em] cursor-pointer select-none items-center pointer-coarse:h-5 pointer-coarse:items-end [-webkit-touch-callout:none]",
+        "group/scrubber relative z-10 flex h-8 w-full min-w-[4em] cursor-pointer select-none items-center pointer-coarse:h-5 pointer-coarse:items-end [-webkit-touch-callout:none]",
         precisionRange && "h-16 pointer-coarse:h-16",
       )}
       // Override the unlayered page-zoom guard; a Tailwind touch-none utility
@@ -266,10 +258,7 @@ export function PositionScrubber({
         if (pointer.current !== event.pointerId) return;
         event.stopPropagation();
         if (gesture.current === "pending") {
-          const along =
-            direction === "right"
-              ? event.clientX - origin.current.x
-              : event.clientY - origin.current.y;
+          const along = event.clientX - origin.current.x;
           const across = crossAxisOffset(event);
           if (Math.max(Math.abs(along), Math.abs(across)) < 10) return;
           gesture.current = Math.abs(across) > Math.abs(along) ? "pan" : "seek";

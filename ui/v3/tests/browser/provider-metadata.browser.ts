@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { test, expect } from "./test";
+import { test, expect, expectBackdropSettled } from "./test";
 
 async function applyProvider(page: Page, kind: "scene" | "performer") {
   await page.getByRole("button", { name: /Scrape with/ }).click();
@@ -14,6 +14,7 @@ async function applyProvider(page: Page, kind: "scene" | "performer") {
   const review = page.getByRole("dialog", { name: "Review scraped results" });
   await review.getByRole("button", { name: "Apply", exact: true }).click();
   await expect(review).not.toBeVisible();
+  await expectBackdropSettled(page);
 }
 
 for (const width of [390, 1280]) {
@@ -172,7 +173,9 @@ test("history reads only expanded current or retired identities and pages by seq
     section.getByText("Saved title 1", { exact: true }),
   ).toBeVisible();
   await section.getByRole("button", { name: "Next", exact: true }).click();
-  await section.getByRole("button", { name: /provider.test/ }).click();
+  const secondPage = section.getByRole("button", { name: /provider.test/ });
+  await expect(secondPage).toHaveCount(1);
+  await secondPage.click();
   await expect(
     section.getByText("Saved title 26", { exact: true }),
   ).toBeVisible();

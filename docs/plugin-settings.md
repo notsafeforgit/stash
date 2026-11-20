@@ -29,7 +29,7 @@ and every row needs an expression. Existing native objects and saved JSON text
 open in the same editor. The API and persisted configuration retain their existing
 JSON representation.
 
-Preview sections use the shared Base UI collapsible. Opening a preview loads
+Preview sections use the shared collapsible. Opening a preview loads
 the picker; collapsing and reopening it preserves the sample and result.
 
 ## Manifest API

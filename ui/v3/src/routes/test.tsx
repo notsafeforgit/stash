@@ -12,7 +12,7 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
-  SelectLabel,
+  SelectGroupLabel,
   SelectTrigger,
   SelectValue,
 } from "src/components/ui/select";
@@ -111,7 +111,7 @@ function SelectScrollableTest() {
         </SelectTrigger>
         <SelectContent visibleItems={8}>
           <SelectGroup>
-            <SelectLabel>Fruits</SelectLabel>
+            <SelectGroupLabel>Fruits</SelectGroupLabel>
             {FRUITS.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
@@ -119,7 +119,7 @@ function SelectScrollableTest() {
             ))}
           </SelectGroup>
           <SelectGroup>
-            <SelectLabel>Vegetables</SelectLabel>
+            <SelectGroupLabel>Vegetables</SelectGroupLabel>
             {VEGGIES.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}

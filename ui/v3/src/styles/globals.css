@@ -1,9 +1,25 @@
+@layer ui-sdk;
 @import "tailwindcss";
+@import "@ui-sdk/core/web.css" layer(components);
+@import "./components/button.css";
+@import "./components/controls.css";
+@import "./components/fields.css";
+@import "./components/overlays.css";
+@import "./components/menus.css";
+@import "./components/lists.css";
+@import "./components/dates.css";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
 
 @theme {
   --color-background: oklch(1 0 0);
@@ -112,6 +128,48 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* ui-sdk's web.css follows the Stash palette, so custom.css overrides of
+   --color-* and --radius reach every component. Its input, ring and
+   muted-foreground tokens stay: Stash's light values miss 3:1 and 4.5:1. */
+:root {
+  --ui-background: var(--color-background);
+  --ui-foreground: var(--color-foreground);
+  --ui-muted: var(--color-muted);
+  --ui-border: var(--color-border);
+  --ui-primary: var(--color-primary);
+  --ui-primary-foreground: var(--color-primary-foreground);
+  --ui-destructive: var(--color-destructive);
+  --ui-radius: var(--radius);
+  --ui-font-sans: "Geist Variable", sans-serif;
+}
+
+/* web.css underlines every link, including card, navigation and button links,
+   which Stash styles where it uses them. In web.css's own layer, its part rules
+   still win. */
+@layer components.ui-sdk {
+  a {
+    color: inherit;
+    text-decoration: inherit;
+  }
+
+  /* web.css draws every popup trigger as a button. A trigger rendered as
+     another element, like a truncated card title, or as a lightbox control
+     keeps that element's look. Later in the layer, so ties go to this rule. */
+  :is(
+    [data-slot="tooltip-trigger"],
+    [data-slot="popover-trigger"],
+    [data-slot="menu-trigger"],
+    [data-slot="dialog-trigger"],
+    [data-slot="drawer-trigger"],
+    [data-slot="alert-dialog-trigger"]
+  ):is(:not(button), .yarl__button) {
+    &,
+    &:hover {
+      all: revert-layer;
+    }
+  }
+}
+
 /* Safari reports the current safe area in browser and Home Screen modes.
    Keep margins separate: portrait left/right insets can legitimately be zero.
    Narrow 320px toolbars still fit seven 44px controls; normal phones get 16px. */
@@ -157,25 +215,6 @@
   padding-bottom: max(0.5rem, var(--safe-area-bottom));
 }
 
-/* Side sheets are portaled outside the app shell. Their own edge padding
-   must survive callers using p-0 to compose headers, scrollers and footers. */
-[data-slot="sheet-content"][data-side="left"],
-[data-slot="sheet-content"][data-side="right"] {
-  padding-top: var(--safe-area-top);
-  padding-bottom: var(--safe-area-bottom);
-}
-[data-slot="sheet-content"][data-side="left"] {
-  padding-left: var(--safe-area-left);
-}
-[data-slot="sheet-content"][data-side="right"] {
-  padding-right: var(--safe-area-right);
-}
-@media (max-width: 639px) {
-  [data-slot="sheet-content"][data-side="left"],
-  [data-slot="sheet-content"][data-side="right"] {
-    padding-inline: var(--safe-area-left) var(--safe-area-right);
-  }
-}
 /* The keyboard occupies layout space so the scroller ends at the footer.
    Moving only the footer with a transform leaves list content behind Safari's
    translucent keyboard chrome and compounds its native focus pan. */
@@ -225,8 +264,8 @@
     @apply bg-background text-foreground;
   }
 
-  /* Create an isolated stacking context so Base UI portaled popups (Dialog,
-     Popover, Menu) always render above page content regardless of z-index.
+  /* Create an isolated stacking context so popups mounted in the body
+     always render above page content regardless of its z-indexes.
      height: 100% propagates the non-scrollable body height into the app tree. */
   .root {
     isolation: isolate;
@@ -271,11 +310,10 @@
 }
 
 /* A card hold belongs to its context menu. Disabling selection/callouts alone
-   still lets Safari lift an image or link into a native drag session. */
+   still lets Safari lift an image or link into a native drag session. The
+   context-menu trigger rules live in components/menus.css. */
 .entity-card img,
-.entity-card a,
-[data-slot="context-menu-trigger"] img,
-[data-slot="context-menu-trigger"] a {
+.entity-card a {
   -webkit-user-drag: none;
 }
 
@@ -920,21 +958,6 @@ body.filter-dragging {
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-/* Override Sonner's hardcoded colors to match our design tokens.
-   Sonner injects its CSS via a runtime <style> tag that lands after
-   globals.css in the DOM; the `html` ancestor lifts these selectors to
-   (0,2,1) over Sonner's (0,2,0) so they win the cascade without
-   !important. Use --color-* (Tailwind v4 @theme tokens) not the legacy
-   un-prefixed vars — the un-prefixed vars are always overridden by
-   :root below. */
-html [data-sonner-toaster][data-sonner-theme="light"],
-html [data-sonner-toaster][data-sonner-theme="dark"],
-html [data-sonner-toaster][data-sonner-theme="system"] {
-  --normal-bg: var(--color-popover);
-  --normal-border: var(--color-border);
-  --normal-text: var(--color-popover-foreground);
-}
-
 /* Lightbox metadata is portaled outside the inset app shell. Move its
    content below the status bar and inside landscape cutouts while the media
    continues to fill the entire viewport. Keep the overlay's normal gutters. */
@@ -1109,18 +1132,6 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
 [data-tv-controls],
 [data-tv-controls] * {
   touch-action: none;
-}
-.tv-viewport[data-tv-rotation="clockwise"] .tv-surface,
-.tv-viewport[data-tv-rotation="counterclockwise"] .tv-surface {
-  inset: auto;
-  top: 50%;
-  left: 50%;
-  width: var(--tv-height, 100dvh);
-  height: var(--tv-width, 100dvw);
-  transform: translate(-50%, -50%) rotate(90deg);
-}
-.tv-viewport[data-tv-rotation="counterclockwise"] .tv-surface {
-  transform: translate(-50%, -50%) rotate(-90deg);
 }
 .tv-footer {
   padding-bottom: max(0.5rem, var(--safe-area-bottom, 0px));

@@ -20,10 +20,10 @@ for (const width of [320, 1024]) {
       );
     }
     const title = await card.locator(".entity-card-title").textContent();
-    const trigger = page.locator('[data-slot="context-menu-trigger"]');
+    const trigger = page.locator('[data-slot="menu-context-trigger"]');
     const menu = page.getByRole("menu");
     await holdForContextMenu(trigger, menu);
-    const label = menu.locator('[data-slot="context-menu-label"]');
+    const label = menu.locator('[data-slot="menu-group-label"]');
     await expect(label).toHaveText(title ?? "");
     await expect(label).toBeVisible();
     expect(
@@ -56,7 +56,7 @@ test.describe("desktop cursor", () => {
     page,
   }) => {
     await page.goto("/entity-cards");
-    const tooltip = page.locator('[data-slot="tooltip-content"]');
+    const tooltip = page.locator('[data-slot="tooltip-content"][data-open]');
     for (const selector of [".entity-card-title", ".entity-card-subtitle"]) {
       const text = page.locator(selector);
       await text.focus();

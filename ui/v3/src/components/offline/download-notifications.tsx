@@ -16,7 +16,7 @@
 
 import { useEffect, useRef } from "react";
 import { useIntl } from "react-intl";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import { fileStemFromPath } from "src/utils/file";
 import { useDownloadQueue } from "./use-download-queue";
 import { getEntry, type OfflineEntry } from "./offline-db";

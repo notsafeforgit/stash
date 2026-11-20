@@ -129,7 +129,6 @@ interface ScenePlayerProps {
   activityScope?: SceneActivityScope;
   qualityPreference?: PlayerQuality;
   nativeFullscreenAllowed?: boolean;
-  presentationRotation?: 0 | 90 | -90;
   initiallyMuted?: boolean;
   /** External controllers own their keyboard/gesture surface. */
   controls?: "standard" | "external";
@@ -344,7 +343,6 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   activityScope,
   qualityPreference,
   nativeFullscreenAllowed = true,
-  presentationRotation = 0,
   initiallyMuted = false,
   controls = "standard",
   completionMode,
@@ -1091,7 +1089,6 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
           <Container className="absolute inset-0 overflow-hidden">
             <VideoFrameZoom
               enabled={enablePinchZoom}
-              presentationRotation={presentationRotation}
               transform={effectiveZoomTransform}
               onTransformChange={setZoomTransform}
               onActiveGesture={handleZoomActiveGesture}

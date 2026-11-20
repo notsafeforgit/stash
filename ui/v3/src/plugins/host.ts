@@ -184,7 +184,7 @@ export interface StashPluginHost {
   };
 
   /**
-   * Curated stable subset of shadcn/Base UI primitives. Additive exports
+   * Curated stable subset of the shared ui-sdk wrappers. Additive exports
    * may appear within a major version; existing exports remain compatible.
    */
   readonly ui: StashPluginUI;

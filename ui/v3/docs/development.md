@@ -15,13 +15,6 @@ scoped dependency overrides live in `pnpm-workspace.yaml`. `make lint` runs the
 CI-pinned Go linter through
 `go run`, so a separate golangci-lint installation is unnecessary.
 
-The pinned Base UI patch in `patches/` lets touch presses generate their native
-combobox selection click in WebKit. Mouse presses still prevent focus changes,
-and the existing mousedown handler keeps the search input focused. When upgrading
-Base UI, rerun `entity-list-filters.browser.ts` in Chromium and WebKit before
-removing or updating the patch. Keep its pnpm lockfile hash in sync with
-`pnpm patch-commit`.
-
 ## First checkout and local development
 
 Install the UI dependencies, generate supported bindings, and build the
@@ -170,8 +163,8 @@ Biome owns formatting, general lint and effect dependencies. It knows that
 React's `refs`/`purity` rules and rejects `as never` and double assertions.
 It also enforces shared UI component boundaries: application code cannot render
 bare buttons, inputs, selects, textareas or disclosure/dialog controls, import
-Base UI outside `src/components/ui`, import Radix, or call blocking browser
-dialogs. The canonical `ui/textarea.tsx` wrapper is the explicit native-control
+ui-sdk outside `src/components/ui`, import Base UI or Radix, or call blocking
+browser dialogs. The canonical `ui/textarea.tsx` wrapper is the explicit native-control
 exception. Semantic anchors, forms and media elements remain ordinary HTML.
 The rule's AST regression tests run with Vitest; browser fixtures are outside
 the production rule. Add any future primitive exception narrowly, with its reason
@@ -259,13 +252,19 @@ existing library is required. Unexpected requests and browser errors fail the
 tests. These are shared-component integration tests, not complete entity-route
 or backend tests.
 
+Three ui-sdk behaviours shape assertions. A closing modal popup takes presses
+until its exit animation ends, so wait for it to be hidden, or for a dialog's
+backdrop with `expectBackdropSettled` from `tests/browser/test.ts`, before the
+next press. Toast text is repeated by a live announcer: scope it to the
+`Notifications` region. Closed tooltips stay mounted: match `[data-open]`.
+
 The suite covers 320–1280px layouts, search/selection replacement rows, page
 validation, section state, direct drawer access, flat entity actions and desktop
 submenus, drawer drag distance and outside-tap dismissal, editor dismissal, keyboard
 navigation, active-query previews and drawer summaries, and keyboard space in
 the page layout. Viewport checks assert footer and scroller bounds immediately
 after resize/pan events, including refocusing an already-open search. Long-press
-checks send synthetic touch events through the production context-menu primitive;
+checks send synthetic touch pointer events through the production context-menu primitive;
 they cover button anchoring at different press positions, edit/clear, outside
 dismissal, and suppressing the release click. Search animation checks cover
 synchronous focus, stable input bounds, interrupted reveals, query preservation,

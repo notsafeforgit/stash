@@ -11,7 +11,7 @@ import {
   type SavedActionLocation,
   type SavedActionSummary,
 } from "@/core/native-archive/saved-actions";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
@@ -311,13 +311,18 @@ export function SavedActions({
                 "Queued work may still be running. Archive activity shows server job progress.",
               )}
             </p>
-            <Link
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-              to="/archive-activity"
-              search={{ view: "jobs", kind: "", state: "", collection: "" }}
+            <Button
+              variant="outline"
+              size="sm"
+              render={
+                <Link
+                  to="/archive-activity"
+                  search={{ view: "jobs", kind: "", state: "", collection: "" }}
+                />
+              }
             >
               {msg("archive_activity.title", "Archive activity")}
-            </Link>
+            </Button>
           </AlertDescription>
         </Alert>
       )}

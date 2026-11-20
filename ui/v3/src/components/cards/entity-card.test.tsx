@@ -6,6 +6,9 @@ import { IntlProvider } from "react-intl";
 import { describe, expect, it, vi } from "vitest";
 import { PreviewImageDynamicRange } from "@/core/generated-graphql";
 
+// Menus portal to the body when the popover top layer is missing, which
+// jsdom lacks and which a server render of a card would otherwise reach.
+
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),

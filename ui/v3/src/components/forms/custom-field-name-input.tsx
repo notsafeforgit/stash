@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useIntl } from "react-intl";
 import {
   Combobox,
@@ -7,7 +6,6 @@ import {
   ComboboxEmpty,
   ComboboxList,
   ComboboxItem,
-  useComboboxFilter,
 } from "@/components/ui/combobox";
 
 export interface CustomFieldNameInputProps {
@@ -31,18 +29,12 @@ export function CustomFieldNameInput({
   ...inputProps
 }: CustomFieldNameInputProps) {
   const intl = useIntl();
-  const { contains } = useComboboxFilter({ locale: intl.locale });
   // The form owns the raw name, including names absent from the suggestions.
-  // Filter from that value so a closing popup's query cannot become stale
-  // when the user immediately reopens it to continue editing.
-  const filteredOptions = useMemo(
-    () => options.filter((name) => contains(name, value.trim())),
-    [options, value, contains],
-  );
+  // The query is that value, so a closing popup's reset cannot make the
+  // suggestions stale when the user immediately reopens it.
   return (
     <Combobox
       items={options}
-      filteredItems={filteredOptions}
       value={options.includes(value) ? value : null}
       inputValue={value}
       onValueChange={(name) => {

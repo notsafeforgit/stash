@@ -7,7 +7,7 @@ import {
 } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
 import { TagBulkEditSheet } from "@/components/detail/tag-bulk-edit-sheet";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 
 export function BulkUpdateFixture() {
   const [open, setOpen] = useState(true);

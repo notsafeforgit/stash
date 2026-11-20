@@ -5,7 +5,7 @@ import type {
   SourcePostAPI,
   ThreadLink,
 } from "@/core/native-archive/source-post-api";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
 import { usePostRead } from "./read";
@@ -23,32 +23,31 @@ function ThreadPostLink({
   return (
     <div className="flex flex-col items-start gap-1">
       {value.post ? (
-        <Link
-          className={buttonVariants({
-            variant: "link",
-            className:
-              "h-auto max-w-full whitespace-normal text-start wrap-anywhere",
-          })}
-          aria-current={value.post.uuid === current ? "page" : undefined}
-          to="/source-posts"
-          search={{
-            post: value.post.uuid,
-            mode: "all",
-            value: "",
-            namespace: "",
-          }}
+        <Button
+          variant="link"
+          className="h-auto max-w-full whitespace-normal text-start wrap-anywhere"
+          render={
+            <Link
+              aria-current={value.post.uuid === current ? "page" : undefined}
+              to="/source-posts"
+              search={{
+                post: value.post.uuid,
+                mode: "all",
+                value: "",
+                namespace: "",
+              }}
+            />
+          }
         >
           {label}
-        </Link>
+        </Button>
       ) : (
-        <a
-          className={buttonVariants({ variant: "link" })}
-          href={value.url}
-          target="_blank"
-          rel="noreferrer"
+        <Button
+          variant="link"
+          render={<a href={value.url} target="_blank" rel="noreferrer" />}
         >
           {value.source_id}
-        </a>
+        </Button>
       )}
       {!value.post && (
         <p className="text-sm text-muted-foreground">

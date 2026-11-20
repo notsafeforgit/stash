@@ -69,6 +69,7 @@ export function EntityMultiSelect({
   return (
     <Combobox<string, true>
       multiple={true}
+      filter={false}
       value={selectedIds}
       onValueChange={handleValueChange}
       onInputValueChange={handleInputValueChange}
@@ -79,7 +80,9 @@ export function EntityMultiSelect({
         <div className="flex flex-1 flex-wrap items-center gap-1 min-w-0">
           {value.map((item) => (
             // Chips are positionally indexed — render in same order as selectedIds
-            <ComboboxChip key={item.id}>{item.name}</ComboboxChip>
+            <ComboboxChip key={item.id} value={item.id}>
+              {item.name}
+            </ComboboxChip>
           ))}
           <ComboboxChipsInput placeholder={placeholder} />
         </div>
@@ -152,8 +155,8 @@ export function EntitySingleSelect({
     [...(value ? [value] : []), ...options].map((item) => [item.id, item.name]),
   );
 
-  // Guard: after selecting an item Base UI fires onInputValueChange with the
-  // raw ID string. We block that one extra call.
+  // Choosing an item reports its name through onInputValueChange; skip that
+  // one call so the search doesn't rerun for it.
   const justSelectedRef = useRef(false);
 
   function handleValueChange(id: string | null) {
@@ -190,13 +193,10 @@ export function EntitySingleSelect({
       onInputValueChange={handleInputValueChange}
       onOpenChange={handleOpenChange}
       disabled={disabled}
-      // Tell Base UI how to render a selected string id as input text.
-      // Without this it falls back to the raw id (e.g. when re-syncing the
-      // input on close, which would otherwise replace the chosen name).
-      // Cast: ComboboxRoot's typing omits this prop but the impl forwards it.
-      {...({
-        itemToStringLabel: (id: string) => knownNames.get(id) ?? id,
-      } as Record<string, unknown>)}
+      filter={false}
+      // Render a selected id as its known name. Without this the input
+      // falls back to the raw id, e.g. when it re-syncs on close.
+      itemToStringLabel={(id: string) => knownNames.get(id) ?? id}
     >
       <ComboboxInput placeholder={placeholder} showClear={!!value} />
       <ComboboxContent>

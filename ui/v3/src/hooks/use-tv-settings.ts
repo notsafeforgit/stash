@@ -1,13 +1,10 @@
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import type { ApolloClient } from "@apollo/client";
 import { useConfigurationContext, useConfigureUISetting } from "./config";
-import { createStoredState } from "./stored-state";
-import { getPlatformURL } from "@/core/platform-url";
 import {
   decodeTvSettings,
   defaultTvSettings,
-  tvRotationSchema,
   tvSettingsSchema,
   type TvSettings,
 } from "@/core/tv/settings";
@@ -24,13 +21,6 @@ type PendingSettings = {
   listeners: Set<() => void>;
 };
 const pending = new WeakMap<ApolloClient, PendingSettings>();
-export function createTvRotationStore() {
-  return createStoredState(
-    `stash:tv:rotation:v1:${getPlatformURL().href}`,
-    tvRotationSchema,
-    "normal",
-  );
-}
 function stateFor(client: ApolloClient): PendingSettings {
   let state = pending.get(client);
   if (!state) {
@@ -101,15 +91,11 @@ export function useTvSettings() {
     },
     [client, configure],
   );
-  const [rotationStore] = useState(createTvRotationStore);
-  const [rotation, setRotation] = rotationStore.useStoredState();
   return {
     result,
     save,
     failed,
     retry: () => (draft ? save(draft) : Promise.resolve(false)),
     reset: () => save(defaultTvSettings),
-    rotation,
-    setRotation,
   };
 }

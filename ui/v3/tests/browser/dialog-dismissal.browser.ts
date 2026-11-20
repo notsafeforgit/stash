@@ -22,20 +22,16 @@ async function expectSingleCancel(dialog: Locator) {
   );
 }
 
-test("rotated TV marker actions stay inside the presentation", async ({
+test("landscape phone TV marker actions stay inside the presentation", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 320, height: 568 });
+  await page.setViewportSize({ width: 568, height: 320 });
   await serveSceneMedia(page, "portrait");
   await page.goto("/tv-fixture/tv?paused&portrait&long-info");
   await expect(page.locator("[data-scene-player]")).toHaveAttribute(
     "data-playback-ready",
     "true",
   );
-  await page.getByRole("button", { name: "Playback", exact: true }).click();
-  await page
-    .getByRole("menuitem", { name: "Rotate presentation", exact: true })
-    .click();
   await openTvAction(page, "Create marker");
   const dialog = page.getByRole("dialog", {
     name: "Create marker",

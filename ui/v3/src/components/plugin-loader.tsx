@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import { useEffect, useState } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import { RouterProvider } from "@tanstack/react-router";

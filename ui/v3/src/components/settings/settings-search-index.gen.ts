@@ -1493,20 +1493,4 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
       defaultMessage: "Show controls initially",
     },
   },
-  {
-    to: "/settings/tv",
-    section: {
-      id: "tv.settings.presentation",
-      defaultMessage: "Presentation",
-    },
-    label: {
-      id: "tv.settings.rotation",
-      defaultMessage: "Rotation on this browser",
-    },
-    description: {
-      id: "tv.settings.rotation_description",
-      defaultMessage:
-        "Saved only for this browser and server. The video remains inline, with the TV controls available.",
-    },
-  },
 ];

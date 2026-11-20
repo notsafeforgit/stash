@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { downloadErrorMessage } from "@/components/offline/download-error";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import {
   Download,
   EllipsisVertical,

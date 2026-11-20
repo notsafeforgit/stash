@@ -76,10 +76,8 @@ export function PlayerMarkers({ markers, duration }: PlayerMarkersProps) {
         const leftPct = (m.seconds / duration) * 100;
         const color = tagColors[m.primaryTag.name];
         return (
-          <Tooltip key={`dot-${i}`} trackCursorAxis="x">
+          <Tooltip key={`dot-${i}`} delay={0} closeDelay={0}>
             <TooltipTrigger
-              delay={0}
-              closeDelay={0}
               render={
                 <div
                   className="player-marker-dot"
@@ -100,10 +98,8 @@ export function PlayerMarkers({ markers, duration }: PlayerMarkersProps) {
         const widthPct = (((m.end_seconds ?? 0) - m.seconds) / duration) * 100;
         const color = tagColors[m.primaryTag.name];
         return (
-          <Tooltip key={`range-${i}`} trackCursorAxis="x">
+          <Tooltip key={`range-${i}`} delay={0} closeDelay={0}>
             <TooltipTrigger
-              delay={0}
-              closeDelay={0}
               render={
                 <div
                   className="player-marker-range"

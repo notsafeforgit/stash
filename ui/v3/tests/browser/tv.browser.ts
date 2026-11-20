@@ -22,6 +22,9 @@ async function open(page: Page, query = "?paused") {
 async function openSettings(page: Page) {
   await page.getByRole("button", { name: "Navigation", exact: true }).click();
   await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Navigation", exact: true }),
+  ).toBeHidden();
   await page
     .getByRole("main")
     .getByRole("link", { name: "TV", exact: true })
@@ -140,7 +143,7 @@ test("TV markers use parent streams and never write activity", async ({
   ).toEqual([]);
 });
 
-test("TV hides unsupported fullscreen and retains inline video, rotation and navigation", async ({
+test("TV hides unsupported fullscreen and retains inline video and navigation", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -168,11 +171,6 @@ test("TV hides unsupported fullscreen and retains inline video, rotation and nav
         (video: HTMLVideoElement) => video.playsInline && !video.controls,
       ),
   ).toBe(true);
-  await page.keyboard.press("o");
-  await expect(page.locator("[data-tv]")).toHaveAttribute(
-    "data-tv-rotation",
-    "clockwise",
-  );
   await page.getByRole("button", { name: "Playback", exact: true }).click();
   await expect(
     page.getByRole("menuitem", { name: "Fullscreen", exact: true }),
@@ -986,35 +984,6 @@ test("scene activity retains absolute resume time for a segment and counts once 
   ).toBe(1);
 });
 
-test("rotated timeline seeking follows the visible track and keeps the item selected", async ({
-  page,
-}) => {
-  await open(page);
-  await page.keyboard.press("o");
-  const track = page.locator("[data-position-scrubber-track]");
-  const bounds = await track.boundingBox();
-  if (!bounds) throw new Error("Missing timeline track");
-  await page.mouse.click(
-    bounds.x + bounds.width / 2,
-    bounds.y + bounds.height * 0.6,
-  );
-  await expect
-    .poll(() =>
-      page
-        .locator("video[data-playback-video]")
-        .evaluate((video: HTMLVideoElement) => video.currentTime),
-    )
-    .toBeGreaterThan(3);
-  await expect(page.locator("video[data-playback-video]")).toHaveJSProperty(
-    "paused",
-    true,
-  );
-  await expect(page.locator("[data-scene-player]")).toHaveAttribute(
-    "data-playback-key",
-    /scene:1$/,
-  );
-});
-
 test("held seeking restores the previous rate and pause state", async ({
   page,
 }) => {
@@ -1212,7 +1181,7 @@ test("TV settings show the rail editor directly and save reordered actions witho
   await page.keyboard.press("Space");
   await expect(drag).not.toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Information", exact: true }).click();
-  const icon = page.getByRole("combobox", { name: "Action icon", exact: true });
+  const icon = page.getByRole("combobox", { name: "Icon", exact: true });
   await expect(icon).toContainText("Default");
   await icon.click();
   await page.getByRole("option", { name: "Heart", exact: true }).click();
@@ -1304,7 +1273,7 @@ for (const width of [320, 390, 1280]) {
       await expect(folder).toHaveAttribute("aria-expanded", "false");
       await expect(
         page.getByRole("button", {
-          name: "Playback Folder · 9 actions",
+          name: "Playback Folder · 8 actions",
           exact: true,
         }),
       ).toBeVisible();

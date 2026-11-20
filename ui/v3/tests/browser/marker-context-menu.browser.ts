@@ -13,7 +13,7 @@ test("long press on a marker thumbnail opens its actions without opening playbac
   const menu = page.getByRole("menu");
   if (browserName === "chromium") {
     // Real browser touch input includes the pointer and compatibility events
-    // that a synthesized touchstart cannot exercise.
+    // that a synthesized pointerdown cannot exercise.
     const session = await page.context().newCDPSession(page);
     const bounds = await thumbnail.boundingBox();
     if (!bounds) throw new Error("Missing marker thumbnail");
@@ -77,22 +77,40 @@ test("moving or cancelling a marker hold leaves scrolling and ordinary taps avai
     .locator(".marker-card [data-entity-card-preview] img")
     .first();
   await expect(thumbnail).toBeVisible();
-  for (const kind of ["touchmove", "touchcancel"] as const) {
+  for (const kind of ["pointermove", "pointercancel"] as const) {
     await thumbnail.evaluate((element, kind) => {
       const rect = element.getBoundingClientRect();
       const fire = (type: string, y: number) => {
-        const event = new Event(type, { bubbles: true });
-        Object.defineProperty(event, "touches", {
-          value: [{ clientX: rect.x + rect.width / 2, clientY: y }],
-        });
-        element.dispatchEvent(event);
+        element.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+            isPrimary: true,
+            pointerId: 1,
+            pointerType: "touch",
+            clientX: rect.x + rect.width / 2,
+            clientY: y,
+          }),
+        );
       };
-      fire("touchstart", rect.y + rect.height / 2);
+      fire("pointerdown", rect.y + rect.height / 2);
       fire(kind, rect.y + rect.height / 2 + 40);
     }, kind);
     await page.clock.runFor(700);
     await expect(page.getByRole("menu")).toHaveCount(0);
-    await thumbnail.dispatchEvent("touchend", { touches: [] });
+    await thumbnail.evaluate((element) => {
+      element.dispatchEvent(
+        new PointerEvent("pointerup", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          isPrimary: true,
+          pointerId: 1,
+          pointerType: "touch",
+        }),
+      );
+    });
   }
   await thumbnail.tap();
   await expect(page.locator(".yarl__portal")).toBeVisible();

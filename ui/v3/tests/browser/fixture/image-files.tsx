@@ -5,7 +5,7 @@ import { ImageCard } from "@/components/cards/image-card";
 import { ImageRowContextMenu } from "@/components/cards/use-image-context-menu";
 import { ImageActionsMenu } from "@/components/detail/image-actions-menu";
 import { ImageViewer } from "@/components/detail/image-viewer";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { ConfigurationProvider } from "@/hooks/config";
 import * as GQL from "@/core/generated-graphql";
 import { images } from "./image-lightbox";

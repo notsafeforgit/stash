@@ -1,29 +1,38 @@
 "use client";
 
 import type * as React from "react";
-import { useOverlayContainer } from "./overlay-container";
-import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
+import {
+  Popover as PopoverPrimitive,
+  PopoverContent as PopoverContentPrimitive,
+  PopoverDescription,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@ui-sdk/react/popover";
 
 import { cn } from "@/lib/utils";
 import {
   type ShortcutOverlayRootProps,
   useOverlayOpenState,
 } from "@/components/shortcut-provider";
+import {
+  type OpenChangeArgs,
+  type OverlayFocus,
+  overlayFocus,
+  useOverlayContainerElement,
+} from "./overlay-container";
 
-function Popover<Payload = unknown>({
+type PopoverRootProps = React.ComponentProps<typeof PopoverPrimitive> &
+  ShortcutOverlayRootProps;
+
+function Popover({
   open,
   defaultOpen,
   onOpenChange,
   blocksListShortcuts,
   ...props
-}: PopoverPrimitive.Root.Props<Payload> & ShortcutOverlayRootProps) {
-  const overlayProps = useOverlayOpenState<
-    Parameters<
-      NonNullable<PopoverPrimitive.Root.Props<Payload>["onOpenChange"]>
-    > extends [boolean, ...infer Rest]
-      ? Rest
-      : never
-  >({
+}: PopoverRootProps) {
+  const container = useOverlayContainerElement();
+  const overlayProps = useOverlayOpenState<OpenChangeArgs<PopoverRootProps>>({
     open,
     defaultOpen,
     onOpenChange,
@@ -31,13 +40,18 @@ function Popover<Payload = unknown>({
   });
 
   return (
-    <PopoverPrimitive.Root data-slot="popover" {...overlayProps} {...props} />
+    <PopoverPrimitive container={container} {...overlayProps} {...props} />
   );
 }
 
-function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
-  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
-}
+type PopoverContentProps = Omit<
+  React.ComponentProps<typeof PopoverContentPrimitive>,
+  "initialFocus" | "finalFocus"
+> & {
+  positionerClassName?: string;
+  initialFocus?: OverlayFocus;
+  finalFocus?: OverlayFocus;
+};
 
 function PopoverContent({
   className,
@@ -47,37 +61,22 @@ function PopoverContent({
   side = "bottom",
   sideOffset = 4,
   anchor,
-  keepMounted,
+  initialFocus,
+  finalFocus,
   ...props
-}: PopoverPrimitive.Popup.Props &
-  Pick<
-    PopoverPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset" | "anchor"
-  > & {
-    positionerClassName?: string;
-    keepMounted?: boolean;
-  }) {
-  const container = useOverlayContainer();
+}: PopoverContentProps) {
   return (
-    <PopoverPrimitive.Portal keepMounted={keepMounted} container={container}>
-      <PopoverPrimitive.Positioner
-        anchor={anchor}
-        align={align}
-        alignOffset={alignOffset}
-        side={side}
-        sideOffset={sideOffset}
-        className={cn("isolate z-50", positionerClassName)}
-      >
-        <PopoverPrimitive.Popup
-          data-slot="popover-content"
-          className={cn(
-            "z-50 flex w-72 origin-(--transform-origin) flex-col gap-2.5 rounded-lg bg-popover p-2.5 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-            className,
-          )}
-          {...props}
-        />
-      </PopoverPrimitive.Positioner>
-    </PopoverPrimitive.Portal>
+    <PopoverContentPrimitive
+      align={align}
+      alignOffset={alignOffset}
+      side={side}
+      sideOffset={sideOffset}
+      anchor={anchor}
+      initialFocus={overlayFocus(initialFocus)}
+      finalFocus={overlayFocus(finalFocus)}
+      className={cn("w-72", positionerClassName, className)}
+      {...props}
+    />
   );
 }
 
@@ -86,29 +85,6 @@ function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="popover-header"
       className={cn("flex flex-col gap-0.5 text-sm", className)}
-      {...props}
-    />
-  );
-}
-
-function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
-  return (
-    <PopoverPrimitive.Title
-      data-slot="popover-title"
-      className={cn("font-medium", className)}
-      {...props}
-    />
-  );
-}
-
-function PopoverDescription({
-  className,
-  ...props
-}: PopoverPrimitive.Description.Props) {
-  return (
-    <PopoverPrimitive.Description
-      data-slot="popover-description"
-      className={cn("text-muted-foreground", className)}
       {...props}
     />
   );

@@ -7,7 +7,7 @@ import type {
   JobActivityDetail,
   RunActivityDetail,
 } from "@/core/native-archive/activity-schema";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -254,20 +254,24 @@ export function ActivityDetail({
                   )}
                 </p>
                 <div>
-                  <Link
-                    className={buttonVariants({ variant: "outline" })}
-                    to="/collections"
-                    search={{
-                      q: "",
-                      state: "",
-                      kind: "",
-                      collection:
-                        run.summary.canonical_collection_uuid ??
-                        run.summary.collection_uuid,
-                    }}
+                  <Button
+                    variant="outline"
+                    render={
+                      <Link
+                        to="/collections"
+                        search={{
+                          q: "",
+                          state: "",
+                          kind: "",
+                          collection:
+                            run.summary.canonical_collection_uuid ??
+                            run.summary.collection_uuid,
+                        }}
+                      />
+                    }
                   >
                     {msg("archive_activity.open_collection", "Open collection")}
-                  </Link>
+                  </Button>
                 </div>
                 <PostSection
                   title={msg("archive_activity.coverage", "Scrape coverage")}

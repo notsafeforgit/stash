@@ -342,7 +342,7 @@ interface ImageRowContextMenuProps {
 
 /**
  * Wraps an image-table row's JSX with the same context menu the card view
- * uses. Uses Base UI's `render` prop so the trigger stays a `<tr>` (no
+ * uses. Uses the trigger's `render` prop so it stays a `<tr>` (no
  * wrapping `<div>` that would break table semantics).
  */
 export function ImageRowContextMenu({

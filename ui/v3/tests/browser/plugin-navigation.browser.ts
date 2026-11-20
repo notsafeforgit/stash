@@ -36,7 +36,7 @@ test("the mobile drawer includes every plugin placement and closes after navigat
     page.getByRole("heading", { name: "Catalog review", exact: true }),
   ).toBeVisible();
   await expect(navigation).toHaveCount(0);
-  await expect(page.locator('[data-slot="drawer-overlay"]')).toHaveCount(0);
+  await expect(page.locator('[data-slot="drawer-backdrop"]')).toHaveCount(0);
   await menu.tap();
   await expect(
     navigation.getByRole("link", { name: "Catalog review", exact: true }),

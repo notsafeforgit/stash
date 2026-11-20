@@ -27,7 +27,9 @@ for (const width of [390, 1280]) {
       await expect(page.getByRole("dialog")).toHaveCount(0);
       await expect(page.getByTestId("saved")).toHaveText("0");
       await expect(
-        page.getByText("Bulk update queued", { exact: true }),
+        page
+          .getByRole("region", { name: "Notifications" })
+          .getByText("Bulk update queued", { exact: true }),
       ).toBeVisible();
       const input = JSON.parse(await page.getByTestId("input").innerText());
       expect(input.ids).toEqual([]);

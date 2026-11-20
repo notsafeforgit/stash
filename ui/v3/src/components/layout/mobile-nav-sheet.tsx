@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { Home, Settings } from "lucide-react";
 import { useIntl } from "react-intl";
@@ -6,21 +7,21 @@ import {
   BottomSheetHeader,
   BottomSheetTitle,
 } from "@/components/ui/bottom-sheet";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { useNavItems } from "./nav-items";
 import { ReviewAttentionBadge } from "./review-attention";
 
 interface MobileNavSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onOpenChangeComplete?: (open: boolean) => void;
+  /** Runs once the closed sheet's content has left the page. */
+  onClosed?: () => void;
 }
 
 export function MobileNavSheet({
   open,
   onOpenChange,
-  onOpenChangeComplete,
+  onClosed,
 }: MobileNavSheetProps) {
   const intl = useIntl();
   const items = useNavItems({ placement: ["main", "mobile", "utility"] });
@@ -28,7 +29,6 @@ export function MobileNavSheet({
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      onOpenChangeComplete={onOpenChangeComplete}
       backdrop="dimmed"
       className="data-ending-style:duration-100"
     >
@@ -50,32 +50,36 @@ export function MobileNavSheet({
         data-mobile-navigation
         className="grid min-h-0 grid-cols-4 gap-1 overflow-y-auto px-2 pb-3"
       >
-        <Link
-          to="/"
-          preload="viewport"
-          activeOptions={{ exact: true, includeSearch: false }}
-          onClick={() => onOpenChange(false)}
-          className={cn(
-            buttonVariants({ variant: "ghost" }),
-            "h-auto flex-col gap-1.5 py-3 text-muted-foreground [&.active]:bg-accent [&.active]:text-foreground [&>svg]:size-6",
-          )}
+        <Button
+          variant="ghost"
+          className="h-auto flex-col gap-1.5 py-3 text-muted-foreground [&.active]:bg-accent [&.active]:text-foreground [&>svg]:size-6"
+          render={
+            <Link
+              to="/"
+              preload="viewport"
+              activeOptions={{ exact: true, includeSearch: false }}
+              onClick={() => onOpenChange(false)}
+            />
+          }
         >
           <Home className="size-6" />
           <span className="text-xs font-medium">
             {intl.formatMessage({ id: "home", defaultMessage: "Home" })}
           </span>
-        </Link>
+        </Button>
         {items.map((item) => (
-          <Link
+          <Button
             key={item.to}
-            to={item.to}
-            search={item.search}
-            activeOptions={{ exact: true, includeSearch: false }}
-            onClick={() => onOpenChange(false)}
-            className={cn(
-              buttonVariants({ variant: "ghost" }),
-              "relative h-auto flex-col gap-1.5 py-3 text-muted-foreground [&.active]:bg-accent [&.active]:text-foreground [&>svg]:size-6",
-            )}
+            variant="ghost"
+            className="relative h-auto flex-col gap-1.5 py-3 text-muted-foreground [&.active]:bg-accent [&.active]:text-foreground [&>svg]:size-6"
+            render={
+              <Link
+                to={item.to}
+                search={item.search}
+                activeOptions={{ exact: true, includeSearch: false }}
+                onClick={() => onOpenChange(false)}
+              />
+            }
           >
             <span className="[&>svg]:size-6">{item.icon}</span>
             <span className="text-center text-xs font-medium wrap-anywhere whitespace-normal">
@@ -85,23 +89,41 @@ export function MobileNavSheet({
               className="absolute top-1 right-1"
               count={item.badge}
             />
-          </Link>
+          </Button>
         ))}
-        <Link
-          to="/settings"
-          activeOptions={{ exact: true, includeSearch: false }}
-          onClick={() => onOpenChange(false)}
-          className={cn(
-            buttonVariants({ variant: "ghost" }),
-            "h-auto flex-col gap-1.5 py-3 text-muted-foreground [&.active]:bg-accent [&.active]:text-foreground",
-          )}
+        <Button
+          variant="ghost"
+          className="h-auto flex-col gap-1.5 py-3 text-muted-foreground [&.active]:bg-accent [&.active]:text-foreground"
+          render={
+            <Link
+              to="/settings"
+              activeOptions={{ exact: true, includeSearch: false }}
+              onClick={() => onOpenChange(false)}
+            />
+          }
         >
           <Settings className="size-6" />
           <span className="text-xs font-medium">
             {intl.formatMessage({ id: "settings", defaultMessage: "Settings" })}
           </span>
-        </Link>
+        </Button>
       </nav>
+      {onClosed && <UnmountSignal onUnmount={onClosed} />}
     </BottomSheet>
   );
+}
+
+// ui-sdk reports a settled close before the closed content unmounts. The token
+// skips StrictMode's mount check, which runs cleanup and setup back to back.
+function UnmountSignal({ onUnmount }: { onUnmount: () => void }) {
+  const mounted = useRef<object>(undefined);
+  useEffect(() => {
+    const token = {};
+    mounted.current = token;
+    return () =>
+      queueMicrotask(() => {
+        if (mounted.current === token) onUnmount();
+      });
+  }, [onUnmount]);
+  return null;
 }

@@ -1,5 +1,5 @@
 import { ApolloProvider } from "@apollo/client/react";
-import { Toaster } from "src/components/ui/sonner";
+import { Toaster } from "src/components/ui/toaster";
 import { getClient } from "src/core/client";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ConfigLoader } from "@/components/config-loader";

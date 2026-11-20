@@ -1,7 +1,7 @@
 /**
  * Uncontrolled search input with internal 300 ms debounce.
  *
- * Uses the shadcn `<Input>` (Base UI primitive) in uncontrolled mode
+ * Uses `<Input>` in uncontrolled mode
  * (ref + defaultValue) so React never mutates the DOM value while the
  * user is typing — that was a real iOS cursor-reset hazard for a
  * controlled input updated on each keystroke. External filter resets

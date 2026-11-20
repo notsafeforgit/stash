@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import viteCompression from "vite-plugin-compression";
@@ -42,6 +43,7 @@ export default defineConfig({
     ),
   },
   publicDir: "public",
+  test: { setupFiles: ["src/test-utils/vitest-setup.ts"] },
   plugins: [
     TanStackRouterVite({
       routesDirectory: "src/routes",

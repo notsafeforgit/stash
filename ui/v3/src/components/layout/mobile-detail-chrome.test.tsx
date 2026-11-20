@@ -27,6 +27,7 @@ function StatefulPanel() {
 
 it("preserves tab state between the mobile picker and desktop strip", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  // jsdom has no Web Animations; tab panels wait for their exit animations.
   const scrollIntoView = vi.fn();
   const originalScroll = HTMLElement.prototype.scrollIntoView;
   HTMLElement.prototype.scrollIntoView = scrollIntoView;

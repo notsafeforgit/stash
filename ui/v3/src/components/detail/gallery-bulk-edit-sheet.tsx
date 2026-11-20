@@ -12,7 +12,7 @@ import {
 import { useLazyQuery } from "@apollo/client/react";
 import { useEntityMutation } from "src/core/client";
 import { useIntl } from "react-intl";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import * as GQL from "src/core/generated-graphql";
 import { Field, FieldGroup, FieldLabel } from "src/components/ui/field";
 import { BulkBooleanField } from "src/components/forms/bulk-boolean-field";

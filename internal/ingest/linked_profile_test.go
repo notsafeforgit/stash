@@ -205,46 +205,56 @@ func linkedProfileUploaderEvent(t *testing.T, f captureFixture, root *models.Med
 
 // A repost profile links a different uploader in almost every post. Nine
 // uploaders in one download folder are a creator's own accounts; a tenth is
-// neither subscribed nor given to the Reddit owner's performer as a profile.
-func TestLinkedRedgifsProfileStopsAtRepostFolderLimit(t *testing.T) {
+// held: its source is created paused, and it is not given to the Reddit
+// owner's performer as a profile until the owner enables it.
+func TestLinkedRedgifsProfileHoldsUploadersBeyondRepostFolderLimit(t *testing.T) {
 	f, root := linkedProfileFixture(t, "https://www.reddit.com/user/example/", ".")
 	submit := func(directory, post, uploader string) *models.IngestReceipt {
 		receipt, err := f.submit(t, linkedProfileUploaderEvent(t, f, root, directory, post, uploader))
 		require.NoError(t, err)
 		return receipt
 	}
+	sources := func() map[string]models.SourceSubscription {
+		ret := map[string]models.SourceSubscription{}
+		for _, item := range linkedProfileSubscriptions(t, f, root) {
+			ret[strings.TrimPrefix(item.Collection.TargetURL, "https://www.redgifs.com/users/")] = item
+		}
+		return ret
+	}
+	enable := func(item models.SourceSubscription, enabled bool) {
+		require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
+			_, err := f.service.Repo.SourceSubscription.Put(ctx, item.Collection.UUID, models.SourceSubscriptionInput{ExpectedRevision: item.Revision, Enabled: enabled})
+			return err
+		}))
+	}
 	first := submit("Example, reddit", "post1", "Uploader1")
 	for i := 2; i <= 9; i++ {
 		submit("Example, reddit", fmt.Sprintf("post%d", i), fmt.Sprintf("Uploader%d", i))
 	}
-	items := linkedProfileSubscriptions(t, f, root)
-	require.Len(t, items, 9, "uploaders below the limit are discovered")
-	for _, item := range items {
-		if item.Collection.TargetURL == "https://www.redgifs.com/users/uploader1" {
-			require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
-				_, err := f.service.Repo.SourceSubscription.Put(ctx, item.Collection.UUID, models.SourceSubscriptionInput{ExpectedRevision: item.Revision, Enabled: false})
-				return err
-			}))
-		}
+	got := sources()
+	require.Len(t, got, 9, "uploaders below the limit are discovered")
+	for _, item := range got {
+		require.True(t, item.Enabled)
+		require.Equal(t, "Redgifs / "+strings.TrimPrefix(item.Collection.TargetURL, "https://www.redgifs.com/users/"), item.Collection.Label)
 	}
+	enable(got["uploader1"], false)
 
 	submit("Example, reddit", "post10", "Uploader10")
 	submit("Example, reddit", "post11", "Uploader3")
-	targets := func() map[string]bool {
-		ret := map[string]bool{}
-		for _, item := range linkedProfileSubscriptions(t, f, root) {
-			ret[item.Collection.TargetURL] = item.Enabled
-		}
-		return ret
-	}
-	got := targets()
-	require.Len(t, got, 9, "a disabled discovery still counts; the tenth uploader is a repost")
-	require.NotContains(t, got, "https://www.redgifs.com/users/uploader10")
-	require.False(t, got["https://www.redgifs.com/users/uploader1"], "an earlier opt-out is preserved")
-	require.True(t, got["https://www.redgifs.com/users/uploader3"], "an already discovered uploader keeps working")
+	submit("Example, reddit", "post12", "Uploader10")
+	got = sources()
+	require.Len(t, got, 10)
+	held := got["uploader10"]
+	require.False(t, held.Enabled, "a disabled discovery still counts; the tenth uploader is held")
+	require.Zero(t, held.Revision)
+	require.Equal(t, "Redgifs / uploader10 (held: repost limit)", held.Collection.Label)
+	require.Equal(t, "active", held.Collection.State, "one switch releases a held source")
+	require.Equal(t, "Example, reddit", held.Collection.PathPrefix)
+	require.False(t, got["uploader1"].Enabled, "an earlier opt-out is preserved")
+	require.True(t, got["uploader3"].Enabled, "an already discovered uploader keeps working")
 
-	submit("Elsewhere, reddit", "post12", "Uploader12")
-	require.Contains(t, targets(), "https://www.redgifs.com/users/uploader12", "each download folder has its own limit")
+	submit("Elsewhere, reddit", "post13", "Uploader13")
+	require.True(t, sources()["uploader13"].Enabled, "each download folder has its own limit")
 
 	var performerID int
 	require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
@@ -266,16 +276,41 @@ func TestLinkedRedgifsProfileStopsAtRepostFolderLimit(t *testing.T) {
 		_, _, err = repo.SourceAccount.ApplyOwnershipReview(ctx, models.AccountOwnershipReviewApplyInput{AccountOwnershipReviewInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest})
 		return err
 	}))
-	var urls []string
-	require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
-		var err error
-		urls, err = f.service.Repo.Performer.GetURLs(ctx, performerID)
+	urls := func() []string {
+		var urls []string
+		require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+			var err error
+			urls, err = f.service.Repo.Performer.GetURLs(ctx, performerID)
+			return err
+		}))
+		return urls
+	}
+	require.NotContains(t, urls(), "https://www.redgifs.com/users/uploader10", "a held uploader is not the owner's profile")
+	for i := 1; i <= 9; i++ {
+		require.Contains(t, urls(), fmt.Sprintf("https://www.redgifs.com/users/uploader%d", i))
+	}
+	submit("Example, reddit", "post14", "Uploader10")
+	submit("Example, reddit", "post15", "Uploader14")
+	require.NotContains(t, urls(), "https://www.redgifs.com/users/uploader10", "a linked owner's later post does not release a hold")
+	require.NotContains(t, urls(), "https://www.redgifs.com/users/uploader14")
+	require.False(t, sources()["uploader14"].Enabled)
+
+	enable(held, true)
+	require.Contains(t, urls(), "https://www.redgifs.com/users/uploader10", "enabling releases the hold")
+	require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		update := models.NewPerformerPartial()
+		update.URLs = &models.UpdateStrings{Mode: models.RelationshipUpdateModeRemove, Values: []string{"https://www.redgifs.com/users/uploader10"}}
+		_, err := f.service.Repo.Performer.UpdatePartial(ctx, performerID, update)
 		return err
 	}))
-	require.NotContains(t, urls, "https://www.redgifs.com/users/uploader10", "the repost uploader is not the owner's profile")
-	for i := 1; i <= 9; i++ {
-		require.Contains(t, urls, fmt.Sprintf("https://www.redgifs.com/users/uploader%d", i))
-	}
+	enable(sources()["uploader10"], false)
+	submit("Example, reddit", "post16", "Uploader10")
+	enable(sources()["uploader10"], true)
+	got = sources()
+	require.True(t, got["uploader10"].Enabled)
+	require.NotContains(t, urls(), "https://www.redgifs.com/users/uploader10", "the owner's removal is kept")
+	require.NotContains(t, urls(), "https://www.redgifs.com/users/uploader14")
+	require.Len(t, got, 12)
 }
 
 func TestLinkedRedgifsProfileRequiresOwnProfileAndBoundDirectory(t *testing.T) {

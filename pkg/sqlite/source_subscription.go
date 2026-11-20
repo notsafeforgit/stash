@@ -157,6 +157,12 @@ ON CONFLICT(collection_uuid) DO UPDATE SET revision=excluded.revision,enabled=ex
 	if err != nil {
 		return nil, err
 	}
+	if current.Revision == 0 {
+		// The owner's first enable releases a held Redgifs discovery.
+		if err := releaseLinkedRedgifsProfile(ctx, current.Collection); err != nil {
+			return nil, err
+		}
+	}
 	if !input.Enabled {
 		// Keep the current attempt and its intake lease intact. Queued work and
 		// subsequent attempts are cancelled; already captured data can still arrive.

@@ -594,15 +594,24 @@ directory hints cannot create download work. Existing sources, destinations,
 paused subscriptions and retired definitions are preserved on fresh captures
 and retries. Stale collection revisions cannot create new subscriptions.
 
-Discovery stops at nine uploaders per Reddit download folder (root and directory).
-A profile that links many different uploaders is reposting other people's clips,
-so a tenth new uploader is neither subscribed nor recorded as a profile URL for
-the Reddit owner's performer. The count includes discovered sources that were
-later paused, retargeted or retired. Uploaders already discovered in the folder
-keep their sources and URLs. Another folder has its own limit, and a manual
-subscription is unaffected. The limit was added after one repost profile
-discovered 182 uploaders in an evening; their sources were then paused and their
-profile URLs removed and suppressed.
+Discovery holds uploaders beyond nine per Reddit download folder (root and
+directory). A profile that links many different uploaders is usually reposting
+other people's clips. A tenth new uploader therefore gets a paused source,
+labelled `Redgifs / <name> (held: repost limit)`, and is not recorded as a
+profile URL for the Reddit owner's performer. The count includes discovered
+sources that were later paused, retargeted or retired; held sources do not raise
+it. Uploaders already discovered in the folder keep their sources and URLs.
+Another folder has its own limit, and a manual subscription is unaffected.
+
+A held source has no subscription record, so monitoring never queues it and later
+captures of the same uploader keep it held. Enabling it under Source collections →
+Monitoring releases it. The first enable records the uploader's profile URL for a
+linked Reddit owner, as ordinary discovery does, and URLs the owner removed stay
+suppressed. A held source that was retargeted or moved before release is left
+alone. After release it behaves as an ordinary discovered source, including when
+it is paused again. The limit was added after one repost profile discovered 182
+uploaders in an evening; their sources were then paused and their profile URLs
+removed and suppressed.
 
 The external Redgifs worker uses the claimed destination when configured with
 `extractor.redgifs.user.native-profile-directory: true`; this keeps direct

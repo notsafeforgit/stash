@@ -2,6 +2,8 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -50,6 +52,7 @@ ORDER BY r.collection_uuid,r.revision LIMIT 128`, capture, after, revision); err
 			if scrape.RedditProfileURL(scope.Target) != link.SourceProfileURL {
 				continue
 			}
+			held := false
 			if scope.Root != nil {
 				retired, err := linkedRedgifsProfileRetired(ctx, link.URL, *scope.Root)
 				if err != nil {
@@ -58,22 +61,21 @@ ORDER BY r.collection_uuid,r.revision LIMIT 128`, capture, after, revision); err
 				if retired {
 					continue // Old captures cannot relink a retired account.
 				}
-				full, err := linkedRedgifsFolderFull(ctx, link.URL, *scope.Root, link.Directory)
-				if err != nil {
+				if held, err = linkedRedgifsProfileHeld(ctx, link.URL, *scope.Root, link.Directory); err != nil {
 					return "", err
 				}
-				if full {
-					continue // A repost profile: the uploader is not this owner's account.
-				}
 			}
-			url = link.URL
+			if !held {
+				// A held uploader may be reposted content, not this owner's account.
+				url = link.URL
+			}
 			// Keep the directory actually chosen by the Reddit job, including
 			// custom names. Missing/unsafe hints may add a URL but cannot widen
 			// the original root or choose a download destination.
 			validDirectory := archive.ValidRootRelativePath(link.Directory, true) &&
 				(scope.Path == "." || link.Directory == scope.Path || strings.HasPrefix(link.Directory, scope.Path+"/"))
 			if scope.Monitor && scope.Root != nil && validDirectory {
-				if err := subscribeLinkedRedgifsProfile(ctx, link.URL, *scope.Root, link.Directory, capture); err != nil {
+				if err := subscribeLinkedRedgifsProfile(ctx, link.URL, *scope.Root, link.Directory, capture, held); err != nil {
 					return "", err
 				}
 			}
@@ -108,22 +110,33 @@ const linkedRedgifsReason = "Linked Redgifs uploader observed in Reddit profile 
 // their profiles are neither its owner's accounts nor sources to download.
 const linkedRedgifsFolderLimit = 9
 
-// linkedRedgifsFolderFull reports whether a new uploader would exceed the
-// limit in the folder chosen by the Reddit job. Uploaders already discovered
-// there keep their sources, profile URLs and replays; a repost profile cannot
-// add more. The count uses each discovered source's creating revision, so a
-// later disable, retarget or retirement still counts.
-func linkedRedgifsFolderFull(ctx context.Context, target, root, directory string) (bool, error) {
-	var full bool
-	err := dbWrapper.Get(ctx, &full, `SELECT NOT EXISTS(SELECT 1 FROM source_collections WHERE uuid=?)
- AND (SELECT count(*) FROM source_collection_revisions INDEXED BY source_collection_directory
+// linkedRedgifsHeldLabel marks a source discovered beyond the folder limit.
+const linkedRedgifsHeldLabel = " (held: repost limit)"
+
+// linkedRedgifsProfileHeld reports whether an uploader is held by the folder
+// limit. A new uploader is held when the folder chosen by the Reddit job
+// already has the limit's discovered sources; the count uses each source's
+// creating revision, so a later disable, retarget or retirement still counts.
+// An existing discovered source stays held until the owner first enables it.
+// Ordinary discovery creates its subscription with the source and a held
+// source has none, so the subscription row records that release. Uploaders
+// discovered below the limit keep their sources, profile URLs and replays.
+func linkedRedgifsProfileHeld(ctx context.Context, target, root, directory string) (bool, error) {
+	id := linkedRedgifsCollectionID(root, target)
+	var held bool
+	err := dbWrapper.Get(ctx, &held, `SELECT CASE WHEN EXISTS(SELECT 1 FROM source_collections WHERE uuid=?)
+ THEN NOT EXISTS(SELECT 1 FROM source_subscriptions WHERE collection_uuid=?)
+ ELSE (SELECT count(*) FROM source_collection_revisions INDEXED BY source_collection_directory
   WHERE root_uuid=? AND path_prefix=? AND revision=1 AND namespace='native:redgifs' AND kind='account'
-  AND origin='ingest' AND substr(reason,1,?)=?) >= ?`,
-		linkedRedgifsCollectionID(root, target), root, directory, len(linkedRedgifsReason), linkedRedgifsReason, linkedRedgifsFolderLimit)
-	return full, err
+  AND origin='ingest' AND substr(reason,1,?)=?) >= ? END`,
+		id, id, root, directory, len(linkedRedgifsReason), linkedRedgifsReason, linkedRedgifsFolderLimit)
+	return held, err
 }
 
-func subscribeLinkedRedgifsProfile(ctx context.Context, target, root, prefix, capture string) error {
+// A held source is active but paused: monitoring queues only enabled
+// subscriptions. It keeps the discovery reason that owner-enabled profile
+// attribution requires.
+func subscribeLinkedRedgifsProfile(ctx context.Context, target, root, prefix, capture string, held bool) error {
 	collections := &SourceCollectionStore{}
 	id := linkedRedgifsCollectionID(root, target)
 	existing, err := collections.Find(ctx, id)
@@ -144,14 +157,54 @@ func subscribeLinkedRedgifsProfile(ctx context.Context, target, root, prefix, ca
 	if account != nil {
 		accountID = &account.UUID
 	}
+	label := "Redgifs / " + strings.TrimPrefix(target, "https://www.redgifs.com/users/")
+	if held {
+		label += linkedRedgifsHeldLabel
+	}
 	_, err = collections.Put(ctx, models.SourceCollectionInput{UUID: id,
 		SourceCollectionDefinition: models.SourceCollectionDefinition{
-			Label: "Redgifs / " + strings.TrimPrefix(target, "https://www.redgifs.com/users/"),
+			Label: label,
 			Kind:  "account", Namespace: "native:redgifs", State: "active", TargetURL: target, AccountUUID: accountID, RootUUID: &root, PathPrefix: prefix,
 		}, Origin: "ingest", Reason: linkedRedgifsReason + capture})
-	if err != nil {
+	if err != nil || held {
 		return err
 	}
 	_, err = (&SourceSubscriptionStore{}).Put(ctx, id, models.SourceSubscriptionInput{Enabled: true})
 	return err
+}
+
+// releaseLinkedRedgifsProfile records a released source's uploader as the
+// Reddit owner's profile, as ordinary discovery does when the capture is
+// published. Owner-removed URLs stay suppressed. A source that was retargeted
+// or moved while held is no longer that discovery and is left alone.
+func releaseLinkedRedgifsProfile(ctx context.Context, current *models.SourceCollection) error {
+	var first struct {
+		Label  string  `db:"label"`
+		Reason string  `db:"reason"`
+		Target string  `db:"target_url"`
+		Root   *string `db:"root_uuid"`
+		Path   string  `db:"path_prefix"`
+	}
+	if err := dbWrapper.Get(ctx, &first, `SELECT label,reason,target_url,root_uuid,path_prefix FROM source_collection_revisions
+ WHERE collection_uuid=? AND revision=1 AND namespace='native:redgifs' AND kind='account' AND origin='ingest'`, current.UUID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	if first.Root == nil || current.RootUUID == nil || *first.Root != *current.RootUUID || first.Target != current.TargetURL ||
+		first.Path != current.PathPrefix || current.UUID != linkedRedgifsCollectionID(*first.Root, first.Target) ||
+		!strings.HasSuffix(first.Label, linkedRedgifsHeldLabel) || !strings.HasPrefix(first.Reason, linkedRedgifsReason) {
+		return nil
+	}
+	capture, err := archiveUUID(strings.TrimPrefix(first.Reason, linkedRedgifsReason))
+	if err != nil {
+		return nil
+	}
+	publisher, err := (&CapturePublisherStore{}).Current(ctx, capture)
+	if err != nil || publisher == nil || publisher.State != "linked" || publisher.AccountUUID == nil {
+		// An unlinked publisher's URLs are recorded when it is linked.
+		return err
+	}
+	return recordAccountProfileURLs(ctx, *publisher.AccountUUID, capture)
 }

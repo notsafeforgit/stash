@@ -139,9 +139,19 @@ for (const mode of [
     await scrubber.focus();
     await expect(scrubber).toHaveAttribute("aria-disabled", "false");
     const duration = Number(await scrubber.getAttribute("aria-valuemax"));
-    const origin =
+    // The scrubber shows the paused time a render later than the video has it,
+    // so read the offset between them once it stops changing.
+    const readOrigin = async () =>
       (await video.evaluate((v: HTMLVideoElement) => v.currentTime)) -
       Number(await scrubber.getAttribute("aria-valuenow"));
+    let origin = Number.NaN;
+    await expect
+      .poll(async () => {
+        const previous = origin;
+        origin = await readOrigin();
+        return Math.abs(origin - previous) < 0.001;
+      })
+      .toBe(true);
     const bar = await scrubber.boundingBox();
     if (!bar) throw new Error("Missing scrubber");
     const point = (ratio: number) => ({

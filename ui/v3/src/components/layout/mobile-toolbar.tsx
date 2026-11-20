@@ -4,6 +4,8 @@ import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useMobileNavigation } from "./mobile-navigation";
+import { useReviewAttention } from "@/hooks/use-review-attention";
+import { ReviewAttentionDot, reviewAttentionLabel } from "./review-attention";
 
 /** Every mobile toolbar keeps navigation first, including search and selection. */
 export function MobileToolbarRow({
@@ -14,6 +16,11 @@ export function MobileToolbarRow({
 }: ComponentProps<"div"> & { onNavigate?: () => void }) {
   const intl = useIntl();
   const openNavigation = useMobileNavigation();
+  const reviews = useReviewAttention();
+  const label = intl.formatMessage({
+    id: "accessibility.open_navigation_menu",
+    defaultMessage: "Open navigation menu",
+  });
   return (
     <div
       data-mobile-toolbar-row
@@ -26,17 +33,17 @@ export function MobileToolbarRow({
       <Button
         variant="ghost"
         size="icon-lg"
-        className="size-11 shrink-0"
+        className="relative size-11 shrink-0"
         onClick={() => {
           onNavigate?.();
           openNavigation();
         }}
-        aria-label={intl.formatMessage({
-          id: "accessibility.open_navigation_menu",
-          defaultMessage: "Open navigation menu",
-        })}
+        aria-label={
+          reviews ? `${label}, ${reviewAttentionLabel(intl, reviews)}` : label
+        }
       >
         <Menu />
+        {reviews > 0 && <ReviewAttentionDot className="top-2 right-2" />}
       </Button>
       {children}
     </div>

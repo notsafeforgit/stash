@@ -18,7 +18,8 @@ export type ArchivePageQuery = {
     | "shares"
     | "review-accounts"
     | "review-media"
-    | "review-metadata";
+    | "review-metadata"
+    | "review-sources";
   subject?: string;
   cursor?: string | number;
   q?: string;

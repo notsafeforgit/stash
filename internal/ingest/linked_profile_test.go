@@ -97,6 +97,29 @@ func linkedProfileSubscriptions(t *testing.T, f captureFixture, root *models.Med
 	return page.Items
 }
 
+// linkedProfileHolds returns the review queue's held sources, checking the
+// navigation count agrees.
+func linkedProfileHolds(t *testing.T, f captureFixture) []string {
+	var ids []string
+	require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		page, err := f.service.Repo.ArchiveReview.Queue(ctx, models.ArchiveReviewFilter{Kind: "sources", Limit: 50})
+		require.NoError(t, err)
+		summary, err := f.service.Repo.ArchiveReview.Summary(ctx)
+		require.NoError(t, err)
+		require.Equal(t, len(page.Items), summary.Sources)
+		info, err := f.service.Repo.ArchivePagination.PageInfo(ctx, models.ArchivePageFilter{Resource: "review-sources"})
+		require.NoError(t, err)
+		require.EqualValues(t, len(page.Items), info.Total)
+		for _, item := range page.Items {
+			require.Equal(t, []string{"source_repost_hold"}, item.Reasons)
+			require.Equal(t, item.UUID, item.Collection.UUID)
+			ids = append(ids, item.UUID)
+		}
+		return nil
+	}))
+	return ids
+}
+
 func TestLinkedRedgifsProfileCaptureAtomicityOwnershipAndOptOut(t *testing.T) {
 	f, root := linkedProfileFixture(t, "https://www.reddit.com/user/Example/submitted/?sort=new", ".")
 	event := linkedProfileEvent(t, f, root, "Custom/Example, reddit", "post1")
@@ -250,6 +273,7 @@ func TestLinkedRedgifsProfileHoldsUploadersBeyondRepostFolderLimit(t *testing.T)
 	require.Equal(t, "Redgifs / uploader10 (held: repost limit)", held.Collection.Label)
 	require.Equal(t, "active", held.Collection.State, "one switch releases a held source")
 	require.Equal(t, "Example, reddit", held.Collection.PathPrefix)
+	require.Equal(t, []string{held.Collection.UUID}, linkedProfileHolds(t, f), "a hold waits in the review queue")
 	require.False(t, got["uploader1"].Enabled, "an earlier opt-out is preserved")
 	require.True(t, got["uploader3"].Enabled, "an already discovered uploader keeps working")
 
@@ -294,8 +318,20 @@ func TestLinkedRedgifsProfileHoldsUploadersBeyondRepostFolderLimit(t *testing.T)
 	require.NotContains(t, urls(), "https://www.redgifs.com/users/uploader10", "a linked owner's later post does not release a hold")
 	require.NotContains(t, urls(), "https://www.redgifs.com/users/uploader14")
 	require.False(t, sources()["uploader14"].Enabled)
+	require.Len(t, linkedProfileHolds(t, f), 2)
+	require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		// Dismissing a hold keeps it paused and out of the queue.
+		c := sources()["uploader14"].Collection
+		definition := c.SourceCollectionDefinition
+		definition.State = "disabled"
+		definition.Label = "Redgifs / renamed"
+		_, err := f.service.Repo.SourceCollection.Put(ctx, models.SourceCollectionInput{UUID: c.UUID, ExpectedRevision: c.Revision, Origin: "review", SourceCollectionDefinition: definition})
+		return err
+	}))
+	require.Equal(t, []string{held.Collection.UUID}, linkedProfileHolds(t, f))
 
 	enable(held, true)
+	require.Empty(t, linkedProfileHolds(t, f), "enabling resolves the hold")
 	require.Contains(t, urls(), "https://www.redgifs.com/users/uploader10", "enabling releases the hold")
 	require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		update := models.NewPerformerPartial()

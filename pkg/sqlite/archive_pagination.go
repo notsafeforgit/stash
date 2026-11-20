@@ -133,6 +133,8 @@ func (s *ArchivePaginationStore) PageInfo(ctx context.Context, f models.ArchiveP
 	case "review-media":
 		query, args = archiveReviewMediaItemsQuery("", -1)
 		column = "post_uuid"
+	case "review-sources":
+		query, args = "SELECT b.uuid AS uuid"+linkedRedgifsPendingHolds, linkedRedgifsHoldArgs()
 	default:
 		return nil, models.ErrArchivePageInvalid
 	}

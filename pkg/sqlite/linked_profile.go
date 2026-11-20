@@ -113,6 +113,21 @@ const linkedRedgifsFolderLimit = 9
 // linkedRedgifsHeldLabel marks a source discovered beyond the folder limit.
 const linkedRedgifsHeldLabel = " (held: repost limit)"
 
+// linkedRedgifsPendingHolds selects held sources that are still active and
+// have never been enabled. The creating revision identifies the hold, so a
+// later rename keeps the source in review.
+const linkedRedgifsPendingHolds = ` FROM source_collections b
+JOIN source_collection_revisions r ON r.collection_uuid=b.uuid AND r.revision=b.revision
+JOIN source_collection_revisions f ON f.collection_uuid=b.uuid AND f.revision=1
+WHERE r.state='active' AND f.namespace='native:redgifs' AND f.kind='account' AND f.origin='ingest'
+AND substr(f.label,-?)=? AND substr(f.reason,1,?)=?
+AND NOT EXISTS(SELECT 1 FROM source_subscriptions s WHERE s.collection_uuid=b.uuid)
+AND NOT EXISTS(SELECT 1 FROM source_collection_aliases a WHERE a.alias_uuid=b.uuid)`
+
+func linkedRedgifsHoldArgs(extra ...any) []any {
+	return append([]any{len(linkedRedgifsHeldLabel), linkedRedgifsHeldLabel, len(linkedRedgifsReason), linkedRedgifsReason}, extra...)
+}
+
 // linkedRedgifsProfileHeld reports whether an uploader is held by the folder
 // limit. A new uploader is held when the folder chosen by the Reddit job
 // already has the limit's discovered sources; the count uses each source's

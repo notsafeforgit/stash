@@ -19,12 +19,16 @@ import {
 } from "lucide-react";
 import { getRegisteredNavItems, type NavPlacement } from "@/plugins";
 import { useSourceTracking } from "@/hooks/use-source-tracking";
+import { useReviewAttention } from "@/hooks/use-review-attention";
 
 export interface NavItem {
   label: React.ReactNode;
   icon: React.ReactNode;
   to: string;
+  search?: Record<string, string>;
   hotkey?: string;
+  /** Decisions waiting behind this item. */
+  badge?: number;
 }
 
 const BUILTIN_NAV_ITEMS: NavItem[] = [
@@ -103,6 +107,7 @@ export function useNavItems(opts?: {
 }): NavItem[] {
   const intl = useIntl();
   const sourceTracking = useSourceTracking();
+  const reviews = useReviewAttention();
   const placement = opts?.placement ?? "main";
   const placements = typeof placement === "string" ? [placement] : placement;
 
@@ -125,6 +130,10 @@ export function useNavItems(opts?: {
             }),
             icon: <History className="size-4" />,
             to: "/review-queue",
+            ...(reviews > 0 && {
+              badge: reviews,
+              search: { kind: "sources" },
+            }),
           },
           {
             label: intl.formatMessage({

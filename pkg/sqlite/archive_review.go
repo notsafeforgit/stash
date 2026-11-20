@@ -35,6 +35,8 @@ func (s *ArchiveReviewStore) Queue(ctx context.Context, filter models.ArchiveRev
 		return s.media(ctx, filter, page)
 	case "metadata":
 		return s.metadata(ctx, filter, page)
+	case "sources":
+		return s.sources(ctx, filter, page)
 	default:
 		return nil, models.ErrArchiveReviewInvalid
 	}
@@ -269,4 +271,38 @@ func (s *ArchiveReviewStore) metadata(ctx context.Context, filter models.Archive
 	}
 	page.Checked = len(ids)
 	return page, nil
+}
+
+// Held sources wait for the owner to enable or dismiss them. Enabling creates
+// the subscription; disabling or retiring the source dismisses it.
+func (s *ArchiveReviewStore) sources(ctx context.Context, filter models.ArchiveReviewFilter, page *models.ArchiveReviewPage) (*models.ArchiveReviewPage, error) {
+	var ids []string
+	if err := dbWrapper.Select(ctx, &ids, "SELECT b.uuid"+linkedRedgifsPendingHolds+" AND b.uuid>? ORDER BY b.uuid LIMIT ?",
+		linkedRedgifsHoldArgs(filter.After, filter.Limit+1)...); err != nil {
+		return nil, err
+	}
+	if len(ids) > filter.Limit {
+		ids = ids[:filter.Limit]
+		page.Next = ids[len(ids)-1]
+	}
+	collections := &SourceCollectionStore{}
+	for _, id := range ids {
+		collection, err := collections.Find(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if collection == nil {
+			return nil, errors.New("held source disappeared during review")
+		}
+		page.Items = append(page.Items, models.ArchiveReviewItem{UUID: id, Reasons: []string{"source_repost_hold"}, Collection: collection})
+	}
+	page.Checked = len(ids)
+	return page, nil
+}
+
+func (s *ArchiveReviewStore) Summary(ctx context.Context) (*models.ArchiveReviewSummary, error) {
+	ret := &models.ArchiveReviewSummary{}
+	err := dbWrapper.Get(ctx, &ret.Sources, "SELECT count(*) FROM (SELECT 1"+linkedRedgifsPendingHolds+" LIMIT ?)",
+		linkedRedgifsHoldArgs(models.ArchiveReviewSummaryLimit)...)
+	return ret, err
 }

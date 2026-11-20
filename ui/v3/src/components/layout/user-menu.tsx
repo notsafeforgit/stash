@@ -12,27 +12,50 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { useNavItems } from "./nav-items";
+import {
+  ReviewAttentionBadge,
+  ReviewAttentionDot,
+  reviewAttentionLabel,
+} from "./review-attention";
 
 export function UserMenu() {
   const intl = useIntl();
   const utilityItems = useNavItems({ placement: "utility" });
+  const reviews = utilityItems.reduce((n, item) => n + (item.badge ?? 0), 0);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button variant="ghost" size="icon" aria-label="More options" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative"
+            aria-label={
+              reviews
+                ? `More options, ${reviewAttentionLabel(intl, reviews)}`
+                : "More options"
+            }
+          />
         }
       >
         <Settings className="size-4" />
+        {reviews > 0 && <ReviewAttentionDot />}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {utilityItems.length > 0 && (
           <>
             <DropdownMenuGroup>
               {utilityItems.map((item) => (
-                <DropdownMenuItem key={item.to} render={<Link to={item.to} />}>
+                <DropdownMenuItem
+                  key={item.to}
+                  render={<Link to={item.to} search={item.search} />}
+                >
                   {item.icon}
                   {item.label}
+                  <ReviewAttentionBadge
+                    className="ml-auto"
+                    count={item.badge}
+                  />
                 </DropdownMenuItem>
               ))}
             </DropdownMenuGroup>

@@ -2879,10 +2879,10 @@ the creation form for an uncommitted collection/root request.
 ## Shared review queue
 
 `GET /api/v3/archive/review-queue/<kind>?after=<uuid>&limit=N` uses application
-session authentication. Supported kinds are `accounts`, `media` and `metadata`;
-limits are 1–50, default 25. It returns `{kind, items, checked, next?}`. Each item
-has its canonical UUID, typed reasons and exactly one compact account, source
-post or scene/image summary. Payload documents, plugin settings and saved
+session authentication. Supported kinds are `accounts`, `media`, `metadata` and
+`sources`; limits are 1–50, default 25. It returns `{kind, items, checked, next?}`.
+Each item has its canonical UUID, typed reasons and exactly one compact account,
+source post, scene/image or source collection summary. Payload documents, plugin settings and saved
 request bodies are excluded. Opening the queue changes no data.
 
 - Accounts lists canonical accounts with undecided ownership. Explicit links
@@ -2894,6 +2894,14 @@ request bodies are excluded. Opening the queue changes no data.
 - Metadata lists current scenes/images with retained source fields that have no
   Apply or Keep outcome for that media or its merged identities. It starts at
   indexed source edits and file matches, without scanning every library item.
+- Sources lists Redgifs sources held by the
+  [repost limit](#wire-contract) (reason `source_repost_hold`) that
+  are still active and have never been enabled. Enabling monitoring releases
+  the hold; disabling or retiring the source dismisses it. Renaming does not.
+
+`GET /api/v3/archive/review-summary` returns `{sources}`, the number of held
+sources, counted up to 100. Navigation badges poll it; it takes no parameters
+and counts none of the larger account, media or metadata backlogs.
 
 Paging is by UUID rather than time. Media inspects at most 100 candidate posts
 per request and returns at most the requested number of unresolved items.
@@ -2904,9 +2912,13 @@ Each candidate is rechecked against its current canonical associations. These
 pages are current views, so refreshing from the first page discovers newly
 unresolved items that sort before an earlier cursor.
 
-The desktop utility menu and mobile drawer expose `/review-queue`. Its three
-filters link to the selected account, post or scene/image's existing review
-controls. The URL retains the kind and cursor, and returning restores list
+The desktop utility menu and mobile drawer expose `/review-queue`. While held
+sources wait, its item shows their count and opens the Sources filter, and the
+menu and drawer buttons show a dot. The count refreshes every five minutes,
+when the window regains focus and after a decision. The account, media and
+metadata filters link to the selected item's existing review controls. Sources
+offers **Enable monitoring**, **Dismiss** (disables the source, keeping it
+paused) and **Manage source**. The URL retains the kind and cursor, and returning restores list
 position. Failed refreshes keep successful same-scope results; a filter change
 cannot display a late response from the previous scope. An empty intermediate
 media page offers **Continue checking**. Explicit refresh removes items whose

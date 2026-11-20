@@ -11,6 +11,13 @@ import {
   type ReviewQueueItem,
   type ReviewQueueSearch,
 } from "@/core/native-archive/review-queue-api";
+import {
+  collectionInputSchema,
+  createCollectionAPI,
+  type CollectionInput,
+} from "@/core/native-archive/collection-api";
+import { createSubscriptionAPI } from "@/core/native-archive/subscription-api";
+import { refreshReviewAttention } from "@/hooks/use-review-attention";
 import { useListScrollRestoration } from "@/components/list/use-list-scroll-restoration";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -110,6 +117,10 @@ function ReviewCard({ item }: { item: ReviewQueueItem }) {
       "review_queue.retained_metadata",
       "Retained catalog edits have not been reviewed",
     ),
+    source_repost_hold: msg(
+      "review_queue.source_held",
+      "Held by the repost limit",
+    ),
   };
   const title = item.account ? (
     <AccountName account={item.account} />
@@ -162,6 +173,120 @@ function ReviewCard({ item }: { item: ReviewQueueItem }) {
   );
 }
 
+type HeldSource = ReviewQueueItem & {
+  collection: NonNullable<ReviewQueueItem["collection"]>;
+};
+
+// A held source is resolved by enabling its monitoring, which releases the
+// hold, or by disabling the source, which keeps it paused and out of review.
+function HeldSourceCard({
+  item,
+  resolved,
+}: {
+  item: HeldSource;
+  resolved: () => void;
+}) {
+  const msg = useMsg();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>();
+  const source = item.collection;
+  async function run(action: () => Promise<unknown>) {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await action();
+      refreshReviewAttention();
+      resolved();
+    } catch (cause) {
+      setError(cause);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const enable = () =>
+    createSubscriptionAPI().save(
+      { collection: source, revision: 0, enabled: false },
+      true,
+    );
+  async function dismiss() {
+    const collections = createCollectionAPI();
+    const input: CollectionInput = collectionInputSchema.parse({
+      uuid: source.uuid,
+      expected_revision: source.revision,
+      reason: "Dismissed from the review queue; held by the repost limit",
+      label: source.label,
+      kind: source.kind,
+      namespace: source.namespace,
+      state: "disabled",
+      target_url: source.target_url,
+      account_uuid: source.account_uuid,
+      root_uuid: source.root_uuid,
+      path_prefix: source.path_prefix,
+    });
+    try {
+      await collections.save(JSON.stringify(input));
+    } catch (cause) {
+      // Recover a lost response without disabling a later edit again.
+      if (!(await collections.recover(input).catch(() => null))) throw cause;
+    }
+  }
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="wrap-anywhere">{source.label}</CardTitle>
+        <CardDescription>
+          <AccountService namespace={source.namespace} />
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <p className="text-sm">
+          {msg(
+            "review_queue.source_repost_hold",
+            "Held by the repost limit: this Reddit download folder already has nine discovered Redgifs uploaders, so this one may be reposted content. It is paused and is not added to the Reddit owner's performer until you enable it.",
+          )}
+        </p>
+        <dl className="flex flex-col gap-1 text-sm">
+          <dt>{msg("review_queue.source_profile", "Profile")}</dt>
+          <dd data-selectable-text className="wrap-anywhere">
+            {source.target_url}
+          </dd>
+          {source.path_prefix && (
+            <>
+              <dt>{msg("review_queue.source_folder", "Download folder")}</dt>
+              <dd data-selectable-text className="wrap-anywhere">
+                {source.path_prefix}
+              </dd>
+            </>
+          )}
+        </dl>
+        {error !== undefined && <ReviewError error={error} retry={resolved} />}
+      </CardContent>
+      <CardFooter className="flex flex-wrap gap-2">
+        <Button disabled={busy} onClick={() => void run(enable)}>
+          {msg("review_queue.enable_source", "Enable monitoring")}
+        </Button>
+        <Button
+          variant="outline"
+          disabled={busy}
+          onClick={() => void run(dismiss)}
+        >
+          {msg("review_queue.dismiss_source", "Dismiss")}
+        </Button>
+        <Link
+          className={buttonVariants({ variant: "ghost" })}
+          to="/collections"
+          search={{ collection: source.uuid, q: "", state: "", kind: "" }}
+        >
+          {msg("review_queue.manage_source", "Manage source")}
+        </Link>
+        {busy && (
+          <Spinner aria-label={msg("review_queue.saving", "Saving decision")} />
+        )}
+      </CardFooter>
+    </Card>
+  );
+}
+
 export function ReviewQueue({
   search,
   onChange,
@@ -207,6 +332,10 @@ export function ReviewQueue({
       "review_queue.metadata_help",
       "Review retained catalog edits by applying a choice or keeping the current field value. Import does not overwrite your library metadata automatically.",
     ),
+    sources: msg(
+      "review_queue.sources_help",
+      "Redgifs uploaders found beyond nine in one Reddit download folder are held as paused sources. Enable one to download it and add its profile to the Reddit owner's performer, or dismiss it to keep it paused.",
+    ),
   };
   return (
     <div
@@ -222,7 +351,7 @@ export function ReviewQueue({
           <p className="text-muted-foreground">
             {msg(
               "review_queue.description",
-              "Review current account, media and metadata decisions in the archive.",
+              "Review current account, media, metadata and source decisions in the archive.",
             )}
           </p>
         </header>
@@ -243,6 +372,9 @@ export function ReviewQueue({
           </ToggleGroupItem>
           <ToggleGroupItem value="metadata">
             {msg("review_queue.metadata", "Metadata")}
+          </ToggleGroupItem>
+          <ToggleGroupItem value="sources">
+            {msg("review_queue.sources", "Sources")}
           </ToggleGroupItem>
         </ToggleGroup>
         <p className="text-sm text-muted-foreground">{descriptions[kind]}</p>
@@ -266,9 +398,17 @@ export function ReviewQueue({
             retry={() => setRefresh((n) => n + 1)}
           />
         )}
-        {read.current?.items.map((item) => (
-          <ReviewCard key={item.uuid} item={item} />
-        ))}
+        {read.current?.items.map((item) =>
+          item.collection ? (
+            <HeldSourceCard
+              key={item.uuid}
+              item={item as HeldSource}
+              resolved={() => setRefresh((n) => n + 1)}
+            />
+          ) : (
+            <ReviewCard key={item.uuid} item={item} />
+          ),
+        )}
         {read.current?.items.length === 0 && (
           <PostEmpty
             title={

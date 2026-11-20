@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./test";
-import { reviewQueuePage } from "../fixtures/review-queue";
+import { heldSource, reviewQueuePage } from "../fixtures/review-queue";
 import type { ReviewQueueKind } from "../../src/core/native-archive/review-queue-api";
 
 test.use({
@@ -15,6 +15,7 @@ async function archive(page: Page) {
     emptyContinuation: false,
     empty: false,
     delayAccounts: false,
+    held: 0,
   };
   let release: (() => void) | undefined;
   const accountDelay = new Promise<void>((resolve) => {
@@ -32,6 +33,9 @@ async function archive(page: Page) {
       },
     });
   });
+  await page.route("**/api/v3/archive/review-summary", (route) =>
+    route.fulfill({ json: { sources: control.held } }),
+  );
   await page.route("**/api/v3/archive/review-queue/**", async (route) => {
     const request = route.request(),
       url = new URL(request.url());
@@ -132,6 +136,125 @@ for (const viewport of [
     expect(fixture.writes).toEqual([]);
   });
 }
+
+test("badges held sources and resolves them by enabling or dismissing", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const fixture = await archive(page);
+  fixture.control.held = 2;
+  const source = heldSource();
+  const saved: { path: string; body: unknown }[] = [];
+  await page.route(
+    `**/api/v3/archive/collections/${source.uuid}/subscription`,
+    async (route) => {
+      saved.push({
+        path: new URL(route.request().url()).pathname,
+        body: route.request().postDataJSON(),
+      });
+      fixture.control.held = 1;
+      await route.fulfill({
+        json: { collection: source, revision: 1, enabled: true },
+      });
+    },
+  );
+  await page.route(
+    `**/api/v3/archive/collections/${source.uuid}`,
+    async (route) => {
+      saved.push({
+        path: new URL(route.request().url()).pathname,
+        body: route.request().postDataJSON(),
+      });
+      fixture.control.held = 0;
+      await route.fulfill({
+        json: { ...source, state: "disabled", revision: 2 },
+      });
+    },
+  );
+  await page.goto("/review-queue?kind=sources");
+  await expect(page.getByText(source.label, { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(source.target_url, { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(source.path_prefix, { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Manage source" }),
+  ).toHaveAttribute(
+    "href",
+    new RegExp(`collections\\?.*collection=${source.uuid}`),
+  );
+  const menu = page.getByRole("button", {
+    name: "More options, 2 held sources to review",
+    exact: true,
+  });
+  await menu.click();
+  const item = page.getByRole("menuitem", { name: /^Review queue/ });
+  await expect(item).toHaveAttribute("href", /review-queue\?kind=sources/);
+  await expect(item).toContainText("2");
+  await page.screenshot({ path: testInfo.outputPath("held-sources.png") });
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Enable monitoring" }).click();
+  await expect(
+    page.getByRole("button", {
+      name: "More options, 1 held source to review",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Dismiss", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "More options", exact: true }),
+  ).toBeVisible();
+  expect(saved).toEqual([
+    {
+      path: `/api/v3/archive/collections/${source.uuid}/subscription`,
+      body: { expected_revision: 0, enabled: true },
+    },
+    {
+      path: `/api/v3/archive/collections/${source.uuid}`,
+      body: {
+        uuid: source.uuid,
+        expected_revision: 1,
+        reason: "Dismissed from the review queue; held by the repost limit",
+        label: source.label,
+        kind: "account",
+        namespace: "native:redgifs",
+        state: "disabled",
+        target_url: source.target_url,
+        account_uuid: null,
+        root_uuid: source.root_uuid,
+        path_prefix: source.path_prefix,
+      },
+    },
+  ]);
+  expect(fixture.writes).toEqual([]);
+});
+
+test("badges the mobile navigation and its held-source destination", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = await archive(page);
+  fixture.control.held = 1;
+  await page.goto("/review-queue");
+  await page
+    .getByRole("button", {
+      name: "Open navigation menu, 1 held source to review",
+      exact: true,
+    })
+    .tap();
+  const drawer = page.locator("[data-mobile-navigation]");
+  const link = drawer.getByRole("link", { name: /^Review queue/ });
+  await expect(link).toContainText("1");
+  await link.tap();
+  await expect(drawer).toHaveCount(0);
+  await expect(page).toHaveURL(/review-queue\?kind=sources/);
+  await expect(
+    page.getByText(heldSource().label, { exact: true }),
+  ).toBeVisible();
+});
 
 test("continues past empty inspected posts and preserves the cursor in the URL", async ({
   page,

@@ -9,6 +9,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavItems } from "./nav-items";
+import { ReviewAttentionBadge } from "./review-attention";
 
 interface MobileNavSheetProps {
   open: boolean;
@@ -68,17 +69,22 @@ export function MobileNavSheet({
           <Link
             key={item.to}
             to={item.to}
+            search={item.search}
             activeOptions={{ exact: true, includeSearch: false }}
             onClick={() => onOpenChange(false)}
             className={cn(
               buttonVariants({ variant: "ghost" }),
-              "h-auto flex-col gap-1.5 py-3 text-muted-foreground [&.active]:bg-accent [&.active]:text-foreground [&>svg]:size-6",
+              "relative h-auto flex-col gap-1.5 py-3 text-muted-foreground [&.active]:bg-accent [&.active]:text-foreground [&>svg]:size-6",
             )}
           >
             <span className="[&>svg]:size-6">{item.icon}</span>
             <span className="text-center text-xs font-medium wrap-anywhere whitespace-normal">
               {item.label}
             </span>
+            <ReviewAttentionBadge
+              className="absolute top-1 right-1"
+              count={item.badge}
+            />
           </Link>
         ))}
         <Link

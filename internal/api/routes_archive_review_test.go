@@ -29,6 +29,12 @@ func TestArchiveReviewQueueHTTPPopulatedContracts(t *testing.T) {
 			Label: "Subscribed account", Kind: "account", Namespace: account.Namespace, State: "active", AccountUUID: &account.UUID}}); err != nil {
 			return err
 		}
+		if _, err := repo.SourceCollection.Put(ctx, models.SourceCollectionInput{UUID: "6f9d3a52-8a51-4c43-9c39-1c0cbb1f1d2e", Origin: "ingest",
+			Reason: "Linked Redgifs uploader observed in Reddit profile capture 0a61ac7f-b315-4a99-99d2-caf57e02b72c",
+			SourceCollectionDefinition: models.SourceCollectionDefinition{Label: "Redgifs / reposted (held: repost limit)", Kind: "account",
+				Namespace: "native:redgifs", State: "active", TargetURL: "https://www.redgifs.com/users/reposted"}}); err != nil {
+			return err
+		}
 		post, err := repo.SourceEvidence.EnsurePost(ctx, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "review-queue"}, "")
 		if err != nil {
 			return err
@@ -47,7 +53,7 @@ func TestArchiveReviewQueueHTTPPopulatedContracts(t *testing.T) {
 	}))
 	handler := (&nativeArchiveRoutes{repo: repo}).router()
 	fixtures := map[string]json.RawMessage{}
-	for _, kind := range []string{"accounts", "media", "metadata"} {
+	for _, kind := range []string{"accounts", "media", "metadata", "sources"} {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/review-queue/"+kind, nil))
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -62,6 +68,11 @@ func TestArchiveReviewQueueHTTPPopulatedContracts(t *testing.T) {
 		}
 		fixtures[kind] = append(json.RawMessage(nil), w.Body.Bytes()...)
 	}
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/review-summary", nil))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.JSONEq(t, `{"sources":1}`, w.Body.String())
+	fixtures["summary"] = append(json.RawMessage(nil), w.Body.Bytes()...)
 	// Opt-in fixture export lets the browser client validate actual HTTP bytes.
 	// Normal test runs never rewrite checked-in fixtures.
 	if path := os.Getenv("STASH_REVIEW_QUEUE_FIXTURE"); path != "" {
@@ -77,7 +88,7 @@ func TestArchiveReviewQueueHTTPReadOnlyAndStrictFilters(t *testing.T) {
 	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "queue.sqlite")))
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	handler := (&nativeArchiveRoutes{repo: db.Repository()}).router()
-	for _, kind := range []string{"accounts", "media", "metadata"} {
+	for _, kind := range []string{"accounts", "media", "metadata", "sources"} {
 		for _, tc := range []struct {
 			method, suffix string
 			status         int
@@ -103,4 +114,15 @@ func TestArchiveReviewQueueHTTPReadOnlyAndStrictFilters(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/review-queue/unknown", nil))
 	require.Equal(t, http.StatusBadRequest, w.Code)
+	for _, tc := range []struct {
+		method, suffix string
+		status         int
+	}{{http.MethodGet, "", 200}, {http.MethodGet, "?limit=1", 400}, {http.MethodPost, "", 405}} {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest(tc.method, "/review-summary"+tc.suffix, nil))
+		require.Equal(t, tc.status, w.Code, "%s %s: %s", tc.method, tc.suffix, w.Body.String())
+		if tc.status == 200 {
+			require.JSONEq(t, `{"sources":0}`, w.Body.String())
+		}
+	}
 }

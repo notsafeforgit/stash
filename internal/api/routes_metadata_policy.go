@@ -231,6 +231,7 @@ func (rs *nativeArchiveRoutes) routerWithSourceTracking(enabled bool) http.Handl
 	r.Get("/scan-journals/{journal}/records", rs.scanJournalRecords)
 	r.Get("/scan-journal-records/{record}", rs.scanJournalRecord)
 	r.Get("/review-queue/{kind}", rs.archiveReviewQueue)
+	r.Get("/review-summary", rs.archiveReviewSummary)
 	r.Get("/translations/{translation}", rs.translation)
 	r.Get("/translation-evidence/{evidence}", rs.translationEvidence)
 	r.Get("/posts/{post}/translations", rs.postTranslations)

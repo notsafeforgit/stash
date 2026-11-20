@@ -46,3 +46,22 @@ func (rs *nativeArchiveRoutes) archiveReviewQueue(w http.ResponseWriter, r *http
 	}
 	ingestJSON(w, http.StatusOK, page)
 }
+
+// The navigation badge polls this; it counts only cheap, new decisions.
+func (rs *nativeArchiveRoutes) archiveReviewSummary(w http.ResponseWriter, r *http.Request) {
+	if len(r.URL.Query()) != 0 {
+		archiveReviewError(w, models.ErrArchiveReviewInvalid)
+		return
+	}
+	var summary *models.ArchiveReviewSummary
+	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		summary, err = rs.repo.ArchiveReview.Summary(ctx)
+		return err
+	})
+	if err != nil {
+		archiveReviewError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, summary)
+}

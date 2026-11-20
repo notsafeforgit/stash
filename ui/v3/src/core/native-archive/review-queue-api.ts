@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { accountSchema, accountUUIDSchema as uuid } from "./account-review-api";
+import { collectionSchema } from "./collection-api";
 import { postLibraryItemSchema, postSummarySchema } from "./source-post-api";
 import {
   createArchiveRequest,
@@ -7,7 +8,12 @@ import {
   NativeArchiveError,
 } from "./client";
 
-export const reviewQueueKindSchema = z.enum(["accounts", "media", "metadata"]);
+export const reviewQueueKindSchema = z.enum([
+  "accounts",
+  "media",
+  "metadata",
+  "sources",
+]);
 export const reviewQueueSearchSchema = z.object({
   kind: reviewQueueKindSchema.default("accounts"),
   after: uuid.optional(),
@@ -25,11 +31,13 @@ export const reviewQueueReasons = {
     "review_limit",
   ],
   metadata: ["retained_metadata"],
+  sources: ["source_repost_hold"],
 } as const;
 const reasonSchema = z.enum([
   ...reviewQueueReasons.accounts,
   ...reviewQueueReasons.media,
   ...reviewQueueReasons.metadata,
+  ...reviewQueueReasons.sources,
 ]);
 const itemSchema = z.strictObject({
   uuid,
@@ -37,6 +45,7 @@ const itemSchema = z.strictObject({
   account: accountSchema.optional(),
   post: postSummarySchema.optional(),
   media: postLibraryItemSchema.optional(),
+  collection: collectionSchema.optional(),
 });
 const pageSchema = z.strictObject({
   kind: reviewQueueKindSchema,
@@ -47,6 +56,12 @@ const pageSchema = z.strictObject({
 export type ReviewQueueItem = z.infer<typeof itemSchema>;
 export type ReviewQueueReason = z.infer<typeof reasonSchema>;
 export type ReviewQueuePage = z.infer<typeof pageSchema>;
+// The server stops counting at this limit.
+export const reviewSummaryLimit = 100;
+const summarySchema = z.strictObject({
+  sources: z.number().int().min(0).max(reviewSummaryLimit),
+});
+export type ReviewSummary = z.infer<typeof summarySchema>;
 
 function validItem(kind: ReviewQueueKind, item: ReviewQueueItem) {
   if (
@@ -57,6 +72,7 @@ function validItem(kind: ReviewQueueKind, item: ReviewQueueItem) {
     )
   )
     return false;
+  if (kind !== "sources" && item.collection) return false;
   switch (kind) {
     case "accounts":
       return (
@@ -83,6 +99,17 @@ function validItem(kind: ReviewQueueKind, item: ReviewQueueItem) {
         item.media.kind !== "gallery" &&
         !item.account &&
         !item.post
+      );
+    case "sources":
+      return (
+        item.collection?.uuid === item.uuid &&
+        (item.collection.canonical_uuid ?? item.uuid) === item.uuid &&
+        item.collection.state === "active" &&
+        item.collection.kind === "account" &&
+        item.collection.namespace === "native:redgifs" &&
+        !item.account &&
+        !item.post &&
+        !item.media
       );
   }
 }
@@ -123,6 +150,13 @@ export function createReviewQueueAPI(
       throw invalid();
     return result;
   }
-  return { endpoint, pageLimit, page };
+  return {
+    endpoint,
+    pageLimit,
+    page,
+    // Counts new decisions for navigation; the queue itself is the authority.
+    summary: (signal?: AbortSignal) =>
+      request("review-summary", summarySchema, undefined, signal),
+  };
 }
 export type ReviewQueueAPI = ReturnType<typeof createReviewQueueAPI>;

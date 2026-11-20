@@ -3,6 +3,7 @@ package ingest_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -190,6 +191,91 @@ func TestLinkedRedgifsProfileCaptureAtomicityOwnershipAndOptOut(t *testing.T) {
 	}))
 	require.Equal(t, subscription.Collection.PathPrefix, items[0].Collection.PathPrefix, "fresh posts must not rewrite a saved destination")
 	require.Empty(t, urls(), "removed profile URLs remain suppressed")
+}
+
+func linkedProfileUploaderEvent(t *testing.T, f captureFixture, root *models.MediaRoot, directory, post, uploader string) ingest.CaptureEvent {
+	event := linkedProfileEvent(t, f, root, directory, post)
+	var err error
+	event.Source, err = archive.RetainSourcePayload([]byte(strings.ReplaceAll(string(event.Source), "DifferentUploader", uploader)))
+	require.NoError(t, err)
+	event.Metadata, err = archive.CapturedMetadata(event.Source)
+	require.NoError(t, err)
+	return event
+}
+
+// A repost profile links a different uploader in almost every post. Nine
+// uploaders in one download folder are a creator's own accounts; a tenth is
+// neither subscribed nor given to the Reddit owner's performer as a profile.
+func TestLinkedRedgifsProfileStopsAtRepostFolderLimit(t *testing.T) {
+	f, root := linkedProfileFixture(t, "https://www.reddit.com/user/example/", ".")
+	submit := func(directory, post, uploader string) *models.IngestReceipt {
+		receipt, err := f.submit(t, linkedProfileUploaderEvent(t, f, root, directory, post, uploader))
+		require.NoError(t, err)
+		return receipt
+	}
+	first := submit("Example, reddit", "post1", "Uploader1")
+	for i := 2; i <= 9; i++ {
+		submit("Example, reddit", fmt.Sprintf("post%d", i), fmt.Sprintf("Uploader%d", i))
+	}
+	items := linkedProfileSubscriptions(t, f, root)
+	require.Len(t, items, 9, "uploaders below the limit are discovered")
+	for _, item := range items {
+		if item.Collection.TargetURL == "https://www.redgifs.com/users/uploader1" {
+			require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
+				_, err := f.service.Repo.SourceSubscription.Put(ctx, item.Collection.UUID, models.SourceSubscriptionInput{ExpectedRevision: item.Revision, Enabled: false})
+				return err
+			}))
+		}
+	}
+
+	submit("Example, reddit", "post10", "Uploader10")
+	submit("Example, reddit", "post11", "Uploader3")
+	targets := func() map[string]bool {
+		ret := map[string]bool{}
+		for _, item := range linkedProfileSubscriptions(t, f, root) {
+			ret[item.Collection.TargetURL] = item.Enabled
+		}
+		return ret
+	}
+	got := targets()
+	require.Len(t, got, 9, "a disabled discovery still counts; the tenth uploader is a repost")
+	require.NotContains(t, got, "https://www.redgifs.com/users/uploader10")
+	require.False(t, got["https://www.redgifs.com/users/uploader1"], "an earlier opt-out is preserved")
+	require.True(t, got["https://www.redgifs.com/users/uploader3"], "an already discovered uploader keeps working")
+
+	submit("Elsewhere, reddit", "post12", "Uploader12")
+	require.Contains(t, targets(), "https://www.redgifs.com/users/uploader12", "each download folder has its own limit")
+
+	var performerID int
+	require.NoError(t, f.service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		repo := f.service.Repo
+		publisher, err := repo.CapturePublisher.Current(ctx, first.CaptureUUID)
+		require.NoError(t, err)
+		account, err := repo.SourceAccount.Find(ctx, *publisher.AccountUUID)
+		require.NoError(t, err)
+		p := models.NewPerformer()
+		p.Name = "Profile owner"
+		require.NoError(t, repo.Performer.Create(ctx, &models.CreatePerformerInput{Performer: &p}))
+		performerID = p.ID
+		entity, err := repo.ArchiveEntity.FindByLocalID(ctx, models.ArchivePerformer, p.ID)
+		require.NoError(t, err)
+		input := models.AccountOwnershipReviewInput{AccountUUID: account.UUID, AccountRevision: account.Revision,
+			State: models.AccountOwnershipLinked, PerformerUUID: entity.UUID, PerformerRevision: entity.Revision}
+		preview, err := repo.SourceAccount.PreviewOwnership(ctx, input)
+		require.NoError(t, err)
+		_, _, err = repo.SourceAccount.ApplyOwnershipReview(ctx, models.AccountOwnershipReviewApplyInput{AccountOwnershipReviewInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest})
+		return err
+	}))
+	var urls []string
+	require.NoError(t, f.service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		urls, err = f.service.Repo.Performer.GetURLs(ctx, performerID)
+		return err
+	}))
+	require.NotContains(t, urls, "https://www.redgifs.com/users/uploader10", "the repost uploader is not the owner's profile")
+	for i := 1; i <= 9; i++ {
+		require.Contains(t, urls, fmt.Sprintf("https://www.redgifs.com/users/uploader%d", i))
+	}
 }
 
 func TestLinkedRedgifsProfileRequiresOwnProfileAndBoundDirectory(t *testing.T) {

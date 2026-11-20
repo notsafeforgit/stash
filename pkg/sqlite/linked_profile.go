@@ -58,6 +58,13 @@ ORDER BY r.collection_uuid,r.revision LIMIT 128`, capture, after, revision); err
 				if retired {
 					continue // Old captures cannot relink a retired account.
 				}
+				full, err := linkedRedgifsFolderFull(ctx, link.URL, *scope.Root, link.Directory)
+				if err != nil {
+					return "", err
+				}
+				if full {
+					continue // A repost profile: the uploader is not this owner's account.
+				}
 			}
 			url = link.URL
 			// Keep the directory actually chosen by the Reddit job, including
@@ -88,11 +95,37 @@ func linkedRedgifsProfileRetired(ctx context.Context, target, root string) (bool
 	return retired, err
 }
 
+// The discovery identity survives retargets and disables: another post must
+// never recreate an automatically discovered source that was later edited.
+func linkedRedgifsCollectionID(root, target string) string {
+	return uuid.NewSHA1(uuid.NameSpaceURL, []byte("stash-linked-redgifs-v1\x00"+root+"\x00"+target)).String()
+}
+
+const linkedRedgifsReason = "Linked Redgifs uploader observed in Reddit profile capture "
+
+// linkedRedgifsFolderLimit bounds discovery per Reddit download folder. A
+// profile that links many different uploaders reposts other people's clips;
+// their profiles are neither its owner's accounts nor sources to download.
+const linkedRedgifsFolderLimit = 9
+
+// linkedRedgifsFolderFull reports whether a new uploader would exceed the
+// limit in the folder chosen by the Reddit job. Uploaders already discovered
+// there keep their sources, profile URLs and replays; a repost profile cannot
+// add more. The count uses each discovered source's creating revision, so a
+// later disable, retarget or retirement still counts.
+func linkedRedgifsFolderFull(ctx context.Context, target, root, directory string) (bool, error) {
+	var full bool
+	err := dbWrapper.Get(ctx, &full, `SELECT NOT EXISTS(SELECT 1 FROM source_collections WHERE uuid=?)
+ AND (SELECT count(*) FROM source_collection_revisions INDEXED BY source_collection_directory
+  WHERE root_uuid=? AND path_prefix=? AND revision=1 AND namespace='native:redgifs' AND kind='account'
+  AND origin='ingest' AND substr(reason,1,?)=?) >= ?`,
+		linkedRedgifsCollectionID(root, target), root, directory, len(linkedRedgifsReason), linkedRedgifsReason, linkedRedgifsFolderLimit)
+	return full, err
+}
+
 func subscribeLinkedRedgifsProfile(ctx context.Context, target, root, prefix, capture string) error {
 	collections := &SourceCollectionStore{}
-	// The discovery identity survives retargets and disables: another post must
-	// never recreate an automatically discovered source that was later edited.
-	id := uuid.NewSHA1(uuid.NameSpaceURL, []byte("stash-linked-redgifs-v1\x00"+root+"\x00"+target)).String()
+	id := linkedRedgifsCollectionID(root, target)
 	existing, err := collections.Find(ctx, id)
 	if err != nil || existing != nil {
 		return err
@@ -115,7 +148,7 @@ func subscribeLinkedRedgifsProfile(ctx context.Context, target, root, prefix, ca
 		SourceCollectionDefinition: models.SourceCollectionDefinition{
 			Label: "Redgifs / " + strings.TrimPrefix(target, "https://www.redgifs.com/users/"),
 			Kind:  "account", Namespace: "native:redgifs", State: "active", TargetURL: target, AccountUUID: accountID, RootUUID: &root, PathPrefix: prefix,
-		}, Origin: "ingest", Reason: "Linked Redgifs uploader observed in Reddit profile capture " + capture})
+		}, Origin: "ingest", Reason: linkedRedgifsReason + capture})
 	if err != nil {
 		return err
 	}

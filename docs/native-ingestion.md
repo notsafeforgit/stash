@@ -594,6 +594,16 @@ directory hints cannot create download work. Existing sources, destinations,
 paused subscriptions and retired definitions are preserved on fresh captures
 and retries. Stale collection revisions cannot create new subscriptions.
 
+Discovery stops at nine uploaders per Reddit download folder (root and directory).
+A profile that links many different uploaders is reposting other people's clips,
+so a tenth new uploader is neither subscribed nor recorded as a profile URL for
+the Reddit owner's performer. The count includes discovered sources that were
+later paused, retargeted or retired. Uploaders already discovered in the folder
+keep their sources and URLs. Another folder has its own limit, and a manual
+subscription is unaffected. The limit was added after one repost profile
+discovered 182 uploaders in an evening; their sources were then paused and their
+profile URLs removed and suppressed.
+
 The external Redgifs worker uses the claimed destination when configured with
 `extractor.redgifs.user.native-profile-directory: true`; this keeps direct
 profile downloads beside the Reddit user's files without fabricating Reddit

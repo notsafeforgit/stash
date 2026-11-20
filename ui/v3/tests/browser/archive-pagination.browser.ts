@@ -110,6 +110,8 @@ test("review deep links show their position without loading earlier pages", asyn
   const requests: URL[] = [];
   await page.route("**/api/v3/archive/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/review-summary"))
+      return route.fulfill({ json: { sources: 0 } });
     if (url.pathname.endsWith("/page-info")) {
       const cursor = url.searchParams.get("cursor") ?? "";
       return route.fulfill({

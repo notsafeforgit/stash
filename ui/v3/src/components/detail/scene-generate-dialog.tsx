@@ -269,209 +269,208 @@ export function SceneGenerateDialog({
   }
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={submitting ? () => {} : onOpenChange}>
-        <DialogContent showCloseButton={false} className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {intl.formatMessage({
-                id: "actions.generate",
-                defaultMessage: "Generate",
-              })}
-            </DialogTitle>
-            <DialogDescription>
-              {intl.formatMessage(
-                {
-                  id: "dialogs.generate.scene_count",
-                  defaultMessage:
-                    "{count, plural, one {1 scene} other {# scenes}}",
-                },
-                { count },
-              )}
-            </DialogDescription>
-          </DialogHeader>
+    <Dialog open={open} onOpenChange={submitting ? () => {} : onOpenChange}>
+      <DialogContent showCloseButton={false} className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {intl.formatMessage({
+              id: "actions.generate",
+              defaultMessage: "Generate",
+            })}
+          </DialogTitle>
+          <DialogDescription>
+            {intl.formatMessage(
+              {
+                id: "dialogs.generate.scene_count",
+                defaultMessage:
+                  "{count, plural, one {1 scene} other {# scenes}}",
+              },
+              { count },
+            )}
+          </DialogDescription>
+        </DialogHeader>
 
-          <FieldGroup
-            data-slot="checkbox-group"
-            className="max-h-[55vh] overflow-y-auto -mx-1 px-1"
+        <FieldGroup
+          data-slot="checkbox-group"
+          className="max-h-[55vh] overflow-y-auto -mx-1 px-1"
+        >
+          <Row
+            label={intl.formatMessage({
+              id: "dialogs.scene_gen.covers",
+              defaultMessage: "Scene covers",
+            })}
+            description={intl.formatMessage({
+              id: "scene_cover.generate_description",
+              defaultMessage:
+                "Reuse recorded frames. Covers without a recorded timestamp use the default frame at 20% of the primary video. Changed or unavailable recorded sources are reported in the task log.",
+            })}
+            checked={options.covers}
+            onChange={(v) => set("covers", v)}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            className="self-start"
+            onClick={() => setResetOpen(true)}
+            disabled={submitting || empty}
           >
+            {intl.formatMessage({
+              id: "scene_cover.reset",
+              defaultMessage: "Reset covers to default",
+            })}
+          </Button>
+          <Row
+            label={intl.formatMessage({
+              id: "dialogs.scene_gen.video_previews",
+              defaultMessage: "Previews",
+            })}
+            checked={options.previews}
+            onChange={(v) => set("previews", v)}
+          />
+          <Row
+            label={intl.formatMessage({
+              id: "dialogs.scene_gen.image_previews",
+              defaultMessage: "Animated image previews",
+            })}
+            checked={options.imagePreviews}
+            disabled={!options.previews}
+            onChange={(v) => set("imagePreviews", v)}
+            indented
+          />
+          <Row
+            label={intl.formatMessage({
+              id: "dialogs.scene_gen.sprites",
+              defaultMessage: "Scene scrubber sprites",
+            })}
+            checked={options.sprites}
+            onChange={(v) => set("sprites", v)}
+          />
+          {hasMarkers && (
             <Row
               label={intl.formatMessage({
-                id: "dialogs.scene_gen.covers",
-                defaultMessage: "Scene covers",
+                id: "dialogs.scene_gen.marker_artifacts",
+                defaultMessage: "Marker artifacts",
               })}
-              description={intl.formatMessage({
-                id: "scene_cover.generate_description",
+              checked={options.markers}
+              onChange={(v) => set("markers", v)}
+            />
+          )}
+          <Row
+            label={intl.formatMessage({
+              id: "dialogs.scene_gen.transcodes",
+              defaultMessage: "Transcodes",
+            })}
+            description={intl.formatMessage({
+              id: "dialogs.scene_gen.transcodes_desc",
+              defaultMessage:
+                "Pre-generate browser-compatible MP4s for sources that aren't already streamable",
+            })}
+            checked={options.transcodes}
+            onChange={(v) => set("transcodes", v)}
+          />
+          <Row
+            label={intl.formatMessage({
+              id: "dialogs.scene_gen.force_transcodes_v2",
+              defaultMessage: "Transcode even if source is already streamable",
+            })}
+            description={intl.formatMessage({
+              id: "dialogs.scene_gen.force_transcodes_desc",
+              defaultMessage:
+                "By default the transcode is skipped when the source video can already play in the browser. Tick this when the codec metadata is unreliable or you want a transcode regardless.",
+            })}
+            checked={options.forceTranscodes}
+            disabled={!options.transcodes}
+            onChange={(v) => set("forceTranscodes", v)}
+            indented
+          />
+          <Row
+            label={intl.formatMessage({
+              id: "dialogs.scene_gen.phash",
+              defaultMessage: "Video perceptual hashes",
+            })}
+            checked={options.phashes}
+            onChange={(v) => set("phashes", v)}
+          />
+          {hasInteractive && (
+            <Row
+              label={intl.formatMessage({
+                id: "dialogs.scene_gen.interactive_heatmap_speed",
                 defaultMessage:
-                  "Reuse recorded frames. Covers without a recorded timestamp use the default frame at 20% of the primary video. Changed or unavailable recorded sources are reported in the task log.",
+                  "Generate heatmaps and speeds for interactive scenes",
               })}
-              checked={options.covers}
-              onChange={(v) => set("covers", v)}
+              checked={options.interactiveHeatmapsSpeeds}
+              onChange={(v) => set("interactiveHeatmapsSpeeds", v)}
             />
-            <Button
-              type="button"
-              variant="outline"
-              className="self-start"
-              onClick={() => setResetOpen(true)}
-              disabled={submitting || empty}
-            >
-              {intl.formatMessage({
-                id: "scene_cover.reset",
-                defaultMessage: "Reset covers to default",
-              })}
-            </Button>
-            <Row
-              label={intl.formatMessage({
-                id: "dialogs.scene_gen.video_previews",
-                defaultMessage: "Previews",
-              })}
-              checked={options.previews}
-              onChange={(v) => set("previews", v)}
-            />
-            <Row
-              label={intl.formatMessage({
-                id: "dialogs.scene_gen.image_previews",
-                defaultMessage: "Animated image previews",
-              })}
-              checked={options.imagePreviews}
-              disabled={!options.previews}
-              onChange={(v) => set("imagePreviews", v)}
-              indented
-            />
-            <Row
-              label={intl.formatMessage({
-                id: "dialogs.scene_gen.sprites",
-                defaultMessage: "Scene scrubber sprites",
-              })}
-              checked={options.sprites}
-              onChange={(v) => set("sprites", v)}
-            />
-            {hasMarkers && (
+          )}
+          {!isSingle && (
+            <>
+              <FieldSeparator />
               <Row
                 label={intl.formatMessage({
-                  id: "dialogs.scene_gen.marker_artifacts",
-                  defaultMessage: "Marker artifacts",
+                  id: "dialogs.scene_gen.overwrite_v2",
+                  defaultMessage: "Replace existing artifacts",
                 })}
-                checked={options.markers}
-                onChange={(v) => set("markers", v)}
-              />
-            )}
-            <Row
-              label={intl.formatMessage({
-                id: "dialogs.scene_gen.transcodes",
-                defaultMessage: "Transcodes",
-              })}
-              description={intl.formatMessage({
-                id: "dialogs.scene_gen.transcodes_desc",
-                defaultMessage:
-                  "Pre-generate browser-compatible MP4s for sources that aren't already streamable",
-              })}
-              checked={options.transcodes}
-              onChange={(v) => set("transcodes", v)}
-            />
-            <Row
-              label={intl.formatMessage({
-                id: "dialogs.scene_gen.force_transcodes_v2",
-                defaultMessage:
-                  "Transcode even if source is already streamable",
-              })}
-              description={intl.formatMessage({
-                id: "dialogs.scene_gen.force_transcodes_desc",
-                defaultMessage:
-                  "By default the transcode is skipped when the source video can already play in the browser. Tick this when the codec metadata is unreliable or you want a transcode regardless.",
-              })}
-              checked={options.forceTranscodes}
-              disabled={!options.transcodes}
-              onChange={(v) => set("forceTranscodes", v)}
-              indented
-            />
-            <Row
-              label={intl.formatMessage({
-                id: "dialogs.scene_gen.phash",
-                defaultMessage: "Video perceptual hashes",
-              })}
-              checked={options.phashes}
-              onChange={(v) => set("phashes", v)}
-            />
-            {hasInteractive && (
-              <Row
-                label={intl.formatMessage({
-                  id: "dialogs.scene_gen.interactive_heatmap_speed",
+                description={intl.formatMessage({
+                  id: "dialogs.scene_gen.overwrite_desc",
                   defaultMessage:
-                    "Generate heatmaps and speeds for interactive scenes",
+                    "By default an artifact that's already on disk is left alone. Tick this to regenerate it.",
                 })}
-                checked={options.interactiveHeatmapsSpeeds}
-                onChange={(v) => set("interactiveHeatmapsSpeeds", v)}
+                checked={options.overwrite}
+                onChange={(v) => set("overwrite", v)}
               />
-            )}
-            {!isSingle && (
-              <>
-                <FieldSeparator />
-                <Row
-                  label={intl.formatMessage({
-                    id: "dialogs.scene_gen.overwrite_v2",
-                    defaultMessage: "Replace existing artifacts",
-                  })}
-                  description={intl.formatMessage({
-                    id: "dialogs.scene_gen.overwrite_desc",
-                    defaultMessage:
-                      "By default an artifact that's already on disk is left alone. Tick this to regenerate it.",
-                  })}
-                  checked={options.overwrite}
-                  onChange={(v) => set("overwrite", v)}
+            </>
+          )}
+        </FieldGroup>
+
+        {scope.applyToAllTarget &&
+          matchingCount !== undefined &&
+          matchingCount > scope.sceneIds.length && (
+            <form.Field name="applyToAll">
+              {(field) => (
+                <BulkApplyToggle
+                  totalCount={matchingCount}
+                  checked={field.state.value}
+                  disabled={submitting}
+                  onCheckedChange={field.handleChange}
                 />
-              </>
-            )}
-          </FieldGroup>
+              )}
+            </form.Field>
+          )}
 
-          {scope.applyToAllTarget &&
-            matchingCount !== undefined &&
-            matchingCount > scope.sceneIds.length && (
-              <form.Field name="applyToAll">
-                {(field) => (
-                  <BulkApplyToggle
-                    totalCount={matchingCount}
-                    checked={field.state.value}
-                    disabled={submitting}
-                    onCheckedChange={field.handleChange}
-                  />
-                )}
-              </form.Field>
-            )}
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={submitting}
-              onClick={() => onOpenChange(false)}
-            >
-              {intl.formatMessage({
-                id: "actions.cancel",
-                defaultMessage: "Cancel",
-              })}
-            </Button>
-            <Button
-              size="sm"
-              disabled={submitting || empty}
-              onClick={handleGenerate}
-            >
-              {submitting ? <Spinner className="size-4" /> : <Cog />}
-              {intl.formatMessage({
-                id: "actions.generate",
-                defaultMessage: "Generate",
-              })}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <SceneCoverResetDialog
-        open={resetOpen}
-        onOpenChange={setResetOpen}
-        target={target}
-        onQueued={() => onOpenChange(false)}
-      />
-    </>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={submitting}
+            onClick={() => onOpenChange(false)}
+          >
+            {intl.formatMessage({
+              id: "actions.cancel",
+              defaultMessage: "Cancel",
+            })}
+          </Button>
+          <Button
+            size="sm"
+            disabled={submitting || empty}
+            onClick={handleGenerate}
+          >
+            {submitting ? <Spinner className="size-4" /> : <Cog />}
+            {intl.formatMessage({
+              id: "actions.generate",
+              defaultMessage: "Generate",
+            })}
+          </Button>
+        </DialogFooter>
+        {/* Nested so that, when both close, focus returns through this
+              dialog instead of falling back to the toast it shows. */}
+        <SceneCoverResetDialog
+          open={resetOpen}
+          onOpenChange={setResetOpen}
+          target={target}
+          onQueued={() => onOpenChange(false)}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }
 

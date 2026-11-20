@@ -55,10 +55,13 @@ export const test = base.extend<{ expectedConsoleErrors: string[] }>({
   },
 });
 
-// A closed dialog's backdrop keeps taking presses while it fades out.
+// A closed dialog or drawer keeps taking presses while it fades out. In WebKit
+// a press elsewhere then never becomes a click.
 export async function expectBackdropSettled(page: Page) {
   await expect(
-    page.locator('[data-slot="dialog-backdrop"][data-closed]'),
+    page.locator(
+      '[data-slot="dialog-backdrop"][data-closed], [data-slot="drawer-backdrop"][data-ending-style]',
+    ),
   ).toHaveCount(0);
 }
 

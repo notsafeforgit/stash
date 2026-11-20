@@ -253,9 +253,9 @@ tests. These are shared-component integration tests, not complete entity-route
 or backend tests.
 
 Three ui-sdk behaviours shape assertions. A closing modal popup takes presses
-until its exit animation ends, so wait for it to be hidden, or for a dialog's
-backdrop with `expectBackdropSettled` from `tests/browser/test.ts`, before the
-next press. Toast text is repeated by a live announcer: scope it to the
+until its exit animation ends, and in WebKit such a press never becomes a click.
+Wait for it to be hidden, or for a dialog's or drawer's backdrop with
+`expectBackdropSettled` from `tests/browser/test.ts`, before the next press. Toast text is repeated by a live announcer: scope it to the
 `Notifications` region. Closed tooltips stay mounted: match `[data-open]`.
 
 The suite covers 320–1280px layouts, search/selection replacement rows, page

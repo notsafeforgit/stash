@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { serveSceneMedia } from "./scene-media";
 import {
   expect,
+  expectBackdropSettled,
   holdForContextMenu,
   chooseSection,
   test as fixtureTest,
@@ -23,6 +24,7 @@ async function action(page: Page, mobile: boolean, name: string) {
   await page
     .getByRole(mobile ? "button" : "menuitem", { name, exact: true })
     .click();
+  if (mobile) await expectBackdropSettled(page);
 }
 
 fixtureTest.beforeEach(async ({ page }) => {

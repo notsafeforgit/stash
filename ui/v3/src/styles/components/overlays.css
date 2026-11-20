@@ -98,8 +98,13 @@
   }
 
   /* The drawer's safe-area bottom and sides come from its wrapper's utilities.
-     web.css's six-unit padding would add to them. */
+     web.css's six-unit padding would add to them. Viewport units ignore the
+     on-screen keyboard, so heights cap at the visible part the drawer reports. */
   [data-slot="drawer-content"] {
+    --drawer-max-height: calc(
+      var(--visual-viewport-height, 100svh) -
+      var(--safe-area-top, 0px)
+    );
     padding: 0;
   }
 

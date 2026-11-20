@@ -24,15 +24,18 @@ export type DrawerBackdrop = "blurred" | "dimmed";
 type DrawerRootProps = React.ComponentProps<typeof DrawerPrimitive> &
   ShortcutOverlayRootProps;
 
-// Pointer dragging keeps the swipe model these sheets were tuned with, where
-// scrollers opt out with data-drawer-no-drag. `auto` would switch touch bottom
-// sheets to native scroll-snap, which needs device validation first.
+// Pointer dragging, not touch scroll-snap: scrolling a field into view would move
+// the sheet. ui-sdk's 0.34 s spring opens about 100 ms behind the 200 ms ease-out
+// these sheets had; 0.2 s keeps pace with it.
+const SHEET_PHYSICS = { response: 0.2 };
+
 function Drawer({
   open,
   defaultOpen,
   onOpenChange,
   blocksListShortcuts,
   driver = "pointer",
+  physics = SHEET_PHYSICS,
   ...props
 }: DrawerRootProps) {
   const container = useOverlayContainerElement();
@@ -47,6 +50,7 @@ function Drawer({
     <DrawerPrimitive
       container={container}
       driver={driver}
+      physics={physics}
       {...overlayProps}
       {...props}
     />
@@ -83,7 +87,7 @@ function DrawerContent({
       <DrawerOverlay appearance={backdrop} />
       <DrawerContentPrimitive
         className={cn(
-          "max-h-[80svh] min-h-0 pb-[max(0.5rem,var(--safe-area-bottom))] pl-[var(--safe-area-left)] pr-[var(--safe-area-right)]",
+          "max-h-[min(80svh,var(--drawer-max-height))] min-h-0 pb-[max(0.5rem,var(--safe-area-bottom))] pl-[var(--safe-area-left)] pr-[var(--safe-area-right)]",
           className,
         )}
         {...props}

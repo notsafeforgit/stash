@@ -100,3 +100,46 @@ for (const kind of ["image", "scene"] as const) {
     });
   }
 }
+
+test("the mobile filter sheet fits above the on-screen keyboard", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/lightbox-list?kind=scene");
+  await page.getByRole("button", { name: "Filters", exact: true }).tap();
+  await page.getByRole("button", { name: "Add first condition" }).tap();
+  const field = page
+    .locator(".filter-condition-shell")
+    .getByRole("textbox")
+    .first();
+  await field.focus();
+  // Browsers here have no on-screen keyboard; report one the way iOS does,
+  // by shrinking the visual viewport and panning it down.
+  for (const offsetTop of [0, 200]) {
+    await page.evaluate((top) => {
+      const viewport = window.visualViewport;
+      if (!viewport) throw new Error("Missing visual viewport");
+      Object.defineProperty(viewport, "height", {
+        configurable: true,
+        get: () => 464,
+      });
+      Object.defineProperty(viewport, "offsetTop", {
+        configurable: true,
+        get: () => top,
+      });
+      viewport.dispatchEvent(new Event("resize"));
+      viewport.dispatchEvent(new Event("scroll"));
+    }, offsetTop);
+    const sheet = page.getByRole("dialog", { name: "Filters", exact: true });
+    await expect
+      .poll(async () => {
+        const box = await sheet.boundingBox();
+        return box && [Math.round(box.y), Math.round(box.y + box.height)];
+      })
+      .toEqual([offsetTop, offsetTop + 464]);
+    const box = await field.boundingBox();
+    if (!box) throw new Error("Missing filter field");
+    expect(box.y).toBeGreaterThanOrEqual(offsetTop);
+    expect(box.y + box.height).toBeLessThanOrEqual(offsetTop + 464);
+  }
+});

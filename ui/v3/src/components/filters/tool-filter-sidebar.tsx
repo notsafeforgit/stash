@@ -126,7 +126,7 @@ export function ToolFilterSidebar({
       <BottomSheet
         open={open}
         onOpenChange={(nextOpen) => onOpenChange?.(nextOpen)}
-        className="h-[88svh] max-h-[88svh]"
+        className="h-[min(88svh,var(--drawer-max-height))] max-h-[min(88svh,var(--drawer-max-height))]"
       >
         <BottomSheetHeader className="shrink-0 border-b border-border px-4! py-3!">
           <BottomSheetTitle className="flex items-center gap-2 text-base">

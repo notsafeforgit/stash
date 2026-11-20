@@ -10,6 +10,7 @@ import {
   DrawerTrigger,
 } from "@ui-sdk/react/drawer";
 
+import { installAnimationStartTimeSync } from "@/lib/animation-start-time";
 import { cn } from "@/lib/utils";
 import {
   type ShortcutOverlayRootProps,
@@ -19,6 +20,8 @@ import {
   type OpenChangeArgs,
   useOverlayContainerElement,
 } from "./overlay-container";
+
+installAnimationStartTimeSync();
 
 export type DrawerBackdrop = "blurred" | "dimmed";
 

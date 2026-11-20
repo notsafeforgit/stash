@@ -258,6 +258,12 @@ Wait for it to be hidden, or for a dialog's or drawer's backdrop with
 `expectBackdropSettled` from `tests/browser/test.ts`, before the next press. Toast text is repeated by a live announcer: scope it to the
 `Notifications` region. Closed tooltips stay mounted: match `[data-open]`.
 
+Linux WebKit doesn't run animations on Safari's animation thread, so it can't
+show one iOS failure. There, a new `startTime` doesn't reach an animation's
+threaded copy, and ui-sdk's drawer moves its slide's start time as it opens.
+`src/lib/animation-start-time.ts` sets the current time again after each move.
+The tests check that this keeps timing intact; only an iPhone shows the slide.
+
 The suite covers 320–1280px layouts, search/selection replacement rows, page
 validation, section state, direct drawer access, flat entity actions and desktop
 submenus, drawer drag distance and outside-tap dismissal, editor dismissal, keyboard

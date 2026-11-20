@@ -769,3 +769,45 @@ test("mobile sheets focus themselves and leave the page un-inert", async ({
     await expect(sheet).toBeHidden();
   }
 });
+
+// Sheets hold their slide with a future start time, then move it. Safari's
+// threaded animations miss that move unless the current time is set again.
+test("moving an animation's start time keeps it on schedule", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("button", { name: "Open navigation menu", exact: true }),
+  ).toBeVisible();
+  const timing = await page.evaluate(async () => {
+    const setter = Object.getOwnPropertyDescriptor(
+      Animation.prototype,
+      "startTime",
+    )?.set;
+    const element = document.body.appendChild(document.createElement("div"));
+    const animation = element.animate(
+      { translate: ["0 100px", "0 0"] },
+      { duration: 300, fill: "both" },
+    );
+    await animation.ready;
+    const start = Number(document.timeline.currentTime);
+    animation.startTime = start + 1000;
+    const held = Number(animation.currentTime);
+    animation.startTime = start;
+    const moved = Number(animation.startTime);
+    await animation.finished;
+    const finishedAfter = Number(document.timeline.currentTime) - start;
+    element.remove();
+    return {
+      resyncs: !String(setter).includes("[native code]"),
+      held,
+      moved: moved - start,
+      finishedAfter,
+    };
+  });
+  expect(timing.resyncs).toBe(true);
+  expect(timing.held).toBeCloseTo(-1000, 0);
+  expect(timing.moved).toBeCloseTo(0, 0);
+  expect(timing.finishedAfter).toBeGreaterThanOrEqual(299);
+  expect(timing.finishedAfter).toBeLessThan(1000);
+});

@@ -9,13 +9,13 @@ import (
 )
 
 func TestArchivePaginationHTTP(t *testing.T) {
-	_, repo, _ := nativeMetadataReviewFixture(t)
+	_, repo, _ := nativeMetadataFixture(t)
 	handler := (&nativeArchiveRoutes{repo: repo}).router()
 	for _, tc := range []struct {
 		query  string
 		status int
 	}{
-		{"resource=media-roots", 200}, {"resource=review-metadata", 200},
+		{"resource=media-roots", 200}, {"resource=review-sources", 200}, {"resource=review-metadata", 400},
 		{"resource=posts&url=https%3A%2F%2Fexample.com%2Fpost", 200},
 		{"resource=posts&cursor=invalid", 400}, {"resource=jobs&cursor=-1", 400},
 		{"resource=collections&q=one&q=two", 400}, {"resource=secrets", 400},

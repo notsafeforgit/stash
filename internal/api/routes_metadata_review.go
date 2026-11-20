@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stashapp/stash/internal/ingest"
-	"github.com/stashapp/stash/pkg/metadata"
 	"github.com/stashapp/stash/pkg/models"
 )
 
@@ -80,13 +79,12 @@ type metadataFieldSummary struct {
 // The selected value, field, mode and entity already appear in the summary.
 // The current value is returned once per field; decision metadata carries its provenance.
 type metadataDecisionProvenance struct {
-	UUID        string                         `json:"uuid"`
-	Sequence    int                            `json:"sequence"`
-	CaptureUUID *string                        `json:"capture_uuid,omitempty"`
-	Reason      string                         `json:"reason"`
-	CreatedAt   time.Time                      `json:"created_at"`
-	Policy      *models.MetadataPolicyRef      `json:"policy,omitempty"`
-	FileEdit    *models.MetadataFileEditReview `json:"file_edit,omitempty"`
+	UUID        string                    `json:"uuid"`
+	Sequence    int                       `json:"sequence"`
+	CaptureUUID *string                   `json:"capture_uuid,omitempty"`
+	Reason      string                    `json:"reason"`
+	CreatedAt   time.Time                 `json:"created_at"`
+	Policy      *models.MetadataPolicyRef `json:"policy,omitempty"`
 }
 
 func (rs *nativeArchiveRoutes) entityMetadataFields(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +117,7 @@ func (rs *nativeArchiveRoutes) entityMetadataFields(w http.ResponseWriter, r *ht
 			field := metadataFieldSummary{Definition: def, Value: state.Value, Mode: state.Mode, Origin: state.Origin, Protected: state.Protected}
 			if decision := state.Decision; decision != nil {
 				field.Decision = &metadataDecisionProvenance{UUID: decision.UUID, Sequence: decision.Sequence, CaptureUUID: decision.CaptureUUID,
-					Reason: decision.Reason, CreatedAt: decision.CreatedAt, Policy: decision.Policy, FileEdit: decision.FileEdit}
+					Reason: decision.Reason, CreatedAt: decision.CreatedAt, Policy: decision.Policy}
 			}
 			for _, ref := range state.References {
 				field.References = append(field.References, metadataIdentity(ref))
@@ -175,98 +173,6 @@ func (rs *nativeArchiveRoutes) entityMetadataHistory(w http.ResponseWriter, r *h
 		result, err = rs.repo.MetadataField.History(ctx, chi.URLParam(r, "entity"), chi.URLParam(r, "field"), after, limit)
 		return err
 	})
-	if err != nil {
-		nativeArchiveError(w, err)
-		return
-	}
-	ingestJSON(w, http.StatusOK, result)
-}
-
-func (rs *nativeArchiveRoutes) entityFileEdits(w http.ResponseWriter, r *http.Request) {
-	if !ingest.ValidUUID(chi.URLParam(r, "entity")) {
-		ingestError(w, ingest.ErrInvalid)
-		return
-	}
-	query, limit := r.URL.Query(), 50
-	if value := query.Get("limit"); value != "" {
-		var err error
-		limit, err = strconv.Atoi(value)
-		if err != nil {
-			ingestError(w, ingest.ErrInvalid)
-			return
-		}
-	}
-	if limit < 1 || limit > 100 {
-		ingestError(w, ingest.ErrInvalid)
-		return
-	}
-	var result []models.MetadataFileEditCandidate
-	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
-		var err error
-		result, err = rs.repo.MetadataField.FileEdits(ctx, chi.URLParam(r, "entity"), query.Get("after_history"), query.Get("after_match"), limit)
-		return err
-	})
-	if err != nil {
-		nativeArchiveError(w, err)
-		return
-	}
-	ingestJSON(w, http.StatusOK, result)
-}
-
-func (rs *nativeArchiveRoutes) previewFileEdit(w http.ResponseWriter, r *http.Request) {
-	var input models.MetadataFileEditInput
-	if err := readIngestJSON(w, r, 262144, &input); err != nil {
-		ingestError(w, err)
-		return
-	}
-	var result *models.MetadataFileEditPreview
-	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
-		var err error
-		result, err = rs.repo.MetadataField.PreviewFileEdit(ctx, input)
-		return err
-	})
-	if err != nil {
-		nativeArchiveError(w, err)
-		return
-	}
-	ingestJSON(w, http.StatusOK, result)
-}
-
-func (rs *nativeArchiveRoutes) applyFileEdit(w http.ResponseWriter, r *http.Request) {
-	var input models.MetadataFileEditApplyInput
-	if err := readIngestJSON(w, r, 262144, &input); err != nil {
-		ingestError(w, err)
-		return
-	}
-	var result struct {
-		Review   *models.MetadataFileEditReview `json:"review"`
-		Replayed bool                           `json:"replayed"`
-	}
-	err := rs.repo.WithTxn(r.Context(), func(ctx context.Context) error {
-		var err error
-		result.Review, result.Replayed, err = rs.repo.MetadataField.ApplyFileEdit(ctx, input)
-		if err == nil && !result.Replayed && !result.Review.KeptCurrent && rs.notifyMetadata != nil {
-			err = rs.notifyMetadata(ctx, metadata.Input{EntityUUID: input.EntityUUID}, []string{result.Review.Field})
-		}
-		return err
-	})
-	if err != nil {
-		nativeArchiveError(w, err)
-		return
-	}
-	ingestJSON(w, http.StatusOK, result)
-}
-
-func (rs *nativeArchiveRoutes) fileEditReview(w http.ResponseWriter, r *http.Request) {
-	var result *models.MetadataFileEditReview
-	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
-		var err error
-		result, err = rs.repo.MetadataField.FileEditReview(ctx, chi.URLParam(r, "request"))
-		return err
-	})
-	if err == nil && result == nil {
-		err = ingest.ErrNotFound
-	}
 	if err != nil {
 		nativeArchiveError(w, err)
 		return

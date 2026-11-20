@@ -45,11 +45,6 @@ func (rs *nativeArchiveRoutes) routerWithSourceTracking(enabled bool) http.Handl
 	r.Get("/entities/{entity}/metadata-fields", rs.entityMetadataFields)
 	r.Get("/entities/{entity}/metadata-fields/{field}/history", rs.entityMetadataHistory)
 	r.Get("/entities/{entity}/provider-metadata-history", rs.entityProviderMetadataHistory)
-	r.Get("/entities/{entity}/file-edits", rs.entityFileEdits)
-	r.Post("/metadata-file-edits/preview", rs.previewFileEdit)
-	r.Post("/metadata-file-edits/apply", rs.applyFileEdit)
-	r.Get("/metadata-file-edits/requests/{request}", rs.fileEditReview)
-	r.Get("/file-history/{history}", rs.sourceFileHistory)
 	r.Get("/media-roots", rs.roots)
 	r.Post("/media-roots/probe", rs.probeRoot)
 	r.Post("/media-roots", rs.putRoot)
@@ -260,8 +255,6 @@ func (rs *nativeArchiveRoutes) routerWithSourceTracking(enabled bool) http.Handl
 	r.Get("/translation-jobs/{job}/attempts", rs.translationJobAttempts)
 	r.Post("/translation-jobs/{job}/cancel", rs.cancelTranslationJob)
 	r.Get("/translation-requests/{request}/jobs", rs.translationJobHistory)
-	r.Get("/file-observations/{observation}/history", rs.observationFileHistory)
-	r.Get("/content-claims/{claim}/history", rs.claimFileHistory)
 	return r
 }
 
@@ -298,7 +291,7 @@ func nativeArchiveError(w http.ResponseWriter, err error) {
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "post_media_conflict", "message": "The post, media or saved association changed; review it again."})
 		return
 	}
-	if errors.Is(err, models.ErrSourceDefinitionInvalid) || errors.Is(err, models.ErrMetadataFileReviewInvalid) || errors.Is(err, models.ErrAccountReviewInvalid) || errors.Is(err, models.ErrAccountConsolidationReviewInvalid) {
+	if errors.Is(err, models.ErrSourceDefinitionInvalid) || errors.Is(err, models.ErrAccountReviewInvalid) || errors.Is(err, models.ErrAccountConsolidationReviewInvalid) {
 		ingestError(w, ingest.ErrInvalid)
 		return
 	}
@@ -332,10 +325,6 @@ func nativeArchiveError(w http.ResponseWriter, err error) {
 	}
 	if errors.Is(err, models.ErrSourceAccountConflict) {
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "preview_changed", "message": "The account or performer changed; load a fresh preview."})
-		return
-	}
-	if errors.Is(err, models.ErrMetadataFileReviewReplay) {
-		ingestJSON(w, http.StatusConflict, map[string]string{"error": "request_conflict", "message": "This request UUID already names a different historical metadata review."})
 		return
 	}
 	if errors.Is(err, models.ErrMetadataPolicyImportInvalid) || errors.Is(err, models.ErrMetadataPolicyInvalid) || errors.Is(err, models.ErrTranslationPolicyInvalid) {

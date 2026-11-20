@@ -68,7 +68,7 @@ for (const viewport of [
   { name: "mobile", width: 390, height: 844 },
   { name: "desktop", width: 1280, height: 900 },
 ]) {
-  test(`reviews accounts, media and metadata through targeted links on ${viewport.name}`, async ({
+  test(`reviews accounts, media and sources through targeted links on ${viewport.name}`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize(viewport);
@@ -117,15 +117,15 @@ for (const viewport of [
     await expect(
       page.getByText("Attachment associations conflict", { exact: true }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Metadata", exact: true }).click();
+    await page.getByRole("button", { name: "Sources", exact: true }).click();
     await expect(
-      page.getByRole("link", { name: "Review retained metadata" }),
-    ).toHaveAttribute(
-      "href",
-      `/scenes/${reviewQueuePage("metadata").items[0]?.media?.uuid}?tab=metadata-review`,
-    );
+      page.getByRole("link", { name: "Manage source" }),
+    ).toHaveAttribute("href", /collections\?.*collection=/);
     await expect(
       page.getByRole("link", { name: "Review post media" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Metadata", exact: true }),
     ).toHaveCount(0);
     expect(
       await page.evaluate(
@@ -286,10 +286,8 @@ test("continues past empty inspected posts and preserves the cursor in the URL",
   await expect(
     page.getByText("More posts to check", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Metadata", exact: true }).click();
-  await expect(
-    page.getByRole("link", { name: "Review retained metadata" }),
-  ).toBeVisible();
+  await page.getByRole("button", { name: "Sources", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Manage source" })).toBeVisible();
   expect(new URL(page.url()).searchParams.has("after")).toBe(false);
 });
 
@@ -323,22 +321,18 @@ test("retains a successful page through a failed refresh and removes reviewed it
   ).toBeDisabled();
 });
 
-test("late account results cannot replace the selected metadata queue", async ({
+test("late account results cannot replace the selected sources queue", async ({
   page,
 }) => {
   const fixture = await archive(page);
   fixture.control.delayAccounts = true;
   await page.goto("/review-queue");
   await expect.poll(() => fixture.requests.length).toBeGreaterThan(0);
-  await page.getByRole("button", { name: "Metadata", exact: true }).click();
-  await expect(
-    page.getByRole("link", { name: "Review retained metadata" }),
-  ).toBeVisible();
+  await page.getByRole("button", { name: "Sources", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Manage source" })).toBeVisible();
   fixture.release();
   await expect(
     page.getByRole("link", { name: "Review account owner" }),
   ).toHaveCount(0);
-  await expect(
-    page.getByRole("link", { name: "Review retained metadata" }),
-  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Manage source" })).toBeVisible();
 });

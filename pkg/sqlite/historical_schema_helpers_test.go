@@ -192,6 +192,26 @@ func removeSourceFileHistorySchema(t *testing.T, raw *sql.DB) {
 	require.NoError(t, err)
 }
 
+func removeMetadataFileReviewSchema(t *testing.T, raw *sql.DB) {
+	t.Helper()
+	removeAccountReviewSchema(t, raw)
+	_, err := raw.Exec("DROP TABLE metadata_file_edit_reviews; DELETE FROM native_migration_history WHERE version=1000067")
+	require.NoError(t, err)
+}
+
+func removeMetadataFileKeepsSchema(t *testing.T, raw *sql.DB) {
+	t.Helper()
+	removeFileDeduplicationsSchema(t, raw)
+	var exists bool
+	require.NoError(t, raw.QueryRow("SELECT EXISTS(SELECT 1 FROM native_migration_history WHERE version=1000094)").Scan(&exists))
+	if !exists {
+		return
+	}
+	_, err := raw.Exec(`DROP TRIGGER metadata_file_edit_apply_request_distinct;
+DROP TABLE metadata_file_edit_keeps; DELETE FROM native_migration_history WHERE version=1000094`)
+	require.NoError(t, err)
+}
+
 func removeCatalogCleanupSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
 	removePostMediaDecisionSchema(t, raw)
@@ -312,11 +332,13 @@ var fileHistoryTables = []string{"catalog_file_history_records", "catalog_file_h
 
 type schemaObject struct{ Type, Name, SQL string }
 
-var importRetirementTemplate struct {
+type schemaTemplate struct {
 	sync.Once
 	objects []schemaObject
 	err     error
 }
+
+var importRetirementTemplate, importEvidenceTemplate schemaTemplate
 
 func schemaObjects(raw *sql.DB) ([]schemaObject, error) {
 	rows, err := raw.Query("SELECT type,name,sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY rowid")
@@ -427,4 +449,74 @@ func removeImportRetirementSchema(t *testing.T, raw *sql.DB) {
 	}
 	_, err = raw.Exec("DELETE FROM native_migration_history WHERE version=1000142")
 	require.NoError(t, err)
+}
+
+// Schema 1000144 drops the frozen receipts and file history and rebuilds
+// enrichment_completions without its receipt reference. Rewind it from a
+// pristine 1000143 schema: retired objects return empty, the completion table
+// regains its earlier definition with every row, and changed triggers return.
+func removeImportEvidenceSchema(t *testing.T, raw *sql.DB) {
+	t.Helper()
+	var present bool
+	require.NoError(t, raw.QueryRow("SELECT EXISTS(SELECT 1 FROM native_migration_history WHERE version=1000144)").Scan(&present))
+	if !present {
+		return
+	}
+	importEvidenceTemplate.Do(func() {
+		importEvidenceTemplate.objects, importEvidenceTemplate.err = buildSchemaTemplate(1000143)
+	})
+	require.NoError(t, importEvidenceTemplate.err)
+	prior := map[string]schemaObject{}
+	for _, o := range importEvidenceTemplate.objects {
+		prior[o.Name] = o
+	}
+	current, err := schemaObjects(raw)
+	require.NoError(t, err)
+	conn, err := raw.Conn(t.Context())
+	require.NoError(t, err)
+	defer conn.Close()
+	exec := func(query string) {
+		t.Helper()
+		_, err := conn.ExecContext(t.Context(), query)
+		require.NoError(t, err, query)
+	}
+	exec("PRAGMA foreign_keys=OFF")
+	defer exec("PRAGMA foreign_keys=ON")
+	now := map[string]schemaObject{}
+	for _, o := range current {
+		now[o.Name] = o
+		if before, ok := prior[o.Name]; ok && before.SQL == o.SQL {
+			continue
+		}
+		switch o.Type {
+		case "table":
+			require.Equal(t, "enrichment_completions", o.Name, "table %s changed after 1000143", o.Name)
+			exec("CREATE TABLE prior_completion_rows AS SELECT rowid AS original_rowid,* FROM enrichment_completions; DROP TABLE enrichment_completions;" +
+				prior[o.Name].SQL + `; INSERT INTO enrichment_completions(rowid,uuid,target_uuid,expected_revision,request_digest,capture_count,legacy_receipt_uuid,legacy_capture_uuid,created_at)
+ SELECT original_rowid,uuid,target_uuid,expected_revision,request_digest,capture_count,legacy_receipt_uuid,legacy_capture_uuid,created_at FROM prior_completion_rows;
+ DROP TABLE prior_completion_rows`)
+			now[o.Name] = prior[o.Name]
+		case "index", "trigger":
+			exec("DROP " + strings.ToUpper(o.Type) + " IF EXISTS " + o.Name)
+			delete(now, o.Name)
+		}
+	}
+	// Dropping the rebuilt table also dropped its own indexes and triggers.
+	for name, o := range now {
+		if o.Type != "table" && queryUint(t, raw, "SELECT count(*) FROM sqlite_schema WHERE name='"+name+"'") == 0 {
+			delete(now, name)
+		}
+	}
+	for _, kind := range []string{"table", "index", "view", "trigger"} {
+		for _, o := range importEvidenceTemplate.objects {
+			if o.Type != kind {
+				continue
+			}
+			if existing, ok := now[o.Name]; ok && existing.SQL == o.SQL {
+				continue
+			}
+			exec(o.SQL)
+		}
+	}
+	exec("DELETE FROM native_migration_history WHERE version=1000144")
 }

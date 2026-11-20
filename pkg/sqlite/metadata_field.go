@@ -62,16 +62,7 @@ func (r metadataFieldRow) resolve(ctx context.Context) (*models.MetadataFieldDec
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	var requestUUID string
 	if err := dbWrapper.Get(ctx, &ret.PostMediaDecisionUUID, "SELECT post_media_decision_uuid FROM metadata_decision_post_media WHERE decision_uuid=?", r.UUID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
-	}
-	if err := dbWrapper.Get(ctx, &requestUUID, "SELECT request_uuid FROM metadata_file_edit_reviews WHERE decision_uuid=?", r.UUID); err == nil {
-		ret.FileEdit, err = (&MetadataFieldStore{}).FileEditReview(ctx, requestUUID)
-		if err != nil {
-			return nil, err
-		}
-	} else if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 	return ret, nil

@@ -14,11 +14,10 @@ type ArchiveReviewFilter struct {
 // Queue entries describe current decisions. Historical importer warnings and
 // browser delivery records have independent readers and do not populate this list.
 type ArchiveReviewItem struct {
-	UUID    string                 `json:"uuid"`
-	Reasons []string               `json:"reasons"`
-	Account *AccountReviewState    `json:"account,omitempty"`
-	Post    *SourcePostSummary     `json:"post,omitempty"`
-	Media   *SourcePostLibraryItem `json:"media,omitempty"`
+	UUID    string              `json:"uuid"`
+	Reasons []string            `json:"reasons"`
+	Account *AccountReviewState `json:"account,omitempty"`
+	Post    *SourcePostSummary  `json:"post,omitempty"`
 	// Collection is a source awaiting the owner's decision.
 	Collection *SourceCollection `json:"collection,omitempty"`
 }

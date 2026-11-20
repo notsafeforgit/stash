@@ -7,8 +7,6 @@ import {
 import { createAccountReviewOutbox } from "./account-review-outbox";
 import { createAccountConsolidationAPI } from "./account-consolidation-api";
 import { createAccountConsolidationOutbox } from "./account-consolidation-outbox";
-import { createMetadataReviewAPI } from "./metadata-review-api";
-import { createMetadataReviewOutbox } from "./metadata-review-outbox";
 import { createSourceReviewAPI } from "./source-review-api";
 import { createSourceReviewOutbox } from "./source-review-outbox";
 import { createAlbumReviewAPI } from "./album-review-api";
@@ -39,7 +37,6 @@ import { reviewKeys } from "./review-storage";
 export const savedActionFamilySchema = z.enum([
   "account_ownership",
   "account_merge",
-  "metadata",
   "source_link",
   "album",
   "attachment_selection",
@@ -74,7 +71,7 @@ export type SavedActionLocation =
   | {
       kind: "scene" | "image";
       id: string;
-      tab: "metadata-review" | "source-review";
+      tab: "source-review";
     };
 export interface SavedActionPage {
   total: number;
@@ -159,14 +156,6 @@ export function createSavedActionsAPI(
       "stash-account-consolidation:v1",
       createAccountConsolidationOutbox(
         createAccountConsolidationAPI(endpoint, transport),
-      ),
-    ),
-    metadata: simple(
-      "stash-metadata-review:v1",
-      mediaBox(
-        createMetadataReviewOutbox(
-          createMetadataReviewAPI(endpoint, transport),
-        ),
       ),
     ),
     source_link: simple(
@@ -279,12 +268,12 @@ export function createSavedActionsAPI(
     ): Promise<SavedActionLocation> {
       savedActionFamilySchema.parse(family);
       signal?.throwIfAborted();
-      if (family === "metadata" || family === "source_link") {
+      if (family === "source_link") {
         const target = mediaKey(key);
         return {
           kind: target.kind,
           id: target.libraryId,
-          tab: family === "metadata" ? "metadata-review" : "source-review",
+          tab: "source-review",
         };
       }
       uuid.parse(key);

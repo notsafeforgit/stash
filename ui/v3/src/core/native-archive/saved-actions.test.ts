@@ -253,14 +253,21 @@ it("routes local media scopes to the correct review using library UUIDs", async 
   const remote = server();
   expect(
     await remote.api.location(
-      "metadata",
+      "source_link",
       "scene:00000000-0000-4000-8000-000000000123",
     ),
   ).toEqual({
     kind: "scene",
     id: "00000000-0000-4000-8000-000000000123",
-    tab: "metadata-review",
+    tab: "source-review",
   });
+  // Historical metadata edits were retired with their server routes.
+  await expect(
+    remote.api.location(
+      "metadata" as never,
+      "scene:00000000-0000-4000-8000-000000000123",
+    ),
+  ).rejects.toThrow();
   expect(
     await remote.api.location(
       "source_link",
@@ -272,7 +279,7 @@ it("routes local media scopes to the correct review using library UUIDs", async 
     tab: "source-review",
   });
   await expect(
-    remote.api.location("metadata", "scene:1:extra"),
+    remote.api.location("source_link", "scene:1:extra"),
   ).rejects.toThrow();
   await expect(
     remote.api.location("account_ownership", "../elsewhere"),

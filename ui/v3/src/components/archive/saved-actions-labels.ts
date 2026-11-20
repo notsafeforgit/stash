@@ -9,7 +9,6 @@ export function useSavedActionLabels() {
         "Account ownership",
       ),
       account_merge: msg("saved_actions.account_merge", "Account merges"),
-      metadata: msg("saved_actions.metadata", "Metadata edits"),
       source_link: msg("saved_actions.source_link", "Media source links"),
       album: msg("saved_actions.album", "Album matching"),
       attachment_selection: msg(

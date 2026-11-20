@@ -29,7 +29,7 @@ func (h *providerReviewHooks) ExecutePostHooks(_ context.Context, _ int, _ hook.
 func TestProviderMetadataInteractiveMutations(t *testing.T) {
 	for _, kind := range []models.ArchiveEntityKind{models.ArchiveScene, models.ArchivePerformer, models.ArchiveStudio, models.ArchiveTag} {
 		t.Run(string(kind), func(t *testing.T) {
-			db, repo, _ := nativeMetadataReviewFixture(t)
+			db, repo, _ := nativeMetadataFixture(t)
 			hooks := &providerReviewHooks{}
 			resolver := &Resolver{repository: repo, hookExecutor: hooks, sceneService: &scene.Service{Repository: repo.Scene, PluginCache: plugin.NewCache(config.GetInstance())}}
 			server := handler.New(newLibrarySchema(Config{Resolvers: resolver}))

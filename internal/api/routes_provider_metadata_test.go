@@ -14,10 +14,10 @@ import (
 )
 
 func TestNativeProviderMetadataHistoryHTTP(t *testing.T) {
-	_, repo, input := nativeMetadataReviewFixture(t)
+	_, repo, scene := nativeMetadataFixture(t)
 	var original *models.ProviderMetadataImport
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
-		entity, err := repo.ArchiveEntity.Find(ctx, input.EntityUUID)
+		entity, err := repo.ArchiveEntity.Find(ctx, scene)
 		if err != nil {
 			return err
 		}
@@ -31,7 +31,7 @@ func TestNativeProviderMetadataHistoryHTTP(t *testing.T) {
 		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
 		return response
 	}
-	path := "/entities/" + input.EntityUUID + "/provider-metadata-history"
+	path := "/entities/" + scene + "/provider-metadata-history"
 	w := request(path + "?limit=1")
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var result []models.ProviderMetadataImport

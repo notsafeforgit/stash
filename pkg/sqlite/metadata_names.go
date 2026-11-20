@@ -7,8 +7,8 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-// NameCandidates shares one exact, indexed resolver between retained-edit
-// review and intake policies. Multiple spellings of one entity count once;
+// NameCandidates is the exact, indexed resolver used by intake policies.
+// Multiple spellings of one entity count once;
 // canonical-name/alias collisions across entities remain separate candidates.
 func (s *MetadataFieldStore) NameCandidates(ctx context.Context, kind models.ArchiveEntityKind, name string) ([]models.MetadataNameCandidate, error) {
 	if !validAccountText(name, 1024, false) {

@@ -3,7 +3,6 @@ import { useMsg } from "@/hooks/message";
 import {
   NativeArchiveError,
   type NativeIdentity,
-  type EditPreview,
 } from "@/core/native-archive/metadata-review-api";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -110,19 +109,13 @@ export function Value({
   value,
   references = [],
   entity,
-  preview,
 }: {
   value: unknown;
   references?: NativeIdentity[];
   entity: EntityNames;
-  preview?: EditPreview;
 }) {
   const msg = useMsg();
   function label(id: string) {
-    const chosen = preview?.names
-      ?.flatMap((name) => (name.selected ? [name.selected] : []))
-      .find((item) => item.uuid === id);
-    if (chosen) return chosen.name;
     const ref = references.find((item) => item.uuid === id);
     const options =
       ref?.kind === "performer"

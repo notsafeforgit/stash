@@ -61,7 +61,6 @@ type Repository struct {
 	SourcePostLinks        SourcePostLinksReaderWriter
 	SourceThread           SourceThreadReaderWriter
 	SourceFile             SourceFileReaderWriter
-	SourceFileHistory      SourceFileHistoryReaderWriter
 	SourceAttachment       SourceAttachmentReaderWriter
 	SourcePostMedia        SourcePostMediaReaderWriter
 	SourceGallery          SourceGalleryReaderWriter

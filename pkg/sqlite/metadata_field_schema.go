@@ -21,7 +21,10 @@ func validateMetadataFieldSchema(conn *sqlx.DB, version uint) error {
 		"metadata_field_decisions_entity", "metadata_field_decisions_capture", "metadata_field_decision_scope", "metadata_field_decision_immutable",
 		"metadata_field_head_forward", "metadata_field_head_scope", "metadata_field_current"}
 	if version >= NativeSchemaBaseline+141 {
-		required = append(required, "metadata_field_decision_cleanup", "metadata_field_retire_superseded", "metadata_file_edit_keeps_decision")
+		required = append(required, "metadata_field_decision_cleanup", "metadata_field_retire_superseded")
+	}
+	if version >= NativeSchemaBaseline+141 && version < importEvidenceRetirementVersion {
+		required = append(required, "metadata_file_edit_keeps_decision")
 	}
 	for _, kind := range []models.ArchiveEntityKind{models.ArchiveScene, models.ArchiveImage, models.ArchiveGallery} {
 		for _, def := range models.MetadataFields(kind) {

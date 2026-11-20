@@ -127,30 +127,12 @@ func TestArchiveReviewQueuePaginatesUnresolvedItems(t *testing.T) {
 	require.Zero(t, info.Offset)
 }
 
-func TestArchiveReviewQueueMetadataTracksEachRetainedFieldAndOriginalReceipt(t *testing.T) {
-	f, input := metadataFileReviewFixture(t, `{"title":"Retained title","details":"Retained detail"}`)
-	page := archiveQueue(t, f.repo, "metadata", "", 25)
-	require.Len(t, page.Items, 1)
-	require.Equal(t, input.EntityUUID, page.Items[0].UUID)
-	require.Equal(t, models.ArchiveScene, page.Items[0].Media.Kind)
-	for _, field := range []string{"title", "details"} {
-		input.SourceField = field
-		preview := previewFileEdit(t, f.repo, input)
-		_, _, err := applyFileEdit(f.repo, models.MetadataFileEditApplyInput{MetadataFileEditInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest})
-		require.NoError(t, err)
-		if field == "title" {
-			require.Len(t, archiveQueue(t, f.repo, "metadata", "", 25).Items, 1, "reviewing one field cannot settle another")
-		}
-	}
-	attachmentSQL(t, f.db, "UPDATE scenes SET title='A later user choice' WHERE id=31")
-	require.Empty(t, archiveQueue(t, f.repo, "metadata", "", 25).Items, "a later edit does not require re-importing old values")
-}
-
 func TestArchiveReviewQueueRejectsInvalidPagesAndCanceledReads(t *testing.T) {
 	_, repo := archiveTestDatabase(t)
 	for _, input := range []models.ArchiveReviewFilter{
 		{Kind: "unknown", Limit: 25}, {Kind: "media", Limit: 0}, {Kind: "accounts", Limit: 51},
-		{Kind: "metadata", Limit: 25, After: "bad"}, {Kind: "media", Limit: 25, After: uuid.Nil.String()},
+		{Kind: "sources", Limit: 25, After: "bad"}, {Kind: "media", Limit: 25, After: uuid.Nil.String()},
+		{Kind: "metadata", Limit: 25}, // retired with the historical file edits (schema 1000144)
 	} {
 		err := repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 			_, err := repo.ArchiveReview.Queue(ctx, input)

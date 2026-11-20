@@ -58,31 +58,6 @@ function ReviewLink({ item }: { item: ReviewQueueItem }) {
         {msg("review_queue.review_post", "Review post media")}
       </Link>
     );
-  if (item.media?.uuid) {
-    const label = msg(
-      "review_queue.review_metadata",
-      "Review retained metadata",
-    );
-    return item.media.kind === "scene" ? (
-      <Link
-        className={className}
-        to="/scenes/$sceneId"
-        params={{ sceneId: item.media.uuid }}
-        search={{ tab: "metadata-review" }}
-      >
-        {label}
-      </Link>
-    ) : (
-      <Link
-        className={className}
-        to="/images/$imageId"
-        params={{ imageId: item.media.uuid }}
-        search={{ tab: "metadata-review" }}
-      >
-        {label}
-      </Link>
-    );
-  }
   return null;
 }
 
@@ -113,10 +88,6 @@ function ReviewCard({ item }: { item: ReviewQueueItem }) {
       "review_queue.limit",
       "This post has too many associations to review together; inspect individual media sources",
     ),
-    retained_metadata: msg(
-      "review_queue.retained_metadata",
-      "Retained catalog edits have not been reviewed",
-    ),
     source_repost_hold: msg(
       "review_queue.source_held",
       "Held by the repost limit",
@@ -124,14 +95,9 @@ function ReviewCard({ item }: { item: ReviewQueueItem }) {
   };
   const title = item.account ? (
     <AccountName account={item.account} />
-  ) : item.post ? (
-    item.post.latest_capture?.title ||
-    msg("review_queue.untitled_post", "Untitled post")
   ) : (
-    item.media?.title ||
-    (item.media?.kind === "scene"
-      ? msg("review_queue.untitled_scene", "Untitled scene")
-      : msg("review_queue.untitled_image", "Untitled image"))
+    item.post?.latest_capture?.title ||
+    msg("review_queue.untitled_post", "Untitled post")
   );
   return (
     <Card>
@@ -140,12 +106,8 @@ function ReviewCard({ item }: { item: ReviewQueueItem }) {
         <CardDescription>
           {item.account ? (
             <AccountService namespace={item.account.namespace} />
-          ) : item.post ? (
-            msg("review_queue.post", "Source post")
-          ) : item.media?.kind === "scene" ? (
-            msg("review_queue.scene", "Scene")
           ) : (
-            msg("review_queue.image", "Image")
+            msg("review_queue.post", "Source post")
           )}
         </CardDescription>
       </CardHeader>
@@ -328,10 +290,6 @@ export function ReviewQueue({
       "review_queue.media_help",
       "Review which scenes and images belong to source posts. Conflicting associations remain here until reviewed.",
     ),
-    metadata: msg(
-      "review_queue.metadata_help",
-      "Review retained catalog edits by applying a choice or keeping the current field value. Import does not overwrite your library metadata automatically.",
-    ),
     sources: msg(
       "review_queue.sources_help",
       "Redgifs uploaders found beyond nine in one Reddit download folder are held as paused sources. Enable one to download it and add its profile to the Reddit owner's performer, or dismiss it to keep it paused.",
@@ -351,7 +309,7 @@ export function ReviewQueue({
           <p className="text-muted-foreground">
             {msg(
               "review_queue.description",
-              "Review current account, media, metadata and source decisions in the archive.",
+              "Review current account, media and source decisions in the archive.",
             )}
           </p>
         </header>
@@ -369,9 +327,6 @@ export function ReviewQueue({
           </ToggleGroupItem>
           <ToggleGroupItem value="media">
             {msg("review_queue.media", "Media")}
-          </ToggleGroupItem>
-          <ToggleGroupItem value="metadata">
-            {msg("review_queue.metadata", "Metadata")}
           </ToggleGroupItem>
           <ToggleGroupItem value="sources">
             {msg("review_queue.sources", "Sources")}

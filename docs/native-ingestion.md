@@ -1751,8 +1751,7 @@ Schema 1000079 adds case-insensitive name/alias indexes for studios, tags and
 groups. These and the existing performer-name index use SQLite `NOCASE` (ASCII
 case folding); non-ASCII spelling remains exact. Shared lookups report up to 100
 candidates with an explicit overflow flag, deduplicating repeated spellings of
-one entity before applying the limit. Retained file-edit review uses the same
-resolver. Neither path chooses between a canonical name and a colliding alias,
+one entity before applying the limit. It does not choose between a canonical name and a colliding alias,
 creates missing entities, or uses approximate matches.
 
 Unambiguous names can be added while collisions remain for review. Unresolved
@@ -2169,88 +2168,24 @@ describes that matching operation, not a claim that later user edits were undone
 Rehearse matching and independently reconcile selected metadata before production
 use; populated source coverage and the broader review UI are release gates.
 
-### Historical metadata review API
+### Metadata field API
 
 These application-authenticated routes live under `/api/v3/archive`; producer
-tokens do not grant access. The backend supports explicit review of retained file edits. Scene and image pages expose these choices in their **Metadata
-review** section, available through desktop tabs and the mobile section menu.
+tokens do not grant access. Scene and image pages show the current field choices
+in their **Metadata review** section, available through desktop tabs and the
+mobile section menu.
 
 | Route | Result |
 | --- | --- |
 | `GET /entity-identities/<kind>/<local-id>` | Current native UUID/revision for an existing library link or picker selection |
 | `GET /entities/<uuid>/metadata-fields` | Typed curated fields, selected values, protection, provenance and relationship revisions |
 | `GET /entities/<uuid>/metadata-fields/<field>/history?after=<sequence>&limit=N` | Immutable decisions in ascending sequence order |
-| `GET /entities/<uuid>/file-edits?after_history=<uuid>&after_match=<uuid>&limit=N` | Historical alternatives linked to that scene/image's files; both cursor parts are required together |
-| `POST /metadata-file-edits/preview` | Current and proposed values, name candidates, file generations, status and digest; no writes |
-| `POST /metadata-file-edits/apply` | Revision-checked Apply or Keep outcome and durable receipt |
-| `GET /metadata-file-edits/requests/<request-uuid>` | The original committed receipt, or 404 |
 
 List limits are 1–100, default 50. Existing integer library IDs remain valid
-navigation addresses; edits use the resolved native UUID. Historical alternatives
-identify their complete immutable source entry at `GET /file-history/<uuid>`.
-
-A preview request selects one source field, for example:
-
-```json
-{
-  "entity_uuid": "<scene-or-image-uuid>",
-  "history_uuid": "<history-uuid>",
-  "source_field": "actors",
-  "match_uuid": "<file-match-uuid>",
-  "selections": {
-    "An ambiguous source name": {"uuid": "<performer-uuid>", "revision": 3}
-  }
-}
-```
-
-`selections` is optional and only accepts names actually present in that edit.
-Unique canonical/alias matches can be proposed automatically; missing or
-ambiguous names return `unresolved_names`, never a partial replacement that drops
-the unresolved performers. Up to 100 candidates per name are returned with
-`more:true` when truncated. Requests allow up to 128 names; larger or unsupported
-retained values return `unsupported`. No new performer, account or relationship
-target is created by preview or apply. Studio, tag and group choices also use
-native UUIDs and reviewed target revisions.
-
-Name candidates also include their local library IDs. The UI shows names,
-disambiguation and those IDs, and can search existing performers, studios, tags
-and groups when a retained name has no suitable candidate. Selecting depicted
-metadata does not associate a source account with a performer.
-
-Only `ready` previews can be applied. Save the preview request plus its `digest`
-and a new `request_uuid` before posting to `/metadata-file-edits/apply`. Retry the
-exact saved body after a lost response, or inspect its receipt; a committed
-retry returns `replayed:true` without editing again. A changed preview or reused
-request UUID with different contents returns 409. Requests are limited to
-256 KiB and cannot specify arbitrary target columns or source payload changes.
-
-To decline a retained field, save the preview request, digest and new request
-UUID with `keep_current:true` and send it to the same endpoint. Keep accepts
-`ready`, `unresolved_names` and `unsupported` previews, but still rechecks their
-digest, current entity revision, field state, file generations and ownership.
-It records review without changing the library value, protection or provenance.
-No replacement performer selection is required and no metadata-update hook is
-sent. A Keep receipt has `kept_current:true` and no `decision_uuid`; an Apply
-receipt has its original decision identity. The exact saved body, including the
-outcome, is part of request identity. Old Apply bodies remain unchanged.
-
-Legacy null removes field protection while keeping the displayed value until a
-permitted native policy updates it. The mode change is explicit in preview.
-Historical edits remain separate choices regardless of timestamps, duplicate
-content claims or file survivors. File/ZIP generations, ownership, selected
-entity revision and relationship candidates are checked again before commit.
-
-The browser journals each Apply or Keep body in IndexedDB before transmission. One
-pending choice per scene/image is shared across tabs, and separate public
-deployment prefixes have separate journals. Reopening the panel only reads
-state. **Check and retry saved change** inspects the original receipt before
-retrying the identical body. Uncertain responses and storage errors preserve the
-pending choice; a definitive stale-preview refusal permits **Review again**.
-Successful receipts remove the pending browser entry and refresh review state;
-Apply also refreshes active library queries. A subsequent display-refresh
-failure does not turn a saved outcome into a failed action. Browser storage is
-temporary request recovery; committed choices
-and their provenance live in the native database and its backups.
+navigation addresses; reads use the resolved native UUID. The historical
+file-edit review routes were removed in schema 1000144, with the file history
+they reviewed; see
+[import evidence retirement](native-schema.md#import-evidence-retirement-schema-1000144).
 
 Application requests use same-origin session authentication and the public
 mount prefix. The Vite development proxy forwards `/api/v3/` while retaining the
@@ -2879,10 +2814,10 @@ the creation form for an uncommitted collection/root request.
 ## Shared review queue
 
 `GET /api/v3/archive/review-queue/<kind>?after=<uuid>&limit=N` uses application
-session authentication. Supported kinds are `accounts`, `media`, `metadata` and
-`sources`; limits are 1–50, default 25. It returns `{kind, items, checked, next?}`.
+session authentication. Supported kinds are `accounts`, `media` and `sources`;
+limits are 1–50, default 25. It returns `{kind, items, checked, next?}`.
 Each item has its canonical UUID, typed reasons and exactly one compact account,
-source post, scene/image or source collection summary. Payload documents, plugin settings and saved
+source post or source collection summary. Payload documents, plugin settings and saved
 request bodies are excluded. Opening the queue changes no data.
 
 - Accounts lists canonical accounts with undecided ownership. Explicit links
@@ -2891,9 +2826,6 @@ request bodies are excluded. Opening the queue changes no data.
   attachment links or conflicting associations after post/media history has
   been consolidated. Explicit post choices take precedence over unambiguous
   attachment defaults. Oversized association sets remain visible for review.
-- Metadata lists current scenes/images with retained source fields that have no
-  Apply or Keep outcome for that media or its merged identities. It starts at
-  indexed source edits and file matches, without scanning every library item.
 - Sources lists Redgifs sources held by the
   [repost limit](#wire-contract) (reason `source_repost_hold`) that
   are still active and have never been enabled. Enabling monitoring releases
@@ -2901,7 +2833,7 @@ request bodies are excluded. Opening the queue changes no data.
 
 `GET /api/v3/archive/review-summary` returns `{sources}`, the number of held
 sources, counted up to 100. Navigation badges poll it; it takes no parameters
-and counts none of the larger account, media or metadata backlogs.
+and counts neither the account nor the media backlog.
 
 Paging is by UUID rather than time. Media inspects at most 100 candidate posts
 per request and returns at most the requested number of unresolved items.
@@ -2915,8 +2847,8 @@ unresolved items that sort before an earlier cursor.
 The desktop utility menu and mobile drawer expose `/review-queue`. While held
 sources wait, its item shows their count and opens the Sources filter, and the
 menu and drawer buttons show a dot. The count refreshes every five minutes,
-when the window regains focus and after a decision. The account, media and
-metadata filters link to the selected item's existing review controls. Sources
+when the window regains focus and after a decision. The account and media
+filters link to the selected item's existing review controls. Sources
 offers **Enable monitoring**, **Dismiss** (disables the source, keeping it
 paused) and **Manage source**. The URL retains the kind and cursor, and returning restores list
 position. Failed refreshes keep successful same-scope results; a filter change

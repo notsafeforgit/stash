@@ -128,8 +128,6 @@ func (s *ArchivePaginationStore) PageInfo(ctx context.Context, f models.ArchiveP
 			table, key, column, descending = "source_run_attempts", "run_uuid", "fence", true
 		}
 		query, args = "SELECT "+column+" FROM "+table+" WHERE "+key+"=?", []any{f.Subject}
-	case "review-metadata":
-		query, args = unboundedArchivePage(archiveReviewMetadataQuery, []any{"", "", 1})
 	case "review-media":
 		query, args = archiveReviewMediaItemsQuery("", -1)
 		column = "post_uuid"

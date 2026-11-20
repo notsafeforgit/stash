@@ -1,19 +1,14 @@
 import { z } from "zod";
 import { accountSchema, accountUUIDSchema as uuid } from "./account-review-api";
 import { collectionSchema } from "./collection-api";
-import { postLibraryItemSchema, postSummarySchema } from "./source-post-api";
+import { postSummarySchema } from "./source-post-api";
 import {
   createArchiveRequest,
   nativeArchiveEndpoint,
   NativeArchiveError,
 } from "./client";
 
-export const reviewQueueKindSchema = z.enum([
-  "accounts",
-  "media",
-  "metadata",
-  "sources",
-]);
+export const reviewQueueKindSchema = z.enum(["accounts", "media", "sources"]);
 export const reviewQueueSearchSchema = z.object({
   kind: reviewQueueKindSchema.default("accounts"),
   after: uuid.optional(),
@@ -30,13 +25,11 @@ export const reviewQueueReasons = {
     "attachment_link_conflict",
     "review_limit",
   ],
-  metadata: ["retained_metadata"],
   sources: ["source_repost_hold"],
 } as const;
 const reasonSchema = z.enum([
   ...reviewQueueReasons.accounts,
   ...reviewQueueReasons.media,
-  ...reviewQueueReasons.metadata,
   ...reviewQueueReasons.sources,
 ]);
 const itemSchema = z.strictObject({
@@ -44,7 +37,6 @@ const itemSchema = z.strictObject({
   reasons: z.array(reasonSchema).min(1).max(5),
   account: accountSchema.optional(),
   post: postSummarySchema.optional(),
-  media: postLibraryItemSchema.optional(),
   collection: collectionSchema.optional(),
 });
 const pageSchema = z.strictObject({
@@ -81,24 +73,14 @@ function validItem(kind: ReviewQueueKind, item: ReviewQueueItem) {
         !item.account.redirect_to &&
         (!item.account.ownership ||
           item.account.ownership.state === "undecided") &&
-        !item.post &&
-        !item.media
+        !item.post
       );
     case "media":
       return (
         item.post?.uuid === item.uuid &&
         item.post.requested_uuid === item.uuid &&
         item.post.state === "active" &&
-        !item.account &&
-        !item.media
-      );
-    case "metadata":
-      return (
-        item.media?.uuid === item.uuid &&
-        item.media.state === "active" &&
-        item.media.kind !== "gallery" &&
-        !item.account &&
-        !item.post
+        !item.account
       );
     case "sources":
       return (
@@ -108,8 +90,7 @@ function validItem(kind: ReviewQueueKind, item: ReviewQueueItem) {
         item.collection.kind === "account" &&
         item.collection.namespace === "native:redgifs" &&
         !item.account &&
-        !item.post &&
-        !item.media
+        !item.post
       );
   }
 }

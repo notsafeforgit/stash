@@ -14,22 +14,31 @@ import (
 // the retired families apply only to databases below this version.
 const importRetirementVersion = NativeSchemaBaseline + 142
 
+// importEvidenceRetirementVersion drops what 1000142 kept frozen: the
+// per-row enrichment receipts, the catalog file history and the file-edit
+// reviews built on it. Completions keep their receipt UUIDs as plain values.
+const importEvidenceRetirementVersion = NativeSchemaBaseline + 144
+
 // validateRetainedImportSchema checks the native objects that arrived with the
 // import schemas and outlive it: post collection membership, the historical
-// enrichment receipts that completions still cite, and the indexes their
-// queries rely on. The retired import validators used to check them.
+// enrichment receipts that completions cited until schema 1000144, and the
+// indexes their queries rely on. The retired import validators used to check them.
 func validateRetainedImportSchema(conn *sqlx.DB, version uint, auditData bool) error {
 	var names []string
 	if version >= NativeSchemaBaseline+39 {
 		names = append(names, "source_collection_post_evidence", "source_collection_post_evidence_post", "source_collection_post_evidence_collection",
 			"source_collection_post_evidence_immutable", "source_collection_post_evidence_active_post", "source_collection_post_evidence_revision")
 	}
-	if version >= NativeSchemaBaseline+57 {
+	receipts := version < importEvidenceRetirementVersion
+	if version >= NativeSchemaBaseline+57 && receipts {
 		names = append(names, "source_enrichment_receipts", "source_enrichment_receipts_post", "source_enrichment_receipts_collection",
 			"source_enrichment_receipt_immutable", "source_enrichment_receipt_scope")
 	}
+	if version >= NativeSchemaBaseline+58 && receipts {
+		names = append(names, "enrichment_completion_legacy_receipt")
+	}
 	if version >= NativeSchemaBaseline+58 {
-		names = append(names, "enrichment_completion_legacy_receipt", "enrichment_completion_legacy_capture")
+		names = append(names, "enrichment_completion_legacy_capture")
 	}
 	if version >= NativeSchemaBaseline+83 {
 		names = append(names, "enrichment_targets_pending_scope")
@@ -60,7 +69,7 @@ func validateRetainedImportSchema(conn *sqlx.DB, version uint, auditData bool) e
  LEFT JOIN source_posts p ON p.uuid=e.post_uuid
  LEFT JOIN source_collection_revisions c ON c.collection_uuid=e.collection_uuid AND c.revision=e.collection_revision
  WHERE p.uuid IS NULL OR c.collection_uuid IS NULL)`
-	if version >= NativeSchemaBaseline+58 {
+	if version >= NativeSchemaBaseline+58 && receipts {
 		query += ` OR EXISTS(SELECT 1 FROM enrichment_completions e LEFT JOIN source_enrichment_receipts r ON r.uuid=e.legacy_receipt_uuid
  WHERE e.legacy_receipt_uuid IS NOT NULL AND r.uuid IS NULL)`
 	}

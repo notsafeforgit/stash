@@ -345,10 +345,12 @@ Import history page are removed; the native facts they produced remain ordinary
 data. Pending enrichment of a legacy-only post still corroborates its identifier
 through the retained `enrichment_identity_lookups` finder values
 (`ResolveLookupIdentity`, policy `retained-discovery-identity-v1`).
-`source_enrichment_receipts` and `source_file_history` are frozen evidence for
-existing completions and file-edit reviews; nothing writes new rows. Unreleased
-imported enrichment targets were excluded with reason `import_retired`. See
-[import history retirement](docs/native-schema.md#import-history-retirement-schema-1000142).
+Unreleased imported enrichment targets were excluded with reason
+`import_retired`. Schema 1000144 then dropped the frozen enrichment receipts,
+catalog file history and the file-edit review built on it; completions keep their
+receipt UUIDs as plain values. See
+[import history retirement](docs/native-schema.md#import-history-retirement-schema-1000142)
+and [import evidence retirement](docs/native-schema.md#import-evidence-retirement-schema-1000144).
 
 `stash_ingest.metadata_fetch` is the isolated metadata-only extractor for native
 enrichment. It shares retained post fields in bounded resumable transcripts,

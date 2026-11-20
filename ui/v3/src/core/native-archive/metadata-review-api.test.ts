@@ -1,11 +1,9 @@
 import { expect, it, vi } from "vitest";
 import {
   createMetadataReviewAPI,
-  editRequestKey,
   metadataReviewEndpoint,
-  validateEditReceipt,
 } from "./metadata-review-api";
-import { ids, preview, receipt } from "../../../tests/fixtures/metadata-review";
+import { ids } from "../../../tests/fixtures/metadata-review";
 
 it("uses the application mount with same-origin session requests and passes cancellation", async () => {
   const endpoint = metadataReviewEndpoint(
@@ -49,104 +47,22 @@ it.each([{ uuid: ids.entity, kind: "scene", local_id: 7, revision: 2 }])(
   },
 );
 
-it("binds previews to their request and compares canonical selections independently of key order", async () => {
-  const body = {
-    ...preview().input,
-    request_uuid: ids.entity,
-    digest: preview().digest,
-    selections: {
-      A: { uuid: ids.performer, revision: 1 },
-      B: { uuid: ids.otherPerformer, revision: 2 },
-    },
-  };
-  expect(editRequestKey(body)).toBe(
-    editRequestKey({
-      ...body,
-      selections: { B: body.selections.B, A: body.selections.A },
-    }),
-  );
-  const api = createMetadataReviewAPI(
-    "https://example.test/api/v3/archive/",
-    async () =>
-      Response.json({
-        ...preview(),
-        input: { ...preview().input, entity_uuid: ids.file },
-      }),
-  );
-  await expect(api.preview(preview().input)).rejects.toMatchObject({
-    code: "preview_mismatch",
-  });
-});
-
-it("bounds pages, sends both keyset parts and does not send internal settings or retained values", async () => {
+it("bounds decision history pages and keeps the field name in its path segment", async () => {
   const transport = vi.fn<typeof fetch>(async () => Response.json([]));
   const api = createMetadataReviewAPI(
     "https://example.test/api/v3/archive/",
     transport,
   );
-  await api.edits(ids.entity, {
-    history_uuid: ids.history,
-    match_uuid: ids.match,
-    collection_uuid: ids.collection,
-    file_uuid: ids.file,
-    source_time: "",
-    relative_path: "media.mp4",
-  });
+  await api.decisions(ids.entity, "custom/fields", 25);
   const url = new URL(String(transport.mock.calls[0]?.[0]));
+  expect(url.pathname).toBe(
+    `/api/v3/archive/entities/${ids.entity}/metadata-fields/custom%2Ffields/history`,
+  );
   expect(Object.fromEntries(url.searchParams)).toEqual({
+    after: "25",
     limit: "25",
-    after_history: ids.history,
-    after_match: ids.match,
   });
-  await expect(
-    api.applySaved(
-      JSON.stringify({
-        ...preview().input,
-        request_uuid: ids.entity,
-        digest: preview().digest,
-        settings: {},
-      }),
-    ),
-  ).rejects.toThrow();
+  expect(() => api.decisions(ids.entity, "title", -1)).toThrow();
+  expect(() => api.decisions("not-a-uuid", "title")).toThrow();
   expect(transport).toHaveBeenCalledTimes(1);
-});
-
-it("distinguishes keeping from applying and rejects receipts for a different outcome", () => {
-  const apply = {
-    ...preview().input,
-    request_uuid: ids.entity,
-    digest: preview().digest,
-  };
-  const keep = { ...apply, keep_current: true };
-  expect(editRequestKey(keep)).not.toBe(editRequestKey(apply));
-  expect(editRequestKey({ ...apply, keep_current: false })).toBe(
-    editRequestKey(apply),
-  );
-  expect(validateEditReceipt(receipt(keep), keep).kept_current).toBe(true);
-  expect(validateEditReceipt(receipt(apply), apply).decision_uuid).toBe(
-    ids.decision,
-  );
-  expect(() => validateEditReceipt(receipt(apply), keep)).toThrow();
-  expect(() => validateEditReceipt(receipt(keep), apply)).toThrow();
-  expect(() =>
-    validateEditReceipt(
-      { ...receipt(keep), decision_uuid: ids.decision },
-      keep,
-    ),
-  ).toThrow();
-  expect(() =>
-    validateEditReceipt({ ...receipt(apply), kept_current: true }, apply),
-  ).toThrow();
-  expect(() =>
-    validateEditReceipt({ ...receipt(apply), decision_uuid: undefined }, apply),
-  ).toThrow();
-  expect(() =>
-    validateEditReceipt({ ...receipt(keep), kept_current: undefined }, keep),
-  ).toThrow();
-  expect(validateEditReceipt({ ...receipt(keep), field: "" }, keep).field).toBe(
-    "",
-  );
-  expect(() =>
-    validateEditReceipt({ ...receipt(apply), field: "" }, apply),
-  ).toThrow();
 });

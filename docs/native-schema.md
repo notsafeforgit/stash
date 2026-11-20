@@ -8,6 +8,33 @@ The startup-versus-full-audit boundary below applies to the historical proof
 validation described throughout this guide. Deployment and one-time import
 completion belong to the installation's operations records.
 
+## Import evidence retirement (schema 1000144)
+
+Schema 1000144 drops what schema 1000142 kept frozen. Nothing had written these
+rows since then, and nothing current read them:
+
+- `source_enrichment_receipts`, the per-row receipts of historical catalog
+  enrichment. `enrichment_completions` is rebuilt without the foreign key to it.
+  Each completion keeps its `legacy_receipt_uuid`, now a UUID-checked value,
+  because the completion digest covers it. The completion API still reports
+  `basis: "legacy_receipt"`. Its scope trigger no longer accepts a new
+  receipt-backed completion.
+- `source_file_history` and its location, edit, state and deduplication tables.
+- `metadata_file_edit_reviews` and `metadata_file_edit_keeps`, the receipts of
+  the historical file-edit review. Production had no edits to review.
+  `metadata_field_retire_superseded` now deletes a superseded field decision
+  unconditionally.
+
+The routes `/entities/<uuid>/file-edits`, `/metadata-file-edits/*`,
+`/file-history/<uuid>`, `/file-observations/<uuid>/history` and
+`/content-claims/<uuid>/history` are removed. So are the review queue's
+`metadata` kind and its `review-metadata` page-info resource, and the historical
+choices on the scene/image **Metadata review** tab. That tab still shows the
+current field choices and provider history. Source file observations, matches
+and content claims stay. So do `enrichment_identity_lookups`, which pending
+enrichment of legacy-only posts still reads. The history row records each
+dropped table's row count.
+
 ## Import history retirement (schema 1000142)
 
 Schema 1000142 removes the frozen catalog and automation import history from the
@@ -25,9 +52,8 @@ approvals.
 The native data the import produced stays ordinary data: posts, captures,
 identifiers, URLs, publisher decisions, attachments, post-media decisions,
 documents, translations, source files, observations and matches, and collection
-membership groups. `source_enrichment_receipts` remain because completions refer
-to them. `source_file_history` and its child tables are frozen evidence for
-metadata file-edit reviews; nothing writes new rows. Held translation targets are
+membership groups. `source_enrichment_receipts` and `source_file_history`
+remained as frozen evidence until schema 1000144. Held translation targets are
 unchanged, since translation targets have no excluded state. Ordinary enrichment
 jobs, publications, checkpoints, pacing and fairness are unaffected.
 
@@ -1196,129 +1222,14 @@ backups include these tables; anonymised exports remove their private evidence.
 
 ## Source file history
 
-Schema 1000066 promotes catalog metadata edits, file-state changes and
+Schema 1000066 promoted catalog metadata edits, file-state changes and
 deduplication assertions into `source_file_history`, with typed child tables
-for locations, edits, states and deduplication. An event pins the original
-collection/root revisions. Its source timestamp may be unknown; `observed_at`
-records receipt of the assertion, and `created_at` records native insertion.
-Signatures cover its provenance and complete child values. Partial event writes
-cannot commit, even when a caller discards a late error. Full native audits validate the graph, signatures and receipts during migration and full snapshot verification.
-
-Locations refer to source file observations, including unavailable files and
-ZIP members. Deduplication points to a declared content claim, which need not be
-a verified digest. A member absent from that catalog, or currently associated
-with a different claim, keeps its declared path without an invented observation.
-The retained stage and survivor describe the historical assertion; neither is
-an instruction to mutate the filesystem. Copies in separate catalogs retain
-their respective scopes and timestamps, even when their source event IDs agree.
-
-Edit entries retain their source key, target field, representation and value.
-Known fields map as follows:
-
-| Source key | Native target | Representation |
-| --- | --- | --- |
-| title, details, director | same field | text |
-| date | date | calendar date |
-| urls | urls | URL strings |
-| actors | performers | source names |
-| tags, studio | same field | source names |
-| movie | groups | source name |
-
-Legacy `null` means `inherit`, not an explicit clear. Unknown fields and invalid
-known representations retain their exact JSON values as `unmapped` extensions,
-including large integers. Relationship names do not become native entity UUIDs.
-An exact-path edit remains separate from edits to other files sharing the source
-claim; importing history cannot replace it with a later duplicate-path value.
-Resolving and applying alternatives belongs to explicit metadata review. The
-existing Stash scene/image selections remain unchanged by this import.
-
-Schema 1000142 retired the historical file-history import. These tables remain frozen evidence read by the metadata file-edit reviews below; nothing writes new rows.
-
-Application-authenticated API routes:
-
-- `GET /api/v3/archive/file-history/UUID` returns one complete event.
-- `GET /api/v3/archive/file-observations/UUID/history?after=UUID&limit=N` returns
-  event summaries for that observation.
-- `GET /api/v3/archive/content-claims/UUID/history?after=UUID&limit=N` returns
-  deduplication event summaries for that claim.
-
-List limits are 1–100. There is no public history endpoint that deletes files or
-applies an edit. Ordinary database backup retains this graph; anonymisation removes the source history, receipts and identifying values together.
-
-### Reviewing a retained metadata edit
-
-Schema 1000067 adds `metadata_file_edit_reviews`. Each immutable receipt joins
-one application request to its native field decision, source history entry,
-source field and file match. The migration still leaves selected metadata unchanged.
-The explicit review operation uses the normal typed field-decision writer and
-commits the chosen value, provenance and retry receipt in one transaction.
-
-The review starts at a selected scene/image's file associations and pages by `(history_uuid, match_uuid)`; it does not read the whole history. Edits
-at an exact path and at a deduplicated predecessor remain separate alternatives.
-The user selects the scene/image explicitly, including when several existing
-entities share a file. Review does not merge those entities or propagate the
-choice to other owners. Historical disabled roots need no live filesystem grant
-to review already retained metadata.
-
-Preview rechecks the original file-match basis, current file generation, ZIP
-container generation and selected entity's ownership of the file. Its digest
-also binds the entity revision, current field decision/value, proposed value,
-name candidates and chosen relationship revisions. Apply repeats these checks
-inside its write transaction. Unrelated matches, changed files, removed
-associations, renamed/deleted relationship targets and stale previews cannot
-silently apply a previously displayed choice.
-
-Relationship names use bounded lookups. Performer matching includes every
-canonical name and alias, without giving either priority. Missing/ambiguous names
-block the whole relationship replacement until explicitly selected; candidate
-overflow is visible. A reviewed selection may link a source name to a differently
-named native entity. Several names selecting one UUID produce one relationship.
-This choice changes depicted metadata only, not source-account ownership.
-Unsupported source fields/representations remain inspectable and cannot be
-selected as native targets.
-
-For legacy `inherit`, review releases the override while retaining the current
-selected value until a permitted native policy evaluates it. It neither clears
-the value nor invents a source/filename fallback. The preview shows that exact
-result. Ordinary source mappings continue to respect explicit set/clear choices.
-
-Clients save a request UUID and exact apply body before sending it. A retry
-recovers the original receipt even after later edits, UUID adoption or deletion
-of the matched file; it does not rerun the old change. Reusing a request UUID
-with a different body fails. Receipt signatures bind the request and decision;
-full native audits also check source scope, normalized scalar choices and preserved UUID
-redirects. A late failure cannot commit a field without its receipt, even when
-the caller discards the error. Application notifications use the existing
-after-commit contract and are not registered again for a committed retry.
-
-Normal database backups retain the receipts; anonymisation removes them before
-their private source history. Migration creates no reviews and changes no
-selected fields. The [application API](native-ingestion.md#historical-metadata-review-api)
-and scene/image review controls are implemented. The review controls use the
-shared mobile section menu and retain uncertain Apply requests across browser
-reloads.
-
-Schema 1000094 adds `metadata_file_edit_keeps` for an explicit **Keep current
-value** outcome. It retains the exact request, reviewed entity revision, current
-field-decision identity, source field and file match. It creates no field
-decision and changes neither the selected value nor its protection, provenance
-or entity revision. Unsupported fields and unresolved relationship names may be
-declined without choosing a replacement. Keeping a value emits no metadata
-update notification.
-
-Keep repeats the same preview digest, current ownership and file-generation
-checks before commit. Its signed receipt remains replayable after later edits,
-UUID adoption, merges and file deletion. Apply and Keep cannot share a request
-UUID; triggers enforce that distinction across both receipt tables. A late
-receipt failure prevents the surrounding transaction from committing. Full native audits
-validate scope, signatures, redirects and cross-table request uniqueness.
-Anonymisation removes Keep receipts before their private source history.
-
-The shared review queue considers each retained source field separately. An
-Apply or Keep receipt settles that field for the selected media and its retained
-merged identities, while other fields remain pending. Later library edits do
-not reopen a previously reviewed historical field. Historical evidence remains
-available, including for a later explicit Apply with a new request identity.
+for locations, edits, states and deduplication. Schemas 1000067 and 1000094
+added the explicit **Apply** and **Keep current value** review of a retained
+edit for one scene or image, with signed, replayable receipts. Schema 1000142
+retired the import that filled these tables, and schema 1000144 removed them
+with their review workflow. See
+[import evidence retirement](#import-evidence-retirement-schema-1000144).
 
 ## Retained source documents
 
@@ -1963,7 +1874,8 @@ collection is later edited or retired. The `catalog-enrichment-v1` policy marks 
 legacy worker assertion. It does not imply complete child coverage, identify
 particular captures or prove execution by a native worker. Existing completions
 that cite a receipt keep that reference. Nothing writes new receipts. The
-enrichment import pass and its receipt routes were retired in schema 1000142.
+enrichment import pass and its receipt routes were retired in schema 1000142,
+and schema 1000144 dropped the receipts; completions keep the receipt UUID.
 
 ## Reviewed post-to-media associations
 

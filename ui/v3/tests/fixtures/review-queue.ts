@@ -4,7 +4,7 @@ import type {
 } from "../../src/core/native-archive/review-queue-api";
 import type { Collection } from "../../src/core/native-archive/collection-api";
 import { account } from "./account-review";
-import { postSummary, postMedia } from "./source-posts";
+import { postSummary } from "./source-posts";
 
 export function heldSource(): Collection {
   return {
@@ -24,8 +24,7 @@ export function heldSource(): Collection {
 
 export function reviewQueuePage(kind: ReviewQueueKind): ReviewQueuePage {
   const owner = account(),
-    post = postSummary(),
-    media = postMedia().media;
+    post = postSummary();
   if (post.latest_capture) post.latest_capture.title = "Shared album post";
   return {
     kind,
@@ -47,14 +46,12 @@ export function reviewQueuePage(kind: ReviewQueueKind): ReviewQueuePage {
                 reasons: ["post_link_conflict", "attachment_link_conflict"],
               },
             ]
-          : kind === "sources"
-            ? [
-                {
-                  uuid: heldSource().uuid,
-                  collection: heldSource(),
-                  reasons: ["source_repost_hold"],
-                },
-              ]
-            : [{ uuid: media.uuid, media, reasons: ["retained_metadata"] }],
+          : [
+              {
+                uuid: heldSource().uuid,
+                collection: heldSource(),
+                reasons: ["source_repost_hold"],
+              },
+            ],
   };
 }

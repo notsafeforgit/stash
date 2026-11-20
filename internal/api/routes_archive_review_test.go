@@ -19,7 +19,7 @@ import (
 )
 
 func TestArchiveReviewQueueHTTPPopulatedContracts(t *testing.T) {
-	_, repo, input := nativeMetadataReviewFixture(t)
+	_, repo, scene := nativeMetadataFixture(t)
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		account, err := repo.SourceAccount.Create(ctx, "native:reddit", "Review account")
 		if err != nil {
@@ -48,12 +48,12 @@ func TestArchiveReviewQueueHTTPPopulatedContracts(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		_, err = repo.SourceAttachment.RecordMediaEvidence(ctx, models.SourceMediaEvidence{UUID: uuid.NewString(), PostUUID: post.UUID, MediaUUID: input.EntityUUID, Basis: "legacy", Details: []byte(`{}`)})
+		_, err = repo.SourceAttachment.RecordMediaEvidence(ctx, models.SourceMediaEvidence{UUID: uuid.NewString(), PostUUID: post.UUID, MediaUUID: scene, Basis: "legacy", Details: []byte(`{}`)})
 		return err
 	}))
 	handler := (&nativeArchiveRoutes{repo: repo}).router()
 	fixtures := map[string]json.RawMessage{}
-	for _, kind := range []string{"accounts", "media", "metadata", "sources"} {
+	for _, kind := range []string{"accounts", "media", "sources"} {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/review-queue/"+kind, nil))
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -88,7 +88,7 @@ func TestArchiveReviewQueueHTTPReadOnlyAndStrictFilters(t *testing.T) {
 	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "queue.sqlite")))
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	handler := (&nativeArchiveRoutes{repo: db.Repository()}).router()
-	for _, kind := range []string{"accounts", "media", "metadata", "sources"} {
+	for _, kind := range []string{"accounts", "media", "sources"} {
 		for _, tc := range []struct {
 			method, suffix string
 			status         int
@@ -111,9 +111,12 @@ func TestArchiveReviewQueueHTTPReadOnlyAndStrictFilters(t *testing.T) {
 			}
 		}
 	}
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/review-queue/unknown", nil))
-	require.Equal(t, http.StatusBadRequest, w.Code)
+	// Historical metadata edits were retired in schema 1000144.
+	for _, kind := range []string{"unknown", "metadata"} {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/review-queue/"+kind, nil))
+		require.Equal(t, http.StatusBadRequest, w.Code, kind)
+	}
 	for _, tc := range []struct {
 		method, suffix string
 		status         int

@@ -24,7 +24,7 @@ func archivePageInfo(t *testing.T, repo models.Repository, filter models.Archive
 
 func TestArchivePaginationEmptyResourcesAndValidation(t *testing.T) {
 	_, repo := archiveTestDatabase(t)
-	for _, resource := range []string{"media-roots", "collections", "accounts", "posts", "jobs", "runs", "root-history", "collection-history", "policy-history", "provider-history", "job-attempts", "run-attempts", "review-accounts", "review-media", "review-metadata", "review-sources", "shares"} {
+	for _, resource := range []string{"media-roots", "collections", "accounts", "posts", "jobs", "runs", "root-history", "collection-history", "policy-history", "provider-history", "job-attempts", "run-attempts", "review-accounts", "review-media", "review-sources", "shares"} {
 		t.Run(resource, func(t *testing.T) {
 			info := archivePageInfo(t, repo, models.ArchivePageFilter{Resource: resource, Subject: uuid.NewString()})
 			require.EqualValues(t, 0, info.Total)

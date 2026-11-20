@@ -44,19 +44,26 @@ func MetadataFields(kind ArchiveEntityKind) []MetadataFieldDefinition {
 }
 
 type MetadataFieldDecision struct {
-	UUID                  string                  `json:"uuid"`
-	Sequence              int                     `json:"sequence"`
-	EntityUUID            string                  `json:"entity_uuid"`
-	Field                 string                  `json:"field"`
-	Mode                  string                  `json:"mode"`   // set, clear, inherit, preserved
-	Origin                string                  `json:"origin"` // library, review, migration, legacy, unattributed, source, policy, filename
-	Value                 json.RawMessage         `json:"value"`
-	CaptureUUID           *string                 `json:"capture_uuid,omitempty"`
-	PostMediaDecisionUUID string                  `json:"post_media_decision_uuid,omitempty"`
-	Reason                string                  `json:"reason"`
-	CreatedAt             time.Time               `json:"created_at"`
-	Policy                *MetadataPolicyRef      `json:"policy,omitempty"`
-	FileEdit              *MetadataFileEditReview `json:"file_edit,omitempty"`
+	UUID                  string             `json:"uuid"`
+	Sequence              int                `json:"sequence"`
+	EntityUUID            string             `json:"entity_uuid"`
+	Field                 string             `json:"field"`
+	Mode                  string             `json:"mode"`   // set, clear, inherit, preserved
+	Origin                string             `json:"origin"` // library, review, migration, legacy, unattributed, source, policy, filename
+	Value                 json.RawMessage    `json:"value"`
+	CaptureUUID           *string            `json:"capture_uuid,omitempty"`
+	PostMediaDecisionUUID string             `json:"post_media_decision_uuid,omitempty"`
+	Reason                string             `json:"reason"`
+	CreatedAt             time.Time          `json:"created_at"`
+	Policy                *MetadataPolicyRef `json:"policy,omitempty"`
+}
+
+type MetadataNameCandidate struct {
+	UUID           string `json:"uuid" db:"uuid"`
+	LocalID        int    `json:"-" db:"local_id"`
+	Revision       int    `json:"revision" db:"revision"`
+	Name           string `json:"name" db:"name"`
+	Disambiguation string `json:"disambiguation,omitempty" db:"disambiguation"`
 }
 
 type MetadataFieldState struct {
@@ -101,10 +108,6 @@ type MetadataFieldReaderWriter interface {
 	// NameCandidates returns at most 101 exact canonical-name/alias matches.
 	// A caller displaying 100 uses the extra row to distinguish truncation.
 	NameCandidates(context.Context, ArchiveEntityKind, string) ([]MetadataNameCandidate, error)
-	FileEdits(context.Context, string, string, string, int) ([]MetadataFileEditCandidate, error)
-	PreviewFileEdit(context.Context, MetadataFileEditInput) (*MetadataFileEditPreview, error)
-	ApplyFileEdit(context.Context, MetadataFileEditApplyInput) (*MetadataFileEditReview, bool, error)
-	FileEditReview(context.Context, string) (*MetadataFileEditReview, error)
 	// Normalize validates a candidate without mutating the entity or history.
 	Normalize(context.Context, ArchiveEntityKind, string, json.RawMessage, map[string]int) (json.RawMessage, error)
 	State(context.Context, string, string) (*MetadataFieldState, error)

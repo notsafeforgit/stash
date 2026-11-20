@@ -14,6 +14,7 @@ import (
 
 func removeBackgroundMetadataSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeImportEvidenceSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER IF EXISTS enrichment_background_attempt_current;
 DROP TRIGGER IF EXISTS enrichment_background_attempt_immutable;
 DROP TABLE IF EXISTS enrichment_background_attempts;

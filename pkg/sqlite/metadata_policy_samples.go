@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 
 	"github.com/stashapp/stash/pkg/archive"
@@ -52,7 +53,7 @@ func (s *MetadataPolicyStore) SampleFiles(ctx context.Context, scope models.Meta
 	if prefix[len(prefix)-1] != filepath.Separator {
 		prefix += string(filepath.Separator)
 	}
-	table, column, err := metadataFileOwnerTable(entity.Kind)
+	table, column, err := mediaFileOwnerTable(entity.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -179,4 +180,16 @@ ORDER BY c.uuid,CASE WHEN l.attachment_uuid='' THEN l.post_media_decision_uuid E
 			PostUUID: row.PostUUID, Title: row.Title, Platform: row.Platform, Origin: row.Origin, CapturedAt: row.CapturedAt.TimePtr()})
 	}
 	return ret, nil
+}
+
+// mediaFileOwnerTable names the join table linking a media entity to its files.
+func mediaFileOwnerTable(kind models.ArchiveEntityKind) (string, string, error) {
+	switch kind {
+	case models.ArchiveScene:
+		return "scenes_files", "scene_id", nil
+	case models.ArchiveImage:
+		return "images_files", "image_id", nil
+	default:
+		return "", "", fmt.Errorf("%s entities have no media files", kind)
+	}
 }

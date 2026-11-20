@@ -775,16 +775,6 @@ AND EXISTS(SELECT 1 FROM pragma_index_info('shares_token_hash') WHERE name='toke
 				return err
 			}
 		}
-		if version >= NativeSchemaBaseline+66 {
-			if err := validateSourceFileHistorySchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+67 {
-			if err := validateMetadataFileReviewSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
 		if version >= NativeSchemaBaseline+68 {
 			if err := validateAccountReviewSchema(conn, auditData); err != nil {
 				return err
@@ -802,11 +792,6 @@ AND EXISTS(SELECT 1 FROM pragma_index_info('shares_token_hash') WHERE name='toke
 		}
 		if version >= NativeSchemaBaseline+92 {
 			if err := validatePostConsolidationReviewSchema(conn, auditData); err != nil {
-				return err
-			}
-		}
-		if version >= NativeSchemaBaseline+94 {
-			if err := validateMetadataFileKeepSchema(conn, auditData); err != nil {
 				return err
 			}
 		}

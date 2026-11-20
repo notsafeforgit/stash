@@ -218,7 +218,7 @@ mobile/desktop navigation and same-scope failed-refresh behavior. These local
 requests are not a cross-device unresolved-conflict queue.
 
 The Review queue route uses `review-queue-api.ts` for current account ownership,
-post/media association, retained metadata and held-source decisions. Held
+post/media association and held-source decisions. Held
 sources are resolved in place through the subscription and collection APIs.
 `AppShell` runs the one poller of the bounded review summary
 (`useReviewAttentionPolling`); navigation badges read its count with
@@ -231,13 +231,10 @@ scroll restoration, desktop/mobile navigation and expandable technical details.
 Refresh recomputes current decisions; local pending requests remain in Saved
 actions.
 
-Historical metadata review offers Apply and Keep current value. Both save an
-exact request before transport and recover its original receipt after a lost
-reply. Keep accepts unresolved names and unsupported historical fields without
-choosing a replacement. Its receipt refreshes review state without refetching
-unchanged library metadata, and its success message remains distinct from Apply.
-The request key includes the Keep outcome while existing Apply keys and bodies
-stay unchanged. A pending choice cannot be silently replaced by the other action.
+The scene/image Metadata review tab is read-only: it shows current field
+choices with their recorded reasons, and scene provider history. Its historical
+Apply/Keep choices and their browser journal were removed with the file history
+in schema 1000144.
 
 The Source posts route provides bounded browsing and exact URL, qualified source
 ID or archive UUID lookup. It is available in the desktop utility menu, mobile

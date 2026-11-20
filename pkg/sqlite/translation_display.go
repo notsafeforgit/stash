@@ -368,7 +368,7 @@ func matchesTwitterDownloadTitle(ctx context.Context, post string, entity *model
 JOIN source_post_identifiers p ON p.post_uuid=i.post_uuid WHERE i.canonical_uuid=? AND p.namespace='native:twitter'`, post); err != nil {
 		return false, err
 	}
-	table, column, err := metadataFileOwnerTable(entity.Kind)
+	table, column, err := mediaFileOwnerTable(entity.Kind)
 	if err != nil {
 		return false, err
 	}

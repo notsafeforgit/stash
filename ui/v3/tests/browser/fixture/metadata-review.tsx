@@ -1,43 +1,14 @@
-import { FindPerformersForSelectDocument } from "@/core/generated-graphql";
 import { MockedProvider } from "@apollo/client/testing/react";
 import { NativeMetadataReview } from "@/components/detail/native-metadata-review";
 import { MediaDetailLayout } from "@/components/detail/media-detail-layout";
+import { ids } from "../../fixtures/metadata-review";
 
 export function MetadataReviewFixture() {
   const kind = new URLSearchParams(location.search).has("image")
     ? "image"
     : "scene";
   return (
-    <MockedProvider
-      mocks={[
-        {
-          request: {
-            query: FindPerformersForSelectDocument,
-            variables: { filter: { q: "Cloud", per_page: 25, page: 1 } },
-          },
-          result: {
-            data: {
-              findPerformers: {
-                __typename: "FindPerformersResultType",
-                count: 1,
-                performers: [
-                  {
-                    __typename: "Performer",
-                    id: ids.thirdPerformer,
-                    name: "Cloud",
-                    disambiguation: "",
-                    aliases: [],
-                    image_path: "",
-                    birthdate: null,
-                    death_date: null,
-                  },
-                ],
-              },
-            },
-          },
-        },
-      ]}
-    >
+    <MockedProvider mocks={[]}>
       <div className="flex h-dvh flex-col overflow-hidden">
         <MediaDetailLayout
           title="Library item"
@@ -75,33 +46,3 @@ export function MetadataReviewFixture() {
     </MockedProvider>
   );
 }
-
-// Test-only bridge to exercise the real IndexedDB journal across tabs and
-// deployment prefixes without exposing application data or issuing HTTP writes.
-import { createMetadataReviewAPI } from "@/core/native-archive/metadata-review-api";
-import {
-  createMetadataReviewOutbox,
-  type SavedReview,
-} from "@/core/native-archive/metadata-review-outbox";
-import { preview, ids } from "../../fixtures/metadata-review";
-
-declare global {
-  interface Window {
-    metadataReviewStorage: {
-      prepare(prefix: string): Promise<SavedReview>;
-      read(prefix: string): Promise<SavedReview | null>;
-    };
-  }
-}
-const storageTarget = { kind: "scene" as const, libraryId: ids.entity };
-function journal(prefix: string) {
-  return createMetadataReviewOutbox(
-    createMetadataReviewAPI(
-      new URL(`${prefix}api/v3/archive/`, location.origin).href,
-    ),
-  );
-}
-window.metadataReviewStorage = {
-  prepare: (prefix) => journal(prefix).prepare(storageTarget, preview()),
-  read: (prefix) => journal(prefix).read(storageTarget),
-};

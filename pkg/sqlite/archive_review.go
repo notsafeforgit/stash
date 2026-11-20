@@ -33,8 +33,6 @@ func (s *ArchiveReviewStore) Queue(ctx context.Context, filter models.ArchiveRev
 		return page, nil
 	case "media":
 		return s.media(ctx, filter, page)
-	case "metadata":
-		return s.metadata(ctx, filter, page)
 	case "sources":
 		return s.sources(ctx, filter, page)
 	default:
@@ -211,66 +209,6 @@ WHERE i.canonical_uuid=? GROUP BY a.namespace,a.value LIMIT ?`, post, bound); er
 	}
 	slices.Sort(result)
 	return result, nil
-}
-
-// File-history indexes find retained edits and their existing library owners.
-// Reviewed fields remain reviewed after a later library edit. Other fields in
-// that same historical edit remain candidates; request bodies are never loaded.
-const archiveReviewMetadataQuery = `WITH owners AS (
- SELECT e.uuid,h.uuid AS history_uuid,ed.field FROM source_file_history_edits ed
- CROSS JOIN source_file_history h ON h.uuid=ed.history_uuid
- CROSS JOIN source_file_history_locations loc ON loc.history_uuid=h.uuid
- CROSS JOIN source_file_matches m ON m.observation_uuid=loc.observation_uuid
- CROSS JOIN archive_entities f ON f.uuid=m.file_uuid AND f.kind='file' AND f.state='active'
- CROSS JOIN scenes_files sf ON sf.file_id=f.file_id
- CROSS JOIN archive_entities e ON e.scene_id=sf.scene_id AND e.state='active'
- WHERE e.uuid>?
- UNION
- SELECT e.uuid,h.uuid AS history_uuid,ed.field FROM source_file_history_edits ed
- CROSS JOIN source_file_history h ON h.uuid=ed.history_uuid
- CROSS JOIN source_file_history_locations loc ON loc.history_uuid=h.uuid
- CROSS JOIN source_file_matches m ON m.observation_uuid=loc.observation_uuid
- CROSS JOIN archive_entities f ON f.uuid=m.file_uuid AND f.kind='file' AND f.state='active'
- CROSS JOIN images_files imf ON imf.file_id=f.file_id
- CROSS JOIN archive_entities e ON e.image_id=imf.image_id AND e.state='active'
- WHERE e.uuid>?
-)
-SELECT DISTINCT o.uuid FROM owners o WHERE NOT EXISTS (
- SELECT 1 FROM metadata_file_edit_reviews r JOIN metadata_field_decisions d ON d.uuid=r.decision_uuid
- WHERE r.history_uuid=o.history_uuid AND r.source_field=o.field AND d.entity_uuid IN (
- WITH RECURSIVE identities(uuid) AS (SELECT o.uuid UNION SELECT a.uuid FROM archive_entities a JOIN identities i ON a.redirect_to=i.uuid)
- SELECT uuid FROM identities)
- ) AND NOT EXISTS (
- SELECT 1 FROM metadata_file_edit_keeps k WHERE k.history_uuid=o.history_uuid AND k.source_field=o.field AND k.entity_uuid IN (
- WITH RECURSIVE identities(uuid) AS (SELECT o.uuid UNION SELECT a.uuid FROM archive_entities a JOIN identities i ON a.redirect_to=i.uuid)
- SELECT uuid FROM identities)
-) ORDER BY o.uuid LIMIT ?`
-
-func (s *ArchiveReviewStore) metadata(ctx context.Context, filter models.ArchiveReviewFilter, page *models.ArchiveReviewPage) (*models.ArchiveReviewPage, error) {
-	var ids []string
-	if err := dbWrapper.Select(ctx, &ids, archiveReviewMetadataQuery, filter.After, filter.After, filter.Limit+1); err != nil {
-		return nil, err
-	}
-	if len(ids) > filter.Limit {
-		ids = ids[:filter.Limit]
-		page.Next = ids[len(ids)-1]
-	}
-	for _, id := range ids {
-		entity, err := (&ArchiveEntityStore{}).Find(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		if !archiveMedia(entity) || entity.State != models.ArchiveEntityActive {
-			return nil, models.ErrSourcePayloadCorrupt
-		}
-		media, err := sourcePostLibraryItem(ctx, entity)
-		if err != nil {
-			return nil, err
-		}
-		page.Items = append(page.Items, models.ArchiveReviewItem{UUID: id, Reasons: []string{"retained_metadata"}, Media: media})
-	}
-	page.Checked = len(ids)
-	return page, nil
 }
 
 // Held sources wait for the owner to enable or dismiss them. Enabling creates

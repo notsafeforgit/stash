@@ -6,6 +6,7 @@ import { MobileNavigationProvider } from "./mobile-navigation";
 import { RouteViewport } from "./route-viewport";
 import { useNavHotkeys } from "src/hooks/use-nav-hotkeys";
 import { useTrackBrowsePage } from "src/hooks/use-smart-back";
+import { useReviewAttentionPolling } from "src/hooks/use-review-attention";
 import { DownloadProgressBar } from "src/components/offline/download-progress-bar";
 import { DownloadTray } from "src/components/offline/download-tray";
 import { DownloadNotifications } from "src/components/offline/download-notifications";
@@ -19,6 +20,8 @@ const DETAIL_ROUTE_RE =
 export function AppShell() {
   useNavHotkeys();
   useTrackBrowsePage();
+  // The one poller behind every review badge.
+  useReviewAttentionPolling();
   // Keep the outgoing page's chrome while the destination loader is pending.
   const pathname = useRouterState({
     select: (s) => s.matches.at(-1)?.pathname ?? s.location.pathname,

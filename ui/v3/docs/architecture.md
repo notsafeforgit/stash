@@ -220,8 +220,10 @@ requests are not a cross-device unresolved-conflict queue.
 The Review queue route uses `review-queue-api.ts` for current account ownership,
 post/media association, retained metadata and held-source decisions. Held
 sources are resolved in place through the subscription and collection APIs.
-`useReviewAttention` shares one poller of the bounded review summary for the
-navigation badges; call `refreshReviewAttention` after resolving a decision. UUID pages carry a
+`AppShell` runs the one poller of the bounded review summary
+(`useReviewAttentionPolling`); navigation badges read its count with
+`useReviewAttention`, so isolated component views never poll. Call
+`refreshReviewAttention` after resolving a decision. UUID pages carry a
 checked count and may have an empty items array with a continuation cursor.
 The UI preserves that distinction, links to existing targeted review screens
 and retains its filter/cursor in the URL. It uses the shared activity reader,

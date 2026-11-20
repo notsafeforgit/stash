@@ -5,8 +5,10 @@ import {
 } from "@/core/native-archive/review-queue-api";
 import { useSourceTracking } from "@/hooks/use-source-tracking";
 
-// One shared poller serves every badge. The summary is a cheap count of new
-// decisions; failures keep the last known count rather than hiding a badge.
+// The app shell owns one poller (useReviewAttentionPolling) and every badge
+// reads its count. Isolated component views render badges without polling.
+// The summary is a cheap count of new decisions; failures keep the last known
+// count rather than hiding a badge.
 const pollInterval = 5 * 60_000;
 const focusThrottle = 30_000;
 
@@ -77,14 +79,19 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** Held sources awaiting a decision; zero while source tracking is off. */
-export function useReviewAttention() {
+/** Polls the review summary while source tracking is active. */
+export function useReviewAttentionPolling() {
   const enabled = useSourceTracking();
   useEffect(() => {
     if (!enabled) return;
     start();
     return stop;
   }, [enabled]);
+}
+
+/** Held sources awaiting a decision; zero while source tracking is off. */
+export function useReviewAttention() {
+  const enabled = useSourceTracking();
   const count = useSyncExternalStore(
     subscribe,
     () => sources,

@@ -15,3 +15,10 @@ concurrency:
 jobs:
   native:
     uses: ./.github/workflows/native-ci.yml
+    # Pull requests never publish: the image job is skipped without the publish
+    # input. GitHub rejects a reusable workflow whose jobs request more than
+    # their caller grants, even skipped ones; fork tokens stay read-only.
+    permissions:
+      contents: read
+      actions: read
+      packages: write

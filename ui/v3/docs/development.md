@@ -206,7 +206,7 @@ make test-ui-browser
 ```
 
 The [browser workflow](../../../.github/workflows/v3-browser-tests.yml) runs
-Chromium and WebKit with four shards each in a digest-pinned Playwright
+Chromium with three shards and WebKit with six in a digest-pinned Playwright
 Ubuntu 26.04 container. The image holds both browsers and their system media
 libraries; CI does not reinstall packages from changing Ubuntu repositories.
 WebKit needs the newer GStreamer media runtime: the 1.24 backend on Ubuntu 24.04
@@ -220,11 +220,13 @@ when the Playwright image changes. The v1.65.1 image ships the same Mesa 26.0.8
 and LLVM 21.1.8 as v1.63.0, so the workaround stays.
 Chromium uses two workers per shard. WebKit uses one to avoid competing media
 pipelines during playback and frame-timing checks on small CI runners.
-The shard runner distributes adjacent independent tests across the four jobs,
+WebKit's single worker makes its share about twice as long, so it has twice the
+shards. The shard runner distributes adjacent independent tests across each
+engine's jobs,
 so slow player cases do not accumulate on one runner. It discovers the complete
 suite each time, including new tests, and assigns every case to exactly one job.
 To reproduce a CI shard from `ui/v3`, run
-`pnpm test:browser:shard webkit 2/4`; append `--list` to inspect its cases.
+`pnpm test:browser:shard webkit 2/6`; append `--list` to inspect its cases.
 For matching local Linux coverage, use the exact image pinned in the workflow.
 Update its version and digest alongside `@playwright/test` in `package.json` and
 the lockfile; mismatched browser and package versions are unsupported. See

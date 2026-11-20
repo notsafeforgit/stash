@@ -55,7 +55,15 @@ retained. Go's normal result cache remains enabled, and summaries distinguish
 reused results from fresh execution. Set `GOFLAGS=-count=1` when measuring uncached
 timings locally; cached results still contain the events needed by the coverage
 check.
-Only the other backend job installs media fixture tools; SQLite tests do not
+The other Go tests run on three runners after the UI build. Each lists every
+package's tagged tests and selects a share of the distinct top-level test names
+across all packages, so a name defined in several packages runs in each of them
+on one runner. Every package still runs on every runner, so a failing `TestMain`
+or build is reported. Each shard checks that its selected tests finished exactly
+once and that every package passed; `backend-tests-*` artifacts retain the JSON
+output and timings. These shards compile the same packages and share one Go
+cache rather than adding three to the repository's cache quota.
+Only the other backend jobs install media fixture tools; SQLite tests do not
 launch FFmpeg or image converters.
 
 The external Python packages run their own
@@ -122,6 +130,11 @@ content manifests are excluded from that cleanup.
 
 ## 2. Deploy the verified native image
 
+The image builds from the validated Linux binary as soon as that binary exists,
+while the checks run. It is pushed only under its revision tag and smoke-tested
+there. The `promote` job moves `develop` to that digest after the whole
+validation workflow, including the image job, succeeds; a failed check leaves the
+run unsuccessful, and deployment requires a successful run.
 The publisher tests the pushed revision digest before promoting `develop`.
 Tests compare the included binary with the validated Actions artifact and exercise
 non-root startup, UID/GID overrides, supplementary groups, command arguments,

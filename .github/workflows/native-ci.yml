@@ -2,6 +2,19 @@ name: Native validation and Linux build
 
 on:
   workflow_call:
+    inputs:
+      publish:
+        description: Build, push and smoke-test this revision's GHCR image while the checks run
+        type: boolean
+        default: false
+      refresh_container_dependencies:
+        description: Rebuild container dependencies without cached layers
+        type: boolean
+        default: false
+    outputs:
+      image_digest:
+        description: The pushed, smoke-tested image digest; promote it only after this workflow succeeds
+        value: ${{ jobs.image.outputs.digest }}
 
 permissions:
   contents: read
@@ -107,10 +120,16 @@ jobs:
     needs: [changes, assets]
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-native-go
         with:
+          # Shards compile the same packages: share one cache rather than
+          # adding a compilation cache per shard to the repository's quota.
           suite: tests-other
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -120,9 +139,18 @@ jobs:
         # The image's pinned Jellyfin FFmpeg, not Ubuntu's distribution build.
         run: sh scripts/install-media-test-runtime.sh
       - name: Go unit and integration tests
-        run: |
-          packages="$(python3 scripts/ci_go_packages.py other)"
-          make it GO_TEST_PACKAGES="$packages"
+        run: >-
+          python3 scripts/ci_backend_tests.py
+          --shard ${{ matrix.shard }} --shards 3
+          --output "$RUNNER_TEMP/backend-tests"
+      - name: Retain test timings and failure output
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-tests-${{ matrix.shard }}
+          path: ${{ runner.temp }}/backend-tests/
+          retention-days: 7
+          if-no-files-found: warn
 
   backend-lint:
     needs: [changes, assets]
@@ -192,6 +220,76 @@ jobs:
           path: dist/stash-linux
           retention-days: 1
           if-no-files-found: error
+
+  # Build the image while the checks run. It is pushed only under its revision
+  # tag; the caller promotes the digest after this whole workflow succeeds, and
+  # a failed check fails the run that production deploys from.
+  image:
+    needs: binary
+    if: inputs.publish
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download validated Linux binary
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-linux-amd64
+          path: dist
+      - run: chmod +x dist/stash-linux
+
+      - name: Set lower case owner name
+        id: repository_owner
+        run: |
+          {
+            echo "owner=${GITHUB_REPOSITORY_OWNER,,}"
+            echo "branch=${GITHUB_REF_NAME//\//-}"
+            echo "short_sha=${GITHUB_SHA::7}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build and push Docker image
+        id: image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/ghcr/Dockerfile
+          push: true
+          pull: true
+          no-cache: ${{ inputs.refresh_container_dependencies }}
+          cache-from: type=gha,scope=stash-native-amd64
+          cache-to: type=gha,mode=max,scope=stash-native-amd64
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+          tags: |
+            ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:${{ steps.repository_owner.outputs.branch }}-${{ steps.repository_owner.outputs.short_sha }}
+
+      - name: Verify published native runtime
+        env:
+          STASH_IMAGE: ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash@${{ steps.image.outputs.digest }}
+        run: |
+          docker pull "$STASH_IMAGE"
+          python3 docker/runtime/smoke.py --image "$STASH_IMAGE" --binary dist/stash-linux
 
   browser-stack:
     needs: [assets, binary]

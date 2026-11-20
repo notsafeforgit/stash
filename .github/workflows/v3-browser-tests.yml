@@ -32,18 +32,22 @@ jobs:
     timeout-minutes: 65
     strategy:
       fail-fast: false
+      # Use GStreamer 1.28: Noble's 1.24 media backend can deadlock or crash
+      # during HLS EOF seeks, including with a bare video element.
+      # WebKit uses one worker per shard so media timing checks do not compete
+      # on a runner, which makes its shards about twice as long as Chromium's
+      # two-worker shards; it gets twice the shards to finish at the same time.
       matrix:
-        browser: [chromium, webkit]
-        shard: [1, 2, 3, 4]
         include:
-          - browser: chromium
-            shards: 4
-          # Use GStreamer 1.28: Noble's 1.24 media backend can deadlock or
-          # crash during HLS EOF seeks, including with a bare video element.
-          - browser: webkit
-            shards: 4
-          # WebKit uses one worker per shard so media timing checks do not
-          # compete on a runner. Chromium retains two workers per shard.
+          - { browser: chromium, shard: 1, shards: 3 }
+          - { browser: chromium, shard: 2, shards: 3 }
+          - { browser: chromium, shard: 3, shards: 3 }
+          - { browser: webkit, shard: 1, shards: 6 }
+          - { browser: webkit, shard: 2, shards: 6 }
+          - { browser: webkit, shard: 3, shards: 6 }
+          - { browser: webkit, shard: 4, shards: 6 }
+          - { browser: webkit, shard: 5, shards: 6 }
+          - { browser: webkit, shard: 6, shards: 6 }
     defaults:
       run:
         shell: bash
@@ -60,7 +64,7 @@ jobs:
           cache-dependency-path: ui/v3/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test:browser:shard ${{ matrix.browser }} ${{ matrix.shard }}/${{ matrix.shards }}
-        # Interleave adjacent cases across all four shards for each engine.
+        # Interleave adjacent cases across each engine's shards.
         # Every discovered test belongs to exactly one shard.
         timeout-minutes: 35
         env:

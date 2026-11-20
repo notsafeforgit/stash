@@ -1,3 +1,4 @@
+import { createContext, useContext } from "react";
 import type * as React from "react";
 import {
   Drawer as DrawerPrimitive,
@@ -29,6 +30,11 @@ type DrawerRootProps = React.ComponentProps<typeof DrawerPrimitive> &
 // these sheets had; 0.2 s keeps pace with it.
 const SHEET_PHYSICS = { response: 0.2 };
 
+const DrawerModalContext = createContext(true);
+
+// A fully modal drawer sets `inert` on the page, which restyles all of it as the
+// sheet opens and closes; on a long list that outlasts the slide, so the sheet
+// pops in. Trapping focus avoids it, and the content still declares aria-modal.
 function Drawer({
   open,
   defaultOpen,
@@ -36,6 +42,7 @@ function Drawer({
   blocksListShortcuts,
   driver = "pointer",
   physics = SHEET_PHYSICS,
+  modal = "trap-focus",
   ...props
 }: DrawerRootProps) {
   const container = useOverlayContainerElement();
@@ -47,13 +54,16 @@ function Drawer({
   });
 
   return (
-    <DrawerPrimitive
-      container={container}
-      driver={driver}
-      physics={physics}
-      {...overlayProps}
-      {...props}
-    />
+    <DrawerModalContext value={modal !== false}>
+      <DrawerPrimitive
+        container={container}
+        driver={driver}
+        physics={physics}
+        modal={modal}
+        {...overlayProps}
+        {...props}
+      />
+    </DrawerModalContext>
   );
 }
 
@@ -73,19 +83,25 @@ function DrawerOverlay({
   );
 }
 
+// Our sheets open from their own buttons, which ui-sdk counts as a code open and
+// focuses the first field, raising the iOS keyboard. Focus the sheet instead.
 function DrawerContent({
   className,
   children,
   backdrop = "blurred",
+  initialFocus = "content",
   ...props
 }: Omit<React.ComponentProps<typeof DrawerContentPrimitive>, "children"> & {
   children?: React.ReactNode;
   backdrop?: DrawerBackdrop;
 }) {
+  const modal = useContext(DrawerModalContext);
   return (
     <>
       <DrawerOverlay appearance={backdrop} />
       <DrawerContentPrimitive
+        aria-modal={modal || undefined}
+        initialFocus={initialFocus}
         className={cn(
           "max-h-[min(80svh,var(--drawer-max-height))] min-h-0 pb-[max(0.5rem,var(--safe-area-bottom))] pl-[var(--safe-area-left)] pr-[var(--safe-area-right)]",
           className,

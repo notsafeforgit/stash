@@ -108,6 +108,12 @@
     padding: 0;
   }
 
+  /* Sheets trap focus without ui-sdk's scroll lock, so a drag on the backdrop
+     must not scroll the page behind it. */
+  [data-slot="drawer-backdrop"] {
+    touch-action: none;
+  }
+
   /* The drawer manages backdrop opacity, so these set only the colour. The
      blurred backdrop keeps its own GPU layer: iOS Safari drops backdrop-filter
      during heavy layout, and the page would flash through. */

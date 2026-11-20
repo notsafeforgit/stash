@@ -747,3 +747,25 @@ for (const layout of ["standalone", "collection", "media"]) {
     await expectCompactRow(footer);
   });
 }
+
+test("mobile sheets focus themselves and leave the page un-inert", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/lightbox-list?kind=scene");
+  for (const [control, title] of [
+    ["View options", "View options"],
+    ["Open navigation menu", "Navigation"],
+  ]) {
+    await page.getByRole("button", { name: control, exact: true }).tap();
+    const sheet = page.getByRole("dialog", { name: title, exact: true });
+    await expect(sheet).toBeVisible();
+    // Focusing a field here would raise the on-screen keyboard.
+    await expect(sheet).toBeFocused();
+    await expect(sheet).toHaveAttribute("aria-modal", "true");
+    // `inert` restyles the whole page and stalls the sheet's slide on long lists.
+    await expect(page.locator("[inert]")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
+  }
+});

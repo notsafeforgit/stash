@@ -88,8 +88,13 @@ playback rate.
 Playback menus include captions and supported device playback controls.
 Fit/fill, zoom, left-handed actions, and hiding controls are available.
 Navigation, mute and restore-controls stay reachable in the bottom
-dock with chrome hidden. Pinned actions use that dock; the remaining action
-rail is bounded above it, on the preferred hand's side.
+dock with chrome hidden. The show/hide control stays in its place, in the dock
+or the rail, so the same tap hides and restores the controls. Pinned actions
+use that dock; the remaining action rail is bounded above it, on the preferred
+hand's side. Above the timeline, the dock shows the item's title and performers
+in one short line each. The performer line keeps its height when there are
+none, so the rail does not move between items. Information shows the full
+details.
 Controls are transparent icons with small shadows and comfortable tap targets.
 The bottom dock has no background panel, including when the UI is hidden;
 its gaps, side gutters and bottom safe-area padding stay outside the video
@@ -114,7 +119,9 @@ tag/performer labels wrap without horizontal overflow.
 
 Add the optional **Feed** action in **Settings → TV → Action rail** to switch
 between **Scenes** and **Markers** with one tap while watching. Its icon shows
-the current feed, and its label names the destination. Switching uses a brief
+the feed it opens, with the clapperboard and map pin that tabs and navigation
+use for scenes and markers, plus a small swap badge. Its label names the
+destination. Switching uses a brief
 fade that respects reduced motion. It can be pinned or placed in a folder.
 The choice applies to the current viewing URL; the saved
 default changes only in settings. Returning to a recent feed restores its

@@ -81,7 +81,7 @@ for (const surface of [
             : surface === "mute"
               ? page.getByRole("button", { name: "Unmute", exact: true })
               : surface === "title"
-                ? page.locator("[data-tv-dock] p")
+                ? page.locator("[data-tv-summary]")
                 : surface === "timeline"
                   ? page.locator("[data-position-scrubber]")
                   : surface === "information"

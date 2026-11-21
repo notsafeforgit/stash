@@ -127,7 +127,8 @@ test("pins Feed, saves the default, and switches directly with reduced motion", 
     .locator("[data-tv-dock]")
     .getByRole("button", { name: "Switch to scenes", exact: true });
   await expect(toggle).toHaveAccessibleDescription("Current feed: Markers");
-  await expect(toggle.locator("svg.lucide-bookmark")).toBeVisible();
+  // The icon names the destination feed.
+  await expect(toggle.locator("svg.lucide-clapperboard")).toBeVisible();
   await toggle.click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await ready(page, /scene:1$/);
@@ -136,7 +137,7 @@ test("pins Feed, saves the default, and switches directly with reduced motion", 
     page
       .locator("[data-tv-dock]")
       .getByRole("button", { name: "Switch to markers", exact: true })
-      .locator("svg.lucide-list-video"),
+      .locator("svg.lucide-map-pin"),
   ).toBeVisible();
 });
 

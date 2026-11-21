@@ -32,6 +32,7 @@ import type { TvFeedQuery } from "@/core/tv/feed-query";
 import * as GQL from "@/core/generated-graphql";
 import { createCache } from "@/core/create-client";
 import { scenes as sourceScenes } from "./scene-lightbox";
+import { performers as fixturePerformers } from "./merge-dialogs";
 import { markerTag } from "./marker-editor";
 import { playerConfiguration } from "./player-configuration";
 import { hdrStreams } from "./hdr-streams";
@@ -71,6 +72,12 @@ const scenes: GQL.SceneDataFragment[] = Array.from(
       title: params.has("long-info")
         ? `Scene ${id} ${"VeryLongUnbrokenTitle".repeat(25)}`
         : `Scene ${id}`,
+      performers: params.has("performers")
+        ? ["Ada Example", "Blake Example"].map((name, index) => ({
+            ...fixturePerformers[index]!,
+            name,
+          }))
+        : base.performers,
       details: params.has("long-info")
         ? "Long description. ".repeat(100)
         : params.has("metadata")
@@ -158,6 +165,26 @@ const settings: TvSettings = {
         ];
       return [entry];
     })
+    .map((entry) =>
+      entry.type === "action" &&
+      entry.action.kind === "visibility" &&
+      params.get("visibility") === "rail"
+        ? { ...entry, pinned: false }
+        : entry,
+    )
+    .sort(
+      (a, b) =>
+        Number(
+          params.get("visibility") === "last" &&
+            a.type === "action" &&
+            a.action.kind === "visibility",
+        ) -
+        Number(
+          params.get("visibility") === "last" &&
+            b.type === "action" &&
+            b.action.kind === "visibility",
+        ),
+    )
     .concat(
       params.has("feed-action")
         ? [

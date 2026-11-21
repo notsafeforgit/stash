@@ -14,6 +14,7 @@ import {
   Play,
   Volume2,
   VolumeX,
+  ArrowLeftRight,
   Eye,
   Scan,
   PictureInPicture,
@@ -175,6 +176,14 @@ function RailEntry({
         <Icon />
         {entry.action.kind === "counter" && (
           <TvCounterBadge count={count} overlay />
+        )}
+        {entry.action.kind === "feed" && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute right-0.5 bottom-0.5 flex size-4 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
+          >
+            <ArrowLeftRight className="size-3" />
+          </span>
         )}
       </TvIconButton>
     );
@@ -347,10 +356,29 @@ export function TvControls({
   const paused = useScenePlayerValue("paused");
   const navigate = useNavigate();
   const router = useRouter();
+  const intl = useIntl();
   const msg = useMsg();
   const [panel, setPanel] = useState<Panel>({ kind: "closed" });
   const [folder, setFolder] = useState<string | null>(null);
   const [visible, setVisible] = useState(settings.uiVisible);
+  const dock = useRef<HTMLDivElement>(null);
+  const shownDockHeight = useRef(0);
+  const [railLift, setRailLift] = useState(0);
+  // Hiding the controls shortens the dock. A visibility action in the rail is
+  // lifted by the difference so it stays where it was.
+  useLayoutEffect(() => {
+    const element = dock.current;
+    if (!element) return;
+    const measure = () => {
+      const height = element.getBoundingClientRect().height;
+      if (visible) shownDockHeight.current = height;
+      else setRailLift(Math.max(0, shownDockHeight.current - height));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [visible]);
   const [infoVisible, setInfoVisible] = useState(false);
   const [fit, setFit] = useState(settings.fit);
   const mutations = useTvMutations(changed);
@@ -508,6 +536,30 @@ export function TvControls({
       feedMode={feedMode}
     />
   );
+  const pinned = entries.filter((entry) => entry.pinned);
+  const rail = entries.filter((entry) => !entry.pinned);
+  const isVisibility = (entry: TvRailEntry) =>
+    entry.type === "action" && entry.action.kind === "visibility";
+  const pinnedToggle = pinned.findIndex(isVisibility);
+  const railToggle = rail.findIndex(isVisibility);
+  // While hidden, the visibility action stays where it is shown. Spacers hold
+  // the places of the actions that set its position.
+  const spacer = (entry: TvRailEntry) => (
+    <span key={railEntryId(entry)} aria-hidden className="size-11 shrink-0" />
+  );
+  const showControls = (entry: TvRailEntry) => {
+    const Icon =
+      entry.type === "action" ? tvActionIcon(entry.action, feedMode) : Eye;
+    return (
+      <TvIconButton
+        key={railEntryId(entry)}
+        aria-label={msg("tv.text.show_tv_controls", "Show TV controls")}
+        onClick={() => setVisible(true)}
+      >
+        <Icon />
+      </TvIconButton>
+    );
+  };
   return (
     <div
       className="pointer-events-none absolute inset-0 flex min-h-0 flex-col justify-end text-foreground"
@@ -524,14 +576,15 @@ export function TvControls({
         onClick={input.tap}
       />
       <SourceFeedback openQuality={() => action("quality")} />
-      {visible && (
+      {(visible || railToggle >= 0) && (
         <div
           className={cn(
             "pointer-events-none relative mb-2 flex min-h-0 flex-1 items-end gap-3 px-3",
             settings.leftHanded && "flex-row-reverse",
           )}
+          style={visible ? undefined : { marginBottom: railLift + 8 }}
         >
-          {infoVisible && <TvInfo key={item.key} scene={scene} />}
+          {visible && infoVisible && <TvInfo key={item.key} scene={scene} />}
           <aside
             aria-label={msg("tv.text.tv_actions", "TV actions")}
             data-tv-interactive
@@ -540,30 +593,51 @@ export function TvControls({
               settings.leftHanded ? "mr-auto" : "ml-auto",
             )}
           >
-            <div className="pointer-events-auto flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain">
-              {entries.filter((entry) => !entry.pinned).map(renderEntry)}
+            <div
+              className={cn(
+                "flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain",
+                visible && "pointer-events-auto",
+              )}
+            >
+              {visible
+                ? rail.map(renderEntry)
+                : rail
+                    .slice(railToggle)
+                    .map((entry, index) =>
+                      index === 0 ? showControls(entry) : spacer(entry),
+                    )}
             </div>
           </aside>
         </div>
       )}
       {/* Gaps and safe-area padding belong to the dock, not the video gestures. */}
       <div
+        ref={dock}
         className="tv-footer pointer-events-auto relative flex shrink-0 flex-col gap-1 px-2 pt-1 text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.85)]"
         data-tv-dock
         data-tv-interactive
       >
         {visible && (
           <>
-            <div className="flex min-w-0 items-center gap-2">
-              <p
+            <div className="flex min-w-0 items-end gap-2">
+              {/* The performer line keeps its height without performers, so
+                  moving between items does not move the rail. */}
+              <div
                 aria-hidden={infoVisible}
                 className={cn(
-                  "min-w-0 flex-1 truncate text-sm",
+                  "min-w-0 flex-1 leading-tight",
                   infoVisible && "invisible",
                 )}
+                data-tv-summary
               >
-                {objectTitle(scene)}
-              </p>
+                <p className="truncate text-sm">{objectTitle(scene)}</p>
+                <p className="min-h-[1lh] truncate text-xs text-white/80">
+                  {intl.formatList(
+                    scene.performers.map((performer) => performer.name),
+                    { type: "conjunction" },
+                  )}
+                </p>
+              </div>
               {/* Background feed refreshes must not move the rail or any
                   popover anchored to it. Reserve space within this row. */}
               <span className="inline-flex size-4 shrink-0 items-center justify-center">
@@ -620,12 +694,20 @@ export function TvControls({
             }}
           />
           <MuteButton />
-          {visible && (
+          {(visible || pinnedToggle >= 0) && (
             <div
               className="pointer-events-auto flex min-w-0 flex-1 gap-1 overflow-x-auto overscroll-contain"
               data-tv-pinned-actions
             >
-              {entries.filter((entry) => entry.pinned).map(renderEntry)}
+              {visible
+                ? pinned.map(renderEntry)
+                : pinned
+                    .slice(0, pinnedToggle + 1)
+                    .map((entry, index) =>
+                      index === pinnedToggle
+                        ? showControls(entry)
+                        : spacer(entry),
+                    )}
             </div>
           )}
           {zoomed && (
@@ -647,17 +729,6 @@ export function TvControls({
             >
               <PictureInPicture />
             </TvIconButton>
-          )}
-          {!visible && (
-            <>
-              <div className="min-w-0 flex-1" />
-              <TvIconButton
-                aria-label={msg("tv.text.show_tv_controls", "Show TV controls")}
-                onClick={() => setVisible(true)}
-              >
-                <Eye />
-              </TvIconButton>
-            </>
           )}
         </div>
         {visible && snapshot.error && (

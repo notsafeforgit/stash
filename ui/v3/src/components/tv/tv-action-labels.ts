@@ -23,7 +23,9 @@ import {
   Sparkles,
   Plus,
   Folder,
-  ListVideo,
+  ArrowLeftRight,
+  Clapperboard,
+  MapPin,
   type LucideIcon,
 } from "lucide-react";
 import type { TvAction, TvActionKind } from "@/core/tv/action-config";
@@ -82,7 +84,7 @@ export const tvActionLabels: Record<TvActionKind, string> = {
 };
 const icons: Record<TvActionKind, LucideIcon> = {
   settings: Settings,
-  feed: ListVideo,
+  feed: ArrowLeftRight,
   visibility: Eye,
   info: Info,
   rating: Star,
@@ -115,6 +117,9 @@ export const tvCustomIcons = {
 } satisfies Record<TvAction["icon"], LucideIcon>;
 export function tvActionIcon(action: TvAction, feedMode?: TvMode): LucideIcon {
   if (action.icon !== "default") return tvCustomIcons[action.icon];
-  if (action.kind === "feed" && feedMode === "markers") return Bookmark;
+  // The feed switch shows where it goes, with the icons the app's tabs and
+  // navigation use for scenes and markers.
+  if (action.kind === "feed" && feedMode)
+    return feedMode === "markers" ? Clapperboard : MapPin;
   return icons[action.kind];
 }

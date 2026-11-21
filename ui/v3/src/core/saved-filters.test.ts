@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FilterMode, type SavedFilterDataFragment } from "./generated-graphql";
-import {
-  buildDefaultFilterFromSavedFilter,
-  buildRenameSavedFilterInput,
-} from "./saved-filters";
+import { buildRenameSavedFilterInput } from "./saved-filters";
 
 // Criteria the list model does not know about, including keys inside a
 // condition value and on a group. A rename must send them back unchanged.
@@ -89,22 +86,5 @@ describe("buildRenameSavedFilterInput", () => {
     const input = buildRenameSavedFilterInput(empty, "Renamed");
     expect(input.find_filter).toBeNull();
     expect(input.filter_ast).toBeNull();
-  });
-});
-
-describe("buildDefaultFilterFromSavedFilter", () => {
-  it("copies the stored criteria without the Apollo typename", () => {
-    expect(buildDefaultFilterFromSavedFilter(stored)).toEqual({
-      mode: FilterMode.Scenes,
-      find_filter: {
-        q: "beach",
-        page: 2,
-        per_page: 40,
-        sort: "date",
-        direction: "DESC",
-      },
-      filter_ast: storedCriteria,
-      ui_options: {},
-    });
   });
 });

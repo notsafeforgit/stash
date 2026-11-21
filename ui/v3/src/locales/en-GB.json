@@ -2321,7 +2321,6 @@
     "rename_name_exists": "A saved filter with this name already exists. Choose another name.",
     "rename_saved_filter_failed": "The saved filter could not be renamed. Try again.",
     "saved_filter_renamed": "Renamed saved filter “{name}”",
-    "set_saved_filter_default": "Set {name} as default filter",
     "no_matching_saved_filters": "No matching saved filters",
     "no_saved_filters": "No saved filters yet",
     "sort_by": "Sort by",

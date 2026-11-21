@@ -8,9 +8,7 @@ import type {
 import {
   DefaultFilterAction,
   type DefaultFilterInput,
-  type SavedFilterDataFragment,
 } from "src/core/generated-graphql";
-import { buildDefaultFilterFromSavedFilter } from "src/core/saved-filters";
 import {
   useConfigurationContextOptional,
   useConfigureDefaultFilter,
@@ -77,13 +75,6 @@ export function useDefaultFilterActions(
       ui_options: copy.makeSavedUIOptions(),
     });
   }, [filter, write]);
-  // A saved row makes its stored criteria the view default, unchanged. Only
-  // the current filter goes through the list model.
-  const setSaved = useCallback(
-    (saved: SavedFilterDataFragment) =>
-      write(DefaultFilterAction.Set, buildDefaultFilterFromSavedFilter(saved)),
-    [write],
-  );
   const clear = useCallback(() => write(DefaultFilterAction.Clear), [write]);
   const useImported = useCallback(
     () => write(DefaultFilterAction.UseImported),
@@ -100,7 +91,6 @@ export function useDefaultFilterActions(
     canUseImported: !conflict?.import_error,
     saving,
     setCurrent,
-    setSaved,
     clear,
     useImported,
     keepCurrent,

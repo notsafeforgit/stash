@@ -231,7 +231,6 @@ export const SavedFilterBar: React.FC<{
             onSelect={loadSavedFilter}
             onTogglePinned={togglePinned}
             onRename={renameSavedFilter}
-            onSetDefault={view ? defaultFilter.setSaved : undefined}
             onDelete={deleteSavedFilter}
           />
           <Button variant="outline" onClick={() => setShowSaveDialog(true)}>

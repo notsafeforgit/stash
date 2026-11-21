@@ -284,6 +284,12 @@ for (const width of [390, 1280]) {
                 },
               ]);
             if (scope === "selected") {
+              // Queuing the reset closes Generate too. Reopening it while it
+              // fades out would press its closing backdrop instead.
+              await expect(
+                page.getByRole("dialog", { name: "Generate", exact: true }),
+              ).toBeHidden();
+              await expectBackdropSettled(page);
               await page
                 .getByRole("button", {
                   name: "Generate selected scenes",

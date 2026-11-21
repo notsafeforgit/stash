@@ -748,6 +748,45 @@ for (const layout of ["standalone", "collection", "media"]) {
   });
 }
 
+for (const layout of ["standalone", "collection"]) {
+  test(`search follows a shell the keyboard resizes (${layout})`, async ({
+    page,
+  }) => {
+    await page.goto(`/?${layout}`);
+    const footer =
+      layout === "standalone"
+        ? page.locator("[data-mobile-list-mode]")
+        : detailFooter(page);
+    await footer.getByRole("button", { name: "Search…", exact: true }).tap();
+    await expect(footer.getByRole("searchbox")).toBeFocused();
+    // With interactive-widget=resizes-content, Safari reports the smaller
+    // visual viewport first and shrinks 100dvh afterwards, with no event.
+    const lifted = await footer.evaluate((element) => {
+      if (!window.visualViewport) throw new Error("Missing visual viewport");
+      Object.defineProperty(window.visualViewport, "height", {
+        configurable: true,
+        value: 500,
+      });
+      Object.defineProperty(window.visualViewport, "offsetTop", {
+        configurable: true,
+        value: 0,
+      });
+      window.visualViewport.dispatchEvent(new Event("resize"));
+      const bottom = element.getBoundingClientRect().bottom;
+      const shell = element.closest<HTMLElement>("[data-app-viewport]");
+      if (!shell) throw new Error("Missing app viewport");
+      shell.style.height = "500px";
+      return bottom;
+    });
+    expect(lifted).toBeCloseTo(500, 0);
+    await expect
+      .poll(() =>
+        footer.evaluate((element) => element.getBoundingClientRect().bottom),
+      )
+      .toBeCloseTo(500, 0);
+  });
+}
+
 test("mobile sheets focus themselves and leave the page un-inert", async ({
   page,
 }) => {

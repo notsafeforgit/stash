@@ -38,6 +38,7 @@ export function useMobileKeyboardLayout<T extends HTMLElement>() {
 
     const viewport = window.visualViewport;
     if (!viewport) return;
+    const appViewport = element.closest<HTMLElement>("[data-app-viewport]");
 
     const update = () => {
       const activeElement = document.activeElement;
@@ -46,9 +47,7 @@ export function useMobileKeyboardLayout<T extends HTMLElement>() {
 
       const bottomInset = hasFocusedInput
         ? calculateVisualViewportBottomInset(
-            element
-              .closest<HTMLElement>("[data-app-viewport]")
-              ?.getBoundingClientRect().height ??
+            appViewport?.getBoundingClientRect().height ??
               document.documentElement.clientHeight,
             viewport,
           )
@@ -63,6 +62,13 @@ export function useMobileKeyboardLayout<T extends HTMLElement>() {
     viewport.addEventListener("resize", update);
     viewport.addEventListener("scroll", update);
     window.addEventListener("resize", update);
+    // With interactive-widget=resizes-content, Safari shrinks 100dvh for the
+    // keyboard after its viewport events, so measure again when the shell does.
+    const shellResize =
+      appViewport && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(update)
+        : null;
+    if (appViewport) shellResize?.observe(appViewport);
     update();
 
     return () => {
@@ -72,6 +78,7 @@ export function useMobileKeyboardLayout<T extends HTMLElement>() {
       viewport.removeEventListener("resize", update);
       viewport.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
+      shellResize?.disconnect();
       element.style.removeProperty("--mobile-keyboard-inset");
     };
   }, [element]);

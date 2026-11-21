@@ -224,6 +224,9 @@ the visual viewport as a bottom margin, shrinking the adjacent scroller so list
 content ends at the search row. It accounts for Safari's native viewport pan and
 updates a dedicated CSS variable synchronously on focus/viewport events, avoiding
 an extra animation frame or React render between the pan and layout correction.
+Safari now applies the viewport's `interactive-widget=resizes-content`, shrinking
+`100dvh` for the keyboard after its viewport events, so the hook also measures
+again when the app shell resizes; the margin then returns to zero.
 Do not translate only the footer: that leaves content under the keyboard chrome
 and can briefly compound the browser's pan. Opening search mounts and focuses in
 the same touch handler and permits native focus scrolling; restoring the trigger

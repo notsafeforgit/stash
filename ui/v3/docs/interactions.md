@@ -157,7 +157,9 @@ and navigation below it on mobile. `mobile-detail-chrome.tsx` provides a shared
 Entity actions, and Back controls. All targets stay at least 44px at 320px width;
 the section label truncates and becomes an icon on the narrowest screens. Search
 and selection replace the browse controls, keeping Navigation on the left and
-their dismissal control at the right edge. Navigation,
+their dismissal control at the right edge. In selection, a Selection actions
+sheet holds Share and the entity's bulk actions, so they work without a
+selected item on screen. Navigation,
 Filters, View options, and Entity actions open bottom drawers with scrollable
 content and dismiss through swipe-down, outside taps, or Escape. They omit Close
 rows; the shared drawer primitive supplies bottom safe-area padding. The section

@@ -34,7 +34,8 @@ import {
 import { SceneCard, SceneCardLayout } from "src/components/cards/scene-card";
 import { EntityContextMenuContent } from "@/components/cards/entity-context-menu-content";
 import { objectTitle } from "@/core/files";
-import { useBulkCardActions } from "src/components/cards/use-bulk-card-actions";
+import { useListContextOptional } from "src/components/list/list-provider";
+import { useSelectionSnapshot } from "src/components/list/selection-actions";
 import { offlineEntryToSceneCardScene } from "./offline-scene-card-data";
 import { useOfflineEntries } from "./use-offline-entries";
 import {
@@ -261,18 +262,16 @@ const OfflineSceneCardCell = React.memo(function OfflineSceneCardCell({
     entry.status === "error" ||
     entry.server_status === "missing";
 
-  // Bulk-mode hook. Snapshot of the current selection is captured at
-  // context-menu open time (lazy — see useBulkCardActions); when the
-  // user has multiple offline scenes selected and right-clicks one of
-  // them, the menu collapses to bulk actions instead of stacking the
-  // single + bulk variants together. Mirrors the streaming card pattern.
-  const {
-    selectedItems,
-    bulkCount,
-    showBulkActions,
-    onContextMenuOpen,
-    onSelectAll,
-  } = useBulkCardActions(OfflineListItems.useItems());
+  // The selection is captured when the menu opens; with several offline
+  // scenes selected, the menu offers bulk actions instead of the single
+  // ones, as streaming cards do.
+  const { onSelectAll } = useListContextOptional();
+  const { selectedItems, capture } = useSelectionSnapshot(
+    OfflineListItems.useItems(),
+    OfflineListItems.useSelectionGetter(),
+  );
+  const bulkCount = selectedItems.length;
+  const showBulkActions = bulkCount > 1;
 
   const contextMenu = showBulkActions ? (
     <EntityContextMenuContent title={objectTitle(cardScene)}>
@@ -284,7 +283,7 @@ const OfflineSceneCardCell = React.memo(function OfflineSceneCardCell({
           requiring the user to first toggle the checkbox — same UX
           as the streaming cards. Once the first card is selected,
           right-clicking another card (or this one again) flips the
-          menu into bulk mode via useBulkCardActions. */}
+          menu into bulk mode. */}
       <ContextMenuItem onClick={() => onSelectedChanged(true, false)}>
         {intl.formatMessage({
           id: "actions.select",
@@ -342,7 +341,7 @@ const OfflineSceneCardCell = React.memo(function OfflineSceneCardCell({
         onSelectedChanged={onSelectedChanged}
         onPreviewClick={canPreviewPlay ? onPreviewClick : undefined}
         contextMenu={contextMenu}
-        onContextMenuOpen={onContextMenuOpen}
+        onContextMenuOpen={capture}
       />
       {showStatus && <CardStatusOverlay entry={entry} active={active} />}
     </div>
@@ -404,7 +403,7 @@ function OfflineBulkContextMenuItems({
   items,
   count,
 }: {
-  items: OfflineCardItem[];
+  items: readonly OfflineCardItem[];
   count: number;
 }) {
   const intl = useIntl();

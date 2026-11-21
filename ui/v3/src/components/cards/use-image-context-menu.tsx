@@ -1,4 +1,3 @@
-import { ImageListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -6,9 +5,6 @@ import { useNavigate, useRouter } from "@tanstack/react-router";
 import * as GQL from "src/core/generated-graphql";
 import { imageTitle } from "src/core/files";
 import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
-import { useBulkMediaDelete } from "@/components/detail/use-bulk-media-delete";
-import type { DeleteOptions } from "@/components/detail/delete-dialog";
-import type { DeleteProgress } from "@/core/bulk-delete";
 import {
   ContextMenu,
   ContextMenuItem,
@@ -19,10 +15,7 @@ import {
   DeleteDialog,
   DeleteFilesList,
 } from "src/components/detail/delete-dialog";
-import {
-  ImageGenerateDialog,
-  ImageBulkEditSheet,
-} from "@/components/detail/deferred-overlays";
+import { ImageGenerateDialog } from "@/components/detail/deferred-overlays";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -87,27 +80,11 @@ export function useImageContextMenu({
       });
     },
   });
-  const deleteImages = useBulkMediaDelete("Image");
 
-  const {
-    selectedItems,
-    totalCount,
-    applyToAllTarget,
-    bulkCount,
-    showBulkActions,
-    bulkDeleteOpen,
-    setBulkDeleteOpen,
-    bulkEditOpen,
-    setBulkEditOpen,
-    onContextMenuOpen,
-  } = useBulkCardActions(
-    ImageListItems.useItems(),
-    ImageListItems.useSelectionGetter(),
-  );
+  const { bulkActions, bulkCount, onContextMenuOpen } = useBulkCardActions();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
-  const [bulkGenerateOpen, setBulkGenerateOpen] = useState(false);
 
   async function handleConfirmedDelete({
     deleteFile,
@@ -125,17 +102,6 @@ export function useImageContextMenu({
     });
   }
 
-  async function handleConfirmedBulkDelete(
-    options: DeleteOptions,
-    onProgress: (progress: DeleteProgress) => void,
-  ) {
-    await deleteImages(
-      selectedItems.map((i) => i.id),
-      options,
-      onProgress,
-    );
-  }
-
   const hasCoverSetters =
     onSetGalleryCover ||
     onSetPerformerImage ||
@@ -144,14 +110,11 @@ export function useImageContextMenu({
 
   const menuContent = (
     <EntityContextMenuContent title={imageTitle(image)}>
-      {showBulkActions ? (
+      {bulkActions ? (
         <BulkContextMenuItems
           count={bulkCount}
-          noun="images"
+          actions={bulkActions}
           openInNewTabHref={`/images/${image.id}`}
-          onEdit={() => setBulkEditOpen(true)}
-          onGenerate={() => setBulkGenerateOpen(true)}
-          onDelete={() => setBulkDeleteOpen(true)}
         />
       ) : (
         <>
@@ -242,12 +205,6 @@ export function useImageContextMenu({
     </EntityContextMenuContent>
   );
 
-  // Cast helper: selectedItems carries visual_files at runtime via the
-  // list-page slim fragment, even though ImageBulkItem doesn't model it.
-  const bulkVisualFilePaths = selectedItems.flatMap(
-    (i) => i.visual_files?.map((f) => f.path) ?? [],
-  );
-
   const dialogs = (
     <>
       <DeleteDialog
@@ -279,52 +236,6 @@ export function useImageContextMenu({
         onOpenChange={setGenerateOpen}
         imageIds={[image.id]}
       />
-      {showBulkActions && (
-        <>
-          <DeleteDialog
-            open={bulkDeleteOpen}
-            onOpenChange={setBulkDeleteOpen}
-            entityCountLabel={intl.formatMessage(
-              {
-                id: "dialogs.delete_images_count",
-                defaultMessage: "{count} images",
-              },
-              { count: bulkCount },
-            )}
-            showFileOptions
-            deleteFileLabel={intl.formatMessage({
-              id: "dialogs.delete_file",
-              defaultMessage: "Delete file",
-            })}
-            details={
-              bulkVisualFilePaths.length > 0 ? (
-                <DeleteFilesList paths={bulkVisualFilePaths} />
-              ) : undefined
-            }
-            detailsLabel={intl.formatMessage(
-              {
-                id: "dialogs.delete_show_files_count",
-                defaultMessage:
-                  "Show {count, plural, one {# file} other {# files}}",
-              },
-              { count: bulkVisualFilePaths.length },
-            )}
-            onConfirm={handleConfirmedBulkDelete}
-          />
-          <ImageGenerateDialog
-            open={bulkGenerateOpen}
-            onOpenChange={setBulkGenerateOpen}
-            imageIds={selectedItems.map((i) => i.id)}
-          />
-          <ImageBulkEditSheet
-            open={bulkEditOpen}
-            onOpenChange={setBulkEditOpen}
-            items={selectedItems}
-            applyToAllTarget={applyToAllTarget}
-            totalCount={totalCount}
-          />
-        </>
-      )}
     </>
   );
 

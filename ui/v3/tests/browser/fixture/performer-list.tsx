@@ -12,6 +12,7 @@ declare global {
   interface Window {
     performerListRequests: string[];
     createdPerformerInputs: PerformerCreateInput[];
+    deletedPerformerIds: string[][];
   }
 }
 
@@ -28,9 +29,14 @@ export function PerformerListFixture() {
   const client = useMemo(() => {
     window.performerListRequests = [];
     window.createdPerformerInputs = [];
-    const listItems = new URLSearchParams(location.search).has("empty")
+    window.deletedPerformerIds = [];
+    const allItems = new URLSearchParams(location.search).has("empty")
       ? []
       : items;
+    const remaining = () => {
+      const deleted = new Set(window.deletedPerformerIds.flat());
+      return allItems.filter((item) => !deleted.has(item.id));
+    };
     return new ApolloClient({
       cache: createCache(),
       link: new ApolloLink(
@@ -38,6 +44,7 @@ export function PerformerListFixture() {
           new Observable((observer) => {
             const name = operation.operationName;
             window.performerListRequests.push(name ?? "");
+            const listItems = remaining();
             let data: object;
             switch (name) {
               case "FindPerformerList":
@@ -83,6 +90,14 @@ export function PerformerListFixture() {
                     name: operation.variables.input.name,
                   },
                 };
+                break;
+              case "FindPerformer":
+                // Hovering a card prefetches its detail page.
+                data = { findPerformer: null };
+                break;
+              case "PerformersDestroy":
+                window.deletedPerformerIds.push(operation.variables.ids);
+                data = { performersDestroy: true };
                 break;
               case "BulkCustomFieldSummary":
                 data = {

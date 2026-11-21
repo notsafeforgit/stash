@@ -1,4 +1,3 @@
-import { GalleryListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -10,10 +9,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "src/components/ui/context-menu";
-import {
-  GalleryBulkEditSheet,
-  GalleryDeleteDialog,
-} from "@/components/detail/deferred-overlays";
+import { GalleryDeleteDialog } from "@/components/detail/deferred-overlays";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -46,33 +42,17 @@ export function useGalleryContextMenu({
   const navigate = useNavigate();
   const router = useRouter();
 
-  const {
-    selectedItems,
-    totalCount,
-    applyToAllTarget,
-    bulkCount,
-    showBulkActions,
-    bulkDeleteOpen,
-    setBulkDeleteOpen,
-    bulkEditOpen,
-    setBulkEditOpen,
-    onContextMenuOpen,
-  } = useBulkCardActions(
-    GalleryListItems.useItems(),
-    GalleryListItems.useSelectionGetter(),
-  );
+  const { bulkActions, bulkCount, onContextMenuOpen } = useBulkCardActions();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const menuContent = (
     <EntityContextMenuContent title={galleryLabel(gallery)}>
-      {showBulkActions ? (
+      {bulkActions ? (
         <BulkContextMenuItems
           count={bulkCount}
-          noun="galleries"
+          actions={bulkActions}
           openInNewTabHref={`/galleries/${gallery.id}`}
-          onEdit={() => setBulkEditOpen(true)}
-          onDelete={() => setBulkDeleteOpen(true)}
         />
       ) : (
         <>
@@ -124,22 +104,6 @@ export function useGalleryContextMenu({
         entityName={galleryLabel(gallery)}
         ids={[gallery.id]}
       />
-      {showBulkActions && (
-        <>
-          <GalleryDeleteDialog
-            open={bulkDeleteOpen}
-            onOpenChange={setBulkDeleteOpen}
-            ids={selectedItems.map((item) => item.id)}
-          />
-          <GalleryBulkEditSheet
-            open={bulkEditOpen}
-            onOpenChange={setBulkEditOpen}
-            items={selectedItems}
-            applyToAllTarget={applyToAllTarget}
-            totalCount={totalCount}
-          />
-        </>
-      )}
     </>
   );
 

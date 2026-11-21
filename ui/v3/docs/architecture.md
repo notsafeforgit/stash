@@ -417,8 +417,17 @@ Creation remains an explicit confirmation, and failed requests preserve the
 draft. The server validates deduplicated media membership, including gallery
 expansion.
 
+A list configuration's `SelectionActions` provider (`components/cards/*-selection-actions.tsx`)
+owns the entity's bulk dialogs once per list. `selection-actions.tsx` exposes
+its actions to the selection toolbar, a desktop menu and a mobile sheet, which
+also holds Share on phones, and to the bulk card and row menus, so a selection
+scrolled out of view, or on another page, can still be edited or deleted. Each
+action captures the selection when it starts; its dialog keeps those items as
+the selection changes behind it. `EntityListPage` provides the list state to
+the toolbar as well as the cards.
+
 `onDeleteSelection` supplies the same action to the desktop/mobile selection
-toolbar and card/row menus. It snapshots selected UUIDs, the current search and
+toolbar and card/row menus for lists without a `SelectionActions` provider. It snapshots selected UUIDs, the current search and
 AST filter, and the matching count. Marker deletion keeps its dialog at page
 level, resolves all matching UUIDs only when explicitly requested, and confirms
 the resolved count before deleting in batches. It never advances offset pages

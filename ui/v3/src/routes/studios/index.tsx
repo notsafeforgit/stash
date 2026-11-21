@@ -8,6 +8,7 @@ import * as GQL from "src/core/generated-graphql";
 import { EntityListPage, type EntityListPageConfig } from "src/components/list";
 import { StudioCard, StudioCardLayout } from "src/components/cards";
 import { StudioRowContextMenu } from "src/components/cards/use-studio-context-menu";
+import { StudioSelectionActions } from "src/components/cards/studio-selection-actions";
 import { View } from "src/components/list/views";
 import { useStudioTableColumns } from "./-table-columns";
 import {
@@ -38,6 +39,7 @@ function StudiosPage() {
     () => ({
       filterMode: GQL.FilterMode.Studios,
       ItemsProvider: StudioListItems.Provider,
+      SelectionActions: StudioSelectionActions,
       view: View.Studios,
       source: {
         kind: "graphql",

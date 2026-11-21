@@ -1,4 +1,3 @@
-import { TagListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -14,7 +13,6 @@ import {
 } from "src/components/ui/context-menu";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
 import { AutoTagDialog } from "src/components/detail/auto-tag-dialog";
-import { TagBulkEditSheet } from "@/components/detail/deferred-overlays";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -46,28 +44,11 @@ export function useTagContextMenu({
 
   const [updateTag] = useMutation(GQL.TagUpdateDocument);
   const [destroyTag] = useEntityMutation(GQL.TagDestroyDocument);
-  const [destroyTags] = useEntityMutation(GQL.TagsDestroyDocument);
 
-  const {
-    selectedItems,
-    totalCount,
-    applyToAllTarget,
-    bulkCount,
-    showBulkActions,
-    bulkDeleteOpen,
-    setBulkDeleteOpen,
-    bulkEditOpen,
-    setBulkEditOpen,
-    onContextMenuOpen,
-    onRemoveSelection,
-  } = useBulkCardActions(
-    TagListItems.useItems(),
-    TagListItems.useSelectionGetter(),
-  );
+  const { bulkActions, bulkCount, onContextMenuOpen } = useBulkCardActions();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [autoTagOpen, setAutoTagOpen] = useState(false);
-  const [bulkAutoTagOpen, setBulkAutoTagOpen] = useState(false);
 
   async function handleConfirmedDelete() {
     await destroyTag({
@@ -84,33 +65,13 @@ export function useTagContextMenu({
     });
   }
 
-  async function handleConfirmedBulkDelete() {
-    const ids = selectedItems.map((i) => i.id);
-    await destroyTags({
-      variables: { ids },
-      update(cache) {
-        removeEntitiesFromCache({
-          cache,
-          typename: "Tag",
-          listFieldName: "findTags",
-          itemsField: "tags",
-          ids,
-        });
-        onRemoveSelection?.(ids);
-      },
-    });
-  }
-
   const menuContent = (
     <EntityContextMenuContent title={tag.name}>
-      {showBulkActions ? (
+      {bulkActions ? (
         <BulkContextMenuItems
           count={bulkCount}
-          noun="tags"
+          actions={bulkActions}
           openInNewTabHref={`/tags/${tag.id}`}
-          onEdit={() => setBulkEditOpen(true)}
-          onAutoTag={() => setBulkAutoTagOpen(true)}
-          onDelete={() => setBulkDeleteOpen(true)}
         />
       ) : (
         <>
@@ -194,35 +155,6 @@ export function useTagContextMenu({
         ids={[tag.id]}
         entityName={tag.name}
       />
-      {showBulkActions && (
-        <>
-          <DeleteDialog
-            open={bulkDeleteOpen}
-            onOpenChange={setBulkDeleteOpen}
-            entityCountLabel={intl.formatMessage(
-              {
-                id: "dialogs.delete_tags_count",
-                defaultMessage: "{count} tags",
-              },
-              { count: bulkCount },
-            )}
-            onConfirm={handleConfirmedBulkDelete}
-          />
-          <AutoTagDialog
-            open={bulkAutoTagOpen}
-            onOpenChange={setBulkAutoTagOpen}
-            entityType="tag"
-            ids={selectedItems.map((i) => i.id)}
-          />
-          <TagBulkEditSheet
-            open={bulkEditOpen}
-            onOpenChange={setBulkEditOpen}
-            items={selectedItems}
-            applyToAllTarget={applyToAllTarget}
-            totalCount={totalCount}
-          />
-        </>
-      )}
     </>
   );
 

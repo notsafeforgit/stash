@@ -196,4 +196,9 @@ export interface EntityListPageConfig<
   pageActions?: readonly EntityActionItem[];
   /** Delete action shared by the selection toolbar and card/row menus. */
   onDeleteSelection?: (selection: ListDeleteSelection) => void;
+  /**
+   * Owns the entity's bulk dialogs and provides their actions to the
+   * selection toolbar and to card and row menus.
+   */
+  SelectionActions?: React.ComponentType<React.PropsWithChildren>;
 }

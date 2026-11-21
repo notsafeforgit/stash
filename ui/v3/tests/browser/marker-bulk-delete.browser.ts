@@ -1,5 +1,10 @@
 import type { Page } from "@playwright/test";
-import { test, expect, holdForContextMenu } from "./test";
+import {
+  test,
+  expect,
+  chooseSelectionAction,
+  holdForContextMenu,
+} from "./test";
 import { DisplayMode } from "../../src/models/list-filter/types";
 import { encodeURLJSON } from "../../src/utils/url-json";
 
@@ -51,9 +56,7 @@ for (const layout of ["grid", "table"] as const) {
     await expect(dialog.getByRole("checkbox")).toHaveCount(0);
     await dialog.getByRole("button", { name: "Cancel", exact: true }).tap();
     expect(await page.evaluate(() => window.markerListMutations)).toEqual([]);
-    await page
-      .getByRole("button", { name: "Delete selected", exact: true })
-      .tap();
+    await chooseSelectionAction(page, "Delete…");
     await dialog.getByRole("button", { name: "Delete", exact: true }).tap();
     await expect(dialog).toBeHidden();
     await expect(items).toHaveCount(1);
@@ -83,9 +86,7 @@ for (const width of [390, 1280]) {
     });
     await page.goto(filterURL);
     await selectPage(page);
-    await page
-      .getByRole("button", { name: "Delete selected", exact: true })
-      .tap();
+    await chooseSelectionAction(page, "Delete…");
     const dialog = page.getByRole("dialog");
     await expect(
       dialog.getByRole("heading", { name: "Delete 23 markers?" }),
@@ -103,9 +104,7 @@ for (const width of [390, 1280]) {
     ).toBeEnabled();
     await dialog.getByRole("button", { name: "Cancel", exact: true }).tap();
     expect(await page.evaluate(() => window.markerListMutations)).toEqual([]);
-    await page
-      .getByRole("button", { name: "Delete selected", exact: true })
-      .tap();
+    await chooseSelectionAction(page, "Delete…");
     await expect(matching).not.toBeChecked();
     await expect(
       dialog.getByRole("heading", { name: "Delete 23 markers?" }),
@@ -165,9 +164,7 @@ test("a failed bulk marker batch stops and reports confirmed progress", async ({
   });
   await page.goto(filterURL);
   await selectPage(page);
-  await page
-    .getByRole("button", { name: "Delete selected", exact: true })
-    .tap();
+  await chooseSelectionAction(page, "Delete…");
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("switch").check();
   await dialog.getByRole("button", { name: "Delete", exact: true }).tap();
@@ -193,9 +190,7 @@ test("an incomplete matching marker lookup cannot be confirmed", async ({
   });
   await page.goto(filterURL);
   await selectPage(page);
-  await page
-    .getByRole("button", { name: "Delete selected", exact: true })
-    .tap();
+  await chooseSelectionAction(page, "Delete…");
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("switch").check();
   await expect(dialog.getByRole("alert")).toHaveText(

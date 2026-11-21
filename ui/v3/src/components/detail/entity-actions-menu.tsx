@@ -7,6 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -136,17 +137,23 @@ export function EntityActionsList({
 export function EntityActionsMenu({
   items,
   busy = false,
+  label: labelProp,
+  heading,
 }: {
   items: readonly EntityActionItem[];
   busy?: boolean;
+  label?: string;
+  heading?: string;
 }) {
   const intl = useIntl();
   const chrome = useMobileDetailChrome();
   const [open, setOpen] = useState(false);
-  const label = intl.formatMessage({
-    id: "operations",
-    defaultMessage: "Operations",
-  });
+  const label =
+    labelProp ??
+    intl.formatMessage({
+      id: "operations",
+      defaultMessage: "Operations",
+    });
 
   if (chrome?.mobile)
     return (
@@ -163,6 +170,7 @@ export function EntityActionsMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuGroup>
+          {heading && <DropdownMenuLabel>{heading}</DropdownMenuLabel>}
           <EntityActionsContent items={items} mobile={false} />
         </DropdownMenuGroup>
       </DropdownMenuContent>

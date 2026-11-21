@@ -47,6 +47,12 @@ import { GalleryRowContextMenu } from "src/components/cards/use-gallery-context-
 import { GroupRowContextMenu } from "src/components/cards/use-group-context-menu";
 import { PerformerRowContextMenu } from "src/components/cards/use-performer-context-menu";
 import { TagRowContextMenu } from "src/components/cards/use-tag-context-menu";
+import { SceneSelectionActions } from "src/components/cards/scene-selection-actions";
+import { ImageSelectionActions } from "src/components/cards/image-selection-actions";
+import { GallerySelectionActions } from "src/components/cards/gallery-selection-actions";
+import { GroupSelectionActions } from "src/components/cards/group-selection-actions";
+import { PerformerSelectionActions } from "src/components/cards/performer-selection-actions";
+import { TagSelectionActions } from "src/components/cards/tag-selection-actions";
 import { useSceneTableColumns } from "src/routes/scenes/-table-columns";
 import {
   Lightbox,
@@ -377,6 +383,7 @@ export function useSceneListConfig(
       filterMode: GQL.FilterMode.Scenes,
       sharing: { kind: GQL.ShareEntityKind.Scene, getTitle: objectTitle },
       ItemsProvider: SceneListItems.Provider,
+      SelectionActions: SceneSelectionActions,
       source: {
         kind: "graphql",
         query: GQL.FindSceneListDocument,
@@ -557,6 +564,7 @@ export function useImageListConfig(
       filterMode: GQL.FilterMode.Images,
       sharing: { kind: GQL.ShareEntityKind.Image, getTitle: imageTitle },
       ItemsProvider: ImageListItems.Provider,
+      SelectionActions: ImageSelectionActions,
       source: {
         kind: "graphql",
         query: GQL.FindImageListDocument,
@@ -929,6 +937,7 @@ export function useGalleryListConfig(onEdit: (id: string) => void): {
       pageNavRef,
       sharing: { kind: GQL.ShareEntityKind.Gallery, getTitle: galleryLabel },
       ItemsProvider: GalleryListItems.Provider,
+      SelectionActions: GallerySelectionActions,
       source: {
         kind: "graphql",
         query: GQL.FindGalleriesDocument,
@@ -1004,6 +1013,7 @@ export function usePerformerListConfig(
     () => ({
       filterMode: GQL.FilterMode.Performers,
       ItemsProvider: PerformerListItems.Provider,
+      SelectionActions: PerformerSelectionActions,
       source: {
         kind: "graphql",
         query: GQL.FindPerformerListDocument,
@@ -1125,6 +1135,7 @@ export function useGroupListConfig(
     () => ({
       filterMode: GQL.FilterMode.Groups,
       ItemsProvider: GroupListItems.Provider,
+      SelectionActions: GroupSelectionActions,
       source: {
         kind: "graphql",
         query: GQL.FindGroupsDocument,
@@ -1198,6 +1209,7 @@ export function useTagListConfig(
     () => ({
       filterMode: GQL.FilterMode.Tags,
       ItemsProvider: TagListItems.Provider,
+      SelectionActions: TagSelectionActions,
       source: {
         kind: "graphql",
         query: GQL.FindTagsDocument,

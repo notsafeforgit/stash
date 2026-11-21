@@ -1,6 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { useIntl } from "react-intl";
 import { useListContextOptional } from "src/components/list/list-provider";
+import {
+  type BulkSelectionActions,
+  useBulkSelectionActions,
+} from "src/components/list/selection-actions";
 import {
   ContextMenuItem,
   ContextMenuSeparator,
@@ -8,94 +12,40 @@ import {
 import { OpenInNewTabMenuItem } from "./open-in-new-tab-menu-item";
 import { SelectAllMenuItem } from "./select-all-menu-item";
 
-export function useBulkCardActions<TItem extends { id: string }>(
-  items: readonly TItem[],
-  getSelectedItems?: () => readonly TItem[],
-) {
-  const {
-    getSelectedIds,
-    totalCount,
-    applyToAllTarget,
-    onSelectAll,
-    onSelectNone,
-    onRemoveSelection,
-  } = useListContextOptional();
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const [bulkEditOpen, setBulkEditOpen] = useState(false);
-  // Computed lazily when the context menu opens — avoids subscribing to
-  // selectedIds/selectedItems and causing re-renders on every selection change.
-  const [selection, setSelection] = useState<readonly TItem[]>([]);
-  const selectedItems = useMemo(() => {
-    const byId = new Map(items.map((item) => [item.id, item]));
-    return selection.map((item) => byId.get(item.id) ?? item);
-  }, [items, selection]);
-  const showBulkActions = selectedItems.length > 1;
-
+export function useBulkCardActions() {
+  const actions = useBulkSelectionActions();
+  const { getSelectedIds } = useListContextOptional();
+  // Counted when the menu opens, so cards do not re-render as the
+  // selection changes.
+  const [bulkCount, setBulkCount] = useState(0);
   const onContextMenuOpen = useCallback(() => {
     // Any right-click while a multi-selection is active surfaces the bulk
-    // menu — even if the right-clicked item isn't itself in the selection.
-    // Without this, a selection that's scrolled off-screen has no way to
-    // be acted on without scrolling back to a selected item.
-    const ids = getSelectedIds();
-    setSelection(
-      getSelectedItems?.() ?? items.filter((item) => ids.has(item.id)),
-    );
-  }, [getSelectedIds, getSelectedItems, items]);
-
+    // menu, even if the right-clicked item isn't itself in the selection.
+    setBulkCount(getSelectedIds().size);
+  }, [getSelectedIds]);
   return {
-    selectedItems,
-    totalCount,
-    applyToAllTarget,
-    bulkCount: selectedItems.length,
-    showBulkActions,
-    bulkDeleteOpen,
-    setBulkDeleteOpen,
-    bulkEditOpen,
-    setBulkEditOpen,
+    bulkActions: actions && bulkCount > 1 ? actions : undefined,
+    bulkCount,
     onContextMenuOpen,
-    /** Selects every item on the current page. Routed through the
-     *  list provider so the same action drives the toolbar's select-
-     *  all button and any context-menu entry that wants to expose it. */
-    onSelectAll,
-    /** Clears all selections — useful for menu items like "Deselect all". */
-    onSelectNone,
-    onRemoveSelection,
   };
 }
 
 interface BulkContextMenuItemsProps {
   count: number;
-  /** English plural noun, e.g. "scenes", "tags". Used as {noun} in the locale string. */
-  noun: string;
-  onEdit: () => void;
-  onDelete: () => void;
+  actions: BulkSelectionActions;
   /** When provided, renders an "Open in new tab" entry that opens the
    *  right-clicked item (not the whole selection) in a new browser tab. */
   openInNewTabHref?: string;
-  /** When provided, renders a "Generate {count} {noun}" entry above Delete. */
-  onGenerate?: () => void;
-  /** When provided, renders a "Merge {count} {noun} into…" entry above Delete. */
-  onMerge?: () => void;
-  /** When provided, renders an "Auto tag {count} {noun}" entry above Delete. */
-  onAutoTag?: () => void;
-  /** When provided, renders a "Download {count} {noun}" entry. Used by
-   *  scene cards to bulk-enqueue selections into the offline download
-   *  queue. */
-  onDownload?: () => void;
 }
 
 export function BulkContextMenuItems({
   count,
-  noun,
-  onEdit,
-  onDelete,
+  actions,
   openInNewTabHref,
-  onGenerate,
-  onMerge,
-  onAutoTag,
-  onDownload,
 }: BulkContextMenuItemsProps) {
   const intl = useIntl();
+  const { noun, onEdit, onDelete, onGenerate, onMerge, onAutoTag, onDownload } =
+    actions;
   // Lead with Select all so the user can extend an in-progress selection
   // without leaving the menu; everything below operates on the current
   // selection only.

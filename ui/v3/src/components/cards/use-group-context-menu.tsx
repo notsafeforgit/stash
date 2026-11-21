@@ -1,4 +1,3 @@
-import { GroupListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -12,7 +11,6 @@ import {
   ContextMenuTrigger,
 } from "src/components/ui/context-menu";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
-import { GroupBulkEditSheet } from "@/components/detail/deferred-overlays";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -42,24 +40,8 @@ export function useGroupContextMenu({
   const router = useRouter();
 
   const [destroyGroup] = useEntityMutation(GQL.GroupDestroyDocument);
-  const [destroyGroups] = useEntityMutation(GQL.GroupsDestroyDocument);
 
-  const {
-    selectedItems,
-    totalCount,
-    applyToAllTarget,
-    bulkCount,
-    showBulkActions,
-    bulkDeleteOpen,
-    setBulkDeleteOpen,
-    bulkEditOpen,
-    setBulkEditOpen,
-    onContextMenuOpen,
-    onRemoveSelection,
-  } = useBulkCardActions(
-    GroupListItems.useItems(),
-    GroupListItems.useSelectionGetter(),
-  );
+  const { bulkActions, bulkCount, onContextMenuOpen } = useBulkCardActions();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -78,32 +60,13 @@ export function useGroupContextMenu({
     });
   }
 
-  async function handleConfirmedBulkDelete() {
-    const ids = selectedItems.map((i) => i.id);
-    await destroyGroups({
-      variables: { ids },
-      update(cache) {
-        removeEntitiesFromCache({
-          cache,
-          typename: "Group",
-          listFieldName: "findGroups",
-          itemsField: "groups",
-          ids,
-        });
-        onRemoveSelection?.(ids);
-      },
-    });
-  }
-
   const menuContent = (
     <EntityContextMenuContent title={group.name}>
-      {showBulkActions ? (
+      {bulkActions ? (
         <BulkContextMenuItems
           count={bulkCount}
-          noun="groups"
+          actions={bulkActions}
           openInNewTabHref={`/groups/${group.id}`}
-          onEdit={() => setBulkEditOpen(true)}
-          onDelete={() => setBulkDeleteOpen(true)}
         />
       ) : (
         <>
@@ -155,29 +118,6 @@ export function useGroupContextMenu({
         entityName={group.name}
         onConfirm={handleConfirmedDelete}
       />
-      {showBulkActions && (
-        <>
-          <DeleteDialog
-            open={bulkDeleteOpen}
-            onOpenChange={setBulkDeleteOpen}
-            entityCountLabel={intl.formatMessage(
-              {
-                id: "dialogs.delete_groups_count",
-                defaultMessage: "{count} groups",
-              },
-              { count: bulkCount },
-            )}
-            onConfirm={handleConfirmedBulkDelete}
-          />
-          <GroupBulkEditSheet
-            open={bulkEditOpen}
-            onOpenChange={setBulkEditOpen}
-            items={selectedItems}
-            applyToAllTarget={applyToAllTarget}
-            totalCount={totalCount}
-          />
-        </>
-      )}
     </>
   );
 

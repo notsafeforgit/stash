@@ -15,8 +15,7 @@ import {
   EmptyMedia,
 } from "@/components/ui/empty";
 import { useIntl } from "react-intl";
-import { SearchXIcon, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { SearchXIcon } from "lucide-react";
 import { EntityList } from "./entity-list";
 import { useListSidebar } from "./use-list-sidebar";
 import { useListSelect } from "./use-list-select";
@@ -39,10 +38,8 @@ import { VirtualizedItemList } from "./virtualized-item-list";
 import { useListPageFilter } from "./use-list-page-filter";
 import { useListData } from "./use-list-data";
 import { useListPageRefill } from "./use-list-page-refill";
-import {
-  ShareSelectionButton,
-  useShareAction,
-} from "@/components/sharing/share-action";
+import { ListSelectionActions } from "./selection-actions";
+import { useShareAction } from "@/components/sharing/share-action";
 import { useActiveCollectionShareList } from "@/components/sharing/collection-share-context";
 import {
   EntityActionsMenu,
@@ -156,6 +153,7 @@ export function EntityListPage<
     getWallDimensions,
     pageActions,
     onDeleteSelection,
+    SelectionActions,
   } = config;
   const intl = useIntl();
 
@@ -237,13 +235,6 @@ export function EntityListPage<
     shareSource?.targets ?? [],
     shareSource?.matching,
   );
-  const shareSelection =
-    shareSource && listSelect.hasSelection ? (
-      <ShareSelectionButton
-        compact={isMobileSidebar}
-        onShare={shareList.open}
-      />
-    ) : undefined;
   const listPageActions: EntityActionItem[] = [...(pageActions ?? [])];
   if (source.kind === "graphql" && sharing) {
     listPageActions.push({
@@ -296,20 +287,12 @@ export function EntityListPage<
     applyToAllTarget,
   ]);
   const selectionActions = listSelect.hasSelection ? (
-    <>
-      {shareSelection}
-      {onDeleteSelection && (
-        <Button
-          variant="ghost"
-          size={isMobileSidebar ? "icon-lg" : "icon-sm"}
-          disabled={isLoading}
-          onClick={deleteSelection}
-          aria-label={intl.formatMessage({ id: "actions.delete_selected" })}
-        >
-          <Trash2 />
-        </Button>
-      )}
-    </>
+    <ListSelectionActions
+      count={listSelect.selectedItems.length}
+      mobile={isMobileSidebar}
+      onShare={shareSource ? shareList.open : undefined}
+      onDelete={onDeleteSelection ? deleteSelection : undefined}
+    />
   ) : undefined;
 
   // Stable context: only changes when query results or filter change, never on selection.
@@ -504,86 +487,92 @@ export function EntityListPage<
         // Table rows pull from the same list context the cards do — so
         // SelectAllMenuItem, BulkContextMenuItems, and useBulkCardActions
         // all see the same selectable/selectedItems/onSelectAll handles.
-        <ListStateContext.Provider value={listStateContextValue}>
-          <EntityDataTable
-            items={items}
-            columns={tableColumns}
-            filter={filter}
-            setFilter={setFilter}
-            listSelect={listSelect}
-            visibilityKey={tableVisibilityKey ?? String(filterMode)}
-            isPending={isLoading}
-            totalCount={count}
-            preserveScrollDuringRefill={preserveScrollDuringRefill}
-            renderRow={renderTableRow}
-          />
-        </ListStateContext.Provider>
+        <EntityDataTable
+          items={items}
+          columns={tableColumns}
+          filter={filter}
+          setFilter={setFilter}
+          listSelect={listSelect}
+          visibilityKey={tableVisibilityKey ?? String(filterMode)}
+          isPending={isLoading}
+          totalCount={count}
+          preserveScrollDuringRefill={preserveScrollDuringRefill}
+          renderRow={renderTableRow}
+        />
       ) : (
-        <ListStateContext.Provider value={listStateContextValue}>
-          <CardLayoutContext.Provider
-            value={
-              filter.displayMode === DisplayMode.Details
-                ? "details"
-                : filter.displayMode === DisplayMode.Wall
-                  ? "wall"
-                  : "grid"
-            }
-          >
-            <CardAspectContext.Provider value={cardAspect}>
-              <ZoomIndexContext.Provider value={filter.zoomIndex}>
-                <MobileGridColsContext.Provider value={mobileGridCols}>
-                  {/* data-selecting drives checkbox/overlay visibility via CSS — no card re-renders needed */}
-                  <div data-selecting={listSelect.selecting || undefined}>
-                    {filter.displayMode === DisplayMode.Wall ? (
-                      <PhotoAlbumWall<TItem>
-                        items={items}
-                        isLoading={isLoading}
-                        zoomIndex={filter.zoomIndex}
-                        isMobile={isMobileSidebar}
-                        selectedIds={listSelect.selectedIds}
-                        onSelectChange={listSelect.onSelectChange}
-                        onCardPreviewClick={onCardPreviewClick}
-                        renderCard={renderCard}
-                        getWallDimensions={getWallDimensions}
-                        itemsPerPage={filter.itemsPerPage}
-                      />
-                    ) : (
-                      // Row-virtualized: only viewport-visible rows mount their
-                      // cards, so 40-item pages mount ~6–10 cards instead of
-                      // all 40. Skeletons are rendered through the same path
-                      // when the list is loading.
-                      <VirtualizedItemList<TItem>
-                        displayMode={filter.displayMode}
-                        mobileGridCols={mobileGridCols}
-                        zoomIndex={filter.zoomIndex}
-                        isMobile={isMobileSidebar}
-                        cardIsPortrait={cardIsPortrait}
-                        renderCardLayout={renderCardLayout}
-                        isLoading={isLoading}
-                        itemsPerPage={filter.itemsPerPage}
-                        preserveScrollDuringRefill={preserveScrollDuringRefill}
-                        items={items}
-                        selectedIds={listSelect.selectedIds}
-                        onSelectChange={listSelect.onSelectChange}
-                        onCardPreviewClick={onCardPreviewClick}
-                        renderCard={renderCard}
-                      />
-                    )}
-                  </div>
-                </MobileGridColsContext.Provider>
-              </ZoomIndexContext.Provider>
-            </CardAspectContext.Provider>
-          </CardLayoutContext.Provider>
-        </ListStateContext.Provider>
+        <CardLayoutContext.Provider
+          value={
+            filter.displayMode === DisplayMode.Details
+              ? "details"
+              : filter.displayMode === DisplayMode.Wall
+                ? "wall"
+                : "grid"
+          }
+        >
+          <CardAspectContext.Provider value={cardAspect}>
+            <ZoomIndexContext.Provider value={filter.zoomIndex}>
+              <MobileGridColsContext.Provider value={mobileGridCols}>
+                {/* data-selecting drives checkbox/overlay visibility via CSS — no card re-renders needed */}
+                <div data-selecting={listSelect.selecting || undefined}>
+                  {filter.displayMode === DisplayMode.Wall ? (
+                    <PhotoAlbumWall<TItem>
+                      items={items}
+                      isLoading={isLoading}
+                      zoomIndex={filter.zoomIndex}
+                      isMobile={isMobileSidebar}
+                      selectedIds={listSelect.selectedIds}
+                      onSelectChange={listSelect.onSelectChange}
+                      onCardPreviewClick={onCardPreviewClick}
+                      renderCard={renderCard}
+                      getWallDimensions={getWallDimensions}
+                      itemsPerPage={filter.itemsPerPage}
+                    />
+                  ) : (
+                    // Row-virtualized: only viewport-visible rows mount their
+                    // cards, so 40-item pages mount ~6–10 cards instead of
+                    // all 40. Skeletons are rendered through the same path
+                    // when the list is loading.
+                    <VirtualizedItemList<TItem>
+                      displayMode={filter.displayMode}
+                      mobileGridCols={mobileGridCols}
+                      zoomIndex={filter.zoomIndex}
+                      isMobile={isMobileSidebar}
+                      cardIsPortrait={cardIsPortrait}
+                      renderCardLayout={renderCardLayout}
+                      isLoading={isLoading}
+                      itemsPerPage={filter.itemsPerPage}
+                      preserveScrollDuringRefill={preserveScrollDuringRefill}
+                      items={items}
+                      selectedIds={listSelect.selectedIds}
+                      onSelectChange={listSelect.onSelectChange}
+                      onCardPreviewClick={onCardPreviewClick}
+                      renderCard={renderCard}
+                    />
+                  )}
+                </div>
+              </MobileGridColsContext.Provider>
+            </ZoomIndexContext.Provider>
+          </CardAspectContext.Provider>
+        </CardLayoutContext.Provider>
       )}
     </EntityList>
+  );
+  // The toolbar's selection actions share the cards' list state and dialogs.
+  const listContent = (
+    <ListStateContext.Provider value={listStateContextValue}>
+      {SelectionActions ? (
+        <SelectionActions>{content}</SelectionActions>
+      ) : (
+        content
+      )}
+    </ListStateContext.Provider>
   );
   const ItemsProvider = config.ItemsProvider;
   return ItemsProvider ? (
     <ItemsProvider items={items} getSelectedItems={listSelect.getSelectedItems}>
-      {content}
+      {listContent}
     </ItemsProvider>
   ) : (
-    content
+    listContent
   );
 }

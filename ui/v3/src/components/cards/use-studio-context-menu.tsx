@@ -1,4 +1,3 @@
-import { StudioListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -14,7 +13,6 @@ import {
 } from "src/components/ui/context-menu";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
 import { AutoTagDialog } from "src/components/detail/auto-tag-dialog";
-import { StudioBulkEditSheet } from "@/components/detail/deferred-overlays";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -46,28 +44,11 @@ export function useStudioContextMenu({
 
   const [updateStudio] = useMutation(GQL.StudioUpdateDocument);
   const [destroyStudio] = useEntityMutation(GQL.StudioDestroyDocument);
-  const [destroyStudios] = useEntityMutation(GQL.StudiosDestroyDocument);
 
-  const {
-    selectedItems,
-    totalCount,
-    applyToAllTarget,
-    bulkCount,
-    showBulkActions,
-    bulkDeleteOpen,
-    setBulkDeleteOpen,
-    bulkEditOpen,
-    setBulkEditOpen,
-    onContextMenuOpen,
-    onRemoveSelection,
-  } = useBulkCardActions(
-    StudioListItems.useItems(),
-    StudioListItems.useSelectionGetter(),
-  );
+  const { bulkActions, bulkCount, onContextMenuOpen } = useBulkCardActions();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [autoTagOpen, setAutoTagOpen] = useState(false);
-  const [bulkAutoTagOpen, setBulkAutoTagOpen] = useState(false);
 
   async function handleConfirmedDelete() {
     await destroyStudio({
@@ -84,33 +65,13 @@ export function useStudioContextMenu({
     });
   }
 
-  async function handleConfirmedBulkDelete() {
-    const ids = selectedItems.map((i) => i.id);
-    await destroyStudios({
-      variables: { ids },
-      update(cache) {
-        removeEntitiesFromCache({
-          cache,
-          typename: "Studio",
-          listFieldName: "findStudios",
-          itemsField: "studios",
-          ids,
-        });
-        onRemoveSelection?.(ids);
-      },
-    });
-  }
-
   const menuContent = (
     <EntityContextMenuContent title={studio.name}>
-      {showBulkActions ? (
+      {bulkActions ? (
         <BulkContextMenuItems
           count={bulkCount}
-          noun="studios"
+          actions={bulkActions}
           openInNewTabHref={`/studios/${studio.id}`}
-          onEdit={() => setBulkEditOpen(true)}
-          onAutoTag={() => setBulkAutoTagOpen(true)}
-          onDelete={() => setBulkDeleteOpen(true)}
         />
       ) : (
         <>
@@ -196,35 +157,6 @@ export function useStudioContextMenu({
         ids={[studio.id]}
         entityName={studio.name}
       />
-      {showBulkActions && (
-        <>
-          <DeleteDialog
-            open={bulkDeleteOpen}
-            onOpenChange={setBulkDeleteOpen}
-            entityCountLabel={intl.formatMessage(
-              {
-                id: "dialogs.delete_studios_count",
-                defaultMessage: "{count} studios",
-              },
-              { count: bulkCount },
-            )}
-            onConfirm={handleConfirmedBulkDelete}
-          />
-          <AutoTagDialog
-            open={bulkAutoTagOpen}
-            onOpenChange={setBulkAutoTagOpen}
-            entityType="studio"
-            ids={selectedItems.map((i) => i.id)}
-          />
-          <StudioBulkEditSheet
-            open={bulkEditOpen}
-            onOpenChange={setBulkEditOpen}
-            items={selectedItems}
-            applyToAllTarget={applyToAllTarget}
-            totalCount={totalCount}
-          />
-        </>
-      )}
     </>
   );
 

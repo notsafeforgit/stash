@@ -1,4 +1,3 @@
-import { SceneListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -6,9 +5,6 @@ import { useNavigate, useRouter } from "@tanstack/react-router";
 import * as GQL from "src/core/generated-graphql";
 import { objectTitle } from "src/core/files";
 import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
-import { useBulkMediaDelete } from "@/components/detail/use-bulk-media-delete";
-import type { DeleteOptions } from "@/components/detail/delete-dialog";
-import type { DeleteProgress } from "@/core/bulk-delete";
 import {
   ContextMenu,
   ContextMenuItem,
@@ -22,10 +18,8 @@ import {
 import {
   SceneGenerateDialog,
   SceneMergeDialog,
-  SceneBulkEditSheet,
 } from "@/components/detail/deferred-overlays";
 import { SceneCardDownloadMenuItem } from "src/components/offline/scene-card-download-menu-item";
-import { useBulkSceneDownload } from "src/components/offline/download-action";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -48,7 +42,7 @@ interface UseSceneContextMenuProps {
 
 /**
  * Owns the default scene context-menu wiring shared by SceneCard and the
- * scenes table row: dialog state, destroy mutations, bulk-action snapshot,
+ * scenes table row: dialog state, destroy mutations, the bulk menu,
  * and the menu/dialog JSX. Callers stitch the returned pieces into their
  * trigger element.
  */
@@ -68,31 +62,11 @@ export function useSceneContextMenu({
   );
 
   const [destroyScene] = useEntityMutation(GQL.SceneDestroyDocument);
-  const deleteScenes = useBulkMediaDelete("Scene");
-
-  const {
-    selectedItems,
-    totalCount,
-    applyToAllTarget,
-    bulkCount,
-    showBulkActions,
-    bulkDeleteOpen,
-    setBulkDeleteOpen,
-    bulkEditOpen,
-    setBulkEditOpen,
-    onContextMenuOpen,
-  } = useBulkCardActions(
-    SceneListItems.useItems(),
-    SceneListItems.useSelectionGetter(),
-  );
+  const { bulkActions, bulkCount, onContextMenuOpen } = useBulkCardActions();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
-  const [bulkGenerateOpen, setBulkGenerateOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
-  const [bulkMergeOpen, setBulkMergeOpen] = useState(false);
-
-  const bulkDownload = useBulkSceneDownload();
 
   async function handleConfirmedDelete({
     deleteFile,
@@ -120,29 +94,13 @@ export function useSceneContextMenu({
     });
   }
 
-  async function handleConfirmedBulkDelete(
-    options: DeleteOptions,
-    onProgress: (progress: DeleteProgress) => void,
-  ) {
-    await deleteScenes(
-      selectedItems.map((i) => i.id),
-      options,
-      onProgress,
-    );
-  }
-
   const menuContent = (
     <EntityContextMenuContent title={objectTitle(scene)}>
-      {showBulkActions ? (
+      {bulkActions ? (
         <BulkContextMenuItems
           count={bulkCount}
-          noun="scenes"
+          actions={bulkActions}
           openInNewTabHref={`/scenes/${scene.id}`}
-          onEdit={() => setBulkEditOpen(true)}
-          onGenerate={() => setBulkGenerateOpen(true)}
-          onMerge={() => setBulkMergeOpen(true)}
-          onDownload={() => void bulkDownload(selectedItems)}
-          onDelete={() => setBulkDeleteOpen(true)}
         />
       ) : (
         <>
@@ -267,75 +225,6 @@ export function useSceneContextMenu({
           },
         ]}
       />
-      {showBulkActions && (
-        <>
-          <DeleteDialog
-            open={bulkDeleteOpen}
-            onOpenChange={setBulkDeleteOpen}
-            entityCountLabel={intl.formatMessage(
-              {
-                id: "dialogs.delete_scenes_count",
-                defaultMessage: "{count} scenes",
-              },
-              { count: bulkCount },
-            )}
-            showFileOptions
-            deleteFileLabel={intl.formatMessage({
-              id: "dialogs.delete_file_and_funscript",
-              defaultMessage: "Delete file and funscript",
-            })}
-            details={(() => {
-              const items = selectedItems;
-              const paths = items.flatMap(
-                (s) => s.files?.map((f) => f.path) ?? [],
-              );
-              return paths.length > 0 ? (
-                <DeleteFilesList paths={paths} />
-              ) : undefined;
-            })()}
-            detailsLabel={intl.formatMessage(
-              {
-                id: "dialogs.delete_show_files_count",
-                defaultMessage:
-                  "Show {count, plural, one {# file} other {# files}}",
-              },
-              {
-                count: selectedItems.reduce(
-                  (n, s) => n + (s.files?.length ?? 0),
-                  0,
-                ),
-              },
-            )}
-            onConfirm={handleConfirmedBulkDelete}
-          />
-          <SceneGenerateDialog
-            open={bulkGenerateOpen}
-            onOpenChange={setBulkGenerateOpen}
-            sceneIds={selectedItems.map((i) => i.id)}
-            applyToAllTarget={applyToAllTarget}
-            totalCount={totalCount}
-          />
-          <SceneMergeDialog
-            open={bulkMergeOpen}
-            onOpenChange={setBulkMergeOpen}
-            sources={selectedItems.map((i) => ({
-              id: i.id,
-              title: i.title,
-              date: i.date ?? null,
-              paths: { screenshot: i.paths?.screenshot ?? null },
-              studio: i.studio ? { name: i.studio.name } : null,
-              performers: i.performers?.map((p) => ({ name: p.name })) ?? [],
-            }))}
-          />
-          <SceneBulkEditSheet
-            open={bulkEditOpen}
-            onOpenChange={setBulkEditOpen}
-            items={selectedItems}
-            applyToAllTarget={applyToAllTarget}
-            totalCount={totalCount}
-          />
-        </>
-      )}
     </>
   );
 

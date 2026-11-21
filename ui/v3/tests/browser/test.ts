@@ -115,6 +115,21 @@ export async function expectTouchTargets(scope: Locator) {
     .toBe(true);
 }
 
+/** Pick a selection action from its phone sheet or desktop menu. */
+export async function chooseSelectionAction(
+  page: Page,
+  name: string,
+  scope: Page | Locator = page,
+) {
+  await scope
+    .getByRole("button", { name: "Selection actions", exact: true })
+    .click();
+  await page
+    .getByRole("menuitem", { name, exact: true })
+    .or(page.getByRole("dialog").getByRole("button", { name, exact: true }))
+    .click();
+}
+
 export async function chooseSection(page: Page, name: string) {
   const trigger = detailFooter(page).getByRole("button", {
     name: "Detail sections",

@@ -1,4 +1,3 @@
-import { PerformerListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -14,10 +13,7 @@ import {
 } from "src/components/ui/context-menu";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
 import { AutoTagDialog } from "src/components/detail/auto-tag-dialog";
-import {
-  PerformerMergeDialog,
-  PerformerBulkEditSheet,
-} from "@/components/detail/deferred-overlays";
+import { PerformerMergeDialog } from "@/components/detail/deferred-overlays";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -53,30 +49,12 @@ export function usePerformerContextMenu({
 
   const [updatePerformer] = useMutation(GQL.PerformerUpdateDocument);
   const [destroyPerformer] = useEntityMutation(GQL.PerformerDestroyDocument);
-  const [destroyPerformers] = useEntityMutation(GQL.PerformersDestroyDocument);
 
-  const {
-    selectedItems,
-    totalCount,
-    applyToAllTarget,
-    bulkCount,
-    showBulkActions,
-    bulkDeleteOpen,
-    setBulkDeleteOpen,
-    bulkEditOpen,
-    setBulkEditOpen,
-    onContextMenuOpen,
-    onRemoveSelection,
-  } = useBulkCardActions(
-    PerformerListItems.useItems(),
-    PerformerListItems.useSelectionGetter(),
-  );
+  const { bulkActions, bulkCount, onContextMenuOpen } = useBulkCardActions();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [autoTagOpen, setAutoTagOpen] = useState(false);
-  const [bulkAutoTagOpen, setBulkAutoTagOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
-  const [bulkMergeOpen, setBulkMergeOpen] = useState(false);
 
   const displayName = performer.disambiguation
     ? `${performer.name} (${performer.disambiguation})`
@@ -97,34 +75,13 @@ export function usePerformerContextMenu({
     });
   }
 
-  async function handleConfirmedBulkDelete() {
-    const ids = selectedItems.map((i) => i.id);
-    await destroyPerformers({
-      variables: { ids },
-      update(cache) {
-        removeEntitiesFromCache({
-          cache,
-          typename: "Performer",
-          listFieldName: "findPerformers",
-          itemsField: "performers",
-          ids,
-        });
-        onRemoveSelection?.(ids);
-      },
-    });
-  }
-
   const menuContent = (
     <EntityContextMenuContent title={displayName}>
-      {showBulkActions ? (
+      {bulkActions ? (
         <BulkContextMenuItems
           count={bulkCount}
-          noun="performers"
+          actions={bulkActions}
           openInNewTabHref={`/performers/${performer.id}`}
-          onEdit={() => setBulkEditOpen(true)}
-          onAutoTag={() => setBulkAutoTagOpen(true)}
-          onMerge={() => setBulkMergeOpen(true)}
-          onDelete={() => setBulkDeleteOpen(true)}
         />
       ) : (
         <>
@@ -230,47 +187,6 @@ export function usePerformerContextMenu({
           },
         ]}
       />
-      {showBulkActions && (
-        <>
-          <DeleteDialog
-            open={bulkDeleteOpen}
-            onOpenChange={setBulkDeleteOpen}
-            entityCountLabel={intl.formatMessage(
-              {
-                id: "dialogs.delete_performers_count",
-                defaultMessage: "{count} performers",
-              },
-              { count: bulkCount },
-            )}
-            onConfirm={handleConfirmedBulkDelete}
-          />
-          <AutoTagDialog
-            open={bulkAutoTagOpen}
-            onOpenChange={setBulkAutoTagOpen}
-            entityType="performer"
-            ids={selectedItems.map((i) => i.id)}
-          />
-          <PerformerMergeDialog
-            open={bulkMergeOpen}
-            onOpenChange={setBulkMergeOpen}
-            sources={selectedItems.map((i) => ({
-              id: i.id,
-              name: i.name,
-              disambiguation: i.disambiguation,
-              image_path: i.image_path,
-              birthdate: i.birthdate,
-              death_date: i.death_date,
-            }))}
-          />
-          <PerformerBulkEditSheet
-            open={bulkEditOpen}
-            onOpenChange={setBulkEditOpen}
-            items={selectedItems}
-            applyToAllTarget={applyToAllTarget}
-            totalCount={totalCount}
-          />
-        </>
-      )}
     </>
   );
 

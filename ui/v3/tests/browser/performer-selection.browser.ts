@@ -2,6 +2,7 @@ import { libraryID } from "../fixtures/library";
 import {
   test,
   expect,
+  chooseSelectionAction,
   detailFooter,
   expectCompactRow,
   expectTouchTargets,
@@ -85,7 +86,7 @@ for (const width of [320, 390]) {
     await picker.getByRole("button", { name: "Prev", exact: true }).tap();
     await footer.getByRole("button", { name: "Pages", exact: true }).tap();
     await expect(first).toHaveAttribute("data-selected", "true");
-    await footer.getByRole("button", { name: "Share…", exact: true }).tap();
+    await chooseSelectionAction(page, "Share…", footer);
     const form = page.getByRole("dialog", {
       name: "Create share",
       exact: true,
@@ -205,9 +206,7 @@ test("switching from filtered ongoing sharing back to selection keeps explicit s
     .locator(`article[data-id="${libraryID(1)}"]`)
     .locator("[data-entity-card-preview]")
     .click({ modifiers: ["Control"] });
-  await detailFooter(page)
-    .getByRole("button", { name: "Share…", exact: true })
-    .tap();
+  await chooseSelectionAction(page, "Share…", detailFooter(page));
   const form = page.getByRole("dialog", { name: "Create share", exact: true });
   await form.getByRole("button", { name: "Filtered list", exact: true }).tap();
   await form.getByRole("button", { name: "Ongoing", exact: true }).tap();
@@ -242,9 +241,7 @@ for (const width of [320, 1280]) {
           )
           .click({ modifiers: ["Control"] });
       if (width === 320) {
-        await detailFooter(page)
-          .getByRole("button", { name: "Share…", exact: true })
-          .tap();
+        await chooseSelectionAction(page, "Share…", detailFooter(page));
       } else {
         // The collection's action must see the active list, just like the
         // selection toolbar. It is independent of the list's own menu.
@@ -362,9 +359,7 @@ test("empty performer categories do not invalidate a fixed selection", async ({
   await page
     .locator(`article[data-id="${libraryID(1)}"] [data-entity-card-preview]`)
     .click({ modifiers: ["Control"] });
-  await detailFooter(page)
-    .getByRole("button", { name: "Share…", exact: true })
-    .tap();
+  await chooseSelectionAction(page, "Share…", detailFooter(page));
   const form = page.getByRole("dialog", { name: "Create share", exact: true });
   await form.getByRole("button", { name: "Performer", exact: true }).click();
   for (const type of ["Scenes", "Images", "Galleries"])

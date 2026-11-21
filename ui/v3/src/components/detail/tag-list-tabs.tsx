@@ -15,6 +15,8 @@ import {
 } from "src/core/generated-graphql";
 import { EntityListPage, type EntityListPageConfig } from "src/components/list";
 import { View } from "src/components/list/views";
+import { StudioListItems } from "src/components/list/entity-list-items";
+import { StudioSelectionActions } from "src/components/cards/studio-selection-actions";
 import {
   useSceneListConfig,
   useImageListConfig,
@@ -270,6 +272,8 @@ export function TagStudiosTab({ tag }: { tag: TagData }) {
   >(
     () => ({
       filterMode: GQL.FilterMode.Studios,
+      ItemsProvider: StudioListItems.Provider,
+      SelectionActions: StudioSelectionActions,
       source: {
         kind: "graphql",
         query: GQL.FindStudioListDocument,

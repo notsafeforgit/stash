@@ -759,8 +759,8 @@ for (const layout of ["standalone", "collection"]) {
         : detailFooter(page);
     await footer.getByRole("button", { name: "Search…", exact: true }).tap();
     await expect(footer.getByRole("searchbox")).toBeFocused();
-    // With interactive-widget=resizes-content, Safari reports the smaller
-    // visual viewport first and shrinks 100dvh afterwards, with no event.
+    // A browser that resizes the page for the keyboard can report the smaller
+    // visual viewport first and shrink 100dvh afterwards, with no event.
     const lifted = await footer.evaluate((element) => {
       if (!window.visualViewport) throw new Error("Missing visual viewport");
       Object.defineProperty(window.visualViewport, "height", {

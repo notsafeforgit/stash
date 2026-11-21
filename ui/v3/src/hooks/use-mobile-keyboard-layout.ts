@@ -62,8 +62,8 @@ export function useMobileKeyboardLayout<T extends HTMLElement>() {
     viewport.addEventListener("resize", update);
     viewport.addEventListener("scroll", update);
     window.addEventListener("resize", update);
-    // With interactive-widget=resizes-content, Safari shrinks 100dvh for the
-    // keyboard after its viewport events, so measure again when the shell does.
+    // A browser that resizes the page for the keyboard can do so after its
+    // viewport events, so measure again when the shell itself resizes.
     const shellResize =
       appViewport && typeof ResizeObserver !== "undefined"
         ? new ResizeObserver(update)

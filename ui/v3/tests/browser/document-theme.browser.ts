@@ -1,13 +1,6 @@
 import type { Page } from "@playwright/test";
 import { test, expect, fixtureModule } from "./test";
 
-test.use({
-  // The real app/offline viewport also opts into Chromium's keyboard sizing.
-  expectedConsoleErrors: [
-    'Viewport argument key "interactive-widget" not recognized and ignored.',
-  ],
-});
-
 async function expectTheme(page: Page, dark: boolean) {
   const scheme = dark ? "dark" : "light";
   const background = dark ? [10, 10, 10, 255] : [255, 255, 255, 255];
@@ -107,3 +100,18 @@ for (const entry of ["app", "login", "offline"]) {
     });
   }
 }
+
+// Safari now honours interactive-widget=resizes-content, shrinking 100dvh after
+// its viewport events. ui-sdk's drawers and the search footer then made room for
+// the keyboard twice, so the entries keep the default visual viewport resizing.
+test("entries keep the browser's default keyboard resizing", async ({
+  page,
+}) => {
+  for (const entry of ["app", "login", "offline"]) {
+    await page.goto(`/theme-shell/${entry}`, { waitUntil: "commit" });
+    await expect(page.locator('meta[name="viewport"]')).not.toHaveAttribute(
+      "content",
+      /interactive-widget/,
+    );
+  }
+});

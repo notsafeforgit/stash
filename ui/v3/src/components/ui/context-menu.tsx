@@ -88,11 +88,13 @@ type ContextMenuContentProps = Omit<
   className?: string;
 };
 
+// Below the press, not beside it: a sideways menu can only flip, so on a phone a
+// wide one ran off the screen. Opening downwards it slides along to fit.
 function ContextMenuContent({
   className,
   align = "start",
   alignOffset = 4,
-  side = "right",
+  side = "bottom",
   sideOffset = 0,
   container,
   ...props

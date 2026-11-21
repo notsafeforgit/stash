@@ -10,9 +10,11 @@ export function EntityCardsFixture() {
   const [selected, setSelected] = useState(false);
   const [action, setAction] = useState("");
   const mobile = useMediaQuery("(max-width: 767px)");
+  // ?end places the card like the right-hand column of a phone grid.
+  const end = new URLSearchParams(window.location.search).has("end");
   return (
     <div data-selecting className="p-3">
-      <div className="w-36">
+      <div className={end ? "ml-auto w-36" : "w-36"}>
         <EntityCard
           id="long-title"
           label={title}

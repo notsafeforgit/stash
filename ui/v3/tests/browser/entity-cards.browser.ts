@@ -45,6 +45,30 @@ for (const width of [320, 1024]) {
   });
 }
 
+// A long title widens the hold menu. Opening sideways it could only flip, and
+// from a right-hand card it ran off the left edge; below the press it slides.
+for (const width of [320, 390]) {
+  test(`the hold menu stays on screen from either column at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    for (const path of ["/entity-cards", "/entity-cards?end"]) {
+      await page.goto(path);
+      const trigger = page.locator('[data-slot="menu-context-trigger"]');
+      const menu = page.getByRole("menu");
+      for (const x of [0.1, 0.5, 0.9]) {
+        await holdForContextMenu(trigger, menu, { x, y: 0.4 });
+        const bounds = await menu.boundingBox();
+        if (!bounds) throw new Error("Missing hold menu");
+        expect(bounds.x).toBeGreaterThanOrEqual(0);
+        expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+        await page.keyboard.press("Escape");
+        await expect(menu).toBeHidden();
+      }
+    }
+  });
+}
+
 test.describe("desktop cursor", () => {
   test.use({
     isMobile: false,

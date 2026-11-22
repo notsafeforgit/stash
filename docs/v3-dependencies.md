@@ -10,10 +10,10 @@ remain preserved in the frozen compatible release.
 | --- | --- |
 | Backend | Go 1.27.4; gqlgen 0.17.98; go-sqlite3 1.14.53; refreshed module graph |
 | Codecs | libheif 1.23.4; libvips 8.18.6; current packages from Alpine 3.24 / the runtime's supported Debian or Ubuntu release |
-| UI | React 19.3.1; ui-sdk 0.1.0-beta.10 (`@ui-sdk/react`, `@ui-sdk/core`); Tailwind 4.3.5 |
+| UI | React 19.3.1; ui-sdk 0.1.0-beta.13 (`@ui-sdk/react`, `@ui-sdk/core`); Tailwind 4.3.5 |
 | Tables | TanStack Table 9.3 with explicit features and server-controlled sorting |
 | GraphQL | Apollo 4.3.8; GraphQL 17.1; Code Generator 7 (CLI) / 6 (TypeScript plugins) |
-| Playback | Video.js 10.4.0; scoped hls.js 1.7.4 override |
+| Playback | Video.js 10.6.0, whose adapter pins hls.js 1.7.4 |
 | Tooling | Node 24 LTS (24.15 minimum); pnpm 12.21.0; TypeScript 7.0.2; Vite 8.3.8; Vitest 5.1; Biome 2.6; Playwright 1.65.1 |
 
 v3 uses TypeScript 7 for builds and app/browser type checks. Following
@@ -25,7 +25,7 @@ compatibility executable. Keep both aliases until those tools support the
 native compiler API. See the [v3 compiler workflow](../ui/v3/docs/development.md#typescript-7).
 
 Node types follow the 24 LTS runtime. Video.js packages remain on the same
-current release; reassess the HLS override when updating its adapter.
+current release; check the adapter's hls.js pin when updating it.
 Go updates keep the existing major import paths for libraries such as JWT v4,
 nullable database values, and mockery v2. Moving these to new APIs or generator
 configuration is a separate migration; the runtime vulnerability scan has no
@@ -84,6 +84,25 @@ every codec from upstream. The verified amd64 runtime versions are:
 | Stash image (`docker/ghcr/Dockerfile`), Debian trixie | Jellyfin 8.1.3-2 (pinned) | 1.4.2 (source build) | 3.14.10 |
 | CI media tests, Ubuntu 24.04 runners | Jellyfin 8.1.3-2 (same pin) | Ubuntu package | runner default |
 | Optional local `make docker-cuda-build` image, Ubuntu 24.04 (not published) | 6.1.1 (Ubuntu updates) | 1.0.4 | 3.12.3 |
+
+## 2026-11-21 refresh
+
+- Video.js 10.4.0 → 10.6.0. Neither release lists breaking changes. 10.5
+  moves the HLS adapter to hls.js 1.7.4, so the scoped pnpm override is
+  removed. 10.6 surfaces fatal hls.js errors raised while media attaches and
+  fixes Google Cast receiver unloading, text tracks and separate HLS audio
+  segments.
+- ui-sdk 0.1.0-beta.10 → beta.13: additive styles (item icons, number input
+  scrub area, visually hidden text) and type additions; the documented
+  component APIs Stash uses are unchanged.
+- lucide-react, react-intl, graphql-ws, tailwind-merge, Biome, Vitest,
+  typescript-eslint and the router devtools take their current releases.
+- Go: surf, gqlgenc, gjson and golang.org/x/net take patch or minor releases.
+  gqlgenc 0.44.1 writes the stash-box client's struct tags with backquotes;
+  the tags are unchanged. chromedp stays on 0.16 and goqu on 9.19, as in the
+  previous refresh.
+- Deferred major updates: graphql-codegen 8, vite-plugin-pwa 2 and jsdom 31.
+  `@types/node` follows the Node 24 runtime.
 
 ## 2026-11-15 refresh
 

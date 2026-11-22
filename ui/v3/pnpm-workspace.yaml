@@ -45,10 +45,6 @@ minimumReleaseAgeExclude:
   - regjsparser@0.13.3
   - which-typed-array@1.1.24
 
-# The 10.4.0 adapter pins hls.js 1.7.3. 1.7.4 reloads a start fragment whose
-# request was aborted before anything buffered and cancels a pending
-# end-of-stream once playback leaves the end; both affect seeks and restarts.
 overrides:
-  "@videojs/hlsjs-video@10.4.0>hls.js": 1.7.4
   "unplugin>esbuild": ^0.28.1
   "tsx>esbuild": ^0.28.1

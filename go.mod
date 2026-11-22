@@ -18,7 +18,7 @@ require (
 	github.com/dsoprea/go-jpeg-image-structure/v2 v2.0.0-20221012074422-4f3f7e934102
 	github.com/dsoprea/go-logging v0.0.0-20200710184922-b02d349568dd
 	github.com/enetx/g v1.1.1
-	github.com/enetx/surf v1.0.255
+	github.com/enetx/surf v1.0.256
 	github.com/feederbox826/gosx-notifier v0.2.2
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-chi/cors v1.2.2
@@ -29,7 +29,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.4.0
-	github.com/gqlgo/gqlgenc v0.44.0
+	github.com/gqlgo/gqlgenc v0.44.1
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hasura/go-graphql-client v0.16.0
 	github.com/itchyny/gojq v0.12.20
@@ -53,7 +53,7 @@ require (
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/pflag v1.1.0
 	github.com/stretchr/testify v1.12.1
-	github.com/tidwall/gjson v1.20.3
+	github.com/tidwall/gjson v1.20.5
 	github.com/vearutop/statigz v1.5.0
 	github.com/vektah/dataloaden v0.3.0
 	github.com/vektah/gqlparser/v2 v2.5.64
@@ -63,7 +63,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.6
 	golang.org/x/crypto v0.59.0
 	golang.org/x/image v0.48.0
-	golang.org/x/net v0.62.0
+	golang.org/x/net v0.63.0
 	golang.org/x/sync v0.25.0
 	golang.org/x/sys v0.50.0
 	golang.org/x/term v0.48.0
@@ -87,7 +87,7 @@ require (
 	github.com/dsoprea/go-photoshop-info-format v0.0.0-20200610045659-121dd752914d // indirect
 	github.com/dsoprea/go-utility/v2 v2.0.0-20221003172846-a3e1774ef349 // indirect
 	github.com/enetx/http v1.0.49 // indirect
-	github.com/enetx/quic-go v1.0.39 // indirect
+	github.com/enetx/quic-go v1.0.40 // indirect
 	github.com/enetx/utls v1.0.10 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect

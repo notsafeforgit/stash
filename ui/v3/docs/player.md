@@ -20,12 +20,11 @@ per-client coordinator in `core/scene-activity.ts`. Do not add route-owned
 automatic activity mutations. Explicit marker, offline, and disabled scopes
 exclude server accounting. See [TV mode](tv-mode.md) for feed ownership,
 quality policy, inline presentation, and the full feature map.
-The Video.js 10.4.0 packages are pinned together in [package.json](../package.json).
-[pnpm-workspace.yaml](../pnpm-workspace.yaml) contains a version-scoped hls.js
-override at 1.7.4; the 10.4.0 adapter declares 1.7.3. 1.7.4 reloads a start
-fragment whose request was aborted before anything buffered and cancels a
-pending end-of-stream once playback leaves the end. Reassess the override with
-the next adapter upgrade.
+The Video.js 10.6.0 packages are pinned together in [package.json](../package.json).
+Their HLS adapter pins hls.js 1.7.4, which reloads a start fragment whose
+request was aborted before anything buffered and cancels a pending
+end-of-stream once playback leaves the end. Before 10.5 a pnpm override
+supplied that version; check the adapter's hls.js pin with each upgrade.
 
 | Module | Responsibility |
 | --- | --- |

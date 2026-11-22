@@ -32,8 +32,8 @@ func NewClient(cli clientv2.HttpClient, baseURL string, options *clientv2.Option
 }
 
 type URLFragment struct {
-	URL  string "json:\"url\" graphql:\"url\""
-	Type string "json:\"type\" graphql:\"type\""
+	URL  string `json:"url" graphql:"url"`
+	Type string `json:"type" graphql:"type"`
 }
 
 func (t *URLFragment) GetURL() string {
@@ -50,10 +50,10 @@ func (t *URLFragment) GetType() string {
 }
 
 type ImageFragment struct {
-	ID     string "json:\"id\" graphql:\"id\""
-	URL    string "json:\"url\" graphql:\"url\""
-	Width  int    "json:\"width\" graphql:\"width\""
-	Height int    "json:\"height\" graphql:\"height\""
+	ID     string `json:"id" graphql:"id"`
+	URL    string `json:"url" graphql:"url"`
+	Width  int    `json:"width" graphql:"width"`
+	Height int    `json:"height" graphql:"height"`
 }
 
 func (t *ImageFragment) GetID() string {
@@ -82,12 +82,12 @@ func (t *ImageFragment) GetHeight() int {
 }
 
 type StudioFragment struct {
-	Name    string                 "json:\"name\" graphql:\"name\""
-	ID      string                 "json:\"id\" graphql:\"id\""
-	Aliases []string               "json:\"aliases\" graphql:\"aliases\""
-	Urls    []*URLFragment         "json:\"urls\" graphql:\"urls\""
-	Parent  *StudioFragment_Parent "json:\"parent,omitempty\" graphql:\"parent\""
-	Images  []*ImageFragment       "json:\"images\" graphql:\"images\""
+	Name    string                 `json:"name" graphql:"name"`
+	ID      string                 `json:"id" graphql:"id"`
+	Aliases []string               `json:"aliases" graphql:"aliases"`
+	Urls    []*URLFragment         `json:"urls" graphql:"urls"`
+	Parent  *StudioFragment_Parent `json:"parent,omitempty" graphql:"parent"`
+	Images  []*ImageFragment       `json:"images" graphql:"images"`
 }
 
 func (t *StudioFragment) GetName() string {
@@ -128,11 +128,11 @@ func (t *StudioFragment) GetImages() []*ImageFragment {
 }
 
 type TagFragment struct {
-	Name        string                "json:\"name\" graphql:\"name\""
-	ID          string                "json:\"id\" graphql:\"id\""
-	Description *string               "json:\"description,omitempty\" graphql:\"description\""
-	Aliases     []string              "json:\"aliases\" graphql:\"aliases\""
-	Category    *TagFragment_Category "json:\"category,omitempty\" graphql:\"category\""
+	Name        string                `json:"name" graphql:"name"`
+	ID          string                `json:"id" graphql:"id"`
+	Description *string               `json:"description,omitempty" graphql:"description"`
+	Aliases     []string              `json:"aliases" graphql:"aliases"`
+	Category    *TagFragment_Category `json:"category,omitempty" graphql:"category"`
 }
 
 func (t *TagFragment) GetName() string {
@@ -167,10 +167,10 @@ func (t *TagFragment) GetCategory() *TagFragment_Category {
 }
 
 type MeasurementsFragment struct {
-	BandSize *int    "json:\"band_size,omitempty\" graphql:\"band_size\""
-	CupSize  *string "json:\"cup_size,omitempty\" graphql:\"cup_size\""
-	Waist    *int    "json:\"waist,omitempty\" graphql:\"waist\""
-	Hip      *int    "json:\"hip,omitempty\" graphql:\"hip\""
+	BandSize *int    `json:"band_size,omitempty" graphql:"band_size"`
+	CupSize  *string `json:"cup_size,omitempty" graphql:"cup_size"`
+	Waist    *int    `json:"waist,omitempty" graphql:"waist"`
+	Hip      *int    `json:"hip,omitempty" graphql:"hip"`
 }
 
 func (t *MeasurementsFragment) GetBandSize() *int {
@@ -199,8 +199,8 @@ func (t *MeasurementsFragment) GetHip() *int {
 }
 
 type BodyModificationFragment struct {
-	Location    string  "json:\"location\" graphql:\"location\""
-	Description *string "json:\"description,omitempty\" graphql:\"description\""
+	Location    string  `json:"location" graphql:"location"`
+	Description *string `json:"description,omitempty" graphql:"description"`
 }
 
 func (t *BodyModificationFragment) GetLocation() string {
@@ -217,29 +217,29 @@ func (t *BodyModificationFragment) GetDescription() *string {
 }
 
 type PerformerFragment struct {
-	ID              string                      "json:\"id\" graphql:\"id\""
-	Name            string                      "json:\"name\" graphql:\"name\""
-	Disambiguation  *string                     "json:\"disambiguation,omitempty\" graphql:\"disambiguation\""
-	Aliases         []string                    "json:\"aliases\" graphql:\"aliases\""
-	Gender          *GenderEnum                 "json:\"gender,omitempty\" graphql:\"gender\""
-	MergedIds       []string                    "json:\"merged_ids\" graphql:\"merged_ids\""
-	Deleted         bool                        "json:\"deleted\" graphql:\"deleted\""
-	MergedIntoID    *string                     "json:\"merged_into_id,omitempty\" graphql:\"merged_into_id\""
-	Urls            []*URLFragment              "json:\"urls\" graphql:\"urls\""
-	Images          []*ImageFragment            "json:\"images\" graphql:\"images\""
-	BirthDate       *string                     "json:\"birth_date,omitempty\" graphql:\"birth_date\""
-	DeathDate       *string                     "json:\"death_date,omitempty\" graphql:\"death_date\""
-	Ethnicity       *EthnicityEnum              "json:\"ethnicity,omitempty\" graphql:\"ethnicity\""
-	Country         *string                     "json:\"country,omitempty\" graphql:\"country\""
-	EyeColor        *EyeColorEnum               "json:\"eye_color,omitempty\" graphql:\"eye_color\""
-	HairColor       *HairColorEnum              "json:\"hair_color,omitempty\" graphql:\"hair_color\""
-	Height          *int                        "json:\"height,omitempty\" graphql:\"height\""
-	Measurements    *MeasurementsFragment       "json:\"measurements\" graphql:\"measurements\""
-	BreastType      *BreastTypeEnum             "json:\"breast_type,omitempty\" graphql:\"breast_type\""
-	CareerStartYear *int                        "json:\"career_start_year,omitempty\" graphql:\"career_start_year\""
-	CareerEndYear   *int                        "json:\"career_end_year,omitempty\" graphql:\"career_end_year\""
-	Tattoos         []*BodyModificationFragment "json:\"tattoos,omitempty\" graphql:\"tattoos\""
-	Piercings       []*BodyModificationFragment "json:\"piercings,omitempty\" graphql:\"piercings\""
+	ID              string                      `json:"id" graphql:"id"`
+	Name            string                      `json:"name" graphql:"name"`
+	Disambiguation  *string                     `json:"disambiguation,omitempty" graphql:"disambiguation"`
+	Aliases         []string                    `json:"aliases" graphql:"aliases"`
+	Gender          *GenderEnum                 `json:"gender,omitempty" graphql:"gender"`
+	MergedIds       []string                    `json:"merged_ids" graphql:"merged_ids"`
+	Deleted         bool                        `json:"deleted" graphql:"deleted"`
+	MergedIntoID    *string                     `json:"merged_into_id,omitempty" graphql:"merged_into_id"`
+	Urls            []*URLFragment              `json:"urls" graphql:"urls"`
+	Images          []*ImageFragment            `json:"images" graphql:"images"`
+	BirthDate       *string                     `json:"birth_date,omitempty" graphql:"birth_date"`
+	DeathDate       *string                     `json:"death_date,omitempty" graphql:"death_date"`
+	Ethnicity       *EthnicityEnum              `json:"ethnicity,omitempty" graphql:"ethnicity"`
+	Country         *string                     `json:"country,omitempty" graphql:"country"`
+	EyeColor        *EyeColorEnum               `json:"eye_color,omitempty" graphql:"eye_color"`
+	HairColor       *HairColorEnum              `json:"hair_color,omitempty" graphql:"hair_color"`
+	Height          *int                        `json:"height,omitempty" graphql:"height"`
+	Measurements    *MeasurementsFragment       `json:"measurements" graphql:"measurements"`
+	BreastType      *BreastTypeEnum             `json:"breast_type,omitempty" graphql:"breast_type"`
+	CareerStartYear *int                        `json:"career_start_year,omitempty" graphql:"career_start_year"`
+	CareerEndYear   *int                        `json:"career_end_year,omitempty" graphql:"career_end_year"`
+	Tattoos         []*BodyModificationFragment `json:"tattoos,omitempty" graphql:"tattoos"`
+	Piercings       []*BodyModificationFragment `json:"piercings,omitempty" graphql:"piercings"`
 }
 
 func (t *PerformerFragment) GetID() string {
@@ -382,8 +382,8 @@ func (t *PerformerFragment) GetPiercings() []*BodyModificationFragment {
 }
 
 type PerformerAppearanceFragment struct {
-	As        *string            "json:\"as,omitempty\" graphql:\"as\""
-	Performer *PerformerFragment "json:\"performer\" graphql:\"performer\""
+	As        *string            `json:"as,omitempty" graphql:"as"`
+	Performer *PerformerFragment `json:"performer" graphql:"performer"`
 }
 
 func (t *PerformerAppearanceFragment) GetAs() *string {
@@ -400,10 +400,10 @@ func (t *PerformerAppearanceFragment) GetPerformer() *PerformerFragment {
 }
 
 type FingerprintFragment struct {
-	Algorithm   FingerprintAlgorithm "json:\"algorithm\" graphql:\"algorithm\""
-	Hash        string               "json:\"hash\" graphql:\"hash\""
-	Duration    int                  "json:\"duration\" graphql:\"duration\""
-	Submissions int                  "json:\"submissions\" graphql:\"submissions\""
+	Algorithm   FingerprintAlgorithm `json:"algorithm" graphql:"algorithm"`
+	Hash        string               `json:"hash" graphql:"hash"`
+	Duration    int                  `json:"duration" graphql:"duration"`
+	Submissions int                  `json:"submissions" graphql:"submissions"`
 }
 
 func (t *FingerprintFragment) GetAlgorithm() *FingerprintAlgorithm {
@@ -432,20 +432,20 @@ func (t *FingerprintFragment) GetSubmissions() int {
 }
 
 type SceneFragment struct {
-	ID             string                         "json:\"id\" graphql:\"id\""
-	Title          *string                        "json:\"title,omitempty\" graphql:\"title\""
-	Code           *string                        "json:\"code,omitempty\" graphql:\"code\""
-	Details        *string                        "json:\"details,omitempty\" graphql:\"details\""
-	Director       *string                        "json:\"director,omitempty\" graphql:\"director\""
-	Duration       *int                           "json:\"duration,omitempty\" graphql:\"duration\""
-	Date           *string                        "json:\"date,omitempty\" graphql:\"date\""
-	ProductionDate *string                        "json:\"production_date,omitempty\" graphql:\"production_date\""
-	Urls           []*URLFragment                 "json:\"urls\" graphql:\"urls\""
-	Images         []*ImageFragment               "json:\"images\" graphql:\"images\""
-	Studio         *StudioFragment                "json:\"studio,omitempty\" graphql:\"studio\""
-	Tags           []*TagFragment                 "json:\"tags\" graphql:\"tags\""
-	Performers     []*PerformerAppearanceFragment "json:\"performers\" graphql:\"performers\""
-	Fingerprints   []*FingerprintFragment         "json:\"fingerprints\" graphql:\"fingerprints\""
+	ID             string                         `json:"id" graphql:"id"`
+	Title          *string                        `json:"title,omitempty" graphql:"title"`
+	Code           *string                        `json:"code,omitempty" graphql:"code"`
+	Details        *string                        `json:"details,omitempty" graphql:"details"`
+	Director       *string                        `json:"director,omitempty" graphql:"director"`
+	Duration       *int                           `json:"duration,omitempty" graphql:"duration"`
+	Date           *string                        `json:"date,omitempty" graphql:"date"`
+	ProductionDate *string                        `json:"production_date,omitempty" graphql:"production_date"`
+	Urls           []*URLFragment                 `json:"urls" graphql:"urls"`
+	Images         []*ImageFragment               `json:"images" graphql:"images"`
+	Studio         *StudioFragment                `json:"studio,omitempty" graphql:"studio"`
+	Tags           []*TagFragment                 `json:"tags" graphql:"tags"`
+	Performers     []*PerformerAppearanceFragment `json:"performers" graphql:"performers"`
+	Fingerprints   []*FingerprintFragment         `json:"fingerprints" graphql:"fingerprints"`
 }
 
 func (t *SceneFragment) GetID() string {
@@ -534,11 +534,11 @@ func (t *SceneFragment) GetFingerprints() []*FingerprintFragment {
 }
 
 type StudioFragment_Parent struct {
-	Aliases []string         "json:\"aliases\" graphql:\"aliases\""
-	ID      string           "json:\"id\" graphql:\"id\""
-	Images  []*ImageFragment "json:\"images\" graphql:\"images\""
-	Name    string           "json:\"name\" graphql:\"name\""
-	Urls    []*URLFragment   "json:\"urls\" graphql:\"urls\""
+	Aliases []string         `json:"aliases" graphql:"aliases"`
+	ID      string           `json:"id" graphql:"id"`
+	Images  []*ImageFragment `json:"images" graphql:"images"`
+	Name    string           `json:"name" graphql:"name"`
+	Urls    []*URLFragment   `json:"urls" graphql:"urls"`
 }
 
 func (t *StudioFragment_Parent) GetAliases() []string {
@@ -573,9 +573,9 @@ func (t *StudioFragment_Parent) GetUrls() []*URLFragment {
 }
 
 type TagFragment_Category struct {
-	Description *string "json:\"description,omitempty\" graphql:\"description\""
-	ID          string  "json:\"id\" graphql:\"id\""
-	Name        string  "json:\"name\" graphql:\"name\""
+	Description *string `json:"description,omitempty" graphql:"description"`
+	ID          string  `json:"id" graphql:"id"`
+	Name        string  `json:"name" graphql:"name"`
 }
 
 func (t *TagFragment_Category) GetDescription() *string {
@@ -598,11 +598,11 @@ func (t *TagFragment_Category) GetName() string {
 }
 
 type SceneFragment_Studio_StudioFragment_Parent struct {
-	Aliases []string         "json:\"aliases\" graphql:\"aliases\""
-	ID      string           "json:\"id\" graphql:\"id\""
-	Images  []*ImageFragment "json:\"images\" graphql:\"images\""
-	Name    string           "json:\"name\" graphql:\"name\""
-	Urls    []*URLFragment   "json:\"urls\" graphql:\"urls\""
+	Aliases []string         `json:"aliases" graphql:"aliases"`
+	ID      string           `json:"id" graphql:"id"`
+	Images  []*ImageFragment `json:"images" graphql:"images"`
+	Name    string           `json:"name" graphql:"name"`
+	Urls    []*URLFragment   `json:"urls" graphql:"urls"`
 }
 
 func (t *SceneFragment_Studio_StudioFragment_Parent) GetAliases() []string {
@@ -637,9 +637,9 @@ func (t *SceneFragment_Studio_StudioFragment_Parent) GetUrls() []*URLFragment {
 }
 
 type SceneFragment_Tags_TagFragment_Category struct {
-	Description *string "json:\"description,omitempty\" graphql:\"description\""
-	ID          string  "json:\"id\" graphql:\"id\""
-	Name        string  "json:\"name\" graphql:\"name\""
+	Description *string `json:"description,omitempty" graphql:"description"`
+	ID          string  `json:"id" graphql:"id"`
+	Name        string  `json:"name" graphql:"name"`
 }
 
 func (t *SceneFragment_Tags_TagFragment_Category) GetDescription() *string {
@@ -662,11 +662,11 @@ func (t *SceneFragment_Tags_TagFragment_Category) GetName() string {
 }
 
 type FindScenesBySceneFingerprints_FindScenesBySceneFingerprints_SceneFragment_Studio_StudioFragment_Parent struct {
-	Aliases []string         "json:\"aliases\" graphql:\"aliases\""
-	ID      string           "json:\"id\" graphql:\"id\""
-	Images  []*ImageFragment "json:\"images\" graphql:\"images\""
-	Name    string           "json:\"name\" graphql:\"name\""
-	Urls    []*URLFragment   "json:\"urls\" graphql:\"urls\""
+	Aliases []string         `json:"aliases" graphql:"aliases"`
+	ID      string           `json:"id" graphql:"id"`
+	Images  []*ImageFragment `json:"images" graphql:"images"`
+	Name    string           `json:"name" graphql:"name"`
+	Urls    []*URLFragment   `json:"urls" graphql:"urls"`
 }
 
 func (t *FindScenesBySceneFingerprints_FindScenesBySceneFingerprints_SceneFragment_Studio_StudioFragment_Parent) GetAliases() []string {
@@ -701,9 +701,9 @@ func (t *FindScenesBySceneFingerprints_FindScenesBySceneFingerprints_SceneFragme
 }
 
 type FindScenesBySceneFingerprints_FindScenesBySceneFingerprints_SceneFragment_Tags_TagFragment_Category struct {
-	Description *string "json:\"description,omitempty\" graphql:\"description\""
-	ID          string  "json:\"id\" graphql:\"id\""
-	Name        string  "json:\"name\" graphql:\"name\""
+	Description *string `json:"description,omitempty" graphql:"description"`
+	ID          string  `json:"id" graphql:"id"`
+	Name        string  `json:"name" graphql:"name"`
 }
 
 func (t *FindScenesBySceneFingerprints_FindScenesBySceneFingerprints_SceneFragment_Tags_TagFragment_Category) GetDescription() *string {
@@ -726,11 +726,11 @@ func (t *FindScenesBySceneFingerprints_FindScenesBySceneFingerprints_SceneFragme
 }
 
 type SearchScene_SearchScene_SceneFragment_Studio_StudioFragment_Parent struct {
-	Aliases []string         "json:\"aliases\" graphql:\"aliases\""
-	ID      string           "json:\"id\" graphql:\"id\""
-	Images  []*ImageFragment "json:\"images\" graphql:\"images\""
-	Name    string           "json:\"name\" graphql:\"name\""
-	Urls    []*URLFragment   "json:\"urls\" graphql:\"urls\""
+	Aliases []string         `json:"aliases" graphql:"aliases"`
+	ID      string           `json:"id" graphql:"id"`
+	Images  []*ImageFragment `json:"images" graphql:"images"`
+	Name    string           `json:"name" graphql:"name"`
+	Urls    []*URLFragment   `json:"urls" graphql:"urls"`
 }
 
 func (t *SearchScene_SearchScene_SceneFragment_Studio_StudioFragment_Parent) GetAliases() []string {
@@ -765,9 +765,9 @@ func (t *SearchScene_SearchScene_SceneFragment_Studio_StudioFragment_Parent) Get
 }
 
 type SearchScene_SearchScene_SceneFragment_Tags_TagFragment_Category struct {
-	Description *string "json:\"description,omitempty\" graphql:\"description\""
-	ID          string  "json:\"id\" graphql:\"id\""
-	Name        string  "json:\"name\" graphql:\"name\""
+	Description *string `json:"description,omitempty" graphql:"description"`
+	ID          string  `json:"id" graphql:"id"`
+	Name        string  `json:"name" graphql:"name"`
 }
 
 func (t *SearchScene_SearchScene_SceneFragment_Tags_TagFragment_Category) GetDescription() *string {
@@ -790,11 +790,11 @@ func (t *SearchScene_SearchScene_SceneFragment_Tags_TagFragment_Category) GetNam
 }
 
 type FindSceneByID_FindScene_SceneFragment_Studio_StudioFragment_Parent struct {
-	Aliases []string         "json:\"aliases\" graphql:\"aliases\""
-	ID      string           "json:\"id\" graphql:\"id\""
-	Images  []*ImageFragment "json:\"images\" graphql:\"images\""
-	Name    string           "json:\"name\" graphql:\"name\""
-	Urls    []*URLFragment   "json:\"urls\" graphql:\"urls\""
+	Aliases []string         `json:"aliases" graphql:"aliases"`
+	ID      string           `json:"id" graphql:"id"`
+	Images  []*ImageFragment `json:"images" graphql:"images"`
+	Name    string           `json:"name" graphql:"name"`
+	Urls    []*URLFragment   `json:"urls" graphql:"urls"`
 }
 
 func (t *FindSceneByID_FindScene_SceneFragment_Studio_StudioFragment_Parent) GetAliases() []string {
@@ -829,9 +829,9 @@ func (t *FindSceneByID_FindScene_SceneFragment_Studio_StudioFragment_Parent) Get
 }
 
 type FindSceneByID_FindScene_SceneFragment_Tags_TagFragment_Category struct {
-	Description *string "json:\"description,omitempty\" graphql:\"description\""
-	ID          string  "json:\"id\" graphql:\"id\""
-	Name        string  "json:\"name\" graphql:\"name\""
+	Description *string `json:"description,omitempty" graphql:"description"`
+	ID          string  `json:"id" graphql:"id"`
+	Name        string  `json:"name" graphql:"name"`
 }
 
 func (t *FindSceneByID_FindScene_SceneFragment_Tags_TagFragment_Category) GetDescription() *string {
@@ -854,11 +854,11 @@ func (t *FindSceneByID_FindScene_SceneFragment_Tags_TagFragment_Category) GetNam
 }
 
 type FindStudio_FindStudio_StudioFragment_Parent struct {
-	Aliases []string         "json:\"aliases\" graphql:\"aliases\""
-	ID      string           "json:\"id\" graphql:\"id\""
-	Images  []*ImageFragment "json:\"images\" graphql:\"images\""
-	Name    string           "json:\"name\" graphql:\"name\""
-	Urls    []*URLFragment   "json:\"urls\" graphql:\"urls\""
+	Aliases []string         `json:"aliases" graphql:"aliases"`
+	ID      string           `json:"id" graphql:"id"`
+	Images  []*ImageFragment `json:"images" graphql:"images"`
+	Name    string           `json:"name" graphql:"name"`
+	Urls    []*URLFragment   `json:"urls" graphql:"urls"`
 }
 
 func (t *FindStudio_FindStudio_StudioFragment_Parent) GetAliases() []string {
@@ -893,9 +893,9 @@ func (t *FindStudio_FindStudio_StudioFragment_Parent) GetUrls() []*URLFragment {
 }
 
 type FindTag_FindTag_TagFragment_Category struct {
-	Description *string "json:\"description,omitempty\" graphql:\"description\""
-	ID          string  "json:\"id\" graphql:\"id\""
-	Name        string  "json:\"name\" graphql:\"name\""
+	Description *string `json:"description,omitempty" graphql:"description"`
+	ID          string  `json:"id" graphql:"id"`
+	Name        string  `json:"name" graphql:"name"`
 }
 
 func (t *FindTag_FindTag_TagFragment_Category) GetDescription() *string {
@@ -918,9 +918,9 @@ func (t *FindTag_FindTag_TagFragment_Category) GetName() string {
 }
 
 type QueryTags_QueryTags_Tags_TagFragment_Category struct {
-	Description *string "json:\"description,omitempty\" graphql:\"description\""
-	ID          string  "json:\"id\" graphql:\"id\""
-	Name        string  "json:\"name\" graphql:\"name\""
+	Description *string `json:"description,omitempty" graphql:"description"`
+	ID          string  `json:"id" graphql:"id"`
+	Name        string  `json:"name" graphql:"name"`
 }
 
 func (t *QueryTags_QueryTags_Tags_TagFragment_Category) GetDescription() *string {
@@ -943,8 +943,8 @@ func (t *QueryTags_QueryTags_Tags_TagFragment_Category) GetName() string {
 }
 
 type QueryTags_QueryTags struct {
-	Count int            "json:\"count\" graphql:\"count\""
-	Tags  []*TagFragment "json:\"tags\" graphql:\"tags\""
+	Count int            `json:"count" graphql:"count"`
+	Tags  []*TagFragment `json:"tags" graphql:"tags"`
 }
 
 func (t *QueryTags_QueryTags) GetCount() int {
@@ -961,7 +961,7 @@ func (t *QueryTags_QueryTags) GetTags() []*TagFragment {
 }
 
 type Me_Me struct {
-	Name string "json:\"name\" graphql:\"name\""
+	Name string `json:"name" graphql:"name"`
 }
 
 func (t *Me_Me) GetName() string {
@@ -972,7 +972,7 @@ func (t *Me_Me) GetName() string {
 }
 
 type SubmitSceneDraft_SubmitSceneDraft struct {
-	ID *string "json:\"id,omitempty\" graphql:\"id\""
+	ID *string `json:"id,omitempty" graphql:"id"`
 }
 
 func (t *SubmitSceneDraft_SubmitSceneDraft) GetID() *string {
@@ -983,7 +983,7 @@ func (t *SubmitSceneDraft_SubmitSceneDraft) GetID() *string {
 }
 
 type SubmitPerformerDraft_SubmitPerformerDraft struct {
-	ID *string "json:\"id,omitempty\" graphql:\"id\""
+	ID *string `json:"id,omitempty" graphql:"id"`
 }
 
 func (t *SubmitPerformerDraft_SubmitPerformerDraft) GetID() *string {
@@ -994,7 +994,7 @@ func (t *SubmitPerformerDraft_SubmitPerformerDraft) GetID() *string {
 }
 
 type FindScenesBySceneFingerprints struct {
-	FindScenesBySceneFingerprints [][]*SceneFragment "json:\"findScenesBySceneFingerprints\" graphql:\"findScenesBySceneFingerprints\""
+	FindScenesBySceneFingerprints [][]*SceneFragment `json:"findScenesBySceneFingerprints" graphql:"findScenesBySceneFingerprints"`
 }
 
 func (t *FindScenesBySceneFingerprints) GetFindScenesBySceneFingerprints() [][]*SceneFragment {
@@ -1005,7 +1005,7 @@ func (t *FindScenesBySceneFingerprints) GetFindScenesBySceneFingerprints() [][]*
 }
 
 type SearchScene struct {
-	SearchScene []*SceneFragment "json:\"searchScene\" graphql:\"searchScene\""
+	SearchScene []*SceneFragment `json:"searchScene" graphql:"searchScene"`
 }
 
 func (t *SearchScene) GetSearchScene() []*SceneFragment {
@@ -1016,7 +1016,7 @@ func (t *SearchScene) GetSearchScene() []*SceneFragment {
 }
 
 type SearchPerformer struct {
-	SearchPerformer []*PerformerFragment "json:\"searchPerformer\" graphql:\"searchPerformer\""
+	SearchPerformer []*PerformerFragment `json:"searchPerformer" graphql:"searchPerformer"`
 }
 
 func (t *SearchPerformer) GetSearchPerformer() []*PerformerFragment {
@@ -1027,7 +1027,7 @@ func (t *SearchPerformer) GetSearchPerformer() []*PerformerFragment {
 }
 
 type FindPerformerByID struct {
-	FindPerformer *PerformerFragment "json:\"findPerformer,omitempty\" graphql:\"findPerformer\""
+	FindPerformer *PerformerFragment `json:"findPerformer,omitempty" graphql:"findPerformer"`
 }
 
 func (t *FindPerformerByID) GetFindPerformer() *PerformerFragment {
@@ -1038,7 +1038,7 @@ func (t *FindPerformerByID) GetFindPerformer() *PerformerFragment {
 }
 
 type FindSceneByID struct {
-	FindScene *SceneFragment "json:\"findScene,omitempty\" graphql:\"findScene\""
+	FindScene *SceneFragment `json:"findScene,omitempty" graphql:"findScene"`
 }
 
 func (t *FindSceneByID) GetFindScene() *SceneFragment {
@@ -1049,7 +1049,7 @@ func (t *FindSceneByID) GetFindScene() *SceneFragment {
 }
 
 type FindStudio struct {
-	FindStudio *StudioFragment "json:\"findStudio,omitempty\" graphql:\"findStudio\""
+	FindStudio *StudioFragment `json:"findStudio,omitempty" graphql:"findStudio"`
 }
 
 func (t *FindStudio) GetFindStudio() *StudioFragment {
@@ -1060,7 +1060,7 @@ func (t *FindStudio) GetFindStudio() *StudioFragment {
 }
 
 type FindTag struct {
-	FindTag *TagFragment "json:\"findTag,omitempty\" graphql:\"findTag\""
+	FindTag *TagFragment `json:"findTag,omitempty" graphql:"findTag"`
 }
 
 func (t *FindTag) GetFindTag() *TagFragment {
@@ -1071,7 +1071,7 @@ func (t *FindTag) GetFindTag() *TagFragment {
 }
 
 type QueryTags struct {
-	QueryTags QueryTags_QueryTags "json:\"queryTags\" graphql:\"queryTags\""
+	QueryTags QueryTags_QueryTags `json:"queryTags" graphql:"queryTags"`
 }
 
 func (t *QueryTags) GetQueryTags() *QueryTags_QueryTags {
@@ -1082,7 +1082,7 @@ func (t *QueryTags) GetQueryTags() *QueryTags_QueryTags {
 }
 
 type SubmitFingerprint struct {
-	SubmitFingerprint bool "json:\"submitFingerprint\" graphql:\"submitFingerprint\""
+	SubmitFingerprint bool `json:"submitFingerprint" graphql:"submitFingerprint"`
 }
 
 func (t *SubmitFingerprint) GetSubmitFingerprint() bool {
@@ -1093,7 +1093,7 @@ func (t *SubmitFingerprint) GetSubmitFingerprint() bool {
 }
 
 type Me struct {
-	Me *Me_Me "json:\"me,omitempty\" graphql:\"me\""
+	Me *Me_Me `json:"me,omitempty" graphql:"me"`
 }
 
 func (t *Me) GetMe() *Me_Me {
@@ -1104,7 +1104,7 @@ func (t *Me) GetMe() *Me_Me {
 }
 
 type SubmitSceneDraft struct {
-	SubmitSceneDraft SubmitSceneDraft_SubmitSceneDraft "json:\"submitSceneDraft\" graphql:\"submitSceneDraft\""
+	SubmitSceneDraft SubmitSceneDraft_SubmitSceneDraft `json:"submitSceneDraft" graphql:"submitSceneDraft"`
 }
 
 func (t *SubmitSceneDraft) GetSubmitSceneDraft() *SubmitSceneDraft_SubmitSceneDraft {
@@ -1115,7 +1115,7 @@ func (t *SubmitSceneDraft) GetSubmitSceneDraft() *SubmitSceneDraft_SubmitSceneDr
 }
 
 type SubmitPerformerDraft struct {
-	SubmitPerformerDraft SubmitPerformerDraft_SubmitPerformerDraft "json:\"submitPerformerDraft\" graphql:\"submitPerformerDraft\""
+	SubmitPerformerDraft SubmitPerformerDraft_SubmitPerformerDraft `json:"submitPerformerDraft" graphql:"submitPerformerDraft"`
 }
 
 func (t *SubmitPerformerDraft) GetSubmitPerformerDraft() *SubmitPerformerDraft_SubmitPerformerDraft {

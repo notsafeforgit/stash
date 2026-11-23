@@ -258,18 +258,19 @@ test("browser downloads finish with the app closed and play on an offline cold l
     .click();
   const video = reopened.locator("video");
   await expect(video).toBeVisible();
-  await video.evaluate((element) => {
-    if (!(element instanceof HTMLVideoElement))
-      throw new Error("Missing video");
-    return element.play();
-  });
+  // Play through the player: a direct element.play() is paused again by the
+  // player, whose own state still says paused.
+  await reopened
+    .getByRole("button", { name: "Play", exact: true })
+    .first()
+    .click();
   await expect
     .poll(() =>
       video.evaluate((element) =>
         element instanceof HTMLVideoElement ? element.currentTime : 0,
       ),
     )
-    .toBeGreaterThan(0);
+    .toBeGreaterThan(0.25);
   expect(
     await reopened.evaluate(() => navigator.mediaSession.metadata?.title),
   ).toBe("Fixture 900000001");

@@ -377,6 +377,12 @@ test.describe("lost response recovery", () => {
     await expect(
       page.getByText("An ownership change needs confirmation", { exact: true }),
     ).toBeVisible();
+    // The notice appears once the change is journaled, before it is sent.
+    // Reload only after the lost response, or the reload cancels the write.
+    await expect(
+      page.getByText("Could not complete this step", { exact: true }),
+    ).toBeVisible();
+    expect(remote.writes).toHaveLength(1);
     await page.reload();
     await expect(
       page.getByRole("button", { name: "Preview ownership", exact: true }),

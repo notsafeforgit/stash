@@ -379,11 +379,17 @@ test("the shared decimal slider previews locally and persists one value on relea
   await expect(slider).toHaveCount(1);
   const box = await track.boundingBox();
   if (!box) throw new Error("Missing rating track");
-  await page.mouse.move(box.x + 2, box.y + box.height / 2);
+  const y = box.y + box.height / 2;
+  await page.mouse.move(box.x + 2, y);
   await page.mouse.down();
-  await page.mouse.move(box.x + box.width * 0.8, box.y + box.height / 2, {
-    steps: 12,
-  });
+  // Browsers send at most one pointermove per frame. Playwright can send all
+  // twelve in one frame, and WebKit's slider then drops most of them.
+  for (let step = 1; step <= 12; step++) {
+    await page.mouse.move(box.x + 2 + ((box.width * 0.8 - 2) * step) / 12, y);
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(resolve)),
+    );
+  }
   expect(
     await page.evaluate(() =>
       window.tvFixtureRequests.filter(

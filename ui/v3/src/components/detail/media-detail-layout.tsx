@@ -367,10 +367,6 @@ function MediaDetailContent({
               onClick={onClosePrimaryFocus}
               data-player-hotkeys-disabled=""
               className="max-lg:order-last max-lg:self-end max-lg:shrink-0 max-lg:m-3 lg:absolute lg:right-3 lg:top-[max(0.75rem,env(safe-area-inset-top,0px))] z-50 h-11 rounded-full border border-white/15 bg-black/60 px-3 text-white shadow-lg backdrop-blur-sm hover:bg-black/75 hover:text-white"
-              aria-label={intl.formatMessage({
-                id: "actions.close_scene_viewer",
-                defaultMessage: "Close scene viewer",
-              })}
             >
               <XIcon />
               {intl.formatMessage({

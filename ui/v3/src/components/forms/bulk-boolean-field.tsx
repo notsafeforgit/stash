@@ -63,21 +63,15 @@ export function BulkBooleanField({
           defaultMessage: "Field update mode",
         })}
       >
-        <ToggleGroupItem<BoolMode>
-          value="keep"
-          aria-label={intl.formatMessage({
-            id: "bulk_update_keep_existing_value",
-            defaultMessage: "Keep existing value",
-          })}
-        >
+        <ToggleGroupItem<BoolMode> value="keep">
           <BanIcon />
           {intl.formatMessage({ id: "actions.keep", defaultMessage: "Keep" })}
         </ToggleGroupItem>
-        <ToggleGroupItem<BoolMode> value="true" aria-label={trueText}>
+        <ToggleGroupItem<BoolMode> value="true">
           <CheckIcon />
           {trueText}
         </ToggleGroupItem>
-        <ToggleGroupItem<BoolMode> value="false" aria-label={falseText}>
+        <ToggleGroupItem<BoolMode> value="false">
           <XIcon />
           {falseText}
         </ToggleGroupItem>

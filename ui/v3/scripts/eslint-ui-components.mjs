@@ -10,6 +10,28 @@ const controls = new Set([
   "summary",
 ]);
 
+// web.css matches `[aria-label]:has(> svg:only-child)`, and :only-child ignores
+// text nodes, so an icon beside visible text is squeezed to icon width.
+function iconWithText(children) {
+  const elements = children.filter((child) => child.type === "JSXElement");
+  if (elements.length !== 1) return false;
+  const name = elements[0].openingElement.name;
+  if (name.type !== "JSXIdentifier" || !/^(svg|\w+Icon)$/.test(name.name))
+    return false;
+  return children.some((child) =>
+    child.type === "JSXText"
+      ? child.value.trim() !== ""
+      : child.type === "JSXExpressionContainer" &&
+        [
+          "CallExpression",
+          "Identifier",
+          "Literal",
+          "MemberExpression",
+          "TemplateLiteral",
+        ].includes(child.expression.type),
+  );
+}
+
 export default {
   meta: {
     type: "problem",
@@ -21,6 +43,8 @@ export default {
       foreign:
         "This application builds its UI on ui-sdk; use the shared UI layer instead of {{name}}.",
       dialog: "Use a shared dialog instead of a blocking browser {{name}}().",
+      labelledText:
+        "This control shows text, so that text is its name: remove aria-label. web.css sizes a labelled control whose only element is an icon as a square icon button.",
     },
   },
   create(context) {
@@ -48,6 +72,14 @@ export default {
         const tag = node.name.type === "JSXIdentifier" ? node.name.name : null;
         if (controls.has(tag) && !(textarea && tag === "textarea")) {
           context.report({ node, messageId: "control", data: { tag } });
+        }
+        const labelled = node.attributes.some(
+          (attribute) =>
+            attribute.type === "JSXAttribute" &&
+            attribute.name.name === "aria-label",
+        );
+        if (labelled && iconWithText(node.parent.children)) {
+          context.report({ node, messageId: "labelledText" });
         }
       },
       ImportDeclaration(node) {

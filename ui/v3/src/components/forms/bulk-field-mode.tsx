@@ -67,35 +67,17 @@ export function BulkFieldModeToggle({
         defaultMessage: "Field update mode",
       })}
     >
-      <ToggleGroupItem<BulkFieldMode>
-        value="keep"
-        aria-label={intl.formatMessage({
-          id: "bulk_update_keep_existing_value",
-          defaultMessage: "Keep existing value",
-        })}
-      >
+      <ToggleGroupItem<BulkFieldMode> value="keep">
         <BanIcon />
         {intl.formatMessage({ id: "actions.keep", defaultMessage: "Keep" })}
       </ToggleGroupItem>
       {!hideClear && (
-        <ToggleGroupItem<BulkFieldMode>
-          value="clear"
-          aria-label={intl.formatMessage({
-            id: "actions.clear",
-            defaultMessage: "Clear",
-          })}
-        >
+        <ToggleGroupItem<BulkFieldMode> value="clear">
           <EraserIcon />
           {intl.formatMessage({ id: "actions.clear", defaultMessage: "Clear" })}
         </ToggleGroupItem>
       )}
-      <ToggleGroupItem<BulkFieldMode>
-        value="set"
-        aria-label={intl.formatMessage({
-          id: "actions.set",
-          defaultMessage: "Set",
-        })}
-      >
+      <ToggleGroupItem<BulkFieldMode> value="set">
         <PencilIcon />
         {intl.formatMessage({ id: "actions.set", defaultMessage: "Set" })}
       </ToggleGroupItem>

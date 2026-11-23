@@ -73,8 +73,8 @@ describe("MediaDetailLayout focus viewer", () => {
       if (!player || !trigger) throw new Error("Viewer is missing");
       trigger.focus();
       await act(async () => trigger.click());
-      const close = container.querySelector<HTMLButtonElement>(
-        '[aria-label="Close scene viewer"]',
+      const close = Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Close scene viewer",
       );
       if (!close) throw new Error("Viewer Close is missing");
       expect(document.activeElement).toBe(close);

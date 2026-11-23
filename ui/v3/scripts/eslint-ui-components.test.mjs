@@ -33,6 +33,12 @@ tester.run("shared UI boundaries", rule, {
       filename: "C:\\project\\src\\components\\ui\\textarea.tsx",
       code: "const x = <textarea />;",
     },
+    ...[
+      'const x = <Button aria-label="Close"><XIcon /></Button>;',
+      "const x = <Button aria-label={label}><XIcon />{/* icon only */}</Button>;",
+      "const x = <Button><XIcon />{label}</Button>;",
+      'const x = <Button aria-label="Status"><XIcon /><Badge>3</Badge></Button>;',
+    ].map((code) => ({ filename, code })),
   ],
   invalid: [
     ...[
@@ -72,6 +78,15 @@ tester.run("shared UI boundaries", rule, {
       filename: shared,
       code,
       errors: [{ messageId: "foreign" }],
+    })),
+    ...[
+      'const x = <ToggleGroupItem aria-label="Keep existing value"><BanIcon />Keep</ToggleGroupItem>;',
+      "const x = <Button aria-label={label}><XIcon />{intl.formatMessage(message)}</Button>;",
+      "const x = <Toggle aria-label={text}><svg />{text}</Toggle>;",
+    ].map((code) => ({
+      filename,
+      code,
+      errors: [{ messageId: "labelledText" }],
     })),
     ...[
       'window.confirm("Delete?")',

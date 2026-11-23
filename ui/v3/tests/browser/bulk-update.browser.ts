@@ -16,6 +16,20 @@ for (const width of [390, 1280]) {
       expect(input.apply_to_items_matching_filters).toBeUndefined();
     });
 
+    test("field mode choices show their whole label", async ({ page }) => {
+      await page.goto("/bulk-update");
+      const choices = page
+        .getByLabel("Field update mode")
+        .locator(":scope > *");
+      await expect(choices.first()).toBeVisible();
+      for (const choice of await choices.all()) {
+        const overflow = await choice.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        );
+        expect(overflow, await choice.innerText()).toBeLessThanOrEqual(0);
+      }
+    });
+
     test("filtered edits report admission without a completed callback", async ({
       page,
     }) => {

@@ -7,8 +7,8 @@ require (
 	github.com/WithoutPants/sortorder v0.0.0-20230616003020-921c9ef69552
 	github.com/antchfx/htmlquery v1.3.7
 	github.com/asticode/go-astisub v0.45.0
-	github.com/chromedp/cdproto v0.0.0-20260912003405-686a5c723acc
-	github.com/chromedp/chromedp v0.16.0
+	github.com/chromedp/cdproto v0.160.1
+	github.com/chromedp/chromedp v0.24.0
 	github.com/coder/websocket v1.8.15
 	github.com/corona10/goimagehash v1.1.0
 	github.com/disintegration/imaging v1.6.2
@@ -81,7 +81,6 @@ require (
 	github.com/asticode/go-astikit v0.59.0 // indirect
 	github.com/asticode/go-astits v1.16.0 // indirect
 	github.com/chigopher/pathlib v0.19.1 // indirect
-	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/dlclark/regexp2/v2 v2.11.0 // indirect
 	github.com/dsoprea/go-iptc v0.0.0-20200610044640-bc9ca208b413 // indirect
 	github.com/dsoprea/go-photoshop-info-format v0.0.0-20200610045659-121dd752914d // indirect
@@ -95,9 +94,6 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-xmlfmt/xmlfmt v1.1.3 // indirect
-	github.com/gobwas/httphead v0.1.0 // indirect
-	github.com/gobwas/pool v0.2.1 // indirect
-	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/golang/geo v0.0.0-20260818125358-b200a1149890 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect

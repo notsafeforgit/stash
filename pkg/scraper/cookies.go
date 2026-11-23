@@ -107,39 +107,34 @@ func printJarCookies(jar *cookiejar.Jar, urls []*url.URL) {
 }
 
 // set all cookies listed in the scraper config
-func setCDPCookies(driverOptions scraperDriverOptions) chromedp.Tasks {
-	return chromedp.Tasks{
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			// create cookie expiration
-			expr := cdp.TimeSinceEpoch(time.Now().Add(180 * 24 * time.Hour))
+func setCDPCookies(driverOptions scraperDriverOptions) chromedp.Action[chromedp.Void] {
+	return chromedp.Func(func(ctx context.Context, t *chromedp.Target) error {
+		// create cookie expiration
+		expires := cdp.TimeSinceEpoch(time.Now().Add(180 * 24 * time.Hour).Unix())
 
-			for _, ckURL := range driverOptions.Cookies {
-				for _, cookie := range ckURL.Cookies {
-					err := network.SetCookie(cookie.Name, getCookieValue(cookie)).
-						WithExpires(&expr).
-						WithDomain(cookie.Domain).
-						WithPath(cookie.Path).
-						WithHTTPOnly(false).
-						WithSecure(false).
-						Do(ctx)
-					if err != nil {
-						return fmt.Errorf("could not set chrome cookie %s: %s", cookie.Name, err)
-					}
+		for _, ckURL := range driverOptions.Cookies {
+			for _, cookie := range ckURL.Cookies {
+				_, err := cdp.Call(ctx, t, network.SetCookie, network.SetCookieParams{
+					Name:     cookie.Name,
+					Value:    getCookieValue(cookie),
+					Expires:  expires,
+					Domain:   cookie.Domain,
+					Path:     cookie.Path,
+					HTTPOnly: new(false),
+					Secure:   new(false),
+				})
+				if err != nil {
+					return fmt.Errorf("could not set chrome cookie %s: %s", cookie.Name, err)
 				}
 			}
-			return nil
-		}),
-	}
+		}
+		return nil
+	})
 }
 
 // print cookies whose domain is included in the scraper  config
-func printCDPCookies(driverOptions scraperDriverOptions, msg string) chromedp.Action {
-	return chromedp.ActionFunc(func(ctx context.Context) error {
-		chromeCookies, err := network.GetCookies().Do(ctx)
-		if err != nil {
-			return err
-		}
-
+func printCDPCookies(driverOptions scraperDriverOptions, msg string) chromedp.Action[chromedp.Void] {
+	return chromedp.Func(func(ctx context.Context, t *chromedp.Target) error {
 		scraperDomains := make(map[string]struct{})
 		for _, ckURL := range driverOptions.Cookies {
 			for _, cookie := range ckURL.Cookies {
@@ -147,13 +142,20 @@ func printCDPCookies(driverOptions scraperDriverOptions, msg string) chromedp.Ac
 			}
 		}
 
-		if len(scraperDomains) > 0 { // only print the cookies if they are listed in the scraper
-			logger.Debugf("%s\n", msg)
-			for i, cookie := range chromeCookies {
-				_, ok := scraperDomains[cookie.Domain]
-				if ok {
-					logger.Debugf("[%d]: Name: \"%s\" Value: \"%s\"  Domain: \"%s\"", i, cookie.Name, cookie.Value, cookie.Domain)
-				}
+		if len(scraperDomains) == 0 { // only print the cookies if they are listed in the scraper
+			return nil
+		}
+
+		chromeCookies, err := cdp.Call(ctx, t, network.GetCookies, network.GetCookiesParams{})
+		if err != nil {
+			return err
+		}
+
+		logger.Debugf("%s\n", msg)
+		for i, cookie := range chromeCookies.Cookies {
+			_, ok := scraperDomains[cookie.Domain]
+			if ok {
+				logger.Debugf("[%d]: Name: \"%s\" Value: \"%s\"  Domain: \"%s\"", i, cookie.Name, cookie.Value, cookie.Domain)
 			}
 		}
 		return nil

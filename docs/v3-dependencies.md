@@ -12,7 +12,7 @@ remain preserved in the frozen compatible release.
 | Codecs | libheif 1.23.4; libvips 8.18.6; current packages from Alpine 3.24 / the runtime's supported Debian or Ubuntu release |
 | UI | React 19.3.1; ui-sdk 0.1.0-beta.13 (`@ui-sdk/react`, `@ui-sdk/core`); Tailwind 4.3.5 |
 | Tables | TanStack Table 9.3 with explicit features and server-controlled sorting |
-| GraphQL | Apollo 4.3.8; GraphQL 17.1; Code Generator 7 (CLI) / 6 (TypeScript plugins) |
+| GraphQL | Apollo 4.3.8; GraphQL 17.1; Code Generator 8 (CLI) / 7 (TypeScript plugins) |
 | Playback | Video.js 10.6.0, whose adapter pins hls.js 1.7.4 |
 | Tooling | Node 24 LTS (24.15 minimum); pnpm 12.21.0; TypeScript 7.0.2; Vite 8.3.8; Vitest 5.1; Biome 2.6; Playwright 1.65.1 |
 
@@ -84,6 +84,41 @@ every codec from upstream. The verified amd64 runtime versions are:
 | Stash image (`docker/ghcr/Dockerfile`), Debian trixie | Jellyfin 8.1.3-2 (pinned) | 1.4.2 (source build) | 3.14.10 |
 | CI media tests, Ubuntu 24.04 runners | Jellyfin 8.1.3-2 (same pin) | Ubuntu package | runner default |
 | Optional local `make docker-cuda-build` image, Ubuntu 24.04 (not published) | 6.1.1 (Ubuntu updates) | 1.0.4 | 3.12.3 |
+
+## 2026-11-23 refresh
+
+- chromedp 0.16 → 0.24 with cdproto 0.160.1. The scraper's Chrome loader
+  (`pkg/scraper/url.go`, `cookies.go`) uses the generic action API: protocol
+  commands go through `cdp.Call` and queries return their values. The remote
+  allocator moves to `chromedp/remote`, whose own WebSocket client replaces
+  gobwas/ws; a local executable uses the pipe transport. Since 0.22 a command
+  fails with `ErrTargetDetached` when its tab goes away instead of waiting for
+  the scrape timeout.
+- Proxy credentials now reach Chrome. The loader listened for Fetch auth
+  challenges but never enabled the Fetch domain, so an authenticating proxy
+  rejected every browser scrape. It now enables Fetch with auth handling,
+  answers a proxy challenge once per request and cancels a repeated one, so a
+  wrong password fails at once rather than at the 60-second timeout. Server
+  challenges keep Chrome's default handling.
+- `pkg/scraper/url_cdp_test.go` drives a real browser: a local executable, a
+  separately running Chrome reached through `http://…/json/version` and `ws://…`,
+  cookies, headers, clicks, script-rendered content and proxy authentication.
+  It runs when `STASH_TEST_CHROME` names a Chrome or Chromium executable; CI
+  does not set it.
+- GraphQL Code Generator 8 (CLI, `add`, `time`, `typed-document-node`) with the
+  7.0 TypeScript plugins. The breaking changes cover Node and GraphQL minimums
+  and configuration shapes Stash does not use. Regenerated types are unchanged
+  except that typescript-operations 7.0.2 writes the `Exact` and `Incremental`
+  helpers after the imports.
+- vite-plugin-pwa 2.0 only widens its `@vite-pwa/assets-generator` peer range,
+  which Stash does not use. The production build, including the service worker
+  and its precache manifest, is byte-identical.
+- jsdom 31, used only by unit tests, replaces its CSS engine and optional canvas
+  backend. The unit tests pass unchanged.
+- goqu stays on 9.19. Comparing generated SQL confirms that 9.27 drops
+  `INSERT OR IGNORE` from the file-metadata and custom-field upserts (the blob
+  insert keeps it) and compares typed nil values with `IS NULL`; the 729
+  comparison call sites in the query code need their own review.
 
 ## 2026-11-21 refresh
 

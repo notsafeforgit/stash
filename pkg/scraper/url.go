@@ -17,6 +17,7 @@ import (
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
+	"github.com/chromedp/chromedp/remote"
 	"github.com/enetx/g"
 	"github.com/enetx/surf"
 	jsoniter "github.com/json-iterator/go"
@@ -181,13 +182,13 @@ func urlFromCDP(ctx context.Context, urlCDP string, driverOptions scraperDriverO
 		var cancelAct context.CancelFunc
 
 		if isCDPPathHTTP(globalConfig) || isCDPPathWS(globalConfig) {
-			remote := cdpPath
+			remoteURL := cdpPath
 
 			// -------------------------------------------------------------------
 			// #1023
 			// when chromium is listening over RDP it only accepts requests
 			// with host headers that are either IPs or `localhost`
-			cdpURL, err := url.Parse(remote)
+			cdpURL, err := url.Parse(remoteURL)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse CDP Path: %v", err)
 			}
@@ -205,7 +206,7 @@ func urlFromCDP(ctx context.Context, urlCDP string, driverOptions scraperDriverO
 					// replace the host part of the cdpURL with the IP
 					cdpURL.Host = strings.Replace(cdpURL.Host, hostname, addr[0].String(), 1)
 					// use that for remote
-					remote = cdpURL.String()
+					remoteURL = cdpURL.String()
 				}
 			}
 			// --------------------------------------------------------------------
@@ -213,13 +214,13 @@ func urlFromCDP(ctx context.Context, urlCDP string, driverOptions scraperDriverO
 			// if CDPPath is http(s) then we need to get the websocket URL
 			if isCDPPathHTTP(globalConfig) {
 				var err error
-				remote, err = getRemoteCDPWSAddress(ctx, remote)
+				remoteURL, err = getRemoteCDPWSAddress(ctx, remoteURL)
 				if err != nil {
 					return nil, err
 				}
 			}
 
-			ctx, cancelAct = chromedp.NewRemoteAllocator(ctx, remote)
+			ctx, cancelAct = remote.NewAllocator(ctx, remoteURL)
 		} else {
 			// use a temporary user directory for chrome
 			dir, err := os.MkdirTemp("", "stash-chromedp")
@@ -250,64 +251,98 @@ func urlFromCDP(ctx context.Context, urlCDP string, driverOptions scraperDriverO
 	ctx, cancel = context.WithTimeout(ctx, scrapeGetTimeout)
 	defer cancel()
 
-	var res string
 	headers := cdpHeaders(driverOptions)
 
 	if proxyUsesAuth(globalConfig.GetProxy()) {
 		_, user, pass := splitProxyAuth(globalConfig.GetProxy())
-
-		// Based on https://github.com/chromedp/examples/blob/master/proxy/main.go
-		lctx, lcancel := context.WithCancel(ctx)
-		chromedp.ListenTarget(lctx, func(ev interface{}) {
-			switch ev := ev.(type) {
-			case *fetch.EventRequestPaused:
-				go func() {
-					_ = chromedp.Run(ctx, fetch.ContinueRequest(ev.RequestID))
-				}()
-			case *fetch.EventAuthRequired:
-				if ev.AuthChallenge.Source == fetch.AuthChallengeSourceProxy {
-					go func() {
-						_ = chromedp.Run(ctx,
-							fetch.ContinueWithAuth(ev.RequestID, &fetch.AuthChallengeResponse{
-								Response: fetch.AuthChallengeResponseResponseProvideCredentials,
-								Username: user,
-								Password: pass,
-							}),
-							// Chrome will remember the credential for the current instance,
-							// so we can disable the fetch domain once credential is provided.
-							// Please file an issue if Chrome does not work in this way.
-							fetch.Disable(),
-						)
-						// and cancel the event handler too.
-						lcancel()
-					}()
-				}
-			}
-		})
+		if err := answerCDPProxyAuth(ctx, user, pass); err != nil {
+			return nil, err
+		}
 	}
 
-	err := chromedp.Run(ctx,
-		network.Enable(),
+	if err := chromedp.Do(ctx,
+		cdpCommand(network.Enable, network.EnableParams{}),
 		setCDPCookies(driverOptions),
 		printCDPCookies(driverOptions, "Cookies found"),
-		network.SetExtraHTTPHeaders(network.Headers(headers)),
+		cdpCommand(network.SetExtraHTTPHeaders, network.SetExtraHTTPHeadersParams{Headers: network.Headers(headers)}),
 		chromedp.Navigate(urlCDP),
 		chromedp.Sleep(sleepDuration),
 		setCDPClicks(driverOptions),
-		chromedp.OuterHTML("html", &res, chromedp.ByQuery),
-		printCDPCookies(driverOptions, "Cookies set"),
-	)
+	); err != nil {
+		return nil, err
+	}
 
+	res, err := chromedp.Run(ctx, chromedp.OuterHTML(chromedp.CSS("html")))
 	if err != nil {
+		return nil, err
+	}
+
+	if err := chromedp.Do(ctx, printCDPCookies(driverOptions, "Cookies set")); err != nil {
 		return nil, err
 	}
 
 	return strings.NewReader(res), nil
 }
 
+func cdpCommand[P, R any](command cdp.Command[P, R], params P) chromedp.Action[chromedp.Void] {
+	return chromedp.Func(func(ctx context.Context, t *chromedp.Target) error {
+		_, err := cdp.Call(ctx, t, command, params)
+		return err
+	})
+}
+
+// answerCDPProxyAuth gives Chrome the proxy credentials, which its
+// --proxy-server flag cannot carry. With Fetch enabled every request pauses
+// until it is continued, so both loops run until the scrape's context ends.
+func answerCDPProxyAuth(ctx context.Context, user, pass string) error {
+	paused := chromedp.Events(ctx, fetch.RequestPaused)
+	challenges := chromedp.Events(ctx, fetch.AuthRequired)
+
+	go func() {
+		for ev, err := range paused {
+			if err != nil {
+				return
+			}
+			_, _ = chromedp.Call(ctx, fetch.ContinueRequest, fetch.ContinueRequestParams{RequestID: ev.RequestID})
+		}
+	}()
+
+	go func() {
+		answered := make(map[fetch.RequestID]bool)
+		for ev, err := range challenges {
+			if err != nil {
+				return
+			}
+			response := &fetch.AuthChallengeResponse{Response: fetch.AuthChallengeResponseResponseDefault}
+			if ev.AuthChallenge != nil && ev.AuthChallenge.Source == fetch.AuthChallengeSourceProxy {
+				// A second challenge for the same request means the proxy
+				// rejected the credentials; repeating them would loop until
+				// the scrape times out.
+				if answered[ev.RequestID] {
+					response = &fetch.AuthChallengeResponse{Response: fetch.AuthChallengeResponseResponseCancelAuth}
+				} else {
+					answered[ev.RequestID] = true
+					response = &fetch.AuthChallengeResponse{
+						Response: fetch.AuthChallengeResponseResponseProvideCredentials,
+						Username: user,
+						Password: pass,
+					}
+				}
+			}
+			_, _ = chromedp.Call(ctx, fetch.ContinueWithAuth, fetch.ContinueWithAuthParams{
+				RequestID:             ev.RequestID,
+				AuthChallengeResponse: response,
+			})
+		}
+	}()
+
+	_, err := chromedp.Call(ctx, fetch.Enable, fetch.EnableParams{HandleAuthRequests: new(true)})
+	return err
+}
+
 // click all xpaths listed in the scraper config
-func setCDPClicks(driverOptions scraperDriverOptions) chromedp.Tasks {
-	var tasks chromedp.Tasks
+func setCDPClicks(driverOptions scraperDriverOptions) chromedp.Action[chromedp.Void] {
+	var steps []chromedp.Action[chromedp.Void]
 	for _, click := range driverOptions.Clicks { // for each click element find the node from the xpath and add a click action
 		if click.XPath != "" {
 			xpath := click.XPath
@@ -316,9 +351,9 @@ func setCDPClicks(driverOptions scraperDriverOptions) chromedp.Tasks {
 				waitDuration = time.Duration(click.Sleep) * time.Second
 			}
 
-			action := chromedp.ActionFunc(func(ctx context.Context) error {
-				var nodes []*cdp.Node
-				if err := chromedp.Nodes(xpath, &nodes, chromedp.AtLeast(0)).Do(ctx); err != nil {
+			steps = append(steps, chromedp.Func(func(ctx context.Context, t *chromedp.Target) error {
+				nodes, err := chromedp.Nodes(xpath, chromedp.AtLeast(0))(ctx, t)
+				if err != nil {
 					logger.Debugf("Error %s looking for click xpath %s.\n", err, xpath)
 					return err
 				}
@@ -327,15 +362,12 @@ func setCDPClicks(driverOptions scraperDriverOptions) chromedp.Tasks {
 					return nil
 				}
 				logger.Debugf("Clicking %s\n", xpath)
-				return chromedp.MouseClickNode(nodes[0]).Do(ctx)
-			})
-
-			tasks = append(tasks, action)
-			tasks = append(tasks, chromedp.Sleep(waitDuration))
+				_, err = chromedp.MouseClickNode(nodes[0])(ctx, t)
+				return err
+			}), chromedp.Sleep(waitDuration))
 		}
-
 	}
-	return tasks
+	return chromedp.Steps(steps...)
 }
 
 // getRemoteCDPWSAddress returns the complete remote address that is required to access the cdp instance

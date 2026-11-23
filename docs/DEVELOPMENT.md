@@ -113,6 +113,17 @@ To start fresh with new configuration:
 3. Run `make server-start` to restart the server
 4. Follow the "On first launch" steps above
 
+### Browser scraper tests
+
+Scrapers with `useCDP` load pages in Chrome. Their tests in
+`pkg/scraper/url_cdp_test.go` skip unless `STASH_TEST_CHROME` names a Chrome or
+Chromium executable, for example Playwright's
+`~/.cache/ms-playwright/chromium-<version>/chrome-linux64/chrome`:
+
+```bash
+STASH_TEST_CHROME=/path/to/chrome go test ./pkg/scraper -run TestCDP
+```
+
 ## Building a release
 
 Simply run `make` or `make release`, or equivalently:

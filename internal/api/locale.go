@@ -9,31 +9,6 @@ import (
 var matcher = language.NewMatcher([]language.Tag{
 	language.MustParse("en-US"), // The first language is used as fallback.
 	language.MustParse("en-GB"),
-	language.MustParse("en-AU"),
-	language.MustParse("es-ES"),
-	language.MustParse("de-DE"),
-	language.MustParse("it-IT"),
-	language.MustParse("fr-FR"),
-	language.MustParse("fi-FI"),
-	language.MustParse("pt-BR"),
-	language.MustParse("sv-SE"),
-	language.MustParse("zh-CN"),
-	language.MustParse("zh-TW"),
-	language.MustParse("hr-HR"),
-	language.MustParse("nl-NL"),
-	language.MustParse("ru-RU"),
-	language.MustParse("tr-TR"),
-	language.MustParse("da-DK"),
-	language.MustParse("pl-PL"),
-	language.MustParse("ko-KR"),
-	language.MustParse("cs-CZ"),
-	language.MustParse("bn-BD"),
-	language.MustParse("et-EE"),
-	language.MustParse("fa-IR"),
-	language.MustParse("hu-HU"),
-	language.MustParse("ro-RO"),
-	language.MustParse("th-TH"),
-	language.MustParse("uk-UA"),
 })
 
 // newCollator parses a locale into a collator

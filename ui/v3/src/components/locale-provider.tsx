@@ -18,27 +18,29 @@ function languageMessageKey(language: string) {
   return language.replace(/-/, "");
 }
 
-function translateLanguageLocale(l: string) {
-  switch (l) {
-    case "nn-NO":
-      return "nb-NO";
-    default:
-      return l;
-  }
+// Only English ships; a language saved before the others were removed falls
+// back to the default instead of formatting dates and numbers for it.
+function supportedLanguage(language: string) {
+  return localeLoader[languageMessageKey(language)] ? language : DEFAULT_LOCALE;
 }
 
 interface LocaleProviderProps extends PropsWithChildren {
   language: string;
 }
 
-export function LocaleProvider(props: LocaleProviderProps) {
+export function LocaleProvider({ language, children }: LocaleProviderProps) {
+  const supported = supportedLanguage(language);
   useEffect(() => {
-    document.documentElement.lang = props.language;
-  }, [props.language]);
+    document.documentElement.lang = supported;
+  }, [supported]);
 
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(async () => setAttempt((n) => n + 1), []);
-  return <LocaleLoader key={attempt} {...props} retry={retry} />;
+  return (
+    <LocaleLoader key={attempt} language={supported} retry={retry}>
+      {children}
+    </LocaleLoader>
+  );
 }
 
 function LocaleLoader({
@@ -48,7 +50,6 @@ function LocaleLoader({
 }: LocaleProviderProps & { retry: () => Promise<void> }) {
   const [messages, setMessages] = useState<Record<string, string>>();
   const [error, setError] = useState<Error>();
-  const intlLanguage = translateLanguageLocale(language);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,7 +60,7 @@ function LocaleLoader({
       const defaultKey = languageMessageKey(DEFAULT_LOCALE);
       const chosenKey = languageMessageKey(language);
 
-      await withTimeout(registerCountry(language), 5000, "Country names");
+      await withTimeout(registerCountry(), 5000, "Country names");
 
       const defaultLoader = localeLoader[defaultKey];
       if (!defaultLoader)
@@ -178,7 +179,7 @@ function LocaleLoader({
 
   return (
     <IntlProvider
-      locale={intlLanguage}
+      locale={language}
       messages={messages}
       defaultLocale={DEFAULT_LOCALE}
     >

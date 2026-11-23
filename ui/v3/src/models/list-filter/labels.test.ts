@@ -2,7 +2,6 @@ import { createIntl } from "react-intl";
 import { describe, expect, it } from "vitest";
 import { FilterMode } from "@/core/generated-graphql";
 import enGB from "@/locales/en-GB.json";
-import frFR from "@/locales/fr-FR.json";
 import flattenMessages from "@/utils/flatten-messages";
 import { getFilterOptions } from "./factory";
 import {
@@ -25,9 +24,15 @@ describe("list filter labels", () => {
   });
 
   it("uses canonical message IDs in the active locale while preserving stored values", () => {
-    const french = createIntl({
-      locale: "fr-FR",
-      messages: { ...messages, ...flattenMessages(frFR) },
+    const overridden = createIntl({
+      locale: "en-GB",
+      messages: {
+        ...messages,
+        created_at: "Added",
+        random: "Shuffle",
+        scene_code: "Code",
+        scenes: "Videos",
+      },
     });
     const options = getFilterOptions(FilterMode.Scenes).sortByOptions;
     expect(formatSortOptions(intl, options)).toEqual(
@@ -37,14 +42,14 @@ describe("list filter labels", () => {
         { value: "code", label: "Studio Code" },
       ]),
     );
-    expect(formatSortOptions(french, options)).toEqual(
+    expect(formatSortOptions(overridden, options)).toEqual(
       expect.arrayContaining([
-        { value: "created_at", label: "Créé le" },
-        { value: "random", label: "Aléatoire" },
-        { value: "code", label: "Code studio" },
+        { value: "created_at", label: "Added" },
+        { value: "random", label: "Shuffle" },
+        { value: "code", label: "Code" },
       ]),
     );
-    expect(formatFilterModeLabel(french, FilterMode.Scenes)).toBe("Scènes");
+    expect(formatFilterModeLabel(overridden, FilterMode.Scenes)).toBe("Videos");
   });
 
   it("uses a readable fallback for an unavailable sort", () => {

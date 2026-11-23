@@ -115,6 +115,13 @@ every codec from upstream. The verified amd64 runtime versions are:
   and its precache manifest, is byte-identical.
 - jsdom 31, used only by unit tests, replaces its CSS engine and optional canvas
   backend. The unit tests pass unchanged.
+- goja moves to its 2026-11-22 commit `35fdc4b88e39`, which fixes out-of-bounds
+  access through detached TypedArray buffers in plugin and scraper JavaScript.
+  The commits since 2026-11-10 also fix `JSON.parse` on numbers beyond float64,
+  `Number.prototype.toString` edge cases, `toPrecision`/`toExponential` for small
+  denormals, sub-second `Date` setters before the epoch, `TypedArray.set` order
+  and `var` redeclaring non-simple parameters. It was held until the commit was a
+  day old.
 - goqu stays on 9.19. Comparing generated SQL confirms that 9.27 drops
   `INSERT OR IGNORE` from the file-metadata and custom-field upserts (the blob
   insert keeps it) and compares typed nil values with `IS NULL`; the 729

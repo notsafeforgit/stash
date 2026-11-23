@@ -65,7 +65,6 @@ export const playerConfiguration: GQL.ConfigDataFragment = {
     transcodeOutputArgs: [],
     liveTranscodeInputArgs: [],
     liveTranscodeOutputArgs: [],
-    drawFunscriptHeatmapRange: false,
     stashes: [],
     stashBoxes: [],
     scraperPackageSources: [],
@@ -95,9 +94,6 @@ export const playerConfiguration: GQL.ConfigDataFragment = {
     customLocalesEnabled: null,
     disableCustomizations: null,
     language: null,
-    handyKey: null,
-    funscriptOffset: null,
-    useStashHostedFunscript: null,
     sfwContentMode: false,
     imageLightbox: {
       __typename: "ConfigImageLightboxResult",

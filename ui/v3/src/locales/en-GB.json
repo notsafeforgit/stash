@@ -176,7 +176,6 @@
     "delete_markers_count": "Delete {count, plural, one {# marker} other {# markers}}",
     "delete_entity": "Delete {entityType}",
     "delete_file": "Delete file",
-    "delete_file_and_funscript": "Delete file (and funscript)",
     "delete_generated_supporting_files": "Delete generated supporting files",
     "disable": "Disable",
     "discard": "Discard",
@@ -627,8 +626,6 @@
           }
         }
       },
-      "funscript_heatmap_draw_range": "Include range in generated heatmaps",
-      "funscript_heatmap_draw_range_desc": "Draw range of motion on the y-axis of the generated heatmap. Existing heatmaps will need to be regenerated after changing.",
       "gallery_cover_regex_desc": "Regexps used to identify an image as gallery cover.",
       "gallery_cover_regex_label": "Gallery cover pattern",
       "gallery_ext_desc": "Comma-delimited list of file extensions that will be identified as gallery ZIP files.",
@@ -638,7 +635,6 @@
       "generated_files_location": "Directory location for the generated files (scene markers, scene previews, sprites, etc).",
       "generated_path_head": "Generated path",
       "hashing": "Hashing",
-      "heatmap_generation": "Funscript Heatmap Generation",
       "image_ext_desc": "Comma-delimited list of file extensions that will be identified as images.",
       "image_ext_head": "Image extensions",
       "include_audio_desc": "Includes audio stream when generating previews.",
@@ -1009,24 +1005,6 @@
           }
         }
       },
-      "funscript_offset": {
-        "description": "Time offset in milliseconds for interactive scripts playback.",
-        "heading": "Funscript offset (ms)"
-      },
-      "handy_connection": {
-        "connect": "Connect",
-        "server_offset": {
-          "heading": "Server Offset"
-        },
-        "status": {
-          "heading": "Handy Connection Status"
-        },
-        "sync": "Sync"
-      },
-      "handy_connection_key": {
-        "description": "Handy connection key to use for interactive scenes. Setting this key will allow Stash to share your current scene information with handyfeeling.com.",
-        "heading": "Handy connection key"
-      },
       "image_lightbox": {
         "heading": "Image Lightbox"
       },
@@ -1048,7 +1026,6 @@
           }
         }
       },
-      "interactive_options": "Interactive Options",
       "language": {
         "heading": "Language"
       },
@@ -1206,10 +1183,6 @@
         "enable": "Enable & Reload",
         "exit": "Exit",
         "overlay_message": "Troubleshooting mode is active - all customizations are disabled"
-      },
-      "use_stash_hosted_funscript": {
-        "description": "When enabled, funscripts will be served directly from Stash to your Handy device without using the third party Handy server. Requires that Stash be accessible from your Handy device, and that an API key is generated if Stash has credentials configured.",
-        "heading": "Serve funscripts directly"
       }
     }
   },
@@ -1367,7 +1340,6 @@
     "delete_entity_simple_desc": "{count, plural, one {Are you sure you want to delete this {singularEntity}?} other {Are you sure you want to delete these {pluralEntity}?}}",
     "delete_entity_title": "Delete <quoted>{name}</quoted>?",
     "delete_file": "Delete file",
-    "delete_file_and_funscript": "Delete file and funscript",
     "delete_galleries_count": "{count} galleries",
     "delete_galleries_extra": "…plus any image files not attached to any other gallery.",
     "delete_gallery_files": "Delete gallery folder/zip file and any images not attached to any other gallery.",
@@ -1492,7 +1464,6 @@
       "image_previews": "Animated image previews",
       "image_previews_tooltip": "Also generate animated (webp) previews, only required when Scene/Marker Wall Preview type is set to Animated image. When browsing they use less CPU than the video previews, but are generated in addition to them and are larger files.",
       "image_thumbnails": "Image thumbnails",
-      "interactive_heatmap_speed": "Generate heatmaps and speeds for interactive scenes",
       "marker_artifacts": "Marker artifacts",
       "marker_image_previews": "Marker animated image previews",
       "marker_image_previews_tooltip": "Also generate animated (webp) previews, only required when Scene/Marker Wall Preview type is set to Animated image. When browsing they use less CPU than the video previews, but are generated in addition to them and are larger files.",
@@ -1720,15 +1691,6 @@
   "group_scene_number": "Scene Number",
   "groups": "Groups",
   "hair_color": "Hair Colour",
-  "handy_connection_status": {
-    "connecting": "Connecting",
-    "disconnected": "Disconnected",
-    "error": "Error connecting to Handy",
-    "missing": "Missing",
-    "ready": "Ready",
-    "syncing": "Syncing with server",
-    "uploading": "Uploading script"
-  },
   "hasChapters": "Chapters",
   "hasMarkers": "Markers",
   "height": "Height",
@@ -1757,8 +1719,6 @@
   "include_sub_tags": "Include sub-tags",
   "index_of_total": "{index} of {total}",
   "instagram": "Instagram",
-  "interactive": "Interactive",
-  "interactive_speed": "Interactive Speed",
   "interface": "Interface",
   "isMissing": "Is Missing",
   "last_o_at": "Last O At",
@@ -1839,7 +1799,6 @@
     "duration_mismatch": "Duration Mismatch",
     "downloaded_from": "Downloaded From",
     "frame_count": "Frame Count",
-    "interactive_speed": "Interactive Speed",
     "md5": "MD5 Checksum",
     "o_count": "O Count",
     "oshash": "oshash",

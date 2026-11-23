@@ -1166,22 +1166,6 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
   {
     to: "/settings/system",
     section: {
-      id: "config.general.heatmap_generation",
-      defaultMessage: "Heatmap generation",
-    },
-    label: {
-      id: "config.general.funscript_heatmap_draw_range",
-      defaultMessage: "Draw funscript heatmap range",
-    },
-    description: {
-      id: "config.general.funscript_heatmap_draw_range_desc",
-      defaultMessage:
-        "Draws the motion range into generated funscript heatmaps.",
-    },
-  },
-  {
-    to: "/settings/system",
-    section: {
       id: "config.general.logging",
       defaultMessage: "Logging",
     },

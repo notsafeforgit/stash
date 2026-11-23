@@ -46,7 +46,6 @@ const generateMetadataInputSchema = z.looseObject({
   imagePhashes: z.boolean().nullish().catch(undefined),
   imagePreviews: z.boolean().nullish().catch(undefined),
   imageThumbnails: z.boolean().nullish().catch(undefined),
-  interactiveHeatmapsSpeeds: z.boolean().nullish().catch(undefined),
   markerIDs: z.array(z.string()).nullish().catch(undefined),
   markerImagePreviews: z.boolean().nullish().catch(undefined),
   markerScreenshots: z.boolean().nullish().catch(undefined),

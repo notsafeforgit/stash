@@ -207,12 +207,6 @@ function GenerateOptionsForm({
         onChange={(v) => set({ phashes: v })}
       />
       <TaskOptionToggle
-        id="gen-interactive-heatmaps"
-        label="Interactive heatmaps / speeds"
-        checked={options.interactiveHeatmapsSpeeds ?? false}
-        onChange={(v) => set({ interactiveHeatmapsSpeeds: v })}
-      />
-      <TaskOptionToggle
         id="gen-clip-previews"
         label="Image clip previews"
         checked={options.clipPreviews ?? false}

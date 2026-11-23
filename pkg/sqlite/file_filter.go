@@ -300,9 +300,6 @@ func (qb *videoFileFilterHandler) criterionHandler() criterionHandler {
 		qb.codecCriterionHandler(videoFileFilter.VideoCodec, "video_files.video_codec", qb.addVideoFilesTable),
 		qb.codecCriterionHandler(videoFileFilter.AudioCodec, "video_files.audio_codec", qb.addVideoFilesTable),
 
-		boolCriterionHandler(videoFileFilter.Interactive, "video_files.interactive", qb.addVideoFilesTable),
-		intCriterionHandler(videoFileFilter.InteractiveSpeed, "video_files.interactive_speed", qb.addVideoFilesTable),
-
 		qb.captionCriterionHandler(videoFileFilter.Captions),
 	}
 }

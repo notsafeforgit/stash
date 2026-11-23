@@ -111,10 +111,6 @@ type SceneFilterType struct {
 	StashIDCount *IntCriterionInput `json:"stash_id_count"`
 	// Filter by url
 	URL *StringCriterionInput `json:"url"`
-	// Filter by interactive
-	Interactive *bool `json:"interactive"`
-	// Filter by InteractiveSpeed
-	InteractiveSpeed *IntCriterionInput `json:"interactive_speed"`
 	// Filter by captions
 	Captions *StringCriterionInput `json:"captions"`
 	// Filter by resume time

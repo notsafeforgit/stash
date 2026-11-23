@@ -599,23 +599,6 @@ function SettingsSystemPage() {
         />
       </SettingsSection>
 
-      <SettingsSection
-        title={msg("config.general.heatmap_generation", "Heatmap generation")}
-      >
-        <SettingSwitch
-          label={msg(
-            "config.general.funscript_heatmap_draw_range",
-            "Draw funscript heatmap range",
-          )}
-          description={msg(
-            "config.general.funscript_heatmap_draw_range_desc",
-            "Draws the motion range into generated funscript heatmaps.",
-          )}
-          checked={general.drawFunscriptHeatmapRange ?? true}
-          onChange={(v) => save({ drawFunscriptHeatmapRange: v })}
-        />
-      </SettingsSection>
-
       <SettingsSection title={msg("config.general.logging", "Logging")}>
         <SettingPath
           label={msg("config.general.auth.log_file", "Log file")}

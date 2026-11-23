@@ -16,8 +16,6 @@ type ScenePathsType {
   webp: String # Resolver
   vtt: String # Resolver
   sprite: String # Resolver
-  funscript: String # Resolver
-  interactive_heatmap: String # Resolver
   caption: String # Resolver
 }
 
@@ -45,8 +43,6 @@ type Scene {
   rating100: Int
   organized: Boolean!
   o_counter: Int
-  interactive: Boolean!
-  interactive_speed: Int
   captions: [VideoCaption!]
   created_at: Time!
   updated_at: Time!

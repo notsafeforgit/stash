@@ -24,7 +24,6 @@ export type SceneCardScene = Omit<
     preview?: string | null;
     webp?: string | null;
     vtt?: string | null;
-    interactive_heatmap?: string | null;
   };
   files: Array<{
     id: string;
@@ -44,8 +43,6 @@ export type SceneCardScene = Omit<
     color_primaries?: string | null;
     fingerprints?: Array<{ type: string; value: string }>;
   }>;
-  interactive?: boolean | null;
-  interactive_speed?: number | null;
   o_counter?: number | null;
   organized?: boolean;
   tags?: GQL.SlimSceneDataFragment["tags"];

@@ -16,8 +16,6 @@ fragment SceneData on Scene {
   rating100
   o_counter
   organized
-  interactive
-  interactive_speed
   captions {
     language_code
     caption_type
@@ -43,8 +41,6 @@ fragment SceneData on Scene {
     webp
     vtt
     sprite
-    funscript
-    interactive_heatmap
     caption
   }
 

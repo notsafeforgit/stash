@@ -96,9 +96,6 @@ type VideoFile struct {
 	ColorSpace          *string  `json:"color_space,omitempty"`
 	ColorTransfer       *string  `json:"color_transfer,omitempty"`
 	ColorPrimaries      *string  `json:"color_primaries,omitempty"`
-
-	Interactive      bool `json:"interactive,omitempty"`
-	InteractiveSpeed *int `json:"interactive_speed,omitempty"`
 }
 
 type ImageFile struct {

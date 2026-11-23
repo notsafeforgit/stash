@@ -53,17 +53,15 @@ func (r *basicFileRow) fromBasicFile(o models.BaseFile) {
 }
 
 type videoFileRow struct {
-	FileID           models.FileID `db:"file_id"`
-	Format           string        `db:"format"`
-	Width            int           `db:"width"`
-	Height           int           `db:"height"`
-	Duration         float64       `db:"duration"`
-	VideoCodec       string        `db:"video_codec"`
-	AudioCodec       string        `db:"audio_codec"`
-	FrameRate        float64       `db:"frame_rate"`
-	BitRate          int64         `db:"bit_rate"`
-	Interactive      bool          `db:"interactive"`
-	InteractiveSpeed null.Int      `db:"interactive_speed"`
+	FileID     models.FileID `db:"file_id"`
+	Format     string        `db:"format"`
+	Width      int           `db:"width"`
+	Height     int           `db:"height"`
+	Duration   float64       `db:"duration"`
+	VideoCodec string        `db:"video_codec"`
+	AudioCodec string        `db:"audio_codec"`
+	FrameRate  float64       `db:"frame_rate"`
+	BitRate    int64         `db:"bit_rate"`
 }
 
 func (f *videoFileRow) fromVideoFile(ff models.VideoFile) {
@@ -76,8 +74,6 @@ func (f *videoFileRow) fromVideoFile(ff models.VideoFile) {
 	f.AudioCodec = ff.AudioCodec
 	f.FrameRate = ff.FrameRate
 	f.BitRate = ff.BitRate
-	f.Interactive = ff.Interactive
-	f.InteractiveSpeed = intFromPtr(ff.InteractiveSpeed)
 }
 
 type imageFileRow struct {
@@ -114,8 +110,6 @@ type videoFileQueryRow struct {
 	ColorSpace          null.String `db:"video_color_space"`
 	ColorTransfer       null.String `db:"video_color_transfer"`
 	ColorPrimaries      null.String `db:"video_color_primaries"`
-	Interactive         null.Bool   `db:"interactive"`
-	InteractiveSpeed    null.Int    `db:"interactive_speed"`
 }
 
 func (f *videoFileQueryRow) resolve() *models.VideoFile {
@@ -136,8 +130,6 @@ func (f *videoFileQueryRow) resolve() *models.VideoFile {
 		ColorSpace:          nullStringPtr(f.ColorSpace),
 		ColorTransfer:       nullStringPtr(f.ColorTransfer),
 		ColorPrimaries:      nullStringPtr(f.ColorPrimaries),
-		Interactive:         f.Interactive.Bool,
-		InteractiveSpeed:    nullIntPtr(f.InteractiveSpeed),
 	}
 }
 
@@ -162,8 +154,6 @@ func videoFileQueryColumns() []interface{} {
 		metadata.Col("color_space").As("video_color_space"),
 		metadata.Col("color_transfer").As("video_color_transfer"),
 		metadata.Col("color_primaries").As("video_color_primaries"),
-		table.Col("interactive"),
-		table.Col("interactive_speed"),
 	}
 }
 

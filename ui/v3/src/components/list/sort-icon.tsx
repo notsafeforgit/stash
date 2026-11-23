@@ -25,12 +25,7 @@ const LEXICOGRAPHIC_FIELDS = new Set<string>([
   "measurements",
 ]);
 
-const OTHER_FIELDS = new Set<string>([
-  "random",
-  "organized",
-  "interactive",
-  "favorite",
-]);
+const OTHER_FIELDS = new Set<string>(["random", "organized", "favorite"]);
 
 function getSortFieldKind(value: string): SortFieldKind {
   if (OTHER_FIELDS.has(value)) return "other";

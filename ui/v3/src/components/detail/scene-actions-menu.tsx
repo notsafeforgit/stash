@@ -456,7 +456,6 @@ export function SceneActionsMenu({
         onOpenChange={setGenerateOpen}
         sceneIds={[scene.id]}
         hasMarkers={scene.scene_markers.length > 0}
-        hasInteractive={scene.interactive}
       />
       <SceneMergeDialog
         open={mergeOpen}

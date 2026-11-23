@@ -46,12 +46,6 @@ interface SceneGenerateDialogProps {
    * when omitted (e.g. bulk callers without per-scene info).
    */
   hasMarkers?: boolean;
-  /**
-   * When false, the interactive heatmap row is hidden — none of the
-   * selected scenes are interactive, so the task would be a no-op.
-   * Defaults to true when omitted.
-   */
-  hasInteractive?: boolean;
 }
 
 type Options = {
@@ -69,7 +63,6 @@ type Options = {
   transcodes: boolean;
   forceTranscodes: boolean;
   phashes: boolean;
-  interactiveHeatmapsSpeeds: boolean;
   overwrite: boolean;
 };
 
@@ -82,7 +75,6 @@ const DEFAULTS: Options = {
   transcodes: false,
   forceTranscodes: false,
   phashes: true,
-  interactiveHeatmapsSpeeds: false,
   overwrite: false,
 };
 
@@ -125,10 +117,6 @@ function getSceneOptions(input: GQL.GenerateMetadataInput): Options {
       DEFAULTS.forceTranscodes,
     ),
     phashes: boolDefault(input.phashes, DEFAULTS.phashes),
-    interactiveHeatmapsSpeeds: boolDefault(
-      input.interactiveHeatmapsSpeeds,
-      DEFAULTS.interactiveHeatmapsSpeeds,
-    ),
     overwrite: boolDefault(input.overwrite, DEFAULTS.overwrite),
   };
 }
@@ -140,7 +128,6 @@ export function SceneGenerateDialog({
   applyToAllTarget,
   totalCount,
   hasMarkers = true,
-  hasInteractive = true,
 }: SceneGenerateDialogProps) {
   const client = useApolloClient();
   const intl = useIntl();
@@ -222,8 +209,6 @@ export function SceneGenerateDialog({
             transcodes: options.transcodes,
             forceTranscodes: options.transcodes && options.forceTranscodes,
             phashes: options.phashes,
-            interactiveHeatmapsSpeeds:
-              hasInteractive && options.interactiveHeatmapsSpeeds,
             overwrite: isSingle ? true : options.overwrite,
           },
         },
@@ -391,17 +376,6 @@ export function SceneGenerateDialog({
             checked={options.phashes}
             onChange={(v) => set("phashes", v)}
           />
-          {hasInteractive && (
-            <Row
-              label={intl.formatMessage({
-                id: "dialogs.scene_gen.interactive_heatmap_speed",
-                defaultMessage:
-                  "Generate heatmaps and speeds for interactive scenes",
-              })}
-              checked={options.interactiveHeatmapsSpeeds}
-              onChange={(v) => set("interactiveHeatmapsSpeeds", v)}
-            />
-          )}
           {!isSingle && (
             <>
               <FieldSeparator />

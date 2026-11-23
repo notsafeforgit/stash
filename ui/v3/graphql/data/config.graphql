@@ -68,7 +68,6 @@ fragment ConfigGeneralData on ConfigGeneralResult {
   transcodeOutputArgs
   liveTranscodeInputArgs
   liveTranscodeOutputArgs
-  drawFunscriptHeatmapRange
 
   scraperPackageSources {
     name
@@ -122,9 +121,6 @@ fragment ConfigInterfaceData on ConfigInterfaceResult {
     movie
     gallery
   }
-  handyKey
-  funscriptOffset
-  useStashHostedFunscript
 }
 
 fragment ConfigScrapingData on ConfigScrapingResult {
@@ -208,7 +204,6 @@ fragment ConfigDefaultSettingsData on ConfigDefaultSettingsResult {
     markerScreenshots
     transcodes
     phashes
-    interactiveHeatmapsSpeeds
     clipPreviews
     imageThumbnails
   }

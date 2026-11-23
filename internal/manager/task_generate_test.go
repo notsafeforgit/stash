@@ -18,7 +18,7 @@ func TestGenerateJobQueuesTaskPerOption(t *testing.T) {
 	config.InitializeEmpty()
 
 	const sceneID = 1
-	videoFile := &models.VideoFile{BaseFile: &models.BaseFile{ID: 1}, Width: 1920, Height: 1080, Interactive: true}
+	videoFile := &models.VideoFile{BaseFile: &models.BaseFile{ID: 1}, Width: 1920, Height: 1080}
 	scene := &models.Scene{
 		ID:    sceneID,
 		Path:  "scene.mp4",
@@ -45,7 +45,6 @@ func TestGenerateJobQueuesTaskPerOption(t *testing.T) {
 		{"marker screenshots", GenerateMetadataInput{MarkerScreenshots: true}, totalsGenerate{markers: 1, tasks: 1}},
 		{"transcodes", GenerateMetadataInput{Transcodes: true, ForceTranscodes: true}, totalsGenerate{transcodes: 1, tasks: 1}},
 		{"phashes", GenerateMetadataInput{Phashes: true}, totalsGenerate{phashes: 1, tasks: 1}},
-		{"interactive heatmaps", GenerateMetadataInput{InteractiveHeatmapsSpeeds: true}, totalsGenerate{interactiveHeatmapSpeeds: 1, tasks: 1}},
 		{"image thumbnails", GenerateMetadataInput{ImageThumbnails: true}, totalsGenerate{imageThumbnails: 1, tasks: 1}},
 		{"clip previews", GenerateMetadataInput{ClipPreviews: true}, totalsGenerate{clipPreviews: 1, tasks: 1}},
 		{"image phashes", GenerateMetadataInput{ImagePhashes: true}, totalsGenerate{imagePhashes: 1, tasks: 1}},

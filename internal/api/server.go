@@ -658,10 +658,6 @@ func setPageSecurityHeaders(c *config.Config, w http.ResponseWriter, r *http.Req
 		styleSrcSlice = append(styleSrcSlice, "https://cdn.jsdelivr.net")
 	}
 
-	if !c.IsNewSystem() && c.GetHandyKey() != "" {
-		connectSrcSlice = append(connectSrcSlice, "https://www.handyfeeling.com")
-	}
-
 	for _, plugin := range plugins {
 		if !plugin.Enabled {
 			continue

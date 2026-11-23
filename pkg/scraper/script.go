@@ -47,9 +47,6 @@ type videoFileInput struct {
 	AudioCodec string  `json:"audio_codec,omitempty"`
 	FrameRate  float64 `json:"frame_rate,omitempty"`
 	BitRate    int64   `json:"bitrate,omitempty"`
-
-	Interactive      bool `json:"interactive,omitempty"`
-	InteractiveSpeed *int `json:"interactive_speed,omitempty"`
 }
 
 // sceneInput is the input passed to the scraper for an existing scene
@@ -101,17 +98,15 @@ func fileInputFromFile(f models.BaseFile) fileInput {
 
 func videoFileInputFromVideoFile(vf *models.VideoFile) videoFileInput {
 	return videoFileInput{
-		fileInput:        fileInputFromFile(*vf.Base()),
-		Format:           vf.Format,
-		Width:            vf.Width,
-		Height:           vf.Height,
-		Duration:         vf.Duration,
-		VideoCodec:       vf.VideoCodec,
-		AudioCodec:       vf.AudioCodec,
-		FrameRate:        vf.FrameRate,
-		BitRate:          vf.BitRate,
-		Interactive:      vf.Interactive,
-		InteractiveSpeed: vf.InteractiveSpeed,
+		fileInput:  fileInputFromFile(*vf.Base()),
+		Format:     vf.Format,
+		Width:      vf.Width,
+		Height:     vf.Height,
+		Duration:   vf.Duration,
+		VideoCodec: vf.VideoCodec,
+		AudioCodec: vf.AudioCodec,
+		FrameRate:  vf.FrameRate,
+		BitRate:    vf.BitRate,
 	}
 }
 

@@ -8,6 +8,18 @@ The startup-versus-full-audit boundary below applies to the historical proof
 validation described throughout this guide. Deployment and one-time import
 completion belong to the installation's operations records.
 
+## Funscript retirement (schema 1000145)
+
+Schema 1000145 drops `video_files.interactive` and
+`video_files.interactive_speed`. Scans no longer look for a `.funscript` beside
+a video, and the interactive heatmap and speed generation task is removed. So
+are the scene `interactive` and `interactive_speed` fields, filters and sorts,
+the `funscript`, `interactive_heatmap` and `interactive_csv` scene routes, and
+the Handy, funscript offset and heatmap range settings. Deleting a scene's file
+no longer deletes a funscript next to it. The history row records how many
+video files were flagged interactive and how many had a speed when the columns
+were dropped.
+
 ## Import evidence retirement (schema 1000144)
 
 Schema 1000144 drops what schema 1000142 kept frozen. Nothing had written these

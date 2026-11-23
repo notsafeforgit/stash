@@ -161,9 +161,6 @@ func (qb *sceneFilterHandler) criterionHandler() criterionHandler {
 
 		qb.stashIDCountCriterionHandler(sceneFilter.StashIDCount),
 
-		boolCriterionHandler(sceneFilter.Interactive, "video_files.interactive", qb.addVideoFilesTable),
-		intCriterionHandler(sceneFilter.InteractiveSpeed, "video_files.interactive_speed", qb.addVideoFilesTable),
-
 		qb.captionCriterionHandler(sceneFilter.Captions),
 
 		floatIntCriterionHandler(sceneFilter.ResumeTime, "scenes.resume_time", nil),

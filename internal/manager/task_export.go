@@ -473,8 +473,6 @@ func fileToJSON(f models.File) jsonschema.DirEntry {
 			ColorSpace:          ff.ColorSpace,
 			ColorTransfer:       ff.ColorTransfer,
 			ColorPrimaries:      ff.ColorPrimaries,
-			Interactive:         ff.Interactive,
-			InteractiveSpeed:    ff.InteractiveSpeed,
 		}
 	case *models.ImageFile:
 		base.Type = jsonschema.DirEntryTypeImage

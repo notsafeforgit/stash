@@ -338,7 +338,7 @@ type schemaTemplate struct {
 	err     error
 }
 
-var importRetirementTemplate, importEvidenceTemplate schemaTemplate
+var importRetirementTemplate, importEvidenceTemplate, interactiveFieldsTemplate schemaTemplate
 
 func schemaObjects(raw *sql.DB) ([]schemaObject, error) {
 	rows, err := raw.Query("SELECT type,name,sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY rowid")
@@ -457,6 +457,7 @@ func removeImportRetirementSchema(t *testing.T, raw *sql.DB) {
 // regains its earlier definition with every row, and changed triggers return.
 func removeImportEvidenceSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeInteractiveFieldsSchema(t, raw)
 	var present bool
 	require.NoError(t, raw.QueryRow("SELECT EXISTS(SELECT 1 FROM native_migration_history WHERE version=1000144)").Scan(&present))
 	if !present {
@@ -519,4 +520,42 @@ func removeImportEvidenceSchema(t *testing.T, raw *sql.DB) {
 		}
 	}
 	exec("DELETE FROM native_migration_history WHERE version=1000144")
+}
+
+// Schema 1000145 drops video_files' interactive columns. Rewind it by
+// rebuilding the table with its 1000144 definition; every row keeps its other
+// values and takes the columns' defaults.
+func removeInteractiveFieldsSchema(t *testing.T, raw *sql.DB) {
+	t.Helper()
+	var present bool
+	require.NoError(t, raw.QueryRow("SELECT EXISTS(SELECT 1 FROM native_migration_history WHERE version=1000145)").Scan(&present))
+	if !present {
+		return
+	}
+	interactiveFieldsTemplate.Do(func() {
+		interactiveFieldsTemplate.objects, interactiveFieldsTemplate.err = buildSchemaTemplate(1000144)
+	})
+	require.NoError(t, interactiveFieldsTemplate.err)
+	var definition string
+	for _, o := range interactiveFieldsTemplate.objects {
+		if o.Name == "video_files" {
+			definition = o.SQL
+		}
+	}
+	require.NotEmpty(t, definition)
+	conn, err := raw.Conn(t.Context())
+	require.NoError(t, err)
+	defer conn.Close()
+	exec := func(query string) {
+		t.Helper()
+		_, err := conn.ExecContext(t.Context(), query)
+		require.NoError(t, err, query)
+	}
+	exec("PRAGMA foreign_keys=OFF")
+	defer exec("PRAGMA foreign_keys=ON")
+	exec("CREATE TABLE prior_video_files AS SELECT rowid AS original_rowid,* FROM video_files; DROP TABLE video_files;" + definition +
+		`; INSERT INTO video_files(rowid,file_id,duration,video_codec,format,audio_codec,width,height,frame_rate,bit_rate)
+ SELECT original_rowid,file_id,duration,video_codec,format,audio_codec,width,height,frame_rate,bit_rate FROM prior_video_files;
+ DROP TABLE prior_video_files`)
+	exec("DELETE FROM native_migration_history WHERE version=1000145")
 }

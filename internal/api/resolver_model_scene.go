@@ -153,8 +153,6 @@ func (r *sceneResolver) Paths(ctx context.Context, obj *models.Scene) (*ScenePat
 	objHash := obj.GetHash(config.GetVideoFileNamingAlgorithm())
 	vttPath := builder.GetSpriteVTTURL(objHash)
 	spritePath := builder.GetSpriteURL(objHash)
-	funscriptPath := builder.GetFunscriptURL(config.GetAPIKey()).String()
-	interactiveHeatmap := builder.GetInteractiveHeatmapURL()
 
 	scenePaths := manager.GetInstance().Paths.Scene
 
@@ -189,15 +187,13 @@ func (r *sceneResolver) Paths(ctx context.Context, obj *models.Scene) (*ScenePat
 	}
 
 	return &ScenePathsType{
-		Screenshot:         screenshotPathPtr,
-		Preview:            previewPathPtr,
-		Stream:             &streamPath,
-		Webp:               webpPathPtr,
-		Vtt:                vttPathPtr,
-		Sprite:             spritePathPtr,
-		Funscript:          &funscriptPath,
-		InteractiveHeatmap: &interactiveHeatmap,
-		Caption:            &captionBasePath,
+		Screenshot: screenshotPathPtr,
+		Preview:    previewPathPtr,
+		Stream:     &streamPath,
+		Webp:       webpPathPtr,
+		Vtt:        vttPathPtr,
+		Sprite:     spritePathPtr,
+		Caption:    &captionBasePath,
 	}, nil
 }
 
@@ -356,30 +352,6 @@ func (r *sceneResolver) SceneStreams(ctx context.Context, obj *models.Scene) ([]
 	}
 
 	return manager.GetSceneStreamPaths(obj, streamURL, config.GetMaxStreamingTranscodeSize())
-}
-
-func (r *sceneResolver) Interactive(ctx context.Context, obj *models.Scene) (bool, error) {
-	primaryFile, err := r.getPrimaryFile(ctx, obj)
-	if err != nil {
-		return false, err
-	}
-	if primaryFile == nil {
-		return false, nil
-	}
-
-	return primaryFile.Interactive, nil
-}
-
-func (r *sceneResolver) InteractiveSpeed(ctx context.Context, obj *models.Scene) (*int, error) {
-	primaryFile, err := r.getPrimaryFile(ctx, obj)
-	if err != nil {
-		return nil, err
-	}
-	if primaryFile == nil {
-		return nil, nil
-	}
-
-	return primaryFile.InteractiveSpeed, nil
 }
 
 func (r *sceneResolver) URL(ctx context.Context, obj *models.Scene) (*string, error) {

@@ -185,10 +185,6 @@ export function useSceneContextMenu({
         onOpenChange={setDeleteOpen}
         entityName={objectTitle(scene) || undefined}
         showFileOptions
-        deleteFileLabel={intl.formatMessage({
-          id: "dialogs.delete_file_and_funscript",
-          defaultMessage: "Delete file and funscript",
-        })}
         details={
           scene.files.length > 0 ? (
             <DeleteFilesList paths={scene.files.map((f) => f.path)} />
@@ -209,7 +205,6 @@ export function useSceneContextMenu({
         onOpenChange={setGenerateOpen}
         sceneIds={[scene.id]}
         hasMarkers={(scene.scene_markers?.length ?? 0) > 0}
-        hasInteractive={scene.interactive ?? false}
       />
       <SceneMergeDialog
         open={mergeOpen}

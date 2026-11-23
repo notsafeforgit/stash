@@ -13,8 +13,6 @@ fragment SlimSceneData on Scene {
   rating100
   o_counter
   organized
-  interactive
-  interactive_speed
   resume_time
   play_duration
   play_count
@@ -28,7 +26,6 @@ fragment SlimSceneData on Scene {
     preview
     webp
     vtt
-    interactive_heatmap
   }
 
   scene_markers {

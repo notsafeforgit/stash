@@ -204,8 +204,6 @@ export type CriterionType =
   | "group_count"
   | "death_year"
   | "url"
-  | "interactive"
-  | "interactive_speed"
   | "captions"
   | "resume_time"
   | "play_count"

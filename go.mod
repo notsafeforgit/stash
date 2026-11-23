@@ -42,7 +42,6 @@ require (
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/providers/posflag v1.0.2
 	github.com/knadh/koanf/v2 v2.4.1
-	github.com/lucasb-eyer/go-colorful v1.4.1
 	github.com/mattn/go-sqlite3 v1.14.53
 	github.com/natefinch/pie v0.0.0-20170715172608-9a0d72014007
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c

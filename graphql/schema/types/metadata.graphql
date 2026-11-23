@@ -12,7 +12,6 @@ input GenerateMetadataInput {
   forceTranscodes: Boolean
   "Generate video phashes during scan"
   phashes: Boolean
-  interactiveHeatmapsSpeeds: Boolean
   "Generate image phashes during scan"
   imagePhashes: Boolean
   imageThumbnails: Boolean
@@ -57,7 +56,6 @@ type GenerateMetadataOptions {
   markerScreenshots: Boolean
   transcodes: Boolean
   phashes: Boolean
-  interactiveHeatmapsSpeeds: Boolean
   imageThumbnails: Boolean
   clipPreviews: Boolean
 }

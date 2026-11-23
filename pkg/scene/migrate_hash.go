@@ -37,10 +37,6 @@ func MigrateHash(p *paths.Paths, oldHash string, newHash string) {
 	migrateSceneFiles(oldPath, newPath)
 	migrateVttFile(newVttPath, oldPath, newPath)
 
-	oldPath = scenePaths.GetInteractiveHeatmapPath(oldHash)
-	newPath = scenePaths.GetInteractiveHeatmapPath(newHash)
-	migrateSceneFiles(oldPath, newPath)
-
 	// #3986 - migrate scene marker files
 	markerPaths := p.SceneMarkers
 	oldPath = markerPaths.GetFolderPath(oldHash)

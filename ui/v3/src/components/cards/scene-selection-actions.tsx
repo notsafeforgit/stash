@@ -64,10 +64,6 @@ export function SceneSelectionActions({ children }: PropsWithChildren) {
               { count: selectedItems.length },
             )}
             showFileOptions
-            deleteFileLabel={intl.formatMessage({
-              id: "dialogs.delete_file_and_funscript",
-              defaultMessage: "Delete file and funscript",
-            })}
             details={
               paths.length > 0 ? <DeleteFilesList paths={paths} /> : undefined
             }

@@ -49,7 +49,3 @@ func (sp *scenePaths) GetSpriteImageFilePath(checksum string) string {
 func (sp *scenePaths) GetSpriteVttFilePath(checksum string) string {
 	return filepath.Join(sp.Vtt, checksum+"_thumbs.vtt")
 }
-
-func (sp *scenePaths) GetInteractiveHeatmapPath(checksum string) string {
-	return filepath.Join(sp.InteractiveHeatmap, checksum+".png")
-}

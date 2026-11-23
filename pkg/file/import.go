@@ -82,8 +82,6 @@ func (i *Importer) fileJSONToFile(ctx context.Context, fileJSON jsonschema.DirEn
 			ColorSpace:          ff.ColorSpace,
 			ColorTransfer:       ff.ColorTransfer,
 			ColorPrimaries:      ff.ColorPrimaries,
-			Interactive:         ff.Interactive,
-			InteractiveSpeed:    ff.InteractiveSpeed,
 		}, nil
 	case *jsonschema.ImageFile:
 		baseFile, err := i.baseFileJSONToBaseFile(ctx, ff.BaseFile)

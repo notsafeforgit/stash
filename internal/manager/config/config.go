@@ -275,14 +275,6 @@ const (
 	DisableDropdownCreateMovie     = "disable_dropdown_create.movie"
 	DisableDropdownCreateGallery   = "disable_dropdown_create.gallery"
 
-	HandyKey                       = "handy_key"
-	FunscriptOffset                = "funscript_offset"
-	UseStashHostedFunscript        = "use_stash_hosted_funscript"
-	useStashHostedFunscriptDefault = false
-
-	DrawFunscriptHeatmapRange        = "draw_funscript_heatmap_range"
-	drawFunscriptHeatmapRangeDefault = true
-
 	ThemeColor        = "theme_color"
 	DefaultThemeColor = "#202b33"
 
@@ -1257,10 +1249,6 @@ func (i *Config) GetLiveTranscodeOutputArgs() []string {
 	return i.getStringSlice(LiveTranscodeOutputArgs)
 }
 
-func (i *Config) GetDrawFunscriptHeatmapRange() bool {
-	return i.getBoolDefault(DrawFunscriptHeatmapRange, drawFunscriptHeatmapRangeDefault)
-}
-
 // IsWriteImageThumbnails returns true if image thumbnails should be written
 // to disk after generating on the fly.
 func (i *Config) IsWriteImageThumbnails() bool {
@@ -1703,18 +1691,6 @@ func (i *Config) GetCustomLocalesEnabled() bool {
 // troubleshooting issues without permanently disabling individual customizations.
 func (i *Config) GetDisableCustomizations() bool {
 	return i.getBool(DisableCustomizations)
-}
-
-func (i *Config) GetHandyKey() string {
-	return i.getString(HandyKey)
-}
-
-func (i *Config) GetFunscriptOffset() int {
-	return i.getInt(FunscriptOffset)
-}
-
-func (i *Config) GetUseStashHostedFunscript() bool {
-	return i.getBoolDefault(UseStashHostedFunscript, useStashHostedFunscriptDefault)
 }
 
 func (i *Config) GetDeleteFileDefault() bool {

@@ -343,18 +343,6 @@ func sceneASTConditionHandler(condition *models.FilterASTCondition) (criterionHa
 			return nil, err
 		}
 		return qb.stashIDCountCriterionHandler(&input), nil
-	case "interactive":
-		input, err := decodeASTValue[bool](condition.Value)
-		if err != nil {
-			return nil, err
-		}
-		return boolCriterionHandler(&input, "video_files.interactive", qb.addVideoFilesTable), nil
-	case "interactive_speed":
-		input, err := decodeASTValue[models.IntCriterionInput](condition.Value)
-		if err != nil {
-			return nil, err
-		}
-		return intCriterionHandler(&input, "video_files.interactive_speed", qb.addVideoFilesTable), nil
 	case "captions":
 		input, err := decodeASTValue[models.StringCriterionInput](condition.Value)
 		if err != nil {

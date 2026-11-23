@@ -97,7 +97,7 @@ func fileASTCondition(c *models.FilterASTCondition, related bool) (criterionHand
 		default:
 			return &relatedFilterHandler{relatedIDCol: "galleries_files.gallery_id", relatedRepo: galleryRepository.repository, relatedHandler: &galleryASTFilterHandler{ast: ast}, joinFn: func(f *filterBuilder) { fileRepository.galleries.innerJoin(f, "", "files.id") }}, nil
 		}
-	case "video.resolution", "video.orientation", "video.framerate", "video.bitrate", "video.bit_depth", "video.video_stream_duration", "video.frame_count", "video.duration_mismatch", "video.format", "video.video_codec", "video.audio_codec", "video.duration", "video.captions", "video.interactive", "video.interactive_speed":
+	case "video.resolution", "video.orientation", "video.framerate", "video.bitrate", "video.bit_depth", "video.video_stream_duration", "video.frame_count", "video.duration_mismatch", "video.format", "video.video_codec", "video.audio_codec", "video.duration", "video.captions":
 		input, err := decodeASTValue[models.VideoFileFilterInput](map[string]any{strings.TrimPrefix(c.Field, "video."): c.Value})
 		if err != nil {
 			return nil, err

@@ -11,7 +11,7 @@
  *     don't (groups / scene_markers / galleries aren't shown on cards
  *     by default and aren't worth carrying through OPFS metadata for
  *     phase 1)
- *   - paths.preview / paths.vtt / paths.interactive_heatmap:
+ *   - paths.preview / paths.vtt:
  *     snapshot's URLs (remote — fall back to placeholder when the
  *     PWA is offline; SceneCard handles a missing screenshot
  *     gracefully).
@@ -40,7 +40,6 @@ export function offlineEntryToSceneCardScene(
       screenshot: entry.paths.screenshot,
       preview: entry.paths.preview,
       vtt: entry.paths.vtt,
-      interactive_heatmap: null,
     },
     studio: entry.studio_id
       ? {

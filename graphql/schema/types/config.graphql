@@ -153,9 +153,6 @@ input ConfigGeneralInput {
   """
   liveTranscodeOutputArgs: [String!]
 
-  "whether to include range in generated funscript heatmaps"
-  drawFunscriptHeatmapRange: Boolean
-
   "Write image thumbnails to disk when generating on the fly"
   writeImageThumbnails: Boolean
   "Create Image Clips from Video extensions when Videos are disabled in Library"
@@ -302,9 +299,6 @@ type ConfigGeneralResult {
   These are applied when live transcoding
   """
   liveTranscodeOutputArgs: [String!]!
-
-  "whether to include range in generated funscript heatmaps"
-  drawFunscriptHeatmapRange: Boolean!
 
   "Write image thumbnails to disk when generating on the fly"
   writeImageThumbnails: Boolean!
@@ -463,12 +457,6 @@ input ConfigInterfaceInput {
   "Set to true to disable creating new objects via the dropdown menus"
   disableDropdownCreate: ConfigDisableDropdownCreateInput
 
-  "Handy Connection Key"
-  handyKey: String
-  "Funscript Time Offset"
-  funscriptOffset: Int
-  "Whether to use Stash Hosted Funscript"
-  useStashHostedFunscript: Boolean
   "True if we should not auto-open a browser window on startup"
   noBrowser: Boolean
   "True if we should send notifications to the desktop"
@@ -544,12 +532,6 @@ type ConfigInterfaceResult {
   "Fields are true if creating via dropdown menus are disabled"
   disableDropdownCreate: ConfigDisableDropdownCreate!
 
-  "Handy Connection Key"
-  handyKey: String
-  "Funscript Time Offset"
-  funscriptOffset: Int
-  "Whether to use Stash Hosted Funscript"
-  useStashHostedFunscript: Boolean
 }
 
 input ConfigScrapingInput {

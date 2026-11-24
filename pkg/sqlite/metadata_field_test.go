@@ -198,7 +198,7 @@ func TestMetadataFieldSchemasAndOrdinaryEdits(t *testing.T) {
 	require.Equal(t, "0", string(rating.Value))
 }
 
-func TestMetadataFieldCurrentChoiceSurvivesAdoptionAndDeletion(t *testing.T) {
+func TestMetadataFieldCurrentChoiceSurvivesAdoptionAndEndsWithDeletion(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
 	identity := archiveFind(t, repo, models.ArchiveImage, 41)
 	state := metadataState(t, repo, identity.UUID, "title")
@@ -235,7 +235,9 @@ func TestMetadataFieldCurrentChoiceSurvivesAdoptionAndDeletion(t *testing.T) {
 	replacement := archiveFind(t, repo, models.ArchiveImage, 41)
 	require.NotEqual(t, adopted, replacement.UUID)
 	require.False(t, metadataState(t, repo, replacement.UUID, "title").Protected)
-	require.Equal(t, history, metadataHistory(t, repo, adopted, "title"))
+	// The deletion marker stays; the field choices of the deleted image do not.
+	require.Equal(t, models.ArchiveEntityDeleted, archiveIdentity(t, repo, adopted).State)
+	require.Empty(t, metadataHistory(t, repo, adopted, "title"))
 }
 
 func TestMetadataFieldMigrationPreservesUnknownAndEmptyValues(t *testing.T) {

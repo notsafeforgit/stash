@@ -525,8 +525,15 @@ func removeImportEvidenceSchema(t *testing.T, raw *sql.DB) {
 // Schema 1000145 drops video_files' interactive columns. Rewind it by
 // rebuilding the table with its 1000144 definition; every row keeps its other
 // values and takes the columns' defaults.
+func removeDeletedMediaFieldsSchema(t *testing.T, raw *sql.DB) {
+	t.Helper()
+	_, err := raw.Exec("DROP TRIGGER IF EXISTS metadata_media_retired; DELETE FROM native_migration_history WHERE version=1000146")
+	require.NoError(t, err)
+}
+
 func removeInteractiveFieldsSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeDeletedMediaFieldsSchema(t, raw)
 	var present bool
 	require.NoError(t, raw.QueryRow("SELECT EXISTS(SELECT 1 FROM native_migration_history WHERE version=1000145)").Scan(&present))
 	if !present {

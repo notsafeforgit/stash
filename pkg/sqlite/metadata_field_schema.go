@@ -8,6 +8,8 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
+const deletedMediaFieldRetirementVersion = NativeSchemaBaseline + 146
+
 func validateMetadataFieldSchema(conn *sqlx.DB, version uint) error {
 	var names []string
 	if err := conn.Select(&names, "SELECT name FROM sqlite_schema WHERE name LIKE 'metadata_%'"); err != nil {
@@ -22,6 +24,9 @@ func validateMetadataFieldSchema(conn *sqlx.DB, version uint) error {
 		"metadata_field_head_forward", "metadata_field_head_scope", "metadata_field_current"}
 	if version >= NativeSchemaBaseline+141 {
 		required = append(required, "metadata_field_decision_cleanup", "metadata_field_retire_superseded")
+	}
+	if version >= deletedMediaFieldRetirementVersion {
+		required = append(required, "metadata_media_retired")
 	}
 	if version >= NativeSchemaBaseline+141 && version < importEvidenceRetirementVersion {
 		required = append(required, "metadata_file_edit_keeps_decision")

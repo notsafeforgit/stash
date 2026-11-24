@@ -8,6 +8,19 @@ The startup-versus-full-audit boundary below applies to the historical proof
 validation described throughout this guide. Deployment and one-time import
 completion belong to the installation's operations records.
 
+## Deleted media field choices (schema 1000146)
+
+Field choices only decide whether automatic metadata may change a live field.
+Schema 1000146 removes the choices, baselines and pending values of scenes and
+images that were already deleted, and the `metadata_media_retired` trigger
+removes them whenever a scene or image is deleted from now on. Removing a
+choice also removes its references, policy links and post-media links through
+`metadata_field_decision_cleanup`. The deletion marker in `archive_entities`
+stays, with every source record that points at it: intake reads those to keep
+a deleted item from being imported again. Galleries, merged identities and
+in-progress write markers are unchanged. The history row records how many
+deleted items had choices and how many choices and baselines were removed.
+
 ## Funscript retirement (schema 1000145)
 
 Schema 1000145 drops `video_files.interactive` and
@@ -752,7 +765,7 @@ replay. `metadata_field_write_context` distinguishes these writes from ordinary
 library edits. An ignored late error leaves the marker and prevents commit;
 startup refuses leftover markers. Decisions advance the archive revision,
 history uses bounded indexed pagination, and UUID adoption cascades references.
-Deleted entities retain history; reused integer IDs receive independent state.
+Deleted scenes and images lose their choices from schema 1000146; reused integer IDs receive independent state.
 Anonymised copies remove decision values and source references before rekeying.
 
 Migration 1000013 adds performers, tags, studio, URLs, and custom fields for all
